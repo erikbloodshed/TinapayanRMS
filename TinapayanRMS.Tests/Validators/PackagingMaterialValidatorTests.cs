@@ -53,4 +53,36 @@ public class PackagingMaterialValidatorTests
 
         result.IsValid.Should().BeFalse();
     }
+
+    [Fact]
+    public void Rejects_a_missing_category()
+    {
+        var result = _validator.Validate(new PackagingMaterial
+        {
+            Name = "Box",
+            PackagingCategoryId = 0,
+            StandardUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitQty = 100m,
+        });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(PackagingMaterial.PackagingCategoryId));
+    }
+
+    [Fact]
+    public void Rejects_a_missing_purchase_unit()
+    {
+        var result = _validator.Validate(new PackagingMaterial
+        {
+            Name = "Box",
+            PackagingCategoryId = 1,
+            StandardUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitId = 0,
+            PurchaseUnitQty = 100m,
+        });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(PackagingMaterial.PurchaseUnitId));
+    }
 }

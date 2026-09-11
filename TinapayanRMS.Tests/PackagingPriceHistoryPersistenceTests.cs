@@ -112,6 +112,22 @@ public class PackagingPriceHistoryPersistenceTests(DatabaseFixture fixture) : Pe
     }
 
     [Fact]
+    public async Task Updating_an_entrys_price_recomputes_CurrentCost()
+    {
+        var packagingMaterialId = await SeedPackagingMaterialAsync();
+        var repository = new PackagingPriceHistoryRepository(CreateDbContextFactory());
+
+        await repository.AddAsync(new PackagingPriceHistory { PackagingMaterialId = packagingMaterialId, Date = new DateOnly(2026, 1, 1), Price = 45m }, Cancellation);
+        var entry = (await repository.GetForPackagingMaterialAsync(packagingMaterialId, Cancellation)).Should().ContainSingle().Subject;
+
+        entry.Price = 48m;
+        await repository.UpdateAsync(entry, Cancellation);
+
+        var packagingMaterial = await GetPackagingMaterialAsync(packagingMaterialId);
+        packagingMaterial.CurrentCost.Should().Be(48m);
+    }
+
+    [Fact]
     public async Task UpdateAsync_rejects_an_entry_for_a_nonexistent_packaging_material()
     {
         var repository = new PackagingPriceHistoryRepository(CreateDbContextFactory());

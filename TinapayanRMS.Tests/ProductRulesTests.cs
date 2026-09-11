@@ -146,6 +146,14 @@ public class ProductRulesTests
     }
 
     [Fact]
+    public void ReconcileReciprocal_rejects_an_undefined_authored_field()
+    {
+        var act = () => ProductRules.ReconcileReciprocal((PackagingLineAuthoredField)999, 6m);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
     public void CalculatePackagingLineCostPerPiece_matches_the_worked_example_with_no_unit_conversion()
     {
         // A ribbon costs ₱45 per 1000cm roll (₱0.045/cm). 5 inches per piece = 12.7cm -> ₱0.5715.

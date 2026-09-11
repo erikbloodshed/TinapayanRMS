@@ -300,4 +300,76 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
+
+    [Fact]
+    public async Task SetLinesAsync_rejects_a_nonexistent_ingredient_without_deleting_the_existing_lines()
+    {
+        var roleId = await SeedRoleAsync("Filling");
+        var categoryId = await SeedCategoryAsync("Fillings");
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
+        await SetIngredientCostPerGramAsync(sugarId, 0.09m);
+        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
+        var lineRepository = CreateLineRepository();
+        await lineRepository.SetLinesAsync(subAssemblyId, [(sugarId, 100m)], Cancellation);
+
+        var act = () => lineRepository.SetLinesAsync(subAssemblyId, [(sugarId, 50m), (999_999, 50m)], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+
+        // The existing lines must survive the rejected replacement: the new set is
+        // validated before the old rows are deleted, not after.
+        var lines = await lineRepository.GetForSubAssemblyAsync(subAssemblyId, Cancellation);
+        lines.Should().ContainSingle().Which.Grams.Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task SubAssemblyRepository_DeleteAsync_removes_an_unused_sub_assembly()
+    {
+        var roleId = await SeedRoleAsync("Dough");
+        var subAssemblyId = await SeedSubAssemblyAsync("Bread Dough", roleId);
+        var subAssemblyRepository = CreateSubAssemblyRepository();
+
+        await subAssemblyRepository.DeleteAsync(subAssemblyId, Cancellation);
+
+        (await subAssemblyRepository.GetAllAsync(Cancellation)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SubAssemblyRoleRepository_UpdateAsync_renames_a_role_and_changes_its_sort_order()
+    {
+        var roleId = await SeedRoleAsync("Dough", sortOrder: 1);
+        var roleRepository = CreateRoleRepository();
+
+        await roleRepository.UpdateAsync(new SubAssemblyRole { Id = roleId, Name = "Sourdough", SortOrder = 9 }, Cancellation);
+
+        var updated = (await roleRepository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        updated.Name.Should().Be("Sourdough");
+        updated.SortOrder.Should().Be(9);
+    }
+
+    [Fact]
+    public async Task SubAssemblyRepository_AddAsync_and_GetAllAsync_round_trip_a_sub_assembly()
+    {
+        var roleId = await SeedRoleAsync("Dough");
+        var subAssemblyRepository = CreateSubAssemblyRepository();
+
+        await subAssemblyRepository.AddAsync(new SubAssembly { Name = "Pandesal Dough", RoleId = roleId }, Cancellation);
+
+        var all = await subAssemblyRepository.GetAllAsync(Cancellation);
+        var saved = all.Should().ContainSingle().Subject;
+        saved.Name.Should().Be("Pandesal Dough");
+        saved.Role.Should().NotBeNull();
+        saved.Role!.Name.Should().Be("Dough");
+    }
+
+    [Fact]
+    public async Task SubAssemblyRoleRepository_AddAsync_persists_a_new_role()
+    {
+        var roleRepository = CreateRoleRepository();
+
+        await roleRepository.AddAsync(new SubAssemblyRole { Name = "Glaze", SortOrder = 5 }, Cancellation);
+
+        var all = await roleRepository.GetAllAsync(Cancellation);
+        all.Should().ContainSingle(r => r.Name == "Glaze" && r.SortOrder == 5);
+    }
 }

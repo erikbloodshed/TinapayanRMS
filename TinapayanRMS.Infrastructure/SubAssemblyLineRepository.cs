@@ -25,6 +25,18 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
         var subAssembly = await dbContext.SubAssemblies.FirstOrDefaultAsync(s => s.Id == subAssemblyId, cancellationToken)
             ?? throw new InvalidOperationException($"Sub-assembly {subAssemblyId} does not exist.");
 
+        var ingredientCosts = await dbContext.Ingredients
+            .Where(i => lines.Select(l => l.IngredientId).Contains(i.Id))
+            .ToDictionaryAsync(i => i.Id, i => i.CostPerGram, cancellationToken);
+
+        foreach (var line in lines)
+        {
+            if (!ingredientCosts.ContainsKey(line.IngredientId))
+            {
+                throw new InvalidOperationException($"Ingredient {line.IngredientId} does not exist.");
+            }
+        }
+
         await dbContext.SubAssemblyLines
             .Where(l => l.SubAssemblyId == subAssemblyId)
             .ExecuteDeleteAsync(cancellationToken);
@@ -35,10 +47,6 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
             IngredientId = l.IngredientId,
             Grams = l.Grams,
         }));
-
-        var ingredientCosts = await dbContext.Ingredients
-            .Where(i => lines.Select(l => l.IngredientId).Contains(i.Id))
-            .ToDictionaryAsync(i => i.Id, i => i.CostPerGram, cancellationToken);
 
         var costInputs = lines.Select(l => (l.Grams, IngredientCostPerGram: ingredientCosts[l.IngredientId])).ToList();
         (subAssembly.TotalWeight, subAssembly.TotalCost) = SubAssemblyRules.CalculateTotals(costInputs);

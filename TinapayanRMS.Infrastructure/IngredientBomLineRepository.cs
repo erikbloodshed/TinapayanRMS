@@ -44,6 +44,20 @@ public class IngredientBomLineRepository(
 
         IngredientBomRules.EnsureNoCycle(ingredientId, lines.Select(l => l.ComponentIngredientId), componentIdsByIngredientId);
 
+        var existingComponentIds = await dbContext.Ingredients
+            .Where(i => lines.Select(l => l.ComponentIngredientId).Contains(i.Id))
+            .Select(i => i.Id)
+            .ToListAsync(cancellationToken);
+        var existingComponentIdSet = existingComponentIds.ToHashSet();
+
+        foreach (var line in lines)
+        {
+            if (!existingComponentIdSet.Contains(line.ComponentIngredientId))
+            {
+                throw new InvalidOperationException($"Ingredient {line.ComponentIngredientId} does not exist.");
+            }
+        }
+
         await dbContext.IngredientBomLines
             .Where(l => l.IngredientId == ingredientId)
             .ExecuteDeleteAsync(cancellationToken);

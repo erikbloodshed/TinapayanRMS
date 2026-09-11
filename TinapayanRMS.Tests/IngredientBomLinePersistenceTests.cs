@@ -192,6 +192,25 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task SetLinesAsync_rejects_a_nonexistent_component_ingredient_without_deleting_the_existing_lines()
+    {
+        var categoryId = await SeedCategoryAsync("Fillings");
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
+        var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId);
+        var bom = CreateBomRepository();
+        await bom.SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation);
+
+        var act = () => bom.SetLinesAsync(syrupId, [(sugarId, 500m), (999_999, 500m)], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+
+        // The existing BOM lines must survive the rejected replacement: the new set is
+        // validated before the old rows are deleted, not after.
+        var lines = await bom.GetForIngredientAsync(syrupId, Cancellation);
+        lines.Should().ContainSingle().Which.Grams.Should().Be(1000m);
+    }
+
+    [Fact]
     public async Task SetLinesAsync_rejects_a_purchased_ingredient()
     {
         var categoryId = await SeedCategoryAsync("Fillings");

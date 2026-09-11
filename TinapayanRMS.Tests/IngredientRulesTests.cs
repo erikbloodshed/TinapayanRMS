@@ -163,4 +163,29 @@ public class IngredientRulesTests
         ingredient.CurrentCost.Should().BeNull();
         ingredient.CostPerGram.Should().Be(0m);
     }
+
+    [Fact]
+    public void RecomputeCostPerGramFromCurrentCost_divides_CurrentCost_by_the_new_PurchaseUnitQty()
+    {
+        var ingredient = new Ingredient
+        {
+            Source = IngredientSource.Purchased,
+            CurrentCost = 900m,
+            PurchaseUnitQty = 30000m, // corrected from 25000m -- no new price entry
+        };
+
+        IngredientRules.RecomputeCostPerGramFromCurrentCost(ingredient);
+
+        ingredient.CostPerGram.Should().Be(0.03m);
+    }
+
+    [Fact]
+    public void RecomputeCostPerGramFromCurrentCost_zeroes_CostPerGram_when_unpriced()
+    {
+        var ingredient = new Ingredient { Source = IngredientSource.Purchased, CurrentCost = null, PurchaseUnitQty = 25000m };
+
+        IngredientRules.RecomputeCostPerGramFromCurrentCost(ingredient);
+
+        ingredient.CostPerGram.Should().Be(0m);
+    }
 }

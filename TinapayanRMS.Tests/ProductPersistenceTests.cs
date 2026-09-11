@@ -116,6 +116,17 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     }
 
     [Fact]
+    public async Task SetUsagesForRoleAsync_rejects_a_sub_assembly_that_does_not_exist_at_all()
+    {
+        var fillingRoleId = await SeedRoleAsync("Filling");
+        var productId = await SeedProductAsync("Ensaymada");
+
+        var act = () => CreateUsageRepository().SetUsagesForRoleAsync(productId, fillingRoleId, [(999_999, 10m)], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
     public async Task Deleting_a_sub_assembly_in_use_by_a_product_is_blocked()
     {
         var roleId = await SeedRoleAsync("Filling");
@@ -275,6 +286,33 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         var act = () => CreateCostingParametersRepository().SetAsync(productId, laborCost: -1m, overheadCost: 0m, marginPercent: 0m, vatPercent: 0m, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task ProductRepository_AddAsync_GetAllAsync_GetByIdAsync_and_UpdateAsync_round_trip_a_product()
+    {
+        var repository = CreateProductRepository();
+
+        await repository.AddAsync(new Product { Name = "Special Ensaymada" }, Cancellation);
+
+        var all = await repository.GetAllAsync(Cancellation);
+        var added = all.Should().ContainSingle().Subject;
+        added.Name.Should().Be("Special Ensaymada");
+
+        var byId = await repository.GetByIdAsync(added.Id, Cancellation);
+        byId.Should().NotBeNull();
+        byId!.Name.Should().Be("Special Ensaymada");
+
+        byId.Name = "Special Ensaymada Big";
+        await repository.UpdateAsync(byId, Cancellation);
+
+        (await repository.GetByIdAsync(added.Id, Cancellation))!.Name.Should().Be("Special Ensaymada Big");
+    }
+
+    [Fact]
+    public async Task ProductRepository_GetByIdAsync_returns_null_for_a_nonexistent_product()
+    {
+        (await CreateProductRepository().GetByIdAsync(999_999, Cancellation)).Should().BeNull();
     }
 
     [Fact]

@@ -108,6 +108,71 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     }
 
     [Fact]
+    public async Task GetByIdAsync_returns_the_ingredient_with_related_data_populated()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
+        await repository.AddAsync(new Ingredient
+        {
+            Name = "Sugar",
+            IngredientCategoryId = categoryId,
+            Source = IngredientSource.Purchased,
+            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitQty = 1000m,
+        }, Cancellation);
+        var seeded = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+
+        var byId = await repository.GetByIdAsync(seeded.Id, Cancellation);
+
+        byId.Should().NotBeNull();
+        byId!.Name.Should().Be("Sugar");
+        byId.IngredientCategory.Should().NotBeNull();
+        byId.PurchaseUnit.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_returns_null_for_a_nonexistent_ingredient()
+    {
+        var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
+
+        (await repository.GetByIdAsync(999_999, Cancellation)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_renames_a_purchased_ingredient_and_preserves_CurrentCost_while_recomputing_CostPerGram()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
+        var priceHistoryRepository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
+
+        await repository.AddAsync(new Ingredient
+        {
+            Name = "Sugar",
+            IngredientCategoryId = categoryId,
+            Source = IngredientSource.Purchased,
+            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitQty = 1000m,
+        }, Cancellation);
+        var ingredient = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        await priceHistoryRepository.AddAsync(new IngredientPriceHistory { IngredientId = ingredient.Id, Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
+
+        // Rename and correct a mistyped purchase-unit quantity -- no new price entry.
+        ingredient = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        ingredient.Name = "Refined Sugar";
+        ingredient.PurchaseUnitQty = 900m;
+        await repository.UpdateAsync(ingredient, Cancellation);
+
+        var updated = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        updated.Name.Should().Be("Refined Sugar");
+        updated.PurchaseUnitQty.Should().Be(900m);
+        // A blind dbContext.Set<T>().Update(incoming) regression would silently zero
+        // these two server-owned fields on every plain rename (PLAN.md's documented
+        // Phase 6 bug) -- they must survive, and CostPerGram must reflect the new qty.
+        updated.CurrentCost.Should().Be(90m);
+        updated.CostPerGram.Should().Be(0.1m); // 90 / 900
+    }
+
+    [Fact]
     public async Task UpdateAsync_rejects_a_nonexistent_ingredient()
     {
         var categoryId = await SeedCategoryAsync();

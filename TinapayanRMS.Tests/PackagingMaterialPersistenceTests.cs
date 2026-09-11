@@ -78,6 +78,71 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task GetByIdAsync_returns_the_packaging_material_with_related_data_populated()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = new PackagingMaterialRepository(CreateDbContextFactory());
+        await repository.AddAsync(new PackagingMaterial
+        {
+            Name = "Satin Ribbon",
+            PackagingCategoryId = categoryId,
+            StandardUnitId = WellKnownUnitOfMeasureIds.Centimeter,
+            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitQty = 1000m,
+        }, Cancellation);
+        var seeded = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+
+        var byId = await repository.GetByIdAsync(seeded.Id, Cancellation);
+
+        byId.Should().NotBeNull();
+        byId!.Name.Should().Be("Satin Ribbon");
+        byId.PackagingCategory.Should().NotBeNull();
+        byId.StandardUnit.Should().NotBeNull();
+        byId.PurchaseUnit.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_returns_null_for_a_nonexistent_packaging_material()
+    {
+        var repository = new PackagingMaterialRepository(CreateDbContextFactory());
+
+        (await repository.GetByIdAsync(999_999, Cancellation)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_renames_a_packaging_material_and_preserves_CurrentCost()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = new PackagingMaterialRepository(CreateDbContextFactory());
+        var priceHistoryRepository = new PackagingPriceHistoryRepository(CreateDbContextFactory());
+
+        await repository.AddAsync(new PackagingMaterial
+        {
+            Name = "Satin Ribbon",
+            PackagingCategoryId = categoryId,
+            StandardUnitId = WellKnownUnitOfMeasureIds.Centimeter,
+            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitQty = 1000m,
+        }, Cancellation);
+        var packagingMaterial = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        await priceHistoryRepository.AddAsync(new PackagingPriceHistory { PackagingMaterialId = packagingMaterial.Id, Date = new DateOnly(2026, 1, 1), Price = 45m }, Cancellation);
+
+        // Rename and correct a mistyped purchase-unit quantity -- no new price entry.
+        packagingMaterial = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        packagingMaterial.Name = "Grosgrain Ribbon";
+        packagingMaterial.PurchaseUnitQty = 900m;
+        await repository.UpdateAsync(packagingMaterial, Cancellation);
+
+        var updated = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        updated.Name.Should().Be("Grosgrain Ribbon");
+        updated.PurchaseUnitQty.Should().Be(900m);
+        // A blind dbContext.Set<T>().Update(incoming) regression would silently zero this
+        // server-owned field on every plain rename (PLAN.md's documented Phase 6 bug,
+        // fixed in both IngredientRepository and PackagingMaterialRepository at once).
+        updated.CurrentCost.Should().Be(45m);
+    }
+
+    [Fact]
     public async Task UpdateAsync_rejects_a_nonexistent_packaging_material()
     {
         var categoryId = await SeedCategoryAsync();
