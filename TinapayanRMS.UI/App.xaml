@@ -5,5 +5,34 @@
              xmlns:sys="clr-namespace:System.Windows.Controls;assembly=PresentationFramework">
     <Application.Resources>
         <sys:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+        <!--
+            ButtonAdv.IconTemplate glyphs, Segoe Fluent Icons (Windows 11) falling back to
+            Segoe MDL2 Assets (Windows 10+) — no extra icon package, and it matches the
+            Windows11Light theme natively. One template per verb, reused across every
+            CRUD screen's buttons instead of repeating the glyph markup on each one.
+        -->
+        <FontFamily x:Key="IconFontFamily">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+        <Style x:Key="IconGlyphStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}" />
+            <Setter Property="FontSize" Value="14" />
+        </Style>
+
+        <DataTemplate x:Key="AddIconTemplate">
+            <TextBlock Text="&#xE710;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="SaveIconTemplate">
+            <TextBlock Text="&#xE74E;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="DeleteIconTemplate">
+            <TextBlock Text="&#xE74D;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="RemoveIconTemplate">
+            <TextBlock Text="&#xE738;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
     </Application.Resources>
 </Application>

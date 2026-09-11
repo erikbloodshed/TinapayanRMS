@@ -60,9 +60,9 @@
                                        Margin="0,0,0,12" />
 
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                <syncfusion:ButtonAdv Label="New" Command="{Binding NewCommand}" Margin="0,0,8,0" />
-                <syncfusion:ButtonAdv Label="Save" Command="{Binding SaveCommand}" Margin="0,0,8,0" />
-                <syncfusion:ButtonAdv Label="Delete" Command="{Binding DeleteCommand}" />
+                <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />
+                <syncfusion:ButtonAdv Label="Save" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveCommand}" Margin="0,0,8,0" />
+                <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
             </StackPanel>
         </StackPanel>
 
@@ -93,8 +93,8 @@
                                        Margin="0,0,0,12" />
 
             <StackPanel Orientation="Horizontal">
-                <syncfusion:ButtonAdv Label="Add Price" Command="{Binding AddPriceCommand}" Margin="0,0,8,0" />
-                <syncfusion:ButtonAdv Label="Delete Price" Command="{Binding DeletePriceCommand}" />
+                <syncfusion:ButtonAdv Label="Add Price" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding AddPriceCommand}" Margin="0,0,8,0" />
+                <syncfusion:ButtonAdv Label="Delete Price" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeletePriceCommand}" />
             </StackPanel>
         </StackPanel>
     </Grid>
