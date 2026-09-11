@@ -31,7 +31,8 @@ TinapayanRMS.slnx
 ## Domain Model
 
 - **UnitOfMeasure**: a flat lookup table with only `Id`, `Name` and `Abbreviation`. It has no base unit, conversion factor, or self-FK. It holds both standard units and purchase units: mass (Gram), count (Piece), length (Millimeter, Centimeter, Inch, Meter), and purchase units (Tin, Pack, Bag, Case, Box, Roll, etc.). Units are defined globally here, but each conversion ratio belongs to a specific material. A material's **standard unit** is the unit its quantities and costs are tracked in. For ingredients it is always the gram; each packaging material declares its own. The table can stay flat because each material has exactly one standard unit. The only conversion between two units in the table is between length units, and it uses fixed physical constants in code rather than table data.
-  - **Length units** (Millimeter, Centimeter, Inch, Meter) are seeded rows with fixed Ids, and they can't be edited or deleted. A static `LengthConversion` helper in `ApplicationCore` maps those Ids to their factors (1 cm = 10 mm, 1 in = 25.4 mm, 1 m = 1000 mm).
+  - **Length units** (Millimeter, Centimeter, Inch, Meter) are seeded rows with fixed Ids, and they can't be edited or deleted. A static `LengthConversion` helper in `ApplicationCore` maps those Ids to their factors (1 cm = 10 mm, 1 in = 25.4 mm, 1 m = 1000 mm); `UnitOfMeasureRules.IsProtected` in `ApplicationCore` is the guard every future edit/delete path must check.
+  - **Gram and Piece are also seeded** (Ids 5 and 6), since they're the default standard units for ingredients and for boxes/wrappers respectively, but neither is protected — they can be renamed or removed like any other row. Purchase units (Tin, Pack, Bag, Case, Box, Roll, …) are **not** seeded; those are business-specific and left for the shop owner to add once a Units of Measure management screen exists.
 - Materials are split into two separate tables, **Ingredient** and **PackagingMaterial**, each with its own category and price history tables. Nothing is shared between the two sides, so the schema itself stops a packaging material from being put in a recipe, or an ingredient on a packaging line. Packaging materials are always purchased. Ingredients can be purchased or made in-house.
 - **IngredientCategory** (Flour, Dairy, …) / **Ingredient**:
   - **The standard unit for every ingredient is the gram.** All ingredient quantities are recorded in grams: sub-assembly lines, BOM lines, sub-assembly total weights, and weight-per-piece. Because of that, `Ingredient` has no standard-unit column.
@@ -122,6 +123,7 @@ The one exception is made ingredients. Their BOMs nest to any depth, so that par
 - **Docker is not used anywhere in the project**: not for development, testing, or deployment.
 - EF Core migrations are generated with `dotnet ef migrations add`, not written by hand, and applied to the local database with `dotnet ef database update`.
 - **A phase is done** when the solution builds without errors, all tests pass, and any new migration applies cleanly to a local database. Mark it Done in the Build Plan table; there are no separate per-phase documents.
+- **Integration test database**: tests never touch the developer's own `TinapayanRMS` database. `TinapayanRMS.Tests/Infrastructure/DatabaseFixture.cs` runs against a separate `TinapayanRMS_Test` database (same server, connection string's `Initial Catalog` overridden), migrated once per test run and reset with Respawn before every test via `[Collection(DatabaseCollection.Name)]` + `IAsyncLifetime`. Seed/reference data (currently just `UnitsOfMeasure`) is excluded from the Respawn reset, since it's owned by migrations, not by tests — add a table to `DatabaseFixture.TablesExcludedFromReset` whenever a future phase adds more seeded lookup data.
 
 ## Build Plan
 
@@ -130,7 +132,7 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Solution scaffold, DI host builder, ReactiveUI bootstrap, EF Core DbContext | Done |
-| 2 | Units of Measure (incl. seeded, protected length units) + Ingredient & Packaging Categories | Not started |
+| 2 | Units of Measure (incl. seeded, protected length units) + Ingredient & Packaging Categories | Done |
 | 3 | Ingredients (Purchased/Made source) + Packaging Materials (CRUD, purchase-unit → standard-unit conversion) | Not started |
 | 4 | Ingredient & Packaging Price History + `CurrentCost` rollup | Not started |
 | 5 | Made Ingredients — BOM lines, `WeightLossPercent`, nested cost rollup with cycle check | Not started |

@@ -20,6 +20,115 @@ namespace TinapayanRMS.Infrastructure.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("TinapayanRMS.Domain.IngredientCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("IngredientCategories");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.PackagingCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("PackagingCategories");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.UnitOfMeasure", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Abbreviation")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Abbreviation")
+                        .IsUnique();
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("UnitsOfMeasure");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Abbreviation = "mm",
+                            Name = "Millimeter"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Abbreviation = "cm",
+                            Name = "Centimeter"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Abbreviation = "in",
+                            Name = "Inch"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Abbreviation = "m",
+                            Name = "Meter"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Abbreviation = "g",
+                            Name = "Gram"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Abbreviation = "pc",
+                            Name = "Piece"
+                        });
+                });
 #pragma warning restore 612, 618
         }
     }
