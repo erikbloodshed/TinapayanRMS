@@ -1,0 +1,31 @@
+using AwesomeAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using TinapayanRMS.Infrastructure;
+using TinapayanRMS.UI;
+
+namespace TinapayanRMS.Tests;
+
+public class CompositionRootTests
+{
+    [Fact]
+    public void CreateHostBuilder_resolves_the_DbContext_from_configuration()
+    {
+        using IHost host = CompositionRoot.CreateHostBuilder([]).Build();
+
+        var dbContext = host.Services.GetRequiredService<TinapayanRMSDbContext>();
+
+        dbContext.Database.GetConnectionString().Should().Contain("Initial Catalog=TinapayanRMS");
+    }
+
+    [Fact]
+    public void CreateHostBuilder_resolves_the_main_window_view_model()
+    {
+        using IHost host = CompositionRoot.CreateHostBuilder([]).Build();
+
+        var viewModel = host.Services.GetRequiredService<MainWindowViewModel>();
+
+        viewModel.Heading.Should().Be(viewModel.Title.ToUpperInvariant());
+    }
+}
