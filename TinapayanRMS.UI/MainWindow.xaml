@@ -23,6 +23,7 @@
             <syncfusion:TabItemExt x:Name="PackagingMaterialsTab" Header="Packaging Materials" />
             <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
             <syncfusion:TabItemExt x:Name="ProductsTab" Header="Products" />
+            <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" />
         </syncfusion:TabControlExt>
     </Grid>
 </Window>

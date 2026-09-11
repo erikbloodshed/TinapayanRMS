@@ -58,6 +58,7 @@ public static class CompositionRoot
                 services.AddSingleton<PackagingMaterialsViewModel>();
                 services.AddSingleton<SubAssembliesViewModel>();
                 services.AddSingleton<ProductsViewModel>();
+                services.AddSingleton<ReportsViewModel>();
             });
     }
 }
