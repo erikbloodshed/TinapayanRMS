@@ -169,5 +169,6 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 
 - The layered architecture is fixed: `Domain` has no external dependencies, business and costing rules live in `ApplicationCore`, and EF Core and other I/O stay in `Infrastructure`.
 - The MVVM toolkit is **ReactiveUI**, not CommunityToolkit.Mvvm. Use `ReactiveObject`, `ReactiveCommand`, `WhenAnyValue`, etc.
+- **Prefer Syncfusion controls over native WPF controls whenever a Syncfusion equivalent is available** (e.g. `ButtonAdv` over `Button`, `TabControlExt` over `TabControl`, `ComboBoxAdv`/`SfDataGrid`/the `SfInput.WPF` edit controls over their native counterparts), so the whole UI picks up the Windows11Light theme consistently. Fall back to a native control only when no Syncfusion equivalent exists, and add the corresponding package to `TinapayanRMS.UI` and (if needed) `TinapayanRMS.Theme` per the Syncfusion UI Framework section above.
 - **Decimal precision**: keep `decimal` values at full precision through the whole cascade, and round only for display and for the final selling price. Rounding each per-piece cost before summing adds up to drift. Phase 1 sets the SQL Server column precision when it defines the `DbContext`.
 - This document is a living plan. Update it as phases complete or decisions change, so it stays the single source of truth for the project.
