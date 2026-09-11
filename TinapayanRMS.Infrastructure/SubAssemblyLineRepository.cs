@@ -25,10 +25,9 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
         var subAssembly = await dbContext.SubAssemblies.FirstOrDefaultAsync(s => s.Id == subAssemblyId, cancellationToken)
             ?? throw new InvalidOperationException($"Sub-assembly {subAssemblyId} does not exist.");
 
-        var existingLines = await dbContext.SubAssemblyLines
+        await dbContext.SubAssemblyLines
             .Where(l => l.SubAssemblyId == subAssemblyId)
-            .ToListAsync(cancellationToken);
-        dbContext.SubAssemblyLines.RemoveRange(existingLines);
+            .ExecuteDeleteAsync(cancellationToken);
 
         dbContext.SubAssemblyLines.AddRange(lines.Select(l => new SubAssemblyLine
         {

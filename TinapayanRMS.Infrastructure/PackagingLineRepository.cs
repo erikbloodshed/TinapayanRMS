@@ -46,10 +46,9 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             ProductRules.EnsureValidEntryUnit(standardUnitId, line.EntryUnitId);
         }
 
-        var existingLines = await dbContext.PackagingLines
+        await dbContext.PackagingLines
             .Where(l => l.ProductId == productId)
-            .ToListAsync(cancellationToken);
-        dbContext.PackagingLines.RemoveRange(existingLines);
+            .ExecuteDeleteAsync(cancellationToken);
 
         dbContext.PackagingLines.AddRange(lines.Select(l =>
         {

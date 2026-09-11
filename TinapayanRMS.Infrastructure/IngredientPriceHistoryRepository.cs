@@ -33,13 +33,19 @@ public class IngredientPriceHistoryRepository(
             throw new InvalidOperationException("Only purchased ingredients have price history.");
         }
 
-        var existingEntries = await dbContext.IngredientPriceHistories
+        // Only the current latest entry can ever be displaced by the new one, so there's
+        // no need to load the ingredient's whole price history — a table that only grows
+        // over the life of the app — just to find it.
+        var currentLatest = await dbContext.IngredientPriceHistories
             .Where(h => h.IngredientId == entry.IngredientId)
-            .ToListAsync(cancellationToken);
+            .OrderByDescending(h => h.Date)
+            .ThenByDescending(h => h.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         dbContext.IngredientPriceHistories.Add(entry);
 
-        var latest = PriceHistoryRules.FindLatest(existingEntries.Append(entry));
+        IngredientPriceHistory[] candidates = currentLatest is null ? [entry] : [currentLatest, entry];
+        var latest = PriceHistoryRules.FindLatest(candidates);
         IngredientRules.ApplyLatestPrice(ingredient, latest);
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -58,13 +64,16 @@ public class IngredientPriceHistoryRepository(
         var ingredient = await dbContext.Ingredients.FirstOrDefaultAsync(i => i.Id == entry.IngredientId, cancellationToken)
             ?? throw new InvalidOperationException($"Ingredient {entry.IngredientId} does not exist.");
 
-        var otherEntries = await dbContext.IngredientPriceHistories
+        var currentLatestOther = await dbContext.IngredientPriceHistories
             .Where(h => h.IngredientId == entry.IngredientId && h.Id != entry.Id)
-            .ToListAsync(cancellationToken);
+            .OrderByDescending(h => h.Date)
+            .ThenByDescending(h => h.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         dbContext.IngredientPriceHistories.Update(entry);
 
-        var latest = PriceHistoryRules.FindLatest(otherEntries.Append(entry));
+        IngredientPriceHistory[] candidates = currentLatestOther is null ? [entry] : [currentLatestOther, entry];
+        var latest = PriceHistoryRules.FindLatest(candidates);
         IngredientRules.ApplyLatestPrice(ingredient, latest);
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -82,13 +91,17 @@ public class IngredientPriceHistoryRepository(
         var ingredient = await dbContext.Ingredients.FirstOrDefaultAsync(i => i.Id == entry.IngredientId, cancellationToken)
             ?? throw new InvalidOperationException($"Ingredient {entry.IngredientId} does not exist.");
 
-        var remainingEntries = await dbContext.IngredientPriceHistories
+        // The query's own ordering already picks the same "latest" row PriceHistoryRules.
+        // FindLatest would from a fully-loaded list, so there's no in-memory candidate left
+        // to run through it.
+        var latest = await dbContext.IngredientPriceHistories
             .Where(h => h.IngredientId == entry.IngredientId && h.Id != id)
-            .ToListAsync(cancellationToken);
+            .OrderByDescending(h => h.Date)
+            .ThenByDescending(h => h.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         dbContext.IngredientPriceHistories.Remove(entry);
 
-        var latest = PriceHistoryRules.FindLatest(remainingEntries);
         IngredientRules.ApplyLatestPrice(ingredient, latest);
 
         await dbContext.SaveChangesAsync(cancellationToken);

@@ -29,10 +29,9 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             throw new InvalidOperationException($"Product {productId} does not exist.");
         }
 
-        var existingUsages = await dbContext.ProductSubAssemblyUsages
+        await dbContext.ProductSubAssemblyUsages
             .Where(u => u.ProductId == productId)
-            .ToListAsync(cancellationToken);
-        dbContext.ProductSubAssemblyUsages.RemoveRange(existingUsages);
+            .ExecuteDeleteAsync(cancellationToken);
 
         dbContext.ProductSubAssemblyUsages.AddRange(usages.Select(u => new ProductSubAssemblyUsage
         {

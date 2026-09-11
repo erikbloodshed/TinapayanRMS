@@ -44,10 +44,9 @@ public class IngredientBomLineRepository(
 
         IngredientBomRules.EnsureNoCycle(ingredientId, lines.Select(l => l.ComponentIngredientId), componentIdsByIngredientId);
 
-        var existingLines = await dbContext.IngredientBomLines
+        await dbContext.IngredientBomLines
             .Where(l => l.IngredientId == ingredientId)
-            .ToListAsync(cancellationToken);
-        dbContext.IngredientBomLines.RemoveRange(existingLines);
+            .ExecuteDeleteAsync(cancellationToken);
 
         dbContext.IngredientBomLines.AddRange(lines.Select(l => new IngredientBomLine
         {

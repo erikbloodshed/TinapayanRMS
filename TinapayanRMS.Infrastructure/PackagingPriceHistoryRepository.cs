@@ -26,13 +26,19 @@ public class PackagingPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbCon
         var packagingMaterial = await dbContext.PackagingMaterials.FirstOrDefaultAsync(p => p.Id == entry.PackagingMaterialId, cancellationToken)
             ?? throw new InvalidOperationException($"Packaging material {entry.PackagingMaterialId} does not exist.");
 
-        var existingEntries = await dbContext.PackagingPriceHistories
+        // Only the current latest entry can ever be displaced by the new one, so there's
+        // no need to load the material's whole price history — a table that only grows
+        // over the life of the app — just to find it.
+        var currentLatest = await dbContext.PackagingPriceHistories
             .Where(h => h.PackagingMaterialId == entry.PackagingMaterialId)
-            .ToListAsync(cancellationToken);
+            .OrderByDescending(h => h.Date)
+            .ThenByDescending(h => h.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         dbContext.PackagingPriceHistories.Add(entry);
 
-        var latest = PriceHistoryRules.FindLatest(existingEntries.Append(entry));
+        PackagingPriceHistory[] candidates = currentLatest is null ? [entry] : [currentLatest, entry];
+        var latest = PriceHistoryRules.FindLatest(candidates);
         PackagingMaterialRules.ApplyLatestPrice(packagingMaterial, latest);
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -47,13 +53,16 @@ public class PackagingPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbCon
         var packagingMaterial = await dbContext.PackagingMaterials.FirstOrDefaultAsync(p => p.Id == entry.PackagingMaterialId, cancellationToken)
             ?? throw new InvalidOperationException($"Packaging material {entry.PackagingMaterialId} does not exist.");
 
-        var otherEntries = await dbContext.PackagingPriceHistories
+        var currentLatestOther = await dbContext.PackagingPriceHistories
             .Where(h => h.PackagingMaterialId == entry.PackagingMaterialId && h.Id != entry.Id)
-            .ToListAsync(cancellationToken);
+            .OrderByDescending(h => h.Date)
+            .ThenByDescending(h => h.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         dbContext.PackagingPriceHistories.Update(entry);
 
-        var latest = PriceHistoryRules.FindLatest(otherEntries.Append(entry));
+        PackagingPriceHistory[] candidates = currentLatestOther is null ? [entry] : [currentLatestOther, entry];
+        var latest = PriceHistoryRules.FindLatest(candidates);
         PackagingMaterialRules.ApplyLatestPrice(packagingMaterial, latest);
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -69,13 +78,17 @@ public class PackagingPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbCon
         var packagingMaterial = await dbContext.PackagingMaterials.FirstOrDefaultAsync(p => p.Id == entry.PackagingMaterialId, cancellationToken)
             ?? throw new InvalidOperationException($"Packaging material {entry.PackagingMaterialId} does not exist.");
 
-        var remainingEntries = await dbContext.PackagingPriceHistories
+        // The query's own ordering already picks the same "latest" row PriceHistoryRules.
+        // FindLatest would from a fully-loaded list, so there's no in-memory candidate left
+        // to run through it.
+        var latest = await dbContext.PackagingPriceHistories
             .Where(h => h.PackagingMaterialId == entry.PackagingMaterialId && h.Id != id)
-            .ToListAsync(cancellationToken);
+            .OrderByDescending(h => h.Date)
+            .ThenByDescending(h => h.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         dbContext.PackagingPriceHistories.Remove(entry);
 
-        var latest = PriceHistoryRules.FindLatest(remainingEntries);
         PackagingMaterialRules.ApplyLatestPrice(packagingMaterial, latest);
 
         await dbContext.SaveChangesAsync(cancellationToken);
