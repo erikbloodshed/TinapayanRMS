@@ -11,6 +11,8 @@ public static class WellKnownUnitOfMeasureIds
     public const int Centimeter = 2;
     public const int Inch = 3;
     public const int Meter = 4;
+    public const int Gram = 5;
+    public const int Piece = 6;
 
     public static readonly IReadOnlyCollection<int> ProtectedLengthUnitIds =
         [Millimeter, Centimeter, Inch, Meter];

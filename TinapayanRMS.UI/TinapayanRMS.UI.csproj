@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="DynamicData" Version="9.4.33" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
     <PackageReference Include="ReactiveUI.WPF" Version="24.2.0" />
     <PackageReference Include="Syncfusion.Licensing" Version="34.2.2" />

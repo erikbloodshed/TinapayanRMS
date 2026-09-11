@@ -10,11 +10,12 @@ namespace TinapayanRMS.Tests;
 public class CompositionRootTests
 {
     [Fact]
-    public void CreateHostBuilder_resolves_the_DbContext_from_configuration()
+    public void CreateHostBuilder_resolves_a_DbContext_from_configuration()
     {
         using IHost host = CompositionRoot.CreateHostBuilder([]).Build();
 
-        var dbContext = host.Services.GetRequiredService<TinapayanRMSDbContext>();
+        var dbContextFactory = host.Services.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>();
+        using var dbContext = dbContextFactory.CreateDbContext();
 
         dbContext.Database.GetConnectionString().Should().Contain("Initial Catalog=TinapayanRMS");
     }

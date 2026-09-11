@@ -1,0 +1,68 @@
+<UserControl x:Class="TinapayanRMS.UI.IngredientsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             mc:Ignorable="d"
+             d:DesignHeight="500" d:DesignWidth="900">
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="320" />
+        </Grid.ColumnDefinitions>
+
+        <syncfusion:SfDataGrid Grid.Column="0"
+                                ItemsSource="{Binding Ingredients}"
+                                SelectedItem="{Binding SelectedIngredient, Mode=TwoWay}"
+                                AutoGenerateColumns="False"
+                                AllowEditing="False"
+                                SelectionMode="Single"
+                                NavigationMode="Row">
+            <syncfusion:SfDataGrid.Columns>
+                <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
+                <syncfusion:GridTextColumn MappingName="IngredientCategory.Name" HeaderText="Category" />
+                <syncfusion:GridTextColumn MappingName="Source" HeaderText="Source" />
+                <syncfusion:GridTextColumn MappingName="PurchaseUnit.Abbreviation" HeaderText="Purchase Unit" />
+                <syncfusion:GridNumericColumn MappingName="PurchaseUnitQty" HeaderText="Purchase Qty" />
+                <syncfusion:GridNumericColumn MappingName="CostPerGram" HeaderText="Cost / Gram" />
+            </syncfusion:SfDataGrid.Columns>
+        </syncfusion:SfDataGrid>
+
+        <StackPanel Grid.Column="2">
+            <TextBlock Text="Name" Margin="0,0,0,4" />
+            <syncfusion:SfTextBoxExt Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Margin="0,0,0,12" />
+
+            <TextBlock Text="Category" Margin="0,0,0,4" />
+            <syncfusion:ComboBoxAdv ItemsSource="{Binding Categories}"
+                                     DisplayMemberPath="Name"
+                                     SelectedItem="{Binding EditingCategory, Mode=TwoWay}"
+                                     Margin="0,0,0,12" />
+
+            <TextBlock Text="Source" Margin="0,0,0,4" />
+            <syncfusion:ComboBoxAdv ItemsSource="{Binding Sources}"
+                                     SelectedItem="{Binding EditingSource, Mode=TwoWay}"
+                                     Margin="0,0,0,12" />
+
+            <StackPanel Visibility="{Binding IsEditingPurchased, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="Purchase Unit" Margin="0,0,0,4" />
+                <syncfusion:ComboBoxAdv ItemsSource="{Binding PurchaseUnits}"
+                                         DisplayMemberPath="Name"
+                                         SelectedItem="{Binding EditingPurchaseUnit, Mode=TwoWay}"
+                                         Margin="0,0,0,12" />
+
+                <TextBlock Text="Purchase Unit Qty (grams)" Margin="0,0,0,4" />
+                <syncfusion:DoubleTextBox Value="{Binding EditingPurchaseUnitQty, Mode=TwoWay}"
+                                           Margin="0,0,0,12" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <syncfusion:ButtonAdv Label="New" Command="{Binding NewCommand}" Margin="0,0,8,0" />
+                <syncfusion:ButtonAdv Label="Save" Command="{Binding SaveCommand}" Margin="0,0,8,0" />
+                <syncfusion:ButtonAdv Label="Delete" Command="{Binding DeleteCommand}" />
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</UserControl>

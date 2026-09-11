@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using TinapayanRMS.ApplicationCore;
 using TinapayanRMS.Infrastructure;
 
 namespace TinapayanRMS.UI;
@@ -27,10 +28,20 @@ public static class CompositionRoot
                 var connectionString = context.Configuration.GetConnectionString("Default")
                     ?? throw new InvalidOperationException("Missing 'ConnectionStrings:Default' configuration value.");
 
-                services.AddDbContext<TinapayanRMSDbContext>(options => options.UseSqlServer(connectionString));
+                // A factory, not AddDbContext: ViewModels are singletons that outlive any one
+                // screen, so there's no natural request scope to hand a single DbContext to.
+                // Each repository call creates and disposes its own short-lived context instead,
+                // which also makes concurrent calls from different screens safe.
+                services.AddDbContextFactory<TinapayanRMSDbContext>(options => options.UseSqlServer(connectionString));
+
+                services.AddSingleton(typeof(ILookupRepository<>), typeof(LookupRepository<>));
+                services.AddSingleton<IIngredientRepository, IngredientRepository>();
+                services.AddSingleton<IPackagingMaterialRepository, PackagingMaterialRepository>();
 
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<MainWindow>();
+                services.AddSingleton<IngredientsViewModel>();
+                services.AddSingleton<PackagingMaterialsViewModel>();
             });
     }
 }

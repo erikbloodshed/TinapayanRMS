@@ -1,0 +1,14 @@
+using TinapayanRMS.Domain;
+
+namespace TinapayanRMS.ApplicationCore;
+
+public interface IPackagingMaterialRepository
+{
+    Task<IReadOnlyList<PackagingMaterial>> GetAllAsync(CancellationToken cancellationToken);
+
+    Task AddAsync(PackagingMaterial packagingMaterial, CancellationToken cancellationToken);
+
+    Task UpdateAsync(PackagingMaterial packagingMaterial, CancellationToken cancellationToken);
+
+    Task DeleteAsync(int id, CancellationToken cancellationToken);
+}

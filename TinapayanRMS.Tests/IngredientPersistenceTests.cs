@@ -1,0 +1,166 @@
+using AwesomeAssertions;
+using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.Domain;
+using TinapayanRMS.Infrastructure;
+using TinapayanRMS.Tests.Infrastructure;
+
+namespace TinapayanRMS.Tests;
+
+[Collection(DatabaseCollection.Name)]
+public class IngredientPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
+{
+    private CancellationToken Cancellation => TestContext.Current.CancellationToken;
+
+    public ValueTask InitializeAsync() => new(fixture.ResetAsync());
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    private TinapayanRMSDbContext CreateDbContext() =>
+        new(CreateDbContextOptions());
+
+    private IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
+        new TestDbContextFactory(CreateDbContextOptions());
+
+    private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
+        new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options;
+
+    private sealed class TestDbContextFactory(DbContextOptions<TinapayanRMSDbContext> options) : IDbContextFactory<TinapayanRMSDbContext>
+    {
+        public TinapayanRMSDbContext CreateDbContext() => new(options);
+    }
+
+    private async Task<int> SeedCategoryAsync()
+    {
+        await using var dbContext = CreateDbContext();
+        var category = new IngredientCategory { Name = "Flour" };
+        dbContext.IngredientCategories.Add(category);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return category.Id;
+    }
+
+    [Fact]
+    public async Task A_purchased_ingredient_can_be_added_and_read_back()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = new IngredientRepository(CreateDbContextFactory());
+
+        await repository.AddAsync(new Ingredient
+        {
+            Name = "All-Purpose Flour",
+            IngredientCategoryId = categoryId,
+            Source = IngredientSource.Purchased,
+            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitQty = 25000m,
+        }, Cancellation);
+
+        var ingredients = await repository.GetAllAsync(Cancellation);
+        var ingredient = ingredients.Should().ContainSingle().Subject;
+        ingredient.Name.Should().Be("All-Purpose Flour");
+        ingredient.Source.Should().Be(IngredientSource.Purchased);
+        ingredient.PurchaseUnitQty.Should().Be(25000m);
+        ingredient.IngredientCategory.Should().NotBeNull();
+        ingredient.PurchaseUnit.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task A_made_ingredient_can_be_added_with_no_purchase_fields()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = new IngredientRepository(CreateDbContextFactory());
+
+        await repository.AddAsync(new Ingredient
+        {
+            Name = "Simple Syrup",
+            IngredientCategoryId = categoryId,
+            Source = IngredientSource.Made,
+        }, Cancellation);
+
+        var ingredient = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        ingredient.Source.Should().Be(IngredientSource.Made);
+        ingredient.PurchaseUnitId.Should().BeNull();
+        ingredient.PurchaseUnitQty.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AddAsync_rejects_a_purchased_ingredient_without_a_purchase_unit()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = new IngredientRepository(CreateDbContextFactory());
+
+        var act = () => repository.AddAsync(new Ingredient
+        {
+            Name = "Invalid",
+            IngredientCategoryId = categoryId,
+            Source = IngredientSource.Purchased,
+        }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_rejects_changing_an_ingredients_source()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = new IngredientRepository(CreateDbContextFactory());
+
+        await repository.AddAsync(new Ingredient
+        {
+            Name = "Sugar",
+            IngredientCategoryId = categoryId,
+            Source = IngredientSource.Purchased,
+            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitQty = 1000m,
+        }, Cancellation);
+
+        var ingredient = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        ingredient.Source = IngredientSource.Made;
+        ingredient.PurchaseUnitId = null;
+        ingredient.PurchaseUnitQty = null;
+
+        var act = () => repository.UpdateAsync(ingredient, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_removes_the_ingredient()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = new IngredientRepository(CreateDbContextFactory());
+
+        await repository.AddAsync(new Ingredient
+        {
+            Name = "Water",
+            IngredientCategoryId = categoryId,
+            Source = IngredientSource.Made,
+        }, Cancellation);
+
+        var ingredient = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        await repository.DeleteAsync(ingredient.Id, Cancellation);
+
+        (await repository.GetAllAsync(Cancellation)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Duplicate_ingredient_names_are_rejected()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = new IngredientRepository(CreateDbContextFactory());
+
+        await repository.AddAsync(new Ingredient
+        {
+            Name = "Butter",
+            IngredientCategoryId = categoryId,
+            Source = IngredientSource.Made,
+        }, Cancellation);
+
+        var act = () => repository.AddAsync(new Ingredient
+        {
+            Name = "Butter",
+            IngredientCategoryId = categoryId,
+            Source = IngredientSource.Made,
+        }, Cancellation);
+
+        await act.Should().ThrowAsync<DbUpdateException>();
+    }
+}

@@ -21,6 +21,54 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("TinapayanRMS.Domain.Ingredient", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("CostPerGram")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("CurrentCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("IngredientCategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("PurchaseUnitId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("PurchaseUnitQty")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngredientCategoryId");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("PurchaseUnitId");
+
+                    b.ToTable("Ingredients");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.IngredientCategory", b =>
                 {
                     b.Property<int>("Id")
@@ -61,6 +109,50 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("PackagingCategories");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.PackagingMaterial", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("CurrentCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("PackagingCategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PurchaseUnitId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PurchaseUnitQty")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("StandardUnitId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("PackagingCategoryId");
+
+                    b.HasIndex("PurchaseUnitId");
+
+                    b.HasIndex("StandardUnitId");
+
+                    b.ToTable("PackagingMaterials");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.UnitOfMeasure", b =>
@@ -128,6 +220,51 @@ namespace TinapayanRMS.Infrastructure.Migrations
                             Abbreviation = "pc",
                             Name = "Piece"
                         });
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Ingredient", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.IngredientCategory", "IngredientCategory")
+                        .WithMany()
+                        .HasForeignKey("IngredientCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.UnitOfMeasure", "PurchaseUnit")
+                        .WithMany()
+                        .HasForeignKey("PurchaseUnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("IngredientCategory");
+
+                    b.Navigation("PurchaseUnit");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.PackagingMaterial", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.PackagingCategory", "PackagingCategory")
+                        .WithMany()
+                        .HasForeignKey("PackagingCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.UnitOfMeasure", "PurchaseUnit")
+                        .WithMany()
+                        .HasForeignKey("PurchaseUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.UnitOfMeasure", "StandardUnit")
+                        .WithMany()
+                        .HasForeignKey("StandardUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PackagingCategory");
+
+                    b.Navigation("PurchaseUnit");
+
+                    b.Navigation("StandardUnit");
                 });
 #pragma warning restore 612, 618
         }

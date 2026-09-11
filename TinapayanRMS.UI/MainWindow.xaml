@@ -6,14 +6,21 @@
         xmlns:local="clr-namespace:TinapayanRMS.UI"
         xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
         mc:Ignorable="d"
-        Title="{Binding Title}" Height="450" Width="800">
-    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-        <TextBlock Text="{Binding Heading}"
-                   HorizontalAlignment="Center"
-                   FontSize="20"
-                   Margin="0,0,0,16" />
-        <syncfusion:ButtonAdv Label="Syncfusion Windows11Light theme applied"
-                               SizeMode="Normal"
-                               Padding="12,6" />
-    </StackPanel>
+        Title="{Binding Title}" Height="700" Width="1100">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="{Binding Heading}"
+                   FontSize="18"
+                   Margin="12,12,12,0" />
+
+        <syncfusion:TabControlExt x:Name="MainTabControl" Grid.Row="1" Margin="8">
+            <syncfusion:TabItemExt x:Name="IngredientsTab" Header="Ingredients" />
+            <syncfusion:TabItemExt x:Name="PackagingMaterialsTab" Header="Packaging Materials" />
+        </syncfusion:TabControlExt>
+    </Grid>
 </Window>

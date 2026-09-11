@@ -1,0 +1,89 @@
+using AwesomeAssertions;
+using TinapayanRMS.ApplicationCore;
+using TinapayanRMS.Domain;
+
+namespace TinapayanRMS.Tests;
+
+public class IngredientRulesTests
+{
+    [Fact]
+    public void EnsureFieldsMatchSource_accepts_a_purchased_ingredient_with_unit_and_quantity()
+    {
+        var ingredient = new Ingredient
+        {
+            Source = IngredientSource.Purchased,
+            PurchaseUnitId = 1,
+            PurchaseUnitQty = 25000m,
+        };
+
+        var act = () => IngredientRules.EnsureFieldsMatchSource(ingredient);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureFieldsMatchSource_rejects_a_purchased_ingredient_without_a_purchase_unit()
+    {
+        var ingredient = new Ingredient
+        {
+            Source = IngredientSource.Purchased,
+            PurchaseUnitId = null,
+            PurchaseUnitQty = 25000m,
+        };
+
+        var act = () => IngredientRules.EnsureFieldsMatchSource(ingredient);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void EnsureFieldsMatchSource_rejects_a_purchased_ingredient_with_a_non_positive_quantity()
+    {
+        var ingredient = new Ingredient
+        {
+            Source = IngredientSource.Purchased,
+            PurchaseUnitId = 1,
+            PurchaseUnitQty = 0m,
+        };
+
+        var act = () => IngredientRules.EnsureFieldsMatchSource(ingredient);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void EnsureFieldsMatchSource_accepts_a_made_ingredient_with_no_purchase_fields()
+    {
+        var ingredient = new Ingredient { Source = IngredientSource.Made };
+
+        var act = () => IngredientRules.EnsureFieldsMatchSource(ingredient);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureFieldsMatchSource_rejects_a_made_ingredient_with_a_purchase_unit()
+    {
+        var ingredient = new Ingredient { Source = IngredientSource.Made, PurchaseUnitId = 1 };
+
+        var act = () => IngredientRules.EnsureFieldsMatchSource(ingredient);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void EnsureSourceUnchanged_accepts_the_same_source()
+    {
+        var act = () => IngredientRules.EnsureSourceUnchanged(IngredientSource.Purchased, IngredientSource.Purchased);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureSourceUnchanged_rejects_a_changed_source()
+    {
+        var act = () => IngredientRules.EnsureSourceUnchanged(IngredientSource.Purchased, IngredientSource.Made);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+}
