@@ -86,4 +86,33 @@ public class IngredientRulesTests
 
         act.Should().Throw<InvalidOperationException>();
     }
+
+    [Fact]
+    public void ApplyLatestPrice_sets_CurrentCost_and_CostPerGram_from_the_latest_entry()
+    {
+        var ingredient = new Ingredient { Source = IngredientSource.Purchased, PurchaseUnitQty = 25000m };
+        var latest = new IngredientPriceHistory { Price = 900m };
+
+        IngredientRules.ApplyLatestPrice(ingredient, latest);
+
+        ingredient.CurrentCost.Should().Be(900m);
+        ingredient.CostPerGram.Should().Be(0.036m);
+    }
+
+    [Fact]
+    public void ApplyLatestPrice_with_no_entries_clears_CurrentCost_and_zeroes_CostPerGram()
+    {
+        var ingredient = new Ingredient
+        {
+            Source = IngredientSource.Purchased,
+            PurchaseUnitQty = 25000m,
+            CurrentCost = 900m,
+            CostPerGram = 0.036m,
+        };
+
+        IngredientRules.ApplyLatestPrice(ingredient, null);
+
+        ingredient.CurrentCost.Should().BeNull();
+        ingredient.CostPerGram.Should().Be(0m);
+    }
 }

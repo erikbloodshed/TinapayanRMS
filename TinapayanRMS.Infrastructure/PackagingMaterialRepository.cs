@@ -18,6 +18,17 @@ public class PackagingMaterialRepository(IDbContextFactory<TinapayanRMSDbContext
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<PackagingMaterial?> GetByIdAsync(int id, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await dbContext.PackagingMaterials
+            .AsNoTracking()
+            .Include(p => p.PackagingCategory)
+            .Include(p => p.StandardUnit)
+            .Include(p => p.PurchaseUnit)
+            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+    }
+
     public async Task AddAsync(PackagingMaterial packagingMaterial, CancellationToken cancellationToken)
     {
         PackagingMaterialRules.EnsureValidStandardUnit(packagingMaterial.StandardUnitId);

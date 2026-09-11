@@ -17,6 +17,16 @@ public class IngredientRepository(IDbContextFactory<TinapayanRMSDbContext> dbCon
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<Ingredient?> GetByIdAsync(int id, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await dbContext.Ingredients
+            .AsNoTracking()
+            .Include(i => i.IngredientCategory)
+            .Include(i => i.PurchaseUnit)
+            .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+    }
+
     public async Task AddAsync(Ingredient ingredient, CancellationToken cancellationToken)
     {
         IngredientRules.EnsureFieldsMatchSource(ingredient);

@@ -12,10 +12,15 @@ namespace TinapayanRMS.UI;
 public class PackagingMaterialsViewModel : ReactiveObject
 {
     private readonly IPackagingMaterialRepository _packagingMaterialRepository;
+    private readonly IPackagingPriceHistoryRepository _priceHistoryRepository;
     private readonly SourceCache<PackagingMaterial, int> _packagingMaterialCache = new(p => p.Id);
     private readonly ReadOnlyObservableCollection<PackagingMaterial> _packagingMaterials;
+    private readonly SourceCache<PackagingPriceHistory, int> _priceHistoryCache = new(h => h.Id);
+    private readonly ReadOnlyObservableCollection<PackagingPriceHistory> _priceHistory;
 
     public ReadOnlyObservableCollection<PackagingMaterial> PackagingMaterials => _packagingMaterials;
+
+    public ReadOnlyObservableCollection<PackagingPriceHistory> PriceHistory => _priceHistory;
 
     public ObservableCollection<PackagingCategory> Categories { get; } = [];
 
@@ -67,25 +72,74 @@ public class PackagingMaterialsViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _editingPurchaseUnitQty, value);
     }
 
+    private readonly ObservableAsPropertyHelper<bool> _showPriceHistory;
+    public bool ShowPriceHistory => _showPriceHistory.Value;
+
+    private PackagingPriceHistory? _selectedPriceHistoryEntry;
+    public PackagingPriceHistory? SelectedPriceHistoryEntry
+    {
+        get => _selectedPriceHistoryEntry;
+        set => this.RaiseAndSetIfChanged(ref _selectedPriceHistoryEntry, value);
+    }
+
+    private DateTime _editingPriceDate = DateTime.Today;
+    public DateTime EditingPriceDate
+    {
+        get => _editingPriceDate;
+        set => this.RaiseAndSetIfChanged(ref _editingPriceDate, value);
+    }
+
+    private decimal _editingPrice;
+    public decimal EditingPrice
+    {
+        get => _editingPrice;
+        set => this.RaiseAndSetIfChanged(ref _editingPrice, value);
+    }
+
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> AddPriceCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> DeletePriceCommand { get; }
 
     public PackagingMaterialsViewModel(
         IPackagingMaterialRepository packagingMaterialRepository,
+        IPackagingPriceHistoryRepository priceHistoryRepository,
         ILookupRepository<PackagingCategory> categoryRepository,
         ILookupRepository<UnitOfMeasure> unitOfMeasureRepository)
     {
         _packagingMaterialRepository = packagingMaterialRepository;
+        _priceHistoryRepository = priceHistoryRepository;
 
         _packagingMaterialCache.Connect()
             .SortAndBind(out _packagingMaterials, SortExpressionComparer<PackagingMaterial>.Ascending(p => p.Name))
             .Subscribe();
 
+        _priceHistoryCache.Connect()
+            .SortAndBind(out _priceHistory, SortExpressionComparer<PackagingPriceHistory>.Descending(h => h.Date).ThenByDescending(h => h.Id))
+            .Subscribe();
+
+        _showPriceHistory = this.WhenAnyValue(x => x.SelectedPackagingMaterial)
+            .Select(packagingMaterial => packagingMaterial is not null)
+            .ToProperty(this, x => x.ShowPriceHistory);
+
         this.WhenAnyValue(x => x.SelectedPackagingMaterial)
             .Where(packagingMaterial => packagingMaterial is not null)
             .Subscribe(packagingMaterial => LoadIntoForm(packagingMaterial!));
+
+        this.WhenAnyValue(x => x.SelectedPackagingMaterial)
+            .Subscribe(_ =>
+            {
+                SelectedPriceHistoryEntry = null;
+                EditingPriceDate = DateTime.Today;
+                EditingPrice = 0m;
+            });
+
+        this.WhenAnyValue(x => x.SelectedPackagingMaterial)
+            .Select(packagingMaterial => Observable.FromAsync(() => LoadPriceHistoryAsync(packagingMaterial)))
+            .Switch()
+            .Subscribe();
 
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
@@ -153,6 +207,28 @@ public class PackagingMaterialsViewModel : ReactiveObject
                 await LoadCommand.Execute();
             },
             this.WhenAnyValue(x => x.SelectedPackagingMaterial).Select(packagingMaterial => packagingMaterial is not null));
+
+        AddPriceCommand = ReactiveCommand.CreateFromTask(
+            async () =>
+            {
+                await _priceHistoryRepository.AddAsync(new PackagingPriceHistory
+                {
+                    PackagingMaterialId = SelectedPackagingMaterial!.Id,
+                    Date = DateOnly.FromDateTime(EditingPriceDate),
+                    Price = EditingPrice,
+                }, CancellationToken.None);
+
+                await RefreshSelectedPackagingMaterialAsync();
+            },
+            this.WhenAnyValue(x => x.SelectedPackagingMaterial).Select(packagingMaterial => packagingMaterial is not null));
+
+        DeletePriceCommand = ReactiveCommand.CreateFromTask(
+            async () =>
+            {
+                await _priceHistoryRepository.DeleteAsync(SelectedPriceHistoryEntry!.Id, CancellationToken.None);
+                await RefreshSelectedPackagingMaterialAsync();
+            },
+            this.WhenAnyValue(x => x.SelectedPriceHistoryEntry).Select(entry => entry is not null));
     }
 
     private void LoadIntoForm(PackagingMaterial packagingMaterial)
@@ -163,5 +239,41 @@ public class PackagingMaterialsViewModel : ReactiveObject
         EditingStandardUnit = StandardUnits.FirstOrDefault(u => u.Id == packagingMaterial.StandardUnitId);
         EditingPurchaseUnit = PurchaseUnits.FirstOrDefault(u => u.Id == packagingMaterial.PurchaseUnitId);
         EditingPurchaseUnitQty = packagingMaterial.PurchaseUnitQty;
+    }
+
+    private async Task LoadPriceHistoryAsync(PackagingMaterial? packagingMaterial)
+    {
+        if (packagingMaterial is null)
+        {
+            _priceHistoryCache.Edit(cache => cache.Clear());
+            return;
+        }
+
+        var entries = await _priceHistoryRepository.GetForPackagingMaterialAsync(packagingMaterial.Id, CancellationToken.None);
+        _priceHistoryCache.Edit(cache =>
+        {
+            cache.Clear();
+            cache.AddOrUpdate(entries);
+        });
+    }
+
+    /// <summary>
+    /// Re-fetches the selected packaging material (its CurrentCost just changed) and
+    /// pushes it back into the grid's cache and the selection, which also re-triggers
+    /// the price-history reload above.
+    /// </summary>
+    private async Task RefreshSelectedPackagingMaterialAsync()
+    {
+        if (SelectedPackagingMaterial is null)
+        {
+            return;
+        }
+
+        var refreshed = await _packagingMaterialRepository.GetByIdAsync(SelectedPackagingMaterial.Id, CancellationToken.None);
+        if (refreshed is not null)
+        {
+            _packagingMaterialCache.AddOrUpdate(refreshed);
+            SelectedPackagingMaterial = refreshed;
+        }
     }
 }

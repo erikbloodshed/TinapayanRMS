@@ -5,12 +5,14 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              mc:Ignorable="d"
-             d:DesignHeight="500" d:DesignWidth="900">
+             d:DesignHeight="500" d:DesignWidth="1200">
     <Grid Margin="12">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="16" />
             <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="280" />
         </Grid.ColumnDefinitions>
 
         <syncfusion:SfDataGrid Grid.Column="0"
@@ -61,6 +63,38 @@
                 <syncfusion:ButtonAdv Label="New" Command="{Binding NewCommand}" Margin="0,0,8,0" />
                 <syncfusion:ButtonAdv Label="Save" Command="{Binding SaveCommand}" Margin="0,0,8,0" />
                 <syncfusion:ButtonAdv Label="Delete" Command="{Binding DeleteCommand}" />
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Column="4"
+                    Visibility="{Binding ShowPriceHistory, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <TextBlock Text="Price History" FontSize="14" Margin="0,0,0,8" />
+
+            <syncfusion:SfDataGrid ItemsSource="{Binding PriceHistory}"
+                                    SelectedItem="{Binding SelectedPriceHistoryEntry, Mode=TwoWay}"
+                                    AutoGenerateColumns="False"
+                                    AllowEditing="False"
+                                    SelectionMode="Single"
+                                    NavigationMode="Row"
+                                    Height="200">
+                <syncfusion:SfDataGrid.Columns>
+                    <syncfusion:GridDateTimeColumn MappingName="Date" HeaderText="Date" />
+                    <syncfusion:GridNumericColumn MappingName="Price" HeaderText="Price" />
+                </syncfusion:SfDataGrid.Columns>
+            </syncfusion:SfDataGrid>
+
+            <TextBlock Text="Date" Margin="0,12,0,4" />
+            <syncfusion:DateTimeEdit DateTime="{Binding EditingPriceDate, Mode=TwoWay}"
+                                      Pattern="ShortDate"
+                                      Margin="0,0,0,12" />
+
+            <TextBlock Text="Price (per purchase unit)" Margin="0,0,0,4" />
+            <syncfusion:DoubleTextBox Value="{Binding EditingPrice, Mode=TwoWay}"
+                                       Margin="0,0,0,12" />
+
+            <StackPanel Orientation="Horizontal">
+                <syncfusion:ButtonAdv Label="Add Price" Command="{Binding AddPriceCommand}" Margin="0,0,8,0" />
+                <syncfusion:ButtonAdv Label="Delete Price" Command="{Binding DeletePriceCommand}" />
             </StackPanel>
         </StackPanel>
     </Grid>
