@@ -54,11 +54,49 @@ public class IngredientRulesTests
     [Fact]
     public void EnsureFieldsMatchSource_accepts_a_made_ingredient_with_no_purchase_fields()
     {
-        var ingredient = new Ingredient { Source = IngredientSource.Made };
+        var ingredient = new Ingredient { Source = IngredientSource.Made, WeightLossPercent = 20m };
 
         var act = () => IngredientRules.EnsureFieldsMatchSource(ingredient);
 
         act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureFieldsMatchSource_rejects_a_made_ingredient_without_a_weight_loss_percent()
+    {
+        var ingredient = new Ingredient { Source = IngredientSource.Made };
+
+        var act = () => IngredientRules.EnsureFieldsMatchSource(ingredient);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(100)]
+    public void EnsureFieldsMatchSource_rejects_an_out_of_range_weight_loss_percent(decimal weightLossPercent)
+    {
+        var ingredient = new Ingredient { Source = IngredientSource.Made, WeightLossPercent = weightLossPercent };
+
+        var act = () => IngredientRules.EnsureFieldsMatchSource(ingredient);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void EnsureFieldsMatchSource_rejects_a_purchased_ingredient_with_a_weight_loss_percent()
+    {
+        var ingredient = new Ingredient
+        {
+            Source = IngredientSource.Purchased,
+            PurchaseUnitId = 1,
+            PurchaseUnitQty = 1000m,
+            WeightLossPercent = 10m,
+        };
+
+        var act = () => IngredientRules.EnsureFieldsMatchSource(ingredient);
+
+        act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]

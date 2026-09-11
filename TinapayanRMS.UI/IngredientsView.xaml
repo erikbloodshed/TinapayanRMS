@@ -61,6 +61,12 @@
                                            Margin="0,0,0,12" />
             </StackPanel>
 
+            <StackPanel Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="Weight Loss %" Margin="0,0,0,4" />
+                <syncfusion:DoubleTextBox Value="{Binding EditingWeightLossPercent, Mode=TwoWay}"
+                                           Margin="0,0,0,12" />
+            </StackPanel>
+
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                 <syncfusion:ButtonAdv Label="New" Command="{Binding NewCommand}" Margin="0,0,8,0" />
                 <syncfusion:ButtonAdv Label="Save" Command="{Binding SaveCommand}" Margin="0,0,8,0" />
@@ -98,6 +104,41 @@
                 <syncfusion:ButtonAdv Label="Add Price" Command="{Binding AddPriceCommand}" Margin="0,0,8,0" />
                 <syncfusion:ButtonAdv Label="Delete Price" Command="{Binding DeletePriceCommand}" />
             </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Column="4"
+                    Visibility="{Binding ShowBomEditor, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <TextBlock Text="Bill of Materials" FontSize="14" Margin="0,0,0,8" />
+
+            <syncfusion:SfDataGrid ItemsSource="{Binding BomLineEdits}"
+                                    SelectedItem="{Binding SelectedBomLineEdit, Mode=TwoWay}"
+                                    AutoGenerateColumns="False"
+                                    AllowEditing="False"
+                                    SelectionMode="Single"
+                                    NavigationMode="Row"
+                                    Height="200">
+                <syncfusion:SfDataGrid.Columns>
+                    <syncfusion:GridTextColumn MappingName="Component.Name" HeaderText="Component" />
+                    <syncfusion:GridNumericColumn MappingName="Grams" HeaderText="Grams" />
+                </syncfusion:SfDataGrid.Columns>
+            </syncfusion:SfDataGrid>
+
+            <TextBlock Text="Component" Margin="0,12,0,4" />
+            <syncfusion:ComboBoxAdv ItemsSource="{Binding Ingredients}"
+                                     DisplayMemberPath="Name"
+                                     SelectedItem="{Binding EditingBomComponent, Mode=TwoWay}"
+                                     Margin="0,0,0,12" />
+
+            <TextBlock Text="Grams" Margin="0,0,0,4" />
+            <syncfusion:DoubleTextBox Value="{Binding EditingBomGrams, Mode=TwoWay}"
+                                       Margin="0,0,0,12" />
+
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <syncfusion:ButtonAdv Label="Add Line" Command="{Binding AddBomLineCommand}" Margin="0,0,8,0" />
+                <syncfusion:ButtonAdv Label="Remove Line" Command="{Binding RemoveBomLineCommand}" />
+            </StackPanel>
+
+            <syncfusion:ButtonAdv Label="Save BOM" Command="{Binding SaveBomCommand}" />
         </StackPanel>
     </Grid>
 </UserControl>

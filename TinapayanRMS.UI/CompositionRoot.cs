@@ -35,10 +35,12 @@ public static class CompositionRoot
                 services.AddDbContextFactory<TinapayanRMSDbContext>(options => options.UseSqlServer(connectionString));
 
                 services.AddSingleton(typeof(ILookupRepository<>), typeof(LookupRepository<>));
+                services.AddSingleton<IngredientCostPropagator>();
                 services.AddSingleton<IIngredientRepository, IngredientRepository>();
                 services.AddSingleton<IPackagingMaterialRepository, PackagingMaterialRepository>();
                 services.AddSingleton<IIngredientPriceHistoryRepository, IngredientPriceHistoryRepository>();
                 services.AddSingleton<IPackagingPriceHistoryRepository, PackagingPriceHistoryRepository>();
+                services.AddSingleton<IIngredientBomLineRepository, IngredientBomLineRepository>();
 
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<MainWindow>();

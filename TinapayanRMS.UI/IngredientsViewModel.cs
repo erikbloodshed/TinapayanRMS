@@ -9,10 +9,19 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.UI;
 
+/// <summary>An in-memory (not yet saved) BOM line, shown in the BOM editor grid.</summary>
+public class IngredientBomLineEdit(Ingredient component, decimal grams)
+{
+    public Ingredient Component { get; } = component;
+
+    public decimal Grams { get; } = grams;
+}
+
 public class IngredientsViewModel : ReactiveObject
 {
     private readonly IIngredientRepository _ingredientRepository;
     private readonly IIngredientPriceHistoryRepository _priceHistoryRepository;
+    private readonly IIngredientBomLineRepository _bomLineRepository;
     private readonly SourceCache<Ingredient, int> _ingredientCache = new(i => i.Id);
     private readonly ReadOnlyObservableCollection<Ingredient> _ingredients;
     private readonly SourceCache<IngredientPriceHistory, int> _priceHistoryCache = new(h => h.Id);
@@ -21,6 +30,8 @@ public class IngredientsViewModel : ReactiveObject
     public ReadOnlyObservableCollection<Ingredient> Ingredients => _ingredients;
 
     public ReadOnlyObservableCollection<IngredientPriceHistory> PriceHistory => _priceHistory;
+
+    public ObservableCollection<IngredientBomLineEdit> BomLineEdits { get; } = [];
 
     public ObservableCollection<IngredientCategory> Categories { get; } = [];
 
@@ -72,11 +83,45 @@ public class IngredientsViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _editingPurchaseUnitQty, value);
     }
 
+    private decimal? _editingWeightLossPercent;
+    public decimal? EditingWeightLossPercent
+    {
+        get => _editingWeightLossPercent;
+        set => this.RaiseAndSetIfChanged(ref _editingWeightLossPercent, value);
+    }
+
     private readonly ObservableAsPropertyHelper<bool> _isEditingPurchased;
     public bool IsEditingPurchased => _isEditingPurchased.Value;
 
+    private readonly ObservableAsPropertyHelper<bool> _isEditingMade;
+    public bool IsEditingMade => _isEditingMade.Value;
+
     private readonly ObservableAsPropertyHelper<bool> _showPriceHistory;
     public bool ShowPriceHistory => _showPriceHistory.Value;
+
+    private readonly ObservableAsPropertyHelper<bool> _showBomEditor;
+    public bool ShowBomEditor => _showBomEditor.Value;
+
+    private Ingredient? _editingBomComponent;
+    public Ingredient? EditingBomComponent
+    {
+        get => _editingBomComponent;
+        set => this.RaiseAndSetIfChanged(ref _editingBomComponent, value);
+    }
+
+    private decimal _editingBomGrams;
+    public decimal EditingBomGrams
+    {
+        get => _editingBomGrams;
+        set => this.RaiseAndSetIfChanged(ref _editingBomGrams, value);
+    }
+
+    private IngredientBomLineEdit? _selectedBomLineEdit;
+    public IngredientBomLineEdit? SelectedBomLineEdit
+    {
+        get => _selectedBomLineEdit;
+        set => this.RaiseAndSetIfChanged(ref _selectedBomLineEdit, value);
+    }
 
     private IngredientPriceHistory? _selectedPriceHistoryEntry;
     public IngredientPriceHistory? SelectedPriceHistoryEntry
@@ -105,15 +150,20 @@ public class IngredientsViewModel : ReactiveObject
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddPriceCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeletePriceCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> AddBomLineCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> RemoveBomLineCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> SaveBomCommand { get; }
 
     public IngredientsViewModel(
         IIngredientRepository ingredientRepository,
         IIngredientPriceHistoryRepository priceHistoryRepository,
+        IIngredientBomLineRepository bomLineRepository,
         ILookupRepository<IngredientCategory> categoryRepository,
         ILookupRepository<UnitOfMeasure> unitOfMeasureRepository)
     {
         _ingredientRepository = ingredientRepository;
         _priceHistoryRepository = priceHistoryRepository;
+        _bomLineRepository = bomLineRepository;
 
         _ingredientCache.Connect()
             .SortAndBind(out _ingredients, SortExpressionComparer<Ingredient>.Ascending(i => i.Name))
@@ -127,9 +177,17 @@ public class IngredientsViewModel : ReactiveObject
             .Select(source => source == IngredientSource.Purchased)
             .ToProperty(this, x => x.IsEditingPurchased);
 
+        _isEditingMade = this.WhenAnyValue(x => x.EditingSource)
+            .Select(source => source == IngredientSource.Made)
+            .ToProperty(this, x => x.IsEditingMade);
+
         _showPriceHistory = this.WhenAnyValue(x => x.SelectedIngredient)
             .Select(ingredient => ingredient is { Source: IngredientSource.Purchased })
             .ToProperty(this, x => x.ShowPriceHistory);
+
+        _showBomEditor = this.WhenAnyValue(x => x.SelectedIngredient)
+            .Select(ingredient => ingredient is { Source: IngredientSource.Made })
+            .ToProperty(this, x => x.ShowBomEditor);
 
         this.WhenAnyValue(x => x.SelectedIngredient)
             .Where(ingredient => ingredient is not null)
@@ -141,10 +199,18 @@ public class IngredientsViewModel : ReactiveObject
                 SelectedPriceHistoryEntry = null;
                 EditingPriceDate = DateTime.Today;
                 EditingPrice = 0m;
+                SelectedBomLineEdit = null;
+                EditingBomComponent = null;
+                EditingBomGrams = 0m;
             });
 
         this.WhenAnyValue(x => x.SelectedIngredient)
             .Select(ingredient => Observable.FromAsync(() => LoadPriceHistoryAsync(ingredient)))
+            .Switch()
+            .Subscribe();
+
+        this.WhenAnyValue(x => x.SelectedIngredient)
+            .Select(ingredient => Observable.FromAsync(() => LoadBomLinesAsync(ingredient)))
             .Switch()
             .Subscribe();
 
@@ -175,6 +241,7 @@ public class IngredientsViewModel : ReactiveObject
             EditingSource = IngredientSource.Purchased;
             EditingPurchaseUnit = PurchaseUnits.FirstOrDefault();
             EditingPurchaseUnitQty = null;
+            EditingWeightLossPercent = null;
         });
 
         SaveCommand = ReactiveCommand.CreateFromTask(async () =>
@@ -187,6 +254,7 @@ public class IngredientsViewModel : ReactiveObject
                 Source = EditingSource,
                 PurchaseUnitId = EditingSource == IngredientSource.Purchased ? EditingPurchaseUnit?.Id : null,
                 PurchaseUnitQty = EditingSource == IngredientSource.Purchased ? EditingPurchaseUnitQty : null,
+                WeightLossPercent = EditingSource == IngredientSource.Made ? EditingWeightLossPercent : null,
             };
 
             if (_editingId == 0)
@@ -231,6 +299,23 @@ public class IngredientsViewModel : ReactiveObject
                 await RefreshSelectedIngredientAsync();
             },
             this.WhenAnyValue(x => x.SelectedPriceHistoryEntry).Select(entry => entry is not null));
+
+        AddBomLineCommand = ReactiveCommand.Create(
+            () => BomLineEdits.Add(new IngredientBomLineEdit(EditingBomComponent!, EditingBomGrams)),
+            this.WhenAnyValue(x => x.EditingBomComponent, x => x.EditingBomGrams, (component, grams) => component is not null && grams > 0));
+
+        RemoveBomLineCommand = ReactiveCommand.Create(
+            () => { BomLineEdits.Remove(SelectedBomLineEdit!); },
+            this.WhenAnyValue(x => x.SelectedBomLineEdit).Select(line => line is not null));
+
+        SaveBomCommand = ReactiveCommand.CreateFromTask(
+            async () =>
+            {
+                var lines = BomLineEdits.Select(l => (l.Component.Id, l.Grams)).ToList();
+                await _bomLineRepository.SetLinesAsync(SelectedIngredient!.Id, lines, CancellationToken.None);
+                await RefreshSelectedIngredientAsync();
+            },
+            this.WhenAnyValue(x => x.SelectedIngredient).Select(ingredient => ingredient is { Source: IngredientSource.Made }));
     }
 
     private void LoadIntoForm(Ingredient ingredient)
@@ -241,6 +326,23 @@ public class IngredientsViewModel : ReactiveObject
         EditingSource = ingredient.Source;
         EditingPurchaseUnit = PurchaseUnits.FirstOrDefault(u => u.Id == ingredient.PurchaseUnitId);
         EditingPurchaseUnitQty = ingredient.PurchaseUnitQty;
+        EditingWeightLossPercent = ingredient.WeightLossPercent;
+    }
+
+    private async Task LoadBomLinesAsync(Ingredient? ingredient)
+    {
+        BomLineEdits.Clear();
+
+        if (ingredient is not { Source: IngredientSource.Made })
+        {
+            return;
+        }
+
+        var lines = await _bomLineRepository.GetForIngredientAsync(ingredient.Id, CancellationToken.None);
+        foreach (var line in lines)
+        {
+            BomLineEdits.Add(new IngredientBomLineEdit(line.ComponentIngredient!, line.Grams));
+        }
     }
 
     private async Task LoadPriceHistoryAsync(Ingredient? ingredient)

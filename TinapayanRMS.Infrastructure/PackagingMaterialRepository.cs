@@ -43,7 +43,18 @@ public class PackagingMaterialRepository(IDbContextFactory<TinapayanRMSDbContext
         PackagingMaterialRules.EnsureValidStandardUnit(packagingMaterial.StandardUnitId);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        dbContext.PackagingMaterials.Update(packagingMaterial);
+
+        var existing = await dbContext.PackagingMaterials.FirstOrDefaultAsync(p => p.Id == packagingMaterial.Id, cancellationToken)
+            ?? throw new InvalidOperationException($"Packaging material {packagingMaterial.Id} does not exist.");
+
+        // Field by field, not a blind Update(): CurrentCost is owned by the price-history
+        // rollup (PackagingMaterialRules.ApplyLatestPrice), not by this form.
+        existing.Name = packagingMaterial.Name;
+        existing.PackagingCategoryId = packagingMaterial.PackagingCategoryId;
+        existing.StandardUnitId = packagingMaterial.StandardUnitId;
+        existing.PurchaseUnitId = packagingMaterial.PurchaseUnitId;
+        existing.PurchaseUnitQty = packagingMaterial.PurchaseUnitQty;
+
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

@@ -21,6 +21,9 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : IAsyncLifetim
     private IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
         new TestDbContextFactory(CreateDbContextOptions());
 
+    private IngredientCostPropagator CreateCostPropagator() =>
+        new(CreateDbContextFactory());
+
     private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
         new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options;
 
@@ -42,7 +45,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : IAsyncLifetim
     public async Task A_purchased_ingredient_can_be_added_and_read_back()
     {
         var categoryId = await SeedCategoryAsync();
-        var repository = new IngredientRepository(CreateDbContextFactory());
+        var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new Ingredient
         {
@@ -66,13 +69,14 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : IAsyncLifetim
     public async Task A_made_ingredient_can_be_added_with_no_purchase_fields()
     {
         var categoryId = await SeedCategoryAsync();
-        var repository = new IngredientRepository(CreateDbContextFactory());
+        var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new Ingredient
         {
             Name = "Simple Syrup",
             IngredientCategoryId = categoryId,
             Source = IngredientSource.Made,
+            WeightLossPercent = 20m,
         }, Cancellation);
 
         var ingredient = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
@@ -85,7 +89,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : IAsyncLifetim
     public async Task AddAsync_rejects_a_purchased_ingredient_without_a_purchase_unit()
     {
         var categoryId = await SeedCategoryAsync();
-        var repository = new IngredientRepository(CreateDbContextFactory());
+        var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         var act = () => repository.AddAsync(new Ingredient
         {
@@ -101,7 +105,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : IAsyncLifetim
     public async Task UpdateAsync_rejects_changing_an_ingredients_source()
     {
         var categoryId = await SeedCategoryAsync();
-        var repository = new IngredientRepository(CreateDbContextFactory());
+        var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new Ingredient
         {
@@ -116,6 +120,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : IAsyncLifetim
         ingredient.Source = IngredientSource.Made;
         ingredient.PurchaseUnitId = null;
         ingredient.PurchaseUnitQty = null;
+        ingredient.WeightLossPercent = 20m;
 
         var act = () => repository.UpdateAsync(ingredient, Cancellation);
 
@@ -126,13 +131,14 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : IAsyncLifetim
     public async Task DeleteAsync_removes_the_ingredient()
     {
         var categoryId = await SeedCategoryAsync();
-        var repository = new IngredientRepository(CreateDbContextFactory());
+        var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new Ingredient
         {
             Name = "Water",
             IngredientCategoryId = categoryId,
             Source = IngredientSource.Made,
+            WeightLossPercent = 0m,
         }, Cancellation);
 
         var ingredient = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
@@ -145,13 +151,14 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : IAsyncLifetim
     public async Task Duplicate_ingredient_names_are_rejected()
     {
         var categoryId = await SeedCategoryAsync();
-        var repository = new IngredientRepository(CreateDbContextFactory());
+        var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new Ingredient
         {
             Name = "Butter",
             IngredientCategoryId = categoryId,
             Source = IngredientSource.Made,
+            WeightLossPercent = 0m,
         }, Cancellation);
 
         var act = () => repository.AddAsync(new Ingredient
@@ -159,6 +166,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : IAsyncLifetim
             Name = "Butter",
             IngredientCategoryId = categoryId,
             Source = IngredientSource.Made,
+            WeightLossPercent = 0m,
         }, Cancellation);
 
         await act.Should().ThrowAsync<DbUpdateException>();

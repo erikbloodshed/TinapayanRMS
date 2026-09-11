@@ -24,6 +24,8 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<PackagingPriceHistory> PackagingPriceHistories => Set<PackagingPriceHistory>();
 
+    public DbSet<IngredientBomLine> IngredientBomLines => Set<IngredientBomLine>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TinapayanRMSDbContext).Assembly);

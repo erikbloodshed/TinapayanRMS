@@ -58,6 +58,10 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<decimal?>("WeightLossPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("IngredientCategoryId");
@@ -68,6 +72,34 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.HasIndex("PurchaseUnitId");
 
                     b.ToTable("Ingredients");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.IngredientBomLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ComponentIngredientId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Grams")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("IngredientId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComponentIngredientId");
+
+                    b.HasIndex("IngredientId", "ComponentIngredientId")
+                        .IsUnique();
+
+                    b.ToTable("IngredientBomLines");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.IngredientCategory", b =>
@@ -289,6 +321,25 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("IngredientCategory");
 
                     b.Navigation("PurchaseUnit");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.IngredientBomLine", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Ingredient", "ComponentIngredient")
+                        .WithMany()
+                        .HasForeignKey("ComponentIngredientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.Ingredient", "Ingredient")
+                        .WithMany()
+                        .HasForeignKey("IngredientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ComponentIngredient");
+
+                    b.Navigation("Ingredient");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.IngredientPriceHistory", b =>

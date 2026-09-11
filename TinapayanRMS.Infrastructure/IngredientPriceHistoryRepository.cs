@@ -4,7 +4,9 @@ using TinapayanRMS.Domain;
 
 namespace TinapayanRMS.Infrastructure;
 
-public class IngredientPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IIngredientPriceHistoryRepository
+public class IngredientPriceHistoryRepository(
+    IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,
+    IngredientCostPropagator costPropagator) : IIngredientPriceHistoryRepository
 {
     public async Task<IReadOnlyList<IngredientPriceHistory>> GetForIngredientAsync(int ingredientId, CancellationToken cancellationToken)
     {
@@ -41,6 +43,10 @@ public class IngredientPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbCo
         IngredientRules.ApplyLatestPrice(ingredient, latest);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // This ingredient's own cost just changed — ripple it to any made ingredient
+        // that (directly or transitively) uses it as a BOM component.
+        await costPropagator.RecomputeAndPropagateAsync(ingredient.Id, cancellationToken);
     }
 
     public async Task UpdateAsync(IngredientPriceHistory entry, CancellationToken cancellationToken)
@@ -62,6 +68,8 @@ public class IngredientPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbCo
         IngredientRules.ApplyLatestPrice(ingredient, latest);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await costPropagator.RecomputeAndPropagateAsync(ingredient.Id, cancellationToken);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
@@ -84,5 +92,7 @@ public class IngredientPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbCo
         IngredientRules.ApplyLatestPrice(ingredient, latest);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await costPropagator.RecomputeAndPropagateAsync(ingredient.Id, cancellationToken);
     }
 }

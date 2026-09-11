@@ -21,6 +21,9 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : I
     private IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
         new TestDbContextFactory(CreateDbContextOptions());
 
+    private IngredientCostPropagator CreateCostPropagator() =>
+        new(CreateDbContextFactory());
+
     private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
         new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options;
 
@@ -77,7 +80,7 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : I
     public async Task Adding_the_first_price_entry_sets_CurrentCost_and_CostPerGram()
     {
         var ingredientId = await SeedPurchasedIngredientAsync();
-        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory());
+        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new IngredientPriceHistory
         {
@@ -95,7 +98,7 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : I
     public async Task Adding_a_newer_dated_entry_replaces_CurrentCost()
     {
         var ingredientId = await SeedPurchasedIngredientAsync();
-        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory());
+        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
         await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, Date = new DateOnly(2026, 2, 1), Price = 950m }, Cancellation);
@@ -108,7 +111,7 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : I
     public async Task Adding_an_older_dated_entry_does_not_change_CurrentCost()
     {
         var ingredientId = await SeedPurchasedIngredientAsync();
-        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory());
+        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, Date = new DateOnly(2026, 2, 1), Price = 950m }, Cancellation);
         await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
@@ -121,7 +124,7 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : I
     public async Task Deleting_the_latest_entry_reverts_CurrentCost_to_the_next_latest()
     {
         var ingredientId = await SeedPurchasedIngredientAsync();
-        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory());
+        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
         await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, Date = new DateOnly(2026, 2, 1), Price = 950m }, Cancellation);
@@ -139,7 +142,7 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : I
     public async Task Deleting_the_only_entry_clears_CurrentCost_and_CostPerGram()
     {
         var ingredientId = await SeedPurchasedIngredientAsync();
-        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory());
+        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
         var entry = (await repository.GetForIngredientAsync(ingredientId, Cancellation)).Should().ContainSingle().Subject;
@@ -155,7 +158,7 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : I
     public async Task Updating_an_entrys_price_recomputes_CurrentCost()
     {
         var ingredientId = await SeedPurchasedIngredientAsync();
-        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory());
+        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
         var entry = (await repository.GetForIngredientAsync(ingredientId, Cancellation)).Should().ContainSingle().Subject;
@@ -171,7 +174,7 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : I
     public async Task AddAsync_rejects_a_non_positive_price()
     {
         var ingredientId = await SeedPurchasedIngredientAsync();
-        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory());
+        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         var act = () => repository.AddAsync(new IngredientPriceHistory
         {
@@ -187,7 +190,7 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : I
     public async Task AddAsync_rejects_price_history_for_a_made_ingredient()
     {
         var ingredientId = await SeedMadeIngredientAsync();
-        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory());
+        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         var act = () => repository.AddAsync(new IngredientPriceHistory
         {
@@ -203,7 +206,7 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : I
     public async Task Deleting_an_ingredient_cascades_to_its_price_history()
     {
         var ingredientId = await SeedPurchasedIngredientAsync();
-        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory());
+        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
         await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
 
         await using (var dbContext = CreateDbContext())
