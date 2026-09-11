@@ -48,6 +48,8 @@ public static class CompositionRoot
                 services.AddSingleton<IProductSubAssemblyUsageRepository, ProductSubAssemblyUsageRepository>();
                 services.AddSingleton<IPackagingLineRepository, PackagingLineRepository>();
                 services.AddSingleton<ICostingParametersRepository, CostingParametersRepository>();
+                services.AddSingleton<IProductTabLinkRepository, ProductTabLinkRepository>();
+                services.AddSingleton<IProductCloner, ProductCloner>();
 
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<MainWindow>();

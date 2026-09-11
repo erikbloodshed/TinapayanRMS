@@ -17,6 +17,38 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<PackagingLine>> GetEffectiveForProductAsync(int productId, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await ResolveEffectiveAsync(dbContext, productId, [], cancellationToken);
+    }
+
+    /// <summary>Follows the Packaging tab's link chain (if any) until an unlinked tab is found, then returns that tab's own lines. visitedProductIds guards against a cycle slipping past SetLinkAsync's own check (e.g. a manual data edit).</summary>
+    private static async Task<IReadOnlyList<PackagingLine>> ResolveEffectiveAsync(
+        TinapayanRMSDbContext dbContext, int productId, HashSet<int> visitedProductIds, CancellationToken cancellationToken)
+    {
+        if (!visitedProductIds.Add(productId))
+        {
+            throw new InvalidOperationException("Circular product tab link detected.");
+        }
+
+        var link = await dbContext.ProductTabLinks
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.ProductId == productId && l.TabKind == ProductTabKind.Packaging, cancellationToken);
+
+        if (link is not null)
+        {
+            return await ResolveEffectiveAsync(dbContext, link.LinkedProductId, visitedProductIds, cancellationToken);
+        }
+
+        return await dbContext.PackagingLines
+            .AsNoTracking()
+            .Include(l => l.PackagingMaterial)
+            .Include(l => l.EntryUnit)
+            .Where(l => l.ProductId == productId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task SetLinesAsync(
         int productId,
         IReadOnlyList<(int PackagingMaterialId, int EntryUnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
@@ -30,6 +62,13 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         if (!productExists)
         {
             throw new InvalidOperationException($"Product {productId} does not exist.");
+        }
+
+        var tabIsLinked = await dbContext.ProductTabLinks
+            .AnyAsync(l => l.ProductId == productId && l.TabKind == ProductTabKind.Packaging, cancellationToken);
+        if (tabIsLinked)
+        {
+            throw new InvalidOperationException("The Packaging tab is Live Template-linked — unlink it before editing its lines directly.");
         }
 
         var materialStandardUnits = await dbContext.PackagingMaterials

@@ -40,6 +40,8 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<CostingParameters> CostingParameters => Set<CostingParameters>();
 
+    public DbSet<ProductTabLink> ProductTabLinks => Set<ProductTabLink>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TinapayanRMSDbContext).Assembly);

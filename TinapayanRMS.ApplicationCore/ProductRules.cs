@@ -4,13 +4,14 @@ namespace TinapayanRMS.ApplicationCore;
 
 public static class ProductRules
 {
+    /// <summary>
+    /// Usages are now set one role (tab) at a time (Phase 10), so an empty list is valid
+    /// here — it means this role currently has no usages, not that the whole product has
+    /// none. Nothing stops every tab from independently being empty; PLAN.md doesn't
+    /// require a product to have at least one usage at all times.
+    /// </summary>
     public static void EnsureValidUsages(IReadOnlyList<(int SubAssemblyId, decimal WeightPerPiece)> usages)
     {
-        if (usages.Count == 0)
-        {
-            throw new InvalidOperationException("A product needs at least one sub-assembly usage.");
-        }
-
         if (usages.Any(u => u.WeightPerPiece <= 0))
         {
             throw new InvalidOperationException("A sub-assembly usage's weight per piece must be positive.");

@@ -71,13 +71,13 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     }
 
     [Fact]
-    public async Task SetUsagesAsync_stores_usages_with_the_sub_assembly_populated_on_read()
+    public async Task SetUsagesForRoleAsync_stores_usages_with_the_sub_assembly_populated_on_read()
     {
         var roleId = await SeedRoleAsync("Filling");
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
         var productId = await SeedProductAsync("Ensaymada");
 
-        await CreateUsageRepository().SetUsagesAsync(productId, [(subAssemblyId, 10m)], Cancellation);
+        await CreateUsageRepository().SetUsagesForRoleAsync(productId, roleId, [(subAssemblyId, 10m)], Cancellation);
 
         var usages = await CreateUsageRepository().GetForProductAsync(productId, Cancellation);
         var usage = usages.Should().ContainSingle().Subject;
@@ -87,17 +87,30 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     }
 
     [Fact]
-    public async Task SetUsagesAsync_rejects_the_same_sub_assembly_twice()
+    public async Task SetUsagesForRoleAsync_rejects_the_same_sub_assembly_twice()
     {
         var roleId = await SeedRoleAsync("Filling");
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
         var productId = await SeedProductAsync("Ensaymada");
 
-        var act = () => CreateUsageRepository().SetUsagesAsync(productId,
+        var act = () => CreateUsageRepository().SetUsagesForRoleAsync(productId, roleId,
         [
             (subAssemblyId, 10m),
             (subAssemblyId, 20m),
         ], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task SetUsagesForRoleAsync_rejects_a_sub_assembly_that_belongs_to_a_different_role()
+    {
+        var fillingRoleId = await SeedRoleAsync("Filling");
+        var doughRoleId = await SeedRoleAsync("Dough", sortOrder: 2);
+        var doughId = await SeedSubAssemblyAsync("Bread Dough", doughRoleId, totalWeight: 1000m, totalCost: 50m);
+        var productId = await SeedProductAsync("Ensaymada");
+
+        var act = () => CreateUsageRepository().SetUsagesForRoleAsync(productId, fillingRoleId, [(doughId, 10m)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -108,7 +121,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         var roleId = await SeedRoleAsync("Filling");
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
         var productId = await SeedProductAsync("Ensaymada");
-        await CreateUsageRepository().SetUsagesAsync(productId, [(subAssemblyId, 10m)], Cancellation);
+        await CreateUsageRepository().SetUsagesForRoleAsync(productId, roleId, [(subAssemblyId, 10m)], Cancellation);
 
         await using var dbContext = CreateDbContext();
         var act = () => dbContext.SubAssemblies.Where(s => s.Id == subAssemblyId).ExecuteDeleteAsync(Cancellation);
@@ -214,7 +227,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
         var productId = await SeedProductAsync("Ensaymada");
 
-        await CreateUsageRepository().SetUsagesAsync(productId, [(subAssemblyId, 10m)], Cancellation);
+        await CreateUsageRepository().SetUsagesForRoleAsync(productId, roleId, [(subAssemblyId, 10m)], Cancellation);
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
             (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
@@ -273,12 +286,12 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     }
 
     [Fact]
-    public async Task SetUsagesAsync_rejects_a_nonexistent_product()
+    public async Task SetUsagesForRoleAsync_rejects_a_nonexistent_product()
     {
         var roleId = await SeedRoleAsync("Filling");
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
 
-        var act = () => CreateUsageRepository().SetUsagesAsync(999_999, [(subAssemblyId, 10m)], Cancellation);
+        var act = () => CreateUsageRepository().SetUsagesForRoleAsync(999_999, roleId, [(subAssemblyId, 10m)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }

@@ -39,16 +39,25 @@
                         Visibility="{Binding ShowProductDetail, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <TextBlock Text="Sub-Assembly Usages" FontSize="14" Margin="0,0,0,8" />
 
+                <TextBlock Text="Role (Tab)" Margin="0,0,0,4" />
+                <syncfusion:ComboBoxAdv ItemsSource="{Binding Roles}"
+                                         DisplayMemberPath="Name"
+                                         SelectedItem="{Binding EditingUsageRole, Mode=TwoWay}"
+                                         Margin="0,0,0,8" />
+
+                <TextBlock Text="This tab is Live Template-linked — unlink it below to edit its usages directly."
+                           Foreground="#B36B00" TextWrapping="Wrap" Margin="0,0,0,8"
+                           Visibility="{Binding IsSelectedRoleLinked, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
                 <syncfusion:SfDataGrid ItemsSource="{Binding UsageEdits}"
                                         SelectedItem="{Binding SelectedUsageEdit, Mode=TwoWay}"
                                         AutoGenerateColumns="False"
                                         AllowEditing="False"
                                         SelectionMode="Single"
                                         NavigationMode="Row"
-                                        Height="220">
+                                        Height="190">
                     <syncfusion:SfDataGrid.Columns>
                         <syncfusion:GridTextColumn MappingName="SubAssembly.Name" HeaderText="Sub-Assembly" />
-                        <syncfusion:GridTextColumn MappingName="SubAssembly.Role.Name" HeaderText="Role" />
                         <syncfusion:GridNumericColumn MappingName="WeightPerPiece" HeaderText="Wt/Piece (g)" />
                         <syncfusion:GridNumericColumn MappingName="Yield" HeaderText="Yield" />
                         <syncfusion:GridNumericColumn MappingName="CostPerPiece" HeaderText="Cost/Piece" />
@@ -56,7 +65,7 @@
                 </syncfusion:SfDataGrid>
 
                 <TextBlock Text="Sub-Assembly" Margin="0,12,0,4" />
-                <syncfusion:ComboBoxAdv ItemsSource="{Binding SubAssemblies}"
+                <syncfusion:ComboBoxAdv ItemsSource="{Binding SubAssembliesForSelectedRole}"
                                          DisplayMemberPath="Name"
                                          SelectedItem="{Binding EditingUsageSubAssembly, Mode=TwoWay}"
                                          Margin="0,0,0,12" />
@@ -76,6 +85,10 @@
             <StackPanel Width="420" Margin="16,0,0,0"
                         Visibility="{Binding ShowProductDetail, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <TextBlock Text="Packaging Lines" FontSize="14" Margin="0,0,0,8" />
+
+                <TextBlock Text="The Packaging tab is Live Template-linked — unlink it below to edit its lines directly."
+                           Foreground="#B36B00" TextWrapping="Wrap" Margin="0,0,0,8"
+                           Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
                 <syncfusion:SfDataGrid ItemsSource="{Binding LineEdits}"
                                         SelectedItem="{Binding SelectedLineEdit, Mode=TwoWay}"
@@ -172,6 +185,59 @@
                     <TextBlock Grid.Row="3" Grid.Column="0" Text="Selling Price" FontWeight="Bold" Margin="0,8,0,0" />
                     <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SellingPrice, StringFormat={}{0:N2}}" FontWeight="Bold" Margin="0,8,0,0" />
                 </Grid>
+            </StackPanel>
+
+            <StackPanel Width="340" Margin="16,0,0,0"
+                        Visibility="{Binding ShowProductDetail, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="Tab Links (Live Template)" FontSize="14" Margin="0,0,0,8" />
+
+                <syncfusion:SfDataGrid ItemsSource="{Binding TabLinks}"
+                                        SelectedItem="{Binding SelectedTabLink, Mode=TwoWay}"
+                                        AutoGenerateColumns="False"
+                                        AllowEditing="False"
+                                        SelectionMode="Single"
+                                        NavigationMode="Row"
+                                        Height="140">
+                    <syncfusion:SfDataGrid.Columns>
+                        <syncfusion:GridTextColumn MappingName="TabName" HeaderText="Tab" />
+                        <syncfusion:GridTextColumn MappingName="LinkedToProductName" HeaderText="Linked To" />
+                    </syncfusion:SfDataGrid.Columns>
+                </syncfusion:SfDataGrid>
+
+                <syncfusion:ButtonAdv Label="Unlink Selected Tab" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding UnlinkTabCommand}" Margin="0,8,0,16" />
+
+                <Border BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,0,0,12" />
+
+                <TextBlock Text="Link a Tab" FontSize="14" Margin="0,0,0,8" />
+
+                <TextBlock Text="Tab Kind" Margin="0,0,0,4" />
+                <syncfusion:ComboBoxAdv ItemsSource="{Binding TabKindOptions}"
+                                         SelectedItem="{Binding EditingLinkTabKind, Mode=TwoWay}"
+                                         Margin="0,0,0,12" />
+
+                <TextBlock Text="Role (only for a SubAssemblyRole tab)" Margin="0,0,0,4" />
+                <syncfusion:ComboBoxAdv ItemsSource="{Binding Roles}"
+                                         DisplayMemberPath="Name"
+                                         SelectedItem="{Binding EditingLinkRole, Mode=TwoWay}"
+                                         Margin="0,0,0,12" />
+
+                <TextBlock Text="Link To Product" Margin="0,0,0,4" />
+                <syncfusion:ComboBoxAdv ItemsSource="{Binding LinkTargetProductOptions}"
+                                         DisplayMemberPath="Name"
+                                         SelectedItem="{Binding EditingLinkTargetProduct, Mode=TwoWay}"
+                                         Margin="0,0,0,12" />
+
+                <syncfusion:ButtonAdv Label="Link Tab" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding LinkTabCommand}" Margin="0,0,0,16" />
+
+                <Border BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,0,0,12" />
+
+                <TextBlock Text="Clone This Product" FontSize="14" Margin="0,0,0,8" />
+
+                <TextBlock Text="New Product Name" Margin="0,0,0,4" />
+                <syncfusion:SfTextBoxExt Text="{Binding EditingCloneName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          Margin="0,0,0,12" />
+
+                <syncfusion:ButtonAdv Label="Clone" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding CloneCommand}" />
             </StackPanel>
 
         </StackPanel>

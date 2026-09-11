@@ -362,6 +362,43 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.ToTable("ProductSubAssemblyUsages");
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.ProductTabLink", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("LinkedProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SubAssemblyRoleId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TabKind")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkedProductId");
+
+                    b.HasIndex("ProductId")
+                        .IsUnique()
+                        .HasFilter("[SubAssemblyRoleId] IS NULL");
+
+                    b.HasIndex("SubAssemblyRoleId");
+
+                    b.HasIndex("ProductId", "SubAssemblyRoleId")
+                        .IsUnique()
+                        .HasFilter("[SubAssemblyRoleId] IS NOT NULL");
+
+                    b.ToTable("ProductTabLinks");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.SubAssembly", b =>
                 {
                     b.Property<int>("Id")
@@ -688,6 +725,32 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("SubAssembly");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.ProductTabLink", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Product", "LinkedProduct")
+                        .WithMany()
+                        .HasForeignKey("LinkedProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.SubAssemblyRole", "SubAssemblyRole")
+                        .WithMany()
+                        .HasForeignKey("SubAssemblyRoleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("LinkedProduct");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("SubAssemblyRole");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.SubAssembly", b =>

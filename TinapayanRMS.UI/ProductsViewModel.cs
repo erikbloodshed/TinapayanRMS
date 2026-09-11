@@ -44,18 +44,34 @@ public class PackagingLineEdit(PackagingMaterial packagingMaterial, UnitOfMeasur
         PackagingMaterial.CurrentCost, PackagingMaterial.PurchaseUnitQty, QtyPerPiece, EntryUnit.Id, PackagingMaterial.StandardUnitId);
 }
 
+/// <summary>A row in the Tab Links grid: a link plus the display name of the role it's for (or "Packaging").</summary>
+public class TabLinkRow(ProductTabLink link)
+{
+    public ProductTabLink Link { get; } = link;
+
+    public string TabName => Link.TabKind == ProductTabKind.Packaging ? "Packaging" : Link.SubAssemblyRole?.Name ?? "?";
+
+    public string LinkedToProductName => Link.LinkedProduct?.Name ?? "?";
+}
+
 public class ProductsViewModel : ReactiveObject
 {
     private readonly IProductRepository _productRepository;
     private readonly IProductSubAssemblyUsageRepository _usageRepository;
     private readonly IPackagingLineRepository _packagingLineRepository;
     private readonly ICostingParametersRepository _costingParametersRepository;
+    private readonly IProductTabLinkRepository _tabLinkRepository;
+    private readonly IProductCloner _productCloner;
     private readonly SourceCache<Product, int> _productCache = new(p => p.Id);
     private readonly ReadOnlyObservableCollection<Product> _products;
 
     public ReadOnlyObservableCollection<Product> Products => _products;
 
+    public ObservableCollection<SubAssemblyRole> Roles { get; } = [];
+
     public ObservableCollection<SubAssembly> SubAssemblies { get; } = [];
+
+    public ObservableCollection<SubAssembly> SubAssembliesForSelectedRole { get; } = [];
 
     public ObservableCollection<PackagingMaterial> PackagingMaterials { get; } = [];
 
@@ -65,9 +81,23 @@ public class ProductsViewModel : ReactiveObject
 
     public IReadOnlyList<PackagingLineAuthoredField> AuthoredFieldOptions { get; } = Enum.GetValues<PackagingLineAuthoredField>();
 
+    public IReadOnlyList<ProductTabKind> TabKindOptions { get; } = Enum.GetValues<ProductTabKind>();
+
     public ObservableCollection<ProductUsageEdit> UsageEdits { get; } = [];
 
     public ObservableCollection<PackagingLineEdit> LineEdits { get; } = [];
+
+    public ObservableCollection<TabLinkRow> TabLinks { get; } = [];
+
+    public ObservableCollection<Product> LinkTargetProductOptions { get; } = [];
+
+    /// <summary>
+    /// Every role's last-saved effective usage costs, keyed by role id — used so the cost
+    /// summary reflects the whole product, not just the currently-selected tab. The
+    /// currently-selected role's entry is always superseded by the live UsageEdits list
+    /// when recomputing (see RecomputeSummary), so it's never double-counted.
+    /// </summary>
+    private Dictionary<int, List<decimal>> _effectiveUsageCostsPerPieceByRoleId = [];
 
     private Product? _selectedProduct;
     public Product? SelectedProduct
@@ -83,6 +113,13 @@ public class ProductsViewModel : ReactiveObject
     {
         get => _editingName;
         set => this.RaiseAndSetIfChanged(ref _editingName, value);
+    }
+
+    private SubAssemblyRole? _editingUsageRole;
+    public SubAssemblyRole? EditingUsageRole
+    {
+        get => _editingUsageRole;
+        set => this.RaiseAndSetIfChanged(ref _editingUsageRole, value);
     }
 
     private SubAssembly? _editingUsageSubAssembly;
@@ -104,6 +141,20 @@ public class ProductsViewModel : ReactiveObject
     {
         get => _selectedUsageEdit;
         set => this.RaiseAndSetIfChanged(ref _selectedUsageEdit, value);
+    }
+
+    private bool _isSelectedRoleLinked;
+    public bool IsSelectedRoleLinked
+    {
+        get => _isSelectedRoleLinked;
+        private set => this.RaiseAndSetIfChanged(ref _isSelectedRoleLinked, value);
+    }
+
+    private bool _isPackagingLinked;
+    public bool IsPackagingLinked
+    {
+        get => _isPackagingLinked;
+        private set => this.RaiseAndSetIfChanged(ref _isPackagingLinked, value);
     }
 
     private PackagingMaterial? _editingLinePackagingMaterial;
@@ -200,6 +251,41 @@ public class ProductsViewModel : ReactiveObject
     private readonly ObservableAsPropertyHelper<bool> _showProductDetail;
     public bool ShowProductDetail => _showProductDetail.Value;
 
+    private ProductTabKind _editingLinkTabKind;
+    public ProductTabKind EditingLinkTabKind
+    {
+        get => _editingLinkTabKind;
+        set => this.RaiseAndSetIfChanged(ref _editingLinkTabKind, value);
+    }
+
+    private SubAssemblyRole? _editingLinkRole;
+    public SubAssemblyRole? EditingLinkRole
+    {
+        get => _editingLinkRole;
+        set => this.RaiseAndSetIfChanged(ref _editingLinkRole, value);
+    }
+
+    private Product? _editingLinkTargetProduct;
+    public Product? EditingLinkTargetProduct
+    {
+        get => _editingLinkTargetProduct;
+        set => this.RaiseAndSetIfChanged(ref _editingLinkTargetProduct, value);
+    }
+
+    private TabLinkRow? _selectedTabLink;
+    public TabLinkRow? SelectedTabLink
+    {
+        get => _selectedTabLink;
+        set => this.RaiseAndSetIfChanged(ref _selectedTabLink, value);
+    }
+
+    private string _editingCloneName = string.Empty;
+    public string EditingCloneName
+    {
+        get => _editingCloneName;
+        set => this.RaiseAndSetIfChanged(ref _editingCloneName, value);
+    }
+
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
@@ -211,13 +297,19 @@ public class ProductsViewModel : ReactiveObject
     public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveLinesCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCostingCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> LinkTabCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> UnlinkTabCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> CloneCommand { get; }
 
     public ProductsViewModel(
         IProductRepository productRepository,
         IProductSubAssemblyUsageRepository usageRepository,
         IPackagingLineRepository packagingLineRepository,
         ICostingParametersRepository costingParametersRepository,
+        IProductTabLinkRepository tabLinkRepository,
+        IProductCloner productCloner,
         ISubAssemblyRepository subAssemblyRepository,
+        ISubAssemblyRoleRepository subAssemblyRoleRepository,
         IPackagingMaterialRepository packagingMaterialRepository,
         ILookupRepository<UnitOfMeasure> unitOfMeasureRepository)
     {
@@ -225,6 +317,8 @@ public class ProductsViewModel : ReactiveObject
         _usageRepository = usageRepository;
         _packagingLineRepository = packagingLineRepository;
         _costingParametersRepository = costingParametersRepository;
+        _tabLinkRepository = tabLinkRepository;
+        _productCloner = productCloner;
 
         _productCache.Connect()
             .SortAndBind(out _products, SortExpressionComparer<Product>.Ascending(p => p.Name))
@@ -239,10 +333,11 @@ public class ProductsViewModel : ReactiveObject
             .Subscribe(product => LoadIntoForm(product!));
 
         this.WhenAnyValue(x => x.SelectedProduct)
-            .Subscribe(_ =>
+            .Subscribe(product =>
             {
                 SelectedUsageEdit = null;
                 SelectedLineEdit = null;
+                SelectedTabLink = null;
                 EditingUsageSubAssembly = null;
                 EditingUsageWeightPerPiece = 0m;
                 EditingLinePackagingMaterial = null;
@@ -251,10 +346,18 @@ public class ProductsViewModel : ReactiveObject
                 EditingOverheadCost = 0m;
                 EditingMarginPercent = 0m;
                 EditingVatPercent = 0m;
+                EditingCloneName = product is not null ? $"{product.Name} Copy" : string.Empty;
+
+                RefreshLinkTargetProductOptions();
             });
 
         this.WhenAnyValue(x => x.SelectedProduct)
             .Select(product => Observable.FromAsync(() => LoadProductDetailAsync(product)))
+            .Switch()
+            .Subscribe();
+
+        this.WhenAnyValue(x => x.EditingUsageRole)
+            .Select(role => Observable.FromAsync(() => LoadUsagesForRoleAsync(role)))
             .Switch()
             .Subscribe();
 
@@ -266,6 +369,10 @@ public class ProductsViewModel : ReactiveObject
 
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
+            var roles = await subAssemblyRoleRepository.GetAllAsync(CancellationToken.None);
+            Roles.Clear();
+            Roles.AddRange(roles);
+
             var subAssemblies = await subAssemblyRepository.GetAllAsync(CancellationToken.None);
             SubAssemblies.Clear();
             SubAssemblies.AddRange(subAssemblies.OrderBy(s => s.Name));
@@ -284,6 +391,8 @@ public class ProductsViewModel : ReactiveObject
                 cache.Clear();
                 cache.AddOrUpdate(products);
             });
+
+            RefreshLinkTargetProductOptions();
         });
 
         NewCommand = ReactiveCommand.Create(() =>
@@ -293,6 +402,8 @@ public class ProductsViewModel : ReactiveObject
             EditingName = string.Empty;
             UsageEdits.Clear();
             LineEdits.Clear();
+            TabLinks.Clear();
+            EditingUsageRole = Roles.FirstOrDefault();
             RecomputeSummary();
         });
 
@@ -327,7 +438,9 @@ public class ProductsViewModel : ReactiveObject
                 UsageEdits.Add(new ProductUsageEdit(EditingUsageSubAssembly!, EditingUsageWeightPerPiece));
                 RecomputeSummary();
             },
-            this.WhenAnyValue(x => x.EditingUsageSubAssembly, x => x.EditingUsageWeightPerPiece, (subAssembly, grams) => subAssembly is not null && grams > 0));
+            this.WhenAnyValue(
+                x => x.EditingUsageSubAssembly, x => x.EditingUsageWeightPerPiece, x => x.IsSelectedRoleLinked,
+                (subAssembly, grams, linked) => subAssembly is not null && grams > 0 && !linked));
 
         RemoveUsageCommand = ReactiveCommand.Create(
             () =>
@@ -335,16 +448,20 @@ public class ProductsViewModel : ReactiveObject
                 UsageEdits.Remove(SelectedUsageEdit!);
                 RecomputeSummary();
             },
-            this.WhenAnyValue(x => x.SelectedUsageEdit).Select(usage => usage is not null));
+            this.WhenAnyValue(x => x.SelectedUsageEdit, x => x.IsSelectedRoleLinked, (usage, linked) => usage is not null && !linked));
 
         SaveUsagesCommand = ReactiveCommand.CreateFromTask(
             async () =>
             {
                 var usages = UsageEdits.Select(u => (u.SubAssembly.Id, u.WeightPerPiece)).ToList();
-                await _usageRepository.SetUsagesAsync(SelectedProduct!.Id, usages, CancellationToken.None);
-                await LoadProductDetailAsync(SelectedProduct);
+                await _usageRepository.SetUsagesForRoleAsync(SelectedProduct!.Id, EditingUsageRole!.Id, usages, CancellationToken.None);
+                await LoadEffectiveUsageCostsAsync(SelectedProduct);
+                await LoadUsagesForRoleAsync(EditingUsageRole);
+                RecomputeSummary();
             },
-            this.WhenAnyValue(x => x.SelectedProduct).Select(product => product is not null));
+            this.WhenAnyValue(
+                x => x.SelectedProduct, x => x.EditingUsageRole, x => x.IsSelectedRoleLinked,
+                (product, role, linked) => product is not null && role is not null && !linked));
 
         AddLineCommand = ReactiveCommand.Create(
             () =>
@@ -354,8 +471,8 @@ public class ProductsViewModel : ReactiveObject
                 RecomputeSummary();
             },
             this.WhenAnyValue(
-                x => x.EditingLinePackagingMaterial, x => x.EditingLineEntryUnit, x => x.EditingLineAuthoredValue,
-                (material, unit, value) => material is not null && unit is not null && value > 0));
+                x => x.EditingLinePackagingMaterial, x => x.EditingLineEntryUnit, x => x.EditingLineAuthoredValue, x => x.IsPackagingLinked,
+                (material, unit, value, linked) => material is not null && unit is not null && value > 0 && !linked));
 
         RemoveLineCommand = ReactiveCommand.Create(
             () =>
@@ -363,7 +480,7 @@ public class ProductsViewModel : ReactiveObject
                 LineEdits.Remove(SelectedLineEdit!);
                 RecomputeSummary();
             },
-            this.WhenAnyValue(x => x.SelectedLineEdit).Select(line => line is not null));
+            this.WhenAnyValue(x => x.SelectedLineEdit, x => x.IsPackagingLinked, (line, linked) => line is not null && !linked));
 
         SaveLinesCommand = ReactiveCommand.CreateFromTask(
             async () =>
@@ -374,7 +491,7 @@ public class ProductsViewModel : ReactiveObject
                 await _packagingLineRepository.SetLinesAsync(SelectedProduct!.Id, lines, CancellationToken.None);
                 await LoadProductDetailAsync(SelectedProduct);
             },
-            this.WhenAnyValue(x => x.SelectedProduct).Select(product => product is not null));
+            this.WhenAnyValue(x => x.SelectedProduct, x => x.IsPackagingLinked, (product, linked) => product is not null && !linked));
 
         SaveCostingCommand = ReactiveCommand.CreateFromTask(
             async () =>
@@ -384,12 +501,54 @@ public class ProductsViewModel : ReactiveObject
                 RecomputeSummary();
             },
             this.WhenAnyValue(x => x.SelectedProduct).Select(product => product is not null));
+
+        LinkTabCommand = ReactiveCommand.CreateFromTask(
+            async () =>
+            {
+                var roleId = EditingLinkTabKind == ProductTabKind.SubAssemblyRole ? EditingLinkRole!.Id : (int?)null;
+                await _tabLinkRepository.SetLinkAsync(SelectedProduct!.Id, EditingLinkTabKind, roleId, EditingLinkTargetProduct!.Id, CancellationToken.None);
+                await LoadProductDetailAsync(SelectedProduct);
+            },
+            this.WhenAnyValue(
+                x => x.SelectedProduct, x => x.EditingLinkTabKind, x => x.EditingLinkRole, x => x.EditingLinkTargetProduct,
+                (product, tabKind, role, target) => product is not null && target is not null && (tabKind == ProductTabKind.Packaging || role is not null)));
+
+        UnlinkTabCommand = ReactiveCommand.CreateFromTask(
+            async () =>
+            {
+                var link = SelectedTabLink!.Link;
+                await _tabLinkRepository.RemoveLinkAsync(SelectedProduct!.Id, link.TabKind, link.SubAssemblyRoleId, CancellationToken.None);
+                await LoadProductDetailAsync(SelectedProduct);
+            },
+            this.WhenAnyValue(x => x.SelectedTabLink).Select(link => link is not null));
+
+        CloneCommand = ReactiveCommand.CreateFromTask(
+            async () =>
+            {
+                var newId = await _productCloner.CloneAsync(SelectedProduct!.Id, EditingCloneName, CancellationToken.None);
+                await LoadCommand.Execute();
+                SelectedProduct = Products.FirstOrDefault(p => p.Id == newId);
+            },
+            this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingCloneName, (product, name) => product is not null && !string.IsNullOrWhiteSpace(name)));
     }
 
     private void LoadIntoForm(Product product)
     {
         _editingId = product.Id;
         EditingName = product.Name;
+    }
+
+    private void RefreshLinkedFlags()
+    {
+        IsSelectedRoleLinked = EditingUsageRole is not null
+            && TabLinks.Any(l => l.Link.TabKind == ProductTabKind.SubAssemblyRole && l.Link.SubAssemblyRoleId == EditingUsageRole.Id);
+        IsPackagingLinked = TabLinks.Any(l => l.Link.TabKind == ProductTabKind.Packaging);
+    }
+
+    private void RefreshLinkTargetProductOptions()
+    {
+        LinkTargetProductOptions.Clear();
+        LinkTargetProductOptions.AddRange(SelectedProduct is null ? Products : Products.Where(p => p.Id != SelectedProduct.Id));
     }
 
     /// <summary>
@@ -430,22 +589,21 @@ public class ProductsViewModel : ReactiveObject
 
     private async Task LoadProductDetailAsync(Product? product)
     {
-        UsageEdits.Clear();
         LineEdits.Clear();
+        TabLinks.Clear();
 
         if (product is null)
         {
+            _effectiveUsageCostsPerPieceByRoleId = [];
             RecomputeSummary();
             return;
         }
 
-        var usages = await _usageRepository.GetForProductAsync(product.Id, CancellationToken.None);
-        foreach (var usage in usages)
-        {
-            UsageEdits.Add(new ProductUsageEdit(usage.SubAssembly!, usage.WeightPerPiece));
-        }
+        var links = await _tabLinkRepository.GetForProductAsync(product.Id, CancellationToken.None);
+        TabLinks.AddRange(links.Select(l => new TabLinkRow(l)));
+        RefreshLinkedFlags();
 
-        var lines = await _packagingLineRepository.GetForProductAsync(product.Id, CancellationToken.None);
+        var lines = await _packagingLineRepository.GetEffectiveForProductAsync(product.Id, CancellationToken.None);
         foreach (var line in lines)
         {
             LineEdits.Add(new PackagingLineEdit(line.PackagingMaterial!, line.EntryUnit!, line.AuthoredField, line.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? line.QtyPerPiece : line.PiecesPerPackagingUnit));
@@ -457,12 +615,85 @@ public class ProductsViewModel : ReactiveObject
         EditingMarginPercent = costingParameters?.MarginPercent ?? 0m;
         EditingVatPercent = costingParameters?.VatPercent ?? 0m;
 
+        await LoadEffectiveUsageCostsAsync(product);
+
+        EditingUsageRole = Roles.FirstOrDefault();
+        // If the role didn't actually change (already the first role from a prior
+        // selection), the WhenAnyValue subscription above won't re-fire on its own.
+        await LoadUsagesForRoleAsync(EditingUsageRole);
+
         RecomputeSummary();
     }
 
+    /// <summary>Loads every role's last-saved effective usage costs (not just the selected one) so the cost summary always reflects the whole product.</summary>
+    private async Task LoadEffectiveUsageCostsAsync(Product? product)
+    {
+        if (product is null)
+        {
+            _effectiveUsageCostsPerPieceByRoleId = [];
+            return;
+        }
+
+        var allUsages = await _usageRepository.GetEffectiveForProductAsync(product.Id, CancellationToken.None);
+        _effectiveUsageCostsPerPieceByRoleId = allUsages
+            .GroupBy(u => u.SubAssembly!.RoleId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(u => ProductRules.CalculateUsageCostPerPiece(u.SubAssembly!.TotalCost, u.WeightPerPiece, u.SubAssembly.TotalWeight)).ToList());
+    }
+
+    private async Task LoadUsagesForRoleAsync(SubAssemblyRole? role)
+    {
+        UsageEdits.Clear();
+        SelectedUsageEdit = null;
+        EditingUsageSubAssembly = null;
+
+        SubAssembliesForSelectedRole.Clear();
+        if (role is not null)
+        {
+            SubAssembliesForSelectedRole.AddRange(SubAssemblies.Where(s => s.RoleId == role.Id));
+        }
+
+        RefreshLinkedFlags();
+
+        if (SelectedProduct is null || role is null)
+        {
+            return;
+        }
+
+        var usages = await _usageRepository.GetEffectiveForRoleAsync(SelectedProduct.Id, role.Id, CancellationToken.None);
+        foreach (var usage in usages)
+        {
+            UsageEdits.Add(new ProductUsageEdit(usage.SubAssembly!, usage.WeightPerPiece));
+        }
+    }
+
+    /// <summary>
+    /// Sums every role's usage cost plus every packaging line's cost. The currently
+    /// selected role always contributes its *live* UsageEdits (including unsaved Add/
+    /// Remove changes), never its last-saved entry in
+    /// _effectiveUsageCostsPerPieceByRoleId — otherwise an unsaved edit to the selected
+    /// role would double-count (once from the cache, once from UsageEdits) or go
+    /// unreflected until Save.
+    /// </summary>
     private void RecomputeSummary()
     {
-        var usageCosts = UsageEdits.Select(u => u.CostPerPiece).ToList();
+        var usageCosts = new List<decimal>();
+        foreach (var (roleId, costs) in _effectiveUsageCostsPerPieceByRoleId)
+        {
+            if (EditingUsageRole is not null && roleId == EditingUsageRole.Id)
+            {
+                continue;
+            }
+
+            usageCosts.AddRange(costs);
+        }
+
+        if (EditingUsageRole is not null)
+        {
+            usageCosts.AddRange(UsageEdits.Select(u => u.CostPerPiece));
+        }
+
         var packagingCosts = LineEdits.Select(l => l.CostPerPiece).ToList();
         MaterialCostPerPiece = ProductRules.CalculateMaterialCostPerPiece(usageCosts, packagingCosts);
 

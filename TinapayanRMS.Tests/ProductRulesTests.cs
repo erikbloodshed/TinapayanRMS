@@ -7,11 +7,13 @@ namespace TinapayanRMS.Tests;
 public class ProductRulesTests
 {
     [Fact]
-    public void EnsureValidUsages_rejects_an_empty_list()
+    public void EnsureValidUsages_accepts_an_empty_list()
     {
+        // Usages are set one role (tab) at a time (Phase 10) — an empty list just means
+        // this particular role currently has no usages, not that the whole product does.
         var act = () => ProductRules.EnsureValidUsages([]);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().NotThrow();
     }
 
     [Fact]
