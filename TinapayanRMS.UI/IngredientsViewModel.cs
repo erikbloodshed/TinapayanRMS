@@ -24,12 +24,16 @@ public class IngredientsViewModel : ViewModelBase
     private readonly IIngredientRepository _ingredientRepository;
     private readonly IIngredientPriceHistoryRepository _priceHistoryRepository;
     private readonly IIngredientBomLineRepository _bomLineRepository;
+    private readonly IIngredientCategoryRepository _categoryRepository;
     private readonly IValidator<Ingredient> _ingredientValidator;
     private readonly IValidator<IngredientPriceHistory> _priceHistoryValidator;
+    private readonly IValidator<IngredientCategory> _categoryValidator;
     private readonly SourceCache<Ingredient, int> _ingredientCache = new(i => i.Id);
     private readonly ReadOnlyObservableCollection<Ingredient> _ingredients;
     private readonly SourceCache<IngredientPriceHistory, int> _priceHistoryCache = new(h => h.Id);
     private readonly ReadOnlyObservableCollection<IngredientPriceHistory> _priceHistory;
+    private readonly SourceCache<IngredientCategory, int> _categoryCache = new(c => c.Id);
+    private readonly ReadOnlyObservableCollection<IngredientCategory> _categories;
 
     public ReadOnlyObservableCollection<Ingredient> Ingredients => _ingredients;
 
@@ -37,7 +41,7 @@ public class IngredientsViewModel : ViewModelBase
 
     public ObservableCollection<IngredientBomLineEdit> BomLineEdits { get; } = [];
 
-    public ObservableCollection<IngredientCategory> Categories { get; } = [];
+    public ReadOnlyObservableCollection<IngredientCategory> Categories => _categories;
 
     public ObservableCollection<UnitOfMeasure> PurchaseUnits { get; } = [];
 
@@ -148,6 +152,23 @@ public class IngredientsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingPrice, value);
     }
 
+    // Category management (embedded panel, independent of the selected ingredient).
+    private IngredientCategory? _selectedCategory;
+    public IngredientCategory? SelectedCategory
+    {
+        get => _selectedCategory;
+        set => this.RaiseAndSetIfChanged(ref _selectedCategory, value);
+    }
+
+    private int _editingCategoryId;
+
+    private string _editingCategoryName = string.Empty;
+    public string EditingCategoryName
+    {
+        get => _editingCategoryName;
+        set => this.RaiseAndSetIfChanged(ref _editingCategoryName, value);
+    }
+
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
@@ -157,14 +178,18 @@ public class IngredientsViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> AddBomLineCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveBomLineCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveBomCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> NewCategoryCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> SaveCategoryCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> DeleteCategoryCommand { get; }
 
     public IngredientsViewModel(
         IIngredientRepository ingredientRepository,
         IIngredientPriceHistoryRepository priceHistoryRepository,
         IIngredientBomLineRepository bomLineRepository,
+        IIngredientCategoryRepository categoryRepository,
         IValidator<Ingredient> ingredientValidator,
         IValidator<IngredientPriceHistory> priceHistoryValidator,
-        ILookupRepository<IngredientCategory> categoryRepository,
+        IValidator<IngredientCategory> categoryValidator,
         ILookupRepository<UnitOfMeasure> unitOfMeasureRepository,
         ILogger logger)
         : base(logger)
@@ -172,8 +197,10 @@ public class IngredientsViewModel : ViewModelBase
         _ingredientRepository = ingredientRepository;
         _priceHistoryRepository = priceHistoryRepository;
         _bomLineRepository = bomLineRepository;
+        _categoryRepository = categoryRepository;
         _ingredientValidator = ingredientValidator;
         _priceHistoryValidator = priceHistoryValidator;
+        _categoryValidator = categoryValidator;
 
         _ingredientCache.Connect()
             .SortAndBind(out _ingredients, SortExpressionComparer<Ingredient>.Ascending(i => i.Name))
@@ -181,6 +208,10 @@ public class IngredientsViewModel : ViewModelBase
 
         _priceHistoryCache.Connect()
             .SortAndBind(out _priceHistory, SortExpressionComparer<IngredientPriceHistory>.Descending(h => h.Date).ThenByDescending(h => h.Id))
+            .Subscribe();
+
+        _categoryCache.Connect()
+            .SortAndBind(out _categories, SortExpressionComparer<IngredientCategory>.Ascending(c => c.Name))
             .Subscribe();
 
         _isEditingPurchased = this.WhenAnyValue(x => x.EditingSource)
@@ -224,11 +255,22 @@ public class IngredientsViewModel : ViewModelBase
             .Switch()
             .Subscribe();
 
+        this.WhenAnyValue(x => x.SelectedCategory)
+            .Where(category => category is not null)
+            .Subscribe(category =>
+            {
+                _editingCategoryId = category!.Id;
+                EditingCategoryName = category.Name;
+            });
+
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var categories = await categoryRepository.GetAllAsync(CancellationToken.None);
-            Categories.Clear();
-            Categories.AddRange(categories.OrderBy(c => c.Name));
+            var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
+            _categoryCache.Edit(cache =>
+            {
+                cache.Clear();
+                cache.AddOrUpdate(categories);
+            });
 
             var units = await unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
             PurchaseUnits.Clear();
@@ -341,6 +383,56 @@ public class IngredientsViewModel : ViewModelBase
                 await RefreshSelectedIngredientAsync();
             }),
             this.WhenAnyValue(x => x.SelectedIngredient).Select(ingredient => ingredient is { Source: IngredientSource.Made }));
+
+        NewCategoryCommand = ReactiveCommand.Create(() =>
+        {
+            SelectedCategory = null;
+            _editingCategoryId = 0;
+            EditingCategoryName = string.Empty;
+        });
+
+        SaveCategoryCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        {
+            var category = new IngredientCategory { Id = _editingCategoryId, Name = EditingCategoryName };
+
+            var validation = _categoryValidator.Validate(category);
+            if (!validation.IsValid)
+            {
+                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
+
+            if (_editingCategoryId == 0)
+            {
+                await _categoryRepository.AddAsync(category, CancellationToken.None);
+            }
+            else
+            {
+                await _categoryRepository.UpdateAsync(category, CancellationToken.None);
+            }
+
+            var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
+            _categoryCache.Edit(cache =>
+            {
+                cache.Clear();
+                cache.AddOrUpdate(categories);
+            });
+            SelectedCategory = null;
+        }));
+
+        DeleteCategoryCommand = ReactiveCommand.CreateFromTask(
+            () => RunWithConfirmationAsync($"Delete the '{SelectedCategory!.Name}' category? This can't be undone.", async () =>
+            {
+                await _categoryRepository.DeleteAsync(SelectedCategory!.Id, CancellationToken.None);
+                var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
+                _categoryCache.Edit(cache =>
+                {
+                    cache.Clear();
+                    cache.AddOrUpdate(categories);
+                });
+                SelectedCategory = null;
+            }),
+            this.WhenAnyValue(x => x.SelectedCategory).Select(category => category is not null));
     }
 
     private void LoadIntoForm(Ingredient ingredient)

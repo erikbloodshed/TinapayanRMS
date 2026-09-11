@@ -41,6 +41,8 @@ public static class CompositionRoot
                 services.AddSingleton(typeof(ILookupRepository<>), typeof(LookupRepository<>));
                 services.AddSingleton<SubAssemblyCostPropagator>();
                 services.AddSingleton<IngredientCostPropagator>();
+                services.AddSingleton<IIngredientCategoryRepository, IngredientCategoryRepository>();
+                services.AddSingleton<IPackagingCategoryRepository, PackagingCategoryRepository>();
                 services.AddSingleton<IIngredientRepository, IngredientRepository>();
                 services.AddSingleton<IPackagingMaterialRepository, PackagingMaterialRepository>();
                 services.AddSingleton<IIngredientPriceHistoryRepository, IngredientPriceHistoryRepository>();
@@ -57,6 +59,8 @@ public static class CompositionRoot
                 services.AddSingleton<IProductCloner, ProductCloner>();
 
                 services.AddSingleton(Log.Logger);
+                services.AddSingleton<IValidator<IngredientCategory>, IngredientCategoryValidator>();
+                services.AddSingleton<IValidator<PackagingCategory>, PackagingCategoryValidator>();
                 services.AddSingleton<IValidator<Ingredient>, IngredientValidator>();
                 services.AddSingleton<IValidator<PackagingMaterial>, PackagingMaterialValidator>();
                 services.AddSingleton<IValidator<SubAssemblyRole>, SubAssemblyRoleValidator>();

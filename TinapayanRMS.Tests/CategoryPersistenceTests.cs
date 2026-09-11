@@ -90,4 +90,132 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
 
         await act.Should().ThrowAsync<DbUpdateException>();
     }
+
+    private IngredientCategoryRepository CreateIngredientCategoryRepository() => new(CreateDbContextFactory());
+
+    private PackagingCategoryRepository CreatePackagingCategoryRepository() => new(CreateDbContextFactory());
+
+    [Fact]
+    public async Task IngredientCategoryRepository_AddAsync_GetAllAsync_and_UpdateAsync_round_trip_a_category()
+    {
+        var repository = CreateIngredientCategoryRepository();
+
+        await repository.AddAsync(new IngredientCategory { Name = "Flour" }, Cancellation);
+
+        var added = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        added.Name.Should().Be("Flour");
+
+        await repository.UpdateAsync(new IngredientCategory { Id = added.Id, Name = "Flours & Starches" }, Cancellation);
+
+        var updated = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        updated.Name.Should().Be("Flours & Starches");
+    }
+
+    [Fact]
+    public async Task IngredientCategoryRepository_UpdateAsync_rejects_a_nonexistent_category()
+    {
+        var act = () => CreateIngredientCategoryRepository().UpdateAsync(new IngredientCategory { Id = 999_999, Name = "Ghost" }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task IngredientCategoryRepository_DeleteAsync_removes_an_unused_category()
+    {
+        var repository = CreateIngredientCategoryRepository();
+        await repository.AddAsync(new IngredientCategory { Name = "Flour" }, Cancellation);
+        var category = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+
+        await repository.DeleteAsync(category.Id, Cancellation);
+
+        (await repository.GetAllAsync(Cancellation)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Deleting_an_ingredient_category_that_is_in_use_is_blocked()
+    {
+        var repository = CreateIngredientCategoryRepository();
+        await repository.AddAsync(new IngredientCategory { Name = "Flour" }, Cancellation);
+        var category = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.Ingredients.Add(new Ingredient
+            {
+                Name = "All-Purpose Flour",
+                IngredientCategoryId = category.Id,
+                Source = IngredientSource.Purchased,
+                PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+                PurchaseUnitQty = 25000m,
+            });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var act = () => repository.DeleteAsync(category.Id, Cancellation);
+
+        // ExecuteDeleteAsync issues a raw DELETE outside EF Core's change tracker, so an
+        // FK violation surfaces as the driver's own SqlException, not a DbUpdateException.
+        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+    }
+
+    [Fact]
+    public async Task PackagingCategoryRepository_AddAsync_GetAllAsync_and_UpdateAsync_round_trip_a_category()
+    {
+        var repository = CreatePackagingCategoryRepository();
+
+        await repository.AddAsync(new PackagingCategory { Name = "Ribbons" }, Cancellation);
+
+        var added = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        added.Name.Should().Be("Ribbons");
+
+        await repository.UpdateAsync(new PackagingCategory { Id = added.Id, Name = "Ribbons & Bows" }, Cancellation);
+
+        var updated = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        updated.Name.Should().Be("Ribbons & Bows");
+    }
+
+    [Fact]
+    public async Task PackagingCategoryRepository_UpdateAsync_rejects_a_nonexistent_category()
+    {
+        var act = () => CreatePackagingCategoryRepository().UpdateAsync(new PackagingCategory { Id = 999_999, Name = "Ghost" }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task PackagingCategoryRepository_DeleteAsync_removes_an_unused_category()
+    {
+        var repository = CreatePackagingCategoryRepository();
+        await repository.AddAsync(new PackagingCategory { Name = "Ribbons" }, Cancellation);
+        var category = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+
+        await repository.DeleteAsync(category.Id, Cancellation);
+
+        (await repository.GetAllAsync(Cancellation)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Deleting_a_packaging_category_that_is_in_use_is_blocked()
+    {
+        var repository = CreatePackagingCategoryRepository();
+        await repository.AddAsync(new PackagingCategory { Name = "Ribbons" }, Cancellation);
+        var category = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.PackagingMaterials.Add(new PackagingMaterial
+            {
+                Name = "Satin Ribbon",
+                PackagingCategoryId = category.Id,
+                StandardUnitId = WellKnownUnitOfMeasureIds.Centimeter,
+                PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+                PurchaseUnitQty = 1000m,
+            });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var act = () => repository.DeleteAsync(category.Id, Cancellation);
+
+        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+    }
 }

@@ -15,18 +15,22 @@ public class PackagingMaterialsViewModel : ViewModelBase
 {
     private readonly IPackagingMaterialRepository _packagingMaterialRepository;
     private readonly IPackagingPriceHistoryRepository _priceHistoryRepository;
+    private readonly IPackagingCategoryRepository _categoryRepository;
     private readonly IValidator<PackagingMaterial> _packagingMaterialValidator;
     private readonly IValidator<PackagingPriceHistory> _priceHistoryValidator;
+    private readonly IValidator<PackagingCategory> _categoryValidator;
     private readonly SourceCache<PackagingMaterial, int> _packagingMaterialCache = new(p => p.Id);
     private readonly ReadOnlyObservableCollection<PackagingMaterial> _packagingMaterials;
     private readonly SourceCache<PackagingPriceHistory, int> _priceHistoryCache = new(h => h.Id);
     private readonly ReadOnlyObservableCollection<PackagingPriceHistory> _priceHistory;
+    private readonly SourceCache<PackagingCategory, int> _categoryCache = new(c => c.Id);
+    private readonly ReadOnlyObservableCollection<PackagingCategory> _categories;
 
     public ReadOnlyObservableCollection<PackagingMaterial> PackagingMaterials => _packagingMaterials;
 
     public ReadOnlyObservableCollection<PackagingPriceHistory> PriceHistory => _priceHistory;
 
-    public ObservableCollection<PackagingCategory> Categories { get; } = [];
+    public ReadOnlyObservableCollection<PackagingCategory> Categories => _categories;
 
     public ObservableCollection<UnitOfMeasure> StandardUnits { get; } = [];
 
@@ -100,27 +104,50 @@ public class PackagingMaterialsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingPrice, value);
     }
 
+    // Category management (embedded panel, independent of the selected packaging material).
+    private PackagingCategory? _selectedCategory;
+    public PackagingCategory? SelectedCategory
+    {
+        get => _selectedCategory;
+        set => this.RaiseAndSetIfChanged(ref _selectedCategory, value);
+    }
+
+    private int _editingCategoryId;
+
+    private string _editingCategoryName = string.Empty;
+    public string EditingCategoryName
+    {
+        get => _editingCategoryName;
+        set => this.RaiseAndSetIfChanged(ref _editingCategoryName, value);
+    }
+
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddPriceCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeletePriceCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> NewCategoryCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> SaveCategoryCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> DeleteCategoryCommand { get; }
 
     public PackagingMaterialsViewModel(
         IPackagingMaterialRepository packagingMaterialRepository,
         IPackagingPriceHistoryRepository priceHistoryRepository,
+        IPackagingCategoryRepository categoryRepository,
         IValidator<PackagingMaterial> packagingMaterialValidator,
         IValidator<PackagingPriceHistory> priceHistoryValidator,
-        ILookupRepository<PackagingCategory> categoryRepository,
+        IValidator<PackagingCategory> categoryValidator,
         ILookupRepository<UnitOfMeasure> unitOfMeasureRepository,
         ILogger logger)
         : base(logger)
     {
         _packagingMaterialRepository = packagingMaterialRepository;
         _priceHistoryRepository = priceHistoryRepository;
+        _categoryRepository = categoryRepository;
         _packagingMaterialValidator = packagingMaterialValidator;
         _priceHistoryValidator = priceHistoryValidator;
+        _categoryValidator = categoryValidator;
 
         _packagingMaterialCache.Connect()
             .SortAndBind(out _packagingMaterials, SortExpressionComparer<PackagingMaterial>.Ascending(p => p.Name))
@@ -128,6 +155,10 @@ public class PackagingMaterialsViewModel : ViewModelBase
 
         _priceHistoryCache.Connect()
             .SortAndBind(out _priceHistory, SortExpressionComparer<PackagingPriceHistory>.Descending(h => h.Date).ThenByDescending(h => h.Id))
+            .Subscribe();
+
+        _categoryCache.Connect()
+            .SortAndBind(out _categories, SortExpressionComparer<PackagingCategory>.Ascending(c => c.Name))
             .Subscribe();
 
         _showPriceHistory = this.WhenAnyValue(x => x.SelectedPackagingMaterial)
@@ -151,11 +182,22 @@ public class PackagingMaterialsViewModel : ViewModelBase
             .Switch()
             .Subscribe();
 
+        this.WhenAnyValue(x => x.SelectedCategory)
+            .Where(category => category is not null)
+            .Subscribe(category =>
+            {
+                _editingCategoryId = category!.Id;
+                EditingCategoryName = category.Name;
+            });
+
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var categories = await categoryRepository.GetAllAsync(CancellationToken.None);
-            Categories.Clear();
-            Categories.AddRange(categories.OrderBy(c => c.Name));
+            var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
+            _categoryCache.Edit(cache =>
+            {
+                cache.Clear();
+                cache.AddOrUpdate(categories);
+            });
 
             var units = await unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
             var orderedUnits = units.OrderBy(u => u.Name).ToList();
@@ -254,6 +296,56 @@ public class PackagingMaterialsViewModel : ViewModelBase
                 await RefreshSelectedPackagingMaterialAsync();
             }),
             this.WhenAnyValue(x => x.SelectedPriceHistoryEntry).Select(entry => entry is not null));
+
+        NewCategoryCommand = ReactiveCommand.Create(() =>
+        {
+            SelectedCategory = null;
+            _editingCategoryId = 0;
+            EditingCategoryName = string.Empty;
+        });
+
+        SaveCategoryCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        {
+            var category = new PackagingCategory { Id = _editingCategoryId, Name = EditingCategoryName };
+
+            var validation = _categoryValidator.Validate(category);
+            if (!validation.IsValid)
+            {
+                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
+
+            if (_editingCategoryId == 0)
+            {
+                await _categoryRepository.AddAsync(category, CancellationToken.None);
+            }
+            else
+            {
+                await _categoryRepository.UpdateAsync(category, CancellationToken.None);
+            }
+
+            var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
+            _categoryCache.Edit(cache =>
+            {
+                cache.Clear();
+                cache.AddOrUpdate(categories);
+            });
+            SelectedCategory = null;
+        }));
+
+        DeleteCategoryCommand = ReactiveCommand.CreateFromTask(
+            () => RunWithConfirmationAsync($"Delete the '{SelectedCategory!.Name}' category? This can't be undone.", async () =>
+            {
+                await _categoryRepository.DeleteAsync(SelectedCategory!.Id, CancellationToken.None);
+                var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
+                _categoryCache.Edit(cache =>
+                {
+                    cache.Clear();
+                    cache.AddOrUpdate(categories);
+                });
+                SelectedCategory = null;
+            }),
+            this.WhenAnyValue(x => x.SelectedCategory).Select(category => category is not null));
     }
 
     private void LoadIntoForm(PackagingMaterial packagingMaterial)
