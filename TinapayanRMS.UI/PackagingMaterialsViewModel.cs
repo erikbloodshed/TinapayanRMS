@@ -2,17 +2,21 @@ using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
+using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore;
 using TinapayanRMS.Domain;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
+using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI;
 
-public class PackagingMaterialsViewModel : ReactiveObject
+public class PackagingMaterialsViewModel : ViewModelBase
 {
     private readonly IPackagingMaterialRepository _packagingMaterialRepository;
     private readonly IPackagingPriceHistoryRepository _priceHistoryRepository;
+    private readonly IValidator<PackagingMaterial> _packagingMaterialValidator;
+    private readonly IValidator<PackagingPriceHistory> _priceHistoryValidator;
     private readonly SourceCache<PackagingMaterial, int> _packagingMaterialCache = new(p => p.Id);
     private readonly ReadOnlyObservableCollection<PackagingMaterial> _packagingMaterials;
     private readonly SourceCache<PackagingPriceHistory, int> _priceHistoryCache = new(h => h.Id);
@@ -106,11 +110,17 @@ public class PackagingMaterialsViewModel : ReactiveObject
     public PackagingMaterialsViewModel(
         IPackagingMaterialRepository packagingMaterialRepository,
         IPackagingPriceHistoryRepository priceHistoryRepository,
+        IValidator<PackagingMaterial> packagingMaterialValidator,
+        IValidator<PackagingPriceHistory> priceHistoryValidator,
         ILookupRepository<PackagingCategory> categoryRepository,
-        ILookupRepository<UnitOfMeasure> unitOfMeasureRepository)
+        ILookupRepository<UnitOfMeasure> unitOfMeasureRepository,
+        ILogger logger)
+        : base(logger)
     {
         _packagingMaterialRepository = packagingMaterialRepository;
         _priceHistoryRepository = priceHistoryRepository;
+        _packagingMaterialValidator = packagingMaterialValidator;
+        _priceHistoryValidator = priceHistoryValidator;
 
         _packagingMaterialCache.Connect()
             .SortAndBind(out _packagingMaterials, SortExpressionComparer<PackagingMaterial>.Ascending(p => p.Name))
@@ -175,7 +185,7 @@ public class PackagingMaterialsViewModel : ReactiveObject
             EditingPurchaseUnitQty = 0;
         });
 
-        SaveCommand = ReactiveCommand.CreateFromTask(async () =>
+        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
             var packagingMaterial = new PackagingMaterial
             {
@@ -187,6 +197,13 @@ public class PackagingMaterialsViewModel : ReactiveObject
                 PurchaseUnitQty = EditingPurchaseUnitQty,
             };
 
+            var validation = _packagingMaterialValidator.Validate(packagingMaterial);
+            if (!validation.IsValid)
+            {
+                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
+
             if (_editingId == 0)
             {
                 await _packagingMaterialRepository.AddAsync(packagingMaterial, CancellationToken.None);
@@ -197,37 +214,45 @@ public class PackagingMaterialsViewModel : ReactiveObject
             }
 
             await LoadCommand.Execute();
-        });
+        }));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunWithConfirmationAsync($"Delete '{SelectedPackagingMaterial!.Name}'? This can't be undone.", async () =>
             {
                 await _packagingMaterialRepository.DeleteAsync(SelectedPackagingMaterial!.Id, CancellationToken.None);
                 SelectedPackagingMaterial = null;
                 await LoadCommand.Execute();
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedPackagingMaterial).Select(packagingMaterial => packagingMaterial is not null));
 
         AddPriceCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunSafelyAsync(async () =>
             {
-                await _priceHistoryRepository.AddAsync(new PackagingPriceHistory
+                var entry = new PackagingPriceHistory
                 {
                     PackagingMaterialId = SelectedPackagingMaterial!.Id,
                     Date = DateOnly.FromDateTime(EditingPriceDate),
                     Price = EditingPrice,
-                }, CancellationToken.None);
+                };
 
+                var validation = _priceHistoryValidator.Validate(entry);
+                if (!validation.IsValid)
+                {
+                    ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                    return;
+                }
+
+                await _priceHistoryRepository.AddAsync(entry, CancellationToken.None);
                 await RefreshSelectedPackagingMaterialAsync();
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedPackagingMaterial).Select(packagingMaterial => packagingMaterial is not null));
 
         DeletePriceCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunWithConfirmationAsync("Delete this price entry? This can't be undone.", async () =>
             {
                 await _priceHistoryRepository.DeleteAsync(SelectedPriceHistoryEntry!.Id, CancellationToken.None);
                 await RefreshSelectedPackagingMaterialAsync();
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedPriceHistoryEntry).Select(entry => entry is not null));
     }
 

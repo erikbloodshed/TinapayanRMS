@@ -2,10 +2,12 @@ using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
+using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore;
 using TinapayanRMS.Domain;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
+using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI;
 
@@ -17,11 +19,13 @@ public class SubAssemblyLineEdit(Ingredient ingredient, decimal grams)
     public decimal Grams { get; } = grams;
 }
 
-public class SubAssembliesViewModel : ReactiveObject
+public class SubAssembliesViewModel : ViewModelBase
 {
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _lineRepository;
     private readonly ISubAssemblyRoleRepository _roleRepository;
+    private readonly IValidator<SubAssembly> _subAssemblyValidator;
+    private readonly IValidator<SubAssemblyRole> _roleValidator;
     private readonly SourceCache<SubAssembly, int> _subAssemblyCache = new(s => s.Id);
     private readonly ReadOnlyObservableCollection<SubAssembly> _subAssemblies;
     private readonly SourceCache<SubAssemblyRole, int> _roleCache = new(r => r.Id);
@@ -121,11 +125,17 @@ public class SubAssembliesViewModel : ReactiveObject
         ISubAssemblyRepository subAssemblyRepository,
         ISubAssemblyLineRepository lineRepository,
         ISubAssemblyRoleRepository roleRepository,
-        IIngredientRepository ingredientRepository)
+        IValidator<SubAssembly> subAssemblyValidator,
+        IValidator<SubAssemblyRole> roleValidator,
+        IIngredientRepository ingredientRepository,
+        ILogger logger)
+        : base(logger)
     {
         _subAssemblyRepository = subAssemblyRepository;
         _lineRepository = lineRepository;
         _roleRepository = roleRepository;
+        _subAssemblyValidator = subAssemblyValidator;
+        _roleValidator = roleValidator;
 
         _subAssemblyCache.Connect()
             .SortAndBind(out _subAssemblies, SortExpressionComparer<SubAssembly>.Ascending(s => s.Name))
@@ -194,7 +204,7 @@ public class SubAssembliesViewModel : ReactiveObject
             EditingRole = Roles.FirstOrDefault();
         });
 
-        SaveCommand = ReactiveCommand.CreateFromTask(async () =>
+        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
             var subAssembly = new SubAssembly
             {
@@ -202,6 +212,13 @@ public class SubAssembliesViewModel : ReactiveObject
                 Name = EditingName,
                 RoleId = EditingRole?.Id ?? 0,
             };
+
+            var validation = _subAssemblyValidator.Validate(subAssembly);
+            if (!validation.IsValid)
+            {
+                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
 
             if (_editingId == 0)
             {
@@ -213,15 +230,15 @@ public class SubAssembliesViewModel : ReactiveObject
             }
 
             await LoadCommand.Execute();
-        });
+        }));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunWithConfirmationAsync($"Delete '{SelectedSubAssembly!.Name}'? This can't be undone.", async () =>
             {
                 await _subAssemblyRepository.DeleteAsync(SelectedSubAssembly!.Id, CancellationToken.None);
                 SelectedSubAssembly = null;
                 await LoadCommand.Execute();
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedSubAssembly).Select(subAssembly => subAssembly is not null));
 
         AddLineCommand = ReactiveCommand.Create(
@@ -233,12 +250,12 @@ public class SubAssembliesViewModel : ReactiveObject
             this.WhenAnyValue(x => x.SelectedLineEdit).Select(line => line is not null));
 
         SaveLinesCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunSafelyAsync(async () =>
             {
                 var lines = LineEdits.Select(l => (l.Ingredient.Id, l.Grams)).ToList();
                 await _lineRepository.SetLinesAsync(SelectedSubAssembly!.Id, lines, CancellationToken.None);
                 await RefreshSelectedSubAssemblyAsync();
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedSubAssembly).Select(subAssembly => subAssembly is not null));
 
         NewRoleCommand = ReactiveCommand.Create(() =>
@@ -249,7 +266,7 @@ public class SubAssembliesViewModel : ReactiveObject
             EditingRoleSortOrder = Roles.Count + 1;
         });
 
-        SaveRoleCommand = ReactiveCommand.CreateFromTask(async () =>
+        SaveRoleCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
             var role = new SubAssemblyRole
             {
@@ -257,6 +274,13 @@ public class SubAssembliesViewModel : ReactiveObject
                 Name = EditingRoleName,
                 SortOrder = (int)EditingRoleSortOrder,
             };
+
+            var validation = _roleValidator.Validate(role);
+            if (!validation.IsValid)
+            {
+                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
 
             if (_editingRoleId == 0)
             {
@@ -274,10 +298,10 @@ public class SubAssembliesViewModel : ReactiveObject
                 cache.AddOrUpdate(roles);
             });
             SelectedRole = null;
-        });
+        }));
 
         DeleteRoleCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunWithConfirmationAsync($"Delete the '{SelectedRole!.Name}' role? This can't be undone.", async () =>
             {
                 await _roleRepository.DeleteAsync(SelectedRole!.Id, CancellationToken.None);
                 var roles = await _roleRepository.GetAllAsync(CancellationToken.None);
@@ -287,7 +311,7 @@ public class SubAssembliesViewModel : ReactiveObject
                     cache.AddOrUpdate(roles);
                 });
                 SelectedRole = null;
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedRole).Select(role => role is not null));
     }
 

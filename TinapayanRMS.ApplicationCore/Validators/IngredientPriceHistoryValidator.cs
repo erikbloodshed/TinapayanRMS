@@ -1,0 +1,13 @@
+using FluentValidation;
+using TinapayanRMS.Domain;
+
+namespace TinapayanRMS.ApplicationCore.Validators;
+
+/// <summary>Friendly, UI-facing pre-check mirroring PriceHistoryRules.EnsureValidPrice.</summary>
+public class IngredientPriceHistoryValidator : AbstractValidator<IngredientPriceHistory>
+{
+    public IngredientPriceHistoryValidator()
+    {
+        RuleFor(h => h.Price).GreaterThan(0m).WithMessage("Price must be positive.");
+    }
+}

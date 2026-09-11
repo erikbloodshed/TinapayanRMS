@@ -7,6 +7,10 @@
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="1400">
     <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="16" />
@@ -17,7 +21,16 @@
             <ColumnDefinition Width="260" />
         </Grid.ColumnDefinitions>
 
-        <syncfusion:SfDataGrid Grid.Column="0"
+        <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="7" Margin="0,0,0,8">
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Foreground="#C00000"
+                       TextWrapping="Wrap"
+                       Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <ProgressBar IsIndeterminate="True" Height="4"
+                         Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        </StackPanel>
+
+        <syncfusion:SfDataGrid Grid.Row="1" Grid.Column="0"
                                 ItemsSource="{Binding SubAssemblies}"
                                 SelectedItem="{Binding SelectedSubAssembly, Mode=TwoWay}"
                                 AutoGenerateColumns="False"
@@ -32,7 +45,7 @@
             </syncfusion:SfDataGrid.Columns>
         </syncfusion:SfDataGrid>
 
-        <StackPanel Grid.Column="2">
+        <StackPanel Grid.Row="1" Grid.Column="2">
             <TextBlock Text="Name" Margin="0,0,0,4" />
             <syncfusion:SfTextBoxExt Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       Margin="0,0,0,12" />
@@ -50,7 +63,7 @@
             </StackPanel>
         </StackPanel>
 
-        <StackPanel Grid.Column="4"
+        <StackPanel Grid.Row="1" Grid.Column="4"
                     Visibility="{Binding ShowLinesEditor, Converter={StaticResource BooleanToVisibilityConverter}}">
             <TextBlock Text="Lines" FontSize="14" Margin="0,0,0,8" />
 
@@ -85,7 +98,7 @@
             <syncfusion:ButtonAdv Label="Save Lines" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveLinesCommand}" />
         </StackPanel>
 
-        <StackPanel Grid.Column="6">
+        <StackPanel Grid.Row="1" Grid.Column="6">
             <TextBlock Text="Roles" FontSize="14" Margin="0,0,0,8" />
 
             <syncfusion:SfDataGrid ItemsSource="{Binding Roles}"

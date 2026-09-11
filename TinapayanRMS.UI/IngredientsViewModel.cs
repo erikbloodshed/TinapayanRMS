@@ -2,10 +2,12 @@ using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
+using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore;
 using TinapayanRMS.Domain;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
+using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI;
 
@@ -17,11 +19,13 @@ public class IngredientBomLineEdit(Ingredient component, decimal grams)
     public decimal Grams { get; } = grams;
 }
 
-public class IngredientsViewModel : ReactiveObject
+public class IngredientsViewModel : ViewModelBase
 {
     private readonly IIngredientRepository _ingredientRepository;
     private readonly IIngredientPriceHistoryRepository _priceHistoryRepository;
     private readonly IIngredientBomLineRepository _bomLineRepository;
+    private readonly IValidator<Ingredient> _ingredientValidator;
+    private readonly IValidator<IngredientPriceHistory> _priceHistoryValidator;
     private readonly SourceCache<Ingredient, int> _ingredientCache = new(i => i.Id);
     private readonly ReadOnlyObservableCollection<Ingredient> _ingredients;
     private readonly SourceCache<IngredientPriceHistory, int> _priceHistoryCache = new(h => h.Id);
@@ -158,12 +162,18 @@ public class IngredientsViewModel : ReactiveObject
         IIngredientRepository ingredientRepository,
         IIngredientPriceHistoryRepository priceHistoryRepository,
         IIngredientBomLineRepository bomLineRepository,
+        IValidator<Ingredient> ingredientValidator,
+        IValidator<IngredientPriceHistory> priceHistoryValidator,
         ILookupRepository<IngredientCategory> categoryRepository,
-        ILookupRepository<UnitOfMeasure> unitOfMeasureRepository)
+        ILookupRepository<UnitOfMeasure> unitOfMeasureRepository,
+        ILogger logger)
+        : base(logger)
     {
         _ingredientRepository = ingredientRepository;
         _priceHistoryRepository = priceHistoryRepository;
         _bomLineRepository = bomLineRepository;
+        _ingredientValidator = ingredientValidator;
+        _priceHistoryValidator = priceHistoryValidator;
 
         _ingredientCache.Connect()
             .SortAndBind(out _ingredients, SortExpressionComparer<Ingredient>.Ascending(i => i.Name))
@@ -244,7 +254,7 @@ public class IngredientsViewModel : ReactiveObject
             EditingWeightLossPercent = null;
         });
 
-        SaveCommand = ReactiveCommand.CreateFromTask(async () =>
+        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
             var ingredient = new Ingredient
             {
@@ -257,6 +267,13 @@ public class IngredientsViewModel : ReactiveObject
                 WeightLossPercent = EditingSource == IngredientSource.Made ? EditingWeightLossPercent : null,
             };
 
+            var validation = _ingredientValidator.Validate(ingredient);
+            if (!validation.IsValid)
+            {
+                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
+
             if (_editingId == 0)
             {
                 await _ingredientRepository.AddAsync(ingredient, CancellationToken.None);
@@ -267,37 +284,45 @@ public class IngredientsViewModel : ReactiveObject
             }
 
             await LoadCommand.Execute();
-        });
+        }));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunWithConfirmationAsync($"Delete '{SelectedIngredient!.Name}'? This can't be undone.", async () =>
             {
                 await _ingredientRepository.DeleteAsync(SelectedIngredient!.Id, CancellationToken.None);
                 SelectedIngredient = null;
                 await LoadCommand.Execute();
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedIngredient).Select(ingredient => ingredient is not null));
 
         AddPriceCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunSafelyAsync(async () =>
             {
-                await _priceHistoryRepository.AddAsync(new IngredientPriceHistory
+                var entry = new IngredientPriceHistory
                 {
                     IngredientId = SelectedIngredient!.Id,
                     Date = DateOnly.FromDateTime(EditingPriceDate),
                     Price = EditingPrice,
-                }, CancellationToken.None);
+                };
 
+                var validation = _priceHistoryValidator.Validate(entry);
+                if (!validation.IsValid)
+                {
+                    ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                    return;
+                }
+
+                await _priceHistoryRepository.AddAsync(entry, CancellationToken.None);
                 await RefreshSelectedIngredientAsync();
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedIngredient).Select(ingredient => ingredient is { Source: IngredientSource.Purchased }));
 
         DeletePriceCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunWithConfirmationAsync("Delete this price entry? This can't be undone.", async () =>
             {
                 await _priceHistoryRepository.DeleteAsync(SelectedPriceHistoryEntry!.Id, CancellationToken.None);
                 await RefreshSelectedIngredientAsync();
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedPriceHistoryEntry).Select(entry => entry is not null));
 
         AddBomLineCommand = ReactiveCommand.Create(
@@ -309,12 +334,12 @@ public class IngredientsViewModel : ReactiveObject
             this.WhenAnyValue(x => x.SelectedBomLineEdit).Select(line => line is not null));
 
         SaveBomCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunSafelyAsync(async () =>
             {
                 var lines = BomLineEdits.Select(l => (l.Component.Id, l.Grams)).ToList();
                 await _bomLineRepository.SetLinesAsync(SelectedIngredient!.Id, lines, CancellationToken.None);
                 await RefreshSelectedIngredientAsync();
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedIngredient).Select(ingredient => ingredient is { Source: IngredientSource.Made }));
     }
 

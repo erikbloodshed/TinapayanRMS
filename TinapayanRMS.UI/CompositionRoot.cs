@@ -1,8 +1,12 @@
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Serilog;
 using TinapayanRMS.ApplicationCore;
+using TinapayanRMS.ApplicationCore.Validators;
+using TinapayanRMS.Domain;
 using TinapayanRMS.Infrastructure;
 
 namespace TinapayanRMS.UI;
@@ -51,6 +55,16 @@ public static class CompositionRoot
                 services.AddSingleton<ICostingParametersRepository, CostingParametersRepository>();
                 services.AddSingleton<IProductTabLinkRepository, ProductTabLinkRepository>();
                 services.AddSingleton<IProductCloner, ProductCloner>();
+
+                services.AddSingleton(Log.Logger);
+                services.AddSingleton<IValidator<Ingredient>, IngredientValidator>();
+                services.AddSingleton<IValidator<PackagingMaterial>, PackagingMaterialValidator>();
+                services.AddSingleton<IValidator<SubAssemblyRole>, SubAssemblyRoleValidator>();
+                services.AddSingleton<IValidator<SubAssembly>, SubAssemblyValidator>();
+                services.AddSingleton<IValidator<Product>, ProductValidator>();
+                services.AddSingleton<IValidator<CostingParameters>, CostingParametersValidator>();
+                services.AddSingleton<IValidator<IngredientPriceHistory>, IngredientPriceHistoryValidator>();
+                services.AddSingleton<IValidator<PackagingPriceHistory>, PackagingPriceHistoryValidator>();
 
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<MainWindow>();

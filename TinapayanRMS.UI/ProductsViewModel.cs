@@ -2,10 +2,12 @@ using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
+using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore;
 using TinapayanRMS.Domain;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
+using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI;
 
@@ -54,7 +56,7 @@ public class TabLinkRow(ProductTabLink link)
     public string LinkedToProductName => Link.LinkedProduct?.Name ?? "?";
 }
 
-public class ProductsViewModel : ReactiveObject
+public class ProductsViewModel : ViewModelBase
 {
     private readonly IProductRepository _productRepository;
     private readonly IProductSubAssemblyUsageRepository _usageRepository;
@@ -62,6 +64,8 @@ public class ProductsViewModel : ReactiveObject
     private readonly ICostingParametersRepository _costingParametersRepository;
     private readonly IProductTabLinkRepository _tabLinkRepository;
     private readonly IProductCloner _productCloner;
+    private readonly IValidator<Product> _productValidator;
+    private readonly IValidator<CostingParameters> _costingParametersValidator;
     private readonly SourceCache<Product, int> _productCache = new(p => p.Id);
     private readonly ReadOnlyObservableCollection<Product> _products;
 
@@ -311,7 +315,11 @@ public class ProductsViewModel : ReactiveObject
         ISubAssemblyRepository subAssemblyRepository,
         ISubAssemblyRoleRepository subAssemblyRoleRepository,
         IPackagingMaterialRepository packagingMaterialRepository,
-        ILookupRepository<UnitOfMeasure> unitOfMeasureRepository)
+        ILookupRepository<UnitOfMeasure> unitOfMeasureRepository,
+        IValidator<Product> productValidator,
+        IValidator<CostingParameters> costingParametersValidator,
+        ILogger logger)
+        : base(logger)
     {
         _productRepository = productRepository;
         _usageRepository = usageRepository;
@@ -319,6 +327,8 @@ public class ProductsViewModel : ReactiveObject
         _costingParametersRepository = costingParametersRepository;
         _tabLinkRepository = tabLinkRepository;
         _productCloner = productCloner;
+        _productValidator = productValidator;
+        _costingParametersValidator = costingParametersValidator;
 
         _productCache.Connect()
             .SortAndBind(out _products, SortExpressionComparer<Product>.Ascending(p => p.Name))
@@ -407,9 +417,16 @@ public class ProductsViewModel : ReactiveObject
             RecomputeSummary();
         });
 
-        SaveCommand = ReactiveCommand.CreateFromTask(async () =>
+        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
             var product = new Product { Id = _editingId, Name = EditingName };
+
+            var validation = _productValidator.Validate(product);
+            if (!validation.IsValid)
+            {
+                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
 
             if (_editingId == 0)
             {
@@ -421,15 +438,15 @@ public class ProductsViewModel : ReactiveObject
             }
 
             await LoadCommand.Execute();
-        });
+        }));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunWithConfirmationAsync($"Delete '{SelectedProduct!.Name}'? This can't be undone.", async () =>
             {
                 await _productRepository.DeleteAsync(SelectedProduct!.Id, CancellationToken.None);
                 SelectedProduct = null;
                 await LoadCommand.Execute();
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedProduct).Select(product => product is not null));
 
         AddUsageCommand = ReactiveCommand.Create(
@@ -451,14 +468,14 @@ public class ProductsViewModel : ReactiveObject
             this.WhenAnyValue(x => x.SelectedUsageEdit, x => x.IsSelectedRoleLinked, (usage, linked) => usage is not null && !linked));
 
         SaveUsagesCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunSafelyAsync(async () =>
             {
                 var usages = UsageEdits.Select(u => (u.SubAssembly.Id, u.WeightPerPiece)).ToList();
                 await _usageRepository.SetUsagesForRoleAsync(SelectedProduct!.Id, EditingUsageRole!.Id, usages, CancellationToken.None);
                 await LoadEffectiveUsageCostsAsync(SelectedProduct);
                 await LoadUsagesForRoleAsync(EditingUsageRole);
                 RecomputeSummary();
-            },
+            }),
             this.WhenAnyValue(
                 x => x.SelectedProduct, x => x.EditingUsageRole, x => x.IsSelectedRoleLinked,
                 (product, role, linked) => product is not null && role is not null && !linked));
@@ -483,52 +500,68 @@ public class ProductsViewModel : ReactiveObject
             this.WhenAnyValue(x => x.SelectedLineEdit, x => x.IsPackagingLinked, (line, linked) => line is not null && !linked));
 
         SaveLinesCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunSafelyAsync(async () =>
             {
                 var lines = LineEdits
                     .Select(l => (l.PackagingMaterial.Id, l.EntryUnit.Id, l.AuthoredField, l.AuthoredValue))
                     .ToList();
                 await _packagingLineRepository.SetLinesAsync(SelectedProduct!.Id, lines, CancellationToken.None);
                 await LoadProductDetailAsync(SelectedProduct);
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedProduct, x => x.IsPackagingLinked, (product, linked) => product is not null && !linked));
 
         SaveCostingCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunSafelyAsync(async () =>
             {
+                var costingParameters = new CostingParameters
+                {
+                    ProductId = SelectedProduct!.Id,
+                    LaborCost = EditingLaborCost,
+                    OverheadCost = EditingOverheadCost,
+                    MarginPercent = EditingMarginPercent,
+                    VatPercent = EditingVatPercent,
+                };
+
+                var validation = _costingParametersValidator.Validate(costingParameters);
+                if (!validation.IsValid)
+                {
+                    ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                    return;
+                }
+
                 await _costingParametersRepository.SetAsync(
                     SelectedProduct!.Id, EditingLaborCost, EditingOverheadCost, EditingMarginPercent, EditingVatPercent, CancellationToken.None);
                 RecomputeSummary();
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedProduct).Select(product => product is not null));
 
         LinkTabCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunSafelyAsync(async () =>
             {
                 var roleId = EditingLinkTabKind == ProductTabKind.SubAssemblyRole ? EditingLinkRole!.Id : (int?)null;
                 await _tabLinkRepository.SetLinkAsync(SelectedProduct!.Id, EditingLinkTabKind, roleId, EditingLinkTargetProduct!.Id, CancellationToken.None);
                 await LoadProductDetailAsync(SelectedProduct);
-            },
+            }),
             this.WhenAnyValue(
                 x => x.SelectedProduct, x => x.EditingLinkTabKind, x => x.EditingLinkRole, x => x.EditingLinkTargetProduct,
                 (product, tabKind, role, target) => product is not null && target is not null && (tabKind == ProductTabKind.Packaging || role is not null)));
 
         UnlinkTabCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunSafelyAsync(async () =>
             {
                 var link = SelectedTabLink!.Link;
                 await _tabLinkRepository.RemoveLinkAsync(SelectedProduct!.Id, link.TabKind, link.SubAssemblyRoleId, CancellationToken.None);
                 await LoadProductDetailAsync(SelectedProduct);
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedTabLink).Select(link => link is not null));
 
         CloneCommand = ReactiveCommand.CreateFromTask(
-            async () =>
+            () => RunSafelyAsync(async () =>
             {
                 var newId = await _productCloner.CloneAsync(SelectedProduct!.Id, EditingCloneName, CancellationToken.None);
                 await LoadCommand.Execute();
                 SelectedProduct = Products.FirstOrDefault(p => p.Id == newId);
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingCloneName, (product, name) => product is not null && !string.IsNullOrWhiteSpace(name)));
     }
 

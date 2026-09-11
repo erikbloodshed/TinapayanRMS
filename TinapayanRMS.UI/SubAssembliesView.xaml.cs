@@ -8,6 +8,7 @@ public partial class SubAssembliesView : UserControl
     {
         InitializeComponent();
         DataContext = viewModel;
+        viewModel.RegisterNativeMessageBoxHandler();
         Loaded += (_, _) => viewModel.LoadCommand.Execute().Subscribe();
     }
 }
