@@ -11,6 +11,12 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
     <PackageReference Include="ReactiveUI.WPF" Version="24.2.0" />
+    <PackageReference Include="Syncfusion.Licensing" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.SfChart.WPF" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.SfGrid.WPF" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.SfInput.WPF" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.SfSkinManager.WPF" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Tools.WPF" Version="34.2.2" />
     <PackageReference Include="System.Reactive" Version="7.0.0" />
   </ItemGroup>
 
@@ -18,6 +24,7 @@
     <ProjectReference Include="..\TinapayanRMS.Domain\TinapayanRMS.Domain.csproj" />
     <ProjectReference Include="..\TinapayanRMS.ApplicationCore\TinapayanRMS.ApplicationCore.csproj" />
     <ProjectReference Include="..\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.Theme\TinapayanRMS.Theme.csproj" />
   </ItemGroup>
 
   <ItemGroup>

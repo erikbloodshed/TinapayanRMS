@@ -5,17 +5,18 @@ Product recipe management & costing app for Tinapayan Festival Bakeshoppe. Track
 ## Tech Stack
 
 - **Language / Runtime**: C# 14, .NET 10 (`net10.0`; `net10.0-windows10.0.19041.0` for the UI and Tests projects — ReactiveUI.WPF requires at least that Windows SDK version, and the bare `net10.0-windows` moniker resolves to `windows7.0`, which is too low)
-- **UI**: WPF
+- **UI**: WPF, styled with **Syncfusion Essential Studio for WPF 34.2.2** and a custom Windows11Light theme authored in Syncfusion Theme Studio
 - **MVVM**: ReactiveUI (24.x). This version requires explicit builder-pattern initialization before any `ReactiveObject` is touched — `RxAppBuilder.CreateReactiveUIBuilder().WithCoreServices().WithWpf().BuildApp()` — done once per process by `TinapayanRMS.UI/ReactiveUIBootstrapper.cs`. It also dropped `System.Reactive` as a dependency, so that package is referenced directly wherever Rx LINQ operators (`.Select`, `.Where`, …) are used on an `IObservable<T>`.
 - **Reactive collections**: DynamicData
 - **Persistence**: EF Core 10.0.12 → SQL Server (db name `TinapayanRMS`)
 - **DI / Hosting**: `Microsoft.Extensions.Hosting` + `Microsoft.Extensions.DependencyInjection`, wired via `HostBuilder` in `TinapayanRMS.UI/CompositionRoot.cs`, called from `App.xaml.cs`
 - **Validation**: FluentValidation
 - **Logging**: Serilog (rolling file sink)
-- **Charts**: LiveCharts2 (margin/price trend reporting)
+- **Charts**: Syncfusion SfChart (`Syncfusion.SfChart.WPF`) for margin/price-trend reporting — replaces the originally-planned LiveCharts2
 - **Testing**: xUnit v3, AwesomeAssertions, NSubstitute, Respawn. Integration tests run against a locally installed SQL Server instance (such as LocalDB or SQL Server Express), and Respawn resets that database between tests. `AwesomeAssertions` replaces `FluentAssertions`: FluentAssertions 8+ requires a paid commercial license for use in a for-profit product, and AwesomeAssertions is a same-API, MIT-licensed fork of the last free FluentAssertions 7 release, created for exactly this situation.
 - **Solution format**: `.slnx`
 - **`dotnet test`**: the .NET 10 SDK dropped VSTest support for `dotnet test`; running under the new Microsoft.Testing.Platform mode needs a `test.runner` setting in `global.json` at the repo root (already added). Run tests with `dotnet test --solution TinapayanRMS.slnx`.
+- **Syncfusion license key**: read from the `SYNCFUSION_LICENSE_KEY` Windows user environment variable and registered in `App`'s static constructor (`TinapayanRMS.UI/App.xaml.cs`), before anything else in the process touches a Syncfusion type. Running the app or its tests on another machine requires that variable to be set there too.
 
 ## Solution Structure
 
@@ -24,8 +25,9 @@ TinapayanRMS.slnx
 ├── TinapayanRMS.Domain           — entities, value objects (no external deps)
 ├── TinapayanRMS.ApplicationCore  — use cases, interfaces, costing/margin logic, DTOs
 ├── TinapayanRMS.Infrastructure   — EF Core DbContext, migrations, repositories
-├── TinapayanRMS.UI               — WPF + ReactiveUI Views/ViewModels, DynamicData-backed collections
-└── TinapayanRMS.Tests            — xUnit v3, FluentAssertions, NSubstitute
+├── TinapayanRMS.Theme            — custom Syncfusion Windows11Light theme (Theme Studio output), referenced by UI
+├── TinapayanRMS.UI               — WPF + Syncfusion controls + ReactiveUI Views/ViewModels, DynamicData-backed collections
+└── TinapayanRMS.Tests            — xUnit v3, AwesomeAssertions, NSubstitute
 ```
 
 ## Domain Model
@@ -96,6 +98,18 @@ Some products derive from others (e.g. Special Ensaymada Small from Special Ensa
 - Live templating covers recipe tabs and packaging lines, but **never** CostingParameters (labor/overhead/margin/VAT), which always stay independent per product.
 - Chains of derived products (a derived product used as the base for a further derived product) are allowed.
 
+## Syncfusion UI Framework
+
+The app is styled with **Syncfusion Essential Studio for WPF 34.2.2**, licensed via the `SYNCFUSION_LICENSE_KEY` environment variable, and a custom **Windows11Light** theme originally authored in Syncfusion Theme Studio.
+
+- **`TinapayanRMS.Theme`** is that Theme Studio output, moved into the repo and converted from local-installer `<Reference HintPath>` entries to NuGet `PackageReference`s pinned to `34.2.2`, so the solution restores from nuget.org rather than depending on Essential Studio being installed on the build machine. **No project in the solution requires the Essential Studio installer anymore** — NuGet is the only source for every Syncfusion assembly.
+- **Core control set**: the app adopts `SfDataGrid` (lists/grids), `Syncfusion.SfInput.WPF`'s edit controls (`ComboBoxAdv`, `AutoComplete`, `MaskedTextBox`, `DateTimeEdit`, `CurrencyTextBox`, and others), `ButtonAdv`, `TabControlExt`, `DockingManager`/`Ribbon` for the app shell, and `SfChart` for reporting. `TinapayanRMS.UI` takes its own `PackageReference`s (pinned to `34.2.2`) for exactly these.
+- **`TinapayanRMS.Theme` is trimmed to that same core set**, not the ~50 assemblies Theme Studio generated by default (which covered every control, including PDF/DocIO/XlsIO/Gantt/Spreadsheet document engines and specialty visualization controls this app has no use for). Trimming turned up two real problems worth remembering:
+  - Four packages (`Syncfusion.PivotAnalysis.WPF`, `Syncfusion.Pdf.Base`, `Syncfusion.DocIO.Base`, `Syncfusion.XlsIO.Base`) don't exist at `34.2.2` on nuget.org at all — Syncfusion renamed them (`Pdf.Wpf`, `DocIO.Wpf`, `XlsIO.Wpf`, and the Pivot WPF package under a name not yet tracked down). None of that chain is needed here, so they were dropped rather than chased.
+  - The "SfTabControl" folder Theme Studio generated is **not** a general tab control — its XAML resolves `Syncfusion.Windows.Controls.SfTabControl` from `Syncfusion.SfChromelessWindow.WPF`, i.e. it's `SfChromelessWindow`'s own tab strip. The general-purpose tab control is `TabControlExt` (`Syncfusion.Tools.WPF`), which is what's actually kept.
+  - The folders backing dropped controls were deleted from `TinapayanRMS.Theme`, not just excluded from compilation — see Open Items below before reaching for one of them again.
+- **Applying the theme**: `App.xaml.cs`'s static constructor registers the license (`SyncfusionLicenseProvider.RegisterLicense`) before anything else touches a Syncfusion type; `OnStartup` then calls `SfSkinManager.SetTheme(mainWindow, new Theme("Windows11Light"))` before showing the window. Verified by actually launching the built app and screenshotting the themed `MainWindow` (custom title bar chrome, styled `ButtonAdv`) — not just a successful build.
+
 ## Reactive Costing Cascade
 
 The core design problem is that a price change on any ingredient or packaging material must ripple up through everything that uses it, automatically. The cascade has two starting points, one per material table, and both end at the product:
@@ -120,6 +134,7 @@ The one exception is made ingredients. Their BOMs nest to any depth, so that par
 ## Development Environment
 
 - Development happens directly on a local Windows machine that has the .NET 10 SDK, SQL Server Express, and SQL Server LocalDB installed.
+- Running the app (not just building it) requires the `SYNCFUSION_LICENSE_KEY` user environment variable to be set (see Syncfusion UI Framework below). The solution builds fine without it, but `App`'s static constructor throws on startup if it's missing.
 - **Docker is not used anywhere in the project**: not for development, testing, or deployment.
 - EF Core migrations are generated with `dotnet ef migrations add`, not written by hand, and applied to the local database with `dotnet ef database update`.
 - **A phase is done** when the solution builds without errors, all tests pass, and any new migration applies cleanly to a local database. Mark it Done in the Build Plan table; there are no separate per-phase documents.
@@ -133,21 +148,22 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 |---|---|---|
 | 1 | Solution scaffold, DI host builder, ReactiveUI bootstrap, EF Core DbContext | Done |
 | 2 | Units of Measure (incl. seeded, protected length units) + Ingredient & Packaging Categories | Done |
-| 3 | Ingredients (Purchased/Made source) + Packaging Materials (CRUD, purchase-unit → standard-unit conversion) | Not started |
-| 4 | Ingredient & Packaging Price History + `CurrentCost` rollup | Not started |
-| 5 | Made Ingredients — BOM lines, `WeightLossPercent`, nested cost rollup with cycle check | Not started |
-| 6 | Sub-Assembly Roles + Sub-Assemblies + Sub-Assembly Lines (composition, cost rollup) | Not started |
-| 7 | Products — sub-assembly usages, packaging lines | Not started |
-| 8 | Costing Parameters — labor/overhead/margin/VAT → selling price | Not started |
-| 9 | Derived Products — Clone vs Live Template, per-tab linking | Not started |
-| 10 | End-to-end reactive price cascade, made-ingredient, sub-assembly and packaging branches (wiring Phases 4–9 together) | Not started |
-| 11 | Margin/price-trend reporting (LiveCharts2) | Not started |
-| 12 | Validation (FluentValidation), logging (Serilog), UX polish | Not started |
-| 13 | Full test coverage consolidation | Not started |
+| 3 | Syncfusion UI shell — license bootstrap, custom Windows11Light theme applied, core control set wired into `TinapayanRMS.UI` | Done |
+| 4 | Ingredients (Purchased/Made source) + Packaging Materials (CRUD, purchase-unit → standard-unit conversion) | Not started |
+| 5 | Ingredient & Packaging Price History + `CurrentCost` rollup | Not started |
+| 6 | Made Ingredients — BOM lines, `WeightLossPercent`, nested cost rollup with cycle check | Not started |
+| 7 | Sub-Assembly Roles + Sub-Assemblies + Sub-Assembly Lines (composition, cost rollup) | Not started |
+| 8 | Products — sub-assembly usages, packaging lines | Not started |
+| 9 | Costing Parameters — labor/overhead/margin/VAT → selling price | Not started |
+| 10 | Derived Products — Clone vs Live Template, per-tab linking | Not started |
+| 11 | End-to-end reactive price cascade, made-ingredient, sub-assembly and packaging branches (wiring Phases 5–10 together) | Not started |
+| 12 | Margin/price-trend reporting (SfChart) | Not started |
+| 13 | Validation (FluentValidation), logging (Serilog), UX polish | Not started |
+| 14 | Full test coverage consolidation | Not started |
 
 ### Open items (for later phases)
 
-- None right now.
+- **Adding back a dropped Syncfusion control.** `TinapayanRMS.Theme` was trimmed from Theme Studio's default ~50-assembly output to the core set (see Syncfusion UI Framework above), and the XAML folders for dropped controls were **deleted from disk**, not just excluded from compilation — the original untrimmed export no longer exists anywhere (it was moved into the repo, then trimmed, rather than copied). If a later phase genuinely needs one of the dropped controls (e.g. `SfScheduler` for some future calendar view), regenerate that theme's XAML from Syncfusion Theme Studio rather than trying to reconstruct it by hand, add the matching `PackageReference`(s) to `TinapayanRMS.Theme.csproj` (check the package's current dependency list on nuget.org first — see the Pdf.Base/DocIO.Base/XlsIO.Base/PivotAnalysis.WPF rename lesson above — some names have changed since Theme Studio was last run), and add matching `PackageReference`(s) to `TinapayanRMS.UI.csproj` for whatever the control itself lives in.
 
 ## Conventions
 
