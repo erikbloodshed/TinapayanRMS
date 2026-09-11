@@ -26,6 +26,12 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<IngredientBomLine> IngredientBomLines => Set<IngredientBomLine>();
 
+    public DbSet<SubAssemblyRole> SubAssemblyRoles => Set<SubAssemblyRole>();
+
+    public DbSet<SubAssembly> SubAssemblies => Set<SubAssembly>();
+
+    public DbSet<SubAssemblyLine> SubAssemblyLines => Set<SubAssemblyLine>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TinapayanRMSDbContext).Assembly);

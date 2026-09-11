@@ -238,6 +238,124 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.ToTable("PackagingPriceHistories");
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.SubAssembly", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("TotalWeight")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("SubAssemblies");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.SubAssemblyLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Grams")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("IngredientId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SubAssemblyId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngredientId");
+
+                    b.HasIndex("SubAssemblyId", "IngredientId")
+                        .IsUnique();
+
+                    b.ToTable("SubAssemblyLines");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.SubAssemblyRole", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("SubAssemblyRoles");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Dough",
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Filling",
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Topping",
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "Inclusion",
+                            SortOrder = 4
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Finishing",
+                            SortOrder = 5
+                        });
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.UnitOfMeasure", b =>
                 {
                     b.Property<int>("Id")
@@ -389,6 +507,36 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("PackagingMaterial");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.SubAssembly", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.SubAssemblyRole", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.SubAssemblyLine", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Ingredient", "Ingredient")
+                        .WithMany()
+                        .HasForeignKey("IngredientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.SubAssembly", "SubAssembly")
+                        .WithMany()
+                        .HasForeignKey("SubAssemblyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ingredient");
+
+                    b.Navigation("SubAssembly");
                 });
 #pragma warning restore 612, 618
         }

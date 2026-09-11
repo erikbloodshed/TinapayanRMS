@@ -21,6 +21,7 @@
         <syncfusion:TabControlExt x:Name="MainTabControl" Grid.Row="1" Margin="8">
             <syncfusion:TabItemExt x:Name="IngredientsTab" Header="Ingredients" />
             <syncfusion:TabItemExt x:Name="PackagingMaterialsTab" Header="Packaging Materials" />
+            <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
         </syncfusion:TabControlExt>
     </Grid>
 </Window>

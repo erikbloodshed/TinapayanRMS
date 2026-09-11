@@ -41,11 +41,15 @@ public static class CompositionRoot
                 services.AddSingleton<IIngredientPriceHistoryRepository, IngredientPriceHistoryRepository>();
                 services.AddSingleton<IPackagingPriceHistoryRepository, PackagingPriceHistoryRepository>();
                 services.AddSingleton<IIngredientBomLineRepository, IngredientBomLineRepository>();
+                services.AddSingleton<ISubAssemblyRoleRepository, SubAssemblyRoleRepository>();
+                services.AddSingleton<ISubAssemblyRepository, SubAssemblyRepository>();
+                services.AddSingleton<ISubAssemblyLineRepository, SubAssemblyLineRepository>();
 
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<IngredientsViewModel>();
                 services.AddSingleton<PackagingMaterialsViewModel>();
+                services.AddSingleton<SubAssembliesViewModel>();
             });
     }
 }
