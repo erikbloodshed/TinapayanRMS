@@ -1,0 +1,286 @@
+using AwesomeAssertions;
+using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.Domain;
+using TinapayanRMS.Infrastructure;
+using TinapayanRMS.Tests.Infrastructure;
+
+namespace TinapayanRMS.Tests;
+
+[Collection(DatabaseCollection.Name)]
+public class ProductPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
+{
+    private CancellationToken Cancellation => TestContext.Current.CancellationToken;
+
+    public ValueTask InitializeAsync() => new(fixture.ResetAsync());
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    private TinapayanRMSDbContext CreateDbContext() =>
+        new(CreateDbContextOptions());
+
+    private IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
+        new TestDbContextFactory(CreateDbContextOptions());
+
+    private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());
+
+    private ProductSubAssemblyUsageRepository CreateUsageRepository() => new(CreateDbContextFactory());
+
+    private PackagingLineRepository CreatePackagingLineRepository() => new(CreateDbContextFactory());
+
+    private CostingParametersRepository CreateCostingParametersRepository() => new(CreateDbContextFactory());
+
+    private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
+        new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options;
+
+    private sealed class TestDbContextFactory(DbContextOptions<TinapayanRMSDbContext> options) : IDbContextFactory<TinapayanRMSDbContext>
+    {
+        public TinapayanRMSDbContext CreateDbContext() => new(options);
+    }
+
+    private async Task<int> SeedRoleAsync(string name, int sortOrder = 1)
+    {
+        await using var dbContext = CreateDbContext();
+        var role = new SubAssemblyRole { Name = name, SortOrder = sortOrder };
+        dbContext.SubAssemblyRoles.Add(role);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return role.Id;
+    }
+
+    private async Task<int> SeedSubAssemblyAsync(string name, int roleId, decimal totalWeight, decimal totalCost)
+    {
+        await using var dbContext = CreateDbContext();
+        var subAssembly = new SubAssembly { Name = name, RoleId = roleId, TotalWeight = totalWeight, TotalCost = totalCost };
+        dbContext.SubAssemblies.Add(subAssembly);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return subAssembly.Id;
+    }
+
+    private async Task<int> SeedPackagingCategoryAsync(string name)
+    {
+        await using var dbContext = CreateDbContext();
+        var category = new PackagingCategory { Name = name };
+        dbContext.PackagingCategories.Add(category);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return category.Id;
+    }
+
+    private async Task<int> SeedPackagingMaterialAsync(string name, int categoryId, int standardUnitId, decimal purchaseUnitQty, decimal currentCost)
+    {
+        await using var dbContext = CreateDbContext();
+        var material = new PackagingMaterial
+        {
+            Name = name,
+            PackagingCategoryId = categoryId,
+            StandardUnitId = standardUnitId,
+            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitQty = purchaseUnitQty,
+            CurrentCost = currentCost,
+        };
+        dbContext.PackagingMaterials.Add(material);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return material.Id;
+    }
+
+    private async Task<int> SeedProductAsync(string name)
+    {
+        await using var dbContext = CreateDbContext();
+        var product = new Product { Name = name };
+        dbContext.Products.Add(product);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return product.Id;
+    }
+
+    [Fact]
+    public async Task SetUsagesAsync_stores_usages_with_the_sub_assembly_populated_on_read()
+    {
+        var roleId = await SeedRoleAsync("Filling");
+        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
+        var productId = await SeedProductAsync("Ensaymada");
+
+        await CreateUsageRepository().SetUsagesAsync(productId, [(subAssemblyId, 10m)], Cancellation);
+
+        var usages = await CreateUsageRepository().GetForProductAsync(productId, Cancellation);
+        var usage = usages.Should().ContainSingle().Subject;
+        usage.WeightPerPiece.Should().Be(10m);
+        usage.SubAssembly.Should().NotBeNull();
+        usage.SubAssembly!.Name.Should().Be("Custard");
+    }
+
+    [Fact]
+    public async Task SetUsagesAsync_rejects_the_same_sub_assembly_twice()
+    {
+        var roleId = await SeedRoleAsync("Filling");
+        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
+        var productId = await SeedProductAsync("Ensaymada");
+
+        var act = () => CreateUsageRepository().SetUsagesAsync(productId,
+        [
+            (subAssemblyId, 10m),
+            (subAssemblyId, 20m),
+        ], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task Deleting_a_sub_assembly_in_use_by_a_product_is_blocked()
+    {
+        var roleId = await SeedRoleAsync("Filling");
+        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
+        var productId = await SeedProductAsync("Ensaymada");
+        await CreateUsageRepository().SetUsagesAsync(productId, [(subAssemblyId, 10m)], Cancellation);
+
+        await using var dbContext = CreateDbContext();
+        var act = () => dbContext.SubAssemblies.Where(s => s.Id == subAssemblyId).ExecuteDeleteAsync(Cancellation);
+
+        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+    }
+
+    [Fact]
+    public async Task SetLinesAsync_stores_lines_and_derives_the_reciprocal_field()
+    {
+        var categoryId = await SeedPackagingCategoryAsync("Boxes");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var productId = await SeedProductAsync("Ensaymada");
+
+        // Authored as "6 pieces per box".
+        await CreatePackagingLineRepository().SetLinesAsync(productId,
+        [
+            (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+        ], Cancellation);
+
+        var lines = await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation);
+        var line = lines.Should().ContainSingle().Subject;
+        line.PiecesPerPackagingUnit.Should().Be(6m);
+        // The repository computes the full-precision reciprocal (1/6 = 0.1666...), but the
+        // decimal(18,4) column rounds it to 4 places on the round trip through SQL Server.
+        line.QtyPerPiece.Should().Be(0.1667m);
+        line.PackagingMaterial.Should().NotBeNull();
+        line.EntryUnit.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task SetLinesAsync_accepts_a_ribbon_entered_in_a_different_length_unit_than_its_standard_unit()
+    {
+        var categoryId = await SeedPackagingCategoryAsync("Ribbons");
+        var ribbonId = await SeedPackagingMaterialAsync("Satin Ribbon", categoryId, WellKnownUnitOfMeasureIds.Centimeter, purchaseUnitQty: 1000m, currentCost: 45m);
+        var productId = await SeedProductAsync("Special Box Set");
+
+        await CreatePackagingLineRepository().SetLinesAsync(productId,
+        [
+            (ribbonId, WellKnownUnitOfMeasureIds.Inch, PackagingLineAuthoredField.QtyPerPiece, 5m),
+        ], Cancellation);
+
+        var lines = await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation);
+        var line = lines.Should().ContainSingle().Subject;
+        line.QtyPerPiece.Should().Be(5m);
+        line.EntryUnit!.Id.Should().Be(WellKnownUnitOfMeasureIds.Inch);
+    }
+
+    [Fact]
+    public async Task SetLinesAsync_rejects_an_entry_unit_that_does_not_match_a_piece_standard_unit()
+    {
+        var categoryId = await SeedPackagingCategoryAsync("Boxes");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var productId = await SeedProductAsync("Ensaymada");
+
+        var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
+        [
+            (boxId, WellKnownUnitOfMeasureIds.Centimeter, PackagingLineAuthoredField.QtyPerPiece, 1m),
+        ], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task SetLinesAsync_rejects_the_same_packaging_material_twice()
+    {
+        var categoryId = await SeedPackagingCategoryAsync("Boxes");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var productId = await SeedProductAsync("Ensaymada");
+
+        var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
+        [
+            (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m),
+        ], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task Deleting_a_packaging_material_in_use_by_a_product_is_blocked()
+    {
+        var categoryId = await SeedPackagingCategoryAsync("Boxes");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var productId = await SeedProductAsync("Ensaymada");
+        await CreatePackagingLineRepository().SetLinesAsync(productId,
+        [
+            (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+        ], Cancellation);
+
+        await using var dbContext = CreateDbContext();
+        var act = () => dbContext.PackagingMaterials.Where(m => m.Id == boxId).ExecuteDeleteAsync(Cancellation);
+
+        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+    }
+
+    [Fact]
+    public async Task Deleting_a_product_cascades_to_its_usages_lines_and_costing_parameters()
+    {
+        var roleId = await SeedRoleAsync("Filling");
+        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
+        var categoryId = await SeedPackagingCategoryAsync("Boxes");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var productId = await SeedProductAsync("Ensaymada");
+
+        await CreateUsageRepository().SetUsagesAsync(productId, [(subAssemblyId, 10m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(productId,
+        [
+            (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+        ], Cancellation);
+        await CreateCostingParametersRepository().SetAsync(productId, laborCost: 5m, overheadCost: 3m, marginPercent: 40m, vatPercent: 12m, Cancellation);
+
+        await CreateProductRepository().DeleteAsync(productId, Cancellation);
+
+        (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Should().BeEmpty();
+        (await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation)).Should().BeEmpty();
+        (await CreateCostingParametersRepository().GetForProductAsync(productId, Cancellation)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CostingParametersRepository_GetForProductAsync_returns_null_before_any_are_set()
+    {
+        var productId = await SeedProductAsync("Ensaymada");
+
+        (await CreateCostingParametersRepository().GetForProductAsync(productId, Cancellation)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CostingParametersRepository_SetAsync_upserts_a_single_row()
+    {
+        var productId = await SeedProductAsync("Ensaymada");
+        var repository = CreateCostingParametersRepository();
+
+        await repository.SetAsync(productId, laborCost: 5m, overheadCost: 3m, marginPercent: 40m, vatPercent: 12m, Cancellation);
+        await repository.SetAsync(productId, laborCost: 6m, overheadCost: 3m, marginPercent: 35m, vatPercent: 12m, Cancellation);
+
+        var parameters = await repository.GetForProductAsync(productId, Cancellation);
+        parameters.Should().NotBeNull();
+        parameters!.LaborCost.Should().Be(6m);
+        parameters.MarginPercent.Should().Be(35m);
+
+        await using var dbContext = CreateDbContext();
+        (await dbContext.CostingParameters.CountAsync(c => c.ProductId == productId, Cancellation)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CostingParametersRepository_SetAsync_rejects_negative_values()
+    {
+        var productId = await SeedProductAsync("Ensaymada");
+
+        var act = () => CreateCostingParametersRepository().SetAsync(productId, laborCost: -1m, overheadCost: 0m, marginPercent: 0m, vatPercent: 0m, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+}

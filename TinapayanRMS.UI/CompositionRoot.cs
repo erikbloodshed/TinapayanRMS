@@ -44,12 +44,17 @@ public static class CompositionRoot
                 services.AddSingleton<ISubAssemblyRoleRepository, SubAssemblyRoleRepository>();
                 services.AddSingleton<ISubAssemblyRepository, SubAssemblyRepository>();
                 services.AddSingleton<ISubAssemblyLineRepository, SubAssemblyLineRepository>();
+                services.AddSingleton<IProductRepository, ProductRepository>();
+                services.AddSingleton<IProductSubAssemblyUsageRepository, ProductSubAssemblyUsageRepository>();
+                services.AddSingleton<IPackagingLineRepository, PackagingLineRepository>();
+                services.AddSingleton<ICostingParametersRepository, CostingParametersRepository>();
 
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<IngredientsViewModel>();
                 services.AddSingleton<PackagingMaterialsViewModel>();
                 services.AddSingleton<SubAssembliesViewModel>();
+                services.AddSingleton<ProductsViewModel>();
             });
     }
 }

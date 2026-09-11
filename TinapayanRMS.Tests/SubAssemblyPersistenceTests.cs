@@ -245,4 +245,50 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : IAsyncLifeti
         updated.TotalWeight.Should().Be(1000m);
         updated.TotalCost.Should().Be(50m);
     }
+
+    [Fact]
+    public async Task UpdateAsync_rejects_a_role_change_while_a_product_uses_the_sub_assembly()
+    {
+        var doughRoleId = await SeedRoleAsync("Dough");
+        var fillingRoleId = await SeedRoleAsync("Filling", sortOrder: 2);
+        var subAssemblyId = await SeedSubAssemblyAsync("Bread Dough", doughRoleId);
+
+        await using (var dbContext = CreateDbContext())
+        {
+            var product = new Product { Name = "Ensaymada" };
+            dbContext.Products.Add(product);
+            await dbContext.SaveChangesAsync(Cancellation);
+            dbContext.ProductSubAssemblyUsages.Add(new ProductSubAssemblyUsage
+            {
+                ProductId = product.Id,
+                SubAssemblyId = subAssemblyId,
+                WeightPerPiece = 30m,
+            });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var subAssemblyRepository = CreateSubAssemblyRepository();
+        var toUpdate = (await subAssemblyRepository.GetByIdAsync(subAssemblyId, Cancellation))!;
+        toUpdate.RoleId = fillingRoleId;
+
+        var act = () => subAssemblyRepository.UpdateAsync(toUpdate, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_allows_a_role_change_when_no_product_uses_the_sub_assembly()
+    {
+        var doughRoleId = await SeedRoleAsync("Dough");
+        var fillingRoleId = await SeedRoleAsync("Filling", sortOrder: 2);
+        var subAssemblyId = await SeedSubAssemblyAsync("Bread Dough", doughRoleId);
+
+        var subAssemblyRepository = CreateSubAssemblyRepository();
+        var toUpdate = (await subAssemblyRepository.GetByIdAsync(subAssemblyId, Cancellation))!;
+        toUpdate.RoleId = fillingRoleId;
+
+        var act = () => subAssemblyRepository.UpdateAsync(toUpdate, Cancellation);
+
+        await act.Should().NotThrowAsync();
+    }
 }

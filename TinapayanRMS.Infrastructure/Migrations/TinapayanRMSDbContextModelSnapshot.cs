@@ -22,6 +22,41 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("TinapayanRMS.Domain.CostingParameters", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("LaborCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("MarginPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("OverheadCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("VatPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId")
+                        .IsUnique();
+
+                    b.ToTable("CostingParameters");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.Ingredient", b =>
                 {
                     b.Property<int>("Id")
@@ -169,6 +204,46 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.ToTable("PackagingCategories");
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.PackagingLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AuthoredField")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EntryUnitId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PackagingMaterialId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PiecesPerPackagingUnit")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("QtyPerPiece")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EntryUnitId");
+
+                    b.HasIndex("PackagingMaterialId");
+
+                    b.HasIndex("ProductId", "PackagingMaterialId")
+                        .IsUnique();
+
+                    b.ToTable("PackagingLines");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.PackagingMaterial", b =>
                 {
                     b.Property<int>("Id")
@@ -236,6 +311,55 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.HasIndex("PackagingMaterialId", "Date");
 
                     b.ToTable("PackagingPriceHistories");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Product", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.ProductSubAssemblyUsage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SubAssemblyId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("WeightPerPiece")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubAssemblyId");
+
+                    b.HasIndex("ProductId", "SubAssemblyId")
+                        .IsUnique();
+
+                    b.ToTable("ProductSubAssemblyUsages");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.SubAssembly", b =>
@@ -423,6 +547,17 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.CostingParameters", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.Ingredient", b =>
                 {
                     b.HasOne("TinapayanRMS.Domain.IngredientCategory", "IngredientCategory")
@@ -471,6 +606,33 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("Ingredient");
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.PackagingLine", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.UnitOfMeasure", "EntryUnit")
+                        .WithMany()
+                        .HasForeignKey("EntryUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.PackagingMaterial", "PackagingMaterial")
+                        .WithMany()
+                        .HasForeignKey("PackagingMaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EntryUnit");
+
+                    b.Navigation("PackagingMaterial");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.PackagingMaterial", b =>
                 {
                     b.HasOne("TinapayanRMS.Domain.PackagingCategory", "PackagingCategory")
@@ -507,6 +669,25 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("PackagingMaterial");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.ProductSubAssemblyUsage", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.SubAssembly", "SubAssembly")
+                        .WithMany()
+                        .HasForeignKey("SubAssemblyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("SubAssembly");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.SubAssembly", b =>

@@ -39,6 +39,17 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         var existing = await dbContext.SubAssemblies.FirstOrDefaultAsync(s => s.Id == subAssembly.Id, cancellationToken)
             ?? throw new InvalidOperationException($"Sub-assembly {subAssembly.Id} does not exist.");
 
+        if (existing.RoleId != subAssembly.RoleId)
+        {
+            // Changing role would move the sub-assembly to a different tab in every product
+            // that uses it and break that tab's links (PLAN.md's SubAssembly domain notes).
+            var usedByAProduct = await dbContext.ProductSubAssemblyUsages.AnyAsync(u => u.SubAssemblyId == subAssembly.Id, cancellationToken);
+            if (usedByAProduct)
+            {
+                throw new InvalidOperationException("This sub-assembly's role can't be changed while a product uses it.");
+            }
+        }
+
         // Field by field: TotalWeight/TotalCost are owned by the line rollup (SetLinesAsync),
         // not by this form.
         existing.Name = subAssembly.Name;

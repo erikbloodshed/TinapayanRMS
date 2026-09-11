@@ -32,6 +32,14 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<SubAssemblyLine> SubAssemblyLines => Set<SubAssemblyLine>();
 
+    public DbSet<Product> Products => Set<Product>();
+
+    public DbSet<ProductSubAssemblyUsage> ProductSubAssemblyUsages => Set<ProductSubAssemblyUsage>();
+
+    public DbSet<PackagingLine> PackagingLines => Set<PackagingLine>();
+
+    public DbSet<CostingParameters> CostingParameters => Set<CostingParameters>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TinapayanRMSDbContext).Assembly);

@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:TinapayanRMS.UI"
         xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
         mc:Ignorable="d"
-        Title="{Binding Title}" Height="750" Width="1400">
+        Title="{Binding Title}" Height="800" Width="1400">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -22,6 +22,7 @@
             <syncfusion:TabItemExt x:Name="IngredientsTab" Header="Ingredients" />
             <syncfusion:TabItemExt x:Name="PackagingMaterialsTab" Header="Packaging Materials" />
             <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
+            <syncfusion:TabItemExt x:Name="ProductsTab" Header="Products" />
         </syncfusion:TabControlExt>
     </Grid>
 </Window>

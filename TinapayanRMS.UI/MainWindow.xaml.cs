@@ -8,7 +8,8 @@ public partial class MainWindow : Window
         MainWindowViewModel viewModel,
         IngredientsViewModel ingredientsViewModel,
         PackagingMaterialsViewModel packagingMaterialsViewModel,
-        SubAssembliesViewModel subAssembliesViewModel)
+        SubAssembliesViewModel subAssembliesViewModel,
+        ProductsViewModel productsViewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
@@ -16,5 +17,6 @@ public partial class MainWindow : Window
         IngredientsTab.Content = new IngredientsView(ingredientsViewModel);
         PackagingMaterialsTab.Content = new PackagingMaterialsView(packagingMaterialsViewModel);
         SubAssembliesTab.Content = new SubAssembliesView(subAssembliesViewModel);
+        ProductsTab.Content = new ProductsView(productsViewModel);
     }
 }
