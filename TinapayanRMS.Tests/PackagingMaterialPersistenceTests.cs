@@ -7,28 +7,8 @@ using TinapayanRMS.Tests.Infrastructure;
 namespace TinapayanRMS.Tests;
 
 [Collection(DatabaseCollection.Name)]
-public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
+public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private CancellationToken Cancellation => TestContext.Current.CancellationToken;
-
-    public ValueTask InitializeAsync() => new(fixture.ResetAsync());
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-    private TinapayanRMSDbContext CreateDbContext() =>
-        new(CreateDbContextOptions());
-
-    private IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
-        new TestDbContextFactory(CreateDbContextOptions());
-
-    private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
-        new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options;
-
-    private sealed class TestDbContextFactory(DbContextOptions<TinapayanRMSDbContext> options) : IDbContextFactory<TinapayanRMSDbContext>
-    {
-        public TinapayanRMSDbContext CreateDbContext() => new(options);
-    }
-
     private async Task<int> SeedCategoryAsync()
     {
         await using var dbContext = CreateDbContext();
@@ -90,6 +70,25 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : IAsync
             Name = "Invalid",
             PackagingCategoryId = categoryId,
             StandardUnitId = WellKnownUnitOfMeasureIds.Gram,
+            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitQty = 1m,
+        }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_rejects_a_nonexistent_packaging_material()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = new PackagingMaterialRepository(CreateDbContextFactory());
+
+        var act = () => repository.UpdateAsync(new PackagingMaterial
+        {
+            Id = 999_999,
+            Name = "Ghost",
+            PackagingCategoryId = categoryId,
+            StandardUnitId = WellKnownUnitOfMeasureIds.Piece,
             PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
             PurchaseUnitQty = 1m,
         }, Cancellation);

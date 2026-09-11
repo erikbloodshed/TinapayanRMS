@@ -120,4 +120,19 @@ public class IngredientBomRulesTests
         outputGrams.Should().Be(100m);
         costPerGram.Should().Be(1m);
     }
+
+    [Fact]
+    public void CalculateCost_with_everything_boiled_away_returns_zero_cost_per_gram_instead_of_dividing_by_zero()
+    {
+        // 100% weight loss: output is 0g, so CostPerGram falls back to 0 rather than a
+        // divide-by-zero. IngredientRules.EnsureFieldsMatchSource rejects a weight loss
+        // percent of 100 at the data-entry layer, but CalculateCost is a pure function
+        // with no such guard of its own, so this defensive branch is exercised directly.
+        var (outputGrams, costPerGram) = IngredientBomRules.CalculateCost(
+            [(Grams: 1000m, ComponentCostPerGram: 0.09m)],
+            weightLossPercent: 100m);
+
+        outputGrams.Should().Be(0m);
+        costPerGram.Should().Be(0m);
+    }
 }

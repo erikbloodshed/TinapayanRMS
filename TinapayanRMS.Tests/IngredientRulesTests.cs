@@ -110,6 +110,16 @@ public class IngredientRulesTests
     }
 
     [Fact]
+    public void EnsureFieldsMatchSource_rejects_a_made_ingredient_with_a_current_cost()
+    {
+        var ingredient = new Ingredient { Source = IngredientSource.Made, WeightLossPercent = 10m, CurrentCost = 5m };
+
+        var act = () => IngredientRules.EnsureFieldsMatchSource(ingredient);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
     public void EnsureSourceUnchanged_accepts_the_same_source()
     {
         var act = () => IngredientRules.EnsureSourceUnchanged(IngredientSource.Purchased, IngredientSource.Purchased);

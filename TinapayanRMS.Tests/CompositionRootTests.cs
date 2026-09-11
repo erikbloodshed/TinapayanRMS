@@ -27,6 +27,9 @@ public class CompositionRootTests
 
         var viewModel = host.Services.GetRequiredService<MainWindowViewModel>();
 
+        // An independent literal, not just internal consistency with Title: this would
+        // still pass if Heading derived correctly from a Title that was itself wrong.
+        viewModel.Title.Should().Be("Tinapayan Festival Bakeshoppe — Recipe & Costing");
         viewModel.Heading.Should().Be(viewModel.Title.ToUpperInvariant());
     }
 }

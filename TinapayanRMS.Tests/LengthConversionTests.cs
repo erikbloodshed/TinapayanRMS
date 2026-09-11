@@ -31,6 +31,32 @@ public class LengthConversionTests
     }
 
     [Fact]
+    public void Convert_from_meters_to_millimeters()
+    {
+        var result = LengthConversion.Convert(1m, WellKnownUnitOfMeasureIds.Meter, WellKnownUnitOfMeasureIds.Millimeter);
+
+        result.Should().Be(1000m);
+    }
+
+    [Fact]
+    public void Convert_from_inches_to_centimeters()
+    {
+        var result = LengthConversion.Convert(5m, WellKnownUnitOfMeasureIds.Inch, WellKnownUnitOfMeasureIds.Centimeter);
+
+        result.Should().Be(12.7m);
+    }
+
+    [Fact]
+    public void Convert_to_inches_from_centimeters()
+    {
+        // Inch is only ever tested above as a source unit — this exercises it as the
+        // destination of the mm-normalize-then-divide step in Convert.
+        var result = LengthConversion.Convert(2.54m, WellKnownUnitOfMeasureIds.Centimeter, WellKnownUnitOfMeasureIds.Inch);
+
+        result.Should().Be(1m);
+    }
+
+    [Fact]
     public void Convert_same_unit_returns_the_same_quantity_unchanged()
     {
         var result = LengthConversion.Convert(12.7m, WellKnownUnitOfMeasureIds.Centimeter, WellKnownUnitOfMeasureIds.Centimeter);

@@ -62,6 +62,16 @@ public class ProductRulesTests
     }
 
     [Fact]
+    public void EnsureValidPackagingLines_accepts_an_empty_list()
+    {
+        // Unlike EnsureValidUsages, an empty packaging line list is a valid state — a
+        // product may not have its packaging entered yet.
+        var act = () => ProductRules.EnsureValidPackagingLines([]);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
     public void EnsureValidPackagingLines_rejects_non_positive_qty_per_piece()
     {
         var act = () => ProductRules.EnsureValidPackagingLines([(PackagingMaterialId: 1, QtyPerPiece: 0m)]);

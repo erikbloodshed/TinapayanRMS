@@ -30,6 +30,12 @@ public static class ProductRules
     public static decimal CalculateUsageCostPerPiece(decimal subAssemblyTotalCost, decimal weightPerPiece, decimal subAssemblyTotalWeight) =>
         subAssemblyTotalCost * weightPerPiece / subAssemblyTotalWeight;
 
+    /// <summary>
+    /// Unlike EnsureValidUsages and the ingredient/sub-assembly line rules, an empty list
+    /// is deliberately allowed here — a product may legitimately have no packaging lines
+    /// entered yet, whereas a sub-assembly with no ingredient lines or a product with no
+    /// sub-assembly usage isn't a real recipe.
+    /// </summary>
     public static void EnsureValidPackagingLines(IReadOnlyList<(int PackagingMaterialId, decimal QtyPerPiece)> lines)
     {
         if (lines.Any(l => l.QtyPerPiece <= 0))

@@ -7,20 +7,8 @@ using TinapayanRMS.Tests.Infrastructure;
 namespace TinapayanRMS.Tests;
 
 [Collection(DatabaseCollection.Name)]
-public class ProductPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
+public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private CancellationToken Cancellation => TestContext.Current.CancellationToken;
-
-    public ValueTask InitializeAsync() => new(fixture.ResetAsync());
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-    private TinapayanRMSDbContext CreateDbContext() =>
-        new(CreateDbContextOptions());
-
-    private IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
-        new TestDbContextFactory(CreateDbContextOptions());
-
     private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());
 
     private ProductSubAssemblyUsageRepository CreateUsageRepository() => new(CreateDbContextFactory());
@@ -28,14 +16,6 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
     private PackagingLineRepository CreatePackagingLineRepository() => new(CreateDbContextFactory());
 
     private CostingParametersRepository CreateCostingParametersRepository() => new(CreateDbContextFactory());
-
-    private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
-        new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options;
-
-    private sealed class TestDbContextFactory(DbContextOptions<TinapayanRMSDbContext> options) : IDbContextFactory<TinapayanRMSDbContext>
-    {
-        public TinapayanRMSDbContext CreateDbContext() => new(options);
-    }
 
     private async Task<int> SeedRoleAsync(string name, int sortOrder = 1)
     {
@@ -280,6 +260,52 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
         var productId = await SeedProductAsync("Ensaymada");
 
         var act = () => CreateCostingParametersRepository().SetAsync(productId, laborCost: -1m, overheadCost: 0m, marginPercent: 0m, vatPercent: 0m, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task ProductRepository_UpdateAsync_rejects_a_nonexistent_product()
+    {
+        var act = () => CreateProductRepository().UpdateAsync(new Product { Id = 999_999, Name = "Ghost" }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task SetUsagesAsync_rejects_a_nonexistent_product()
+    {
+        var roleId = await SeedRoleAsync("Filling");
+        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
+
+        var act = () => CreateUsageRepository().SetUsagesAsync(999_999, [(subAssemblyId, 10m)], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task SetLinesAsync_rejects_a_nonexistent_product()
+    {
+        var categoryId = await SeedPackagingCategoryAsync("Boxes");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+
+        var act = () => CreatePackagingLineRepository().SetLinesAsync(999_999,
+        [
+            (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+        ], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task SetLinesAsync_rejects_a_nonexistent_packaging_material()
+    {
+        var productId = await SeedProductAsync("Ensaymada");
+
+        var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
+        [
+            (999_999, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+        ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }

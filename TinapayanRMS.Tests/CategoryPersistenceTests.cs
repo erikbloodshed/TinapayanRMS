@@ -7,17 +7,8 @@ using TinapayanRMS.Tests.Infrastructure;
 namespace TinapayanRMS.Tests;
 
 [Collection(DatabaseCollection.Name)]
-public class CategoryPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
+public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private CancellationToken Cancellation => TestContext.Current.CancellationToken;
-
-    public ValueTask InitializeAsync() => new(fixture.ResetAsync());
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-    private TinapayanRMSDbContext CreateDbContext() =>
-        new(new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options);
-
     [Fact]
     public async Task The_four_protected_length_units_and_gram_and_piece_are_seeded()
     {
@@ -67,6 +58,23 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
             var category = await dbContext.PackagingCategories.SingleAsync(Cancellation);
             category.Name.Should().Be("Ribbons");
         }
+    }
+
+    [Fact]
+    public async Task LookupRepository_GetAllAsync_returns_every_row_for_its_entity_type()
+    {
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.IngredientCategories.AddRange(
+                new IngredientCategory { Name = "Flour" },
+                new IngredientCategory { Name = "Dairy" });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var repository = new LookupRepository<IngredientCategory>(CreateDbContextFactory());
+        var categories = await repository.GetAllAsync(Cancellation);
+
+        categories.Select(c => c.Name).Should().BeEquivalentTo(["Flour", "Dairy"]);
     }
 
     [Fact]

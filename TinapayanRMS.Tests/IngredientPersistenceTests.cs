@@ -7,30 +7,10 @@ using TinapayanRMS.Tests.Infrastructure;
 namespace TinapayanRMS.Tests;
 
 [Collection(DatabaseCollection.Name)]
-public class IngredientPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
+public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private CancellationToken Cancellation => TestContext.Current.CancellationToken;
-
-    public ValueTask InitializeAsync() => new(fixture.ResetAsync());
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-    private TinapayanRMSDbContext CreateDbContext() =>
-        new(CreateDbContextOptions());
-
-    private IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
-        new TestDbContextFactory(CreateDbContextOptions());
-
     private IngredientCostPropagator CreateCostPropagator() =>
         new(CreateDbContextFactory());
-
-    private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
-        new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options;
-
-    private sealed class TestDbContextFactory(DbContextOptions<TinapayanRMSDbContext> options) : IDbContextFactory<TinapayanRMSDbContext>
-    {
-        public TinapayanRMSDbContext CreateDbContext() => new(options);
-    }
 
     private async Task<int> SeedCategoryAsync()
     {
@@ -123,6 +103,24 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : IAsyncLifetim
         ingredient.WeightLossPercent = 20m;
 
         var act = () => repository.UpdateAsync(ingredient, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_rejects_a_nonexistent_ingredient()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
+
+        var act = () => repository.UpdateAsync(new Ingredient
+        {
+            Id = 999_999,
+            Name = "Ghost",
+            IngredientCategoryId = categoryId,
+            Source = IngredientSource.Made,
+            WeightLossPercent = 10m,
+        }, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }

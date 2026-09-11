@@ -7,20 +7,8 @@ using TinapayanRMS.Tests.Infrastructure;
 namespace TinapayanRMS.Tests;
 
 [Collection(DatabaseCollection.Name)]
-public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
+public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private CancellationToken Cancellation => TestContext.Current.CancellationToken;
-
-    public ValueTask InitializeAsync() => new(fixture.ResetAsync());
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-    private TinapayanRMSDbContext CreateDbContext() =>
-        new(CreateDbContextOptions());
-
-    private IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
-        new TestDbContextFactory(CreateDbContextOptions());
-
     private IngredientCostPropagator CreateCostPropagator() =>
         new(CreateDbContextFactory());
 
@@ -29,14 +17,6 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : IAsync
 
     private IngredientPriceHistoryRepository CreatePriceHistoryRepository() =>
         new(CreateDbContextFactory(), CreateCostPropagator());
-
-    private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
-        new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options;
-
-    private sealed class TestDbContextFactory(DbContextOptions<TinapayanRMSDbContext> options) : IDbContextFactory<TinapayanRMSDbContext>
-    {
-        public TinapayanRMSDbContext CreateDbContext() => new(options);
-    }
 
     private async Task<int> SeedCategoryAsync(string name)
     {
@@ -196,6 +176,17 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : IAsync
         var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId);
 
         var act = () => CreateBomRepository().SetLinesAsync(syrupId, [(syrupId, 100m)], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task SetLinesAsync_rejects_a_nonexistent_ingredient()
+    {
+        var categoryId = await SeedCategoryAsync("Fillings");
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
+
+        var act = () => CreateBomRepository().SetLinesAsync(999_999, [(sugarId, 100m)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }

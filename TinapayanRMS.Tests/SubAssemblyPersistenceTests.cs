@@ -7,33 +7,13 @@ using TinapayanRMS.Tests.Infrastructure;
 namespace TinapayanRMS.Tests;
 
 [Collection(DatabaseCollection.Name)]
-public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
+public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private CancellationToken Cancellation => TestContext.Current.CancellationToken;
-
-    public ValueTask InitializeAsync() => new(fixture.ResetAsync());
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-    private TinapayanRMSDbContext CreateDbContext() =>
-        new(CreateDbContextOptions());
-
-    private IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
-        new TestDbContextFactory(CreateDbContextOptions());
-
     private SubAssemblyRoleRepository CreateRoleRepository() => new(CreateDbContextFactory());
 
     private SubAssemblyRepository CreateSubAssemblyRepository() => new(CreateDbContextFactory());
 
     private SubAssemblyLineRepository CreateLineRepository() => new(CreateDbContextFactory());
-
-    private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
-        new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options;
-
-    private sealed class TestDbContextFactory(DbContextOptions<TinapayanRMSDbContext> options) : IDbContextFactory<TinapayanRMSDbContext>
-    {
-        public TinapayanRMSDbContext CreateDbContext() => new(options);
-    }
 
     private async Task<int> SeedRoleAsync(string name, int sortOrder = 1)
     {
@@ -290,5 +270,34 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : IAsyncLifeti
         var act = () => subAssemblyRepository.UpdateAsync(toUpdate, Cancellation);
 
         await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task SubAssemblyRepository_UpdateAsync_rejects_a_nonexistent_sub_assembly()
+    {
+        var roleId = await SeedRoleAsync("Dough");
+
+        var act = () => CreateSubAssemblyRepository().UpdateAsync(new SubAssembly { Id = 999_999, Name = "Ghost", RoleId = roleId }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task SubAssemblyRoleRepository_UpdateAsync_rejects_a_nonexistent_role()
+    {
+        var act = () => CreateRoleRepository().UpdateAsync(new SubAssemblyRole { Id = 999_999, Name = "Ghost", SortOrder = 1 }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task SetLinesAsync_rejects_a_nonexistent_sub_assembly()
+    {
+        var categoryId = await SeedCategoryAsync("Fillings");
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
+
+        var act = () => CreateLineRepository().SetLinesAsync(999_999, [(sugarId, 100m)], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 }

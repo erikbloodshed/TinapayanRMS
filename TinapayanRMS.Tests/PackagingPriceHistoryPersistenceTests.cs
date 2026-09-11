@@ -7,28 +7,8 @@ using TinapayanRMS.Tests.Infrastructure;
 namespace TinapayanRMS.Tests;
 
 [Collection(DatabaseCollection.Name)]
-public class PackagingPriceHistoryPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
+public class PackagingPriceHistoryPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private CancellationToken Cancellation => TestContext.Current.CancellationToken;
-
-    public ValueTask InitializeAsync() => new(fixture.ResetAsync());
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-    private TinapayanRMSDbContext CreateDbContext() =>
-        new(CreateDbContextOptions());
-
-    private IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
-        new TestDbContextFactory(CreateDbContextOptions());
-
-    private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
-        new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options;
-
-    private sealed class TestDbContextFactory(DbContextOptions<TinapayanRMSDbContext> options) : IDbContextFactory<TinapayanRMSDbContext>
-    {
-        public TinapayanRMSDbContext CreateDbContext() => new(options);
-    }
-
     private async Task<int> SeedPackagingMaterialAsync()
     {
         await using var dbContext = CreateDbContext();
@@ -112,6 +92,47 @@ public class PackagingPriceHistoryPersistenceTests(DatabaseFixture fixture) : IA
             Date = new DateOnly(2026, 1, 1),
             Price = -5m,
         }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task AddAsync_rejects_a_nonexistent_packaging_material()
+    {
+        var repository = new PackagingPriceHistoryRepository(CreateDbContextFactory());
+
+        var act = () => repository.AddAsync(new PackagingPriceHistory
+        {
+            PackagingMaterialId = 999_999,
+            Date = new DateOnly(2026, 1, 1),
+            Price = 45m,
+        }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_rejects_an_entry_for_a_nonexistent_packaging_material()
+    {
+        var repository = new PackagingPriceHistoryRepository(CreateDbContextFactory());
+
+        var act = () => repository.UpdateAsync(new PackagingPriceHistory
+        {
+            Id = 999_999,
+            PackagingMaterialId = 999_999,
+            Date = new DateOnly(2026, 1, 1),
+            Price = 45m,
+        }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_rejects_a_nonexistent_entry()
+    {
+        var repository = new PackagingPriceHistoryRepository(CreateDbContextFactory());
+
+        var act = () => repository.DeleteAsync(999_999, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }

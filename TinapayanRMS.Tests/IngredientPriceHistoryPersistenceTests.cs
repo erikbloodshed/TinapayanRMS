@@ -7,30 +7,10 @@ using TinapayanRMS.Tests.Infrastructure;
 namespace TinapayanRMS.Tests;
 
 [Collection(DatabaseCollection.Name)]
-public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : IAsyncLifetime
+public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private CancellationToken Cancellation => TestContext.Current.CancellationToken;
-
-    public ValueTask InitializeAsync() => new(fixture.ResetAsync());
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-    private TinapayanRMSDbContext CreateDbContext() =>
-        new(CreateDbContextOptions());
-
-    private IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
-        new TestDbContextFactory(CreateDbContextOptions());
-
     private IngredientCostPropagator CreateCostPropagator() =>
         new(CreateDbContextFactory());
-
-    private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
-        new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options;
-
-    private sealed class TestDbContextFactory(DbContextOptions<TinapayanRMSDbContext> options) : IDbContextFactory<TinapayanRMSDbContext>
-    {
-        public TinapayanRMSDbContext CreateDbContext() => new(options);
-    }
 
     private async Task<int> SeedPurchasedIngredientAsync()
     {
@@ -198,6 +178,47 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : I
             Date = new DateOnly(2026, 1, 1),
             Price = 100m,
         }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task AddAsync_rejects_a_nonexistent_ingredient()
+    {
+        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
+
+        var act = () => repository.AddAsync(new IngredientPriceHistory
+        {
+            IngredientId = 999_999,
+            Date = new DateOnly(2026, 1, 1),
+            Price = 100m,
+        }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_rejects_an_entry_for_a_nonexistent_ingredient()
+    {
+        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
+
+        var act = () => repository.UpdateAsync(new IngredientPriceHistory
+        {
+            Id = 999_999,
+            IngredientId = 999_999,
+            Date = new DateOnly(2026, 1, 1),
+            Price = 100m,
+        }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_rejects_a_nonexistent_entry()
+    {
+        var repository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
+
+        var act = () => repository.DeleteAsync(999_999, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }

@@ -14,9 +14,25 @@ public class CostingRulesTests
     }
 
     [Fact]
+    public void EnsureValidParameters_rejects_negative_overhead_cost()
+    {
+        var act = () => CostingRules.EnsureValidParameters(laborCost: 0m, overheadCost: -1m, marginPercent: 0m, vatPercent: 0m);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
     public void EnsureValidParameters_rejects_negative_margin_percent()
     {
         var act = () => CostingRules.EnsureValidParameters(laborCost: 0m, overheadCost: 0m, marginPercent: -5m, vatPercent: 0m);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void EnsureValidParameters_rejects_negative_vat_percent()
+    {
+        var act = () => CostingRules.EnsureValidParameters(laborCost: 0m, overheadCost: 0m, marginPercent: 0m, vatPercent: -1m);
 
         act.Should().Throw<InvalidOperationException>();
     }
