@@ -10,7 +10,7 @@ namespace TinapayanRMS.Tests;
 public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private IngredientCostPropagator CreateCostPropagator() =>
-        new(CreateDbContextFactory());
+        new(CreateDbContextFactory(), new SubAssemblyCostPropagator(CreateDbContextFactory()));
 
     private async Task<int> SeedCategoryAsync()
     {

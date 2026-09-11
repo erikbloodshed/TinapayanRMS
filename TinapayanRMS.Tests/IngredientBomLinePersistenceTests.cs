@@ -10,7 +10,7 @@ namespace TinapayanRMS.Tests;
 public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private IngredientCostPropagator CreateCostPropagator() =>
-        new(CreateDbContextFactory());
+        new(CreateDbContextFactory(), new SubAssemblyCostPropagator(CreateDbContextFactory()));
 
     private IngredientBomLineRepository CreateBomRepository() =>
         new(CreateDbContextFactory(), CreateCostPropagator());
