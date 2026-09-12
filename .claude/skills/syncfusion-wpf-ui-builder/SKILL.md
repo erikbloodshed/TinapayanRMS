@@ -19,9 +19,11 @@ metadata:
 >   generated layout conventions.
 > - **Data access**: repositories take `IDbContextFactory<TinapayanRMSDbContext>` and
 >   create a short-lived context per call; ViewModels never touch a `DbContext`.
-> - **Theme**: `TinapayanRMS.Theme` is deliberately trimmed. Adopting a control it
->   doesn't cover is a three-step job — see PLAN.md's Open Items before generating
->   markup that depends on one.
+> - **Theme**: the app uses Syncfusion's official `Syncfusion.Themes.Windows11Light.WPF`
+>   package, which styles every Syncfusion control. Adopting a new control only needs its
+>   `PackageReference` in `TinapayanRMS.UI`, at the same version as the other Syncfusion
+>   packages. Never set a `Style` on a Syncfusion control. The app recolours the theme
+>   only through `Windows11LightThemeSettings` (see PLAN.md).
 >
 > Treat this skill's value as its layout/control-selection thinking and its accessibility
 > and validation checklists, not its code-generation templates.

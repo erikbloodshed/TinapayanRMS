@@ -20,11 +20,13 @@ description: "UI/UX design intelligence for web, mobile, and desktop. This skill
 >   its "Unit test ViewModels" guideline: here only `ApplicationCore` rules and
 >   `Infrastructure` repositories get tests. The other 47 WPF guidelines (XAML, layout,
 >   resources, styling, performance, accessibility) are toolkit-agnostic — use those.
-> - **The Syncfusion Windows11Light theme governs control appearance.** `TinapayanRMS.Theme`
->   styles every Syncfusion control, so don't generate a competing design system, palette
->   or font pairing that restyles them. Apply this skill to what the theme doesn't cover:
+> - **The Syncfusion Windows11Light theme governs control appearance.** Syncfusion's
+>   official `Syncfusion.Themes.Windows11Light.WPF` package styles every Syncfusion
+>   control. The app recolours it only through `Windows11LightThemeSettings` (the amber
+>   accent, set in `App.xaml.cs`), so don't generate a competing design system, palette or
+>   font pairing that restyles them. Apply this skill to what the theme doesn't cover:
 >   `SfChart` series colors in `ReportsView`, spacing and layout between controls, the app's
->   own brushes, and UX/accessibility review. Its web-only advice (viewport meta, CLS,
+>   own brushes (the design tokens in `App.xaml`), and UX/accessibility review. Its web-only advice (viewport meta, CLS,
 >   WebP/AVIF, mobile-first breakpoints, touch targets for a mouse-driven desktop app)
 >   doesn't apply.
 > - **Script paths were rewritten.** Upstream invokes `search.py` via
