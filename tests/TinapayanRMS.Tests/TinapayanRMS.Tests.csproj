@@ -25,14 +25,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TinapayanRMS.Domain\TinapayanRMS.Domain.csproj" />
-    <ProjectReference Include="..\TinapayanRMS.ApplicationCore\TinapayanRMS.ApplicationCore.csproj" />
-    <ProjectReference Include="..\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
-    <ProjectReference Include="..\TinapayanRMS.UI\TinapayanRMS.UI.csproj" />
+    <ProjectReference Include="..\..\src\TinapayanRMS.Domain\TinapayanRMS.Domain.csproj" />
+    <ProjectReference Include="..\..\src\TinapayanRMS.ApplicationCore\TinapayanRMS.ApplicationCore.csproj" />
+    <ProjectReference Include="..\..\src\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\TinapayanRMS.UI\TinapayanRMS.UI.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\TinapayanRMS.UI\appsettings.json" Link="appsettings.json">
+    <Content Include="..\..\src\TinapayanRMS.UI\appsettings.json" Link="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

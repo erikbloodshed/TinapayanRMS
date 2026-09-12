@@ -1,7 +1,11 @@
 <Solution>
-  <Project Path="TinapayanRMS.ApplicationCore/TinapayanRMS.ApplicationCore.csproj" />
-  <Project Path="TinapayanRMS.Domain/TinapayanRMS.Domain.csproj" />
-  <Project Path="TinapayanRMS.Infrastructure/TinapayanRMS.Infrastructure.csproj" />
-  <Project Path="TinapayanRMS.Tests/TinapayanRMS.Tests.csproj" />
-  <Project Path="TinapayanRMS.UI/TinapayanRMS.UI.csproj" />
+  <Folder Name="/src/">
+    <Project Path="src/TinapayanRMS.ApplicationCore/TinapayanRMS.ApplicationCore.csproj" />
+    <Project Path="src/TinapayanRMS.Domain/TinapayanRMS.Domain.csproj" />
+    <Project Path="src/TinapayanRMS.Infrastructure/TinapayanRMS.Infrastructure.csproj" />
+    <Project Path="src/TinapayanRMS.UI/TinapayanRMS.UI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TinapayanRMS.Tests/TinapayanRMS.Tests.csproj" />
+  </Folder>
 </Solution>
