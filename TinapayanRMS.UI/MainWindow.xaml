@@ -7,6 +7,20 @@
         xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="800" Width="1400">
+    <Window.Resources>
+        <!--
+            A NavigationItem's Icon is dropped into a fixed-size ContentPresenter in the
+            drawer's item template, so the icon element has to center itself — without
+            these alignments the glyph sits wherever the box's default alignment and
+            negative left margin leave it. Matches how Syncfusion's own NavigationDrawer
+            demo aligns its Path icons.
+        -->
+        <Style x:Key="NavigationIconStyle" TargetType="TextBlock" BasedOn="{StaticResource IconGlyphStyle}">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -18,13 +32,70 @@
                    FontSize="18"
                    Margin="12,12,12,0" />
 
-        <syncfusion:TabControlExt x:Name="MainTabControl" Grid.Row="1" Margin="8">
-            <syncfusion:TabItemExt x:Name="IngredientsTab" Header="Ingredients" />
-            <syncfusion:TabItemExt x:Name="PackagingMaterialsTab" Header="Packaging Materials" />
-            <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
-            <syncfusion:TabItemExt x:Name="ProductsTab" Header="Products" />
-            <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" />
-            <syncfusion:TabItemExt x:Name="UnitsOfMeasureTab" Header="Units of Measure" />
-        </syncfusion:TabControlExt>
+        <!--
+            DisplayMode=Compact, not the default: only the Compact/Expanded control template
+            draws the drawer's own built-in hamburger toggle (two-way bound to IsOpen) and
+            renders the Items collection. The Default mode's template has neither — it draws
+            no toggle at all and presents DrawerContentView instead — so it would need a
+            hand-rolled toggle button and a hand-rolled menu.
+            Collapsed, the drawer is a CompactModeWidth-wide icon rail, which is why every
+            NavigationItem needs an Icon; expanded, it overlays the content at DrawerWidth
+            and shows the headers too.
+        -->
+        <syncfusion:SfNavigationDrawer x:Name="NavigationDrawer"
+                                        Grid.Row="1"
+                                        DisplayMode="Compact"
+                                        DrawerWidth="220"
+                                        ItemClicked="NavigationDrawer_ItemClicked">
+            <syncfusion:SfNavigationDrawer.ToggleButtonContentTemplate>
+                <DataTemplate>
+                    <TextBlock Text="Navigate" FontWeight="Bold" VerticalAlignment="Center" Margin="5,0,0,0" />
+                </DataTemplate>
+            </syncfusion:SfNavigationDrawer.ToggleButtonContentTemplate>
+
+            <syncfusion:SfNavigationDrawer.Items>
+                <syncfusion:NavigationItem x:Name="IngredientsNavItem" Header="Ingredients" IsSelected="True">
+                    <syncfusion:NavigationItem.Icon>
+                        <TextBlock Text="&#xE8F1;" Style="{StaticResource NavigationIconStyle}" />
+                    </syncfusion:NavigationItem.Icon>
+                </syncfusion:NavigationItem>
+                <syncfusion:NavigationItem x:Name="PackagingMaterialsNavItem" Header="Packaging Materials">
+                    <syncfusion:NavigationItem.Icon>
+                        <TextBlock Text="&#xE7B8;" Style="{StaticResource NavigationIconStyle}" />
+                    </syncfusion:NavigationItem.Icon>
+                </syncfusion:NavigationItem>
+                <syncfusion:NavigationItem x:Name="SubAssembliesNavItem" Header="Sub-Assemblies">
+                    <syncfusion:NavigationItem.Icon>
+                        <TextBlock Text="&#xE8FD;" Style="{StaticResource NavigationIconStyle}" />
+                    </syncfusion:NavigationItem.Icon>
+                </syncfusion:NavigationItem>
+                <syncfusion:NavigationItem x:Name="ProductsNavItem" Header="Products">
+                    <syncfusion:NavigationItem.Icon>
+                        <TextBlock Text="&#xE71D;" Style="{StaticResource NavigationIconStyle}" />
+                    </syncfusion:NavigationItem.Icon>
+                </syncfusion:NavigationItem>
+                <syncfusion:NavigationItem x:Name="ReportsNavItem" Header="Reports">
+                    <syncfusion:NavigationItem.Icon>
+                        <TextBlock Text="&#xEB05;" Style="{StaticResource NavigationIconStyle}" />
+                    </syncfusion:NavigationItem.Icon>
+                </syncfusion:NavigationItem>
+                <syncfusion:NavigationItem x:Name="UnitsOfMeasureNavItem" Header="Units of Measure">
+                    <syncfusion:NavigationItem.Icon>
+                        <TextBlock Text="&#xE9E9;" Style="{StaticResource NavigationIconStyle}" />
+                    </syncfusion:NavigationItem.Icon>
+                </syncfusion:NavigationItem>
+            </syncfusion:SfNavigationDrawer.Items>
+
+            <syncfusion:SfNavigationDrawer.ContentView>
+                <syncfusion:TabControlExt x:Name="MainTabControl" Margin="8">
+                    <syncfusion:TabItemExt x:Name="IngredientsTab" Header="Ingredients" />
+                    <syncfusion:TabItemExt x:Name="PackagingMaterialsTab" Header="Packaging Materials" />
+                    <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
+                    <syncfusion:TabItemExt x:Name="ProductsTab" Header="Products" />
+                    <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" />
+                    <syncfusion:TabItemExt x:Name="UnitsOfMeasureTab" Header="Units of Measure" />
+                </syncfusion:TabControlExt>
+            </syncfusion:SfNavigationDrawer.ContentView>
+        </syncfusion:SfNavigationDrawer>
     </Grid>
 </Window>

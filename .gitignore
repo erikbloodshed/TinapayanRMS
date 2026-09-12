@@ -20,3 +20,8 @@ TestResults/
 # Rider/ReSharper caches
 _ReSharper*/
 *.DotSettings.user
+
+# Full Syncfusion Theme Studio export, kept locally as a reference for adding a
+# currently-unused control's theme later (see PLAN.md's Open Items). Not the
+# TinapayanRMS.Theme project itself, which stays trimmed and version-controlled.
+ThemeStudioReference/

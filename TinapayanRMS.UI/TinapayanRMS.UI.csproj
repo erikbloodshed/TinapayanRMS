@@ -18,6 +18,7 @@
     <PackageReference Include="Syncfusion.SfChart.WPF" Version="34.2.2" />
     <PackageReference Include="Syncfusion.SfGrid.WPF" Version="34.2.2" />
     <PackageReference Include="Syncfusion.SfInput.WPF" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.SfNavigationDrawer.WPF" Version="34.2.2" />
     <PackageReference Include="Syncfusion.SfSkinManager.WPF" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Tools.WPF" Version="34.2.2" />
     <PackageReference Include="System.Reactive" Version="7.0.0" />
