@@ -31,8 +31,6 @@ public class PackagingMaterialRepository(IDbContextFactory<TinapayanRMSDbContext
 
     public async Task AddAsync(PackagingMaterial packagingMaterial, CancellationToken cancellationToken)
     {
-        PackagingMaterialRules.EnsureValidStandardUnit(packagingMaterial.StandardUnitId);
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         dbContext.PackagingMaterials.Add(packagingMaterial);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -40,8 +38,6 @@ public class PackagingMaterialRepository(IDbContextFactory<TinapayanRMSDbContext
 
     public async Task UpdateAsync(PackagingMaterial packagingMaterial, CancellationToken cancellationToken)
     {
-        PackagingMaterialRules.EnsureValidStandardUnit(packagingMaterial.StandardUnitId);
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var existing = await dbContext.PackagingMaterials.FirstOrDefaultAsync(p => p.Id == packagingMaterial.Id, cancellationToken)

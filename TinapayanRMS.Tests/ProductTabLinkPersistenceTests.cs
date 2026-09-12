@@ -56,7 +56,7 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
             Name = name,
             PackagingCategoryId = categoryId,
             StandardUnitId = standardUnitId,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitId = await GetOrCreateUnitOfMeasureAsync("piece", "pc"),
             PurchaseUnitQty = purchaseUnitQty,
             CurrentCost = currentCost,
         };
@@ -98,10 +98,11 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
     public async Task SetLinkAsync_makes_the_packaging_tab_resolve_through_the_linked_product()
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
         var bigId = await SeedProductAsync("Big");
         var smallId = await SeedProductAsync("Small");
-        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
 
         await CreateTabLinkRepository().SetLinkAsync(smallId, ProductTabKind.Packaging, null, bigId, Cancellation);
 
@@ -234,13 +235,14 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
     public async Task SetLinesAsync_rejects_editing_a_linked_packaging_tab()
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
         var bigId = await SeedProductAsync("Big");
         var smallId = await SeedProductAsync("Small");
-        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
         await CreateTabLinkRepository().SetLinkAsync(smallId, ProductTabKind.Packaging, null, bigId, Cancellation);
 
-        var act = () => CreatePackagingLineRepository().SetLinesAsync(smallId, [(boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m)], Cancellation);
+        var act = () => CreatePackagingLineRepository().SetLinesAsync(smallId, [(boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -279,10 +281,11 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
         var roleId = await SeedRoleAsync("Filling");
         var subAssemblyId = await SeedSubAssemblyAsync("Ube Filling", roleId, totalWeight: 100m, totalCost: 24m);
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
         var sourceId = await SeedProductAsync("Source");
         await CreateUsageRepository().SetUsagesForRoleAsync(sourceId, roleId, [(subAssemblyId, 15m)], Cancellation);
-        await CreatePackagingLineRepository().SetLinesAsync(sourceId, [(boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(sourceId, [(boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
         await CreateCostingParametersRepository().SetAsync(sourceId, laborCost: 5m, overheadCost: 3m, marginPercent: 40m, vatPercent: 12m, Cancellation);
 
         var newId = await CreateProductCloner().CloneAsync(sourceId, "Clone Of Source", Cancellation);

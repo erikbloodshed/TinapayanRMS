@@ -13,5 +13,14 @@ public class UnitOfMeasureValidator : AbstractValidator<UnitOfMeasure>
             .WithMessage("Name must be all lowercase.")
             .When(u => !string.IsNullOrEmpty(u.Name));
         RuleFor(u => u.Abbreviation).NotEmpty().WithMessage("Abbreviation is required.");
+
+        RuleFor(u => u.MillimetersPerUnit)
+            .Must(factor => factor is > 0)
+            .WithMessage("A length unit needs a positive conversion factor (millimeters per unit).")
+            .When(u => u.IsLengthUnit);
+        RuleFor(u => u.MillimetersPerUnit)
+            .Must(factor => factor is null)
+            .WithMessage("Only a length unit has a conversion factor.")
+            .When(u => !u.IsLengthUnit);
     }
 }

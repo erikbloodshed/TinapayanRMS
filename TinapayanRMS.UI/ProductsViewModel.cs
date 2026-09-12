@@ -43,7 +43,7 @@ public class PackagingLineEdit(PackagingMaterial packagingMaterial, UnitOfMeasur
     public decimal PiecesPerPackagingUnit => Reciprocal.PiecesPerPackagingUnit;
 
     public decimal CostPerPiece => ProductRules.CalculatePackagingLineCostPerPiece(
-        PackagingMaterial.CurrentCost, PackagingMaterial.PurchaseUnitQty, QtyPerPiece, EntryUnit.Id, PackagingMaterial.StandardUnitId);
+        PackagingMaterial.CurrentCost, PackagingMaterial.PurchaseUnitQty, QtyPerPiece, EntryUnit, PackagingMaterial.StandardUnit!);
 }
 
 /// <summary>A row in the Tab Links grid: a link plus the display name of the role it's for (or "Packaging").</summary>
@@ -586,7 +586,7 @@ public class ProductsViewModel : ViewModelBase
 
     /// <summary>
     /// A packaging line's entry unit is the material's own standard unit, or — only when
-    /// that standard unit is itself a length unit — any of the four length units
+    /// that standard unit is itself a length unit — any other length unit
     /// (ProductRules.EnsureValidEntryUnit). Defaults the picker to the material's own unit.
     /// </summary>
     private void RefreshEntryUnitOptions(PackagingMaterial? material)
@@ -599,22 +599,22 @@ public class ProductsViewModel : ViewModelBase
             return;
         }
 
-        if (LengthConversion.IsLengthUnit(material.StandardUnitId))
+        var standardUnit = _allUnits.FirstOrDefault(u => u.Id == material.StandardUnitId);
+        if (standardUnit is null)
         {
-            foreach (var unit in _allUnits
-                         .Where(u => LengthConversion.IsLengthUnit(u.Id))
-                         .OrderBy(u => u.Name))
+            return;
+        }
+
+        if (standardUnit.IsLengthUnit)
+        {
+            foreach (var unit in _allUnits.Where(u => u.IsLengthUnit).OrderBy(u => u.Name))
             {
                 EntryUnitOptions.Add(unit);
             }
         }
         else
         {
-            var standardUnit = _allUnits.FirstOrDefault(u => u.Id == material.StandardUnitId);
-            if (standardUnit is not null)
-            {
-                EntryUnitOptions.Add(standardUnit);
-            }
+            EntryUnitOptions.Add(standardUnit);
         }
 
         EditingLineEntryUnit = EntryUnitOptions.FirstOrDefault(u => u.Id == material.StandardUnitId) ?? EntryUnitOptions.FirstOrDefault();

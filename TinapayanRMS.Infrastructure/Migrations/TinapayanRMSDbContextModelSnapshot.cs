@@ -530,6 +530,13 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
+                    b.Property<bool>("IsLengthUnit")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("MillimetersPerUnit")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -544,44 +551,6 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("UnitsOfMeasure");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Abbreviation = "mm",
-                            Name = "Millimeter"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Abbreviation = "cm",
-                            Name = "Centimeter"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Abbreviation = "in",
-                            Name = "Inch"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Abbreviation = "m",
-                            Name = "Meter"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Abbreviation = "g",
-                            Name = "Gram"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Abbreviation = "pc",
-                            Name = "Piece"
-                        });
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.CostingParameters", b =>

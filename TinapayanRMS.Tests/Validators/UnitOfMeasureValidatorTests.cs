@@ -42,4 +42,30 @@ public class UnitOfMeasureValidatorTests
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(UnitOfMeasure.Name));
     }
+
+    [Fact]
+    public void Accepts_a_length_unit_with_a_positive_factor()
+    {
+        var result = _validator.Validate(new UnitOfMeasure { Name = "centimeter", Abbreviation = "cm", IsLengthUnit = true, MillimetersPerUnit = 10m });
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Rejects_a_length_unit_without_a_conversion_factor()
+    {
+        var result = _validator.Validate(new UnitOfMeasure { Name = "centimeter", Abbreviation = "cm", IsLengthUnit = true, MillimetersPerUnit = null });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(UnitOfMeasure.MillimetersPerUnit));
+    }
+
+    [Fact]
+    public void Rejects_a_non_length_unit_with_a_stray_conversion_factor()
+    {
+        var result = _validator.Validate(new UnitOfMeasure { Name = "bag", Abbreviation = "bag", IsLengthUnit = false, MillimetersPerUnit = 10m });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(UnitOfMeasure.MillimetersPerUnit));
+    }
 }

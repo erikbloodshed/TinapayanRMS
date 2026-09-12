@@ -11,6 +11,9 @@ public class PackagingPriceHistoryPersistenceTests(DatabaseFixture fixture) : Pe
 {
     private async Task<int> SeedPackagingMaterialAsync()
     {
+        var standardUnitId = await GetOrCreateUnitOfMeasureAsync("centimeter", "cm", isLengthUnit: true, millimetersPerUnit: 10m);
+        var purchaseUnitId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+
         await using var dbContext = CreateDbContext();
         var category = new PackagingCategory { Name = "Ribbons" };
         dbContext.PackagingCategories.Add(category);
@@ -20,8 +23,8 @@ public class PackagingPriceHistoryPersistenceTests(DatabaseFixture fixture) : Pe
         {
             Name = "Satin Ribbon",
             PackagingCategoryId = category.Id,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Centimeter,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = standardUnitId,
+            PurchaseUnitId = purchaseUnitId,
             PurchaseUnitQty = 1000m,
         };
         dbContext.PackagingMaterials.Add(packagingMaterial);

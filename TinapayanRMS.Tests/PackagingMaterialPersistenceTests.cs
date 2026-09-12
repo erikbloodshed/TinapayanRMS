@@ -22,20 +22,22 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
     public async Task A_packaging_material_with_a_length_standard_unit_can_be_added_and_read_back()
     {
         var categoryId = await SeedCategoryAsync();
+        var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm", isLengthUnit: true, millimetersPerUnit: 10m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         var repository = new PackagingMaterialRepository(CreateDbContextFactory());
 
         await repository.AddAsync(new PackagingMaterial
         {
             Name = "Satin Ribbon",
             PackagingCategoryId = categoryId,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Centimeter,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = centimeterId,
+            PurchaseUnitId = pieceId,
             PurchaseUnitQty = 1000m,
         }, Cancellation);
 
         var packagingMaterial = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
         packagingMaterial.Name.Should().Be("Satin Ribbon");
-        packagingMaterial.StandardUnitId.Should().Be(WellKnownUnitOfMeasureIds.Centimeter);
+        packagingMaterial.StandardUnitId.Should().Be(centimeterId);
         packagingMaterial.PackagingCategory.Should().NotBeNull();
         packagingMaterial.StandardUnit.Should().NotBeNull();
         packagingMaterial.PurchaseUnit.Should().NotBeNull();
@@ -45,14 +47,15 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
     public async Task A_packaging_material_with_piece_as_standard_unit_can_be_added()
     {
         var categoryId = await SeedCategoryAsync();
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         var repository = new PackagingMaterialRepository(CreateDbContextFactory());
 
         await repository.AddAsync(new PackagingMaterial
         {
             Name = "Pastry Box",
             PackagingCategoryId = categoryId,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Piece,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = pieceId,
+            PurchaseUnitId = pieceId,
             PurchaseUnitQty = 100m,
         }, Cancellation);
 
@@ -60,34 +63,18 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
-    public async Task AddAsync_rejects_gram_as_a_standard_unit()
-    {
-        var categoryId = await SeedCategoryAsync();
-        var repository = new PackagingMaterialRepository(CreateDbContextFactory());
-
-        var act = () => repository.AddAsync(new PackagingMaterial
-        {
-            Name = "Invalid",
-            PackagingCategoryId = categoryId,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Gram,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
-            PurchaseUnitQty = 1m,
-        }, Cancellation);
-
-        await act.Should().ThrowAsync<InvalidOperationException>();
-    }
-
-    [Fact]
     public async Task GetByIdAsync_returns_the_packaging_material_with_related_data_populated()
     {
         var categoryId = await SeedCategoryAsync();
+        var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm", isLengthUnit: true, millimetersPerUnit: 10m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         var repository = new PackagingMaterialRepository(CreateDbContextFactory());
         await repository.AddAsync(new PackagingMaterial
         {
             Name = "Satin Ribbon",
             PackagingCategoryId = categoryId,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Centimeter,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = centimeterId,
+            PurchaseUnitId = pieceId,
             PurchaseUnitQty = 1000m,
         }, Cancellation);
         var seeded = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
@@ -113,6 +100,8 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
     public async Task UpdateAsync_renames_a_packaging_material_and_preserves_CurrentCost()
     {
         var categoryId = await SeedCategoryAsync();
+        var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm", isLengthUnit: true, millimetersPerUnit: 10m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         var repository = new PackagingMaterialRepository(CreateDbContextFactory());
         var priceHistoryRepository = new PackagingPriceHistoryRepository(CreateDbContextFactory());
 
@@ -120,8 +109,8 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         {
             Name = "Satin Ribbon",
             PackagingCategoryId = categoryId,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Centimeter,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = centimeterId,
+            PurchaseUnitId = pieceId,
             PurchaseUnitQty = 1000m,
         }, Cancellation);
         var packagingMaterial = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
@@ -146,6 +135,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
     public async Task UpdateAsync_rejects_a_nonexistent_packaging_material()
     {
         var categoryId = await SeedCategoryAsync();
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         var repository = new PackagingMaterialRepository(CreateDbContextFactory());
 
         var act = () => repository.UpdateAsync(new PackagingMaterial
@@ -153,8 +143,8 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
             Id = 999_999,
             Name = "Ghost",
             PackagingCategoryId = categoryId,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Piece,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = pieceId,
+            PurchaseUnitId = pieceId,
             PurchaseUnitQty = 1m,
         }, Cancellation);
 
@@ -165,14 +155,16 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
     public async Task DeleteAsync_removes_the_packaging_material()
     {
         var categoryId = await SeedCategoryAsync();
+        var meterId = await SeedUnitOfMeasureAsync("meter", "m", isLengthUnit: true, millimetersPerUnit: 1000m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         var repository = new PackagingMaterialRepository(CreateDbContextFactory());
 
         await repository.AddAsync(new PackagingMaterial
         {
             Name = "Twine",
             PackagingCategoryId = categoryId,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Meter,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = meterId,
+            PurchaseUnitId = pieceId,
             PurchaseUnitQty = 50m,
         }, Cancellation);
 
@@ -186,14 +178,15 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
     public async Task Duplicate_packaging_material_names_are_rejected()
     {
         var categoryId = await SeedCategoryAsync();
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         var repository = new PackagingMaterialRepository(CreateDbContextFactory());
 
         await repository.AddAsync(new PackagingMaterial
         {
             Name = "Label",
             PackagingCategoryId = categoryId,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Piece,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = pieceId,
+            PurchaseUnitId = pieceId,
             PurchaseUnitQty = 500m,
         }, Cancellation);
 
@@ -201,8 +194,8 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         {
             Name = "Label",
             PackagingCategoryId = categoryId,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Piece,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = pieceId,
+            PurchaseUnitId = pieceId,
             PurchaseUnitQty = 500m,
         }, Cancellation);
 

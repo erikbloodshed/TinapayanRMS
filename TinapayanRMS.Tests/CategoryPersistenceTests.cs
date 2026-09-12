@@ -10,22 +10,16 @@ namespace TinapayanRMS.Tests;
 public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task The_four_protected_length_units_and_gram_and_piece_are_seeded()
+    public async Task UnitsOfMeasure_has_no_seeded_rows_by_default()
     {
+        // Units are fully user-managed (no protected/well-known ids) -- a freshly
+        // migrated database starts with zero rows, and the shop owner adds every unit
+        // they need through the Units of Measure screen.
         await using var dbContext = CreateDbContext();
 
-        var units = await dbContext.UnitsOfMeasure.OrderBy(u => u.Id).ToListAsync(Cancellation);
+        var units = await dbContext.UnitsOfMeasure.ToListAsync(Cancellation);
 
-        units.Should().HaveCount(6);
-        units.Select(u => (u.Id, u.Name, u.Abbreviation)).Should().BeEquivalentTo(
-        [
-            (WellKnownUnitOfMeasureIds.Millimeter, "Millimeter", "mm"),
-            (WellKnownUnitOfMeasureIds.Centimeter, "Centimeter", "cm"),
-            (WellKnownUnitOfMeasureIds.Inch, "Inch", "in"),
-            (WellKnownUnitOfMeasureIds.Meter, "Meter", "m"),
-            (5, "Gram", "g"),
-            (6, "Piece", "pc"),
-        ]);
+        units.Should().BeEmpty();
     }
 
     [Fact]
@@ -120,6 +114,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         var repository = CreateIngredientCategoryRepository();
         await repository.AddAsync(new IngredientCategory { Name = "Flour" }, Cancellation);
         var category = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        var unitId = await SeedUnitOfMeasureAsync("piece", "pc");
 
         await using (var dbContext = CreateDbContext())
         {
@@ -128,7 +123,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
                 Name = "All-Purpose Flour",
                 IngredientCategoryId = category.Id,
                 Source = IngredientSource.Purchased,
-                PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+                PurchaseUnitId = unitId,
                 PurchaseUnitQty = 25000m,
             });
             await dbContext.SaveChangesAsync(Cancellation);
@@ -183,6 +178,8 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         var repository = CreatePackagingCategoryRepository();
         await repository.AddAsync(new PackagingCategory { Name = "Ribbons" }, Cancellation);
         var category = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        var standardUnitId = await SeedUnitOfMeasureAsync("centimeter", "cm", isLengthUnit: true, millimetersPerUnit: 10m);
+        var purchaseUnitId = await SeedUnitOfMeasureAsync("piece", "pc");
 
         await using (var dbContext = CreateDbContext())
         {
@@ -190,8 +187,8 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
             {
                 Name = "Satin Ribbon",
                 PackagingCategoryId = category.Id,
-                StandardUnitId = WellKnownUnitOfMeasureIds.Centimeter,
-                PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+                StandardUnitId = standardUnitId,
+                PurchaseUnitId = purchaseUnitId,
                 PurchaseUnitQty = 1000m,
             });
             await dbContext.SaveChangesAsync(Cancellation);

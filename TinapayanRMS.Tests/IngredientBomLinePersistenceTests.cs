@@ -29,13 +29,15 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
 
     private async Task<int> SeedPurchasedIngredientAsync(string name, int categoryId)
     {
+        var unitId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+
         await using var dbContext = CreateDbContext();
         var ingredient = new Ingredient
         {
             Name = name,
             IngredientCategoryId = categoryId,
             Source = IngredientSource.Purchased,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitId = unitId,
             PurchaseUnitQty = 1000m,
         };
         dbContext.Ingredients.Add(ingredient);

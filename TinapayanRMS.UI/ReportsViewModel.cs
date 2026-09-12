@@ -163,7 +163,7 @@ public class ReportsViewModel : ReactiveObject
             var lines = await _packagingLineRepository.GetEffectiveForProductAsync(product.Id, CancellationToken.None);
             var packagingCosts = lines
                 .Select(l => ProductRules.CalculatePackagingLineCostPerPiece(
-                    l.PackagingMaterial!.CurrentCost, l.PackagingMaterial.PurchaseUnitQty, l.QtyPerPiece, l.EntryUnitId, l.PackagingMaterial.StandardUnitId))
+                    l.PackagingMaterial!.CurrentCost, l.PackagingMaterial.PurchaseUnitQty, l.QtyPerPiece, l.EntryUnit!, l.PackagingMaterial.StandardUnit!))
                 .ToList();
 
             var materialCostPerPiece = ProductRules.CalculateMaterialCostPerPiece(usageCosts, packagingCosts);

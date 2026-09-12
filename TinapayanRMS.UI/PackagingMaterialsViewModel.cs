@@ -203,7 +203,7 @@ public class PackagingMaterialsViewModel : ViewModelBase
             var orderedUnits = units.OrderBy(u => u.Name).ToList();
 
             StandardUnits.Clear();
-            StandardUnits.AddRange(orderedUnits.Where(u => PackagingMaterialRules.IsValidStandardUnit(u.Id)));
+            StandardUnits.AddRange(orderedUnits);
 
             PurchaseUnits.Clear();
             PurchaseUnits.AddRange(orderedUnits);

@@ -42,13 +42,15 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
 
     private async Task<int> SeedPurchasedIngredientAsync(string name, int categoryId)
     {
+        var unitId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+
         await using var dbContext = CreateDbContext();
         var ingredient = new Ingredient
         {
             Name = name,
             IngredientCategoryId = categoryId,
             Source = IngredientSource.Purchased,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitId = unitId,
             PurchaseUnitQty = 1000m,
         };
         dbContext.Ingredients.Add(ingredient);
@@ -244,6 +246,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
     public async Task The_packaging_branch_needs_no_propagation_code_a_price_change_is_visible_immediately_on_read()
     {
         int materialId;
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         await using (var dbContext = CreateDbContext())
         {
             var category = new PackagingCategory { Name = "Boxes" };
@@ -254,8 +257,8 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
             {
                 Name = "Box",
                 PackagingCategoryId = category.Id,
-                StandardUnitId = WellKnownUnitOfMeasureIds.Piece,
-                PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+                StandardUnitId = pieceId,
+                PurchaseUnitId = pieceId,
                 PurchaseUnitQty = 1m,
             };
             dbContext.PackagingMaterials.Add(material);

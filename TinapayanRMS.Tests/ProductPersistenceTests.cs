@@ -52,7 +52,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
             Name = name,
             PackagingCategoryId = categoryId,
             StandardUnitId = standardUnitId,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitId = await GetOrCreateUnitOfMeasureAsync("piece", "pc"),
             PurchaseUnitQty = purchaseUnitQty,
             CurrentCost = currentCost,
         };
@@ -144,13 +144,14 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     public async Task SetLinesAsync_stores_lines_and_derives_the_reciprocal_field()
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
         var productId = await SeedProductAsync("Ensaymada");
 
         // Authored as "6 pieces per box".
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
         ], Cancellation);
 
         var lines = await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation);
@@ -167,30 +168,34 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     public async Task SetLinesAsync_accepts_a_ribbon_entered_in_a_different_length_unit_than_its_standard_unit()
     {
         var categoryId = await SeedPackagingCategoryAsync("Ribbons");
-        var ribbonId = await SeedPackagingMaterialAsync("Satin Ribbon", categoryId, WellKnownUnitOfMeasureIds.Centimeter, purchaseUnitQty: 1000m, currentCost: 45m);
+        var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm", isLengthUnit: true, millimetersPerUnit: 10m);
+        var inchId = await SeedUnitOfMeasureAsync("inch", "in", isLengthUnit: true, millimetersPerUnit: 25.4m);
+        var ribbonId = await SeedPackagingMaterialAsync("Satin Ribbon", categoryId, centimeterId, purchaseUnitQty: 1000m, currentCost: 45m);
         var productId = await SeedProductAsync("Special Box Set");
 
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (ribbonId, WellKnownUnitOfMeasureIds.Inch, PackagingLineAuthoredField.QtyPerPiece, 5m),
+            (ribbonId, inchId, PackagingLineAuthoredField.QtyPerPiece, 5m),
         ], Cancellation);
 
         var lines = await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation);
         var line = lines.Should().ContainSingle().Subject;
         line.QtyPerPiece.Should().Be(5m);
-        line.EntryUnit!.Id.Should().Be(WellKnownUnitOfMeasureIds.Inch);
+        line.EntryUnit!.Id.Should().Be(inchId);
     }
 
     [Fact]
     public async Task SetLinesAsync_rejects_an_entry_unit_that_does_not_match_a_piece_standard_unit()
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
+        var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm", isLengthUnit: true, millimetersPerUnit: 10m);
         var productId = await SeedProductAsync("Ensaymada");
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, WellKnownUnitOfMeasureIds.Centimeter, PackagingLineAuthoredField.QtyPerPiece, 1m),
+            (boxId, centimeterId, PackagingLineAuthoredField.QtyPerPiece, 1m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -200,13 +205,14 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     public async Task SetLinesAsync_rejects_the_same_packaging_material_twice()
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
         var productId = await SeedProductAsync("Ensaymada");
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
-            (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m),
+            (boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -216,11 +222,12 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     public async Task Deleting_a_packaging_material_in_use_by_a_product_is_blocked()
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
         var productId = await SeedProductAsync("Ensaymada");
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
         ], Cancellation);
 
         await using var dbContext = CreateDbContext();
@@ -235,13 +242,14 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         var roleId = await SeedRoleAsync("Filling");
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
         var productId = await SeedProductAsync("Ensaymada");
 
         await CreateUsageRepository().SetUsagesForRoleAsync(productId, roleId, [(subAssemblyId, 10m)], Cancellation);
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
         ], Cancellation);
         await CreateCostingParametersRepository().SetAsync(productId, laborCost: 5m, overheadCost: 3m, marginPercent: 40m, vatPercent: 12m, Cancellation);
 
@@ -338,11 +346,12 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     public async Task SetLinesAsync_rejects_a_nonexistent_product()
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, WellKnownUnitOfMeasureIds.Piece, purchaseUnitQty: 1m, currentCost: 30m);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(999_999,
         [
-            (boxId, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -355,7 +364,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (999_999, WellKnownUnitOfMeasureIds.Piece, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (999_999, 999_998, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();

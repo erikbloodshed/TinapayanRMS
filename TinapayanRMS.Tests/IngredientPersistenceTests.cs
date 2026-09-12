@@ -25,6 +25,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     public async Task A_purchased_ingredient_can_be_added_and_read_back()
     {
         var categoryId = await SeedCategoryAsync();
+        var unitId = await SeedUnitOfMeasureAsync("piece", "pc");
         var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new Ingredient
@@ -32,7 +33,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
             Name = "All-Purpose Flour",
             IngredientCategoryId = categoryId,
             Source = IngredientSource.Purchased,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitId = unitId,
             PurchaseUnitQty = 25000m,
         }, Cancellation);
 
@@ -85,6 +86,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     public async Task UpdateAsync_rejects_changing_an_ingredients_source()
     {
         var categoryId = await SeedCategoryAsync();
+        var unitId = await SeedUnitOfMeasureAsync("piece", "pc");
         var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new Ingredient
@@ -92,7 +94,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
             Name = "Sugar",
             IngredientCategoryId = categoryId,
             Source = IngredientSource.Purchased,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitId = unitId,
             PurchaseUnitQty = 1000m,
         }, Cancellation);
 
@@ -111,13 +113,14 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     public async Task GetByIdAsync_returns_the_ingredient_with_related_data_populated()
     {
         var categoryId = await SeedCategoryAsync();
+        var unitId = await SeedUnitOfMeasureAsync("piece", "pc");
         var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
         await repository.AddAsync(new Ingredient
         {
             Name = "Sugar",
             IngredientCategoryId = categoryId,
             Source = IngredientSource.Purchased,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitId = unitId,
             PurchaseUnitQty = 1000m,
         }, Cancellation);
         var seeded = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
@@ -142,6 +145,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     public async Task UpdateAsync_renames_a_purchased_ingredient_and_preserves_CurrentCost_while_recomputing_CostPerGram()
     {
         var categoryId = await SeedCategoryAsync();
+        var unitId = await SeedUnitOfMeasureAsync("piece", "pc");
         var repository = new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator());
         var priceHistoryRepository = new IngredientPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
 
@@ -150,7 +154,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
             Name = "Sugar",
             IngredientCategoryId = categoryId,
             Source = IngredientSource.Purchased,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitId = unitId,
             PurchaseUnitQty = 1000m,
         }, Cancellation);
         var ingredient = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;

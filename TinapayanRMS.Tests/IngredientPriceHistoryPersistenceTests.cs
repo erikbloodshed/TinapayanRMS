@@ -14,6 +14,8 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
 
     private async Task<int> SeedPurchasedIngredientAsync()
     {
+        var unitId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+
         await using var dbContext = CreateDbContext();
         var category = new IngredientCategory { Name = "Flour" };
         dbContext.IngredientCategories.Add(category);
@@ -24,7 +26,7 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
             Name = "All-Purpose Flour",
             IngredientCategoryId = category.Id,
             Source = IngredientSource.Purchased,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            PurchaseUnitId = unitId,
             PurchaseUnitQty = 25000m,
         };
         dbContext.Ingredients.Add(ingredient);

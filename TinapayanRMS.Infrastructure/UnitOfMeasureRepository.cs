@@ -18,6 +18,7 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
     public async Task AddAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken)
     {
         UnitOfMeasureRules.EnsureNameIsLowercase(unitOfMeasure.Name);
+        UnitOfMeasureRules.EnsureLengthUnitFieldsAreConsistent(unitOfMeasure.IsLengthUnit, unitOfMeasure.MillimetersPerUnit);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         dbContext.UnitsOfMeasure.Add(unitOfMeasure);
@@ -26,12 +27,8 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
 
     public async Task UpdateAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken)
     {
-        if (UnitOfMeasureRules.IsProtected(unitOfMeasure.Id))
-        {
-            throw new InvalidOperationException("This unit is protected and can't be edited.");
-        }
-
         UnitOfMeasureRules.EnsureNameIsLowercase(unitOfMeasure.Name);
+        UnitOfMeasureRules.EnsureLengthUnitFieldsAreConsistent(unitOfMeasure.IsLengthUnit, unitOfMeasure.MillimetersPerUnit);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
@@ -40,17 +37,14 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
 
         existing.Name = unitOfMeasure.Name;
         existing.Abbreviation = unitOfMeasure.Abbreviation;
+        existing.IsLengthUnit = unitOfMeasure.IsLengthUnit;
+        existing.MillimetersPerUnit = unitOfMeasure.MillimetersPerUnit;
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
     {
-        if (UnitOfMeasureRules.IsProtected(id))
-        {
-            throw new InvalidOperationException("This unit is protected and can't be deleted.");
-        }
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await dbContext.UnitsOfMeasure.Where(u => u.Id == id).ExecuteDeleteAsync(cancellationToken);
     }

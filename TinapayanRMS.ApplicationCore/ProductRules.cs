@@ -50,15 +50,15 @@ public static class ProductRules
         }
     }
 
-    /// <summary>A packaging line's entry unit must be the material's own standard unit, or — only when that standard unit is itself a length unit — any of the four length units.</summary>
-    public static void EnsureValidEntryUnit(int packagingMaterialStandardUnitId, int entryUnitId)
+    /// <summary>A packaging line's entry unit must be the material's own standard unit, or — only when that standard unit is itself a length unit — another length unit.</summary>
+    public static void EnsureValidEntryUnit(UnitOfMeasure packagingMaterialStandardUnit, UnitOfMeasure entryUnit)
     {
-        if (entryUnitId == packagingMaterialStandardUnitId)
+        if (entryUnit.Id == packagingMaterialStandardUnit.Id)
         {
             return;
         }
 
-        if (LengthConversion.IsLengthUnit(packagingMaterialStandardUnitId) && LengthConversion.IsLengthUnit(entryUnitId))
+        if (packagingMaterialStandardUnit.IsLengthUnit && entryUnit.IsLengthUnit)
         {
             return;
         }
@@ -78,9 +78,9 @@ public static class ProductRules
 
     /// <summary>Cost of one packaging line per finished piece, converting the entry-unit quantity to the material's standard unit first (a no-op when they're the same unit).</summary>
     public static decimal CalculatePackagingLineCostPerPiece(
-        decimal packagingMaterialCurrentCost, decimal purchaseUnitQty, decimal qtyPerPiece, int entryUnitId, int standardUnitId)
+        decimal packagingMaterialCurrentCost, decimal purchaseUnitQty, decimal qtyPerPiece, UnitOfMeasure entryUnit, UnitOfMeasure standardUnit)
     {
-        var qtyInStandardUnit = LengthConversion.Convert(qtyPerPiece, entryUnitId, standardUnitId);
+        var qtyInStandardUnit = LengthConversion.Convert(qtyPerPiece, entryUnit, standardUnit);
         return packagingMaterialCurrentCost / purchaseUnitQty * qtyInStandardUnit;
     }
 

@@ -43,10 +43,19 @@ public class UnitsOfMeasureViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingAbbreviation, value);
     }
 
-    private readonly ObservableAsPropertyHelper<bool> _isSelectedProtected;
+    private bool _editingIsLengthUnit;
+    public bool EditingIsLengthUnit
+    {
+        get => _editingIsLengthUnit;
+        set => this.RaiseAndSetIfChanged(ref _editingIsLengthUnit, value);
+    }
 
-    /// <summary>Whether the selected row is one of the four seeded length units, which can never be edited or deleted (UnitOfMeasureRules.IsProtected) -- drives disabling Save/Delete in the view as a courtesy; the repository is the authoritative enforcement.</summary>
-    public bool IsSelectedProtected => _isSelectedProtected.Value;
+    private decimal? _editingMillimetersPerUnit;
+    public decimal? EditingMillimetersPerUnit
+    {
+        get => _editingMillimetersPerUnit;
+        set => this.RaiseAndSetIfChanged(ref _editingMillimetersPerUnit, value);
+    }
 
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
@@ -63,10 +72,6 @@ public class UnitsOfMeasureViewModel : ViewModelBase
             .SortAndBind(out _units, SortExpressionComparer<UnitOfMeasure>.Ascending(u => u.Name))
             .Subscribe();
 
-        _isSelectedProtected = this.WhenAnyValue(x => x.SelectedUnit)
-            .Select(unit => unit is not null && UnitOfMeasureRules.IsProtected(unit.Id))
-            .ToProperty(this, x => x.IsSelectedProtected);
-
         this.WhenAnyValue(x => x.SelectedUnit)
             .Where(unit => unit is not null)
             .Subscribe(unit =>
@@ -74,6 +79,8 @@ public class UnitsOfMeasureViewModel : ViewModelBase
                 _editingId = unit!.Id;
                 EditingName = unit.Name;
                 EditingAbbreviation = unit.Abbreviation;
+                EditingIsLengthUnit = unit.IsLengthUnit;
+                EditingMillimetersPerUnit = unit.MillimetersPerUnit;
             });
 
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
@@ -92,33 +99,40 @@ public class UnitsOfMeasureViewModel : ViewModelBase
             _editingId = 0;
             EditingName = string.Empty;
             EditingAbbreviation = string.Empty;
+            EditingIsLengthUnit = false;
+            EditingMillimetersPerUnit = null;
         });
 
-        SaveCommand = ReactiveCommand.CreateFromTask(
-            () => RunSafelyAsync(async () =>
+        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        {
+            var unit = new UnitOfMeasure
             {
-                var unit = new UnitOfMeasure { Id = _editingId, Name = EditingName, Abbreviation = EditingAbbreviation };
+                Id = _editingId,
+                Name = EditingName,
+                Abbreviation = EditingAbbreviation,
+                IsLengthUnit = EditingIsLengthUnit,
+                MillimetersPerUnit = EditingIsLengthUnit ? EditingMillimetersPerUnit : null,
+            };
 
-                var validation = _unitOfMeasureValidator.Validate(unit);
-                if (!validation.IsValid)
-                {
-                    ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
-                    return;
-                }
+            var validation = _unitOfMeasureValidator.Validate(unit);
+            if (!validation.IsValid)
+            {
+                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
 
-                if (_editingId == 0)
-                {
-                    await _unitOfMeasureRepository.AddAsync(unit, CancellationToken.None);
-                }
-                else
-                {
-                    await _unitOfMeasureRepository.UpdateAsync(unit, CancellationToken.None);
-                }
+            if (_editingId == 0)
+            {
+                await _unitOfMeasureRepository.AddAsync(unit, CancellationToken.None);
+            }
+            else
+            {
+                await _unitOfMeasureRepository.UpdateAsync(unit, CancellationToken.None);
+            }
 
-                await LoadCommand.Execute();
-                SelectedUnit = null;
-            }),
-            this.WhenAnyValue(x => x.IsSelectedProtected).Select(isProtected => !isProtected));
+            await LoadCommand.Execute();
+            SelectedUnit = null;
+        }));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
             () => RunWithConfirmationAsync($"Delete '{SelectedUnit!.Name}'? This can't be undone.", async () =>
@@ -127,6 +141,6 @@ public class UnitsOfMeasureViewModel : ViewModelBase
                 SelectedUnit = null;
                 await LoadCommand.Execute();
             }),
-            this.WhenAnyValue(x => x.SelectedUnit, x => x.IsSelectedProtected, (unit, isProtected) => unit is not null && !isProtected));
+            this.WhenAnyValue(x => x.SelectedUnit).Select(unit => unit is not null));
     }
 }

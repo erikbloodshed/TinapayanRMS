@@ -3,36 +3,22 @@ using TinapayanRMS.Domain;
 namespace TinapayanRMS.ApplicationCore;
 
 /// <summary>
-/// Converts between the four protected length units. UnitOfMeasure stores no
-/// conversion factors itself, so this is the one place cm/mm/inch/m math happens
+/// Converts between two length units using each unit's own MillimetersPerUnit factor
 /// (e.g. a PackagingLine entered in inches for a material whose standard unit is cm).
+/// No unit id is special-cased — any unit the shop owner marks IsLengthUnit works.
 /// </summary>
 public static class LengthConversion
 {
-    private static readonly IReadOnlyDictionary<int, decimal> MillimetersPerUnit = new Dictionary<int, decimal>
+    public static decimal Convert(decimal quantity, UnitOfMeasure fromUnit, UnitOfMeasure toUnit)
     {
-        [WellKnownUnitOfMeasureIds.Millimeter] = 1m,
-        [WellKnownUnitOfMeasureIds.Centimeter] = 10m,
-        [WellKnownUnitOfMeasureIds.Inch] = 25.4m,
-        [WellKnownUnitOfMeasureIds.Meter] = 1000m,
-    };
-
-    public static bool IsLengthUnit(int unitOfMeasureId) => MillimetersPerUnit.ContainsKey(unitOfMeasureId);
-
-    public static decimal Convert(decimal quantity, int fromUnitOfMeasureId, int toUnitOfMeasureId)
-    {
-        if (fromUnitOfMeasureId == toUnitOfMeasureId)
+        if (fromUnit.Id == toUnit.Id)
         {
             return quantity;
         }
 
-        var millimeters = quantity * MillimetersPerUnitOrThrow(fromUnitOfMeasureId);
-        return millimeters / MillimetersPerUnitOrThrow(toUnitOfMeasureId);
+        return quantity * MillimetersPerUnitOrThrow(fromUnit) / MillimetersPerUnitOrThrow(toUnit);
     }
 
-    private static decimal MillimetersPerUnitOrThrow(int unitOfMeasureId) =>
-        MillimetersPerUnit.TryGetValue(unitOfMeasureId, out var factor)
-            ? factor
-            : throw new ArgumentOutOfRangeException(
-                nameof(unitOfMeasureId), unitOfMeasureId, "Not one of the four protected length units.");
+    private static decimal MillimetersPerUnitOrThrow(UnitOfMeasure unit) =>
+        unit.MillimetersPerUnit ?? throw new InvalidOperationException($"'{unit.Name}' is not a length unit.");
 }

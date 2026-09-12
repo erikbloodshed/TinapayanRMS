@@ -12,6 +12,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         return await dbContext.PackagingLines
             .AsNoTracking()
             .Include(l => l.PackagingMaterial)
+            .ThenInclude(m => m!.StandardUnit)
             .Include(l => l.EntryUnit)
             .Where(l => l.ProductId == productId)
             .ToListAsync(cancellationToken);
@@ -44,6 +45,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         return await dbContext.PackagingLines
             .AsNoTracking()
             .Include(l => l.PackagingMaterial)
+            .ThenInclude(m => m!.StandardUnit)
             .Include(l => l.EntryUnit)
             .Where(l => l.ProductId == productId)
             .ToListAsync(cancellationToken);
@@ -72,17 +74,27 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         }
 
         var materialStandardUnits = await dbContext.PackagingMaterials
+            .Include(m => m.StandardUnit)
             .Where(m => lines.Select(l => l.PackagingMaterialId).Contains(m.Id))
-            .ToDictionaryAsync(m => m.Id, m => m.StandardUnitId, cancellationToken);
+            .ToDictionaryAsync(m => m.Id, m => m.StandardUnit!, cancellationToken);
+
+        var entryUnits = await dbContext.UnitsOfMeasure
+            .Where(u => lines.Select(l => l.EntryUnitId).Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, cancellationToken);
 
         foreach (var line in lines)
         {
-            if (!materialStandardUnits.TryGetValue(line.PackagingMaterialId, out var standardUnitId))
+            if (!materialStandardUnits.TryGetValue(line.PackagingMaterialId, out var standardUnit))
             {
                 throw new InvalidOperationException($"Packaging material {line.PackagingMaterialId} does not exist.");
             }
 
-            ProductRules.EnsureValidEntryUnit(standardUnitId, line.EntryUnitId);
+            if (!entryUnits.TryGetValue(line.EntryUnitId, out var entryUnit))
+            {
+                throw new InvalidOperationException($"Unit of measure {line.EntryUnitId} does not exist.");
+            }
+
+            ProductRules.EnsureValidEntryUnit(standardUnit, entryUnit);
         }
 
         await dbContext.PackagingLines

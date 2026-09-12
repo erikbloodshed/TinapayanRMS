@@ -6,6 +6,10 @@ namespace TinapayanRMS.Tests;
 
 public class ProductRulesTests
 {
+    private static readonly UnitOfMeasure Piece = new() { Id = 1, Name = "piece", Abbreviation = "pc" };
+    private static readonly UnitOfMeasure Centimeter = new() { Id = 2, Name = "centimeter", Abbreviation = "cm", IsLengthUnit = true, MillimetersPerUnit = 10m };
+    private static readonly UnitOfMeasure Inch = new() { Id = 3, Name = "inch", Abbreviation = "in", IsLengthUnit = true, MillimetersPerUnit = 25.4m };
+
     [Fact]
     public void EnsureValidUsages_accepts_an_empty_list()
     {
@@ -96,7 +100,7 @@ public class ProductRulesTests
     [Fact]
     public void EnsureValidEntryUnit_accepts_the_materials_own_standard_unit()
     {
-        var act = () => ProductRules.EnsureValidEntryUnit(WellKnownUnitOfMeasureIds.Piece, WellKnownUnitOfMeasureIds.Piece);
+        var act = () => ProductRules.EnsureValidEntryUnit(Piece, Piece);
 
         act.Should().NotThrow();
     }
@@ -104,23 +108,23 @@ public class ProductRulesTests
     [Fact]
     public void EnsureValidEntryUnit_accepts_any_length_unit_when_the_standard_unit_is_a_length_unit()
     {
-        var act = () => ProductRules.EnsureValidEntryUnit(WellKnownUnitOfMeasureIds.Centimeter, WellKnownUnitOfMeasureIds.Inch);
+        var act = () => ProductRules.EnsureValidEntryUnit(Centimeter, Inch);
 
         act.Should().NotThrow();
     }
 
     [Fact]
-    public void EnsureValidEntryUnit_rejects_a_length_unit_for_a_piece_standard_unit()
+    public void EnsureValidEntryUnit_rejects_a_length_unit_for_a_non_length_standard_unit()
     {
-        var act = () => ProductRules.EnsureValidEntryUnit(WellKnownUnitOfMeasureIds.Piece, WellKnownUnitOfMeasureIds.Centimeter);
+        var act = () => ProductRules.EnsureValidEntryUnit(Piece, Centimeter);
 
         act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void EnsureValidEntryUnit_rejects_piece_for_a_length_standard_unit()
+    public void EnsureValidEntryUnit_rejects_a_non_length_unit_for_a_length_standard_unit()
     {
-        var act = () => ProductRules.EnsureValidEntryUnit(WellKnownUnitOfMeasureIds.Centimeter, WellKnownUnitOfMeasureIds.Piece);
+        var act = () => ProductRules.EnsureValidEntryUnit(Centimeter, Piece);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -159,7 +163,7 @@ public class ProductRulesTests
         // A ribbon costs ₱45 per 1000cm roll (₱0.045/cm). 5 inches per piece = 12.7cm -> ₱0.5715.
         var costPerPiece = ProductRules.CalculatePackagingLineCostPerPiece(
             packagingMaterialCurrentCost: 45m, purchaseUnitQty: 1000m, qtyPerPiece: 5m,
-            entryUnitId: WellKnownUnitOfMeasureIds.Inch, standardUnitId: WellKnownUnitOfMeasureIds.Centimeter);
+            entryUnit: Inch, standardUnit: Centimeter);
 
         costPerPiece.Should().Be(0.5715m);
     }
@@ -170,7 +174,7 @@ public class ProductRulesTests
         // A box costs ₱30 per 100-piece pack (₱0.30/piece), used one per finished piece.
         var costPerPiece = ProductRules.CalculatePackagingLineCostPerPiece(
             packagingMaterialCurrentCost: 30m, purchaseUnitQty: 100m, qtyPerPiece: 1m,
-            entryUnitId: WellKnownUnitOfMeasureIds.Piece, standardUnitId: WellKnownUnitOfMeasureIds.Piece);
+            entryUnit: Piece, standardUnit: Piece);
 
         costPerPiece.Should().Be(0.3m);
     }

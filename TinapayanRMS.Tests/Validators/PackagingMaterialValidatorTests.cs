@@ -15,8 +15,8 @@ public class PackagingMaterialValidatorTests
         {
             Name = "Satin Ribbon",
             PackagingCategoryId = 1,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Centimeter,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = 1,
+            PurchaseUnitId = 2,
             PurchaseUnitQty = 1000m,
         });
 
@@ -24,14 +24,14 @@ public class PackagingMaterialValidatorTests
     }
 
     [Fact]
-    public void Rejects_gram_as_a_standard_unit()
+    public void Rejects_a_missing_standard_unit()
     {
         var result = _validator.Validate(new PackagingMaterial
         {
             Name = "Invalid",
             PackagingCategoryId = 1,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Gram,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = 0,
+            PurchaseUnitId = 2,
             PurchaseUnitQty = 1m,
         });
 
@@ -46,8 +46,8 @@ public class PackagingMaterialValidatorTests
         {
             Name = "Box",
             PackagingCategoryId = 1,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Piece,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = 1,
+            PurchaseUnitId = 2,
             PurchaseUnitQty = 0m,
         });
 
@@ -61,8 +61,8 @@ public class PackagingMaterialValidatorTests
         {
             Name = "Box",
             PackagingCategoryId = 0,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Piece,
-            PurchaseUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = 1,
+            PurchaseUnitId = 2,
             PurchaseUnitQty = 100m,
         });
 
@@ -77,7 +77,7 @@ public class PackagingMaterialValidatorTests
         {
             Name = "Box",
             PackagingCategoryId = 1,
-            StandardUnitId = WellKnownUnitOfMeasureIds.Piece,
+            StandardUnitId = 1,
             PurchaseUnitId = 0,
             PurchaseUnitQty = 100m,
         });

@@ -13,13 +13,5 @@ public class UnitOfMeasureConfiguration : IEntityTypeConfiguration<UnitOfMeasure
 
         builder.HasIndex(u => u.Name).IsUnique();
         builder.HasIndex(u => u.Abbreviation).IsUnique();
-
-        builder.HasData(
-            new UnitOfMeasure { Id = WellKnownUnitOfMeasureIds.Millimeter, Name = "Millimeter", Abbreviation = "mm" },
-            new UnitOfMeasure { Id = WellKnownUnitOfMeasureIds.Centimeter, Name = "Centimeter", Abbreviation = "cm" },
-            new UnitOfMeasure { Id = WellKnownUnitOfMeasureIds.Inch, Name = "Inch", Abbreviation = "in" },
-            new UnitOfMeasure { Id = WellKnownUnitOfMeasureIds.Meter, Name = "Meter", Abbreviation = "m" },
-            new UnitOfMeasure { Id = 5, Name = "Gram", Abbreviation = "g" },
-            new UnitOfMeasure { Id = 6, Name = "Piece", Abbreviation = "pc" });
     }
 }
