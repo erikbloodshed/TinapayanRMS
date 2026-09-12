@@ -4,12 +4,13 @@ using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
 using ReactiveUI;
-using TinapayanRMS.ApplicationCore;
-using TinapayanRMS.Domain;
+using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
-namespace TinapayanRMS.UI;
+namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>An in-memory (not yet saved) BOM line, shown in the BOM editor grid.</summary>
 public class IngredientBomLineEdit(Ingredient component, decimal grams)

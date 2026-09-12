@@ -1,6 +1,7 @@
 using System.Windows.Controls;
+using TinapayanRMS.UI.ViewModels;
 
-namespace TinapayanRMS.UI;
+namespace TinapayanRMS.UI.Views;
 
 public partial class PackagingMaterialsView : UserControl
 {

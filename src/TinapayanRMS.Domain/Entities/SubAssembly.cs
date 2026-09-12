@@ -1,4 +1,4 @@
-namespace TinapayanRMS.Domain;
+namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>An in-house recipe (dough, a filling, a topping, …) that products use directly.</summary>
 public class SubAssembly

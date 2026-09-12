@@ -1,11 +1,11 @@
 <Application x:Class="TinapayanRMS.UI.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:TinapayanRMS.UI"
+             xmlns:converters="clr-namespace:TinapayanRMS.UI.Converters"
              xmlns:sys="clr-namespace:System.Windows.Controls;assembly=PresentationFramework">
     <Application.Resources>
         <sys:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-        <local:EmptyStateVisibilityConverter x:Key="EmptyStateVisibilityConverter" />
+        <converters:EmptyStateVisibilityConverter x:Key="EmptyStateVisibilityConverter" />
 
         <!--
             ButtonAdv.IconTemplate glyphs, Segoe Fluent Icons (Windows 11) falling back to

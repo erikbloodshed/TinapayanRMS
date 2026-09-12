@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using TinapayanRMS.ApplicationCore;
-using TinapayanRMS.Domain;
+using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.Domain.Entities;
 
-namespace TinapayanRMS.Infrastructure;
+namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class PackagingMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IPackagingMaterialRepository
 {

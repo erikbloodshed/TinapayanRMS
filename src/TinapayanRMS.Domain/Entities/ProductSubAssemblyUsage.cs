@@ -1,4 +1,4 @@
-namespace TinapayanRMS.Domain;
+namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>One sub-assembly used in a product's recipe.</summary>
 public class ProductSubAssemblyUsage

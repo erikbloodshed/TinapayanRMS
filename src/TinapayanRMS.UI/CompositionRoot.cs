@@ -4,10 +4,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using TinapayanRMS.ApplicationCore;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Validators;
-using TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
+using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.UI.Views;
 
 namespace TinapayanRMS.UI;
 

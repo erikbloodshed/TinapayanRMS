@@ -1,8 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using TinapayanRMS.ApplicationCore;
-using TinapayanRMS.Domain;
+using TinapayanRMS.ApplicationCore.Rules;
 
-namespace TinapayanRMS.Infrastructure;
+namespace TinapayanRMS.Infrastructure.Services;
 
 /// <summary>
 /// Keeps every SubAssembly's TotalWeight/TotalCost correct after one or more ingredients

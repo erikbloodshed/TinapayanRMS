@@ -1,4 +1,4 @@
-namespace TinapayanRMS.Domain;
+namespace TinapayanRMS.Domain.Enums;
 
 public enum IngredientSource
 {

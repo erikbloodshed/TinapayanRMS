@@ -1,6 +1,6 @@
 using AwesomeAssertions;
 using TinapayanRMS.ApplicationCore.Validators;
-using TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Tests.Validators;
 

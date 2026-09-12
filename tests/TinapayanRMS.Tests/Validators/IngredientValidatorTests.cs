@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using TinapayanRMS.ApplicationCore.Validators;
-using TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.Tests.Validators;
 

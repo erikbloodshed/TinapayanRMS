@@ -1,7 +1,7 @@
 using AwesomeAssertions;
-using TinapayanRMS.ApplicationCore;
+using TinapayanRMS.ApplicationCore.Rules;
 
-namespace TinapayanRMS.Tests;
+namespace TinapayanRMS.Tests.Rules;
 
 public class IngredientCostGraphTests
 {

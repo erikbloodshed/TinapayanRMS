@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure;
 

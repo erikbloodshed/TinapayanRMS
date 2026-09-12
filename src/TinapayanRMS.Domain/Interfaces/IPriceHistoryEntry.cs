@@ -1,4 +1,4 @@
-namespace TinapayanRMS.Domain;
+namespace TinapayanRMS.Domain.Interfaces;
 
 /// <summary>
 /// Shared shape of IngredientPriceHistory and PackagingPriceHistory, so

@@ -1,8 +1,9 @@
 using System.Windows;
 using Syncfusion.UI.Xaml.NavigationDrawer;
 using Syncfusion.Windows.Tools.Controls;
+using TinapayanRMS.UI.ViewModels;
 
-namespace TinapayanRMS.UI;
+namespace TinapayanRMS.UI.Views;
 
 public partial class MainWindow : Window
 {

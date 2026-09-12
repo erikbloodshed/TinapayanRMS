@@ -4,12 +4,14 @@ using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
 using ReactiveUI;
-using TinapayanRMS.ApplicationCore;
-using TinapayanRMS.Domain;
+using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
-namespace TinapayanRMS.UI;
+namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>An in-memory (not yet saved) sub-assembly usage, shown in the usages editor grid.</summary>
 public class ProductUsageEdit(SubAssembly subAssembly, decimal weightPerPiece)

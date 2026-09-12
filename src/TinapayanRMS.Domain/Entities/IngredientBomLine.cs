@@ -1,4 +1,4 @@
-namespace TinapayanRMS.Domain;
+namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>One component of a Made ingredient's bill of materials.</summary>
 public class IngredientBomLine

@@ -1,4 +1,4 @@
-namespace TinapayanRMS.Domain;
+namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>
 /// Labor, overhead, margin and VAT for one product's selling price. Always independent

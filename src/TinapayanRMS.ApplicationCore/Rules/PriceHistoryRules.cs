@@ -1,6 +1,6 @@
-using TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Interfaces;
 
-namespace TinapayanRMS.ApplicationCore;
+namespace TinapayanRMS.ApplicationCore.Rules;
 
 public static class PriceHistoryRules
 {

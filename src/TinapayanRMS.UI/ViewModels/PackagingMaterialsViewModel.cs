@@ -4,12 +4,12 @@ using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
 using ReactiveUI;
-using TinapayanRMS.ApplicationCore;
-using TinapayanRMS.Domain;
+using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.Domain.Entities;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
-namespace TinapayanRMS.UI;
+namespace TinapayanRMS.UI.ViewModels;
 
 public class PackagingMaterialsViewModel : ViewModelBase
 {

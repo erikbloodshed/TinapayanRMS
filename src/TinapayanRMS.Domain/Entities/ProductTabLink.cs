@@ -1,4 +1,6 @@
-namespace TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Enums;
+
+namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>
 /// A "Live Template" link: one of a product's tabs (a SubAssemblyRole, or its one

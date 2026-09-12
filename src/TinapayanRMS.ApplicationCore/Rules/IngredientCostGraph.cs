@@ -1,4 +1,4 @@
-namespace TinapayanRMS.ApplicationCore;
+namespace TinapayanRMS.ApplicationCore.Rules;
 
 /// <summary>
 /// Pure graph logic for propagating a cost change through the made-ingredient BOM

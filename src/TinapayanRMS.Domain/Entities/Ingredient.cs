@@ -1,4 +1,6 @@
-namespace TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Enums;
+
+namespace TinapayanRMS.Domain.Entities;
 
 public class Ingredient
 {

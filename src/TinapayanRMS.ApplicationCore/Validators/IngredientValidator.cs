@@ -1,5 +1,6 @@
 using FluentValidation;
-using TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.ApplicationCore.Validators;
 

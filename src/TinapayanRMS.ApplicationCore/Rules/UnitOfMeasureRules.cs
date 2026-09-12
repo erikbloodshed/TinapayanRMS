@@ -1,4 +1,4 @@
-namespace TinapayanRMS.ApplicationCore;
+namespace TinapayanRMS.ApplicationCore.Rules;
 
 public static class UnitOfMeasureRules
 {

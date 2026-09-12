@@ -10,6 +10,7 @@ using Syncfusion.Licensing;
 using Syncfusion.SfSkinManager;
 using Syncfusion.Themes.Windows11Light.WPF;
 using Syncfusion.Windows.Controls.Input;
+using TinapayanRMS.UI.Views;
 
 namespace TinapayanRMS.UI;
 

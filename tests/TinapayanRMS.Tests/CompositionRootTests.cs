@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.UI;
+using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.Tests;
 

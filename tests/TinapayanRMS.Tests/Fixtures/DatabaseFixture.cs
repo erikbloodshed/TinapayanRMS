@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Respawn;
 using TinapayanRMS.Infrastructure;
 
-namespace TinapayanRMS.Tests.Infrastructure;
+namespace TinapayanRMS.Tests.Fixtures;
 
 /// <summary>
 /// Integration tests run against a dedicated "TinapayanRMS_Test" database (never

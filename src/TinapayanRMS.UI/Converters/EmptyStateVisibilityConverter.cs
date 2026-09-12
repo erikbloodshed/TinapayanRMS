@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
-namespace TinapayanRMS.UI;
+namespace TinapayanRMS.UI.Converters;
 
 /// <summary>
 /// Shows an empty-state hint exactly when there is nothing to show in its place: the value

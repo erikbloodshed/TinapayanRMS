@@ -1,6 +1,6 @@
-using TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Entities;
 
-namespace TinapayanRMS.ApplicationCore;
+namespace TinapayanRMS.ApplicationCore.Rules;
 
 /// <summary>
 /// Converts between two length units using each unit's own MillimetersPerUnit factor

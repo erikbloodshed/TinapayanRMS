@@ -2,11 +2,13 @@ using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using DynamicData;
 using ReactiveUI;
-using TinapayanRMS.ApplicationCore;
-using TinapayanRMS.Domain;
+using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 
-namespace TinapayanRMS.UI;
+namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>Which material list the price-trend chart's material picker shows.</summary>
 public enum PriceTrendMaterialKind

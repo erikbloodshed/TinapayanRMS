@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
 
-namespace TinapayanRMS.Tests.Infrastructure;
+namespace TinapayanRMS.Tests.Fixtures;
 
 /// <summary>
 /// Base for every Respawn-backed integration test class. The DbContext/DbContextFactory

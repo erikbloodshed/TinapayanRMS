@@ -1,4 +1,6 @@
-namespace TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Interfaces;
+
+namespace TinapayanRMS.Domain.Entities;
 
 public class PackagingPriceHistory : IPriceHistoryEntry
 {

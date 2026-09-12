@@ -1,4 +1,4 @@
-namespace TinapayanRMS.ApplicationCore;
+namespace TinapayanRMS.ApplicationCore.Interfaces;
 
 public interface IProductCloner
 {

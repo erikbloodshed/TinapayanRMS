@@ -1,4 +1,4 @@
-namespace TinapayanRMS.Domain;
+namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>One ingredient composing a sub-assembly.</summary>
 public class SubAssemblyLine

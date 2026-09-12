@@ -1,4 +1,6 @@
-namespace TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Enums;
+
+namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>One packaging material used by a product.</summary>
 public class PackagingLine

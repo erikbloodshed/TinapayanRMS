@@ -1,10 +1,12 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
-using TinapayanRMS.Domain;
-using TinapayanRMS.Infrastructure;
-using TinapayanRMS.Tests.Infrastructure;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.Tests.Fixtures;
 
-namespace TinapayanRMS.Tests;
+namespace TinapayanRMS.Tests.Persistence;
 
 [Collection(DatabaseCollection.Name)]
 public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)

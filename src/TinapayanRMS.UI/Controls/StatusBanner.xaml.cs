@@ -1,6 +1,6 @@
 using System.Windows.Controls;
 
-namespace TinapayanRMS.UI;
+namespace TinapayanRMS.UI.Controls;
 
 public partial class StatusBanner : UserControl
 {

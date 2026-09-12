@@ -1,7 +1,7 @@
 using System.Reactive.Linq;
 using ReactiveUI;
 
-namespace TinapayanRMS.UI;
+namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// Proves the ReactiveUI bootstrap end-to-end: a ReactiveObject property driving

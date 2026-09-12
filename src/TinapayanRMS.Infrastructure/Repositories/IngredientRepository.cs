@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
-using TinapayanRMS.ApplicationCore;
-using TinapayanRMS.Domain;
+using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Services;
 
-namespace TinapayanRMS.Infrastructure;
+namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class IngredientRepository(
     IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,

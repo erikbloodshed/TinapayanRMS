@@ -1,4 +1,4 @@
-namespace TinapayanRMS.Domain;
+namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>
 /// An editable lookup, unlike UnitOfMeasure/IngredientCategory/PackagingCategory — new

@@ -1,4 +1,4 @@
-namespace TinapayanRMS.Tests.Infrastructure;
+namespace TinapayanRMS.Tests.Fixtures;
 
 [CollectionDefinition(Name)]
 public class DatabaseCollection : ICollectionFixture<DatabaseFixture>

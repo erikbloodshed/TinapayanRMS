@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using TinapayanRMS.ApplicationCore;
-using TinapayanRMS.Domain;
+using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Domain.Enums;
 
-namespace TinapayanRMS.Infrastructure;
+namespace TinapayanRMS.Infrastructure.Services;
 
 /// <summary>
 /// Keeps every made ingredient's CostPerGram correct after something it (directly or

@@ -1,4 +1,6 @@
-namespace TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Interfaces;
+
+namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>Only for Purchased ingredients — Made ingredients have no price history.</summary>
 public class IngredientPriceHistory : IPriceHistoryEntry

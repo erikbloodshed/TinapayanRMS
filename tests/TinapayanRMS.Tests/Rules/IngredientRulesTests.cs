@@ -1,8 +1,9 @@
 using AwesomeAssertions;
-using TinapayanRMS.ApplicationCore;
-using TinapayanRMS.Domain;
+using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 
-namespace TinapayanRMS.Tests;
+namespace TinapayanRMS.Tests.Rules;
 
 public class IngredientRulesTests
 {

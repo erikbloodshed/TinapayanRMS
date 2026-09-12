@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ReactiveUI;
 using ILogger = Serilog.ILogger;
 
-namespace TinapayanRMS.UI;
+namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// Shared behavior for every screen's ViewModel: a friendly ErrorMessage surfaced in the UI

@@ -1,6 +1,6 @@
-using TinapayanRMS.Domain;
+using TinapayanRMS.Domain.Entities;
 
-namespace TinapayanRMS.ApplicationCore;
+namespace TinapayanRMS.ApplicationCore.Interfaces;
 
 public interface IProductSubAssemblyUsageRepository
 {
