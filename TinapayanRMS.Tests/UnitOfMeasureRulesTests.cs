@@ -27,4 +27,23 @@ public class UnitOfMeasureRulesTests
     {
         UnitOfMeasureRules.IsProtected(999).Should().BeFalse();
     }
+
+    [Fact]
+    public void EnsureNameIsLowercase_accepts_an_all_lowercase_name()
+    {
+        var act = () => UnitOfMeasureRules.EnsureNameIsLowercase("bag");
+
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData("Bag")]
+    [InlineData("BAG")]
+    [InlineData("bAg")]
+    public void EnsureNameIsLowercase_rejects_a_name_with_any_uppercase_letter(string name)
+    {
+        var act = () => UnitOfMeasureRules.EnsureNameIsLowercase(name);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
 }

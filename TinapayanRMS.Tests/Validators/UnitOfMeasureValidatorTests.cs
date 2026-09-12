@@ -11,7 +11,7 @@ public class UnitOfMeasureValidatorTests
     [Fact]
     public void Accepts_a_valid_unit()
     {
-        var result = _validator.Validate(new UnitOfMeasure { Name = "Bag", Abbreviation = "bag" });
+        var result = _validator.Validate(new UnitOfMeasure { Name = "bag", Abbreviation = "bag" });
 
         result.IsValid.Should().BeTrue();
     }
@@ -28,9 +28,18 @@ public class UnitOfMeasureValidatorTests
     [Fact]
     public void Rejects_a_missing_abbreviation()
     {
-        var result = _validator.Validate(new UnitOfMeasure { Name = "Bag", Abbreviation = "" });
+        var result = _validator.Validate(new UnitOfMeasure { Name = "bag", Abbreviation = "" });
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(UnitOfMeasure.Abbreviation));
+    }
+
+    [Fact]
+    public void Rejects_a_name_with_an_uppercase_letter()
+    {
+        var result = _validator.Validate(new UnitOfMeasure { Name = "Bag", Abbreviation = "bag" });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(UnitOfMeasure.Name));
     }
 }

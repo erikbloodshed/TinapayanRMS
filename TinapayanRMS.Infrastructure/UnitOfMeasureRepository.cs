@@ -17,6 +17,8 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
 
     public async Task AddAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken)
     {
+        UnitOfMeasureRules.EnsureNameIsLowercase(unitOfMeasure.Name);
+
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         dbContext.UnitsOfMeasure.Add(unitOfMeasure);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -28,6 +30,8 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
         {
             throw new InvalidOperationException("This unit is protected and can't be edited.");
         }
+
+        UnitOfMeasureRules.EnsureNameIsLowercase(unitOfMeasure.Name);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 

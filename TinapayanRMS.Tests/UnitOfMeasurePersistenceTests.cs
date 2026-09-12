@@ -26,24 +26,44 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
     {
         var repository = CreateRepository();
 
-        await repository.AddAsync(new UnitOfMeasure { Name = "Bag", Abbreviation = "bag" }, Cancellation);
+        await repository.AddAsync(new UnitOfMeasure { Name = "bag", Abbreviation = "bag" }, Cancellation);
 
         var units = await repository.GetAllAsync(Cancellation);
-        units.Should().Contain(u => u.Name == "Bag" && u.Abbreviation == "bag");
+        units.Should().Contain(u => u.Name == "bag" && u.Abbreviation == "bag");
     }
 
     [Fact]
     public async Task UpdateAsync_renames_an_unprotected_unit()
     {
         var repository = CreateRepository();
-        await repository.AddAsync(new UnitOfMeasure { Name = "Bag", Abbreviation = "bag" }, Cancellation);
-        var unit = (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "Bag").Subject;
+        await repository.AddAsync(new UnitOfMeasure { Name = "bag", Abbreviation = "bag" }, Cancellation);
+        var unit = (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "bag").Subject;
 
-        await repository.UpdateAsync(new UnitOfMeasure { Id = unit.Id, Name = "Sack", Abbreviation = "sk" }, Cancellation);
+        await repository.UpdateAsync(new UnitOfMeasure { Id = unit.Id, Name = "sack", Abbreviation = "sk" }, Cancellation);
 
         var updated = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle(u => u.Id == unit.Id).Subject;
-        updated.Name.Should().Be("Sack");
+        updated.Name.Should().Be("sack");
         updated.Abbreviation.Should().Be("sk");
+    }
+
+    [Fact]
+    public async Task AddAsync_rejects_a_name_with_an_uppercase_letter()
+    {
+        var act = () => CreateRepository().AddAsync(new UnitOfMeasure { Name = "Bag", Abbreviation = "bag" }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_rejects_a_name_with_an_uppercase_letter()
+    {
+        var repository = CreateRepository();
+        await repository.AddAsync(new UnitOfMeasure { Name = "bag", Abbreviation = "bag" }, Cancellation);
+        var unit = (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "bag").Subject;
+
+        var act = () => repository.UpdateAsync(new UnitOfMeasure { Id = unit.Id, Name = "Sack", Abbreviation = "sk" }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
@@ -61,7 +81,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task UpdateAsync_rejects_a_nonexistent_unit()
     {
-        var act = () => CreateRepository().UpdateAsync(new UnitOfMeasure { Id = 999_999, Name = "Ghost", Abbreviation = "gh" }, Cancellation);
+        var act = () => CreateRepository().UpdateAsync(new UnitOfMeasure { Id = 999_999, Name = "ghost", Abbreviation = "gh" }, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -73,7 +93,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
     [InlineData(WellKnownUnitOfMeasureIds.Meter)]
     public async Task UpdateAsync_rejects_a_protected_length_unit(int protectedUnitId)
     {
-        var act = () => CreateRepository().UpdateAsync(new UnitOfMeasure { Id = protectedUnitId, Name = "Renamed", Abbreviation = "rn" }, Cancellation);
+        var act = () => CreateRepository().UpdateAsync(new UnitOfMeasure { Id = protectedUnitId, Name = "renamed", Abbreviation = "rn" }, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -96,8 +116,8 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
     public async Task DeleteAsync_removes_an_unused_unprotected_unit()
     {
         var repository = CreateRepository();
-        await repository.AddAsync(new UnitOfMeasure { Name = "Bag", Abbreviation = "bag" }, Cancellation);
-        var unit = (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "Bag").Subject;
+        await repository.AddAsync(new UnitOfMeasure { Name = "bag", Abbreviation = "bag" }, Cancellation);
+        var unit = (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "bag").Subject;
 
         await repository.DeleteAsync(unit.Id, Cancellation);
 
@@ -108,8 +128,8 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
     public async Task Deleting_a_unit_that_is_in_use_is_blocked()
     {
         var repository = CreateRepository();
-        await repository.AddAsync(new UnitOfMeasure { Name = "Bag", Abbreviation = "bag" }, Cancellation);
-        var unit = (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "Bag").Subject;
+        await repository.AddAsync(new UnitOfMeasure { Name = "bag", Abbreviation = "bag" }, Cancellation);
+        var unit = (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "bag").Subject;
         var categoryId = await SeedCategoryAsync();
 
         await using (var dbContext = CreateDbContext())
@@ -136,9 +156,9 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
     public async Task Duplicate_unit_names_are_rejected()
     {
         var repository = CreateRepository();
-        await repository.AddAsync(new UnitOfMeasure { Name = "Bag", Abbreviation = "bg1" }, Cancellation);
+        await repository.AddAsync(new UnitOfMeasure { Name = "bag", Abbreviation = "bg1" }, Cancellation);
 
-        var act = () => repository.AddAsync(new UnitOfMeasure { Name = "Bag", Abbreviation = "bg2" }, Cancellation);
+        var act = () => repository.AddAsync(new UnitOfMeasure { Name = "bag", Abbreviation = "bg2" }, Cancellation);
 
         await act.Should().ThrowAsync<DbUpdateException>();
     }
@@ -147,9 +167,9 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
     public async Task Duplicate_unit_abbreviations_are_rejected()
     {
         var repository = CreateRepository();
-        await repository.AddAsync(new UnitOfMeasure { Name = "Bag", Abbreviation = "bg" }, Cancellation);
+        await repository.AddAsync(new UnitOfMeasure { Name = "bag", Abbreviation = "bg" }, Cancellation);
 
-        var act = () => repository.AddAsync(new UnitOfMeasure { Name = "Sack", Abbreviation = "bg" }, Cancellation);
+        var act = () => repository.AddAsync(new UnitOfMeasure { Name = "sack", Abbreviation = "bg" }, Cancellation);
 
         await act.Should().ThrowAsync<DbUpdateException>();
     }
