@@ -41,14 +41,12 @@ public partial class MainWindow : Window
         }
     }
 
-    // Closing a tab removes it from MainTabControl.Items, so re-add it here if needed before selecting it.
+    // MainTabControl.CloseMode="Hide" (set in XAML) means closing a tab only collapses its
+    // TabItemExt rather than removing it from Items, so it's always still there to select —
+    // just possibly Visibility.Collapsed from having been closed.
     private void ShowTab(TabItemExt tab)
     {
-        if (!MainTabControl.Items.Contains(tab))
-        {
-            MainTabControl.Items.Add(tab);
-        }
-
+        tab.Visibility = Visibility.Visible;
         MainTabControl.SelectedItem = tab;
         NavigationDrawer.IsOpen = false;
     }

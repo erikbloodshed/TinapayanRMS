@@ -25,7 +25,6 @@ _ReSharper*/
 __pycache__/
 *.pyc
 
-# Full Syncfusion Theme Studio export, kept locally as a reference for adding a
-# currently-unused control's theme later (see PLAN.md's Open Items). Not the
-# TinapayanRMS.Theme project itself, which stays trimmed and version-controlled.
+# Local copy of a Theme Studio export, from when the theme was a trimmed in-repo
+# project. Superseded by the official theme package (see PLAN.md) and safe to delete.
 ThemeStudioReference/

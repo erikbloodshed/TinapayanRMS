@@ -4,9 +4,10 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:local="clr-namespace:TinapayanRMS.UI"
              mc:Ignorable="d"
-             d:DesignHeight="500" d:DesignWidth="900">
-    <Grid Margin="12">
+             d:DesignHeight="550" d:DesignWidth="1000">
+    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -14,58 +15,69 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="16" />
-            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="360" />
         </Grid.ColumnDefinitions>
 
-        <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,0,0,8">
-            <TextBlock Text="{Binding ErrorMessage}"
-                       Foreground="#C00000"
-                       TextWrapping="Wrap"
-                       Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}" />
-            <ProgressBar IsIndeterminate="True" Height="4"
-                         Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
-        </StackPanel>
+        <local:StatusBanner Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,0,0,12" />
 
-        <syncfusion:SfDataGrid Grid.Row="1" Grid.Column="0"
-                                ItemsSource="{Binding Units}"
-                                SelectedItem="{Binding SelectedUnit, Mode=TwoWay}"
-                                AutoGenerateColumns="False"
-                                AllowEditing="False"
-                                SelectionMode="Single"
-                                NavigationMode="Row">
-            <syncfusion:SfDataGrid.Columns>
-                <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
-                <syncfusion:GridTextColumn MappingName="Abbreviation" HeaderText="Abbreviation" />
-                <syncfusion:GridCheckBoxColumn MappingName="IsLengthUnit" HeaderText="Length Unit" />
-                <syncfusion:GridNumericColumn MappingName="MillimetersPerUnit" HeaderText="mm / Unit" />
-            </syncfusion:SfDataGrid.Columns>
-        </syncfusion:SfDataGrid>
+        <!-- Units list -->
+        <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource CardStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="1" Grid.Column="2">
-            <TextBlock Text="Name" Margin="0,0,0,4" />
-            <syncfusion:SfTextBoxExt Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                      Margin="0,0,0,12" />
+                <TextBlock Grid.Row="0" Text="Units of Measure" Style="{StaticResource SectionHeaderStyle}" />
 
-            <TextBlock Text="Abbreviation" Margin="0,0,0,4" />
-            <syncfusion:SfTextBoxExt Text="{Binding EditingAbbreviation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                      Margin="0,0,0,12" />
+                <syncfusion:SfDataGrid Grid.Row="1"
+                                        ItemsSource="{Binding Units}"
+                                        SelectedItem="{Binding SelectedUnit, Mode=TwoWay}"
+                                        AutoGenerateColumns="False"
+                                        AllowEditing="False"
+                                        SelectionMode="Single"
+                                        NavigationMode="Row"
+                                        ColumnSizer="AutoWithLastColumnFill">
+                    <syncfusion:SfDataGrid.Columns>
+                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
+                        <syncfusion:GridTextColumn MappingName="Abbreviation" HeaderText="Abbreviation" />
+                        <syncfusion:GridCheckBoxColumn MappingName="IsLengthUnit" HeaderText="Length Unit" />
+                        <syncfusion:GridNumericColumn MappingName="MillimetersPerUnit" HeaderText="mm / Unit" NumberDecimalDigits="2" />
+                    </syncfusion:SfDataGrid.Columns>
+                </syncfusion:SfDataGrid>
+            </Grid>
+        </Border>
 
-            <CheckBox IsChecked="{Binding EditingIsLengthUnit, Mode=TwoWay}"
-                      Margin="0,0,0,12">
-                <TextBlock Text="Is a length unit (can substitute for other length units as a packaging line's entry unit)" TextWrapping="Wrap" />
-            </CheckBox>
+        <!-- Details -->
+        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource CardStyle}" VerticalAlignment="Top">
+            <StackPanel>
+                <TextBlock Text="Details" Style="{StaticResource SectionHeaderStyle}" />
 
-            <StackPanel Visibility="{Binding EditingIsLengthUnit, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock Text="Millimeters Per Unit" Margin="0,0,0,4" />
-                <syncfusion:DoubleTextBox Value="{Binding EditingMillimetersPerUnit, Mode=TwoWay}"
-                                           Margin="0,0,0,12" />
+                <TextBlock Text="Name" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:SfTextBoxExt Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          Margin="0,0,0,12" />
+
+                <TextBlock Text="Abbreviation" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:SfTextBoxExt Text="{Binding EditingAbbreviation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          Margin="0,0,0,12" />
+
+                <CheckBox IsChecked="{Binding EditingIsLengthUnit, Mode=TwoWay}"
+                          Margin="0,0,0,12">
+                    <TextBlock Text="Is a length unit (can substitute for other length units as a packaging line's entry unit)" TextWrapping="Wrap" />
+                </CheckBox>
+
+                <StackPanel Visibility="{Binding EditingIsLengthUnit, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="Millimeters Per Unit" Style="{StaticResource FieldLabelStyle}" />
+                    <syncfusion:DoubleTextBox Value="{Binding EditingMillimetersPerUnit, Mode=TwoWay}"
+                                               Margin="0,0,0,12" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal">
+                    <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />
+                    <syncfusion:ButtonAdv Label="Save" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveCommand}" Margin="0,0,8,0" />
+                    <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
+                </StackPanel>
             </StackPanel>
-
-            <StackPanel Orientation="Horizontal">
-                <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />
-                <syncfusion:ButtonAdv Label="Save" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveCommand}" Margin="0,0,8,0" />
-                <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
-            </StackPanel>
-        </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

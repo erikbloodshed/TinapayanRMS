@@ -3,6 +3,5 @@
   <Project Path="TinapayanRMS.Domain/TinapayanRMS.Domain.csproj" />
   <Project Path="TinapayanRMS.Infrastructure/TinapayanRMS.Infrastructure.csproj" />
   <Project Path="TinapayanRMS.Tests/TinapayanRMS.Tests.csproj" />
-  <Project Path="TinapayanRMS.Theme/TinapayanRMS.Theme.csproj" />
   <Project Path="TinapayanRMS.UI/TinapayanRMS.UI.csproj" />
 </Solution>

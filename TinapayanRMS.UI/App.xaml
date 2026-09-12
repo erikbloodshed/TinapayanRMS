@@ -1,10 +1,11 @@
-﻿<Application x:Class="TinapayanRMS.UI.App"
+<Application x:Class="TinapayanRMS.UI.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:TinapayanRMS.UI"
              xmlns:sys="clr-namespace:System.Windows.Controls;assembly=PresentationFramework">
     <Application.Resources>
         <sys:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <local:EmptyStateVisibilityConverter x:Key="EmptyStateVisibilityConverter" />
 
         <!--
             ButtonAdv.IconTemplate glyphs, Segoe Fluent Icons (Windows 11) falling back to
@@ -34,5 +35,80 @@
         <DataTemplate x:Key="RemoveIconTemplate">
             <TextBlock Text="&#xE738;" Style="{StaticResource IconGlyphStyle}" />
         </DataTemplate>
+
+        <!--
+            Design tokens for the app's own surfaces (cards, page background, banners). These
+            are plain app resources, not Syncfusion theme resources — Syncfusion controls only
+            ever get recolored through Windows11LightThemeSettings (see App.xaml.cs), never
+            through a Style, so their templates stay intact. Kept in one neutral (Stone-ish)
+            scale plus the warm amber accent that matches PrimaryBackground/PrimaryForeground.
+        -->
+        <SolidColorBrush x:Key="PageBackgroundBrush" Color="#F5F5F4" />
+        <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#E7E5E4" />
+        <SolidColorBrush x:Key="HeadingForegroundBrush" Color="#1C1917" />
+        <SolidColorBrush x:Key="MutedForegroundBrush" Color="#57534E" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#B45309" />
+
+        <SolidColorBrush x:Key="ErrorBackgroundBrush" Color="#FEF2F2" />
+        <SolidColorBrush x:Key="ErrorForegroundBrush" Color="#B91C1C" />
+        <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#FFFBEB" />
+        <SolidColorBrush x:Key="WarningForegroundBrush" Color="#92400E" />
+
+        <!-- Chart series colors for the Reports screen — same-hue with the accent, distinguished by adornment labels rather than color alone. -->
+        <SolidColorBrush x:Key="ChartBaseCostBrush" Color="#D97706" />
+        <SolidColorBrush x:Key="ChartSellingPriceBrush" Color="#92400E" />
+
+        <!-- Card container: the shared "panel on a surface" look used by every screen's list and detail sections. -->
+        <Style x:Key="CardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="16" />
+        </Style>
+
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+
+        <Style x:Key="CaptionStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="EmptyStateStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="ErrorBannerStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource ErrorBackgroundBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+
+        <Style x:Key="WarningBannerStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource WarningBackgroundBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+
+        <Style x:Key="AppTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
+        </Style>
     </Application.Resources>
 </Application>
