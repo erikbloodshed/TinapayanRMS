@@ -58,23 +58,25 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task AddAsync_rejects_a_name_with_an_uppercase_letter()
+    public async Task AddAsync_lowercases_a_name_with_an_uppercase_letter()
     {
-        var act = () => CreateRepository().AddAsync(new UnitOfMeasure { Name = "Bag", Abbreviation = "bag" }, Cancellation);
+        var repository = CreateRepository();
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await repository.AddAsync(new UnitOfMeasure { Name = "Bag", Abbreviation = "bag" }, Cancellation);
+
+        (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "bag");
     }
 
     [Fact]
-    public async Task UpdateAsync_rejects_a_name_with_an_uppercase_letter()
+    public async Task UpdateAsync_lowercases_a_name_with_an_uppercase_letter()
     {
         var repository = CreateRepository();
         await repository.AddAsync(new UnitOfMeasure { Name = "bag", Abbreviation = "bag" }, Cancellation);
         var unit = (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "bag").Subject;
 
-        var act = () => repository.UpdateAsync(new UnitOfMeasure { Id = unit.Id, Name = "Sack", Abbreviation = "sk" }, Cancellation);
+        await repository.UpdateAsync(new UnitOfMeasure { Id = unit.Id, Name = "Sack", Abbreviation = "sk" }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "sack");
     }
 
     [Fact]

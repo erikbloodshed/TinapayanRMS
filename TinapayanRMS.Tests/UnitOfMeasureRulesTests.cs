@@ -6,22 +6,18 @@ namespace TinapayanRMS.Tests;
 public class UnitOfMeasureRulesTests
 {
     [Fact]
-    public void EnsureNameIsLowercase_accepts_an_all_lowercase_name()
+    public void NormalizeName_leaves_an_already_lowercase_name_unchanged()
     {
-        var act = () => UnitOfMeasureRules.EnsureNameIsLowercase("bag");
-
-        act.Should().NotThrow();
+        UnitOfMeasureRules.NormalizeName("bag").Should().Be("bag");
     }
 
     [Theory]
-    [InlineData("Bag")]
-    [InlineData("BAG")]
-    [InlineData("bAg")]
-    public void EnsureNameIsLowercase_rejects_a_name_with_any_uppercase_letter(string name)
+    [InlineData("Bag", "bag")]
+    [InlineData("BAG", "bag")]
+    [InlineData("bAg", "bag")]
+    public void NormalizeName_lowercases_a_name_with_any_uppercase_letter(string name, string expected)
     {
-        var act = () => UnitOfMeasureRules.EnsureNameIsLowercase(name);
-
-        act.Should().Throw<InvalidOperationException>();
+        UnitOfMeasureRules.NormalizeName(name).Should().Be(expected);
     }
 
     [Fact]

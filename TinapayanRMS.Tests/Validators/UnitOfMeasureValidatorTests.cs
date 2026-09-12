@@ -35,12 +35,13 @@ public class UnitOfMeasureValidatorTests
     }
 
     [Fact]
-    public void Rejects_a_name_with_an_uppercase_letter()
+    public void Accepts_a_name_with_an_uppercase_letter()
     {
+        // Casing is auto-corrected by the repository (UnitOfMeasureRules.NormalizeName),
+        // not rejected here -- the validator only checks that a name is present at all.
         var result = _validator.Validate(new UnitOfMeasure { Name = "Bag", Abbreviation = "bag" });
 
-        result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(UnitOfMeasure.Name));
+        result.IsValid.Should().BeTrue();
     }
 
     [Fact]

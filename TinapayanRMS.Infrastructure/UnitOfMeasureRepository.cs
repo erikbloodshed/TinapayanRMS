@@ -17,7 +17,7 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
 
     public async Task AddAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken)
     {
-        UnitOfMeasureRules.EnsureNameIsLowercase(unitOfMeasure.Name);
+        unitOfMeasure.Name = UnitOfMeasureRules.NormalizeName(unitOfMeasure.Name);
         UnitOfMeasureRules.EnsureLengthUnitFieldsAreConsistent(unitOfMeasure.IsLengthUnit, unitOfMeasure.MillimetersPerUnit);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -27,7 +27,6 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
 
     public async Task UpdateAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken)
     {
-        UnitOfMeasureRules.EnsureNameIsLowercase(unitOfMeasure.Name);
         UnitOfMeasureRules.EnsureLengthUnitFieldsAreConsistent(unitOfMeasure.IsLengthUnit, unitOfMeasure.MillimetersPerUnit);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -35,7 +34,7 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
         var existing = await dbContext.UnitsOfMeasure.FirstOrDefaultAsync(u => u.Id == unitOfMeasure.Id, cancellationToken)
             ?? throw new InvalidOperationException($"Unit of measure {unitOfMeasure.Id} does not exist.");
 
-        existing.Name = unitOfMeasure.Name;
+        existing.Name = UnitOfMeasureRules.NormalizeName(unitOfMeasure.Name);
         existing.Abbreviation = unitOfMeasure.Abbreviation;
         existing.IsLengthUnit = unitOfMeasure.IsLengthUnit;
         existing.MillimetersPerUnit = unitOfMeasure.MillimetersPerUnit;

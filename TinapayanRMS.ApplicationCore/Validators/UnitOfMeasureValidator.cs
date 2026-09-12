@@ -7,11 +7,9 @@ public class UnitOfMeasureValidator : AbstractValidator<UnitOfMeasure>
 {
     public UnitOfMeasureValidator()
     {
+        // Casing is auto-corrected (UnitOfMeasureRules.NormalizeName), not rejected, so
+        // there's no "must be lowercase" rule here -- only that a name is present at all.
         RuleFor(u => u.Name).NotEmpty().WithMessage("Name is required.");
-        RuleFor(u => u.Name)
-            .Must(name => name == name.ToLowerInvariant())
-            .WithMessage("Name must be all lowercase.")
-            .When(u => !string.IsNullOrEmpty(u.Name));
         RuleFor(u => u.Abbreviation).NotEmpty().WithMessage("Abbreviation is required.");
 
         RuleFor(u => u.MillimetersPerUnit)
