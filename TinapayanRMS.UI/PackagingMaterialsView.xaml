@@ -64,12 +64,16 @@
             <syncfusion:ComboBoxAdv ItemsSource="{Binding StandardUnits}"
                                      DisplayMemberPath="Name"
                                      SelectedItem="{Binding EditingStandardUnit, Mode=TwoWay}"
+                                     IsTextSearchEnabled="True"
+                                     AutoCompleteMode="Suggest"
                                      Margin="0,0,0,12" />
 
             <TextBlock Text="Purchase Unit" Margin="0,0,0,4" />
             <syncfusion:ComboBoxAdv ItemsSource="{Binding PurchaseUnits}"
                                      DisplayMemberPath="Name"
                                      SelectedItem="{Binding EditingPurchaseUnit, Mode=TwoWay}"
+                                     IsTextSearchEnabled="True"
+                                     AutoCompleteMode="Suggest"
                                      Margin="0,0,0,12" />
 
             <TextBlock Text="Purchase Unit Qty" Margin="0,0,0,4" />

@@ -131,6 +131,8 @@
                 <syncfusion:ComboBoxAdv ItemsSource="{Binding EntryUnitOptions}"
                                          DisplayMemberPath="Name"
                                          SelectedItem="{Binding EditingLineEntryUnit, Mode=TwoWay}"
+                                         IsTextSearchEnabled="True"
+                                         AutoCompleteMode="Suggest"
                                          Margin="0,0,0,12" />
 
                 <TextBlock Text="Authored Field" Margin="0,0,0,4" />

@@ -61,23 +61,6 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
     }
 
     [Fact]
-    public async Task LookupRepository_GetAllAsync_returns_every_row_for_its_entity_type()
-    {
-        await using (var dbContext = CreateDbContext())
-        {
-            dbContext.IngredientCategories.AddRange(
-                new IngredientCategory { Name = "Flour" },
-                new IngredientCategory { Name = "Dairy" });
-            await dbContext.SaveChangesAsync(Cancellation);
-        }
-
-        var repository = new LookupRepository<IngredientCategory>(CreateDbContextFactory());
-        var categories = await repository.GetAllAsync(Cancellation);
-
-        categories.Select(c => c.Name).Should().BeEquivalentTo(["Flour", "Dairy"]);
-    }
-
-    [Fact]
     public async Task Duplicate_ingredient_category_names_are_rejected()
     {
         await using var dbContext = CreateDbContext();

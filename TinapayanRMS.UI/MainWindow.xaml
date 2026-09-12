@@ -24,6 +24,7 @@
             <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
             <syncfusion:TabItemExt x:Name="ProductsTab" Header="Products" />
             <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" />
+            <syncfusion:TabItemExt x:Name="UnitsOfMeasureTab" Header="Units of Measure" />
         </syncfusion:TabControlExt>
     </Grid>
 </Window>

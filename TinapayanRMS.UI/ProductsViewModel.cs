@@ -315,7 +315,7 @@ public class ProductsViewModel : ViewModelBase
         ISubAssemblyRepository subAssemblyRepository,
         ISubAssemblyRoleRepository subAssemblyRoleRepository,
         IPackagingMaterialRepository packagingMaterialRepository,
-        ILookupRepository<UnitOfMeasure> unitOfMeasureRepository,
+        IUnitOfMeasureRepository unitOfMeasureRepository,
         IValidator<Product> productValidator,
         IValidator<CostingParameters> costingParametersValidator,
         ILogger logger)

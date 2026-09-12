@@ -38,9 +38,9 @@ public static class CompositionRoot
                 // which also makes concurrent calls from different screens safe.
                 services.AddDbContextFactory<TinapayanRMSDbContext>(options => options.UseSqlServer(connectionString));
 
-                services.AddSingleton(typeof(ILookupRepository<>), typeof(LookupRepository<>));
                 services.AddSingleton<SubAssemblyCostPropagator>();
                 services.AddSingleton<IngredientCostPropagator>();
+                services.AddSingleton<IUnitOfMeasureRepository, UnitOfMeasureRepository>();
                 services.AddSingleton<IIngredientCategoryRepository, IngredientCategoryRepository>();
                 services.AddSingleton<IPackagingCategoryRepository, PackagingCategoryRepository>();
                 services.AddSingleton<IIngredientRepository, IngredientRepository>();
@@ -59,6 +59,7 @@ public static class CompositionRoot
                 services.AddSingleton<IProductCloner, ProductCloner>();
 
                 services.AddSingleton(Log.Logger);
+                services.AddSingleton<IValidator<UnitOfMeasure>, UnitOfMeasureValidator>();
                 services.AddSingleton<IValidator<IngredientCategory>, IngredientCategoryValidator>();
                 services.AddSingleton<IValidator<PackagingCategory>, PackagingCategoryValidator>();
                 services.AddSingleton<IValidator<Ingredient>, IngredientValidator>();
@@ -77,6 +78,7 @@ public static class CompositionRoot
                 services.AddSingleton<SubAssembliesViewModel>();
                 services.AddSingleton<ProductsViewModel>();
                 services.AddSingleton<ReportsViewModel>();
+                services.AddSingleton<UnitsOfMeasureViewModel>();
             });
     }
 }

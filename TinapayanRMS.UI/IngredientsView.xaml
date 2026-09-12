@@ -71,6 +71,8 @@
                 <syncfusion:ComboBoxAdv ItemsSource="{Binding PurchaseUnits}"
                                          DisplayMemberPath="Name"
                                          SelectedItem="{Binding EditingPurchaseUnit, Mode=TwoWay}"
+                                         IsTextSearchEnabled="True"
+                                         AutoCompleteMode="Suggest"
                                          Margin="0,0,0,12" />
 
                 <TextBlock Text="Purchase Unit Qty (grams)" Margin="0,0,0,4" />

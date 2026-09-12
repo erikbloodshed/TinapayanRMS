@@ -138,7 +138,7 @@ public class PackagingMaterialsViewModel : ViewModelBase
         IValidator<PackagingMaterial> packagingMaterialValidator,
         IValidator<PackagingPriceHistory> priceHistoryValidator,
         IValidator<PackagingCategory> categoryValidator,
-        ILookupRepository<UnitOfMeasure> unitOfMeasureRepository,
+        IUnitOfMeasureRepository unitOfMeasureRepository,
         ILogger logger)
         : base(logger)
     {

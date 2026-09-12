@@ -2,6 +2,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Respawn;
+using TinapayanRMS.Domain;
 using TinapayanRMS.Infrastructure;
 
 namespace TinapayanRMS.Tests.Infrastructure;
@@ -9,8 +10,13 @@ namespace TinapayanRMS.Tests.Infrastructure;
 /// <summary>
 /// Integration tests run against a dedicated "TinapayanRMS_Test" database (never
 /// the developer's real "TinapayanRMS" one), migrated once per test run and reset
-/// between tests with Respawn. Seed data (currently just UnitsOfMeasure) is
-/// excluded from the reset, since it's owned by migrations, not by tests.
+/// between tests with Respawn. UnitsOfMeasure is excluded from Respawn's own reset
+/// (its migration-seeded rows, ids 1-6, are baseline data every other test's FK
+/// references may depend on, and Respawn has no notion of "reset to this seed
+/// state" -- only "delete everything" or "touch nothing"). Any *test-added* row in
+/// that table (id > 6, from a UnitOfMeasureRepository AddAsync/DeleteAsync test) is
+/// still cleared after every test by the explicit delete in ResetAsync below, so
+/// UnitsOfMeasure keeps the same test-to-test isolation every other table gets.
 /// </summary>
 public class DatabaseFixture : IAsyncLifetime
 {
@@ -61,6 +67,10 @@ public class DatabaseFixture : IAsyncLifetime
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
         await _respawner.ResetAsync(connection);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"DELETE FROM UnitsOfMeasure WHERE Id > {WellKnownUnitOfMeasureIds.Piece};";
+        await command.ExecuteNonQueryAsync();
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;

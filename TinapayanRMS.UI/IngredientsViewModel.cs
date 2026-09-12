@@ -190,7 +190,7 @@ public class IngredientsViewModel : ViewModelBase
         IValidator<Ingredient> ingredientValidator,
         IValidator<IngredientPriceHistory> priceHistoryValidator,
         IValidator<IngredientCategory> categoryValidator,
-        ILookupRepository<UnitOfMeasure> unitOfMeasureRepository,
+        IUnitOfMeasureRepository unitOfMeasureRepository,
         ILogger logger)
         : base(logger)
     {
