@@ -21,6 +21,10 @@ TestResults/
 _ReSharper*/
 *.DotSettings.user
 
+# Python bytecode — the ui-ux-pro-max skill's search script regenerates this on every run
+__pycache__/
+*.pyc
+
 # Full Syncfusion Theme Studio export, kept locally as a reference for adding a
 # currently-unused control's theme later (see PLAN.md's Open Items). Not the
 # TinapayanRMS.Theme project itself, which stays trimmed and version-controlled.
