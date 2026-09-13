@@ -36,16 +36,12 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
 
     private async Task<int> SeedPurchasedIngredientAsync(string name, int categoryId)
     {
-        var unitId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
-
         await using var dbContext = CreateDbContext();
         var ingredient = new Ingredient
         {
             Name = name,
             IngredientCategoryId = categoryId,
             Source = IngredientSource.Purchased,
-            PurchaseUnitId = unitId,
-            PurchaseUnitQty = 1000m,
         };
         dbContext.Ingredients.Add(ingredient);
         await dbContext.SaveChangesAsync(Cancellation);
@@ -88,13 +84,61 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         await CreateLineRepository().SetLinesAsync(subAssemblyId,
         [
-            (flourId, 800m),
-            (sugarId, 200m),
+            (flourId, null, 800m),
+            (sugarId, null, 200m),
         ], Cancellation);
 
         var subAssembly = await GetSubAssemblyAsync(subAssemblyId);
         subAssembly.TotalWeight.Should().Be(1000m);
         subAssembly.TotalCost.Should().Be(58m); // 800*0.05 + 200*0.09
+    }
+
+    [Fact]
+    public async Task A_line_entered_in_an_alternative_unit_keeps_what_was_entered_and_totals_in_grams()
+    {
+        var roleId = await SeedRoleAsync("Dough");
+        var categoryId = await SeedCategoryAsync("Dairy");
+        var eggId = await SeedPurchasedIngredientAsync("Egg", categoryId);
+        await SetIngredientCostPerGramAsync(eggId, 0.2m);
+        var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
+        int eggPieceId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var piece = new IngredientUnit { IngredientId = eggId, UnitOfMeasureId = pieceId, GramsPerUnit = 50m };
+            dbContext.IngredientUnits.Add(piece);
+            await dbContext.SaveChangesAsync(Cancellation);
+            eggPieceId = piece.Id;
+        }
+        var subAssemblyId = await SeedSubAssemblyAsync("Bread Dough", roleId);
+
+        await CreateLineRepository().SetLinesAsync(subAssemblyId, [(eggId, eggPieceId, 3m)], Cancellation); // 3 eggs of 50 g
+
+        var line = (await CreateLineRepository().GetForSubAssemblyAsync(subAssemblyId, Cancellation)).Should().ContainSingle().Subject;
+        line.Quantity.Should().Be(3m);
+        line.IngredientUnit!.UnitOfMeasure!.Name.Should().Be("piece");
+        line.Grams.Should().Be(150m);
+
+        var subAssembly = await GetSubAssemblyAsync(subAssemblyId);
+        subAssembly.TotalWeight.Should().Be(150m);
+        subAssembly.TotalCost.Should().Be(30m); // 150 g at 0.20/g
+    }
+
+    [Fact]
+    public async Task SetLinesAsync_rejects_a_unit_that_belongs_to_another_ingredient_without_deleting_the_existing_lines()
+    {
+        var roleId = await SeedRoleAsync("Dough");
+        var categoryId = await SeedCategoryAsync("Dairy");
+        var eggId = await SeedPurchasedIngredientAsync("Egg", categoryId);
+        var flourId = await SeedPurchasedIngredientAsync("Flour", categoryId);
+        var flourKilogramId = await AddKilogramUnitAsync(flourId);
+        var subAssemblyId = await SeedSubAssemblyAsync("Bread Dough", roleId);
+        var lineRepository = CreateLineRepository();
+        await lineRepository.SetLinesAsync(subAssemblyId, [(eggId, null, 100m)], Cancellation);
+
+        var act = () => lineRepository.SetLinesAsync(subAssemblyId, [(eggId, flourKilogramId, 2m)], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        (await lineRepository.GetForSubAssemblyAsync(subAssemblyId, Cancellation)).Should().ContainSingle().Which.Grams.Should().Be(100m);
     }
 
     [Fact]
@@ -105,7 +149,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
 
-        await CreateLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, 300m)], Cancellation);
+        await CreateLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, null, 300m)], Cancellation);
 
         var lines = await CreateLineRepository().GetForSubAssemblyAsync(subAssemblyId, Cancellation);
         var line = lines.Should().ContainSingle().Subject;
@@ -124,8 +168,8 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         var act = () => CreateLineRepository().SetLinesAsync(subAssemblyId,
         [
-            (sugarId, 100m),
-            (sugarId, 50m),
+            (sugarId, null, 100m),
+            (sugarId, null, 50m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -142,8 +186,8 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
 
         var lineRepository = CreateLineRepository();
-        await lineRepository.SetLinesAsync(subAssemblyId, [(sugarId, 100m), (waterId, 100m)], Cancellation);
-        await lineRepository.SetLinesAsync(subAssemblyId, [(sugarId, 500m)], Cancellation);
+        await lineRepository.SetLinesAsync(subAssemblyId, [(sugarId, null, 100m), (waterId, null, 100m)], Cancellation);
+        await lineRepository.SetLinesAsync(subAssemblyId, [(sugarId, null, 500m)], Cancellation);
 
         var lines = await lineRepository.GetForSubAssemblyAsync(subAssemblyId, Cancellation);
         lines.Should().ContainSingle();
@@ -160,7 +204,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
-        await CreateLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, 100m)], Cancellation);
+        await CreateLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, null, 100m)], Cancellation);
 
         await using var dbContext = CreateDbContext();
         var act = () => dbContext.Ingredients.Where(i => i.Id == sugarId).ExecuteDeleteAsync(Cancellation);
@@ -175,7 +219,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
-        await CreateLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, 100m)], Cancellation);
+        await CreateLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, null, 100m)], Cancellation);
 
         await using (var dbContext = CreateDbContext())
         {
@@ -216,7 +260,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var flourId = await SeedPurchasedIngredientAsync("Flour", categoryId);
         await SetIngredientCostPerGramAsync(flourId, 0.05m);
         var subAssemblyId = await SeedSubAssemblyAsync("Bread Dough", roleId);
-        await CreateLineRepository().SetLinesAsync(subAssemblyId, [(flourId, 1000m)], Cancellation);
+        await CreateLineRepository().SetLinesAsync(subAssemblyId, [(flourId, null, 1000m)], Cancellation);
 
         var subAssemblyRepository = CreateSubAssemblyRepository();
         var toUpdate = (await subAssemblyRepository.GetByIdAsync(subAssemblyId, Cancellation))!;
@@ -299,7 +343,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
 
-        var act = () => CreateLineRepository().SetLinesAsync(999_999, [(sugarId, 100m)], Cancellation);
+        var act = () => CreateLineRepository().SetLinesAsync(999_999, [(sugarId, null, 100m)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -313,9 +357,9 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         await SetIngredientCostPerGramAsync(sugarId, 0.09m);
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
         var lineRepository = CreateLineRepository();
-        await lineRepository.SetLinesAsync(subAssemblyId, [(sugarId, 100m)], Cancellation);
+        await lineRepository.SetLinesAsync(subAssemblyId, [(sugarId, null, 100m)], Cancellation);
 
-        var act = () => lineRepository.SetLinesAsync(subAssemblyId, [(sugarId, 50m), (999_999, 50m)], Cancellation);
+        var act = () => lineRepository.SetLinesAsync(subAssemblyId, [(sugarId, null, 50m), (999_999, null, 50m)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
 

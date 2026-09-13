@@ -43,20 +43,6 @@ public class UnitsOfMeasureViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingAbbreviation, value);
     }
 
-    private bool _editingIsLengthUnit;
-    public bool EditingIsLengthUnit
-    {
-        get => _editingIsLengthUnit;
-        set => this.RaiseAndSetIfChanged(ref _editingIsLengthUnit, value);
-    }
-
-    private decimal? _editingMillimetersPerUnit;
-    public decimal? EditingMillimetersPerUnit
-    {
-        get => _editingMillimetersPerUnit;
-        set => this.RaiseAndSetIfChanged(ref _editingMillimetersPerUnit, value);
-    }
-
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
@@ -80,8 +66,6 @@ public class UnitsOfMeasureViewModel : ViewModelBase
                 _editingId = unit!.Id;
                 EditingName = unit.Name;
                 EditingAbbreviation = unit.Abbreviation;
-                EditingIsLengthUnit = unit.IsLengthUnit;
-                EditingMillimetersPerUnit = unit.MillimetersPerUnit;
             });
 
         // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
@@ -104,8 +88,6 @@ public class UnitsOfMeasureViewModel : ViewModelBase
             _editingId = 0;
             EditingName = string.Empty;
             EditingAbbreviation = string.Empty;
-            EditingIsLengthUnit = false;
-            EditingMillimetersPerUnit = null;
         });
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
@@ -115,8 +97,6 @@ public class UnitsOfMeasureViewModel : ViewModelBase
                 Id = _editingId,
                 Name = EditingName,
                 Abbreviation = EditingAbbreviation,
-                IsLengthUnit = EditingIsLengthUnit,
-                MillimetersPerUnit = EditingIsLengthUnit ? EditingMillimetersPerUnit : null,
             };
 
             var validation = _unitOfMeasureValidator.Validate(unit);

@@ -21,6 +21,12 @@ public class IngredientBomLineConfiguration : IEntityTypeConfiguration<Ingredien
             .HasForeignKey(l => l.ComponentIngredientId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // A component's unit can't be deleted while a line is entered in it.
+        builder.HasOne(l => l.IngredientUnit)
+            .WithMany()
+            .HasForeignKey(l => l.IngredientUnitId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(l => new { l.IngredientId, l.ComponentIngredientId }).IsUnique();
     }
 }

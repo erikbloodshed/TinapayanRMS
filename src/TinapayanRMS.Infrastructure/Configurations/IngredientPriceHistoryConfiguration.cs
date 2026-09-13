@@ -13,6 +13,14 @@ public class IngredientPriceHistoryConfiguration : IEntityTypeConfiguration<Ingr
             .HasForeignKey(h => h.IngredientId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // A unit something was priced in can't be deleted while that price entry exists.
+        // Not Cascade: SQL Server rejects a second cascade path from Ingredients (through
+        // IngredientUnits) to this table.
+        builder.HasOne(h => h.IngredientUnit)
+            .WithMany()
+            .HasForeignKey(h => h.IngredientUnitId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(h => new { h.IngredientId, h.Date });
     }
 }

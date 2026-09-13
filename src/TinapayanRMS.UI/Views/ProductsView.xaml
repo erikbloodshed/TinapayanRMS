@@ -154,7 +154,7 @@
                                                     Height="220">
                                 <syncfusion:SfDataGrid.Columns>
                                     <syncfusion:GridTextColumn MappingName="PackagingMaterial.Name" HeaderText="Material" />
-                                    <syncfusion:GridTextColumn MappingName="EntryUnit.Abbreviation" HeaderText="Unit" />
+                                    <syncfusion:GridTextColumn MappingName="Unit.Abbreviation" HeaderText="Unit" />
                                     <controls:NumericColumn MappingName="QtyPerPiece" HeaderText="Qty/Piece" NumberDecimalDigits="4" />
                                     <controls:NumericColumn MappingName="PiecesPerPackagingUnit" HeaderText="Pieces/Unit" NumberDecimalDigits="4" />
                                     <controls:NumericColumn MappingName="CostPerPiece" HeaderText="Cost/Piece" NumberDecimalDigits="4" />
@@ -167,10 +167,10 @@
                                                      SelectedItem="{Binding EditingLinePackagingMaterial, Mode=TwoWay}"
                                                      Margin="0,0,0,12" />
 
-                            <TextBlock Text="Entry Unit" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBlock Text="Unit" Style="{StaticResource FieldLabelStyle}" />
                             <syncfusion:ComboBoxAdv ItemsSource="{Binding EntryUnitOptions}"
                                                      DisplayMemberPath="Name"
-                                                     SelectedItem="{Binding EditingLineEntryUnit, Mode=TwoWay}"
+                                                     SelectedItem="{Binding EditingLineUnit, Mode=TwoWay}"
                                                      Margin="0,0,0,12" />
 
                             <TextBlock Text="Authored Field" Style="{StaticResource FieldLabelStyle}" />

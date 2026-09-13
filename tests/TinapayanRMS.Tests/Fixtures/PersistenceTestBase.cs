@@ -35,10 +35,10 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
     /// no protected/well-known ids), so any test that needs a unit as an FK target seeds
     /// its own via this helper rather than relying on a shared baseline row.
     /// </summary>
-    protected async Task<int> SeedUnitOfMeasureAsync(string name, string abbreviation, bool isLengthUnit = false, decimal? millimetersPerUnit = null)
+    protected async Task<int> SeedUnitOfMeasureAsync(string name, string abbreviation)
     {
         await using var dbContext = CreateDbContext();
-        var unit = new UnitOfMeasure { Name = name, Abbreviation = abbreviation, IsLengthUnit = isLengthUnit, MillimetersPerUnit = millimetersPerUnit };
+        var unit = new UnitOfMeasure { Name = name, Abbreviation = abbreviation };
         dbContext.UnitsOfMeasure.Add(unit);
         await dbContext.SaveChangesAsync(Cancellation);
         return unit.Id;
@@ -50,7 +50,7 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
     /// existing row by name within the test instead of colliding with the unique Name
     /// index on a second SeedUnitOfMeasureAsync("piece", ...) call.
     /// </summary>
-    protected async Task<int> GetOrCreateUnitOfMeasureAsync(string name, string abbreviation, bool isLengthUnit = false, decimal? millimetersPerUnit = null)
+    protected async Task<int> GetOrCreateUnitOfMeasureAsync(string name, string abbreviation)
     {
         await using var dbContext = CreateDbContext();
         var existing = await dbContext.UnitsOfMeasure.FirstOrDefaultAsync(u => u.Name == name, Cancellation);
@@ -59,10 +59,35 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
             return existing.Id;
         }
 
-        var unit = new UnitOfMeasure { Name = name, Abbreviation = abbreviation, IsLengthUnit = isLengthUnit, MillimetersPerUnit = millimetersPerUnit };
+        var unit = new UnitOfMeasure { Name = name, Abbreviation = abbreviation };
         dbContext.UnitsOfMeasure.Add(unit);
         await dbContext.SaveChangesAsync(Cancellation);
         return unit.Id;
+    }
+
+    /// <summary>
+    /// Gives an ingredient a "kilogram" alternative unit of 1,000 g and returns the unit's id, so a
+    /// test can price it per kilogram (₱90 a kilogram is ₱0.09 a gram).
+    /// </summary>
+    protected async Task<int> AddKilogramUnitAsync(int ingredientId)
+    {
+        var kilogramId = await GetOrCreateUnitOfMeasureAsync("kilogram", "kg");
+
+        await using var dbContext = CreateDbContext();
+        var unit = new IngredientUnit { IngredientId = ingredientId, UnitOfMeasureId = kilogramId, GramsPerUnit = 1000m };
+        dbContext.IngredientUnits.Add(unit);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return unit.Id;
+    }
+
+    /// <summary>The id of the kilogram unit AddKilogramUnitAsync gave <paramref name="ingredientId"/>.</summary>
+    protected async Task<int> KilogramUnitIdAsync(int ingredientId)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.IngredientUnits
+            .Where(u => u.IngredientId == ingredientId && u.UnitOfMeasure!.Name == "kilogram")
+            .Select(u => u.Id)
+            .SingleAsync(Cancellation);
     }
 
     private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>

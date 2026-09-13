@@ -15,43 +15,38 @@ public class PackagingMaterialValidatorTests
         {
             Name = "Satin Ribbon",
             PackagingCategoryId = 1,
-            StandardUnitId = 1,
-            PurchaseUnitId = 2,
-            PurchaseUnitQty = 1000m,
+            BaseUnitId = 1,
         });
 
         result.IsValid.Should().BeTrue();
     }
 
     [Fact]
-    public void Rejects_a_missing_standard_unit()
+    public void Rejects_a_missing_base_unit()
     {
         var result = _validator.Validate(new PackagingMaterial
         {
             Name = "Invalid",
             PackagingCategoryId = 1,
-            StandardUnitId = 0,
-            PurchaseUnitId = 2,
-            PurchaseUnitQty = 1m,
+            BaseUnitId = 0,
         });
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(PackagingMaterial.StandardUnitId));
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(PackagingMaterial.BaseUnitId));
     }
 
     [Fact]
-    public void Rejects_a_non_positive_purchase_unit_quantity()
+    public void Rejects_a_missing_name()
     {
         var result = _validator.Validate(new PackagingMaterial
         {
-            Name = "Box",
+            Name = "",
             PackagingCategoryId = 1,
-            StandardUnitId = 1,
-            PurchaseUnitId = 2,
-            PurchaseUnitQty = 0m,
+            BaseUnitId = 1,
         });
 
         result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(PackagingMaterial.Name));
     }
 
     [Fact]
@@ -61,28 +56,10 @@ public class PackagingMaterialValidatorTests
         {
             Name = "Box",
             PackagingCategoryId = 0,
-            StandardUnitId = 1,
-            PurchaseUnitId = 2,
-            PurchaseUnitQty = 100m,
+            BaseUnitId = 1,
         });
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(PackagingMaterial.PackagingCategoryId));
-    }
-
-    [Fact]
-    public void Rejects_a_missing_purchase_unit()
-    {
-        var result = _validator.Validate(new PackagingMaterial
-        {
-            Name = "Box",
-            PackagingCategoryId = 1,
-            StandardUnitId = 1,
-            PurchaseUnitId = 0,
-            PurchaseUnitQty = 100m,
-        });
-
-        result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(PackagingMaterial.PurchaseUnitId));
     }
 }

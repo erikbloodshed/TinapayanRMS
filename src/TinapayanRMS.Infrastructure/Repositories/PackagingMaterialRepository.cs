@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
@@ -12,8 +13,9 @@ public class PackagingMaterialRepository(IDbContextFactory<TinapayanRMSDbContext
         return await dbContext.PackagingMaterials
             .AsNoTracking()
             .Include(p => p.PackagingCategory)
-            .Include(p => p.StandardUnit)
-            .Include(p => p.PurchaseUnit)
+            .Include(p => p.BaseUnit)
+            .Include(p => p.Units.OrderByDescending(u => u.BaseUnitsPerUnit))
+            .ThenInclude(u => u.UnitOfMeasure)
             .OrderBy(p => p.Name)
             .ToListAsync(cancellationToken);
     }
@@ -24,8 +26,9 @@ public class PackagingMaterialRepository(IDbContextFactory<TinapayanRMSDbContext
         return await dbContext.PackagingMaterials
             .AsNoTracking()
             .Include(p => p.PackagingCategory)
-            .Include(p => p.StandardUnit)
-            .Include(p => p.PurchaseUnit)
+            .Include(p => p.BaseUnit)
+            .Include(p => p.Units.OrderByDescending(u => u.BaseUnitsPerUnit))
+            .ThenInclude(u => u.UnitOfMeasure)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 
@@ -43,13 +46,19 @@ public class PackagingMaterialRepository(IDbContextFactory<TinapayanRMSDbContext
         var existing = await dbContext.PackagingMaterials.FirstOrDefaultAsync(p => p.Id == packagingMaterial.Id, cancellationToken)
             ?? throw new InvalidOperationException($"Packaging material {packagingMaterial.Id} does not exist.");
 
-        // Field by field, not a blind Update(): CurrentCost is owned by the price-history
-        // rollup (PackagingMaterialRules.ApplyLatestPrice), not by this form.
+        if (existing.BaseUnitId != packagingMaterial.BaseUnitId)
+        {
+            PackagingMaterialRules.EnsureBaseUnitCanChange(
+                hasUnits: await dbContext.PackagingMaterialUnits.AnyAsync(u => u.PackagingMaterialId == existing.Id, cancellationToken),
+                hasPrices: await dbContext.PackagingPriceHistories.AnyAsync(h => h.PackagingMaterialId == existing.Id, cancellationToken),
+                hasLines: await dbContext.PackagingLines.AnyAsync(l => l.PackagingMaterialId == existing.Id, cancellationToken));
+        }
+
+        // Field by field, not a blind Update(): CostPerBaseUnit is owned by the price-history rollup
+        // (PackagingMaterialRules.ApplyLatestPrice), and the units by PackagingMaterialUnitRepository.
         existing.Name = packagingMaterial.Name;
         existing.PackagingCategoryId = packagingMaterial.PackagingCategoryId;
-        existing.StandardUnitId = packagingMaterial.StandardUnitId;
-        existing.PurchaseUnitId = packagingMaterial.PurchaseUnitId;
-        existing.PurchaseUnitQty = packagingMaterial.PurchaseUnitQty;
+        existing.BaseUnitId = packagingMaterial.BaseUnitId;
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

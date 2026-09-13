@@ -19,7 +19,6 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
     public async Task AddAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken)
     {
         unitOfMeasure.Name = UnitOfMeasureRules.NormalizeName(unitOfMeasure.Name);
-        UnitOfMeasureRules.EnsureLengthUnitFieldsAreConsistent(unitOfMeasure.IsLengthUnit, unitOfMeasure.MillimetersPerUnit);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         dbContext.UnitsOfMeasure.Add(unitOfMeasure);
@@ -28,8 +27,6 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
 
     public async Task UpdateAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken)
     {
-        UnitOfMeasureRules.EnsureLengthUnitFieldsAreConsistent(unitOfMeasure.IsLengthUnit, unitOfMeasure.MillimetersPerUnit);
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var existing = await dbContext.UnitsOfMeasure.FirstOrDefaultAsync(u => u.Id == unitOfMeasure.Id, cancellationToken)
@@ -37,8 +34,6 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
 
         existing.Name = UnitOfMeasureRules.NormalizeName(unitOfMeasure.Name);
         existing.Abbreviation = unitOfMeasure.Abbreviation;
-        existing.IsLengthUnit = unitOfMeasure.IsLengthUnit;
-        existing.MillimetersPerUnit = unitOfMeasure.MillimetersPerUnit;
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

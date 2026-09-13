@@ -57,10 +57,9 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
         {
             Name = name,
             PackagingCategoryId = categoryId,
-            StandardUnitId = standardUnitId,
-            PurchaseUnitId = await GetOrCreateUnitOfMeasureAsync("piece", "pc"),
-            PurchaseUnitQty = purchaseUnitQty,
-            CurrentCost = currentCost,
+            BaseUnitId = standardUnitId,
+            // Priced as currentCost per purchaseUnitQty base units, as these tests were written.
+            CostPerBaseUnit = currentCost / purchaseUnitQty,
         };
         dbContext.PackagingMaterials.Add(material);
         await dbContext.SaveChangesAsync(Cancellation);
@@ -104,7 +103,7 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
         var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
         var bigId = await SeedProductAsync("Big");
         var smallId = await SeedProductAsync("Small");
-        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
 
         await CreateTabLinkRepository().SetLinkAsync(smallId, ProductTabKind.Packaging, null, bigId, Cancellation);
 
@@ -241,10 +240,10 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
         var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
         var bigId = await SeedProductAsync("Big");
         var smallId = await SeedProductAsync("Small");
-        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
         await CreateTabLinkRepository().SetLinkAsync(smallId, ProductTabKind.Packaging, null, bigId, Cancellation);
 
-        var act = () => CreatePackagingLineRepository().SetLinesAsync(smallId, [(boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m)], Cancellation);
+        var act = () => CreatePackagingLineRepository().SetLinesAsync(smallId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -287,7 +286,7 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
         var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
         var sourceId = await SeedProductAsync("Source");
         await CreateUsageRepository().SetUsagesForRoleAsync(sourceId, roleId, [(subAssemblyId, 15m)], Cancellation);
-        await CreatePackagingLineRepository().SetLinesAsync(sourceId, [(boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(sourceId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
         await CreateCostingParametersRepository().SetAsync(sourceId, laborCost: 5m, overheadCost: 3m, marginPercent: 40m, vatPercent: 12m, Cancellation);
 
         var newId = await CreateProductCloner().CloneAsync(sourceId, "Clone Of Source", Cancellation);

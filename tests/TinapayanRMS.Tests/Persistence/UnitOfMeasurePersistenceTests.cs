@@ -29,19 +29,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
         await repository.AddAsync(new UnitOfMeasure { Name = "bag", Abbreviation = "bag" }, Cancellation);
 
         var units = await repository.GetAllAsync(Cancellation);
-        units.Should().Contain(u => u.Name == "bag" && u.Abbreviation == "bag" && !u.IsLengthUnit && u.MillimetersPerUnit == null);
-    }
-
-    [Fact]
-    public async Task AddAsync_and_GetAllAsync_round_trip_a_length_unit()
-    {
-        var repository = CreateRepository();
-
-        await repository.AddAsync(new UnitOfMeasure { Name = "centimeter", Abbreviation = "cm", IsLengthUnit = true, MillimetersPerUnit = 10m }, Cancellation);
-
-        var unit = (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "centimeter").Subject;
-        unit.IsLengthUnit.Should().BeTrue();
-        unit.MillimetersPerUnit.Should().Be(10m);
+        units.Should().Contain(u => u.Name == "bag" && u.Abbreviation == "bag");
     }
 
     [Fact]
@@ -81,22 +69,6 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task AddAsync_rejects_a_length_unit_without_a_conversion_factor()
-    {
-        var act = () => CreateRepository().AddAsync(new UnitOfMeasure { Name = "centimeter", Abbreviation = "cm", IsLengthUnit = true }, Cancellation);
-
-        await act.Should().ThrowAsync<InvalidOperationException>();
-    }
-
-    [Fact]
-    public async Task AddAsync_rejects_a_non_length_unit_with_a_stray_conversion_factor()
-    {
-        var act = () => CreateRepository().AddAsync(new UnitOfMeasure { Name = "bag", Abbreviation = "bag", MillimetersPerUnit = 10m }, Cancellation);
-
-        await act.Should().ThrowAsync<InvalidOperationException>();
-    }
-
-    [Fact]
     public async Task UpdateAsync_rejects_a_nonexistent_unit()
     {
         var act = () => CreateRepository().UpdateAsync(new UnitOfMeasure { Id = 999_999, Name = "ghost", Abbreviation = "gh" }, Cancellation);
@@ -126,13 +98,13 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
 
         await using (var dbContext = CreateDbContext())
         {
+            // In use as an ingredient's alternative unit.
             dbContext.Ingredients.Add(new Ingredient
             {
                 Name = "Flour",
                 IngredientCategoryId = categoryId,
                 Source = IngredientSource.Purchased,
-                PurchaseUnitId = unit.Id,
-                PurchaseUnitQty = 1m,
+                Units = [new IngredientUnit { UnitOfMeasureId = unit.Id, GramsPerUnit = 25000m }],
             });
             await dbContext.SaveChangesAsync(Cancellation);
         }

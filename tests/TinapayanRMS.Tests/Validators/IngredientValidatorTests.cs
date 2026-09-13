@@ -17,8 +17,6 @@ public class IngredientValidatorTests
             Name = "Sugar",
             IngredientCategoryId = 1,
             Source = IngredientSource.Purchased,
-            PurchaseUnitId = 1,
-            PurchaseUnitQty = 1000m,
         });
 
         result.IsValid.Should().BeTrue();
@@ -54,21 +52,6 @@ public class IngredientValidatorTests
     }
 
     [Fact]
-    public void Rejects_a_purchased_ingredient_without_a_purchase_unit()
-    {
-        var result = _validator.Validate(new Ingredient
-        {
-            Name = "Sugar",
-            IngredientCategoryId = 1,
-            Source = IngredientSource.Purchased,
-            PurchaseUnitQty = 1000m,
-        });
-
-        result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(Ingredient.PurchaseUnitId));
-    }
-
-    [Fact]
     public void Rejects_a_made_ingredient_with_an_out_of_range_weight_loss_percent()
     {
         var result = _validator.Validate(new Ingredient
@@ -83,19 +66,17 @@ public class IngredientValidatorTests
     }
 
     [Fact]
-    public void Rejects_a_made_ingredient_with_a_purchase_unit()
+    public void Rejects_a_made_ingredient_without_a_weight_loss_percent()
     {
         var result = _validator.Validate(new Ingredient
         {
             Name = "Simple Syrup",
             IngredientCategoryId = 1,
             Source = IngredientSource.Made,
-            WeightLossPercent = 20m,
-            PurchaseUnitId = 1,
         });
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(Ingredient.PurchaseUnitId));
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(Ingredient.WeightLossPercent));
     }
 
     [Fact]
@@ -106,28 +87,10 @@ public class IngredientValidatorTests
             Name = "Sugar",
             IngredientCategoryId = 0,
             Source = IngredientSource.Purchased,
-            PurchaseUnitId = 1,
-            PurchaseUnitQty = 1000m,
         });
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(Ingredient.IngredientCategoryId));
-    }
-
-    [Fact]
-    public void Rejects_a_purchased_ingredient_with_a_non_positive_purchase_quantity()
-    {
-        var result = _validator.Validate(new Ingredient
-        {
-            Name = "Sugar",
-            IngredientCategoryId = 1,
-            Source = IngredientSource.Purchased,
-            PurchaseUnitId = 1,
-            PurchaseUnitQty = 0m,
-        });
-
-        result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(Ingredient.PurchaseUnitQty));
     }
 
     [Fact]
@@ -138,44 +101,10 @@ public class IngredientValidatorTests
             Name = "Sugar",
             IngredientCategoryId = 1,
             Source = IngredientSource.Purchased,
-            PurchaseUnitId = 1,
-            PurchaseUnitQty = 1000m,
             WeightLossPercent = 10m,
         });
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(Ingredient.WeightLossPercent));
-    }
-
-    [Fact]
-    public void Rejects_a_made_ingredient_with_a_purchase_quantity()
-    {
-        var result = _validator.Validate(new Ingredient
-        {
-            Name = "Simple Syrup",
-            IngredientCategoryId = 1,
-            Source = IngredientSource.Made,
-            WeightLossPercent = 20m,
-            PurchaseUnitQty = 1000m,
-        });
-
-        result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(Ingredient.PurchaseUnitQty));
-    }
-
-    [Fact]
-    public void Rejects_a_made_ingredient_with_a_current_cost()
-    {
-        var result = _validator.Validate(new Ingredient
-        {
-            Name = "Simple Syrup",
-            IngredientCategoryId = 1,
-            Source = IngredientSource.Made,
-            WeightLossPercent = 20m,
-            CurrentCost = 5m,
-        });
-
-        result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(Ingredient.CurrentCost));
     }
 }

@@ -48,7 +48,9 @@ public static class CompositionRoot
                 services.AddSingleton<IIngredientCategoryRepository, IngredientCategoryRepository>();
                 services.AddSingleton<IPackagingCategoryRepository, PackagingCategoryRepository>();
                 services.AddSingleton<IIngredientRepository, IngredientRepository>();
+                services.AddSingleton<IIngredientUnitRepository, IngredientUnitRepository>();
                 services.AddSingleton<IPackagingMaterialRepository, PackagingMaterialRepository>();
+                services.AddSingleton<IPackagingMaterialUnitRepository, PackagingMaterialUnitRepository>();
                 services.AddSingleton<IIngredientPriceHistoryRepository, IngredientPriceHistoryRepository>();
                 services.AddSingleton<IPackagingPriceHistoryRepository, PackagingPriceHistoryRepository>();
                 services.AddSingleton<IIngredientBomLineRepository, IngredientBomLineRepository>();
@@ -67,7 +69,9 @@ public static class CompositionRoot
                 services.AddSingleton<IValidator<IngredientCategory>, IngredientCategoryValidator>();
                 services.AddSingleton<IValidator<PackagingCategory>, PackagingCategoryValidator>();
                 services.AddSingleton<IValidator<Ingredient>, IngredientValidator>();
+                services.AddSingleton<IValidator<IngredientUnit>, IngredientUnitValidator>();
                 services.AddSingleton<IValidator<PackagingMaterial>, PackagingMaterialValidator>();
+                services.AddSingleton<IValidator<PackagingMaterialUnit>, PackagingMaterialUnitValidator>();
                 services.AddSingleton<IValidator<SubAssemblyRole>, SubAssemblyRoleValidator>();
                 services.AddSingleton<IValidator<SubAssembly>, SubAssemblyValidator>();
                 services.AddSingleton<IValidator<Product>, ProductValidator>();

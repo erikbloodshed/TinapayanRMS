@@ -102,7 +102,7 @@ public class ProductTabLinkRepository(
 
             await packagingLineRepository.SetLinesAsync(
                 productId,
-                [.. effectiveLines.Select(l => (l.PackagingMaterialId, l.EntryUnitId, l.AuthoredField,
+                [.. effectiveLines.Select(l => (l.PackagingMaterialId, l.PackagingMaterialUnitId, l.AuthoredField,
                     l.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? l.QtyPerPiece : l.PiecesPerPackagingUnit))],
                 cancellationToken);
         }

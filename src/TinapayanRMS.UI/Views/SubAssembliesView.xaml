@@ -93,7 +93,10 @@
                                                 Height="220">
                             <syncfusion:SfDataGrid.Columns>
                                 <syncfusion:GridTextColumn MappingName="Ingredient.Name" HeaderText="Ingredient" />
+                                <controls:NumericColumn MappingName="Quantity" HeaderText="Qty" NumberDecimalDigits="2" />
+                                <syncfusion:GridTextColumn MappingName="Unit.Abbreviation" HeaderText="Unit" Padding="12,0,0,0" />
                                 <controls:NumericColumn MappingName="Grams" HeaderText="Grams" NumberDecimalDigits="2" />
+                                <controls:NumericColumn MappingName="Cost" HeaderText="Cost" NumberDecimalDigits="2" />
                             </syncfusion:SfDataGrid.Columns>
                         </syncfusion:SfDataGrid>
 
@@ -103,9 +106,23 @@
                                                  SelectedItem="{Binding EditingLineIngredient, Mode=TwoWay}"
                                                  Margin="0,0,0,12" />
 
-                        <TextBlock Text="Grams" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:DoubleTextBox Value="{Binding EditingLineGrams, Mode=TwoWay}"
-                                                   Margin="0,0,0,12" />
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Quantity" Style="{StaticResource FieldLabelStyle}" />
+                                <syncfusion:DoubleTextBox Value="{Binding EditingLineQuantity, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Unit" Style="{StaticResource FieldLabelStyle}" />
+                                <syncfusion:ComboBoxAdv ItemsSource="{Binding LineUnitOptions}"
+                                                         DisplayMemberPath="Name"
+                                                         SelectedItem="{Binding EditingLineUnit, Mode=TwoWay}" />
+                            </StackPanel>
+                        </Grid>
 
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                             <syncfusion:ButtonAdv Label="Add Line" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding AddLineCommand}" Margin="0,0,8,0" />

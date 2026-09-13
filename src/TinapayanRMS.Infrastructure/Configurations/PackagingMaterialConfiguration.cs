@@ -16,14 +16,9 @@ public class PackagingMaterialConfiguration : IEntityTypeConfiguration<Packaging
             .HasForeignKey(p => p.PackagingCategoryId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(p => p.StandardUnit)
+        builder.HasOne(p => p.BaseUnit)
             .WithMany()
-            .HasForeignKey(p => p.StandardUnitId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(p => p.PurchaseUnit)
-            .WithMany()
-            .HasForeignKey(p => p.PurchaseUnitId)
+            .HasForeignKey(p => p.BaseUnitId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

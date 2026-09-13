@@ -1,0 +1,97 @@
+<UserControl x:Class="TinapayanRMS.UI.Controls.UnitConversionOverview"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             x:Name="Root"
+             d:DesignHeight="260" d:DesignWidth="360">
+    <StackPanel>
+        <!-- Empty state: nothing to convert yet -->
+        <TextBlock Style="{StaticResource EmptyStateStyle}"
+                   Margin="0,24"
+                   Visibility="{Binding HasItems, ElementName=Root, Converter={StaticResource EmptyStateVisibilityConverter}}">
+            <Run Text="No alternative units yet. Add one to see how it converts to" />
+            <Run Text="{Binding BaseUnitName, ElementName=Root, Mode=OneWay}" /><Run Text="." />
+        </TextBlock>
+
+        <StackPanel Visibility="{Binding HasItems, ElementName=Root, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <!-- One box per alternative unit, each pointing down into the base unit -->
+            <ItemsControl ItemsSource="{Binding ItemsSource, ElementName=Root}" HorizontalAlignment="Center">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel HorizontalAlignment="Center" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="6,0" MinWidth="96">
+                            <Border Background="{StaticResource CardBackgroundBrush}"
+                                    BorderBrush="{StaticResource AccentBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="12,8">
+                                <StackPanel>
+                                    <TextBlock HorizontalAlignment="Center"
+                                               FontSize="15"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource HeadingForegroundBrush}">
+                                        <Run Text="1" />
+                                        <Run Text="{Binding UnitName, Mode=OneWay}" />
+                                    </TextBlock>
+                                    <TextBlock HorizontalAlignment="Center"
+                                               Foreground="{StaticResource MutedForegroundBrush}"
+                                               Text="{Binding BaseEquivalentText, StringFormat=({0})}" />
+                                </StackPanel>
+                            </Border>
+                            <TextBlock HorizontalAlignment="Center"
+                                       Margin="0,6,0,0"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource HeadingForegroundBrush}"
+                                       Text="{Binding BaseEquivalentText}" />
+                            <TextBlock HorizontalAlignment="Center"
+                                       Style="{StaticResource IconGlyphStyle}"
+                                       FontSize="18"
+                                       Foreground="{StaticResource AccentBrush}"
+                                       Text="&#xE74B;" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- The base unit everything converts to -->
+            <Border HorizontalAlignment="Center"
+                    Margin="0,4,0,0"
+                    MinWidth="120"
+                    Background="{StaticResource CardBackgroundBrush}"
+                    BorderBrush="{StaticResource AccentBrush}"
+                    BorderThickness="2"
+                    CornerRadius="6"
+                    Padding="16,8">
+                <StackPanel>
+                    <TextBlock HorizontalAlignment="Center"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource HeadingForegroundBrush}"
+                               Text="{Binding BaseUnitName, ElementName=Root}" />
+                    <TextBlock HorizontalAlignment="Center"
+                               Foreground="{StaticResource MutedForegroundBrush}"
+                               Text="(base unit)" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <Border Style="{StaticResource WarningBannerStyle}" Margin="0,16,0,0">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Left"
+                           Style="{StaticResource IconGlyphStyle}"
+                           Foreground="{StaticResource WarningForegroundBrush}"
+                           Margin="0,1,8,0"
+                           Text="&#xE946;" />
+                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource WarningForegroundBrush}">
+                    <Run Text="The base unit (" /><Run Text="{Binding BaseUnitName, ElementName=Root, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=") is the common unit used for costing and recipe calculations." />
+                </TextBlock>
+            </DockPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

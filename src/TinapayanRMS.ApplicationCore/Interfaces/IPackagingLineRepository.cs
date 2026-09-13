@@ -19,10 +19,12 @@ public interface IPackagingLineRepository
     /// Replaces the product's whole packaging line set. AuthoredValue is whichever of
     /// QtyPerPiece/PiecesPerPackagingUnit the user actually typed for that line (per
     /// AuthoredField) — the repository derives the other one (ProductRules.ReconcileReciprocal).
+    /// Each line's quantities are in PackagingMaterialUnitId, one of that material's own units, or in
+    /// its base unit when that's null.
     /// Rejected if the Packaging tab is currently Live Template-linked; unlink it first.
     /// </summary>
     Task SetLinesAsync(
         int productId,
-        IReadOnlyList<(int PackagingMaterialId, int EntryUnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
+        IReadOnlyList<(int PackagingMaterialId, int? PackagingMaterialUnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
         CancellationToken cancellationToken);
 }

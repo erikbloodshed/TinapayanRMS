@@ -6,6 +6,8 @@
     <Application.Resources>
         <sys:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <converters:EmptyStateVisibilityConverter x:Key="EmptyStateVisibilityConverter" />
+        <converters:UnitsSummaryConverter x:Key="UnitsSummaryConverter" />
+        <converters:NotNullToVisibilityConverter x:Key="NotNullToVisibilityConverter" />
 
         <!--
             ButtonAdv.IconTemplate glyphs, Segoe Fluent Icons (Windows 11) falling back to
@@ -36,6 +38,18 @@
             <TextBlock Text="&#xE738;" Style="{StaticResource IconGlyphStyle}" />
         </DataTemplate>
 
+        <DataTemplate x:Key="CancelIconTemplate">
+            <TextBlock Text="&#xE711;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="EditIconTemplate">
+            <TextBlock Text="&#xE70F;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="CalculateIconTemplate">
+            <TextBlock Text="&#xE8EF;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
         <!--
             Design tokens for the app's own surfaces (cards, page background, banners). These
             are plain app resources, not Syncfusion theme resources — Syncfusion controls only
@@ -49,6 +63,9 @@
         <SolidColorBrush x:Key="HeadingForegroundBrush" Color="#1C1917" />
         <SolidColorBrush x:Key="MutedForegroundBrush" Color="#57534E" />
         <SolidColorBrush x:Key="AccentBrush" Color="#B45309" />
+        <SolidColorBrush x:Key="AccentSoftBrush" Color="#FEF3C7" />
+        <SolidColorBrush x:Key="SuccessBackgroundBrush" Color="#ECFDF5" />
+        <SolidColorBrush x:Key="SuccessForegroundBrush" Color="#047857" />
 
         <SolidColorBrush x:Key="ErrorBackgroundBrush" Color="#FEF2F2" />
         <SolidColorBrush x:Key="ErrorForegroundBrush" Color="#B91C1C" />

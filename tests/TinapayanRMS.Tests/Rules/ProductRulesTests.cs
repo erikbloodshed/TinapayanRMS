@@ -1,16 +1,11 @@
 using AwesomeAssertions;
 using TinapayanRMS.ApplicationCore.Rules;
-using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.Tests.Rules;
 
 public class ProductRulesTests
 {
-    private static readonly UnitOfMeasure Piece = new() { Id = 1, Name = "piece", Abbreviation = "pc" };
-    private static readonly UnitOfMeasure Centimeter = new() { Id = 2, Name = "centimeter", Abbreviation = "cm", IsLengthUnit = true, MillimetersPerUnit = 10m };
-    private static readonly UnitOfMeasure Inch = new() { Id = 3, Name = "inch", Abbreviation = "in", IsLengthUnit = true, MillimetersPerUnit = 25.4m };
-
     [Fact]
     public void EnsureValidUsages_accepts_an_empty_list()
     {
@@ -99,38 +94,6 @@ public class ProductRulesTests
     }
 
     [Fact]
-    public void EnsureValidEntryUnit_accepts_the_materials_own_standard_unit()
-    {
-        var act = () => ProductRules.EnsureValidEntryUnit(Piece, Piece);
-
-        act.Should().NotThrow();
-    }
-
-    [Fact]
-    public void EnsureValidEntryUnit_accepts_any_length_unit_when_the_standard_unit_is_a_length_unit()
-    {
-        var act = () => ProductRules.EnsureValidEntryUnit(Centimeter, Inch);
-
-        act.Should().NotThrow();
-    }
-
-    [Fact]
-    public void EnsureValidEntryUnit_rejects_a_length_unit_for_a_non_length_standard_unit()
-    {
-        var act = () => ProductRules.EnsureValidEntryUnit(Piece, Centimeter);
-
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void EnsureValidEntryUnit_rejects_a_non_length_unit_for_a_length_standard_unit()
-    {
-        var act = () => ProductRules.EnsureValidEntryUnit(Centimeter, Piece);
-
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
     public void ReconcileReciprocal_derives_PiecesPerPackagingUnit_from_an_authored_QtyPerPiece()
     {
         // A box: 6 pieces per box means 0.1667 (1/6) of the box per piece.
@@ -159,23 +122,31 @@ public class ProductRulesTests
     }
 
     [Fact]
-    public void CalculatePackagingLineCostPerPiece_matches_the_worked_example_with_no_unit_conversion()
+    public void CalculatePackagingLineCostPerPiece_matches_the_ribbon_worked_example()
     {
-        // A ribbon costs ₱45 per 1000cm roll (₱0.045/cm). 5 inches per piece = 12.7cm -> ₱0.5715.
+        // A ribbon costs ₱0.045/cm (₱45 per 1000cm roll), used at 12.7cm per piece -> ₱0.5715.
         var costPerPiece = ProductRules.CalculatePackagingLineCostPerPiece(
-            packagingMaterialCurrentCost: 45m, purchaseUnitQty: 1000m, qtyPerPiece: 5m,
-            entryUnit: Inch, standardUnit: Centimeter);
+            costPerBaseUnit: 0.045m, qtyPerPiece: 12.7m, baseUnitsPerEntryUnit: null);
 
         costPerPiece.Should().Be(0.5715m);
     }
 
     [Fact]
-    public void CalculatePackagingLineCostPerPiece_needs_no_conversion_when_entry_unit_matches_standard_unit()
+    public void CalculatePackagingLineCostPerPiece_converts_a_line_entered_in_an_alternative_unit()
     {
-        // A box costs ₱30 per 100-piece pack (₱0.30/piece), used one per finished piece.
+        // The same ribbon entered in metres (100 cm each): 0.127 m per piece -> 12.7 cm -> ₱0.5715.
         var costPerPiece = ProductRules.CalculatePackagingLineCostPerPiece(
-            packagingMaterialCurrentCost: 30m, purchaseUnitQty: 100m, qtyPerPiece: 1m,
-            entryUnit: Piece, standardUnit: Piece);
+            costPerBaseUnit: 0.045m, qtyPerPiece: 0.127m, baseUnitsPerEntryUnit: 100m);
+
+        costPerPiece.Should().Be(0.5715m);
+    }
+
+    [Fact]
+    public void CalculatePackagingLineCostPerPiece_matches_the_box_worked_example()
+    {
+        // A box costs ₱0.30/piece (₱30 per 100-piece pack), used one per finished piece.
+        var costPerPiece = ProductRules.CalculatePackagingLineCostPerPiece(
+            costPerBaseUnit: 0.3m, qtyPerPiece: 1m, baseUnitsPerEntryUnit: null);
 
         costPerPiece.Should().Be(0.3m);
     }

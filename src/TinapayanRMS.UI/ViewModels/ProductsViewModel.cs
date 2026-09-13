@@ -26,12 +26,13 @@ public class ProductUsageEdit(SubAssembly subAssembly, decimal weightPerPiece)
     public decimal CostPerPiece => ProductRules.CalculateUsageCostPerPiece(SubAssembly.TotalCost, WeightPerPiece, SubAssembly.TotalWeight);
 }
 
-/// <summary>An in-memory (not yet saved) packaging line, shown in the packaging editor grid.</summary>
-public class PackagingLineEdit(PackagingMaterial packagingMaterial, UnitOfMeasure entryUnit, PackagingLineAuthoredField authoredField, decimal authoredValue)
+/// <summary>An in-memory (not yet saved) packaging line, shown in the packaging editor grid: quantities in one of the material's units.</summary>
+public class PackagingLineEdit(PackagingMaterial packagingMaterial, PackagingUnitOption unit, PackagingLineAuthoredField authoredField, decimal authoredValue)
 {
     public PackagingMaterial PackagingMaterial { get; } = packagingMaterial;
 
-    public UnitOfMeasure EntryUnit { get; } = entryUnit;
+    /// <summary>The unit QtyPerPiece and PiecesPerPackagingUnit are in: the material's base unit or one of its alternative units.</summary>
+    public PackagingUnitOption Unit { get; } = unit;
 
     public PackagingLineAuthoredField AuthoredField { get; } = authoredField;
 
@@ -45,7 +46,7 @@ public class PackagingLineEdit(PackagingMaterial packagingMaterial, UnitOfMeasur
     public decimal PiecesPerPackagingUnit => Reciprocal.PiecesPerPackagingUnit;
 
     public decimal CostPerPiece => ProductRules.CalculatePackagingLineCostPerPiece(
-        PackagingMaterial.CurrentCost, PackagingMaterial.PurchaseUnitQty, QtyPerPiece, EntryUnit, PackagingMaterial.StandardUnit!);
+        PackagingMaterial.CostPerBaseUnit, QtyPerPiece, Unit.Unit?.BaseUnitsPerUnit);
 }
 
 /// <summary>A row in the Tab Links grid: a link plus the display name of the role it's for (or "Packaging").</summary>
@@ -80,10 +81,6 @@ public class ProductsViewModel : ViewModelBase
     public ObservableCollection<SubAssembly> SubAssembliesForSelectedRole { get; } = [];
 
     public ObservableCollection<PackagingMaterial> PackagingMaterials { get; } = [];
-
-    private readonly List<UnitOfMeasure> _allUnits = [];
-
-    public ObservableCollection<UnitOfMeasure> EntryUnitOptions { get; } = [];
 
     public IReadOnlyList<PackagingLineAuthoredField> AuthoredFieldOptions { get; } = Enum.GetValues<PackagingLineAuthoredField>();
 
@@ -170,11 +167,14 @@ public class ProductsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingLinePackagingMaterial, value);
     }
 
-    private UnitOfMeasure? _editingLineEntryUnit;
-    public UnitOfMeasure? EditingLineEntryUnit
+    /// <summary>The picked material's units, for the line editor's unit picker.</summary>
+    public ObservableCollection<PackagingUnitOption> EntryUnitOptions { get; } = [];
+
+    private PackagingUnitOption? _editingLineUnit;
+    public PackagingUnitOption? EditingLineUnit
     {
-        get => _editingLineEntryUnit;
-        set => this.RaiseAndSetIfChanged(ref _editingLineEntryUnit, value);
+        get => _editingLineUnit;
+        set => this.RaiseAndSetIfChanged(ref _editingLineUnit, value);
     }
 
     private PackagingLineAuthoredField _editingLineAuthoredField;
@@ -317,7 +317,6 @@ public class ProductsViewModel : ViewModelBase
         ISubAssemblyRepository subAssemblyRepository,
         ISubAssemblyRoleRepository subAssemblyRoleRepository,
         IPackagingMaterialRepository packagingMaterialRepository,
-        IUnitOfMeasureRepository unitOfMeasureRepository,
         IValidator<Product> productValidator,
         IValidator<CostingParameters> costingParametersValidator,
         ILogger logger)
@@ -373,15 +372,15 @@ public class ProductsViewModel : ViewModelBase
             .Switch()
             .Subscribe();
 
+        this.WhenAnyValue(x => x.EditingLinePackagingMaterial)
+            .Where(_ => !IsRefreshing)
+            .Subscribe(material => ReplaceEntryUnitOptions(material, keepUnitId: null));
+
         this.WhenAnyValue(x => x.EditingUsageRole)
             .Where(_ => !IsRefreshing)
             .Select(role => Observable.FromAsync(() => LoadUsagesForRoleAsync(role)))
             .Switch()
             .Subscribe();
-
-        this.WhenAnyValue(x => x.EditingLinePackagingMaterial)
-            .Where(_ => !IsRefreshing)
-            .Subscribe(material => RefreshEntryUnitOptions(material));
 
         this.WhenAnyValue(x => x.EditingLaborCost, x => x.EditingOverheadCost, x => x.EditingMarginPercent, x => x.EditingVatPercent)
             .Subscribe(_ => RecomputeSummary());
@@ -395,7 +394,6 @@ public class ProductsViewModel : ViewModelBase
             var roles = await subAssemblyRoleRepository.GetAllAsync(CancellationToken.None);
             var subAssemblies = await subAssemblyRepository.GetAllAsync(CancellationToken.None);
             var packagingMaterials = await packagingMaterialRepository.GetAllAsync(CancellationToken.None);
-            var units = await unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
             var products = await _productRepository.GetAllAsync(CancellationToken.None);
 
             // The selected product's saved usage costs and tab links can change on other tabs too
@@ -413,7 +411,7 @@ public class ProductsViewModel : ViewModelBase
             var usageRoleId = EditingUsageRole?.Id;
             var usageSubAssemblyId = EditingUsageSubAssembly?.Id;
             var linePackagingMaterialId = EditingLinePackagingMaterial?.Id;
-            var lineEntryUnitId = EditingLineEntryUnit?.Id;
+            var lineUnitId = EditingLineUnit?.UnitId;
             var linkRoleId = EditingLinkRole?.Id;
             var linkTargetId = EditingLinkTargetProduct?.Id;
 
@@ -422,8 +420,6 @@ public class ProductsViewModel : ViewModelBase
                 Roles.MergeFrom(roles, r => r.Id);
                 SubAssemblies.MergeFrom([.. subAssemblies.OrderBy(s => s.Name)], s => s.Id);
                 PackagingMaterials.MergeFrom([.. packagingMaterials.OrderBy(m => m.Name)], m => m.Id);
-                _allUnits.Clear();
-                _allUnits.AddRange(units);
                 _productCache.MergeFrom(products);
 
                 SelectedProduct = Products.FirstOrDefault(p => p.Id == selectedId);
@@ -432,9 +428,12 @@ public class ProductsViewModel : ViewModelBase
                 SubAssembliesForSelectedRole.MergeFrom([.. SubAssemblies.Where(s => s.RoleId == EditingUsageRole?.Id)], s => s.Id);
                 EditingUsageSubAssembly = SubAssembliesForSelectedRole.FirstOrDefault(s => s.Id == usageSubAssemblyId);
 
+                var previousLineMaterial = EditingLinePackagingMaterial;
                 EditingLinePackagingMaterial = PackagingMaterials.FirstOrDefault(m => m.Id == linePackagingMaterialId);
-                EntryUnitOptions.MergeFrom(EntryUnitOptionsFor(EditingLinePackagingMaterial), u => u.Id);
-                EditingLineEntryUnit = EntryUnitOptions.FirstOrDefault(u => u.Id == lineEntryUnitId);
+                if (!ReferenceEquals(previousLineMaterial, EditingLinePackagingMaterial))
+                {
+                    ReplaceEntryUnitOptions(EditingLinePackagingMaterial, lineUnitId);
+                }
 
                 EditingLinkRole = Roles.FirstOrDefault(r => r.Id == linkRoleId);
                 RefreshLinkTargetProductOptions();
@@ -530,12 +529,11 @@ public class ProductsViewModel : ViewModelBase
         AddLineCommand = ReactiveCommand.Create(
             () =>
             {
-                LineEdits.Add(new PackagingLineEdit(
-                    EditingLinePackagingMaterial!, EditingLineEntryUnit!, EditingLineAuthoredField, EditingLineAuthoredValue));
+                LineEdits.Add(new PackagingLineEdit(EditingLinePackagingMaterial!, EditingLineUnit!, EditingLineAuthoredField, EditingLineAuthoredValue));
                 RecomputeSummary();
             },
             this.WhenAnyValue(
-                x => x.EditingLinePackagingMaterial, x => x.EditingLineEntryUnit, x => x.EditingLineAuthoredValue, x => x.IsPackagingLinked,
+                x => x.EditingLinePackagingMaterial, x => x.EditingLineUnit, x => x.EditingLineAuthoredValue, x => x.IsPackagingLinked,
                 (material, unit, value, linked) => material is not null && unit is not null && value > 0 && !linked));
 
         RemoveLineCommand = ReactiveCommand.Create(
@@ -550,7 +548,7 @@ public class ProductsViewModel : ViewModelBase
             () => RunSafelyAsync(async () =>
             {
                 var lines = LineEdits
-                    .Select(l => (l.PackagingMaterial.Id, l.EntryUnit.Id, l.AuthoredField, l.AuthoredValue))
+                    .Select(l => (l.PackagingMaterial.Id, l.Unit.UnitId, l.AuthoredField, l.AuthoredValue))
                     .ToList();
                 await _packagingLineRepository.SetLinesAsync(SelectedProduct!.Id, lines, CancellationToken.None);
                 await LoadProductDetailAsync(SelectedProduct);
@@ -632,36 +630,18 @@ public class ProductsViewModel : ViewModelBase
             p => p.Id);
     }
 
-    /// <summary>Fills the entry-unit picker for a newly picked material, defaulting it to the material's own unit.</summary>
-    private void RefreshEntryUnitOptions(PackagingMaterial? material)
+    /// <summary>Fills the line editor's unit picker with <paramref name="material"/>'s units and picks the one with <paramref name="keepUnitId"/>, else its base unit.</summary>
+    private void ReplaceEntryUnitOptions(PackagingMaterial? material, int? keepUnitId)
     {
+        EditingLineUnit = null;
         EntryUnitOptions.Clear();
-        EditingLineEntryUnit = null;
-        EntryUnitOptions.AddRange(EntryUnitOptionsFor(material));
-        EditingLineEntryUnit = EntryUnitOptions.FirstOrDefault(u => u.Id == material?.StandardUnitId) ?? EntryUnitOptions.FirstOrDefault();
+        EntryUnitOptions.AddRange(PackagingUnitOption.For(material));
+        EditingLineUnit = EntryUnitOptions.FirstOrDefault(o => o.UnitId == keepUnitId) ?? EntryUnitOptions.FirstOrDefault();
     }
 
     /// <summary>
-    /// A packaging line's entry unit is the material's own standard unit, or — only when
-    /// that standard unit is itself a length unit — any other length unit
-    /// (ProductRules.EnsureValidEntryUnit).
-    /// </summary>
-    private List<UnitOfMeasure> EntryUnitOptionsFor(PackagingMaterial? material)
-    {
-        var standardUnit = material is null ? null : _allUnits.FirstOrDefault(u => u.Id == material.StandardUnitId);
-        if (standardUnit is null)
-        {
-            return [];
-        }
-
-        return standardUnit.IsLengthUnit
-            ? [.. _allUnits.Where(u => u.IsLengthUnit).OrderBy(u => u.Name)]
-            : [standardUnit];
-    }
-
-    /// <summary>
-    /// Points the unsaved usage and packaging rows at the refreshed sub-assemblies, materials and
-    /// units, keeping each row's own numbers, so their costs reflect prices changed on other tabs.
+    /// Points the unsaved usage and packaging rows at the refreshed sub-assemblies and materials,
+    /// keeping each row's own numbers, so their costs reflect prices changed on other tabs.
     /// A row whose sub-assembly or material didn't change is left alone.
     /// </summary>
     private void RefreshUnsavedRows()
@@ -687,15 +667,17 @@ public class ProductsViewModel : ViewModelBase
         {
             var edit = LineEdits[i];
             var material = PackagingMaterials.FirstOrDefault(m => m.Id == edit.PackagingMaterial.Id);
-            var entryUnit = _allUnits.FirstOrDefault(u => u.Id == edit.EntryUnit.Id);
-            if (material is null || entryUnit is null
-                || (CollectionMerge.HasSameValues(material, edit.PackagingMaterial) && CollectionMerge.HasSameValues(entryUnit, edit.EntryUnit)))
+            if (material is null || CollectionMerge.HasSameValues(material, edit.PackagingMaterial))
             {
                 continue;
             }
 
+            // The same unit on the refreshed material, or its base unit if that unit is gone.
+            var options = PackagingUnitOption.For(material);
+            var unit = options.FirstOrDefault(o => o.UnitId == edit.Unit.UnitId) ?? options[0];
+
             var wasSelected = ReferenceEquals(SelectedLineEdit, edit);
-            LineEdits[i] = new PackagingLineEdit(material, entryUnit, edit.AuthoredField, edit.AuthoredValue);
+            LineEdits[i] = new PackagingLineEdit(material, unit, edit.AuthoredField, edit.AuthoredValue);
             if (wasSelected)
             {
                 SelectedLineEdit = LineEdits[i];
@@ -737,7 +719,11 @@ public class ProductsViewModel : ViewModelBase
         var lines = await _packagingLineRepository.GetEffectiveForProductAsync(product.Id, CancellationToken.None);
         foreach (var line in lines)
         {
-            LineEdits.Add(new PackagingLineEdit(line.PackagingMaterial!, line.EntryUnit!, line.AuthoredField, line.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? line.QtyPerPiece : line.PiecesPerPackagingUnit));
+            LineEdits.Add(new PackagingLineEdit(
+                line.PackagingMaterial!,
+                new PackagingUnitOption(line.PackagingMaterialUnit, line.PackagingMaterial!.BaseUnit),
+                line.AuthoredField,
+                line.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? line.QtyPerPiece : line.PiecesPerPackagingUnit));
         }
 
         var costingParameters = await _costingParametersRepository.GetForProductAsync(product.Id, CancellationToken.None);

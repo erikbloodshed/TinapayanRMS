@@ -21,6 +21,7 @@
     <PackageReference Include="Syncfusion.SfInput.WPF" Version="34.2.7" />
     <PackageReference Include="Syncfusion.SfNavigationDrawer.WPF" Version="34.2.7" />
     <PackageReference Include="Syncfusion.SfSkinManager.WPF" Version="34.2.7" />
+    <PackageReference Include="Syncfusion.SfTextInputLayout.WPF" Version="34.2.7" />
     <PackageReference Include="Syncfusion.Themes.Windows11Light.WPF" Version="34.2.7" />
     <PackageReference Include="Syncfusion.Tools.WPF" Version="34.2.7" />
     <PackageReference Include="System.Reactive" Version="7.0.0" />

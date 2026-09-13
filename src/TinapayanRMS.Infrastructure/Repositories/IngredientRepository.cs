@@ -17,7 +17,8 @@ public class IngredientRepository(
         return await dbContext.Ingredients
             .AsNoTracking()
             .Include(i => i.IngredientCategory)
-            .Include(i => i.PurchaseUnit)
+            .Include(i => i.Units.OrderByDescending(u => u.GramsPerUnit))
+            .ThenInclude(u => u.UnitOfMeasure)
             .OrderBy(i => i.Name)
             .ToListAsync(cancellationToken);
     }
@@ -28,7 +29,8 @@ public class IngredientRepository(
         return await dbContext.Ingredients
             .AsNoTracking()
             .Include(i => i.IngredientCategory)
-            .Include(i => i.PurchaseUnit)
+            .Include(i => i.Units.OrderByDescending(u => u.GramsPerUnit))
+            .ThenInclude(u => u.UnitOfMeasure)
             .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
     }
 
@@ -52,20 +54,11 @@ public class IngredientRepository(
 
         IngredientRules.EnsureSourceUnchanged(existing.Source, ingredient.Source);
 
-        // Field by field, not a blind Update(): CurrentCost/CostPerGram are owned by the
-        // price-history and BOM rollups, not by this form.
+        // Field by field, not a blind Update(): CostPerGram is owned by the price-history and
+        // BOM rollups, and the units by IngredientUnitRepository, not by this form.
         existing.Name = ingredient.Name;
         existing.IngredientCategoryId = ingredient.IngredientCategoryId;
-        existing.PurchaseUnitId = ingredient.PurchaseUnitId;
-        existing.PurchaseUnitQty = ingredient.PurchaseUnitQty;
         existing.WeightLossPercent = ingredient.WeightLossPercent;
-
-        if (existing.Source == IngredientSource.Purchased)
-        {
-            // PurchaseUnitQty may have just changed with no new price entry —
-            // CostPerGram would otherwise stay stale against the old quantity.
-            IngredientRules.RecomputeCostPerGramFromCurrentCost(existing);
-        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

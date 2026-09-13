@@ -5,18 +5,26 @@ using DynamicData.Binding;
 using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI.ViewModels;
 
-/// <summary>An in-memory (not yet saved) sub-assembly line, shown in the lines editor grid.</summary>
-public class SubAssemblyLineEdit(Ingredient ingredient, decimal grams)
+/// <summary>An in-memory (not yet saved) sub-assembly line, shown in the lines editor grid: an amount of an ingredient in one of its units.</summary>
+public class SubAssemblyLineEdit(Ingredient ingredient, IngredientUnitOption unit, decimal quantity)
 {
     public Ingredient Ingredient { get; } = ingredient;
 
-    public decimal Grams { get; } = grams;
+    public IngredientUnitOption Unit { get; } = unit;
+
+    public decimal Quantity { get; } = quantity;
+
+    public decimal Grams => UnitConversionRules.ToBaseQuantity(Quantity, Unit.Unit?.GramsPerUnit);
+
+    /// <summary>What this line adds to the sub-assembly's total cost, at the ingredient's current cost per gram.</summary>
+    public decimal Cost => Grams * Ingredient.CostPerGram;
 }
 
 public class SubAssembliesViewModel : ViewModelBase
@@ -69,11 +77,21 @@ public class SubAssembliesViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingLineIngredient, value);
     }
 
-    private decimal _editingLineGrams;
-    public decimal EditingLineGrams
+    /// <summary>The picked ingredient's units, for the line editor's unit picker.</summary>
+    public ObservableCollection<IngredientUnitOption> LineUnitOptions { get; } = [];
+
+    private IngredientUnitOption? _editingLineUnit;
+    public IngredientUnitOption? EditingLineUnit
     {
-        get => _editingLineGrams;
-        set => this.RaiseAndSetIfChanged(ref _editingLineGrams, value);
+        get => _editingLineUnit;
+        set => this.RaiseAndSetIfChanged(ref _editingLineUnit, value);
+    }
+
+    private decimal _editingLineQuantity;
+    public decimal EditingLineQuantity
+    {
+        get => _editingLineQuantity;
+        set => this.RaiseAndSetIfChanged(ref _editingLineQuantity, value);
     }
 
     private SubAssemblyLineEdit? _selectedLineEdit;
@@ -161,8 +179,12 @@ public class SubAssembliesViewModel : ViewModelBase
             {
                 SelectedLineEdit = null;
                 EditingLineIngredient = null;
-                EditingLineGrams = 0m;
+                EditingLineQuantity = 0m;
             });
+
+        this.WhenAnyValue(x => x.EditingLineIngredient)
+            .Where(_ => !IsRefreshing)
+            .Subscribe(ingredient => ReplaceLineUnitOptions(ingredient, keepUnitId: null));
 
         this.WhenAnyValue(x => x.SelectedSubAssembly)
             .Where(_ => !IsRefreshing)
@@ -193,6 +215,7 @@ public class SubAssembliesViewModel : ViewModelBase
             var roleId = EditingRole?.Id;
             var panelRoleId = SelectedRole?.Id;
             var lineIngredientId = EditingLineIngredient?.Id;
+            var lineUnitId = EditingLineUnit?.UnitId;
 
             ApplyRefresh(() =>
             {
@@ -202,7 +225,15 @@ public class SubAssembliesViewModel : ViewModelBase
 
                 EditingRole = Roles.FirstOrDefault(r => r.Id == roleId);
                 SelectedRole = Roles.FirstOrDefault(r => r.Id == panelRoleId);
+
+                var previousLineIngredient = EditingLineIngredient;
                 EditingLineIngredient = Ingredients.FirstOrDefault(i => i.Id == lineIngredientId);
+                if (!ReferenceEquals(previousLineIngredient, EditingLineIngredient))
+                {
+                    // Its units changed (a unit added on the Ingredients tab): refill the picker, keeping the pick.
+                    ReplaceLineUnitOptions(EditingLineIngredient, lineUnitId);
+                }
+
                 SelectedSubAssembly = SubAssemblies.FirstOrDefault(s => s.Id == selectedId);
             });
         });
@@ -253,8 +284,9 @@ public class SubAssembliesViewModel : ViewModelBase
             this.WhenAnyValue(x => x.SelectedSubAssembly).Select(subAssembly => subAssembly is not null));
 
         AddLineCommand = ReactiveCommand.Create(
-            () => LineEdits.Add(new SubAssemblyLineEdit(EditingLineIngredient!, EditingLineGrams)),
-            this.WhenAnyValue(x => x.EditingLineIngredient, x => x.EditingLineGrams, (ingredient, grams) => ingredient is not null && grams > 0));
+            () => LineEdits.Add(new SubAssemblyLineEdit(EditingLineIngredient!, EditingLineUnit!, EditingLineQuantity)),
+            this.WhenAnyValue(x => x.EditingLineIngredient, x => x.EditingLineUnit, x => x.EditingLineQuantity,
+                (ingredient, unit, quantity) => ingredient is not null && unit is not null && quantity > 0));
 
         RemoveLineCommand = ReactiveCommand.Create(
             () => { LineEdits.Remove(SelectedLineEdit!); },
@@ -263,7 +295,7 @@ public class SubAssembliesViewModel : ViewModelBase
         SaveLinesCommand = ReactiveCommand.CreateFromTask(
             () => RunSafelyAsync(async () =>
             {
-                var lines = LineEdits.Select(l => (l.Ingredient.Id, l.Grams)).ToList();
+                var lines = LineEdits.Select(l => (l.Ingredient.Id, l.Unit.UnitId, l.Quantity)).ToList();
                 await _lineRepository.SetLinesAsync(SelectedSubAssembly!.Id, lines, CancellationToken.None);
                 await RefreshSelectedSubAssemblyAsync();
             }),
@@ -336,8 +368,22 @@ public class SubAssembliesViewModel : ViewModelBase
         var lines = await _lineRepository.GetForSubAssemblyAsync(subAssembly.Id, CancellationToken.None);
         foreach (var line in lines)
         {
-            LineEdits.Add(new SubAssemblyLineEdit(line.Ingredient!, line.Grams));
+            LineEdits.Add(new SubAssemblyLineEdit(line.Ingredient!, new IngredientUnitOption(line.IngredientUnit), line.Quantity));
         }
+    }
+
+    /// <summary>Fills the unit picker with <paramref name="ingredient"/>'s units and picks the one with <paramref name="keepUnitId"/>, else the gram.</summary>
+    private void ReplaceLineUnitOptions(Ingredient? ingredient, int? keepUnitId)
+    {
+        EditingLineUnit = null;
+        LineUnitOptions.Clear();
+        if (ingredient is null)
+        {
+            return;
+        }
+
+        LineUnitOptions.AddRange(IngredientUnitOption.For(ingredient));
+        EditingLineUnit = LineUnitOptions.FirstOrDefault(o => o.UnitId == keepUnitId) ?? LineUnitOptions[0];
     }
 
     /// <summary>

@@ -12,6 +12,8 @@ public class PackagingPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbCon
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         return await dbContext.PackagingPriceHistories
             .AsNoTracking()
+            .Include(h => h.PackagingMaterialUnit)
+            .ThenInclude(u => u!.UnitOfMeasure)
             .Where(h => h.PackagingMaterialId == packagingMaterialId)
             .OrderByDescending(h => h.Date)
             .ThenByDescending(h => h.Id)
@@ -27,6 +29,8 @@ public class PackagingPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbCon
         var packagingMaterial = await dbContext.PackagingMaterials.FirstOrDefaultAsync(p => p.Id == entry.PackagingMaterialId, cancellationToken)
             ?? throw new InvalidOperationException($"Packaging material {entry.PackagingMaterialId} does not exist.");
 
+        await EnsureUnitBelongsToMaterialAsync(dbContext, entry, cancellationToken);
+
         // Only the current latest entry can ever be displaced by the new one, so there's
         // no need to load the material's whole price history — a table that only grows
         // over the life of the app — just to find it.
@@ -38,9 +42,7 @@ public class PackagingPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbCon
 
         dbContext.PackagingPriceHistories.Add(entry);
 
-        PackagingPriceHistory[] candidates = currentLatest is null ? [entry] : [currentLatest, entry];
-        var latest = PriceHistoryRules.FindLatest(candidates);
-        PackagingMaterialRules.ApplyLatestPrice(packagingMaterial, latest);
+        await ApplyLatestPriceAsync(dbContext, packagingMaterial, PriceHistoryRules.FindLatestAfterAdding(currentLatest, entry), cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -54,17 +56,25 @@ public class PackagingPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbCon
         var packagingMaterial = await dbContext.PackagingMaterials.FirstOrDefaultAsync(p => p.Id == entry.PackagingMaterialId, cancellationToken)
             ?? throw new InvalidOperationException($"Packaging material {entry.PackagingMaterialId} does not exist.");
 
+        await EnsureUnitBelongsToMaterialAsync(dbContext, entry, cancellationToken);
+
+        // Field by field, not a blind Update(): the caller's entry may carry a PackagingMaterialUnit
+        // navigation loaded for display, which must not be attached and saved along with it.
+        var existing = await dbContext.PackagingPriceHistories
+            .FirstOrDefaultAsync(h => h.Id == entry.Id && h.PackagingMaterialId == entry.PackagingMaterialId, cancellationToken)
+            ?? throw new InvalidOperationException($"Price history entry {entry.Id} does not exist.");
+        existing.Date = entry.Date;
+        existing.PackagingMaterialUnitId = entry.PackagingMaterialUnitId;
+        existing.Price = entry.Price;
+
         var currentLatestOther = await dbContext.PackagingPriceHistories
             .Where(h => h.PackagingMaterialId == entry.PackagingMaterialId && h.Id != entry.Id)
             .OrderByDescending(h => h.Date)
             .ThenByDescending(h => h.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        dbContext.PackagingPriceHistories.Update(entry);
-
-        PackagingPriceHistory[] candidates = currentLatestOther is null ? [entry] : [currentLatestOther, entry];
-        var latest = PriceHistoryRules.FindLatest(candidates);
-        PackagingMaterialRules.ApplyLatestPrice(packagingMaterial, latest);
+        PackagingPriceHistory[] candidates = currentLatestOther is null ? [existing] : [currentLatestOther, existing];
+        await ApplyLatestPriceAsync(dbContext, packagingMaterial, PriceHistoryRules.FindLatest(candidates), cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -90,8 +100,34 @@ public class PackagingPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbCon
 
         dbContext.PackagingPriceHistories.Remove(entry);
 
-        PackagingMaterialRules.ApplyLatestPrice(packagingMaterial, latest);
+        await ApplyLatestPriceAsync(dbContext, packagingMaterial, latest, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>A price's unit must be one of that material's own units (or none, for a price per base unit).</summary>
+    private static async Task EnsureUnitBelongsToMaterialAsync(TinapayanRMSDbContext dbContext, PackagingPriceHistory entry, CancellationToken cancellationToken)
+    {
+        if (entry.PackagingMaterialUnitId is not { } unitId)
+        {
+            return;
+        }
+
+        var belongs = await dbContext.PackagingMaterialUnits.AnyAsync(u => u.Id == unitId && u.PackagingMaterialId == entry.PackagingMaterialId, cancellationToken);
+        if (!belongs)
+        {
+            throw new InvalidOperationException("A price's unit must be one of that material's own units.");
+        }
+    }
+
+    /// <summary>CostPerBaseUnit from <paramref name="latest"/>'s price and the base units in the unit it was priced in.</summary>
+    private static async Task ApplyLatestPriceAsync(
+        TinapayanRMSDbContext dbContext, PackagingMaterial packagingMaterial, PackagingPriceHistory? latest, CancellationToken cancellationToken)
+    {
+        decimal? baseUnitsPerUnit = latest?.PackagingMaterialUnitId is { } unitId
+            ? await dbContext.PackagingMaterialUnits.Where(u => u.Id == unitId).Select(u => u.BaseUnitsPerUnit).SingleAsync(cancellationToken)
+            : null;
+
+        PackagingMaterialRules.ApplyLatestPrice(packagingMaterial, latest?.Price, baseUnitsPerUnit);
     }
 }

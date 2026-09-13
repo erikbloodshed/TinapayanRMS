@@ -18,7 +18,11 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
 
+    public DbSet<IngredientUnit> IngredientUnits => Set<IngredientUnit>();
+
     public DbSet<PackagingMaterial> PackagingMaterials => Set<PackagingMaterial>();
+
+    public DbSet<PackagingMaterialUnit> PackagingMaterialUnits => Set<PackagingMaterialUnit>();
 
     public DbSet<IngredientPriceHistory> IngredientPriceHistories => Set<IngredientPriceHistory>();
 

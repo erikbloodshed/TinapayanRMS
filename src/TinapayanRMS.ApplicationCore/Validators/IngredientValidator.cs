@@ -19,16 +19,11 @@ public class IngredientValidator : AbstractValidator<Ingredient>
 
         When(i => i.Source == IngredientSource.Purchased, () =>
         {
-            RuleFor(i => i.PurchaseUnitId).NotNull().WithMessage("A purchased ingredient needs a purchase unit.");
-            RuleFor(i => i.PurchaseUnitQty).NotNull().GreaterThan(0m).WithMessage("A purchased ingredient needs a positive purchase quantity.");
             RuleFor(i => i.WeightLossPercent).Null().WithMessage("A purchased ingredient has no weight loss percent.");
         });
 
         When(i => i.Source == IngredientSource.Made, () =>
         {
-            RuleFor(i => i.PurchaseUnitId).Null().WithMessage("A made ingredient has no purchase unit.");
-            RuleFor(i => i.PurchaseUnitQty).Null().WithMessage("A made ingredient has no purchase quantity.");
-            RuleFor(i => i.CurrentCost).Null().WithMessage("A made ingredient has no price.");
             RuleFor(i => i.WeightLossPercent)
                 .NotNull().WithMessage("A made ingredient needs a weight loss percent.");
             RuleFor(i => i.WeightLossPercent!.Value)

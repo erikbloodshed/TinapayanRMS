@@ -15,19 +15,15 @@ public class PackagingLine
 
     public PackagingMaterial? PackagingMaterial { get; set; }
 
-    /// <summary>
-    /// The unit this line's quantities are entered in: the material's own StandardUnit,
-    /// or — only when that standard unit is itself a length unit — any of the four
-    /// length units (TinapayanRMS.ApplicationCore.ProductRules.EnsureValidEntryUnit).
-    /// </summary>
-    public int EntryUnitId { get; set; }
+    /// <summary>The unit this line's quantities are entered in: one of the material's own units, or null for its base unit.</summary>
+    public int? PackagingMaterialUnitId { get; set; }
 
-    public UnitOfMeasure? EntryUnit { get; set; }
+    public PackagingMaterialUnit? PackagingMaterialUnit { get; set; }
 
-    /// <summary>Amount of the packaging material, in EntryUnit, used by one finished piece.</summary>
+    /// <summary>Amount of the packaging material, in the line's unit, used by one finished piece.</summary>
     public decimal QtyPerPiece { get; set; }
 
-    /// <summary>Finished pieces served by one EntryUnit of the packaging material — exactly 1 / QtyPerPiece.</summary>
+    /// <summary>Finished pieces served by one of the line's unit of the packaging material — exactly 1 / QtyPerPiece.</summary>
     public decimal PiecesPerPackagingUnit { get; set; }
 
     /// <summary>Which of the two fields above the user typed; the other is recalculated from it on every edit.</summary>

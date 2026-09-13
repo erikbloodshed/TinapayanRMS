@@ -80,4 +80,31 @@ public class PriceHistoryRulesTests
     {
         PriceHistoryRules.FindLatest(Array.Empty<IngredientPriceHistory>()).Should().BeNull();
     }
+
+    [Fact]
+    public void FindLatestAfterAdding_picks_an_unsaved_entry_on_the_same_date_as_the_current_latest()
+    {
+        // The unsaved entry's id is still 0, but it will be the most recently added once saved.
+        var currentLatest = new IngredientPriceHistory { Id = 11, Date = new DateOnly(2026, 9, 13), Price = 13500m };
+        var added = new IngredientPriceHistory { Date = new DateOnly(2026, 9, 13), Price = 13600m };
+
+        PriceHistoryRules.FindLatestAfterAdding(currentLatest, added).Should().BeSameAs(added);
+    }
+
+    [Fact]
+    public void FindLatestAfterAdding_keeps_the_current_latest_when_the_added_entry_is_older()
+    {
+        var currentLatest = new IngredientPriceHistory { Id = 11, Date = new DateOnly(2026, 9, 13), Price = 13500m };
+        var added = new IngredientPriceHistory { Date = new DateOnly(2026, 9, 1), Price = 13000m };
+
+        PriceHistoryRules.FindLatestAfterAdding(currentLatest, added).Should().BeSameAs(currentLatest);
+    }
+
+    [Fact]
+    public void FindLatestAfterAdding_picks_the_added_entry_when_there_is_no_other()
+    {
+        var added = new IngredientPriceHistory { Date = new DateOnly(2026, 9, 1), Price = 13000m };
+
+        PriceHistoryRules.FindLatestAfterAdding(null, added).Should().BeSameAs(added);
+    }
 }

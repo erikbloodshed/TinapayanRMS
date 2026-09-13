@@ -26,12 +26,37 @@ public class CollectionMergeTests
     }
 
     [Fact]
-    public void HasSameValues_ignores_collections()
+    public void HasSameValues_is_true_when_an_owned_collection_holds_the_same_values()
     {
-        var withHistory = Row(1, "Flour", 930m, "bag");
-        withHistory.History.Add(new TestUnit { Id = 9, Name = "old" });
+        var a = Row(1, "Flour", 930m, "bag");
+        a.Units.Add(OwnedUnit(9, "pack", 1000m));
+        var b = Row(1, "Flour", 930m, "bag");
+        b.Units.Add(OwnedUnit(9, "pack", 1000m));
 
-        CollectionMerge.HasSameValues(withHistory, Row(1, "Flour", 930m, "bag")).Should().BeTrue();
+        CollectionMerge.HasSameValues(a, b).Should().BeTrue();
+    }
+
+    [Fact]
+    public void HasSameValues_detects_an_added_element_in_an_owned_collection()
+    {
+        var withPack = Row(1, "Flour", 930m, "bag");
+        withPack.Units.Add(OwnedUnit(9, "pack", 1000m));
+
+        CollectionMerge.HasSameValues(withPack, Row(1, "Flour", 930m, "bag")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void HasSameValues_detects_a_change_inside_an_owned_collection_element_and_what_it_references()
+    {
+        var a = Row(1, "Flour", 930m, "bag");
+        a.Units.Add(OwnedUnit(9, "pack", 1000m));
+        var renamed = Row(1, "Flour", 930m, "bag");
+        renamed.Units.Add(OwnedUnit(9, "packet", 1000m));
+        var resized = Row(1, "Flour", 930m, "bag");
+        resized.Units.Add(OwnedUnit(9, "pack", 500m));
+
+        CollectionMerge.HasSameValues(a, renamed).Should().BeFalse();
+        CollectionMerge.HasSameValues(a, resized).Should().BeFalse();
     }
 
     [Fact]
@@ -83,6 +108,9 @@ public class CollectionMergeTests
     private static TestRow Row(int id, string name, decimal cost, string unitName) =>
         new() { Id = id, Name = name, Cost = cost, Unit = new TestUnit { Id = 100, Name = unitName } };
 
+    private static TestOwnedUnit OwnedUnit(int id, string unitName, decimal multiplier) =>
+        new() { Id = id, Multiplier = multiplier, Unit = new TestUnit { Id = 200, Name = unitName } };
+
     public sealed class TestRow
     {
         public int Id { get; set; }
@@ -93,7 +121,7 @@ public class CollectionMergeTests
 
         public TestUnit? Unit { get; set; }
 
-        public List<TestUnit> History { get; } = [];
+        public List<TestOwnedUnit> Units { get; } = [];
     }
 
     public sealed class TestUnit
@@ -101,5 +129,15 @@ public class CollectionMergeTests
         public int Id { get; set; }
 
         public string Name { get; set; } = string.Empty;
+    }
+
+    /// <summary>Shaped like IngredientUnit: an owned row that references a unit of measure.</summary>
+    public sealed class TestOwnedUnit
+    {
+        public int Id { get; set; }
+
+        public decimal Multiplier { get; set; }
+
+        public TestUnit? Unit { get; set; }
     }
 }

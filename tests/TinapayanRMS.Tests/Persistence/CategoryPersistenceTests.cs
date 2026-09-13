@@ -115,7 +115,6 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         var repository = CreateIngredientCategoryRepository();
         await repository.AddAsync(new IngredientCategory { Name = "Flour" }, Cancellation);
         var category = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
-        var unitId = await SeedUnitOfMeasureAsync("piece", "pc");
 
         await using (var dbContext = CreateDbContext())
         {
@@ -124,8 +123,6 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
                 Name = "All-Purpose Flour",
                 IngredientCategoryId = category.Id,
                 Source = IngredientSource.Purchased,
-                PurchaseUnitId = unitId,
-                PurchaseUnitQty = 25000m,
             });
             await dbContext.SaveChangesAsync(Cancellation);
         }
@@ -179,8 +176,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         var repository = CreatePackagingCategoryRepository();
         await repository.AddAsync(new PackagingCategory { Name = "Ribbons" }, Cancellation);
         var category = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
-        var standardUnitId = await SeedUnitOfMeasureAsync("centimeter", "cm", isLengthUnit: true, millimetersPerUnit: 10m);
-        var purchaseUnitId = await SeedUnitOfMeasureAsync("piece", "pc");
+        var baseUnitId = await SeedUnitOfMeasureAsync("centimeter", "cm");
 
         await using (var dbContext = CreateDbContext())
         {
@@ -188,9 +184,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
             {
                 Name = "Satin Ribbon",
                 PackagingCategoryId = category.Id,
-                StandardUnitId = standardUnitId,
-                PurchaseUnitId = purchaseUnitId,
-                PurchaseUnitQty = 1000m,
+                BaseUnitId = baseUnitId,
             });
             await dbContext.SaveChangesAsync(Cancellation);
         }

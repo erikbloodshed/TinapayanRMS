@@ -20,10 +20,5 @@ public class IngredientConfiguration : IEntityTypeConfiguration<Ingredient>
             .WithMany()
             .HasForeignKey(i => i.IngredientCategoryId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(i => i.PurchaseUnit)
-            .WithMany()
-            .HasForeignKey(i => i.PurchaseUnitId)
-            .OnDelete(DeleteBehavior.Restrict);
     }
 }

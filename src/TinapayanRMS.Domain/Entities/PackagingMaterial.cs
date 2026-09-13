@@ -10,19 +10,21 @@ public class PackagingMaterial
 
     public PackagingCategory? PackagingCategory { get; set; }
 
-    /// <summary>Piece, or a length unit for ribbon-like materials (TinapayanRMS.ApplicationCore.PackagingMaterialRules).</summary>
-    public int StandardUnitId { get; set; }
+    /// <summary>
+    /// The unit its quantities and cost are tracked in, chosen per material: typically a piece for
+    /// boxes, a length for ribbon. Fixed once the material has alternative units, prices or
+    /// packaging lines, which are all measured against it.
+    /// </summary>
+    public int BaseUnitId { get; set; }
 
-    public UnitOfMeasure? StandardUnit { get; set; }
+    public UnitOfMeasure? BaseUnit { get; set; }
 
-    /// <summary>The unit it's bought in.</summary>
-    public int PurchaseUnitId { get; set; }
+    /// <summary>
+    /// Stored rather than computed, like Ingredient.CostPerGram: the latest price divided by the base
+    /// units in that price's unit. 0 until priced.
+    /// </summary>
+    public decimal CostPerBaseUnit { get; set; }
 
-    public UnitOfMeasure? PurchaseUnit { get; set; }
-
-    /// <summary>Standard units per purchase unit (e.g. 1000 for a 1000cm ribbon roll).</summary>
-    public decimal PurchaseUnitQty { get; set; }
-
-    /// <summary>The latest price, per purchase unit, from PackagingPriceHistory (Phase 5).</summary>
-    public decimal CurrentCost { get; set; }
+    /// <summary>The units it's bought or used in besides its base unit.</summary>
+    public List<PackagingMaterialUnit> Units { get; set; } = [];
 }

@@ -1,4 +1,3 @@
-using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.ApplicationCore.Rules;
@@ -51,22 +50,6 @@ public static class ProductRules
         }
     }
 
-    /// <summary>A packaging line's entry unit must be the material's own standard unit, or — only when that standard unit is itself a length unit — another length unit.</summary>
-    public static void EnsureValidEntryUnit(UnitOfMeasure packagingMaterialStandardUnit, UnitOfMeasure entryUnit)
-    {
-        if (entryUnit.Id == packagingMaterialStandardUnit.Id)
-        {
-            return;
-        }
-
-        if (packagingMaterialStandardUnit.IsLengthUnit && entryUnit.IsLengthUnit)
-        {
-            return;
-        }
-
-        throw new InvalidOperationException("A packaging line's entry unit must be the material's standard unit, or another length unit if the material is measured in length.");
-    }
-
     /// <summary>Derives QtyPerPiece and PiecesPerPackagingUnit — exact reciprocals of each other — from whichever one the user actually typed.</summary>
     public static (decimal QtyPerPiece, decimal PiecesPerPackagingUnit) ReconcileReciprocal(
         PackagingLineAuthoredField authoredField, decimal authoredValue) =>
@@ -77,13 +60,13 @@ public static class ProductRules
             _ => throw new ArgumentOutOfRangeException(nameof(authoredField)),
         };
 
-    /// <summary>Cost of one packaging line per finished piece, converting the entry-unit quantity to the material's standard unit first (a no-op when they're the same unit).</summary>
-    public static decimal CalculatePackagingLineCostPerPiece(
-        decimal packagingMaterialCurrentCost, decimal purchaseUnitQty, decimal qtyPerPiece, UnitOfMeasure entryUnit, UnitOfMeasure standardUnit)
-    {
-        var qtyInStandardUnit = LengthConversion.Convert(qtyPerPiece, entryUnit, standardUnit);
-        return packagingMaterialCurrentCost / purchaseUnitQty * qtyInStandardUnit;
-    }
+    /// <summary>
+    /// Cost of one packaging line per finished piece: QtyPerPiece, in the line's unit, converted to
+    /// the material's base units (<paramref name="baseUnitsPerEntryUnit"/>, null when the line is in
+    /// the base unit), at the material's cost per base unit.
+    /// </summary>
+    public static decimal CalculatePackagingLineCostPerPiece(decimal costPerBaseUnit, decimal qtyPerPiece, decimal? baseUnitsPerEntryUnit) =>
+        costPerBaseUnit * UnitConversionRules.ToBaseQuantity(qtyPerPiece, baseUnitsPerEntryUnit);
 
     /// <summary>A product's total material cost per piece: every sub-assembly usage's cost-per-piece, plus every packaging line's cost-per-piece.</summary>
     public static decimal CalculateMaterialCostPerPiece(IReadOnlyList<decimal> usageCostsPerPiece, IReadOnlyList<decimal> packagingCostsPerPiece) =>

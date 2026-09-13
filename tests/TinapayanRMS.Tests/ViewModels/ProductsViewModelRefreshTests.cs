@@ -74,7 +74,6 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             new SubAssemblyRepository(factory),
             new SubAssemblyRoleRepository(factory),
             new PackagingMaterialRepository(factory),
-            new UnitOfMeasureRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),
             new LoggerConfiguration().CreateLogger());

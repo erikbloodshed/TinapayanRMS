@@ -16,12 +16,15 @@ public static class CollectionMerge
 {
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> ScalarProperties = new();
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> ReferenceProperties = new();
+    private static readonly ConcurrentDictionary<Type, PropertyInfo[]> CollectionProperties = new();
 
     /// <summary>
     /// Whether two copies of a row hold the same values: every scalar property (numbers, text,
     /// enums, dates), plus the scalar properties of each entity it references, one level deep, so
-    /// a renamed unit shows up as a change to the ingredient that displays its abbreviation.
-    /// Collections are ignored.
+    /// a renamed category shows up as a change to the ingredient that displays it. A collection the
+    /// row owns (an ingredient's Units) counts as part of the row: its elements are compared in
+    /// order, each the same way as the row itself, so an added unit or a renamed unit of measure
+    /// shows up as a change to the ingredient too.
     /// </summary>
     public static bool HasSameValues(object? a, object? b) => HasSameValues(a, b, referenceDepth: 1);
 
@@ -107,7 +110,44 @@ public static class CollectionMerge
             }
         }
 
+        foreach (var property in CollectionProperties.GetOrAdd(type, FindCollectionProperties))
+        {
+            if (!HaveSameElements((IEnumerable?)property.GetValue(a), (IEnumerable?)property.GetValue(b), referenceDepth))
+            {
+                return false;
+            }
+        }
+
         return true;
+    }
+
+    private static bool HaveSameElements(IEnumerable? a, IEnumerable? b, int referenceDepth)
+    {
+        if (a is null || b is null)
+        {
+            return a is null && b is null;
+        }
+
+        var left = a.GetEnumerator();
+        var right = b.GetEnumerator();
+        while (true)
+        {
+            var hasLeft = left.MoveNext();
+            if (hasLeft != right.MoveNext())
+            {
+                return false;
+            }
+
+            if (!hasLeft)
+            {
+                return true;
+            }
+
+            if (!HasSameValues(left.Current, right.Current, referenceDepth))
+            {
+                return false;
+            }
+        }
     }
 
     private static PropertyInfo[] FindScalarProperties(Type type) =>
@@ -115,6 +155,9 @@ public static class CollectionMerge
 
     private static PropertyInfo[] FindReferenceProperties(Type type) =>
         [.. ReadableProperties(type).Where(p => !IsScalar(p.PropertyType) && p.PropertyType.IsClass && !typeof(IEnumerable).IsAssignableFrom(p.PropertyType))];
+
+    private static PropertyInfo[] FindCollectionProperties(Type type) =>
+        [.. ReadableProperties(type).Where(p => !IsScalar(p.PropertyType) && typeof(IEnumerable).IsAssignableFrom(p.PropertyType))];
 
     private static IEnumerable<PropertyInfo> ReadableProperties(Type type) =>
         type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanRead && p.GetIndexParameters().Length == 0);

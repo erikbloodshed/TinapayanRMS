@@ -24,12 +24,21 @@ public static class PriceHistoryRules
         (enteredPrice ?? 0m) != (currentPrice ?? 0m);
 
     /// <summary>
-    /// The entry CurrentCost is recalculated from: the latest by date, and among
-    /// same-dated entries, the most recently added (highest id).
+    /// The entry an item's cost is recalculated from: the latest by date, and among
+    /// same-dated entries, the most recently added (highest id). Only for saved entries;
+    /// use FindLatestAfterAdding for one that hasn't been given an id yet.
     /// </summary>
     public static T? FindLatest<T>(IEnumerable<T> entries) where T : IPriceHistoryEntry =>
         entries
             .OrderByDescending(e => e.Date)
             .ThenByDescending(e => e.Id)
             .FirstOrDefault();
+
+    /// <summary>
+    /// The latest entry once <paramref name="added"/> is saved. It will get the highest id, so it
+    /// also wins a tie on date — which FindLatest can't tell while its id is still 0. (It used to
+    /// be asked anyway, so a second price entered on the same day never became the current one.)
+    /// </summary>
+    public static T FindLatestAfterAdding<T>(T? currentLatest, T added) where T : class, IPriceHistoryEntry =>
+        currentLatest is null || added.Date >= currentLatest.Date ? added : currentLatest;
 }

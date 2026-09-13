@@ -10,5 +10,8 @@ public partial class PackagingMaterialsView : UserControl
         InitializeComponent();
         DataContext = viewModel;
         viewModel.RegisterNativeMessageBoxHandler();
+
+        // New clears the form; put the cursor in Name so typing can start straight away.
+        viewModel.NewCommand.Subscribe(_ => NameTextBox.Focus());
     }
 }

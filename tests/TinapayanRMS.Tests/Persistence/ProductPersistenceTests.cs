@@ -52,10 +52,9 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         {
             Name = name,
             PackagingCategoryId = categoryId,
-            StandardUnitId = standardUnitId,
-            PurchaseUnitId = await GetOrCreateUnitOfMeasureAsync("piece", "pc"),
-            PurchaseUnitQty = purchaseUnitQty,
-            CurrentCost = currentCost,
+            BaseUnitId = standardUnitId,
+            // Priced as currentCost per purchaseUnitQty base units, as these tests were written.
+            CostPerBaseUnit = currentCost / purchaseUnitQty,
         };
         dbContext.PackagingMaterials.Add(material);
         await dbContext.SaveChangesAsync(Cancellation);
@@ -142,6 +141,55 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     }
 
     [Fact]
+    public async Task SetLinesAsync_stores_a_line_entered_in_one_of_the_materials_units()
+    {
+        var categoryId = await SeedPackagingCategoryAsync("Ribbons");
+        var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm");
+        var meterUnitOfMeasureId = await SeedUnitOfMeasureAsync("meter", "m");
+        var ribbonId = await SeedPackagingMaterialAsync("Satin Ribbon", categoryId, centimeterId, purchaseUnitQty: 1000m, currentCost: 45m);
+        var meterId = await AddPackagingMaterialUnitAsync(ribbonId, meterUnitOfMeasureId, baseUnitsPerUnit: 100m);
+        var productId = await SeedProductAsync("Gift Box Set");
+
+        await CreatePackagingLineRepository().SetLinesAsync(productId,
+        [
+            (ribbonId, meterId, PackagingLineAuthoredField.QtyPerPiece, 0.127m),
+        ], Cancellation);
+
+        var line = (await CreatePackagingLineRepository().GetEffectiveForProductAsync(productId, Cancellation)).Should().ContainSingle().Subject;
+        line.QtyPerPiece.Should().Be(0.127m, "quantities are stored as entered, in the line's unit");
+        line.PackagingMaterialUnit!.UnitOfMeasure!.Abbreviation.Should().Be("m");
+        line.PackagingMaterial!.Units.Should().ContainSingle("the Products editor needs the material's units");
+    }
+
+    [Fact]
+    public async Task SetLinesAsync_rejects_a_unit_that_belongs_to_another_material()
+    {
+        var categoryId = await SeedPackagingCategoryAsync("Ribbons");
+        var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm");
+        var meterUnitOfMeasureId = await SeedUnitOfMeasureAsync("meter", "m");
+        var ribbonId = await SeedPackagingMaterialAsync("Satin Ribbon", categoryId, centimeterId, purchaseUnitQty: 1000m, currentCost: 45m);
+        var twineId = await SeedPackagingMaterialAsync("Twine", categoryId, centimeterId, purchaseUnitQty: 1000m, currentCost: 20m);
+        var twineMeterId = await AddPackagingMaterialUnitAsync(twineId, meterUnitOfMeasureId, baseUnitsPerUnit: 100m);
+        var productId = await SeedProductAsync("Gift Box Set");
+
+        var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
+        [
+            (ribbonId, twineMeterId, PackagingLineAuthoredField.QtyPerPiece, 0.127m),
+        ], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    private async Task<int> AddPackagingMaterialUnitAsync(int packagingMaterialId, int unitOfMeasureId, decimal baseUnitsPerUnit)
+    {
+        await using var dbContext = CreateDbContext();
+        var unit = new PackagingMaterialUnit { PackagingMaterialId = packagingMaterialId, UnitOfMeasureId = unitOfMeasureId, BaseUnitsPerUnit = baseUnitsPerUnit };
+        dbContext.PackagingMaterialUnits.Add(unit);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return unit.Id;
+    }
+
+    [Fact]
     public async Task SetLinesAsync_stores_lines_and_derives_the_reciprocal_field()
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
@@ -152,7 +200,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         // Authored as "6 pieces per box".
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
         ], Cancellation);
 
         var lines = await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation);
@@ -161,45 +209,8 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         // The repository computes the full-precision reciprocal (1/6 = 0.1666...), but the
         // decimal(18,4) column rounds it to 4 places on the round trip through SQL Server.
         line.QtyPerPiece.Should().Be(0.1667m);
-        line.PackagingMaterial.Should().NotBeNull();
-        line.EntryUnit.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task SetLinesAsync_accepts_a_ribbon_entered_in_a_different_length_unit_than_its_standard_unit()
-    {
-        var categoryId = await SeedPackagingCategoryAsync("Ribbons");
-        var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm", isLengthUnit: true, millimetersPerUnit: 10m);
-        var inchId = await SeedUnitOfMeasureAsync("inch", "in", isLengthUnit: true, millimetersPerUnit: 25.4m);
-        var ribbonId = await SeedPackagingMaterialAsync("Satin Ribbon", categoryId, centimeterId, purchaseUnitQty: 1000m, currentCost: 45m);
-        var productId = await SeedProductAsync("Special Box Set");
-
-        await CreatePackagingLineRepository().SetLinesAsync(productId,
-        [
-            (ribbonId, inchId, PackagingLineAuthoredField.QtyPerPiece, 5m),
-        ], Cancellation);
-
-        var lines = await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation);
-        var line = lines.Should().ContainSingle().Subject;
-        line.QtyPerPiece.Should().Be(5m);
-        line.EntryUnit!.Id.Should().Be(inchId);
-    }
-
-    [Fact]
-    public async Task SetLinesAsync_rejects_an_entry_unit_that_does_not_match_a_piece_standard_unit()
-    {
-        var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
-        var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm", isLengthUnit: true, millimetersPerUnit: 10m);
-        var productId = await SeedProductAsync("Ensaymada");
-
-        var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
-        [
-            (boxId, centimeterId, PackagingLineAuthoredField.QtyPerPiece, 1m),
-        ], Cancellation);
-
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        // The line's quantities are in the material's standard unit, which the Products grid shows.
+        line.PackagingMaterial!.BaseUnit!.Id.Should().Be(pieceId);
     }
 
     [Fact]
@@ -212,8 +223,8 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
-            (boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m),
+            (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -228,7 +239,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         var productId = await SeedProductAsync("Ensaymada");
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
         ], Cancellation);
 
         await using var dbContext = CreateDbContext();
@@ -250,7 +261,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await CreateUsageRepository().SetUsagesForRoleAsync(productId, roleId, [(subAssemblyId, 10m)], Cancellation);
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
         ], Cancellation);
         await CreateCostingParametersRepository().SetAsync(productId, laborCost: 5m, overheadCost: 3m, marginPercent: 40m, vatPercent: 12m, Cancellation);
 
@@ -352,7 +363,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(999_999,
         [
-            (boxId, pieceId, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -365,7 +376,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (999_999, 999_998, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (999_999, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();

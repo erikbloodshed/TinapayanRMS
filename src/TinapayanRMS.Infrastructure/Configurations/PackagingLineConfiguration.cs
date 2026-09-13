@@ -20,9 +20,10 @@ public class PackagingLineConfiguration : IEntityTypeConfiguration<PackagingLine
             .HasForeignKey(l => l.PackagingMaterialId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(l => l.EntryUnit)
+        // A material's unit can't be deleted while a line is entered in it.
+        builder.HasOne(l => l.PackagingMaterialUnit)
             .WithMany()
-            .HasForeignKey(l => l.EntryUnitId)
+            .HasForeignKey(l => l.PackagingMaterialUnitId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(l => new { l.ProductId, l.PackagingMaterialId }).IsUnique();
