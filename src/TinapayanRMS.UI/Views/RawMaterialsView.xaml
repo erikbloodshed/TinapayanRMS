@@ -367,7 +367,7 @@
                                 Visibility="{Binding ShowPurchaseSetup, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <StackPanel>
                                 <TextBlock Text="Purchase Cost Setup" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-                                <TextBlock Text="Enter the purchase price for one unit. The system works out the cost per base unit."
+                                <TextBlock Text="Enter the purchase price for one unit. The system works out the cost per base unit. A unit marked new is added as an alternative unit when picked."
                                            Style="{StaticResource CardCaptionStyle}" />
 
                                 <Grid>
@@ -378,9 +378,24 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
                                         <TextBlock Text="Purchase Unit" Style="{StaticResource FieldLabelStyle}" />
+                                        <!-- Units the material doesn't have yet are tagged "new": picking one adds it as an alternative unit.
+                                             The ItemTemplate only draws the dropdown; the closed box shows the option's text
+                                             (RawMaterialUnitOption.ToString), which is its name. -->
                                         <syncfusion:ComboBoxAdv ItemsSource="{Binding PurchaseUnitOptions}"
-                                                                DisplayMemberPath="Name"
-                                                                SelectedItem="{Binding EditingPurchaseUnit, Mode=TwoWay}" />
+                                                                SelectedItem="{Binding EditingPurchaseUnit, Mode=TwoWay}">
+                                            <syncfusion:ComboBoxAdv.ItemTemplate>
+                                                <DataTemplate>
+                                                    <DockPanel>
+                                                        <TextBlock DockPanel.Dock="Right"
+                                                                   Text="new"
+                                                                   Margin="12,0,0,0"
+                                                                   Foreground="{StaticResource MutedForegroundBrush}"
+                                                                   Visibility="{Binding IsNew, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                        <TextBlock Text="{Binding Name}" />
+                                                    </DockPanel>
+                                                </DataTemplate>
+                                            </syncfusion:ComboBoxAdv.ItemTemplate>
+                                        </syncfusion:ComboBoxAdv>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
                                         <TextBlock Text="Purchase Price" Style="{StaticResource FieldLabelStyle}" />
@@ -408,9 +423,11 @@
                                             Background="{StaticResource PageBackgroundBrush}">
                                         <TextBlock Text="{Binding BaseUnitAbbreviation}" VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" />
                                     </Border>
-                                    <syncfusion:DoubleTextBox Value="{Binding EditingPurchaseUnit.BaseUnitsPerUnit, Mode=OneWay}"
-                                                              IsReadOnly="True"
-                                                              NumberDecimalDigits="2" />
+                                    <!-- The unit's multiplier: typed for a unit not saved yet, read-only otherwise -->
+                                    <syncfusion:DoubleTextBox Value="{Binding EditingPurchaseQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                              IsReadOnly="{Binding IsPurchaseQuantityReadOnly}"
+                                                              NumberDecimalDigits="2"
+                                                              ToolTip="Type it for a unit that isn't saved yet. A saved unit's multiplier changes with Edit in Alternative Units." />
                                 </DockPanel>
 
                                 <Border Margin="0,12,0,0" Padding="12" CornerRadius="6" Background="{StaticResource AccentSoftBrush}">

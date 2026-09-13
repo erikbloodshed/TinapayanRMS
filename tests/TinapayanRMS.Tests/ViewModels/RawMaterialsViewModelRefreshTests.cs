@@ -129,6 +129,120 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task Picking_a_new_purchase_unit_adds_it_as_an_alternative_unit_and_one_save_saves_it_with_the_price()
+    {
+        await SeedUnitOfMeasureAsync("bag", "bag");
+        await SeedUnitOfMeasureAsync("sack", "sk");
+        await SeedUnitOfMeasureAsync("gram", "g");
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Flour";
+        viewModel.PurchaseUnitOptions.Select(o => (o.Name, o.IsNew)).Should().Equal(
+            [("gram", false), ("bag", true), ("sack", true)], "a unit of measure named like the ingredient's gram isn't offered twice");
+        viewModel.EditingPurchaseUnit!.Name.Should().Be("gram", "an unpriced material with no units starts on its base unit, never a new one");
+        viewModel.IsPurchaseQuantityReadOnly.Should().BeTrue("the base unit is always 1");
+
+        viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "sack");
+
+        var row = viewModel.UnitRows.Should().ContainSingle().Subject;
+        row.UnitName.Should().Be("sack");
+        row.Unit.Id.Should().Be(0, "it isn't saved yet");
+        viewModel.EditingPurchaseUnit!.Unit.Should().BeSameAs(row.Unit, "the pick is now the unit added");
+        viewModel.EditingPurchaseUnit.IsNew.Should().BeFalse();
+        viewModel.IsPurchaseQuantityReadOnly.Should().BeFalse();
+        viewModel.EditingPurchaseQuantity.Should().BeNull("the unit has no quantity until it's typed");
+
+        viewModel.EditingPurchaseQuantity = 25000m;
+        viewModel.EditingPrice = 1500m;
+        viewModel.UnitRows.Single().Example.Should().Be("1 sk = 25,000 g", "the quantity typed is the unit's multiplier");
+        viewModel.PurchaseCostText.Should().Be("₱0.0600 / g");
+
+        await viewModel.SaveCommand.Execute();
+
+        await WaitUntilSettledAsync(() => viewModel.PriceHistory.Count == 1,
+            () => $"price rows={viewModel.PriceHistory.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        viewModel.ErrorMessage.Should().BeNull();
+        var saved = viewModel.UnitRows.Should().ContainSingle().Subject;
+        saved.Unit.Id.Should().BeGreaterThan(0);
+        saved.BaseUnitsPerUnit.Should().Be(25000m);
+        viewModel.PriceHistory.Single().Entry.UnitId.Should().Be(saved.Unit.Id);
+        viewModel.EditingPurchaseUnit!.Name.Should().Be("sack", "the setup shows the latest price's unit");
+        viewModel.IsPurchaseQuantityReadOnly.Should().BeTrue("a saved unit's multiplier changes with Edit in Alternative Units");
+        viewModel.CurrentCostText.Should().Be("₱0.0600 / g");
+    }
+
+    [Fact]
+    public async Task Picking_another_purchase_unit_takes_back_the_one_added_there()
+    {
+        await SeedUnitOfMeasureAsync("bag", "bag");
+        await SeedUnitOfMeasureAsync("sack", "sk");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await viewModel.NewCommand.Execute();
+
+        viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "sack");
+        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal("sack");
+
+        viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "bag");
+        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal(["bag"], "picking another new unit replaces the one added");
+        viewModel.PurchaseUnitOptions.Select(o => (o.Name, o.IsNew)).Should().Equal(("gram", false), ("bag", false), ("sack", true));
+
+        viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "gram");
+        viewModel.UnitRows.Should().BeEmpty("the unit was only there as the purchase unit");
+        viewModel.EditingPurchaseQuantity.Should().Be(1m);
+    }
+
+    [Fact]
+    public async Task A_saved_units_quantity_is_read_only_and_new_units_are_offered_while_there_is_room_for_one()
+    {
+        var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
+        await SeedUnitOfMeasureAsync("pack", "pack");
+        await SeedUnitOfMeasureAsync("sack", "sk");
+        await SeedPurchasedIngredientAsync("Flour", (bagId, 25000m));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await WaitUntilSettledAsync(() => viewModel.EditingPurchaseUnit?.Name == "bag",
+            () => $"picked={viewModel.EditingPurchaseUnit?.Name ?? "none"}");
+        viewModel.IsPurchaseQuantityReadOnly.Should().BeTrue("the bag unit is saved");
+        viewModel.EditingPurchaseQuantity.Should().Be(25000m);
+        viewModel.PurchaseUnitOptions.Where(o => o.IsNew).Select(o => o.Name).Should().Equal("pack", "sack");
+
+        viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "pack");
+        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal("bag", "pack");
+        viewModel.CanAddUnit.Should().BeFalse("that's the two alternative units allowed");
+        viewModel.PurchaseUnitOptions.Where(o => o.IsNew).Select(o => o.Name).Should().Equal(["sack"], "the unit added here can still be swapped for another");
+
+        viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "sack");
+        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal("bag", "sack");
+    }
+
+    [Fact]
+    public async Task Saving_a_unit_added_as_the_purchase_unit_without_its_quantity_saves_nothing()
+    {
+        await SeedUnitOfMeasureAsync("sack", "sk");
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Flour";
+        viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "sack");
+        viewModel.EditingPrice = 1500m;
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().Be("Enter how many g are in one sack (Quantity per Purchase Unit).");
+        viewModel.UnitRows.Should().ContainSingle().Which.UnitName.Should().Be("sack", "the edits stay to be fixed");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task A_rejected_save_saves_nothing_and_keeps_every_edit()
     {
         await SeedPurchasedIngredientAsync("Flour");
@@ -276,7 +390,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.UnitRows.Should().BeEmpty();
         viewModel.CanAddUnit.Should().BeTrue();
-        viewModel.PurchaseUnitOptions.Select(o => o.Name).Should().Equal("gram");
+        viewModel.PurchaseUnitOptions.Select(o => (o.Name, o.IsNew)).Should().Equal(("gram", false), ("bag", true));
         viewModel.EditingPrice.Should().BeNull();
         viewModel.BomLineEdits.Should().BeEmpty();
     }

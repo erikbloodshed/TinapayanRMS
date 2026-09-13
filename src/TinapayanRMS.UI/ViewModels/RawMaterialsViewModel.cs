@@ -308,6 +308,36 @@ public class RawMaterialsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingPrice, value);
     }
 
+    /// <summary>
+    /// How many base units one EditingPurchaseUnit holds: its multiplier. Typing it sets the multiplier
+    /// of a unit that isn't saved yet; empty for one added here until it's typed.
+    /// </summary>
+    private decimal? _editingPurchaseQuantity;
+    public decimal? EditingPurchaseQuantity
+    {
+        get => _editingPurchaseQuantity;
+        set => this.RaiseAndSetIfChanged(ref _editingPurchaseQuantity, value);
+    }
+
+    private readonly ObservableAsPropertyHelper<bool> _isPurchaseQuantityReadOnly;
+    /// <summary>
+    /// Read-only for the base unit (always 1) and a saved alternative unit, whose multiplier changes
+    /// with Edit in Alternative Units, since a change reprices the recipe lines measured in it.
+    /// </summary>
+    public bool IsPurchaseQuantityReadOnly => _isPurchaseQuantityReadOnly.Value;
+
+    /// <summary>
+    /// The alternative unit added by picking a new unit in the Purchase Cost Setup. It stays only while
+    /// it's the purchase unit, so picking another before Save takes it back out.
+    /// </summary>
+    private RawMaterialUnit? _purchaseAddedUnit;
+
+    /// <summary>
+    /// Set while the purchase unit choices are replaced or a unit is picked for the user, so neither the
+    /// picker clearing itself nor the quantity box following the pick counts as the user's own change.
+    /// </summary>
+    private bool _syncingPurchaseSetup;
+
     private readonly ObservableAsPropertyHelper<string> _purchaseCostText;
     /// <summary>What EditingPrice comes to per base unit, recalculated as it's typed, e.g. "₱0.0372 / g".</summary>
     public string PurchaseCostText => _purchaseCostText.Value;
@@ -484,11 +514,34 @@ public class RawMaterialsViewModel : ViewModelBase
             .Select(material => material is null ? "—" : $"₱{material.CostPerBaseUnit:N4} / {BaseUnitText.AbbreviationOf(material)}")
             .ToProperty(this, x => x.CurrentCostText, "—");
 
-        _purchaseCostText = this.WhenAnyValue(x => x.EditingPrice, x => x.EditingPurchaseUnit, x => x.BaseUnitAbbreviation, (price, unit, abbreviation) =>
-                price is > 0 && unit is not null
-                    ? $"₱{UnitConversionRules.CostPerBaseUnit(price.Value, unit.BaseUnitsPerUnit):N4} / {abbreviation}"
+        _purchaseCostText = this.WhenAnyValue(x => x.EditingPrice, x => x.EditingPurchaseQuantity, x => x.BaseUnitAbbreviation, (price, quantity, abbreviation) =>
+                price is > 0 && quantity is > 0
+                    ? $"₱{UnitConversionRules.CostPerBaseUnit(price.Value, quantity):N4} / {abbreviation}"
                     : "—")
             .ToProperty(this, x => x.PurchaseCostText, "—");
+
+        _isPurchaseQuantityReadOnly = this.WhenAnyValue(x => x.EditingPurchaseUnit)
+            .Select(option => option?.Unit is not { Id: 0 })
+            .ToProperty(this, x => x.IsPurchaseQuantityReadOnly, true);
+
+        // Picking a unit the material doesn't have yet adds it as an alternative unit; picking any other
+        // takes back one added that way, so browsing the picker leaves nothing behind.
+        this.WhenAnyValue(x => x.EditingPurchaseUnit)
+            .Where(_ => !IsRefreshing && !_syncingPurchaseSetup)
+            .Subscribe(OnPurchaseUnitPicked);
+
+        // The quantity typed for a unit that isn't saved yet is its multiplier, which the Alternative
+        // Units grid and the overview show as it's typed.
+        this.WhenAnyValue(x => x.EditingPurchaseQuantity)
+            .Where(_ => !IsRefreshing && !_syncingPurchaseSetup)
+            .Subscribe(quantity =>
+            {
+                if (EditingPurchaseUnit?.Unit is { Id: 0 } unit)
+                {
+                    unit.BaseUnitsPerUnit = quantity ?? 0m;
+                    ReplaceUnitRows([.. UnitRows.Select(r => r.Unit)], SelectedUnitRow?.Unit);
+                }
+            });
 
         // A packaging material is always purchased, and an ingredient's base unit is the gram, so
         // switching a new material's type clears whatever the other type had filled in.
@@ -608,8 +661,11 @@ public class RawMaterialsViewModel : ViewModelBase
 
                 if (unitRenamed || !ReferenceEquals(previousBaseUnit, EditingBaseUnit))
                 {
-                    RebuildUnitViews();
+                    ReplaceUnitRows([.. UnitRows.Select(r => r.Unit)], SelectedUnitRow?.Unit);
                 }
+
+                // Every time, so a unit of measure created in Settings shows as a new purchase unit.
+                RebuildPurchaseUnitOptions();
 
                 var previousExample = ExampleRawMaterial;
                 ExampleRawMaterial = RawMaterials.FirstOrDefault(m => m.Id == exampleMaterialId);
@@ -661,6 +717,14 @@ public class RawMaterialsViewModel : ViewModelBase
             if (!validation.IsValid)
             {
                 ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
+
+            // Apply checked the units added in Alternative Units, but a unit added by picking it as the
+            // purchase unit gets its multiplier from Quantity per Purchase Unit, which can still be empty.
+            if (UnitRows.Select(r => r.Unit).FirstOrDefault(u => u.Id == 0 && u.BaseUnitsPerUnit <= 0) is { } unquantified)
+            {
+                ErrorMessage = $"Enter how many {BaseUnitAbbreviation} are in one {unquantified.UnitOfMeasure?.Name ?? "unit"} (Quantity per Purchase Unit).";
                 return;
             }
 
@@ -732,6 +796,11 @@ public class RawMaterialsViewModel : ViewModelBase
                 if (ReferenceEquals(removed, _editingUnit))
                 {
                     CloseUnitForm();
+                }
+
+                if (ReferenceEquals(removed, _purchaseAddedUnit))
+                {
+                    _purchaseAddedUnit = null;
                 }
 
                 ReplaceUnitRows([.. UnitRows.Select(r => r.Unit).Where(u => !ReferenceEquals(u, removed))], selectedUnit: null);
@@ -842,6 +911,7 @@ public class RawMaterialsViewModel : ViewModelBase
             Description = u.Description,
         });
 
+        _purchaseAddedUnit = null;
         ReplaceUnitRows([.. units], selectedUnit: null);
         RebuildPurchaseUnitOptions();
         UpdateCanChangeBaseUnit();
@@ -865,7 +935,8 @@ public class RawMaterialsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// The Purchase Cost Setup's units: the base unit, then the form's alternative units, saved or not.
+    /// The Purchase Cost Setup's units: the base unit, then the form's alternative units, saved or not,
+    /// then, while there's room for another, the units of measure it doesn't have yet (marked new).
     /// Keeps the unit picked while it's still there; otherwise picks as ResetPurchaseSetup does.
     /// </summary>
     private void RebuildPurchaseUnitOptions()
@@ -874,11 +945,115 @@ public class RawMaterialsViewModel : ViewModelBase
         var picked = EditingPurchaseUnit;
 
         var form = new RawMaterial { Type = EditingType, BaseUnit = EditingBaseUnit, Units = [.. UnitRows.Select(r => r.Unit)] };
-        PurchaseUnitOptions.Clear();
-        PurchaseUnitOptions.AddRange(RawMaterialUnitOption.For(form));
+        _syncingPurchaseSetup = true;
+        try
+        {
+            PurchaseUnitOptions.Clear();
+            PurchaseUnitOptions.AddRange(RawMaterialUnitOption.For(form));
+            PurchaseUnitOptions.AddRange(NewPurchaseUnitOptions(form));
+        }
+        finally
+        {
+            _syncingPurchaseSetup = false;
+        }
 
-        EditingPurchaseUnit = (picked is null ? null : PurchaseUnitOptions.FirstOrDefault(o => ReferenceEquals(o.Unit, picked.Unit)))
-            ?? DefaultPurchaseUnit();
+        SetPurchaseUnit((picked is { IsNew: false } ? PurchaseUnitOptions.FirstOrDefault(o => !o.IsNew && ReferenceEquals(o.Unit, picked.Unit)) : null)
+            ?? DefaultPurchaseUnit());
+    }
+
+    /// <summary>
+    /// The units of measure the form doesn't have yet, which picking as the purchase unit adds. Only
+    /// while there's room for another alternative unit; the one already added here doesn't count, since
+    /// picking a new unit replaces it. The base unit is never offered: a packaging material's own, or a
+    /// unit of measure named like an ingredient's gram, which has no unit of measure row of its own.
+    /// </summary>
+    private List<RawMaterialUnitOption> NewPurchaseUnitOptions(RawMaterial form)
+    {
+        if (UnitRows.Count(r => !ReferenceEquals(r.Unit, _purchaseAddedUnit)) >= UnitConversionRules.MaxAlternativeUnits)
+        {
+            return [];
+        }
+
+        var baseUnitId = EditingType == RawMaterialType.Packaging ? EditingBaseUnit?.Id : null;
+        return
+        [
+            .. UnitsOfMeasure
+                .Where(u => u.Id != baseUnitId && UnitRows.All(r => r.Unit.UnitOfMeasureId != u.Id) && !IsNamedLikeTheBaseUnit(u))
+                .Select(u => new RawMaterialUnitOption(new RawMaterialUnit { UnitOfMeasureId = u.Id, UnitOfMeasure = u }, form, isNew: true)),
+        ];
+    }
+
+    private bool IsNamedLikeTheBaseUnit(UnitOfMeasure unit) =>
+        string.Equals(unit.Name, BaseUnitName, StringComparison.CurrentCultureIgnoreCase)
+        || string.Equals(unit.Abbreviation, BaseUnitAbbreviation, StringComparison.CurrentCultureIgnoreCase);
+
+    /// <summary>
+    /// What picking a purchase unit does: a new one becomes an alternative unit, and any other takes back
+    /// one added that way. Neither replaces the picker's items: a ComboBoxAdv whose items are replaced
+    /// while it's still handling the pick falls back to its first item. So the picked option becomes
+    /// the added unit's own, and only its IsNew flag changes.
+    /// </summary>
+    private void OnPurchaseUnitPicked(RawMaterialUnitOption? picked)
+    {
+        // The picker clears itself while its items are replaced.
+        if (picked is null)
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(picked.Unit, _purchaseAddedUnit))
+        {
+            DropPurchaseAddedUnit();
+        }
+
+        if (picked.IsNew)
+        {
+            picked.IsNew = false;
+            _purchaseAddedUnit = picked.Unit;
+            ReplaceUnitRows([.. UnitRows.Select(r => r.Unit), picked.Unit!], SelectedUnitRow?.Unit);
+        }
+
+        SetPurchaseUnit(picked);
+    }
+
+    /// <summary>
+    /// Takes the unit added through the Purchase Cost Setup back out of the rows, and makes its option
+    /// new again, in case it's picked again.
+    /// </summary>
+    private void DropPurchaseAddedUnit()
+    {
+        var added = _purchaseAddedUnit;
+        if (added is null)
+        {
+            return;
+        }
+
+        _purchaseAddedUnit = null;
+        if (ReferenceEquals(added, _editingUnit))
+        {
+            CloseUnitForm();
+        }
+
+        ReplaceUnitRows([.. UnitRows.Select(r => r.Unit).Where(u => !ReferenceEquals(u, added))], SelectedUnitRow?.Unit);
+        if (PurchaseUnitOptions.FirstOrDefault(o => ReferenceEquals(o.Unit, added)) is { } option)
+        {
+            option.IsNew = true;
+        }
+    }
+
+    /// <summary>Picks a purchase unit for the user and shows its quantity: its multiplier, or empty for a unit added here that has none yet.</summary>
+    private void SetPurchaseUnit(RawMaterialUnitOption? option)
+    {
+        _syncingPurchaseSetup = true;
+        try
+        {
+            EditingPurchaseUnit = option;
+            EditingPurchaseQuantity = option is { BaseUnitsPerUnit: > 0 } ? option.BaseUnitsPerUnit : null;
+        }
+        finally
+        {
+            _syncingPurchaseSetup = false;
+        }
     }
 
     /// <summary>
@@ -967,21 +1142,34 @@ public class RawMaterialsViewModel : ViewModelBase
         _editingUnit = null;
     }
 
-    /// <summary>Puts the Purchase Cost Setup back to the latest price: its unit and amount, or the largest unit and no price.</summary>
+    /// <summary>
+    /// Puts the Purchase Cost Setup back to the latest price: its unit and amount, or the largest unit and
+    /// no price. A unit added by picking it here goes, since it's no longer the purchase unit.
+    /// </summary>
     private void ResetPurchaseSetup()
     {
-        EditingPurchaseUnit = DefaultPurchaseUnit();
+        if (_purchaseAddedUnit is not null)
+        {
+            DropPurchaseAddedUnit();
+            RebuildPurchaseUnitOptions();
+        }
+
+        SetPurchaseUnit(DefaultPurchaseUnit());
         EditingPrice = PriceHistory.FirstOrDefault()?.Entry.Price;
     }
 
-    /// <summary>The latest price's unit, or for an unpriced material its largest unit, else the base unit.</summary>
+    /// <summary>
+    /// The latest price's unit, or for an unpriced material its largest unit, else the base unit. Never a
+    /// new unit, which picking would add as an alternative unit.
+    /// </summary>
     private RawMaterialUnitOption? DefaultPurchaseUnit()
     {
         var latest = PriceHistory.FirstOrDefault()?.Entry;
+        var options = PurchaseUnitOptions.Where(o => !o.IsNew).ToList();
         return (latest is not null
-                ? PurchaseUnitOptions.FirstOrDefault(o => o.UnitId == latest.UnitId)
-                : PurchaseUnitOptions.Skip(1).FirstOrDefault())
-            ?? PurchaseUnitOptions.FirstOrDefault();
+                ? options.FirstOrDefault(o => o.UnitId == latest.UnitId)
+                : options.Skip(1).FirstOrDefault())
+            ?? options.FirstOrDefault();
     }
 
     /// <summary>
