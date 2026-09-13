@@ -114,7 +114,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
                                 <TextBlock Text="Quantity" Style="{StaticResource FieldLabelStyle}" />
-                                <syncfusion:DoubleTextBox Value="{Binding EditingLineQuantity, Mode=TwoWay}" />
+                                <syncfusion:DoubleTextBox Value="{Binding EditingLineQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Grid.Column="2">
                                 <TextBlock Text="Unit" Style="{StaticResource FieldLabelStyle}" />
@@ -155,7 +155,7 @@
                                                       Margin="0,0,0,12" />
 
                             <TextBlock Text="Sort Order" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingRoleSortOrder, Mode=TwoWay}"
+                            <syncfusion:DoubleTextBox Value="{Binding EditingRoleSortOrder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                        Margin="0,0,0,12" />
 
                             <StackPanel Orientation="Horizontal">

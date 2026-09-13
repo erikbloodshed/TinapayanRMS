@@ -122,7 +122,7 @@
                                                      Margin="0,0,0,12" />
 
                             <TextBlock Text="Weight Per Piece (g)" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingUsageWeightPerPiece, Mode=TwoWay}"
+                            <syncfusion:DoubleTextBox Value="{Binding EditingUsageWeightPerPiece, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                        Margin="0,0,0,12" />
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -179,7 +179,7 @@
                                                      Margin="0,0,0,12" />
 
                             <TextBlock Text="Value (in the field above)" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingLineAuthoredValue, Mode=TwoWay}"
+                            <syncfusion:DoubleTextBox Value="{Binding EditingLineAuthoredValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                        Margin="0,0,0,12" />
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -196,19 +196,19 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="16">
                             <TextBlock Text="Labor Cost (per piece)" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingLaborCost, Mode=TwoWay}"
+                            <syncfusion:DoubleTextBox Value="{Binding EditingLaborCost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                        Margin="0,0,0,12" />
 
                             <TextBlock Text="Overhead Cost (per piece)" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingOverheadCost, Mode=TwoWay}"
+                            <syncfusion:DoubleTextBox Value="{Binding EditingOverheadCost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                        Margin="0,0,0,12" />
 
                             <TextBlock Text="Margin %" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingMarginPercent, Mode=TwoWay}"
+                            <syncfusion:DoubleTextBox Value="{Binding EditingMarginPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                        Margin="0,0,0,12" />
 
                             <TextBlock Text="VAT %" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingVatPercent, Mode=TwoWay}"
+                            <syncfusion:DoubleTextBox Value="{Binding EditingVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                        Margin="0,0,0,12" />
 
                             <syncfusion:ButtonAdv Label="Save Costing" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveCostingCommand}" />

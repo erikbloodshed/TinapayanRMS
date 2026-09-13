@@ -255,7 +255,7 @@
                             <StackPanel Grid.Column="6"
                                         Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <TextBlock Text="Weight Loss %" Style="{StaticResource FieldLabelStyle}" />
-                                <syncfusion:DoubleTextBox Value="{Binding EditingWeightLossPercent, Mode=TwoWay}" />
+                                <syncfusion:DoubleTextBox Value="{Binding EditingWeightLossPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                         </Grid>
                     </StackPanel>
@@ -337,7 +337,7 @@
                                                 <TextBlock Style="{StaticResource FieldLabelStyle}">
                                                     <Run Text="Multiplier (" /><Run Text="{Binding BaseUnitAbbreviation, Mode=OneWay}" /><Run Text=" per unit)" />
                                                 </TextBlock>
-                                                <syncfusion:DoubleTextBox Value="{Binding EditingUnitBaseUnitsPerUnit, Mode=TwoWay}" />
+                                                <syncfusion:DoubleTextBox Value="{Binding EditingUnitBaseUnitsPerUnit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                             </StackPanel>
                                         </Grid>
                                         <TextBlock Text="Description (optional)" Style="{StaticResource FieldLabelStyle}" Margin="0,8,0,4" />
@@ -393,7 +393,7 @@
                                                     Background="{StaticResource PageBackgroundBrush}">
                                                 <TextBlock Text="₱" VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" />
                                             </Border>
-                                            <syncfusion:DoubleTextBox Value="{Binding EditingPrice, Mode=TwoWay}" NumberDecimalDigits="2" />
+                                            <syncfusion:DoubleTextBox Value="{Binding EditingPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" NumberDecimalDigits="2" />
                                         </DockPanel>
                                     </StackPanel>
                                 </Grid>
@@ -454,7 +454,7 @@
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
                                         <TextBlock Text="Use Quantity" Style="{StaticResource FieldLabelStyle}" />
-                                        <syncfusion:DoubleTextBox Value="{Binding ExampleQuantity, Mode=TwoWay}" NumberDecimalDigits="2" />
+                                        <syncfusion:DoubleTextBox Value="{Binding ExampleQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" NumberDecimalDigits="2" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="3" VerticalAlignment="Bottom">
                                         <syncfusion:ComboBoxAdv Width="84"
@@ -581,7 +581,7 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Text="Quantity" Style="{StaticResource FieldLabelStyle}" />
-                                    <syncfusion:DoubleTextBox Value="{Binding EditingBomQuantity, Mode=TwoWay}" />
+                                    <syncfusion:DoubleTextBox Value="{Binding EditingBomQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="4">
                                     <TextBlock Text="Unit" Style="{StaticResource FieldLabelStyle}" />
