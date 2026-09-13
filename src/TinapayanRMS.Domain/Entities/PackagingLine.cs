@@ -2,7 +2,7 @@ using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.Domain.Entities;
 
-/// <summary>One packaging material used by a product.</summary>
+/// <summary>One packaging material (a raw material of the Packaging type) used by a product.</summary>
 public class PackagingLine
 {
     public int Id { get; set; }
@@ -13,12 +13,12 @@ public class PackagingLine
 
     public int PackagingMaterialId { get; set; }
 
-    public PackagingMaterial? PackagingMaterial { get; set; }
+    public RawMaterial? PackagingMaterial { get; set; }
 
     /// <summary>The unit this line's quantities are entered in: one of the material's own units, or null for its base unit.</summary>
-    public int? PackagingMaterialUnitId { get; set; }
+    public int? UnitId { get; set; }
 
-    public PackagingMaterialUnit? PackagingMaterialUnit { get; set; }
+    public RawMaterialUnit? Unit { get; set; }
 
     /// <summary>Amount of the packaging material, in the line's unit, used by one finished piece.</summary>
     public decimal QtyPerPiece { get; set; }

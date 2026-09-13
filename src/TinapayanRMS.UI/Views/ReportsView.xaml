@@ -18,28 +18,11 @@
             <StackPanel>
                 <TextBlock Text="Price Trend" Style="{StaticResource SectionHeaderStyle}" />
 
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                    <StackPanel Width="160" Margin="0,0,12,0">
-                        <TextBlock Text="Material Kind" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:ComboBoxAdv ItemsSource="{Binding MaterialKindOptions}"
-                                                 SelectedItem="{Binding SelectedMaterialKind, Mode=TwoWay}" />
-                    </StackPanel>
-
-                    <StackPanel Width="240"
-                                Visibility="{Binding IsIngredientKind, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="Ingredient" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:ComboBoxAdv ItemsSource="{Binding Ingredients}"
-                                                 DisplayMemberPath="Name"
-                                                 SelectedItem="{Binding SelectedIngredient, Mode=TwoWay}" />
-                    </StackPanel>
-
-                    <StackPanel Width="240"
-                                Visibility="{Binding IsPackagingKind, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="Packaging Material" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:ComboBoxAdv ItemsSource="{Binding PackagingMaterials}"
-                                                 DisplayMemberPath="Name"
-                                                 SelectedItem="{Binding SelectedPackagingMaterial, Mode=TwoWay}" />
-                    </StackPanel>
+                <StackPanel Width="280" HorizontalAlignment="Left" Margin="0,0,0,12">
+                    <TextBlock Text="Raw Material" Style="{StaticResource FieldLabelStyle}" />
+                    <syncfusion:ComboBoxAdv ItemsSource="{Binding RawMaterials}"
+                                             DisplayMemberPath="Name"
+                                             SelectedItem="{Binding SelectedRawMaterial, Mode=TwoWay}" />
                 </StackPanel>
 
                 <syncfusion:SfChart Header="Price Per Purchase Unit Over Time" Height="480">

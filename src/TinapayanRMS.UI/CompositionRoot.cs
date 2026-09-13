@@ -45,14 +45,10 @@ public static class CompositionRoot
                 services.AddSingleton<SubAssemblyCostPropagator>();
                 services.AddSingleton<IngredientCostPropagator>();
                 services.AddSingleton<IUnitOfMeasureRepository, UnitOfMeasureRepository>();
-                services.AddSingleton<IIngredientCategoryRepository, IngredientCategoryRepository>();
-                services.AddSingleton<IPackagingCategoryRepository, PackagingCategoryRepository>();
-                services.AddSingleton<IIngredientRepository, IngredientRepository>();
-                services.AddSingleton<IIngredientUnitRepository, IngredientUnitRepository>();
-                services.AddSingleton<IPackagingMaterialRepository, PackagingMaterialRepository>();
-                services.AddSingleton<IPackagingMaterialUnitRepository, PackagingMaterialUnitRepository>();
-                services.AddSingleton<IIngredientPriceHistoryRepository, IngredientPriceHistoryRepository>();
-                services.AddSingleton<IPackagingPriceHistoryRepository, PackagingPriceHistoryRepository>();
+                services.AddSingleton<IRawMaterialCategoryRepository, RawMaterialCategoryRepository>();
+                services.AddSingleton<IRawMaterialRepository, RawMaterialRepository>();
+                services.AddSingleton<IRawMaterialUnitRepository, RawMaterialUnitRepository>();
+                services.AddSingleton<IRawMaterialPriceHistoryRepository, RawMaterialPriceHistoryRepository>();
                 services.AddSingleton<IIngredientBomLineRepository, IngredientBomLineRepository>();
                 services.AddSingleton<ISubAssemblyRoleRepository, SubAssemblyRoleRepository>();
                 services.AddSingleton<ISubAssemblyRepository, SubAssemblyRepository>();
@@ -66,27 +62,23 @@ public static class CompositionRoot
 
                 services.AddSingleton(Log.Logger);
                 services.AddSingleton<IValidator<UnitOfMeasure>, UnitOfMeasureValidator>();
-                services.AddSingleton<IValidator<IngredientCategory>, IngredientCategoryValidator>();
-                services.AddSingleton<IValidator<PackagingCategory>, PackagingCategoryValidator>();
-                services.AddSingleton<IValidator<Ingredient>, IngredientValidator>();
-                services.AddSingleton<IValidator<IngredientUnit>, IngredientUnitValidator>();
-                services.AddSingleton<IValidator<PackagingMaterial>, PackagingMaterialValidator>();
-                services.AddSingleton<IValidator<PackagingMaterialUnit>, PackagingMaterialUnitValidator>();
+                services.AddSingleton<IValidator<RawMaterialCategory>, RawMaterialCategoryValidator>();
+                services.AddSingleton<IValidator<RawMaterial>, RawMaterialValidator>();
+                services.AddSingleton<IValidator<RawMaterialUnit>, RawMaterialUnitValidator>();
                 services.AddSingleton<IValidator<SubAssemblyRole>, SubAssemblyRoleValidator>();
                 services.AddSingleton<IValidator<SubAssembly>, SubAssemblyValidator>();
                 services.AddSingleton<IValidator<Product>, ProductValidator>();
                 services.AddSingleton<IValidator<CostingParameters>, CostingParametersValidator>();
-                services.AddSingleton<IValidator<IngredientPriceHistory>, IngredientPriceHistoryValidator>();
-                services.AddSingleton<IValidator<PackagingPriceHistory>, PackagingPriceHistoryValidator>();
+                services.AddSingleton<IValidator<RawMaterialPriceHistory>, RawMaterialPriceHistoryValidator>();
 
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<MainWindow>();
-                services.AddSingleton<IngredientsViewModel>();
-                services.AddSingleton<PackagingMaterialsViewModel>();
+                services.AddSingleton<RawMaterialsViewModel>();
                 services.AddSingleton<SubAssembliesViewModel>();
                 services.AddSingleton<ProductsViewModel>();
                 services.AddSingleton<ReportsViewModel>();
                 services.AddSingleton<UnitsOfMeasureViewModel>();
+                services.AddSingleton<CategoriesViewModel>();
             });
     }
 }

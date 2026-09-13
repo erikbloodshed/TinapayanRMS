@@ -15,7 +15,7 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="16" />
-            <ColumnDefinition Width="360" />
+            <ColumnDefinition Width="320" />
         </Grid.ColumnDefinitions>
 
         <controls:StatusBanner Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,0,0,12" />
@@ -49,10 +49,11 @@
         <!-- Details -->
         <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource CardStyle}" VerticalAlignment="Top">
             <StackPanel>
-                <TextBlock Text="Details" Style="{StaticResource SectionHeaderStyle}" />
+                <TextBlock Text="{Binding FormTitle}" Style="{StaticResource SectionHeaderStyle}" />
 
                 <TextBlock Text="Name" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:SfTextBoxExt Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                <syncfusion:SfTextBoxExt x:Name="NameTextBox"
+                                          Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           Margin="0,0,0,12" />
 
                 <TextBlock Text="Abbreviation" Style="{StaticResource FieldLabelStyle}" />

@@ -10,9 +10,9 @@ namespace TinapayanRMS.Tests.Persistence;
 
 /// <summary>
 /// End-to-end tests for the reactive costing cascade (PLAN.md), proving the full chain
-/// a price change ripples through: IngredientPriceHistory -> Ingredient.CostPerGram ->
+/// a price change ripples through: an ingredient's price history -> its CostPerBaseUnit ->
 /// (through the BOM tree) -> SubAssembly.TotalCost -> a product's live-read cost per piece.
-/// Also proves the packaging branch (PackagingPriceHistory -> PackagingMaterial.CostPerBaseUnit
+/// Also proves the packaging branch (a packaging material's price history -> its CostPerBaseUnit
 /// -> a product's live-read packaging cost) needs no propagation code of its own, since
 /// nothing in it is stored redundantly.
 /// </summary>
@@ -23,21 +23,21 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
 
     private IngredientCostPropagator CreateIngredientCostPropagator() => new(CreateDbContextFactory(), CreateSubAssemblyCostPropagator());
 
-    private IngredientRepository CreateIngredientRepository() => new(CreateDbContextFactory(), CreateIngredientCostPropagator());
+    private RawMaterialRepository CreateIngredientRepository() => new(CreateDbContextFactory(), CreateIngredientCostPropagator());
 
-    private IngredientPriceHistoryRepository CreatePriceHistoryRepository() => new(CreateDbContextFactory(), CreateIngredientCostPropagator());
+    private RawMaterialPriceHistoryRepository CreatePriceHistoryRepository() => new(CreateDbContextFactory(), CreateIngredientCostPropagator());
 
     private IngredientBomLineRepository CreateBomRepository() => new(CreateDbContextFactory(), CreateIngredientCostPropagator());
 
     private SubAssemblyLineRepository CreateSubAssemblyLineRepository() => new(CreateDbContextFactory());
 
-    private PackagingPriceHistoryRepository CreatePackagingPriceHistoryRepository() => new(CreateDbContextFactory());
+    private RawMaterialPriceHistoryRepository CreatePackagingPriceHistoryRepository() => new(CreateDbContextFactory(), CreateIngredientCostPropagator());
 
     private async Task<int> SeedCategoryAsync(string name)
     {
         await using var dbContext = CreateDbContext();
-        var category = new IngredientCategory { Name = name };
-        dbContext.IngredientCategories.Add(category);
+        var category = new RawMaterialCategory { Name = name };
+        dbContext.RawMaterialCategories.Add(category);
         await dbContext.SaveChangesAsync(Cancellation);
         return category.Id;
     }
@@ -45,13 +45,13 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
     private async Task<int> SeedPurchasedIngredientAsync(string name, int categoryId)
     {
         await using var dbContext = CreateDbContext();
-        var ingredient = new Ingredient
+        var ingredient = new RawMaterial
         {
             Name = name,
-            IngredientCategoryId = categoryId,
-            Source = IngredientSource.Purchased,
+            CategoryId = categoryId,
+            Source = RawMaterialSource.Purchased,
         };
-        dbContext.Ingredients.Add(ingredient);
+        dbContext.RawMaterials.Add(ingredient);
         await dbContext.SaveChangesAsync(Cancellation);
 
         // Bought by the kilogram: tests price it per kilogram (₱90 is ₱0.09 a gram).
@@ -62,14 +62,14 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
     private async Task<int> SeedMadeIngredientAsync(string name, int categoryId, decimal weightLossPercent = 0m)
     {
         await using var dbContext = CreateDbContext();
-        var ingredient = new Ingredient
+        var ingredient = new RawMaterial
         {
             Name = name,
-            IngredientCategoryId = categoryId,
-            Source = IngredientSource.Made,
+            CategoryId = categoryId,
+            Source = RawMaterialSource.Made,
             WeightLossPercent = weightLossPercent,
         };
-        dbContext.Ingredients.Add(ingredient);
+        dbContext.RawMaterials.Add(ingredient);
         await dbContext.SaveChangesAsync(Cancellation);
         return ingredient.Id;
     }
@@ -106,13 +106,13 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var roleId = await SeedRoleAsync("Filling");
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
 
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation); // 0.09/g
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation); // 0.09/g
         await CreateSubAssemblyLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, null, 1000m)], Cancellation);
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(90m);
 
         // Sugar's price doubles — no direct edit to the sub-assembly.
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation);
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation);
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(180m);
     }
@@ -127,14 +127,14 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var roleId = await SeedRoleAsync("Filling");
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
 
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
         await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, null, 1000m)], Cancellation); // syrup: 0.09/g
         await CreateSubAssemblyLineRepository().SetLinesAsync(subAssemblyId, [(syrupId, null, 500m)], Cancellation); // 500g syrup @ 0.09/g -> 45
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(45m);
 
         // Sugar's price doubles: syrup becomes 0.18/g, which should ripple into Custard too.
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation);
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation);
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(90m); // 500g @ 0.18/g
     }
@@ -148,7 +148,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var roleId = await SeedRoleAsync("Filling");
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
 
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
         await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, null, 1000m)], Cancellation); // syrup: 1000g -> 0.09/g
         await CreateSubAssemblyLineRepository().SetLinesAsync(subAssemblyId, [(syrupId, null, 1000m)], Cancellation); // 1000g syrup @ 0.09/g -> 90
 
@@ -157,11 +157,11 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         // 10% weight loss: syrup output drops to 900g for the same 90 total cost -> 0.10/g.
         await using (var dbContext = CreateDbContext())
         {
-            var syrup = await dbContext.Ingredients.SingleAsync(i => i.Id == syrupId, Cancellation);
+            var syrup = await dbContext.RawMaterials.SingleAsync(i => i.Id == syrupId, Cancellation);
             syrup.WeightLossPercent = 10m;
             await dbContext.SaveChangesAsync(Cancellation);
         }
-        await CreateIngredientRepository().UpdateAsync(new Ingredient { Id = syrupId, Name = "Simple Syrup", IngredientCategoryId = categoryId, Source = IngredientSource.Made, WeightLossPercent = 10m }, Cancellation);
+        await CreateIngredientRepository().UpdateAsync(new RawMaterial { Id = syrupId, Name = "Simple Syrup", CategoryId = categoryId, Source = RawMaterialSource.Made, WeightLossPercent = 10m }, Cancellation);
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(100m); // 1000g @ 0.10/g
     }
@@ -175,11 +175,11 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var custardId = await SeedSubAssemblyAsync("Custard", roleId);
         var caramelId = await SeedSubAssemblyAsync("Caramel Sauce", roleId);
 
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
         await CreateSubAssemblyLineRepository().SetLinesAsync(custardId, [(sugarId, null, 500m)], Cancellation);
         await CreateSubAssemblyLineRepository().SetLinesAsync(caramelId, [(sugarId, null, 200m)], Cancellation);
 
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation); // 0.18/g
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation); // 0.18/g
 
         (await GetSubAssemblyAsync(custardId)).TotalCost.Should().Be(90m); // 500 * 0.18
         (await GetSubAssemblyAsync(caramelId)).TotalCost.Should().Be(36m); // 200 * 0.18
@@ -194,14 +194,14 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var roleId = await SeedRoleAsync("Dough");
         var subAssemblyId = await SeedSubAssemblyAsync("Bread Dough", roleId);
 
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = flourId, IngredientUnitId = await KilogramUnitIdAsync(flourId), Date = new DateOnly(2026, 1, 1), Price = 50m }, Cancellation); // 0.05/g
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation); // 0.09/g
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = flourId, UnitId = await KilogramUnitIdAsync(flourId), Date = new DateOnly(2026, 1, 1), Price = 50m }, Cancellation); // 0.05/g
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation); // 0.09/g
         await CreateSubAssemblyLineRepository().SetLinesAsync(subAssemblyId, [(flourId, null, 800m), (sugarId, null, 200m)], Cancellation);
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(58m); // 800*0.05 + 200*0.09
 
         // Only flour's price changes; sugar's line cost must still use its own current cost.
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = flourId, IngredientUnitId = await KilogramUnitIdAsync(flourId), Date = new DateOnly(2026, 2, 1), Price = 100m }, Cancellation); // 0.10/g
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = flourId, UnitId = await KilogramUnitIdAsync(flourId), Date = new DateOnly(2026, 2, 1), Price = 100m }, Cancellation); // 0.10/g
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(98m); // 800*0.10 + 200*0.09
     }
@@ -217,7 +217,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var roleId = await SeedRoleAsync("Filling");
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
 
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
         await CreateSubAssemblyLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, null, 100m)], Cancellation); // 100g @ 0.09/g -> 9, TotalWeight 100g
 
         await using var dbContext = CreateDbContext();
@@ -238,7 +238,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
 
         ReadUsageCostPerPiece().Should().Be(0.9m); // 9 * 10 / 100
 
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation);
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation);
 
         ReadUsageCostPerPiece().Should().Be(1.8m); // sugar doubled -> usage cost doubled, with zero product-level code involved
     }
@@ -250,32 +250,33 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         await using (var dbContext = CreateDbContext())
         {
-            var category = new PackagingCategory { Name = "Boxes" };
-            dbContext.PackagingCategories.Add(category);
+            var category = new RawMaterialCategory { Name = "Boxes" };
+            dbContext.RawMaterialCategories.Add(category);
             await dbContext.SaveChangesAsync(Cancellation);
 
-            var material = new PackagingMaterial
+            var material = new RawMaterial
             {
+                Type = RawMaterialType.Packaging,
                 Name = "Box",
-                PackagingCategoryId = category.Id,
+                CategoryId = category.Id,
                 BaseUnitId = pieceId,
             };
-            dbContext.PackagingMaterials.Add(material);
+            dbContext.RawMaterials.Add(material);
             await dbContext.SaveChangesAsync(Cancellation);
             materialId = material.Id;
         }
 
-        await CreatePackagingPriceHistoryRepository().AddAsync(new PackagingPriceHistory { PackagingMaterialId = materialId, Date = new DateOnly(2026, 1, 1), Price = 30m }, Cancellation);
+        await CreatePackagingPriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = materialId, Date = new DateOnly(2026, 1, 1), Price = 30m }, Cancellation);
 
         async Task<decimal> ReadCostPerBaseUnitAsync()
         {
             await using var dbContext = CreateDbContext();
-            return (await dbContext.PackagingMaterials.AsNoTracking().SingleAsync(m => m.Id == materialId, Cancellation)).CostPerBaseUnit;
+            return (await dbContext.RawMaterials.AsNoTracking().SingleAsync(m => m.Id == materialId, Cancellation)).CostPerBaseUnit;
         }
 
         (await ReadCostPerBaseUnitAsync()).Should().Be(30m);
 
-        await CreatePackagingPriceHistoryRepository().AddAsync(new PackagingPriceHistory { PackagingMaterialId = materialId, Date = new DateOnly(2026, 2, 1), Price = 36m }, Cancellation);
+        await CreatePackagingPriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = materialId, Date = new DateOnly(2026, 2, 1), Price = 36m }, Cancellation);
 
         (await ReadCostPerBaseUnitAsync()).Should().Be(36m);
     }

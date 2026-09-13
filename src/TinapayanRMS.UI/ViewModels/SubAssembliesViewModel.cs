@@ -7,24 +7,25 @@ using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>An in-memory (not yet saved) sub-assembly line, shown in the lines editor grid: an amount of an ingredient in one of its units.</summary>
-public class SubAssemblyLineEdit(Ingredient ingredient, IngredientUnitOption unit, decimal quantity)
+public class SubAssemblyLineEdit(RawMaterial ingredient, RawMaterialUnitOption unit, decimal quantity)
 {
-    public Ingredient Ingredient { get; } = ingredient;
+    public RawMaterial Ingredient { get; } = ingredient;
 
-    public IngredientUnitOption Unit { get; } = unit;
+    public RawMaterialUnitOption Unit { get; } = unit;
 
     public decimal Quantity { get; } = quantity;
 
-    public decimal Grams => UnitConversionRules.ToBaseQuantity(Quantity, Unit.Unit?.GramsPerUnit);
+    public decimal Grams => UnitConversionRules.ToBaseQuantity(Quantity, Unit.Unit?.BaseUnitsPerUnit);
 
     /// <summary>What this line adds to the sub-assembly's total cost, at the ingredient's current cost per gram.</summary>
-    public decimal Cost => Grams * Ingredient.CostPerGram;
+    public decimal Cost => Grams * Ingredient.CostPerBaseUnit;
 }
 
 public class SubAssembliesViewModel : ViewModelBase
@@ -43,7 +44,8 @@ public class SubAssembliesViewModel : ViewModelBase
 
     public ReadOnlyObservableCollection<SubAssemblyRole> Roles => _roles;
 
-    public ObservableCollection<Ingredient> Ingredients { get; } = [];
+    /// <summary>The ingredients only: packaging never goes in a recipe.</summary>
+    public ObservableCollection<RawMaterial> Ingredients { get; } = [];
 
     public ObservableCollection<SubAssemblyLineEdit> LineEdits { get; } = [];
 
@@ -70,18 +72,18 @@ public class SubAssembliesViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingRole, value);
     }
 
-    private Ingredient? _editingLineIngredient;
-    public Ingredient? EditingLineIngredient
+    private RawMaterial? _editingLineIngredient;
+    public RawMaterial? EditingLineIngredient
     {
         get => _editingLineIngredient;
         set => this.RaiseAndSetIfChanged(ref _editingLineIngredient, value);
     }
 
     /// <summary>The picked ingredient's units, for the line editor's unit picker.</summary>
-    public ObservableCollection<IngredientUnitOption> LineUnitOptions { get; } = [];
+    public ObservableCollection<RawMaterialUnitOption> LineUnitOptions { get; } = [];
 
-    private IngredientUnitOption? _editingLineUnit;
-    public IngredientUnitOption? EditingLineUnit
+    private RawMaterialUnitOption? _editingLineUnit;
+    public RawMaterialUnitOption? EditingLineUnit
     {
         get => _editingLineUnit;
         set => this.RaiseAndSetIfChanged(ref _editingLineUnit, value);
@@ -145,7 +147,7 @@ public class SubAssembliesViewModel : ViewModelBase
         ISubAssemblyRoleRepository roleRepository,
         IValidator<SubAssembly> subAssemblyValidator,
         IValidator<SubAssemblyRole> roleValidator,
-        IIngredientRepository ingredientRepository,
+        IRawMaterialRepository rawMaterialRepository,
         ILogger logger)
         : base(logger)
     {
@@ -207,7 +209,7 @@ public class SubAssembliesViewModel : ViewModelBase
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var roles = await _roleRepository.GetAllAsync(CancellationToken.None);
-            var ingredients = await ingredientRepository.GetAllAsync(CancellationToken.None);
+            var rawMaterials = await rawMaterialRepository.GetAllAsync(CancellationToken.None);
             var subAssemblies = await _subAssemblyRepository.GetAllAsync(CancellationToken.None);
 
             // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
@@ -220,7 +222,7 @@ public class SubAssembliesViewModel : ViewModelBase
             ApplyRefresh(() =>
             {
                 _roleCache.MergeFrom(roles);
-                Ingredients.MergeFrom([.. ingredients.OrderBy(i => i.Name)], i => i.Id);
+                Ingredients.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Ingredient).OrderBy(m => m.Name)], m => m.Id);
                 _subAssemblyCache.MergeFrom(subAssemblies);
 
                 EditingRole = Roles.FirstOrDefault(r => r.Id == roleId);
@@ -230,7 +232,7 @@ public class SubAssembliesViewModel : ViewModelBase
                 EditingLineIngredient = Ingredients.FirstOrDefault(i => i.Id == lineIngredientId);
                 if (!ReferenceEquals(previousLineIngredient, EditingLineIngredient))
                 {
-                    // Its units changed (a unit added on the Ingredients tab): refill the picker, keeping the pick.
+                    // Its units changed (a unit added on the Raw Materials tab): refill the picker, keeping the pick.
                     ReplaceLineUnitOptions(EditingLineIngredient, lineUnitId);
                 }
 
@@ -368,12 +370,12 @@ public class SubAssembliesViewModel : ViewModelBase
         var lines = await _lineRepository.GetForSubAssemblyAsync(subAssembly.Id, CancellationToken.None);
         foreach (var line in lines)
         {
-            LineEdits.Add(new SubAssemblyLineEdit(line.Ingredient!, new IngredientUnitOption(line.IngredientUnit), line.Quantity));
+            LineEdits.Add(new SubAssemblyLineEdit(line.Ingredient!, new RawMaterialUnitOption(line.Unit, line.Ingredient!), line.Quantity));
         }
     }
 
     /// <summary>Fills the unit picker with <paramref name="ingredient"/>'s units and picks the one with <paramref name="keepUnitId"/>, else the gram.</summary>
-    private void ReplaceLineUnitOptions(Ingredient? ingredient, int? keepUnitId)
+    private void ReplaceLineUnitOptions(RawMaterial? ingredient, int? keepUnitId)
     {
         EditingLineUnit = null;
         LineUnitOptions.Clear();
@@ -382,7 +384,7 @@ public class SubAssembliesViewModel : ViewModelBase
             return;
         }
 
-        LineUnitOptions.AddRange(IngredientUnitOption.For(ingredient));
+        LineUnitOptions.AddRange(RawMaterialUnitOption.For(ingredient));
         EditingLineUnit = LineUnitOptions.FirstOrDefault(o => o.UnitId == keepUnitId) ?? LineUnitOptions[0];
     }
 

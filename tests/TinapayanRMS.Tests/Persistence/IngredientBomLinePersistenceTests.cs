@@ -11,20 +11,17 @@ namespace TinapayanRMS.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private IngredientCostPropagator CreateCostPropagator() =>
-        new(CreateDbContextFactory(), new SubAssemblyCostPropagator(CreateDbContextFactory()));
-
     private IngredientBomLineRepository CreateBomRepository() =>
         new(CreateDbContextFactory(), CreateCostPropagator());
 
-    private IngredientPriceHistoryRepository CreatePriceHistoryRepository() =>
+    private RawMaterialPriceHistoryRepository CreatePriceHistoryRepository() =>
         new(CreateDbContextFactory(), CreateCostPropagator());
 
     private async Task<int> SeedCategoryAsync(string name)
     {
         await using var dbContext = CreateDbContext();
-        var category = new IngredientCategory { Name = name };
-        dbContext.IngredientCategories.Add(category);
+        var category = new RawMaterialCategory { Name = name };
+        dbContext.RawMaterialCategories.Add(category);
         await dbContext.SaveChangesAsync(Cancellation);
         return category.Id;
     }
@@ -32,13 +29,13 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
     private async Task<int> SeedPurchasedIngredientAsync(string name, int categoryId)
     {
         await using var dbContext = CreateDbContext();
-        var ingredient = new Ingredient
+        var ingredient = new RawMaterial
         {
             Name = name,
-            IngredientCategoryId = categoryId,
-            Source = IngredientSource.Purchased,
+            CategoryId = categoryId,
+            Source = RawMaterialSource.Purchased,
         };
-        dbContext.Ingredients.Add(ingredient);
+        dbContext.RawMaterials.Add(ingredient);
         await dbContext.SaveChangesAsync(Cancellation);
 
         // Bought by the kilogram: tests price it per kilogram (₱90 is ₱0.09 a gram).
@@ -49,22 +46,22 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
     private async Task<int> SeedMadeIngredientAsync(string name, int categoryId, decimal weightLossPercent = 0m)
     {
         await using var dbContext = CreateDbContext();
-        var ingredient = new Ingredient
+        var ingredient = new RawMaterial
         {
             Name = name,
-            IngredientCategoryId = categoryId,
-            Source = IngredientSource.Made,
+            CategoryId = categoryId,
+            Source = RawMaterialSource.Made,
             WeightLossPercent = weightLossPercent,
         };
-        dbContext.Ingredients.Add(ingredient);
+        dbContext.RawMaterials.Add(ingredient);
         await dbContext.SaveChangesAsync(Cancellation);
         return ingredient.Id;
     }
 
-    private async Task<Ingredient> GetIngredientAsync(int id)
+    private async Task<RawMaterial> GetIngredientAsync(int id)
     {
         await using var dbContext = CreateDbContext();
-        return await dbContext.Ingredients.AsNoTracking().SingleAsync(i => i.Id == id, Cancellation);
+        return await dbContext.RawMaterials.AsNoTracking().SingleAsync(i => i.Id == id, Cancellation);
     }
 
     [Fact]
@@ -72,13 +69,13 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
     {
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
-        var waterId = await SeedPurchasedIngredientAsync("Water", categoryId); // never priced: CostPerGram stays 0
+        var waterId = await SeedPurchasedIngredientAsync("Water", categoryId); // never priced: CostPerBaseUnit stays 0
         var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId, weightLossPercent: 20m);
 
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory
         {
-            IngredientId = sugarId,
-            IngredientUnitId = await KilogramUnitIdAsync(sugarId),
+            RawMaterialId = sugarId,
+            UnitId = await KilogramUnitIdAsync(sugarId),
             Date = new DateOnly(2026, 1, 1),
             Price = 90m, // per kilogram -> ₱0.09/g
         }, Cancellation);
@@ -90,7 +87,7 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
         ], Cancellation);
 
         var syrup = await GetIngredientAsync(syrupId);
-        syrup.CostPerGram.Should().Be(0.075m);
+        syrup.CostPerBaseUnit.Should().Be(0.075m);
     }
 
     [Fact]
@@ -101,16 +98,16 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
         var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId);
         var sugarKilogramId = await KilogramUnitIdAsync(sugarId);
         await CreatePriceHistoryRepository().AddAsync(
-            new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = sugarKilogramId, Date = new DateOnly(2026, 1, 1), Price = 90m },
+            new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = sugarKilogramId, Date = new DateOnly(2026, 1, 1), Price = 90m },
             Cancellation); // ₱0.09/g
 
         await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, sugarKilogramId, 2m)], Cancellation); // 2 kg of sugar
 
         var line = (await CreateBomRepository().GetForIngredientAsync(syrupId, Cancellation)).Should().ContainSingle().Subject;
         line.Quantity.Should().Be(2m);
-        line.IngredientUnit!.UnitOfMeasure!.Abbreviation.Should().Be("kg");
+        line.Unit!.UnitOfMeasure!.Abbreviation.Should().Be("kg");
         line.Grams.Should().Be(2000m);
-        (await GetIngredientAsync(syrupId)).CostPerGram.Should().Be(0.09m); // ₱180 over 2,000 g
+        (await GetIngredientAsync(syrupId)).CostPerBaseUnit.Should().Be(0.09m); // ₱180 over 2,000 g
     }
 
     [Fact]
@@ -142,18 +139,18 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
         var priceHistory = CreatePriceHistoryRepository();
         var bom = CreateBomRepository();
 
-        await priceHistory.AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
+        await priceHistory.AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
         await bom.SetLinesAsync(syrupId, [(sugarId, null, 1000m)], Cancellation); // syrup: 1000g @ 0.09/g, no weight loss -> 0.09/g
         await bom.SetLinesAsync(caramelId, [(syrupId, null, 1000m)], Cancellation); // caramel: 1000g syrup @ 0.09/g -> 0.09/g
 
-        (await GetIngredientAsync(syrupId)).CostPerGram.Should().Be(0.09m);
-        (await GetIngredientAsync(caramelId)).CostPerGram.Should().Be(0.09m);
+        (await GetIngredientAsync(syrupId)).CostPerBaseUnit.Should().Be(0.09m);
+        (await GetIngredientAsync(caramelId)).CostPerBaseUnit.Should().Be(0.09m);
 
         // Sugar's price doubles.
-        await priceHistory.AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation);
+        await priceHistory.AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation);
 
-        (await GetIngredientAsync(syrupId)).CostPerGram.Should().Be(0.18m);
-        (await GetIngredientAsync(caramelId)).CostPerGram.Should().Be(0.18m);
+        (await GetIngredientAsync(syrupId)).CostPerBaseUnit.Should().Be(0.18m);
+        (await GetIngredientAsync(caramelId)).CostPerBaseUnit.Should().Be(0.18m);
     }
 
     [Fact]
@@ -163,17 +160,17 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
         var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId, weightLossPercent: 0m);
 
-        await CreatePriceHistoryRepository().AddAsync(new IngredientPriceHistory { IngredientId = sugarId, IngredientUnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
         await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, null, 1000m)], Cancellation);
 
-        (await GetIngredientAsync(syrupId)).CostPerGram.Should().Be(0.09m);
+        (await GetIngredientAsync(syrupId)).CostPerBaseUnit.Should().Be(0.09m);
 
         var syrup = await GetIngredientAsync(syrupId);
         syrup.WeightLossPercent = 10m;
-        await new IngredientRepository(CreateDbContextFactory(), CreateCostPropagator()).UpdateAsync(syrup, Cancellation);
+        await new RawMaterialRepository(CreateDbContextFactory(), CreateCostPropagator()).UpdateAsync(syrup, Cancellation);
 
         // 1000g -> 900g output, same ₱90 total cost -> ₱0.10/g.
-        (await GetIngredientAsync(syrupId)).CostPerGram.Should().Be(0.1m);
+        (await GetIngredientAsync(syrupId)).CostPerBaseUnit.Should().Be(0.1m);
     }
 
     [Fact]
@@ -235,6 +232,26 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task SetLinesAsync_rejects_a_packaging_component()
+    {
+        var categoryId = await SeedCategoryAsync("Fillings");
+        var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId);
+        var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
+        int jarId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var jar = new RawMaterial { Type = RawMaterialType.Packaging, Name = "Jar", CategoryId = categoryId, BaseUnitId = pieceId };
+            dbContext.RawMaterials.Add(jar);
+            await dbContext.SaveChangesAsync(Cancellation);
+            jarId = jar.Id;
+        }
+
+        var act = () => CreateBomRepository().SetLinesAsync(syrupId, [(jarId, null, 1m)], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'Jar' is packaging*");
+    }
+
+    [Fact]
     public async Task SetLinesAsync_rejects_a_purchased_ingredient()
     {
         var categoryId = await SeedCategoryAsync("Fillings");
@@ -255,7 +272,7 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
         await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, null, 100m)], Cancellation);
 
         await using var dbContext = CreateDbContext();
-        var act = () => dbContext.Ingredients.Where(i => i.Id == sugarId).ExecuteDeleteAsync(Cancellation);
+        var act = () => dbContext.RawMaterials.Where(i => i.Id == sugarId).ExecuteDeleteAsync(Cancellation);
 
         // ExecuteDeleteAsync issues a raw DELETE outside EF Core's change tracker, so an
         // FK violation surfaces as the driver's own SqlException, not a DbUpdateException
@@ -273,7 +290,7 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
 
         await using (var dbContext = CreateDbContext())
         {
-            await dbContext.Ingredients.Where(i => i.Id == syrupId).ExecuteDeleteAsync(Cancellation);
+            await dbContext.RawMaterials.Where(i => i.Id == syrupId).ExecuteDeleteAsync(Cancellation);
         }
 
         (await CreateBomRepository().GetForIngredientAsync(syrupId, Cancellation)).Should().BeEmpty();

@@ -12,12 +12,15 @@ namespace TinapayanRMS.UI;
 /// </summary>
 public static class ConfirmDeleteHandlerRegistration
 {
-    public static void RegisterNativeMessageBoxHandler(this ViewModelBase viewModel)
-    {
+    /// <returns>
+    /// The registration. A screen that lives as long as the app can ignore it; a view built afresh
+    /// each time over a longer-lived ViewModel (the Settings dialog's tabs) disposes it on close, so
+    /// handlers don't pile up.
+    /// </returns>
+    public static IDisposable RegisterNativeMessageBoxHandler(this ViewModelBase viewModel) =>
         viewModel.ConfirmDelete.RegisterHandler(interaction =>
         {
             var result = MessageBox.Show(interaction.Input, "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             interaction.SetOutput(result == MessageBoxResult.Yes);
         });
-    }
 }

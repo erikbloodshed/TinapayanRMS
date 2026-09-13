@@ -33,7 +33,7 @@ public class IngredientCostGraphTests
     public void GetDependentsInOrder_orders_a_multi_level_chain_components_first()
     {
         // 1 sugar -> 2 syrup -> 3 caramel. Sugar's price changes: syrup must be
-        // recomputed before caramel, since caramel reads syrup's fresh CostPerGram.
+        // recomputed before caramel, since caramel reads syrup's fresh CostPerBaseUnit.
         var componentIdsByIngredientId = new Dictionary<int, IReadOnlyList<int>>
         {
             [2] = [1],

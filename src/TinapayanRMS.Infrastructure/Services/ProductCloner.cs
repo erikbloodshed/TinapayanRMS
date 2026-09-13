@@ -46,7 +46,7 @@ public class ProductCloner(
         {
             await packagingLineRepository.SetLinesAsync(
                 newProduct.Id,
-                [.. effectiveLines.Select(l => (l.PackagingMaterialId, l.PackagingMaterialUnitId, l.AuthoredField,
+                [.. effectiveLines.Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
                     l.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? l.QtyPerPiece : l.PiecesPerPackagingUnit))],
                 cancellationToken);
         }

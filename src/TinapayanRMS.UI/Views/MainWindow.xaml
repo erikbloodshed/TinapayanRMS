@@ -58,14 +58,9 @@
             </syncfusion:SfNavigationDrawer.ToggleButtonContentTemplate>
 
             <syncfusion:SfNavigationDrawer.Items>
-                <syncfusion:NavigationItem x:Name="IngredientsNavItem" Header="Ingredients" IsSelected="True">
+                <syncfusion:NavigationItem x:Name="RawMaterialsNavItem" Header="Raw Materials" IsSelected="True">
                     <syncfusion:NavigationItem.Icon>
                         <TextBlock Text="&#xE8F1;" Style="{StaticResource NavigationIconStyle}" />
-                    </syncfusion:NavigationItem.Icon>
-                </syncfusion:NavigationItem>
-                <syncfusion:NavigationItem x:Name="PackagingMaterialsNavItem" Header="Packaging Materials">
-                    <syncfusion:NavigationItem.Icon>
-                        <TextBlock Text="&#xE7B8;" Style="{StaticResource NavigationIconStyle}" />
                     </syncfusion:NavigationItem.Icon>
                 </syncfusion:NavigationItem>
                 <syncfusion:NavigationItem x:Name="SubAssembliesNavItem" Header="Sub-Assemblies">
@@ -83,12 +78,19 @@
                         <TextBlock Text="&#xEB05;" Style="{StaticResource NavigationIconStyle}" />
                     </syncfusion:NavigationItem.Icon>
                 </syncfusion:NavigationItem>
-                <syncfusion:NavigationItem x:Name="UnitsOfMeasureNavItem" Header="Units of Measure">
+            </syncfusion:SfNavigationDrawer.Items>
+
+            <!--
+                Settings opens a dialog rather than a tab, so it's ItemType="Button": clicking it raises
+                ItemClicked without selecting it, and the highlighted page stays the one on screen.
+            -->
+            <syncfusion:SfNavigationDrawer.FooterItems>
+                <syncfusion:NavigationItem x:Name="SettingsNavItem" Header="Settings" ItemType="Button">
                     <syncfusion:NavigationItem.Icon>
-                        <TextBlock Text="&#xE9E9;" Style="{StaticResource NavigationIconStyle}" />
+                        <TextBlock Text="&#xE713;" Style="{StaticResource NavigationIconStyle}" />
                     </syncfusion:NavigationItem.Icon>
                 </syncfusion:NavigationItem>
-            </syncfusion:SfNavigationDrawer.Items>
+            </syncfusion:SfNavigationDrawer.FooterItems>
 
             <syncfusion:SfNavigationDrawer.ContentView>
                 <!--
@@ -111,12 +113,10 @@
                 <syncfusion:TabControlExt x:Name="MainTabControl" Margin="8" CloseMode="Hide"
                                           IsDisableUnloadTabItemExtContent="True"
                                           SelectionChanged="MainTabControl_SelectionChanged">
-                    <syncfusion:TabItemExt x:Name="IngredientsTab" Header="Ingredients" />
-                    <syncfusion:TabItemExt x:Name="PackagingMaterialsTab" Header="Packaging Materials" />
+                    <syncfusion:TabItemExt x:Name="RawMaterialsTab" Header="Raw Materials" />
                     <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
                     <syncfusion:TabItemExt x:Name="ProductsTab" Header="Products" />
                     <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" />
-                    <syncfusion:TabItemExt x:Name="UnitsOfMeasureTab" Header="Units of Measure" />
                 </syncfusion:TabControlExt>
             </syncfusion:SfNavigationDrawer.ContentView>
         </syncfusion:SfNavigationDrawer>

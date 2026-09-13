@@ -11,10 +11,7 @@ namespace TinapayanRMS.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private IngredientCostPropagator CreateCostPropagator() =>
-        new(CreateDbContextFactory(), new SubAssemblyCostPropagator(CreateDbContextFactory()));
-
-    private IngredientPriceHistoryRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
+    private RawMaterialPriceHistoryRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
 
     /// <summary>A purchased flour with a 25,000 g bag and a 1,000 g pack; returns the ingredient's and both units' ids.</summary>
     private async Task<(int IngredientId, int BagId, int PackId)> SeedPurchasedIngredientAsync()
@@ -23,18 +20,18 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
         var packId = await GetOrCreateUnitOfMeasureAsync("pack", "pack");
 
         await using var dbContext = CreateDbContext();
-        var category = new IngredientCategory { Name = "Flour" };
-        dbContext.IngredientCategories.Add(category);
-        var bag = new IngredientUnit { UnitOfMeasureId = bagId, GramsPerUnit = 25000m };
-        var pack = new IngredientUnit { UnitOfMeasureId = packId, GramsPerUnit = 1000m };
-        var ingredient = new Ingredient
+        var category = new RawMaterialCategory { Name = "Flour" };
+        dbContext.RawMaterialCategories.Add(category);
+        var bag = new RawMaterialUnit { UnitOfMeasureId = bagId, BaseUnitsPerUnit = 25000m };
+        var pack = new RawMaterialUnit { UnitOfMeasureId = packId, BaseUnitsPerUnit = 1000m };
+        var ingredient = new RawMaterial
         {
             Name = "All-Purpose Flour",
-            IngredientCategory = category,
-            Source = IngredientSource.Purchased,
+            Category = category,
+            Source = RawMaterialSource.Purchased,
             Units = [bag, pack],
         };
-        dbContext.Ingredients.Add(ingredient);
+        dbContext.RawMaterials.Add(ingredient);
         await dbContext.SaveChangesAsync(Cancellation);
         return (ingredient.Id, bag.Id, pack.Id);
     }
@@ -42,18 +39,18 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
     private async Task<int> SeedMadeIngredientAsync()
     {
         await using var dbContext = CreateDbContext();
-        var category = new IngredientCategory { Name = "Fillings" };
-        dbContext.IngredientCategories.Add(category);
+        var category = new RawMaterialCategory { Name = "Fillings" };
+        dbContext.RawMaterialCategories.Add(category);
         await dbContext.SaveChangesAsync(Cancellation);
 
-        var ingredient = new Ingredient
+        var ingredient = new RawMaterial
         {
             Name = "Simple Syrup",
-            IngredientCategoryId = category.Id,
-            Source = IngredientSource.Made,
+            CategoryId = category.Id,
+            Source = RawMaterialSource.Made,
             WeightLossPercent = 0m,
         };
-        dbContext.Ingredients.Add(ingredient);
+        dbContext.RawMaterials.Add(ingredient);
         await dbContext.SaveChangesAsync(Cancellation);
         return ingredient.Id;
     }
@@ -61,7 +58,7 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
     private async Task<decimal> GetCostPerGramAsync(int ingredientId)
     {
         await using var dbContext = CreateDbContext();
-        return (await dbContext.Ingredients.AsNoTracking().SingleAsync(i => i.Id == ingredientId, Cancellation)).CostPerGram;
+        return (await dbContext.RawMaterials.AsNoTracking().SingleAsync(i => i.Id == ingredientId, Cancellation)).CostPerBaseUnit;
     }
 
     [Fact]
@@ -69,10 +66,10 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
 
-        await CreateRepository().AddAsync(new IngredientPriceHistory
+        await CreateRepository().AddAsync(new RawMaterialPriceHistory
         {
-            IngredientId = ingredientId,
-            IngredientUnitId = bagId,
+            RawMaterialId = ingredientId,
+            UnitId = bagId,
             Date = new DateOnly(2026, 1, 1),
             Price = 900m,
         }, Cancellation);
@@ -85,7 +82,7 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
     {
         var (ingredientId, _, _) = await SeedPurchasedIngredientAsync();
 
-        await CreateRepository().AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, Date = new DateOnly(2026, 1, 1), Price = 0.04m }, Cancellation);
+        await CreateRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, Date = new DateOnly(2026, 1, 1), Price = 0.04m }, Cancellation);
 
         (await GetCostPerGramAsync(ingredientId)).Should().Be(0.04m);
     }
@@ -96,13 +93,13 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
         var (ingredientId, bagId, packId) = await SeedPurchasedIngredientAsync();
         var repository = CreateRepository();
 
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = packId, Date = new DateOnly(2026, 2, 1), Price = 40m }, Cancellation);
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = packId, Date = new DateOnly(2026, 2, 1), Price = 40m }, Cancellation);
 
         (await GetCostPerGramAsync(ingredientId)).Should().Be(0.04m); // 40 / 1,000 g
 
-        var entries = await repository.GetForIngredientAsync(ingredientId, Cancellation);
-        entries.Select(e => (e.Price, e.IngredientUnit!.UnitOfMeasure!.Name)).Should().Equal((40m, "pack"), (900m, "bag"));
+        var entries = await repository.GetForRawMaterialAsync(ingredientId, Cancellation);
+        entries.Select(e => (e.Price, e.Unit!.UnitOfMeasure!.Name)).Should().Equal((40m, "pack"), (900m, "bag"));
     }
 
     [Fact]
@@ -111,8 +108,8 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
         var repository = CreateRepository();
 
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = bagId, Date = new DateOnly(2026, 2, 1), Price = 950m }, Cancellation);
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = bagId, Date = new DateOnly(2026, 2, 1), Price = 950m }, Cancellation);
 
         (await GetCostPerGramAsync(ingredientId)).Should().Be(0.038m);
     }
@@ -125,8 +122,8 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
         var repository = CreateRepository();
 
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = bagId, Date = new DateOnly(2026, 9, 13), Price = 900m }, Cancellation);
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = bagId, Date = new DateOnly(2026, 9, 13), Price = 1000m }, Cancellation);
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = bagId, Date = new DateOnly(2026, 9, 13), Price = 900m }, Cancellation);
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = bagId, Date = new DateOnly(2026, 9, 13), Price = 1000m }, Cancellation);
 
         (await GetCostPerGramAsync(ingredientId)).Should().Be(0.04m);
     }
@@ -137,8 +134,8 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
         var repository = CreateRepository();
 
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = bagId, Date = new DateOnly(2026, 2, 1), Price = 950m }, Cancellation);
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = bagId, Date = new DateOnly(2026, 2, 1), Price = 950m }, Cancellation);
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
 
         (await GetCostPerGramAsync(ingredientId)).Should().Be(0.038m);
     }
@@ -149,10 +146,10 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
         var (ingredientId, bagId, packId) = await SeedPurchasedIngredientAsync();
         var repository = CreateRepository();
 
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = packId, Date = new DateOnly(2026, 2, 1), Price = 40m }, Cancellation);
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = packId, Date = new DateOnly(2026, 2, 1), Price = 40m }, Cancellation);
 
-        var latestEntry = (await repository.GetForIngredientAsync(ingredientId, Cancellation)).Should().ContainSingle(e => e.Price == 40m).Subject;
+        var latestEntry = (await repository.GetForRawMaterialAsync(ingredientId, Cancellation)).Should().ContainSingle(e => e.Price == 40m).Subject;
         await repository.DeleteAsync(latestEntry.Id, Cancellation);
 
         (await GetCostPerGramAsync(ingredientId)).Should().Be(0.036m); // back to 900 / 25,000 g
@@ -164,8 +161,8 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
         var repository = CreateRepository();
 
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
-        var entry = (await repository.GetForIngredientAsync(ingredientId, Cancellation)).Should().ContainSingle().Subject;
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
+        var entry = (await repository.GetForRawMaterialAsync(ingredientId, Cancellation)).Should().ContainSingle().Subject;
 
         await repository.DeleteAsync(entry.Id, Cancellation);
 
@@ -178,16 +175,16 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
         var (ingredientId, bagId, packId) = await SeedPurchasedIngredientAsync();
         var repository = CreateRepository();
 
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
-        var entry = (await repository.GetForIngredientAsync(ingredientId, Cancellation)).Should().ContainSingle().Subject;
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
+        var entry = (await repository.GetForRawMaterialAsync(ingredientId, Cancellation)).Should().ContainSingle().Subject;
 
-        // Still carries the IngredientUnit loaded for display; only the ids and values are saved.
+        // Still carries the Unit loaded for display; only the ids and values are saved.
         entry.Price = 50m;
-        entry.IngredientUnitId = packId;
+        entry.UnitId = packId;
         await repository.UpdateAsync(entry, Cancellation);
 
         (await GetCostPerGramAsync(ingredientId)).Should().Be(0.05m);
-        (await repository.GetForIngredientAsync(ingredientId, Cancellation)).Should().ContainSingle().Which.IngredientUnit!.UnitOfMeasure!.Name.Should().Be("pack");
+        (await repository.GetForRawMaterialAsync(ingredientId, Cancellation)).Should().ContainSingle().Which.Unit!.UnitOfMeasure!.Name.Should().Be("pack");
     }
 
     [Fact]
@@ -197,10 +194,10 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
         var sugarId = await SeedMadeIngredientAsync();
         var sugarKilogramId = await AddKilogramUnitAsync(sugarId);
 
-        var act = () => CreateRepository().AddAsync(new IngredientPriceHistory
+        var act = () => CreateRepository().AddAsync(new RawMaterialPriceHistory
         {
-            IngredientId = flourId,
-            IngredientUnitId = sugarKilogramId,
+            RawMaterialId = flourId,
+            UnitId = sugarKilogramId,
             Date = new DateOnly(2026, 1, 1),
             Price = 100m,
         }, Cancellation);
@@ -213,10 +210,10 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
 
-        var act = () => CreateRepository().AddAsync(new IngredientPriceHistory
+        var act = () => CreateRepository().AddAsync(new RawMaterialPriceHistory
         {
-            IngredientId = ingredientId,
-            IngredientUnitId = bagId,
+            RawMaterialId = ingredientId,
+            UnitId = bagId,
             Date = new DateOnly(2026, 1, 1),
             Price = 0m,
         }, Cancellation);
@@ -229,9 +226,9 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
     {
         var ingredientId = await SeedMadeIngredientAsync();
 
-        var act = () => CreateRepository().AddAsync(new IngredientPriceHistory
+        var act = () => CreateRepository().AddAsync(new RawMaterialPriceHistory
         {
-            IngredientId = ingredientId,
+            RawMaterialId = ingredientId,
             Date = new DateOnly(2026, 1, 1),
             Price = 100m,
         }, Cancellation);
@@ -242,9 +239,9 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
     [Fact]
     public async Task AddAsync_rejects_a_nonexistent_ingredient()
     {
-        var act = () => CreateRepository().AddAsync(new IngredientPriceHistory
+        var act = () => CreateRepository().AddAsync(new RawMaterialPriceHistory
         {
-            IngredientId = 999_999,
+            RawMaterialId = 999_999,
             Date = new DateOnly(2026, 1, 1),
             Price = 100m,
         }, Cancellation);
@@ -255,10 +252,10 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
     [Fact]
     public async Task UpdateAsync_rejects_an_entry_for_a_nonexistent_ingredient()
     {
-        var act = () => CreateRepository().UpdateAsync(new IngredientPriceHistory
+        var act = () => CreateRepository().UpdateAsync(new RawMaterialPriceHistory
         {
             Id = 999_999,
-            IngredientId = 999_999,
+            RawMaterialId = 999_999,
             Date = new DateOnly(2026, 1, 1),
             Price = 100m,
         }, Cancellation);
@@ -271,11 +268,11 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
 
-        var act = () => CreateRepository().UpdateAsync(new IngredientPriceHistory
+        var act = () => CreateRepository().UpdateAsync(new RawMaterialPriceHistory
         {
             Id = 999_999,
-            IngredientId = ingredientId,
-            IngredientUnitId = bagId,
+            RawMaterialId = ingredientId,
+            UnitId = bagId,
             Date = new DateOnly(2026, 1, 1),
             Price = 100m,
         }, Cancellation);
@@ -296,13 +293,13 @@ public class IngredientPriceHistoryPersistenceTests(DatabaseFixture fixture) : P
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
         var repository = CreateRepository();
-        await repository.AddAsync(new IngredientPriceHistory { IngredientId = ingredientId, IngredientUnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
+        await repository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredientId, UnitId = bagId, Date = new DateOnly(2026, 1, 1), Price = 900m }, Cancellation);
 
         await using (var dbContext = CreateDbContext())
         {
-            await dbContext.Ingredients.Where(i => i.Id == ingredientId).ExecuteDeleteAsync(Cancellation);
+            await dbContext.RawMaterials.Where(i => i.Id == ingredientId).ExecuteDeleteAsync(Cancellation);
         }
 
-        (await repository.GetForIngredientAsync(ingredientId, Cancellation)).Should().BeEmpty();
+        (await repository.GetForRawMaterialAsync(ingredientId, Cancellation)).Should().BeEmpty();
     }
 }

@@ -1,8 +1,8 @@
 namespace TinapayanRMS.Domain.Interfaces;
 
 /// <summary>
-/// Shared shape of IngredientPriceHistory and PackagingPriceHistory, so
-/// ApplicationCore.PriceHistoryRules.FindLatest can work generically over either.
+/// The shape of a price history entry (RawMaterialPriceHistory) that
+/// ApplicationCore.PriceHistoryRules.FindLatest works over, without depending on the entity.
 /// </summary>
 public interface IPriceHistoryEntry
 {

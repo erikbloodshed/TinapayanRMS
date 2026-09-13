@@ -15,8 +15,8 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
     private async Task<int> SeedCategoryAsync()
     {
         await using var dbContext = CreateDbContext();
-        var category = new IngredientCategory { Name = "Flour" };
-        dbContext.IngredientCategories.Add(category);
+        var category = new RawMaterialCategory { Name = "Flour" };
+        dbContext.RawMaterialCategories.Add(category);
         await dbContext.SaveChangesAsync(Cancellation);
         return category.Id;
     }
@@ -99,12 +99,12 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
         await using (var dbContext = CreateDbContext())
         {
             // In use as an ingredient's alternative unit.
-            dbContext.Ingredients.Add(new Ingredient
+            dbContext.RawMaterials.Add(new RawMaterial
             {
                 Name = "Flour",
-                IngredientCategoryId = categoryId,
-                Source = IngredientSource.Purchased,
-                Units = [new IngredientUnit { UnitOfMeasureId = unit.Id, GramsPerUnit = 25000m }],
+                CategoryId = categoryId,
+                Source = RawMaterialSource.Purchased,
+                Units = [new RawMaterialUnit { UnitOfMeasureId = unit.Id, BaseUnitsPerUnit = 25000m }],
             });
             await dbContext.SaveChangesAsync(Cancellation);
         }

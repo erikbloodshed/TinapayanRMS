@@ -39,8 +39,8 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     private async Task<int> SeedPackagingCategoryAsync(string name)
     {
         await using var dbContext = CreateDbContext();
-        var category = new PackagingCategory { Name = name };
-        dbContext.PackagingCategories.Add(category);
+        var category = new RawMaterialCategory { Name = name };
+        dbContext.RawMaterialCategories.Add(category);
         await dbContext.SaveChangesAsync(Cancellation);
         return category.Id;
     }
@@ -48,15 +48,16 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     private async Task<int> SeedPackagingMaterialAsync(string name, int categoryId, int standardUnitId, decimal purchaseUnitQty, decimal currentCost)
     {
         await using var dbContext = CreateDbContext();
-        var material = new PackagingMaterial
+        var material = new RawMaterial
         {
+            Type = RawMaterialType.Packaging,
             Name = name,
-            PackagingCategoryId = categoryId,
+            CategoryId = categoryId,
             BaseUnitId = standardUnitId,
             // Priced as currentCost per purchaseUnitQty base units, as these tests were written.
             CostPerBaseUnit = currentCost / purchaseUnitQty,
         };
-        dbContext.PackagingMaterials.Add(material);
+        dbContext.RawMaterials.Add(material);
         await dbContext.SaveChangesAsync(Cancellation);
         return material.Id;
     }
@@ -157,7 +158,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         var line = (await CreatePackagingLineRepository().GetEffectiveForProductAsync(productId, Cancellation)).Should().ContainSingle().Subject;
         line.QtyPerPiece.Should().Be(0.127m, "quantities are stored as entered, in the line's unit");
-        line.PackagingMaterialUnit!.UnitOfMeasure!.Abbreviation.Should().Be("m");
+        line.Unit!.UnitOfMeasure!.Abbreviation.Should().Be("m");
         line.PackagingMaterial!.Units.Should().ContainSingle("the Products editor needs the material's units");
     }
 
@@ -183,8 +184,8 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     private async Task<int> AddPackagingMaterialUnitAsync(int packagingMaterialId, int unitOfMeasureId, decimal baseUnitsPerUnit)
     {
         await using var dbContext = CreateDbContext();
-        var unit = new PackagingMaterialUnit { PackagingMaterialId = packagingMaterialId, UnitOfMeasureId = unitOfMeasureId, BaseUnitsPerUnit = baseUnitsPerUnit };
-        dbContext.PackagingMaterialUnits.Add(unit);
+        var unit = new RawMaterialUnit { RawMaterialId = packagingMaterialId, UnitOfMeasureId = unitOfMeasureId, BaseUnitsPerUnit = baseUnitsPerUnit };
+        dbContext.RawMaterialUnits.Add(unit);
         await dbContext.SaveChangesAsync(Cancellation);
         return unit.Id;
     }
@@ -243,7 +244,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         ], Cancellation);
 
         await using var dbContext = CreateDbContext();
-        var act = () => dbContext.PackagingMaterials.Where(m => m.Id == boxId).ExecuteDeleteAsync(Cancellation);
+        var act = () => dbContext.RawMaterials.Where(m => m.Id == boxId).ExecuteDeleteAsync(Cancellation);
 
         await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
     }
@@ -367,6 +368,28 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task SetLinesAsync_rejects_an_ingredient_on_a_packaging_line()
+    {
+        var productId = await SeedProductAsync("Ensaymada");
+        var categoryId = await SeedPackagingCategoryAsync("Dairy");
+        int butterId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var butter = new RawMaterial { Type = RawMaterialType.Ingredient, Name = "Butter", CategoryId = categoryId };
+            dbContext.RawMaterials.Add(butter);
+            await dbContext.SaveChangesAsync(Cancellation);
+            butterId = butter.Id;
+        }
+
+        var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
+        [
+            (butterId, null, PackagingLineAuthoredField.QtyPerPiece, 1m),
+        ], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'Butter' is an ingredient*");
     }
 
     [Fact]

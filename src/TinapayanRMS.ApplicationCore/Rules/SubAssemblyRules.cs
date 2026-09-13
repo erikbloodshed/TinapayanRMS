@@ -21,7 +21,7 @@ public static class SubAssemblyRules
         }
     }
 
-    /// <summary>TotalWeight = Σ grams; TotalCost = Σ (grams × that line's ingredient CostPerGram).</summary>
+    /// <summary>TotalWeight = Σ grams; TotalCost = Σ (grams × that line's ingredient cost per gram, its CostPerBaseUnit).</summary>
     public static (decimal TotalWeight, decimal TotalCost) CalculateTotals(IReadOnlyList<(decimal Grams, decimal IngredientCostPerGram)> lines)
     {
         var totalWeight = lines.Sum(l => l.Grams);

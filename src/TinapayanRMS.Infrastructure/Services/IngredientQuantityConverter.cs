@@ -12,34 +12,34 @@ internal static class IngredientQuantityConverter
 {
     /// <summary>
     /// Each line's quantity in grams, in the same order: the quantity itself when it has no unit,
-    /// otherwise the quantity times the unit's GramsPerUnit. Rejects a unit that isn't one of that
-    /// line's own ingredient's units.
+    /// otherwise the quantity times the unit's multiplier (an ingredient's base unit is the gram).
+    /// Rejects a unit that isn't one of that line's own ingredient's units.
     /// </summary>
     public static async Task<decimal[]> ToGramsAsync(
         TinapayanRMSDbContext dbContext,
-        IReadOnlyList<(int IngredientId, int? IngredientUnitId, decimal Quantity)> lines,
+        IReadOnlyList<(int IngredientId, int? UnitId, decimal Quantity)> lines,
         CancellationToken cancellationToken)
     {
-        var unitIds = lines.Where(l => l.IngredientUnitId is not null).Select(l => l.IngredientUnitId!.Value).Distinct().ToList();
+        var unitIds = lines.Where(l => l.UnitId is not null).Select(l => l.UnitId!.Value).Distinct().ToList();
         var units = unitIds.Count == 0
             ? []
-            : await dbContext.IngredientUnits
+            : await dbContext.RawMaterialUnits
                 .Where(u => unitIds.Contains(u.Id))
-                .ToDictionaryAsync(u => u.Id, u => (u.IngredientId, u.GramsPerUnit), cancellationToken);
+                .ToDictionaryAsync(u => u.Id, u => (u.RawMaterialId, u.BaseUnitsPerUnit), cancellationToken);
 
         return [.. lines.Select(line =>
         {
-            if (line.IngredientUnitId is not { } unitId)
+            if (line.UnitId is not { } unitId)
             {
                 return line.Quantity;
             }
 
-            if (!units.TryGetValue(unitId, out var unit) || unit.IngredientId != line.IngredientId)
+            if (!units.TryGetValue(unitId, out var unit) || unit.RawMaterialId != line.IngredientId)
             {
                 throw new InvalidOperationException("A line's unit must be one of that ingredient's own units.");
             }
 
-            return UnitConversionRules.ToBaseQuantity(line.Quantity, unit.GramsPerUnit);
+            return UnitConversionRules.ToBaseQuantity(line.Quantity, unit.BaseUnitsPerUnit);
         })];
     }
 }

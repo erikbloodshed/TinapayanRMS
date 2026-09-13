@@ -5,8 +5,8 @@ using TinapayanRMS.Domain.Enums;
 namespace TinapayanRMS.Infrastructure.Services;
 
 /// <summary>
-/// Keeps every made ingredient's CostPerGram correct after something it (directly or
-/// transitively) depends on changes cost, then hands off to SubAssemblyCostPropagator so
+/// Keeps every made ingredient's cost per gram (CostPerBaseUnit) correct after something it
+/// (directly or transitively) depends on changes cost, then hands off to SubAssemblyCostPropagator so
 /// every sub-assembly using any of the changed ingredients stays correct too (Phase 11 —
 /// the sub-assembly branch of the reactive costing cascade). An Infrastructure-internal
 /// collaborator, not exposed as an ApplicationCore interface — callers are other
@@ -17,17 +17,20 @@ public class IngredientCostPropagator(IDbContextFactory<TinapayanRMSDbContext> d
     /// <summary>
     /// Call after anything that can change changedIngredientId's own cost: a price
     /// history add/update/delete (Phase 5), or a BOM line / weight loss percent edit
-    /// (this phase). If changedIngredientId is itself Made, its own CostPerGram is
+    /// (this phase). If changedIngredientId is itself Made, its own cost is
     /// recomputed first from its current BOM lines; then every made ingredient that
     /// transitively depends on it is recomputed too, in dependency order; then every
     /// sub-assembly that uses any of those ingredients — or changedIngredientId itself,
     /// whose own cost the caller already updated before calling this — is recomputed.
+    /// Only ingredients take part: packaging is never in a BOM or a sub-assembly.
     /// </summary>
     public async Task RecomputeAndPropagateAsync(int changedIngredientId, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var ingredients = await dbContext.Ingredients.ToDictionaryAsync(i => i.Id, cancellationToken);
+        var ingredients = await dbContext.RawMaterials
+            .Where(m => m.Type == RawMaterialType.Ingredient)
+            .ToDictionaryAsync(m => m.Id, cancellationToken);
         var bomLines = await dbContext.IngredientBomLines.ToListAsync(cancellationToken);
         var linesByIngredientId = bomLines.ToLookup(l => l.IngredientId);
 
@@ -36,7 +39,7 @@ public class IngredientCostPropagator(IDbContextFactory<TinapayanRMSDbContext> d
             .ToDictionary(g => g.Key, g => (IReadOnlyList<int>)g.Select(l => l.ComponentIngredientId).ToList());
 
         var order = new List<int>();
-        if (ingredients.TryGetValue(changedIngredientId, out var changed) && changed.Source == IngredientSource.Made)
+        if (ingredients.TryGetValue(changedIngredientId, out var changed) && changed.Source == RawMaterialSource.Made)
         {
             order.Add(changedIngredientId);
         }
@@ -49,17 +52,17 @@ public class IngredientCostPropagator(IDbContextFactory<TinapayanRMSDbContext> d
             {
                 var ingredient = ingredients[id];
                 var lines = linesByIngredientId[id]
-                    .Select(l => (l.Grams, ComponentCostPerGram: ingredients[l.ComponentIngredientId].CostPerGram))
+                    .Select(l => (l.Grams, ComponentCostPerGram: ingredients[l.ComponentIngredientId].CostPerBaseUnit))
                     .ToList();
 
                 var (_, costPerGram) = IngredientBomRules.CalculateCost(lines, ingredient.WeightLossPercent ?? 0m);
-                ingredient.CostPerGram = costPerGram;
+                ingredient.CostPerBaseUnit = costPerGram;
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        // Every ingredient whose CostPerGram just changed: changedIngredientId itself (its
+        // Every ingredient whose cost just changed: changedIngredientId itself (its
         // own cost may already have been updated by the caller before this method ran —
         // e.g. a new price history entry) plus every made ingredient just recomputed above.
         var allChangedIngredientIds = new HashSet<int>(order) { changedIngredientId };

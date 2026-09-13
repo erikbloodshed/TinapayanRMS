@@ -27,12 +27,12 @@ public class ProductUsageEdit(SubAssembly subAssembly, decimal weightPerPiece)
 }
 
 /// <summary>An in-memory (not yet saved) packaging line, shown in the packaging editor grid: quantities in one of the material's units.</summary>
-public class PackagingLineEdit(PackagingMaterial packagingMaterial, PackagingUnitOption unit, PackagingLineAuthoredField authoredField, decimal authoredValue)
+public class PackagingLineEdit(RawMaterial packagingMaterial, RawMaterialUnitOption unit, PackagingLineAuthoredField authoredField, decimal authoredValue)
 {
-    public PackagingMaterial PackagingMaterial { get; } = packagingMaterial;
+    public RawMaterial PackagingMaterial { get; } = packagingMaterial;
 
     /// <summary>The unit QtyPerPiece and PiecesPerPackagingUnit are in: the material's base unit or one of its alternative units.</summary>
-    public PackagingUnitOption Unit { get; } = unit;
+    public RawMaterialUnitOption Unit { get; } = unit;
 
     public PackagingLineAuthoredField AuthoredField { get; } = authoredField;
 
@@ -80,7 +80,8 @@ public class ProductsViewModel : ViewModelBase
 
     public ObservableCollection<SubAssembly> SubAssembliesForSelectedRole { get; } = [];
 
-    public ObservableCollection<PackagingMaterial> PackagingMaterials { get; } = [];
+    /// <summary>The packaging materials only: ingredients never go on a packaging line.</summary>
+    public ObservableCollection<RawMaterial> PackagingMaterials { get; } = [];
 
     public IReadOnlyList<PackagingLineAuthoredField> AuthoredFieldOptions { get; } = Enum.GetValues<PackagingLineAuthoredField>();
 
@@ -160,18 +161,18 @@ public class ProductsViewModel : ViewModelBase
         private set => this.RaiseAndSetIfChanged(ref _isPackagingLinked, value);
     }
 
-    private PackagingMaterial? _editingLinePackagingMaterial;
-    public PackagingMaterial? EditingLinePackagingMaterial
+    private RawMaterial? _editingLinePackagingMaterial;
+    public RawMaterial? EditingLinePackagingMaterial
     {
         get => _editingLinePackagingMaterial;
         set => this.RaiseAndSetIfChanged(ref _editingLinePackagingMaterial, value);
     }
 
     /// <summary>The picked material's units, for the line editor's unit picker.</summary>
-    public ObservableCollection<PackagingUnitOption> EntryUnitOptions { get; } = [];
+    public ObservableCollection<RawMaterialUnitOption> EntryUnitOptions { get; } = [];
 
-    private PackagingUnitOption? _editingLineUnit;
-    public PackagingUnitOption? EditingLineUnit
+    private RawMaterialUnitOption? _editingLineUnit;
+    public RawMaterialUnitOption? EditingLineUnit
     {
         get => _editingLineUnit;
         set => this.RaiseAndSetIfChanged(ref _editingLineUnit, value);
@@ -316,7 +317,7 @@ public class ProductsViewModel : ViewModelBase
         IProductCloner productCloner,
         ISubAssemblyRepository subAssemblyRepository,
         ISubAssemblyRoleRepository subAssemblyRoleRepository,
-        IPackagingMaterialRepository packagingMaterialRepository,
+        IRawMaterialRepository rawMaterialRepository,
         IValidator<Product> productValidator,
         IValidator<CostingParameters> costingParametersValidator,
         ILogger logger)
@@ -393,7 +394,7 @@ public class ProductsViewModel : ViewModelBase
         {
             var roles = await subAssemblyRoleRepository.GetAllAsync(CancellationToken.None);
             var subAssemblies = await subAssemblyRepository.GetAllAsync(CancellationToken.None);
-            var packagingMaterials = await packagingMaterialRepository.GetAllAsync(CancellationToken.None);
+            var rawMaterials = await rawMaterialRepository.GetAllAsync(CancellationToken.None);
             var products = await _productRepository.GetAllAsync(CancellationToken.None);
 
             // The selected product's saved usage costs and tab links can change on other tabs too
@@ -419,7 +420,7 @@ public class ProductsViewModel : ViewModelBase
             {
                 Roles.MergeFrom(roles, r => r.Id);
                 SubAssemblies.MergeFrom([.. subAssemblies.OrderBy(s => s.Name)], s => s.Id);
-                PackagingMaterials.MergeFrom([.. packagingMaterials.OrderBy(m => m.Name)], m => m.Id);
+                PackagingMaterials.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Packaging).OrderBy(m => m.Name)], m => m.Id);
                 _productCache.MergeFrom(products);
 
                 SelectedProduct = Products.FirstOrDefault(p => p.Id == selectedId);
@@ -631,11 +632,11 @@ public class ProductsViewModel : ViewModelBase
     }
 
     /// <summary>Fills the line editor's unit picker with <paramref name="material"/>'s units and picks the one with <paramref name="keepUnitId"/>, else its base unit.</summary>
-    private void ReplaceEntryUnitOptions(PackagingMaterial? material, int? keepUnitId)
+    private void ReplaceEntryUnitOptions(RawMaterial? material, int? keepUnitId)
     {
         EditingLineUnit = null;
         EntryUnitOptions.Clear();
-        EntryUnitOptions.AddRange(PackagingUnitOption.For(material));
+        EntryUnitOptions.AddRange(RawMaterialUnitOption.For(material));
         EditingLineUnit = EntryUnitOptions.FirstOrDefault(o => o.UnitId == keepUnitId) ?? EntryUnitOptions.FirstOrDefault();
     }
 
@@ -673,7 +674,7 @@ public class ProductsViewModel : ViewModelBase
             }
 
             // The same unit on the refreshed material, or its base unit if that unit is gone.
-            var options = PackagingUnitOption.For(material);
+            var options = RawMaterialUnitOption.For(material);
             var unit = options.FirstOrDefault(o => o.UnitId == edit.Unit.UnitId) ?? options[0];
 
             var wasSelected = ReferenceEquals(SelectedLineEdit, edit);
@@ -721,7 +722,7 @@ public class ProductsViewModel : ViewModelBase
         {
             LineEdits.Add(new PackagingLineEdit(
                 line.PackagingMaterial!,
-                new PackagingUnitOption(line.PackagingMaterialUnit, line.PackagingMaterial!.BaseUnit),
+                new RawMaterialUnitOption(line.Unit, line.PackagingMaterial!),
                 line.AuthoredField,
                 line.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? line.QtyPerPiece : line.PiecesPerPackagingUnit));
         }

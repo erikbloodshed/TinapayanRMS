@@ -16,7 +16,7 @@ namespace TinapayanRMS.Infrastructure.Services;
 public class SubAssemblyCostPropagator(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory)
 {
     /// <summary>
-    /// Call after one or more ingredients' CostPerGram values have changed and been saved.
+    /// Call after one or more ingredients' costs (CostPerBaseUnit) have changed and been saved.
     /// Recomputes every sub-assembly that has a line referencing any of them; a no-op if
     /// none do.
     /// </summary>
@@ -54,7 +54,7 @@ public class SubAssemblyCostPropagator(IDbContextFactory<TinapayanRMSDbContext> 
         foreach (var subAssemblyId in affectedSubAssemblyIds)
         {
             var costInputs = linesBySubAssemblyId[subAssemblyId]
-                .Select(l => (l.Grams, IngredientCostPerGram: l.Ingredient!.CostPerGram))
+                .Select(l => (l.Grams, IngredientCostPerGram: l.Ingredient!.CostPerBaseUnit))
                 .ToList();
 
             var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(costInputs);

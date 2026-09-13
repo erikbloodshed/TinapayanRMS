@@ -131,7 +131,7 @@ public class CollectionMergeTests
         public string Name { get; set; } = string.Empty;
     }
 
-    /// <summary>Shaped like IngredientUnit: an owned row that references a unit of measure.</summary>
+    /// <summary>Shaped like RawMaterialUnit: an owned row that references a unit of measure.</summary>
     public sealed class TestOwnedUnit
     {
         public int Id { get; set; }

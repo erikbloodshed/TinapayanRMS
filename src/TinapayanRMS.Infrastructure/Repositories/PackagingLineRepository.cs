@@ -57,12 +57,12 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             .Include(l => l.PackagingMaterial)
             .ThenInclude(m => m!.Units.OrderByDescending(u => u.BaseUnitsPerUnit))
             .ThenInclude(u => u.UnitOfMeasure)
-            .Include(l => l.PackagingMaterialUnit)
+            .Include(l => l.Unit)
             .ThenInclude(u => u!.UnitOfMeasure);
 
     public async Task SetLinesAsync(
         int productId,
-        IReadOnlyList<(int PackagingMaterialId, int? PackagingMaterialUnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
+        IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
         CancellationToken cancellationToken)
     {
         ProductRules.EnsureValidPackagingLines([.. lines.Select(l => (l.PackagingMaterialId, l.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? l.AuthoredValue : 1m / l.AuthoredValue))]);
@@ -82,24 +82,30 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             throw new InvalidOperationException("The Packaging tab is Live Template-linked — unlink it before editing its lines directly.");
         }
 
-        var existingMaterialIds = await dbContext.PackagingMaterials
-            .Where(m => lines.Select(l => l.PackagingMaterialId).Contains(m.Id))
-            .Select(m => m.Id)
-            .ToListAsync(cancellationToken);
-
-        if (lines.Select(l => l.PackagingMaterialId).Except(existingMaterialIds).Cast<int?>().FirstOrDefault() is { } missingMaterialId)
-        {
-            throw new InvalidOperationException($"Packaging material {missingMaterialId} does not exist.");
-        }
-
-        var unitIds = lines.Where(l => l.PackagingMaterialUnitId is not null).Select(l => l.PackagingMaterialUnitId!.Value).Distinct().ToList();
-        var materialIdByUnitId = await dbContext.PackagingMaterialUnits
-            .Where(u => unitIds.Contains(u.Id))
-            .ToDictionaryAsync(u => u.Id, u => u.PackagingMaterialId, cancellationToken);
+        var materialIds = lines.Select(l => l.PackagingMaterialId).ToList();
+        var materials = await dbContext.RawMaterials
+            .Where(m => materialIds.Contains(m.Id))
+            .Select(m => new { m.Id, m.Name, m.Type })
+            .ToDictionaryAsync(m => m.Id, cancellationToken);
 
         foreach (var line in lines)
         {
-            if (line.PackagingMaterialUnitId is { } unitId
+            if (!materials.TryGetValue(line.PackagingMaterialId, out var material))
+            {
+                throw new InvalidOperationException($"Packaging material {line.PackagingMaterialId} does not exist.");
+            }
+
+            RawMaterialRules.EnsureUsableAsPackaging(material.Type, material.Name);
+        }
+
+        var unitIds = lines.Where(l => l.UnitId is not null).Select(l => l.UnitId!.Value).Distinct().ToList();
+        var materialIdByUnitId = await dbContext.RawMaterialUnits
+            .Where(u => unitIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.RawMaterialId, cancellationToken);
+
+        foreach (var line in lines)
+        {
+            if (line.UnitId is { } unitId
                 && (!materialIdByUnitId.TryGetValue(unitId, out var unitMaterialId) || unitMaterialId != line.PackagingMaterialId))
             {
                 throw new InvalidOperationException("A packaging line's unit must be one of that material's own units.");
@@ -117,7 +123,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             {
                 ProductId = productId,
                 PackagingMaterialId = l.PackagingMaterialId,
-                PackagingMaterialUnitId = l.PackagingMaterialUnitId,
+                UnitId = l.UnitId,
                 QtyPerPiece = qtyPerPiece,
                 PiecesPerPackagingUnit = piecesPerPackagingUnit,
                 AuthoredField = l.AuthoredField,

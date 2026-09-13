@@ -21,9 +21,9 @@ public class PackagingLineConfiguration : IEntityTypeConfiguration<PackagingLine
             .OnDelete(DeleteBehavior.Restrict);
 
         // A material's unit can't be deleted while a line is entered in it.
-        builder.HasOne(l => l.PackagingMaterialUnit)
+        builder.HasOne(l => l.Unit)
             .WithMany()
-            .HasForeignKey(l => l.PackagingMaterialUnitId)
+            .HasForeignKey(l => l.UnitId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(l => new { l.ProductId, l.PackagingMaterialId }).IsUnique();

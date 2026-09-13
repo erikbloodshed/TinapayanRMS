@@ -28,8 +28,8 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
     private async Task<int> SeedCategoryAsync(string name)
     {
         await using var dbContext = CreateDbContext();
-        var category = new IngredientCategory { Name = name };
-        dbContext.IngredientCategories.Add(category);
+        var category = new RawMaterialCategory { Name = name };
+        dbContext.RawMaterialCategories.Add(category);
         await dbContext.SaveChangesAsync(Cancellation);
         return category.Id;
     }
@@ -37,13 +37,13 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
     private async Task<int> SeedPurchasedIngredientAsync(string name, int categoryId)
     {
         await using var dbContext = CreateDbContext();
-        var ingredient = new Ingredient
+        var ingredient = new RawMaterial
         {
             Name = name,
-            IngredientCategoryId = categoryId,
-            Source = IngredientSource.Purchased,
+            CategoryId = categoryId,
+            Source = RawMaterialSource.Purchased,
         };
-        dbContext.Ingredients.Add(ingredient);
+        dbContext.RawMaterials.Add(ingredient);
         await dbContext.SaveChangesAsync(Cancellation);
         return ingredient.Id;
     }
@@ -51,8 +51,8 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
     private async Task SetIngredientCostPerGramAsync(int ingredientId, decimal costPerGram)
     {
         await using var dbContext = CreateDbContext();
-        var ingredient = await dbContext.Ingredients.SingleAsync(i => i.Id == ingredientId, Cancellation);
-        ingredient.CostPerGram = costPerGram;
+        var ingredient = await dbContext.RawMaterials.SingleAsync(i => i.Id == ingredientId, Cancellation);
+        ingredient.CostPerBaseUnit = costPerGram;
         await dbContext.SaveChangesAsync(Cancellation);
     }
 
@@ -69,6 +69,32 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
     {
         await using var dbContext = CreateDbContext();
         return await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == id, Cancellation);
+    }
+
+    [Fact]
+    public async Task SetLinesAsync_rejects_a_packaging_material_without_deleting_the_existing_lines()
+    {
+        var roleId = await SeedRoleAsync("Filling");
+        var categoryId = await SeedCategoryAsync("Fillings");
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
+        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
+        await CreateLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, null, 100m)], Cancellation);
+
+        var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
+        int boxId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var box = new RawMaterial { Type = RawMaterialType.Packaging, Name = "Cake Box", CategoryId = categoryId, BaseUnitId = pieceId };
+            dbContext.RawMaterials.Add(box);
+            await dbContext.SaveChangesAsync(Cancellation);
+            boxId = box.Id;
+        }
+
+        var act = () => CreateLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, null, 100m), (boxId, null, 1m)], Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'Cake Box' is packaging*");
+        (await CreateLineRepository().GetForSubAssemblyAsync(subAssemblyId, Cancellation))
+            .Should().ContainSingle("the existing lines survive a rejected replacement");
     }
 
     [Fact]
@@ -104,8 +130,8 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         int eggPieceId;
         await using (var dbContext = CreateDbContext())
         {
-            var piece = new IngredientUnit { IngredientId = eggId, UnitOfMeasureId = pieceId, GramsPerUnit = 50m };
-            dbContext.IngredientUnits.Add(piece);
+            var piece = new RawMaterialUnit { RawMaterialId = eggId, UnitOfMeasureId = pieceId, BaseUnitsPerUnit = 50m };
+            dbContext.RawMaterialUnits.Add(piece);
             await dbContext.SaveChangesAsync(Cancellation);
             eggPieceId = piece.Id;
         }
@@ -115,7 +141,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         var line = (await CreateLineRepository().GetForSubAssemblyAsync(subAssemblyId, Cancellation)).Should().ContainSingle().Subject;
         line.Quantity.Should().Be(3m);
-        line.IngredientUnit!.UnitOfMeasure!.Name.Should().Be("piece");
+        line.Unit!.UnitOfMeasure!.Name.Should().Be("piece");
         line.Grams.Should().Be(150m);
 
         var subAssembly = await GetSubAssemblyAsync(subAssemblyId);
@@ -207,7 +233,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         await CreateLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, null, 100m)], Cancellation);
 
         await using var dbContext = CreateDbContext();
-        var act = () => dbContext.Ingredients.Where(i => i.Id == sugarId).ExecuteDeleteAsync(Cancellation);
+        var act = () => dbContext.RawMaterials.Where(i => i.Id == sugarId).ExecuteDeleteAsync(Cancellation);
 
         await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
     }

@@ -44,8 +44,8 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
     private async Task<int> SeedPackagingCategoryAsync(string name)
     {
         await using var dbContext = CreateDbContext();
-        var category = new PackagingCategory { Name = name };
-        dbContext.PackagingCategories.Add(category);
+        var category = new RawMaterialCategory { Name = name };
+        dbContext.RawMaterialCategories.Add(category);
         await dbContext.SaveChangesAsync(Cancellation);
         return category.Id;
     }
@@ -53,15 +53,16 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
     private async Task<int> SeedPackagingMaterialAsync(string name, int categoryId, int standardUnitId, decimal purchaseUnitQty, decimal currentCost)
     {
         await using var dbContext = CreateDbContext();
-        var material = new PackagingMaterial
+        var material = new RawMaterial
         {
+            Type = RawMaterialType.Packaging,
             Name = name,
-            PackagingCategoryId = categoryId,
+            CategoryId = categoryId,
             BaseUnitId = standardUnitId,
             // Priced as currentCost per purchaseUnitQty base units, as these tests were written.
             CostPerBaseUnit = currentCost / purchaseUnitQty,
         };
-        dbContext.PackagingMaterials.Add(material);
+        dbContext.RawMaterials.Add(material);
         await dbContext.SaveChangesAsync(Cancellation);
         return material.Id;
     }

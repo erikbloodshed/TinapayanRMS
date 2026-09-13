@@ -14,14 +14,14 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
         return await dbContext.SubAssemblyLines
             .AsNoTracking()
             .Include(l => l.Ingredient)
-            .Include(l => l.IngredientUnit)
+            .Include(l => l.Unit)
             .ThenInclude(u => u!.UnitOfMeasure)
             .Where(l => l.SubAssemblyId == subAssemblyId)
             .ToListAsync(cancellationToken);
     }
 
     public async Task SetLinesAsync(
-        int subAssemblyId, IReadOnlyList<(int IngredientId, int? IngredientUnitId, decimal Quantity)> lines, CancellationToken cancellationToken)
+        int subAssemblyId, IReadOnlyList<(int IngredientId, int? UnitId, decimal Quantity)> lines, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
@@ -31,16 +31,20 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
         var grams = await IngredientQuantityConverter.ToGramsAsync(dbContext, lines, cancellationToken);
         SubAssemblyRules.EnsureValidLines([.. lines.Select((l, i) => (l.IngredientId, grams[i]))]);
 
-        var ingredientCosts = await dbContext.Ingredients
-            .Where(i => lines.Select(l => l.IngredientId).Contains(i.Id))
-            .ToDictionaryAsync(i => i.Id, i => i.CostPerGram, cancellationToken);
+        var ingredientIds = lines.Select(l => l.IngredientId).ToList();
+        var ingredients = await dbContext.RawMaterials
+            .Where(m => ingredientIds.Contains(m.Id))
+            .Select(m => new { m.Id, m.Name, m.Type, m.CostPerBaseUnit })
+            .ToDictionaryAsync(m => m.Id, cancellationToken);
 
         foreach (var line in lines)
         {
-            if (!ingredientCosts.ContainsKey(line.IngredientId))
+            if (!ingredients.TryGetValue(line.IngredientId, out var ingredient))
             {
                 throw new InvalidOperationException($"Ingredient {line.IngredientId} does not exist.");
             }
+
+            RawMaterialRules.EnsureUsableInRecipes(ingredient.Type, ingredient.Name);
         }
 
         await dbContext.SubAssemblyLines
@@ -52,11 +56,11 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
             SubAssemblyId = subAssemblyId,
             IngredientId = l.IngredientId,
             Quantity = l.Quantity,
-            IngredientUnitId = l.IngredientUnitId,
+            UnitId = l.UnitId,
             Grams = grams[i],
         }));
 
-        var costInputs = lines.Select((l, i) => (grams[i], IngredientCostPerGram: ingredientCosts[l.IngredientId])).ToList();
+        var costInputs = lines.Select((l, i) => (grams[i], IngredientCostPerGram: ingredients[l.IngredientId].CostPerBaseUnit)).ToList();
         (subAssembly.TotalWeight, subAssembly.TotalCost) = SubAssemblyRules.CalculateTotals(costInputs);
 
         await dbContext.SaveChangesAsync(cancellationToken);

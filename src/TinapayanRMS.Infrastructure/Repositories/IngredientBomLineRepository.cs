@@ -17,21 +17,22 @@ public class IngredientBomLineRepository(
         return await dbContext.IngredientBomLines
             .AsNoTracking()
             .Include(l => l.ComponentIngredient)
-            .Include(l => l.IngredientUnit)
+            .Include(l => l.Unit)
             .ThenInclude(u => u!.UnitOfMeasure)
             .Where(l => l.IngredientId == ingredientId)
             .ToListAsync(cancellationToken);
     }
 
     public async Task SetLinesAsync(
-        int ingredientId, IReadOnlyList<(int ComponentIngredientId, int? IngredientUnitId, decimal Quantity)> lines, CancellationToken cancellationToken)
+        int ingredientId, IReadOnlyList<(int ComponentIngredientId, int? UnitId, decimal Quantity)> lines, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var ingredient = await dbContext.Ingredients.FirstOrDefaultAsync(i => i.Id == ingredientId, cancellationToken)
+        var ingredient = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == ingredientId, cancellationToken)
             ?? throw new InvalidOperationException($"Ingredient {ingredientId} does not exist.");
 
-        if (ingredient.Source != IngredientSource.Made)
+        // Made implies the Ingredient type (RawMaterialRules.EnsureFieldsMatchType).
+        if (ingredient.Source != RawMaterialSource.Made)
         {
             throw new InvalidOperationException("Only made ingredients have a BOM.");
         }
@@ -51,18 +52,20 @@ public class IngredientBomLineRepository(
 
         IngredientBomRules.EnsureNoCycle(ingredientId, lines.Select(l => l.ComponentIngredientId), componentIdsByIngredientId);
 
-        var existingComponentIds = await dbContext.Ingredients
-            .Where(i => lines.Select(l => l.ComponentIngredientId).Contains(i.Id))
-            .Select(i => i.Id)
-            .ToListAsync(cancellationToken);
-        var existingComponentIdSet = existingComponentIds.ToHashSet();
+        var componentIds = lines.Select(l => l.ComponentIngredientId).ToList();
+        var components = await dbContext.RawMaterials
+            .Where(m => componentIds.Contains(m.Id))
+            .Select(m => new { m.Id, m.Name, m.Type })
+            .ToDictionaryAsync(m => m.Id, cancellationToken);
 
         foreach (var line in lines)
         {
-            if (!existingComponentIdSet.Contains(line.ComponentIngredientId))
+            if (!components.TryGetValue(line.ComponentIngredientId, out var component))
             {
                 throw new InvalidOperationException($"Ingredient {line.ComponentIngredientId} does not exist.");
             }
+
+            RawMaterialRules.EnsureUsableInRecipes(component.Type, component.Name);
         }
 
         await dbContext.IngredientBomLines
@@ -74,13 +77,13 @@ public class IngredientBomLineRepository(
             IngredientId = ingredientId,
             ComponentIngredientId = l.ComponentIngredientId,
             Quantity = l.Quantity,
-            IngredientUnitId = l.IngredientUnitId,
+            UnitId = l.UnitId,
             Grams = grams[i],
         }));
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // Recomputes ingredientId's own CostPerGram from the lines just saved, then
+        // Recomputes ingredientId's own CostPerBaseUnit from the lines just saved, then
         // ripples the change to anything that depends on it.
         await costPropagator.RecomputeAndPropagateAsync(ingredientId, cancellationToken);
     }

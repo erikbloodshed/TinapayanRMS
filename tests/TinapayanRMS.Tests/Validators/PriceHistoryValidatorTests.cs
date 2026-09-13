@@ -6,27 +6,21 @@ namespace TinapayanRMS.Tests.Validators;
 
 public class PriceHistoryValidatorTests
 {
-    [Fact]
-    public void IngredientPriceHistoryValidator_accepts_a_positive_price()
+    private readonly RawMaterialPriceHistoryValidator _validator = new();
+
+    [Theory]
+    [InlineData(90)]
+    [InlineData(1)]
+    public void Accepts_a_positive_price(decimal price)
     {
-        new IngredientPriceHistoryValidator().Validate(new IngredientPriceHistory { Price = 90m }).IsValid.Should().BeTrue();
+        _validator.Validate(new RawMaterialPriceHistory { Price = price }).IsValid.Should().BeTrue();
     }
 
-    [Fact]
-    public void IngredientPriceHistoryValidator_rejects_a_non_positive_price()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void Rejects_a_non_positive_price(decimal price)
     {
-        new IngredientPriceHistoryValidator().Validate(new IngredientPriceHistory { Price = 0m }).IsValid.Should().BeFalse();
-    }
-
-    [Fact]
-    public void PackagingPriceHistoryValidator_accepts_a_positive_price()
-    {
-        new PackagingPriceHistoryValidator().Validate(new PackagingPriceHistory { Price = 45m }).IsValid.Should().BeTrue();
-    }
-
-    [Fact]
-    public void PackagingPriceHistoryValidator_rejects_a_non_positive_price()
-    {
-        new PackagingPriceHistoryValidator().Validate(new PackagingPriceHistory { Price = -5m }).IsValid.Should().BeFalse();
+        _validator.Validate(new RawMaterialPriceHistory { Price = price }).IsValid.Should().BeFalse();
     }
 }

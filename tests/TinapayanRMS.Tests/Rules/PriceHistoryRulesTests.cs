@@ -46,7 +46,7 @@ public class PriceHistoryRulesTests
     [Fact]
     public void FindLatest_picks_the_most_recent_date()
     {
-        IngredientPriceHistory[] entries =
+        RawMaterialPriceHistory[] entries =
         [
             new() { Id = 1, Date = new DateOnly(2026, 1, 1), Price = 80m },
             new() { Id = 2, Date = new DateOnly(2026, 3, 1), Price = 90m },
@@ -62,7 +62,7 @@ public class PriceHistoryRulesTests
     [Fact]
     public void FindLatest_breaks_a_tied_date_by_the_highest_id()
     {
-        IngredientPriceHistory[] entries =
+        RawMaterialPriceHistory[] entries =
         [
             new() { Id = 1, Date = new DateOnly(2026, 1, 1), Price = 80m },
             new() { Id = 5, Date = new DateOnly(2026, 1, 1), Price = 82m },
@@ -78,15 +78,15 @@ public class PriceHistoryRulesTests
     [Fact]
     public void FindLatest_returns_null_for_no_entries()
     {
-        PriceHistoryRules.FindLatest(Array.Empty<IngredientPriceHistory>()).Should().BeNull();
+        PriceHistoryRules.FindLatest(Array.Empty<RawMaterialPriceHistory>()).Should().BeNull();
     }
 
     [Fact]
     public void FindLatestAfterAdding_picks_an_unsaved_entry_on_the_same_date_as_the_current_latest()
     {
         // The unsaved entry's id is still 0, but it will be the most recently added once saved.
-        var currentLatest = new IngredientPriceHistory { Id = 11, Date = new DateOnly(2026, 9, 13), Price = 13500m };
-        var added = new IngredientPriceHistory { Date = new DateOnly(2026, 9, 13), Price = 13600m };
+        var currentLatest = new RawMaterialPriceHistory { Id = 11, Date = new DateOnly(2026, 9, 13), Price = 13500m };
+        var added = new RawMaterialPriceHistory { Date = new DateOnly(2026, 9, 13), Price = 13600m };
 
         PriceHistoryRules.FindLatestAfterAdding(currentLatest, added).Should().BeSameAs(added);
     }
@@ -94,8 +94,8 @@ public class PriceHistoryRulesTests
     [Fact]
     public void FindLatestAfterAdding_keeps_the_current_latest_when_the_added_entry_is_older()
     {
-        var currentLatest = new IngredientPriceHistory { Id = 11, Date = new DateOnly(2026, 9, 13), Price = 13500m };
-        var added = new IngredientPriceHistory { Date = new DateOnly(2026, 9, 1), Price = 13000m };
+        var currentLatest = new RawMaterialPriceHistory { Id = 11, Date = new DateOnly(2026, 9, 13), Price = 13500m };
+        var added = new RawMaterialPriceHistory { Date = new DateOnly(2026, 9, 1), Price = 13000m };
 
         PriceHistoryRules.FindLatestAfterAdding(currentLatest, added).Should().BeSameAs(currentLatest);
     }
@@ -103,7 +103,7 @@ public class PriceHistoryRulesTests
     [Fact]
     public void FindLatestAfterAdding_picks_the_added_entry_when_there_is_no_other()
     {
-        var added = new IngredientPriceHistory { Date = new DateOnly(2026, 9, 1), Price = 13000m };
+        var added = new RawMaterialPriceHistory { Date = new DateOnly(2026, 9, 1), Price = 13000m };
 
         PriceHistoryRules.FindLatestAfterAdding(null, added).Should().BeSameAs(added);
     }

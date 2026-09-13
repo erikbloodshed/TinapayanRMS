@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
+using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Tests.Fixtures;
 
@@ -29,6 +30,10 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
 
     protected IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
         new TestDbContextFactory(CreateDbContextOptions());
+
+    /// <summary>The ingredient cost cascade the raw material repositories hand ingredient cost changes to.</summary>
+    protected IngredientCostPropagator CreateCostPropagator() =>
+        new(CreateDbContextFactory(), new SubAssemblyCostPropagator(CreateDbContextFactory()));
 
     /// <summary>
     /// UnitOfMeasure has no migration-seeded rows (Phase: units are fully user-managed,
@@ -74,8 +79,8 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
         var kilogramId = await GetOrCreateUnitOfMeasureAsync("kilogram", "kg");
 
         await using var dbContext = CreateDbContext();
-        var unit = new IngredientUnit { IngredientId = ingredientId, UnitOfMeasureId = kilogramId, GramsPerUnit = 1000m };
-        dbContext.IngredientUnits.Add(unit);
+        var unit = new RawMaterialUnit { RawMaterialId = ingredientId, UnitOfMeasureId = kilogramId, BaseUnitsPerUnit = 1000m };
+        dbContext.RawMaterialUnits.Add(unit);
         await dbContext.SaveChangesAsync(Cancellation);
         return unit.Id;
     }
@@ -84,8 +89,8 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
     protected async Task<int> KilogramUnitIdAsync(int ingredientId)
     {
         await using var dbContext = CreateDbContext();
-        return await dbContext.IngredientUnits
-            .Where(u => u.IngredientId == ingredientId && u.UnitOfMeasure!.Name == "kilogram")
+        return await dbContext.RawMaterialUnits
+            .Where(u => u.RawMaterialId == ingredientId && u.UnitOfMeasure!.Name == "kilogram")
             .Select(u => u.Id)
             .SingleAsync(Cancellation);
     }

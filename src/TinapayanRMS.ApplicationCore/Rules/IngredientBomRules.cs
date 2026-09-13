@@ -77,9 +77,10 @@ public static class IngredientBomRules
     }
 
     /// <summary>
-    /// Output grams = Σ line grams × (1 − weightLossPercent / 100); CostPerGram = Σ (line
-    /// grams × component CostPerGram) / output grams. lines carry each component's CURRENT
-    /// CostPerGram, which the caller must have already up to date (see IngredientCostGraph).
+    /// Output grams = Σ line grams × (1 − weightLossPercent / 100); cost per gram = Σ (line
+    /// grams × component cost per gram) / output grams. lines carry each component's CURRENT
+    /// cost per gram (its CostPerBaseUnit), which the caller must have already up to date (see
+    /// IngredientCostGraph).
     /// </summary>
     public static (decimal OutputGrams, decimal CostPerGram) CalculateCost(
         IReadOnlyList<(decimal Grams, decimal ComponentCostPerGram)> lines,

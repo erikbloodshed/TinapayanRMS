@@ -24,85 +24,106 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
     }
 
     [Fact]
-    public async Task An_ingredient_category_can_be_inserted_and_read_back()
+    public async Task A_category_can_be_inserted_and_read_back()
     {
         await using (var dbContext = CreateDbContext())
         {
-            dbContext.IngredientCategories.Add(new IngredientCategory { Name = "Flour" });
+            dbContext.RawMaterialCategories.Add(new RawMaterialCategory { Name = "Flour" });
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
         await using (var dbContext = CreateDbContext())
         {
-            var category = await dbContext.IngredientCategories.SingleAsync(Cancellation);
+            var category = await dbContext.RawMaterialCategories.SingleAsync(Cancellation);
             category.Name.Should().Be("Flour");
         }
     }
 
     [Fact]
-    public async Task A_packaging_category_can_be_inserted_and_read_back()
-    {
-        await using (var dbContext = CreateDbContext())
-        {
-            dbContext.PackagingCategories.Add(new PackagingCategory { Name = "Ribbons" });
-            await dbContext.SaveChangesAsync(Cancellation);
-        }
-
-        await using (var dbContext = CreateDbContext())
-        {
-            var category = await dbContext.PackagingCategories.SingleAsync(Cancellation);
-            category.Name.Should().Be("Ribbons");
-        }
-    }
-
-    [Fact]
-    public async Task Duplicate_ingredient_category_names_are_rejected()
+    public async Task Duplicate_category_names_are_rejected()
     {
         await using var dbContext = CreateDbContext();
 
-        dbContext.IngredientCategories.Add(new IngredientCategory { Name = "Dairy" });
+        dbContext.RawMaterialCategories.Add(new RawMaterialCategory { Name = "Dairy" });
         await dbContext.SaveChangesAsync(Cancellation);
 
-        dbContext.IngredientCategories.Add(new IngredientCategory { Name = "Dairy" });
+        dbContext.RawMaterialCategories.Add(new RawMaterialCategory { Name = "Dairy" });
         var act = () => dbContext.SaveChangesAsync(Cancellation);
 
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
-    private IngredientCategoryRepository CreateIngredientCategoryRepository() => new(CreateDbContextFactory());
+    [Fact]
+    public async Task One_category_can_hold_both_ingredients_and_packaging()
+    {
+        var category = await SeedCategoryAsync("Butter");
+        var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
 
-    private PackagingCategoryRepository CreatePackagingCategoryRepository() => new(CreateDbContextFactory());
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.RawMaterials.Add(new RawMaterial { Name = "Unsalted Butter", Type = RawMaterialType.Ingredient, CategoryId = category.Id });
+            dbContext.RawMaterials.Add(new RawMaterial { Name = "Butter Tub", Type = RawMaterialType.Packaging, CategoryId = category.Id, BaseUnitId = pieceId });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        await using (var dbContext = CreateDbContext())
+        {
+            var types = await dbContext.RawMaterials.Where(m => m.CategoryId == category.Id).Select(m => m.Type).ToListAsync(Cancellation);
+            types.Should().BeEquivalentTo([RawMaterialType.Ingredient, RawMaterialType.Packaging]);
+        }
+    }
+
+    private RawMaterialCategoryRepository CreateRepository() => new(CreateDbContextFactory());
+
+    private async Task<RawMaterialCategory> SeedCategoryAsync(string name)
+    {
+        var repository = CreateRepository();
+        await repository.AddAsync(new RawMaterialCategory { Name = name }, Cancellation);
+        return (await repository.GetAllAsync(Cancellation)).Single(c => c.Name == name);
+    }
 
     [Fact]
-    public async Task IngredientCategoryRepository_AddAsync_GetAllAsync_and_UpdateAsync_round_trip_a_category()
+    public async Task RawMaterialCategoryRepository_AddAsync_GetAllAsync_and_UpdateAsync_round_trip_a_category()
     {
-        var repository = CreateIngredientCategoryRepository();
+        var repository = CreateRepository();
 
-        await repository.AddAsync(new IngredientCategory { Name = "Flour" }, Cancellation);
+        await repository.AddAsync(new RawMaterialCategory { Name = "Flour" }, Cancellation);
 
         var added = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
         added.Name.Should().Be("Flour");
 
-        await repository.UpdateAsync(new IngredientCategory { Id = added.Id, Name = "Flours & Starches" }, Cancellation);
+        await repository.UpdateAsync(new RawMaterialCategory { Id = added.Id, Name = "Flours & Starches" }, Cancellation);
 
         var updated = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
         updated.Name.Should().Be("Flours & Starches");
     }
 
     [Fact]
-    public async Task IngredientCategoryRepository_UpdateAsync_rejects_a_nonexistent_category()
+    public async Task RawMaterialCategoryRepository_GetAllAsync_orders_by_name()
     {
-        var act = () => CreateIngredientCategoryRepository().UpdateAsync(new IngredientCategory { Id = 999_999, Name = "Ghost" }, Cancellation);
+        var repository = CreateRepository();
+        await repository.AddAsync(new RawMaterialCategory { Name = "Ribbons" }, Cancellation);
+        await repository.AddAsync(new RawMaterialCategory { Name = "Boxes" }, Cancellation);
+        await repository.AddAsync(new RawMaterialCategory { Name = "Flour" }, Cancellation);
+
+        var names = (await repository.GetAllAsync(Cancellation)).Select(c => c.Name);
+
+        names.Should().Equal("Boxes", "Flour", "Ribbons");
+    }
+
+    [Fact]
+    public async Task RawMaterialCategoryRepository_UpdateAsync_rejects_a_nonexistent_category()
+    {
+        var act = () => CreateRepository().UpdateAsync(new RawMaterialCategory { Id = 999_999, Name = "Ghost" }, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
-    public async Task IngredientCategoryRepository_DeleteAsync_removes_an_unused_category()
+    public async Task RawMaterialCategoryRepository_DeleteAsync_removes_an_unused_category()
     {
-        var repository = CreateIngredientCategoryRepository();
-        await repository.AddAsync(new IngredientCategory { Name = "Flour" }, Cancellation);
-        var category = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        var repository = CreateRepository();
+        var category = await SeedCategoryAsync("Flour");
 
         await repository.DeleteAsync(category.Id, Cancellation);
 
@@ -110,24 +131,23 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
     }
 
     [Fact]
-    public async Task Deleting_an_ingredient_category_that_is_in_use_is_blocked()
+    public async Task Deleting_a_category_that_an_ingredient_is_in_is_blocked()
     {
-        var repository = CreateIngredientCategoryRepository();
-        await repository.AddAsync(new IngredientCategory { Name = "Flour" }, Cancellation);
-        var category = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        var category = await SeedCategoryAsync("Flour");
 
         await using (var dbContext = CreateDbContext())
         {
-            dbContext.Ingredients.Add(new Ingredient
+            dbContext.RawMaterials.Add(new RawMaterial
             {
                 Name = "All-Purpose Flour",
-                IngredientCategoryId = category.Id,
-                Source = IngredientSource.Purchased,
+                Type = RawMaterialType.Ingredient,
+                CategoryId = category.Id,
+                Source = RawMaterialSource.Purchased,
             });
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
-        var act = () => repository.DeleteAsync(category.Id, Cancellation);
+        var act = () => CreateRepository().DeleteAsync(category.Id, Cancellation);
 
         // ExecuteDeleteAsync issues a raw DELETE outside EF Core's change tracker, so an
         // FK violation surfaces as the driver's own SqlException, not a DbUpdateException.
@@ -135,61 +155,24 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
     }
 
     [Fact]
-    public async Task PackagingCategoryRepository_AddAsync_GetAllAsync_and_UpdateAsync_round_trip_a_category()
+    public async Task Deleting_a_category_that_a_packaging_material_is_in_is_blocked()
     {
-        var repository = CreatePackagingCategoryRepository();
-
-        await repository.AddAsync(new PackagingCategory { Name = "Ribbons" }, Cancellation);
-
-        var added = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
-        added.Name.Should().Be("Ribbons");
-
-        await repository.UpdateAsync(new PackagingCategory { Id = added.Id, Name = "Ribbons & Bows" }, Cancellation);
-
-        var updated = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
-        updated.Name.Should().Be("Ribbons & Bows");
-    }
-
-    [Fact]
-    public async Task PackagingCategoryRepository_UpdateAsync_rejects_a_nonexistent_category()
-    {
-        var act = () => CreatePackagingCategoryRepository().UpdateAsync(new PackagingCategory { Id = 999_999, Name = "Ghost" }, Cancellation);
-
-        await act.Should().ThrowAsync<InvalidOperationException>();
-    }
-
-    [Fact]
-    public async Task PackagingCategoryRepository_DeleteAsync_removes_an_unused_category()
-    {
-        var repository = CreatePackagingCategoryRepository();
-        await repository.AddAsync(new PackagingCategory { Name = "Ribbons" }, Cancellation);
-        var category = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
-
-        await repository.DeleteAsync(category.Id, Cancellation);
-
-        (await repository.GetAllAsync(Cancellation)).Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task Deleting_a_packaging_category_that_is_in_use_is_blocked()
-    {
-        var repository = CreatePackagingCategoryRepository();
-        await repository.AddAsync(new PackagingCategory { Name = "Ribbons" }, Cancellation);
-        var category = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        var category = await SeedCategoryAsync("Ribbons");
         var baseUnitId = await SeedUnitOfMeasureAsync("centimeter", "cm");
 
         await using (var dbContext = CreateDbContext())
         {
-            dbContext.PackagingMaterials.Add(new PackagingMaterial
+            dbContext.RawMaterials.Add(new RawMaterial
             {
                 Name = "Satin Ribbon",
-                PackagingCategoryId = category.Id,
+                Type = RawMaterialType.Packaging,
+                CategoryId = category.Id,
                 BaseUnitId = baseUnitId,
             });
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
-        var act = () => repository.DeleteAsync(category.Id, Cancellation);
+        var act = () => CreateRepository().DeleteAsync(category.Id, Cancellation);
 
         await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
     }

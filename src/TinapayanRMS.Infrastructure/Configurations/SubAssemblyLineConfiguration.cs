@@ -21,9 +21,9 @@ public class SubAssemblyLineConfiguration : IEntityTypeConfiguration<SubAssembly
             .OnDelete(DeleteBehavior.Restrict);
 
         // An ingredient's unit can't be deleted while a line is entered in it.
-        builder.HasOne(l => l.IngredientUnit)
+        builder.HasOne(l => l.Unit)
             .WithMany()
-            .HasForeignKey(l => l.IngredientUnitId)
+            .HasForeignKey(l => l.UnitId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(l => new { l.SubAssemblyId, l.IngredientId }).IsUnique();

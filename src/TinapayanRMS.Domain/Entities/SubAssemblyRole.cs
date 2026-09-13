@@ -1,8 +1,8 @@
 namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>
-/// An editable lookup, unlike UnitOfMeasure/IngredientCategory/PackagingCategory — new
-/// roles (e.g. Glaze) can be added by the shop owner. Seeded with five starting roles.
+/// An editable lookup, like UnitOfMeasure and RawMaterialCategory — new roles (e.g. Glaze)
+/// can be added by the shop owner. Unlike them, it's seeded with five starting roles.
 /// </summary>
 public class SubAssemblyRole
 {

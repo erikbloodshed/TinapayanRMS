@@ -1,12 +1,12 @@
 namespace TinapayanRMS.ApplicationCore.Rules;
 
 /// <summary>
-/// Conversions between an item's alternative units and its base unit (grams for ingredients).
-/// A null factor means the quantity or price is already in the base unit.
+/// Conversions between a raw material's alternative units and its base unit (grams for an
+/// ingredient). A null factor means the quantity or price is already in the base unit.
 /// </summary>
 public static class UnitConversionRules
 {
-    /// <summary>The most alternative units one ingredient or packaging material can have, besides its base unit.</summary>
+    /// <summary>The most alternative units one raw material can have, besides its base unit.</summary>
     public const int MaxAlternativeUnits = 2;
 
     /// <summary>An item already holding <see cref="MaxAlternativeUnits"/> alternative units can't take another.</summary>

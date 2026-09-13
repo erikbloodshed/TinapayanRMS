@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Tests.Fixtures;
 
@@ -9,13 +10,13 @@ namespace TinapayanRMS.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private PackagingMaterialRepository CreateRepository() => new(CreateDbContextFactory());
+    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
 
     private async Task<int> SeedCategoryAsync()
     {
         await using var dbContext = CreateDbContext();
-        var category = new PackagingCategory { Name = "Ribbons" };
-        dbContext.PackagingCategories.Add(category);
+        var category = new RawMaterialCategory { Name = "Ribbons" };
+        dbContext.RawMaterialCategories.Add(category);
         await dbContext.SaveChangesAsync(Cancellation);
         return category.Id;
     }
@@ -27,17 +28,18 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm");
         var repository = CreateRepository();
 
-        await repository.AddAsync(new PackagingMaterial
+        await repository.AddAsync(new RawMaterial
         {
+            Type = RawMaterialType.Packaging,
             Name = "Satin Ribbon",
-            PackagingCategoryId = categoryId,
+            CategoryId = categoryId,
             BaseUnitId = centimeterId,
         }, Cancellation);
 
         var packagingMaterial = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
         packagingMaterial.Name.Should().Be("Satin Ribbon");
         packagingMaterial.BaseUnitId.Should().Be(centimeterId);
-        packagingMaterial.PackagingCategory.Should().NotBeNull();
+        packagingMaterial.Category.Should().NotBeNull();
         packagingMaterial.BaseUnit!.Abbreviation.Should().Be("cm");
         packagingMaterial.Units.Should().BeEmpty();
         packagingMaterial.CostPerBaseUnit.Should().Be(0m);
@@ -52,15 +54,16 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         var rollId = await SeedUnitOfMeasureAsync("roll", "roll");
         await using (var dbContext = CreateDbContext())
         {
-            dbContext.PackagingMaterials.Add(new PackagingMaterial
+            dbContext.RawMaterials.Add(new RawMaterial
             {
+                Type = RawMaterialType.Packaging,
                 Name = "Satin Ribbon",
-                PackagingCategoryId = categoryId,
+                CategoryId = categoryId,
                 BaseUnitId = centimeterId,
                 Units =
                 [
-                    new PackagingMaterialUnit { UnitOfMeasureId = meterId, BaseUnitsPerUnit = 100m },
-                    new PackagingMaterialUnit { UnitOfMeasureId = rollId, BaseUnitsPerUnit = 1000m, Description = "10 m roll" },
+                    new RawMaterialUnit { UnitOfMeasureId = meterId, BaseUnitsPerUnit = 100m },
+                    new RawMaterialUnit { UnitOfMeasureId = rollId, BaseUnitsPerUnit = 1000m, Description = "10 m roll" },
                 ],
             });
             await dbContext.SaveChangesAsync(Cancellation);
@@ -91,10 +94,10 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm");
         var repository = CreateRepository();
 
-        await repository.AddAsync(new PackagingMaterial { Name = "Satin Ribbon", PackagingCategoryId = categoryId, BaseUnitId = centimeterId }, Cancellation);
+        await repository.AddAsync(new RawMaterial { Type = RawMaterialType.Packaging, Name = "Satin Ribbon", CategoryId = categoryId, BaseUnitId = centimeterId }, Cancellation);
         var packagingMaterial = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
-        await new PackagingPriceHistoryRepository(CreateDbContextFactory()).AddAsync(
-            new PackagingPriceHistory { PackagingMaterialId = packagingMaterial.Id, Date = new DateOnly(2026, 1, 1), Price = 0.045m },
+        await new RawMaterialPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator()).AddAsync(
+            new RawMaterialPriceHistory { RawMaterialId = packagingMaterial.Id, Date = new DateOnly(2026, 1, 1), Price = 0.045m },
             Cancellation);
 
         packagingMaterial = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
@@ -116,7 +119,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm");
         var inchId = await SeedUnitOfMeasureAsync("inch", "in");
         var repository = CreateRepository();
-        await repository.AddAsync(new PackagingMaterial { Name = "Satin Ribbon", PackagingCategoryId = categoryId, BaseUnitId = centimeterId }, Cancellation);
+        await repository.AddAsync(new RawMaterial { Type = RawMaterialType.Packaging, Name = "Satin Ribbon", CategoryId = categoryId, BaseUnitId = centimeterId }, Cancellation);
         var packagingMaterial = (await repository.GetAllAsync(Cancellation)).Single();
 
         packagingMaterial.BaseUnitId = inchId;
@@ -133,10 +136,10 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         var inchId = await SeedUnitOfMeasureAsync("inch", "in");
         var rollId = await SeedUnitOfMeasureAsync("roll", "roll");
         var repository = CreateRepository();
-        await repository.AddAsync(new PackagingMaterial { Name = "Satin Ribbon", PackagingCategoryId = categoryId, BaseUnitId = centimeterId }, Cancellation);
+        await repository.AddAsync(new RawMaterial { Type = RawMaterialType.Packaging, Name = "Satin Ribbon", CategoryId = categoryId, BaseUnitId = centimeterId }, Cancellation);
         var packagingMaterial = (await repository.GetAllAsync(Cancellation)).Single();
-        await new PackagingMaterialUnitRepository(CreateDbContextFactory()).AddAsync(
-            new PackagingMaterialUnit { PackagingMaterialId = packagingMaterial.Id, UnitOfMeasureId = rollId, BaseUnitsPerUnit = 1000m }, Cancellation);
+        await new RawMaterialUnitRepository(CreateDbContextFactory(), CreateCostPropagator()).AddAsync(
+            new RawMaterialUnit { RawMaterialId = packagingMaterial.Id, UnitOfMeasureId = rollId, BaseUnitsPerUnit = 1000m }, Cancellation);
 
         packagingMaterial.BaseUnitId = inchId;
         var act = () => repository.UpdateAsync(packagingMaterial, Cancellation);
@@ -151,10 +154,10 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm");
         var inchId = await SeedUnitOfMeasureAsync("inch", "in");
         var repository = CreateRepository();
-        await repository.AddAsync(new PackagingMaterial { Name = "Satin Ribbon", PackagingCategoryId = categoryId, BaseUnitId = centimeterId }, Cancellation);
+        await repository.AddAsync(new RawMaterial { Type = RawMaterialType.Packaging, Name = "Satin Ribbon", CategoryId = categoryId, BaseUnitId = centimeterId }, Cancellation);
         var packagingMaterial = (await repository.GetAllAsync(Cancellation)).Single();
-        await new PackagingPriceHistoryRepository(CreateDbContextFactory()).AddAsync(
-            new PackagingPriceHistory { PackagingMaterialId = packagingMaterial.Id, Date = new DateOnly(2026, 1, 1), Price = 0.045m }, Cancellation);
+        await new RawMaterialPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator()).AddAsync(
+            new RawMaterialPriceHistory { RawMaterialId = packagingMaterial.Id, Date = new DateOnly(2026, 1, 1), Price = 0.045m }, Cancellation);
 
         packagingMaterial.BaseUnitId = inchId;
         var act = () => repository.UpdateAsync(packagingMaterial, Cancellation);
@@ -168,11 +171,12 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         var categoryId = await SeedCategoryAsync();
         var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
 
-        var act = () => CreateRepository().UpdateAsync(new PackagingMaterial
+        var act = () => CreateRepository().UpdateAsync(new RawMaterial
         {
+            Type = RawMaterialType.Packaging,
             Id = 999_999,
             Name = "Ghost",
-            PackagingCategoryId = categoryId,
+            CategoryId = categoryId,
             BaseUnitId = pieceId,
         }, Cancellation);
 
@@ -187,20 +191,72 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         var spoolId = await SeedUnitOfMeasureAsync("spool", "spool");
         var repository = CreateRepository();
 
-        await repository.AddAsync(new PackagingMaterial { Name = "Twine", PackagingCategoryId = categoryId, BaseUnitId = meterId }, Cancellation);
+        await repository.AddAsync(new RawMaterial { Type = RawMaterialType.Packaging, Name = "Twine", CategoryId = categoryId, BaseUnitId = meterId }, Cancellation);
         var packagingMaterial = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
-        var unitRepository = new PackagingMaterialUnitRepository(CreateDbContextFactory());
-        await unitRepository.AddAsync(new PackagingMaterialUnit { PackagingMaterialId = packagingMaterial.Id, UnitOfMeasureId = spoolId, BaseUnitsPerUnit = 50m }, Cancellation);
-        var spool = (await unitRepository.GetForPackagingMaterialAsync(packagingMaterial.Id, Cancellation)).Single();
-        await new PackagingPriceHistoryRepository(CreateDbContextFactory()).AddAsync(
-            new PackagingPriceHistory { PackagingMaterialId = packagingMaterial.Id, PackagingMaterialUnitId = spool.Id, Date = new DateOnly(2026, 1, 1), Price = 100m }, Cancellation);
+        var unitRepository = new RawMaterialUnitRepository(CreateDbContextFactory(), CreateCostPropagator());
+        await unitRepository.AddAsync(new RawMaterialUnit { RawMaterialId = packagingMaterial.Id, UnitOfMeasureId = spoolId, BaseUnitsPerUnit = 50m }, Cancellation);
+        var spool = (await unitRepository.GetForRawMaterialAsync(packagingMaterial.Id, Cancellation)).Single();
+        await new RawMaterialPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator()).AddAsync(
+            new RawMaterialPriceHistory { RawMaterialId = packagingMaterial.Id, UnitId = spool.Id, Date = new DateOnly(2026, 1, 1), Price = 100m }, Cancellation);
 
         await repository.DeleteAsync(packagingMaterial.Id, Cancellation);
 
         await using var dbContext = CreateDbContext();
-        (await dbContext.PackagingMaterials.AnyAsync(Cancellation)).Should().BeFalse();
-        (await dbContext.PackagingMaterialUnits.AnyAsync(Cancellation)).Should().BeFalse();
-        (await dbContext.PackagingPriceHistories.AnyAsync(Cancellation)).Should().BeFalse();
+        (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
+        (await dbContext.RawMaterialUnits.AnyAsync(Cancellation)).Should().BeFalse();
+        (await dbContext.RawMaterialPriceHistories.AnyAsync(Cancellation)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AddAsync_rejects_a_packaging_material_without_a_base_unit()
+    {
+        var categoryId = await SeedCategoryAsync();
+
+        var act = () => CreateRepository().AddAsync(new RawMaterial { Type = RawMaterialType.Packaging, Name = "Label", CategoryId = categoryId }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*base unit*");
+    }
+
+    [Fact]
+    public async Task AddAsync_rejects_a_made_packaging_material()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+
+        var act = () => CreateRepository().AddAsync(new RawMaterial
+        {
+            Type = RawMaterialType.Packaging,
+            Name = "Label",
+            CategoryId = categoryId,
+            BaseUnitId = pieceId,
+            Source = RawMaterialSource.Made,
+            WeightLossPercent = 0m,
+        }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*packaging is always purchased*");
+    }
+
+    [Fact]
+    public async Task The_database_rejects_a_made_packaging_material_even_past_the_repository()
+    {
+        // A check constraint backs RawMaterialRules.EnsureFieldsMatchType up.
+        var categoryId = await SeedCategoryAsync();
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        await using var dbContext = CreateDbContext();
+        dbContext.RawMaterials.Add(new RawMaterial
+        {
+            Type = RawMaterialType.Packaging,
+            Name = "Label",
+            CategoryId = categoryId,
+            BaseUnitId = pieceId,
+            Source = RawMaterialSource.Made,
+            WeightLossPercent = 0m,
+        });
+
+        var act = () => dbContext.SaveChangesAsync(Cancellation);
+
+        (await act.Should().ThrowAsync<DbUpdateException>()).WithInnerException<Microsoft.Data.SqlClient.SqlException>()
+            .WithMessage("*CK_RawMaterials_OnlyIngredientsAreMade*");
     }
 
     [Fact]
@@ -210,9 +266,9 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         var repository = CreateRepository();
 
-        await repository.AddAsync(new PackagingMaterial { Name = "Label", PackagingCategoryId = categoryId, BaseUnitId = pieceId }, Cancellation);
+        await repository.AddAsync(new RawMaterial { Type = RawMaterialType.Packaging, Name = "Label", CategoryId = categoryId, BaseUnitId = pieceId }, Cancellation);
 
-        var act = () => repository.AddAsync(new PackagingMaterial { Name = "Label", PackagingCategoryId = categoryId, BaseUnitId = pieceId }, Cancellation);
+        var act = () => repository.AddAsync(new RawMaterial { Type = RawMaterialType.Packaging, Name = "Label", CategoryId = categoryId, BaseUnitId = pieceId }, Cancellation);
 
         await act.Should().ThrowAsync<DbUpdateException>();
     }

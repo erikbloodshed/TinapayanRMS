@@ -6,7 +6,7 @@
     <Application.Resources>
         <sys:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <converters:EmptyStateVisibilityConverter x:Key="EmptyStateVisibilityConverter" />
-        <converters:UnitsSummaryConverter x:Key="UnitsSummaryConverter" />
+        <converters:CostPerBaseUnitConverter x:Key="CostPerBaseUnitConverter" />
         <converters:NotNullToVisibilityConverter x:Key="NotNullToVisibilityConverter" />
 
         <!--
@@ -48,6 +48,15 @@
 
         <DataTemplate x:Key="CalculateIconTemplate">
             <TextBlock Text="&#xE8EF;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
+        <!--
+            SfTextBoxExt.WatermarkTemplate: the theme shows the watermark in a plain ContentControl,
+            which ignores VerticalContentAlignment, so the hint sits at the top of the box, and 4px
+            right of where typed text starts (measured). This puts the hint where typed text goes.
+        -->
+        <DataTemplate x:Key="AlignedWatermarkTemplate">
+            <TextBlock Text="{Binding}" VerticalAlignment="Center" Margin="-4,0,0,0" />
         </DataTemplate>
 
         <!--

@@ -12,21 +12,13 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<UnitOfMeasure> UnitsOfMeasure => Set<UnitOfMeasure>();
 
-    public DbSet<IngredientCategory> IngredientCategories => Set<IngredientCategory>();
+    public DbSet<RawMaterialCategory> RawMaterialCategories => Set<RawMaterialCategory>();
 
-    public DbSet<PackagingCategory> PackagingCategories => Set<PackagingCategory>();
+    public DbSet<RawMaterial> RawMaterials => Set<RawMaterial>();
 
-    public DbSet<Ingredient> Ingredients => Set<Ingredient>();
+    public DbSet<RawMaterialUnit> RawMaterialUnits => Set<RawMaterialUnit>();
 
-    public DbSet<IngredientUnit> IngredientUnits => Set<IngredientUnit>();
-
-    public DbSet<PackagingMaterial> PackagingMaterials => Set<PackagingMaterial>();
-
-    public DbSet<PackagingMaterialUnit> PackagingMaterialUnits => Set<PackagingMaterialUnit>();
-
-    public DbSet<IngredientPriceHistory> IngredientPriceHistories => Set<IngredientPriceHistory>();
-
-    public DbSet<PackagingPriceHistory> PackagingPriceHistories => Set<PackagingPriceHistory>();
+    public DbSet<RawMaterialPriceHistory> RawMaterialPriceHistories => Set<RawMaterialPriceHistory>();
 
     public DbSet<IngredientBomLine> IngredientBomLines => Set<IngredientBomLine>();
 
@@ -55,7 +47,7 @@ public class TinapayanRMSDbContext : DbContext
     {
         // Every decimal column defaults to this precision unless a configuration overrides it,
         // so a future column can't silently fall back to SQL Server's decimal(18,2) default and
-        // truncate a fractional cost (e.g. PackagingMaterial's ₱0.045/cm).
+        // truncate a fractional cost (e.g. a ribbon's ₱0.045/cm).
         configurationBuilder.Properties<decimal>().HavePrecision(18, 4);
     }
 }

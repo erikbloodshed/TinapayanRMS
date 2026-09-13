@@ -73,7 +73,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             new ProductCloner(factory, usageRepository, packagingLineRepository, costingParametersRepository),
             new SubAssemblyRepository(factory),
             new SubAssemblyRoleRepository(factory),
-            new PackagingMaterialRepository(factory),
+            new RawMaterialRepository(factory, CreateCostPropagator()),
             new ProductValidator(),
             new CostingParametersValidator(),
             new LoggerConfiguration().CreateLogger());
