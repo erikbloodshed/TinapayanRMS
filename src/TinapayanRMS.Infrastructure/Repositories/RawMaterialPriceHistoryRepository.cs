@@ -26,9 +26,21 @@ public class RawMaterialPriceHistoryRepository(
 
     public async Task AddAsync(RawMaterialPriceHistory entry, CancellationToken cancellationToken)
     {
-        PriceHistoryRules.EnsureValidPrice(entry.Price);
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        if (await AddAsync(dbContext, entry, cancellationToken))
+        {
+            await costPropagator.RecomputeAndPropagateAsync(entry.RawMaterialId, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Adds the entry to a purchased material, reprices the material from whichever entry is now its
+    /// latest, and saves. Returns whether the material is an ingredient, whose new cost the caller
+    /// cascades (see PropagateAsync).
+    /// </summary>
+    internal static async Task<bool> AddAsync(TinapayanRMSDbContext dbContext, RawMaterialPriceHistory entry, CancellationToken cancellationToken)
+    {
+        PriceHistoryRules.EnsureValidPrice(entry.Price);
 
         var material = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == entry.RawMaterialId, cancellationToken)
             ?? throw new InvalidOperationException($"Raw material {entry.RawMaterialId} does not exist.");
@@ -55,7 +67,7 @@ public class RawMaterialPriceHistoryRepository(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await PropagateAsync(material, cancellationToken);
+        return material.Type == RawMaterialType.Ingredient;
     }
 
     public async Task UpdateAsync(RawMaterialPriceHistory entry, CancellationToken cancellationToken)

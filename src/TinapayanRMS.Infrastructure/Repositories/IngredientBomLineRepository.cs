@@ -28,6 +28,28 @@ public class IngredientBomLineRepository(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
+        // The old lines' delete and the new lines' insert commit together.
+        await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
+        {
+            await SetLinesAsync(dbContext, ingredientId, lines, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        // Recomputes ingredientId's own CostPerBaseUnit from the lines just saved, then
+        // ripples the change to anything that depends on it.
+        await costPropagator.RecomputeAndPropagateAsync(ingredientId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Replaces the made ingredient's BOM with <paramref name="lines"/> and saves, once every line
+    /// passes. Its cost is the caller's to cascade, after its transaction commits.
+    /// </summary>
+    internal static async Task SetLinesAsync(
+        TinapayanRMSDbContext dbContext,
+        int ingredientId,
+        IReadOnlyList<(int ComponentIngredientId, int? UnitId, decimal Quantity)> lines,
+        CancellationToken cancellationToken)
+    {
         var ingredient = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == ingredientId, cancellationToken)
             ?? throw new InvalidOperationException($"Ingredient {ingredientId} does not exist.");
 
@@ -82,9 +104,5 @@ public class IngredientBomLineRepository(
         }));
 
         await dbContext.SaveChangesAsync(cancellationToken);
-
-        // Recomputes ingredientId's own CostPerBaseUnit from the lines just saved, then
-        // ripples the change to anything that depends on it.
-        await costPropagator.RecomputeAndPropagateAsync(ingredientId, cancellationToken);
     }
 }

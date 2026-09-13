@@ -30,6 +30,10 @@
             <TextBlock Text="&#xE74E;" Style="{StaticResource IconGlyphStyle}" />
         </DataTemplate>
 
+        <DataTemplate x:Key="ApplyIconTemplate">
+            <TextBlock Text="&#xE73E;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
         <DataTemplate x:Key="DeleteIconTemplate">
             <TextBlock Text="&#xE74D;" Style="{StaticResource IconGlyphStyle}" />
         </DataTemplate>

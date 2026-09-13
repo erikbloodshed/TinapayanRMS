@@ -10,8 +10,15 @@ namespace TinapayanRMS.UI.ViewModels;
 public static class BaseUnitText
 {
     public static string NameOf(RawMaterial? material) =>
-        material is { Type: RawMaterialType.Packaging } ? material.BaseUnit?.Name ?? "?" : "gram";
+        material is null ? "gram" : NameOf(material.Type, material.BaseUnit);
 
     public static string AbbreviationOf(RawMaterial? material) =>
-        material is { Type: RawMaterialType.Packaging } ? material.BaseUnit?.Abbreviation ?? "?" : "g";
+        material is null ? "g" : AbbreviationOf(material.Type, material.BaseUnit);
+
+    /// <summary>For a material still being filled in: its type and the base unit picked so far.</summary>
+    public static string NameOf(RawMaterialType type, UnitOfMeasure? baseUnit) =>
+        type == RawMaterialType.Packaging ? baseUnit?.Name ?? "?" : "gram";
+
+    public static string AbbreviationOf(RawMaterialType type, UnitOfMeasure? baseUnit) =>
+        type == RawMaterialType.Packaging ? baseUnit?.Abbreviation ?? "?" : "g";
 }

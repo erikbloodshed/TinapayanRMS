@@ -73,6 +73,8 @@
                     Sorted by name in the grid itself: a grouped grid places rows that arrive after
                     the first load (a refresh replacing a changed row) by its own sort, not by the
                     bound collection's order, so without one the order drifted between runs.
+                    AllowDataShaping makes that sort apply to rows added or replaced while the app
+                    runs too; by default the grid appended them to the end of their group.
                 -->
                 <syncfusion:SfDataGrid Grid.Row="1"
                                        ItemsSource="{Binding VisibleRawMaterials}"
@@ -82,6 +84,7 @@
                                        SelectionMode="Single"
                                        NavigationMode="Row"
                                        ColumnSizer="Star"
+                                       LiveDataUpdateMode="AllowDataShaping"
                                        AutoExpandGroups="True"
                                        ShowColumnWhenGrouped="False"
                                        GroupCaptionTextFormat="{}{Key} ({ItemsCount})">
@@ -127,7 +130,11 @@
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
                                 <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />
-                                <syncfusion:ButtonAdv Label="Save" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveCommand}" Margin="0,0,8,0" />
+                                <syncfusion:ButtonAdv Label="Save"
+                                                      IconTemplate="{StaticResource SaveIconTemplate}"
+                                                      Command="{Binding SaveCommand}"
+                                                      ToolTip="Saves the details, alternative units, price and bill of materials together."
+                                                      Margin="0,0,8,0" />
                                 <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
                             </StackPanel>
 
@@ -254,15 +261,8 @@
                     </StackPanel>
                 </Border>
 
-                <Border Style="{StaticResource CardStyle}"
-                        Margin="0,0,0,16"
-                        MinHeight="120"
-                        Visibility="{Binding HasSelection, Converter={StaticResource EmptyStateVisibilityConverter}}">
-                    <TextBlock Text="Select a raw material to manage its units, price and cost, or fill in the details above and Save to add a new one."
-                               Style="{StaticResource EmptyStateStyle}" />
-                </Border>
-
-                <StackPanel Visibility="{Binding HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <!-- Every card below is part of the one form Save writes, so a new material shows them too -->
+                <StackPanel>
                     <Grid Margin="0,0,0,16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="2*" />
@@ -281,7 +281,7 @@
                                                           Command="{Binding AddUnitCommand}" />
                                     <StackPanel Margin="0,0,12,0">
                                         <TextBlock Text="Alternative Units" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-                                        <TextBlock Text="Define up to two units you commonly buy or use this material in."
+                                        <TextBlock Text="Define up to two units you commonly buy or use this material in. Changes are saved with Save."
                                                    Style="{StaticResource CardCaptionStyle}" />
                                     </StackPanel>
                                 </DockPanel>
@@ -344,7 +344,7 @@
                                         <syncfusion:SfTextBoxExt Text="{Binding EditingUnitDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
                                             <syncfusion:ButtonAdv Label="Cancel" IconTemplate="{StaticResource CancelIconTemplate}" Command="{Binding CancelUnitCommand}" Margin="0,0,8,0" />
-                                            <syncfusion:ButtonAdv Label="Save Unit" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveUnitCommand}" />
+                                            <syncfusion:ButtonAdv Label="Apply" IconTemplate="{StaticResource ApplyIconTemplate}" Command="{Binding ApplyUnitCommand}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -425,16 +425,9 @@
                                     </StackPanel>
                                 </Border>
 
-                                <DockPanel Margin="0,12,0,0">
-                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                        <syncfusion:ButtonAdv Label="Cancel" IconTemplate="{StaticResource CancelIconTemplate}" Command="{Binding ResetPriceCommand}" Margin="0,0,8,0" />
-                                        <syncfusion:ButtonAdv Label="Save Price" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SavePriceCommand}" />
-                                    </StackPanel>
-                                    <TextBlock Text="Saving adds it to Price History, dated today."
-                                               Style="{StaticResource CaptionStyle}"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,12,0" />
-                                </DockPanel>
+                                <TextBlock Text="Save adds a changed price to Price History, dated today."
+                                           Style="{StaticResource CaptionStyle}"
+                                           Margin="0,12,0,0" />
                             </StackPanel>
                         </Border>
 
@@ -518,10 +511,10 @@
                         </Border>
                     </UniformGrid>
 
-                    <!-- Price History (purchased) -->
+                    <!-- Price History (a saved purchased material) -->
                     <Border Style="{StaticResource CardStyle}"
                             Margin="0,0,0,16"
-                            Visibility="{Binding ShowPurchaseSetup, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding ShowPriceHistory, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
                             <TextBlock Text="Price History" Style="{StaticResource SectionHeaderStyle}" />
 
@@ -552,7 +545,7 @@
                     <!-- Bill of Materials (made ingredients) -->
                     <Border Style="{StaticResource CardStyle}"
                             Margin="0,0,0,16"
-                            Visibility="{Binding ShowBomEditor, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
                             <TextBlock Text="Bill of Materials" Style="{StaticResource SectionHeaderStyle}" />
 
@@ -600,8 +593,7 @@
 
                             <StackPanel Orientation="Horizontal">
                                 <syncfusion:ButtonAdv Label="Add Line" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding AddBomLineCommand}" Margin="0,0,8,0" />
-                                <syncfusion:ButtonAdv Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveBomLineCommand}" Margin="0,0,8,0" />
-                                <syncfusion:ButtonAdv Label="Save BOM" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveBomCommand}" />
+                                <syncfusion:ButtonAdv Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveBomLineCommand}" />
                             </StackPanel>
                         </StackPanel>
                     </Border>

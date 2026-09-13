@@ -218,6 +218,22 @@ public class RawMaterialRulesTests
     }
 
     [Fact]
+    public void EnsureUnitNotAlreadyAdded_accepts_a_unit_the_material_does_not_have_yet()
+    {
+        var act = () => RawMaterialRules.EnsureUnitNotAlreadyAdded(alreadyAdded: false);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureUnitNotAlreadyAdded_rejects_a_second_unit_in_the_same_unit_of_measure()
+    {
+        var act = () => RawMaterialRules.EnsureUnitNotAlreadyAdded(alreadyAdded: true);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*already has that unit*");
+    }
+
+    [Fact]
     public void EnsureBaseUnitCanChange_accepts_a_material_with_nothing_measured_in_it_yet()
     {
         var act = () => RawMaterialRules.EnsureBaseUnitCanChange(hasUnits: false, hasPrices: false, hasLines: false);

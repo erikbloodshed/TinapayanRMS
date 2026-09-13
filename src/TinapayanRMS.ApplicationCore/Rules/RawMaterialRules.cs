@@ -125,6 +125,15 @@ public static class RawMaterialRules
         }
     }
 
+    /// <summary>A material has each unit of measure at most once: two of its alternative units can't share one.</summary>
+    public static void EnsureUnitNotAlreadyAdded(bool alreadyAdded)
+    {
+        if (alreadyAdded)
+        {
+            throw new InvalidOperationException("This material already has that unit.");
+        }
+    }
+
     /// <summary>
     /// A packaging material's alternative units, prices and packaging lines are all measured against
     /// its base unit, so it can only change while it has none of them.
