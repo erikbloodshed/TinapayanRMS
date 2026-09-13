@@ -41,8 +41,8 @@
                     <syncfusion:SfDataGrid.Columns>
                         <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
                         <syncfusion:GridTextColumn MappingName="Role.Name" HeaderText="Role" />
-                        <syncfusion:GridNumericColumn MappingName="TotalWeight" HeaderText="Total Weight (g)" NumberDecimalDigits="2" />
-                        <syncfusion:GridCurrencyColumn MappingName="TotalCost" HeaderText="Total Cost" CurrencySymbol="₱" CurrencyDecimalDigits="2" />
+                        <controls:NumericColumn MappingName="TotalWeight" HeaderText="Total Weight (g)" NumberDecimalDigits="2" />
+                        <controls:NumericColumn MappingName="TotalCost" HeaderText="Total Cost" NumberDecimalDigits="2" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </Grid>
@@ -93,7 +93,7 @@
                                                 Height="220">
                             <syncfusion:SfDataGrid.Columns>
                                 <syncfusion:GridTextColumn MappingName="Ingredient.Name" HeaderText="Ingredient" />
-                                <syncfusion:GridNumericColumn MappingName="Grams" HeaderText="Grams" NumberDecimalDigits="2" />
+                                <controls:NumericColumn MappingName="Grams" HeaderText="Grams" NumberDecimalDigits="2" />
                             </syncfusion:SfDataGrid.Columns>
                         </syncfusion:SfDataGrid>
 
@@ -129,7 +129,7 @@
                                                     Height="180">
                                 <syncfusion:SfDataGrid.Columns>
                                     <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
-                                    <syncfusion:GridNumericColumn MappingName="SortOrder" HeaderText="Order" NumberDecimalDigits="0" />
+                                    <controls:NumericColumn MappingName="SortOrder" HeaderText="Order" NumberDecimalDigits="0" />
                                 </syncfusion:SfDataGrid.Columns>
                             </syncfusion:SfDataGrid>
 

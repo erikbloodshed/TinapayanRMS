@@ -340,11 +340,15 @@ public class ProductsViewModel : ViewModelBase
             .Select(product => product is not null)
             .ToProperty(this, x => x.ShowProductDetail);
 
+        // Every selection-driven subscription skips while LoadCommand merges in fresh data, which
+        // only re-points a selection at its refreshed copy; the form, detail and unsaved rows must
+        // stay as-is.
         this.WhenAnyValue(x => x.SelectedProduct)
-            .Where(product => product is not null)
+            .Where(product => product is not null && !IsRefreshing)
             .Subscribe(product => LoadIntoForm(product!));
 
         this.WhenAnyValue(x => x.SelectedProduct)
+            .Where(_ => !IsRefreshing)
             .Subscribe(product =>
             {
                 SelectedUsageEdit = null;
@@ -364,47 +368,88 @@ public class ProductsViewModel : ViewModelBase
             });
 
         this.WhenAnyValue(x => x.SelectedProduct)
+            .Where(_ => !IsRefreshing)
             .Select(product => Observable.FromAsync(() => LoadProductDetailAsync(product)))
             .Switch()
             .Subscribe();
 
         this.WhenAnyValue(x => x.EditingUsageRole)
+            .Where(_ => !IsRefreshing)
             .Select(role => Observable.FromAsync(() => LoadUsagesForRoleAsync(role)))
             .Switch()
             .Subscribe();
 
         this.WhenAnyValue(x => x.EditingLinePackagingMaterial)
+            .Where(_ => !IsRefreshing)
             .Subscribe(material => RefreshEntryUnitOptions(material));
 
         this.WhenAnyValue(x => x.EditingLaborCost, x => x.EditingOverheadCost, x => x.EditingMarginPercent, x => x.EditingVatPercent)
             .Subscribe(_ => RecomputeSummary());
 
+        // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
+        // rather than replaces, so the screen keeps its selection, sub-tab pickers and unsaved usage
+        // and packaging rows while picking up what changed elsewhere, such as a repriced ingredient
+        // flowing into a sub-assembly's cost.
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var roles = await subAssemblyRoleRepository.GetAllAsync(CancellationToken.None);
-            Roles.Clear();
-            Roles.AddRange(roles);
-
             var subAssemblies = await subAssemblyRepository.GetAllAsync(CancellationToken.None);
-            SubAssemblies.Clear();
-            SubAssemblies.AddRange(subAssemblies.OrderBy(s => s.Name));
-
             var packagingMaterials = await packagingMaterialRepository.GetAllAsync(CancellationToken.None);
-            PackagingMaterials.Clear();
-            PackagingMaterials.AddRange(packagingMaterials.OrderBy(m => m.Name));
-
             var units = await unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
-            _allUnits.Clear();
-            _allUnits.AddRange(units);
-
             var products = await _productRepository.GetAllAsync(CancellationToken.None);
-            _productCache.Edit(cache =>
-            {
-                cache.Clear();
-                cache.AddOrUpdate(products);
-            });
 
-            RefreshLinkTargetProductOptions();
+            // The selected product's saved usage costs and tab links can change on other tabs too
+            // (a repriced ingredient, a renamed role), so they're fetched here as well.
+            var detailProductId = SelectedProduct?.Id;
+            IReadOnlyList<ProductSubAssemblyUsage> effectiveUsages = detailProductId is { } usagesProductId
+                ? await _usageRepository.GetEffectiveForProductAsync(usagesProductId, CancellationToken.None)
+                : [];
+            IReadOnlyList<ProductTabLink> links = detailProductId is { } linksProductId
+                ? await _tabLinkRepository.GetForProductAsync(linksProductId, CancellationToken.None)
+                : [];
+
+            // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
+            var selectedId = SelectedProduct?.Id;
+            var usageRoleId = EditingUsageRole?.Id;
+            var usageSubAssemblyId = EditingUsageSubAssembly?.Id;
+            var linePackagingMaterialId = EditingLinePackagingMaterial?.Id;
+            var lineEntryUnitId = EditingLineEntryUnit?.Id;
+            var linkRoleId = EditingLinkRole?.Id;
+            var linkTargetId = EditingLinkTargetProduct?.Id;
+
+            ApplyRefresh(() =>
+            {
+                Roles.MergeFrom(roles, r => r.Id);
+                SubAssemblies.MergeFrom([.. subAssemblies.OrderBy(s => s.Name)], s => s.Id);
+                PackagingMaterials.MergeFrom([.. packagingMaterials.OrderBy(m => m.Name)], m => m.Id);
+                _allUnits.Clear();
+                _allUnits.AddRange(units);
+                _productCache.MergeFrom(products);
+
+                SelectedProduct = Products.FirstOrDefault(p => p.Id == selectedId);
+
+                EditingUsageRole = Roles.FirstOrDefault(r => r.Id == usageRoleId);
+                SubAssembliesForSelectedRole.MergeFrom([.. SubAssemblies.Where(s => s.RoleId == EditingUsageRole?.Id)], s => s.Id);
+                EditingUsageSubAssembly = SubAssembliesForSelectedRole.FirstOrDefault(s => s.Id == usageSubAssemblyId);
+
+                EditingLinePackagingMaterial = PackagingMaterials.FirstOrDefault(m => m.Id == linePackagingMaterialId);
+                EntryUnitOptions.MergeFrom(EntryUnitOptionsFor(EditingLinePackagingMaterial), u => u.Id);
+                EditingLineEntryUnit = EntryUnitOptions.FirstOrDefault(u => u.Id == lineEntryUnitId);
+
+                EditingLinkRole = Roles.FirstOrDefault(r => r.Id == linkRoleId);
+                RefreshLinkTargetProductOptions();
+                EditingLinkTargetProduct = LinkTargetProductOptions.FirstOrDefault(p => p.Id == linkTargetId);
+
+                RefreshUnsavedRows();
+
+                if (SelectedProduct is not null && SelectedProduct.Id == detailProductId)
+                {
+                    _effectiveUsageCostsPerPieceByRoleId = UsageCostsPerPieceByRole(effectiveUsages);
+                    ReplaceTabLinks(links);
+                }
+
+                RecomputeSummary();
+            });
         });
 
         NewCommand = ReactiveCommand.Create(() =>
@@ -582,44 +627,95 @@ public class ProductsViewModel : ViewModelBase
 
     private void RefreshLinkTargetProductOptions()
     {
-        LinkTargetProductOptions.Clear();
-        LinkTargetProductOptions.AddRange(SelectedProduct is null ? Products : Products.Where(p => p.Id != SelectedProduct.Id));
+        LinkTargetProductOptions.MergeFrom(
+            [.. SelectedProduct is null ? Products : Products.Where(p => p.Id != SelectedProduct.Id)],
+            p => p.Id);
+    }
+
+    /// <summary>Fills the entry-unit picker for a newly picked material, defaulting it to the material's own unit.</summary>
+    private void RefreshEntryUnitOptions(PackagingMaterial? material)
+    {
+        EntryUnitOptions.Clear();
+        EditingLineEntryUnit = null;
+        EntryUnitOptions.AddRange(EntryUnitOptionsFor(material));
+        EditingLineEntryUnit = EntryUnitOptions.FirstOrDefault(u => u.Id == material?.StandardUnitId) ?? EntryUnitOptions.FirstOrDefault();
     }
 
     /// <summary>
     /// A packaging line's entry unit is the material's own standard unit, or — only when
     /// that standard unit is itself a length unit — any other length unit
-    /// (ProductRules.EnsureValidEntryUnit). Defaults the picker to the material's own unit.
+    /// (ProductRules.EnsureValidEntryUnit).
     /// </summary>
-    private void RefreshEntryUnitOptions(PackagingMaterial? material)
+    private List<UnitOfMeasure> EntryUnitOptionsFor(PackagingMaterial? material)
     {
-        EntryUnitOptions.Clear();
-        EditingLineEntryUnit = null;
-
-        if (material is null)
-        {
-            return;
-        }
-
-        var standardUnit = _allUnits.FirstOrDefault(u => u.Id == material.StandardUnitId);
+        var standardUnit = material is null ? null : _allUnits.FirstOrDefault(u => u.Id == material.StandardUnitId);
         if (standardUnit is null)
         {
-            return;
+            return [];
         }
 
-        if (standardUnit.IsLengthUnit)
+        return standardUnit.IsLengthUnit
+            ? [.. _allUnits.Where(u => u.IsLengthUnit).OrderBy(u => u.Name)]
+            : [standardUnit];
+    }
+
+    /// <summary>
+    /// Points the unsaved usage and packaging rows at the refreshed sub-assemblies, materials and
+    /// units, keeping each row's own numbers, so their costs reflect prices changed on other tabs.
+    /// A row whose sub-assembly or material didn't change is left alone.
+    /// </summary>
+    private void RefreshUnsavedRows()
+    {
+        for (var i = 0; i < UsageEdits.Count; i++)
         {
-            foreach (var unit in _allUnits.Where(u => u.IsLengthUnit).OrderBy(u => u.Name))
+            var edit = UsageEdits[i];
+            var subAssembly = SubAssemblies.FirstOrDefault(s => s.Id == edit.SubAssembly.Id);
+            if (subAssembly is null || CollectionMerge.HasSameValues(subAssembly, edit.SubAssembly))
             {
-                EntryUnitOptions.Add(unit);
+                continue;
+            }
+
+            var wasSelected = ReferenceEquals(SelectedUsageEdit, edit);
+            UsageEdits[i] = new ProductUsageEdit(subAssembly, edit.WeightPerPiece);
+            if (wasSelected)
+            {
+                SelectedUsageEdit = UsageEdits[i];
             }
         }
-        else
-        {
-            EntryUnitOptions.Add(standardUnit);
-        }
 
-        EditingLineEntryUnit = EntryUnitOptions.FirstOrDefault(u => u.Id == material.StandardUnitId) ?? EntryUnitOptions.FirstOrDefault();
+        for (var i = 0; i < LineEdits.Count; i++)
+        {
+            var edit = LineEdits[i];
+            var material = PackagingMaterials.FirstOrDefault(m => m.Id == edit.PackagingMaterial.Id);
+            var entryUnit = _allUnits.FirstOrDefault(u => u.Id == edit.EntryUnit.Id);
+            if (material is null || entryUnit is null
+                || (CollectionMerge.HasSameValues(material, edit.PackagingMaterial) && CollectionMerge.HasSameValues(entryUnit, edit.EntryUnit)))
+            {
+                continue;
+            }
+
+            var wasSelected = ReferenceEquals(SelectedLineEdit, edit);
+            LineEdits[i] = new PackagingLineEdit(material, entryUnit, edit.AuthoredField, edit.AuthoredValue);
+            if (wasSelected)
+            {
+                SelectedLineEdit = LineEdits[i];
+            }
+        }
+    }
+
+    /// <summary>Swaps in a fresh copy of the selected product's tab links (they show role and product names), keeping the selected link.</summary>
+    private void ReplaceTabLinks(IReadOnlyList<ProductTabLink> links)
+    {
+        var selectedKind = SelectedTabLink?.Link.TabKind;
+        var selectedRoleId = SelectedTabLink?.Link.SubAssemblyRoleId;
+
+        TabLinks.Clear();
+        TabLinks.AddRange(links.Select(l => new TabLinkRow(l)));
+        SelectedTabLink = selectedKind is null
+            ? null
+            : TabLinks.FirstOrDefault(r => r.Link.TabKind == selectedKind && r.Link.SubAssemblyRoleId == selectedRoleId);
+
+        RefreshLinkedFlags();
     }
 
     private async Task LoadProductDetailAsync(Product? product)
@@ -652,10 +748,19 @@ public class ProductsViewModel : ViewModelBase
 
         await LoadEffectiveUsageCostsAsync(product);
 
-        EditingUsageRole = Roles.FirstOrDefault();
-        // If the role didn't actually change (already the first role from a prior
-        // selection), the WhenAnyValue subscription above won't re-fire on its own.
-        await LoadUsagesForRoleAsync(EditingUsageRole);
+        var firstRole = Roles.FirstOrDefault();
+        if (ReferenceEquals(EditingUsageRole, firstRole))
+        {
+            // The role didn't change, so the WhenAnyValue subscription above won't reload its
+            // usages for this product on its own.
+            await LoadUsagesForRoleAsync(firstRole);
+        }
+        else
+        {
+            // The WhenAnyValue subscription above loads its usages. Loading them here too ran two
+            // loads side by side, and every usage was listed (and costed) twice.
+            EditingUsageRole = firstRole;
+        }
 
         RecomputeSummary();
     }
@@ -670,12 +775,15 @@ public class ProductsViewModel : ViewModelBase
         }
 
         var allUsages = await _usageRepository.GetEffectiveForProductAsync(product.Id, CancellationToken.None);
-        _effectiveUsageCostsPerPieceByRoleId = allUsages
+        _effectiveUsageCostsPerPieceByRoleId = UsageCostsPerPieceByRole(allUsages);
+    }
+
+    private static Dictionary<int, List<decimal>> UsageCostsPerPieceByRole(IEnumerable<ProductSubAssemblyUsage> usages) =>
+        usages
             .GroupBy(u => u.SubAssembly!.RoleId)
             .ToDictionary(
                 g => g.Key,
                 g => g.Select(u => ProductRules.CalculateUsageCostPerPiece(u.SubAssembly!.TotalCost, u.WeightPerPiece, u.SubAssembly.TotalWeight)).ToList());
-    }
 
     private async Task LoadUsagesForRoleAsync(SubAssemblyRole? role)
     {
@@ -701,6 +809,9 @@ public class ProductsViewModel : ViewModelBase
         {
             UsageEdits.Add(new ProductUsageEdit(usage.SubAssembly!, usage.WeightPerPiece));
         }
+
+        // When a role change triggered this load, nothing else recomputes the summary afterwards.
+        RecomputeSummary();
     }
 
     /// <summary>

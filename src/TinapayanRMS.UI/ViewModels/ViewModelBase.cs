@@ -44,6 +44,27 @@ public abstract class ViewModelBase : ReactiveObject
         private set => this.RaiseAndSetIfChanged(ref _isBusy, value);
     }
 
+    /// <summary>
+    /// True while a LoadCommand merges freshly loaded data into the screen (PLAN.md, tab state).
+    /// Selection-driven subscriptions skip while it's set, so pointing a selection or picker at
+    /// its refreshed copy doesn't reload the form or throw away unsaved edits.
+    /// </summary>
+    protected bool IsRefreshing { get; private set; }
+
+    /// <summary>Runs <paramref name="merge"/>, the synchronous step of a LoadCommand, with IsRefreshing set.</summary>
+    protected void ApplyRefresh(Action merge)
+    {
+        IsRefreshing = true;
+        try
+        {
+            merge();
+        }
+        finally
+        {
+            IsRefreshing = false;
+        }
+    }
+
     /// <summary>Input: a confirmation message to show the user. Output: true if they confirmed. The View registers a handler that shows a native MessageBox.</summary>
     public Interaction<string, bool> ConfirmDelete { get; } = new();
 

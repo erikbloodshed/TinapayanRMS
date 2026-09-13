@@ -9,6 +9,5 @@ public partial class ReportsView : UserControl
     {
         InitializeComponent();
         DataContext = viewModel;
-        Loaded += (_, _) => viewModel.LoadCommand.Execute().Subscribe();
     }
 }

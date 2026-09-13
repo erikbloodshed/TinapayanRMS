@@ -72,8 +72,9 @@ public class UnitsOfMeasureViewModel : ViewModelBase
             .SortAndBind(out _units, SortExpressionComparer<UnitOfMeasure>.Ascending(u => u.Name))
             .Subscribe();
 
+        // Skips while LoadCommand merges, which only re-points the selection at its refreshed copy.
         this.WhenAnyValue(x => x.SelectedUnit)
-            .Where(unit => unit is not null)
+            .Where(unit => unit is not null && !IsRefreshing)
             .Subscribe(unit =>
             {
                 _editingId = unit!.Id;
@@ -83,13 +84,17 @@ public class UnitsOfMeasureViewModel : ViewModelBase
                 EditingMillimetersPerUnit = unit.MillimetersPerUnit;
             });
 
+        // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
+        // rather than replaces, so the selection and any unsaved edits survive.
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var units = await _unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
-            _unitCache.Edit(cache =>
+            var selectedId = SelectedUnit?.Id;
+
+            ApplyRefresh(() =>
             {
-                cache.Clear();
-                cache.AddOrUpdate(units);
+                _unitCache.MergeFrom(units);
+                SelectedUnit = Units.FirstOrDefault(u => u.Id == selectedId);
             });
         });
 

@@ -149,11 +149,14 @@ public class SubAssembliesViewModel : ViewModelBase
             .Select(subAssembly => subAssembly is not null)
             .ToProperty(this, x => x.ShowLinesEditor);
 
+        // Every selection-driven subscription skips while LoadCommand merges in fresh data, which
+        // only re-points a selection at its refreshed copy; the form and lines must stay as-is.
         this.WhenAnyValue(x => x.SelectedSubAssembly)
-            .Where(subAssembly => subAssembly is not null)
+            .Where(subAssembly => subAssembly is not null && !IsRefreshing)
             .Subscribe(subAssembly => LoadIntoForm(subAssembly!));
 
         this.WhenAnyValue(x => x.SelectedSubAssembly)
+            .Where(_ => !IsRefreshing)
             .Subscribe(_ =>
             {
                 SelectedLineEdit = null;
@@ -162,12 +165,13 @@ public class SubAssembliesViewModel : ViewModelBase
             });
 
         this.WhenAnyValue(x => x.SelectedSubAssembly)
+            .Where(_ => !IsRefreshing)
             .Select(subAssembly => Observable.FromAsync(() => LoadLinesAsync(subAssembly)))
             .Switch()
             .Subscribe();
 
         this.WhenAnyValue(x => x.SelectedRole)
-            .Where(role => role is not null)
+            .Where(role => role is not null && !IsRefreshing)
             .Subscribe(role =>
             {
                 _editingRoleId = role!.Id;
@@ -175,24 +179,31 @@ public class SubAssembliesViewModel : ViewModelBase
                 EditingRoleSortOrder = role.SortOrder;
             });
 
+        // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
+        // rather than replaces, so the screen keeps its selection, picker choices and unsaved lines
+        // while picking up what changed elsewhere, such as an ingredient added or repriced.
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var roles = await _roleRepository.GetAllAsync(CancellationToken.None);
-            _roleCache.Edit(cache =>
-            {
-                cache.Clear();
-                cache.AddOrUpdate(roles);
-            });
-
             var ingredients = await ingredientRepository.GetAllAsync(CancellationToken.None);
-            Ingredients.Clear();
-            Ingredients.AddRange(ingredients.OrderBy(i => i.Name));
-
             var subAssemblies = await _subAssemblyRepository.GetAllAsync(CancellationToken.None);
-            _subAssemblyCache.Edit(cache =>
+
+            // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
+            var selectedId = SelectedSubAssembly?.Id;
+            var roleId = EditingRole?.Id;
+            var panelRoleId = SelectedRole?.Id;
+            var lineIngredientId = EditingLineIngredient?.Id;
+
+            ApplyRefresh(() =>
             {
-                cache.Clear();
-                cache.AddOrUpdate(subAssemblies);
+                _roleCache.MergeFrom(roles);
+                Ingredients.MergeFrom([.. ingredients.OrderBy(i => i.Name)], i => i.Id);
+                _subAssemblyCache.MergeFrom(subAssemblies);
+
+                EditingRole = Roles.FirstOrDefault(r => r.Id == roleId);
+                SelectedRole = Roles.FirstOrDefault(r => r.Id == panelRoleId);
+                EditingLineIngredient = Ingredients.FirstOrDefault(i => i.Id == lineIngredientId);
+                SelectedSubAssembly = SubAssemblies.FirstOrDefault(s => s.Id == selectedId);
             });
         });
 
@@ -291,12 +302,8 @@ public class SubAssembliesViewModel : ViewModelBase
                 await _roleRepository.UpdateAsync(role, CancellationToken.None);
             }
 
-            var roles = await _roleRepository.GetAllAsync(CancellationToken.None);
-            _roleCache.Edit(cache =>
-            {
-                cache.Clear();
-                cache.AddOrUpdate(roles);
-            });
+            // The whole screen, not just the roles: a renamed role shows in the grid too.
+            await LoadCommand.Execute();
             SelectedRole = null;
         }));
 
@@ -304,12 +311,7 @@ public class SubAssembliesViewModel : ViewModelBase
             () => RunWithConfirmationAsync($"Delete the '{SelectedRole!.Name}' role? This can't be undone.", async () =>
             {
                 await _roleRepository.DeleteAsync(SelectedRole!.Id, CancellationToken.None);
-                var roles = await _roleRepository.GetAllAsync(CancellationToken.None);
-                _roleCache.Edit(cache =>
-                {
-                    cache.Clear();
-                    cache.AddOrUpdate(roles);
-                });
+                await LoadCommand.Execute();
                 SelectedRole = null;
             }),
             this.WhenAnyValue(x => x.SelectedRole).Select(role => role is not null));

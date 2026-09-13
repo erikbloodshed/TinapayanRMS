@@ -165,11 +165,14 @@ public class PackagingMaterialsViewModel : ViewModelBase
             .Select(packagingMaterial => packagingMaterial is not null)
             .ToProperty(this, x => x.ShowPriceHistory);
 
+        // Every selection-driven subscription skips while LoadCommand merges in fresh data, which
+        // only re-points a selection at its refreshed copy; the form and details must stay as-is.
         this.WhenAnyValue(x => x.SelectedPackagingMaterial)
-            .Where(packagingMaterial => packagingMaterial is not null)
+            .Where(packagingMaterial => packagingMaterial is not null && !IsRefreshing)
             .Subscribe(packagingMaterial => LoadIntoForm(packagingMaterial!));
 
         this.WhenAnyValue(x => x.SelectedPackagingMaterial)
+            .Where(_ => !IsRefreshing)
             .Subscribe(_ =>
             {
                 SelectedPriceHistoryEntry = null;
@@ -178,41 +181,48 @@ public class PackagingMaterialsViewModel : ViewModelBase
             });
 
         this.WhenAnyValue(x => x.SelectedPackagingMaterial)
+            .Where(_ => !IsRefreshing)
             .Select(packagingMaterial => Observable.FromAsync(() => LoadPriceHistoryAsync(packagingMaterial)))
             .Switch()
             .Subscribe();
 
         this.WhenAnyValue(x => x.SelectedCategory)
-            .Where(category => category is not null)
+            .Where(category => category is not null && !IsRefreshing)
             .Subscribe(category =>
             {
                 _editingCategoryId = category!.Id;
                 EditingCategoryName = category.Name;
             });
 
+        // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
+        // rather than replaces, so the screen keeps its selection, picker choices and unsaved edits
+        // while picking up what changed elsewhere, such as a unit added on another tab.
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
-            _categoryCache.Edit(cache =>
-            {
-                cache.Clear();
-                cache.AddOrUpdate(categories);
-            });
-
             var units = await unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
-            var orderedUnits = units.OrderBy(u => u.Name).ToList();
-
-            StandardUnits.Clear();
-            StandardUnits.AddRange(orderedUnits);
-
-            PurchaseUnits.Clear();
-            PurchaseUnits.AddRange(orderedUnits);
-
             var packagingMaterials = await _packagingMaterialRepository.GetAllAsync(CancellationToken.None);
-            _packagingMaterialCache.Edit(cache =>
+
+            // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
+            var selectedId = SelectedPackagingMaterial?.Id;
+            var categoryId = EditingCategory?.Id;
+            var panelCategoryId = SelectedCategory?.Id;
+            var standardUnitId = EditingStandardUnit?.Id;
+            var purchaseUnitId = EditingPurchaseUnit?.Id;
+
+            ApplyRefresh(() =>
             {
-                cache.Clear();
-                cache.AddOrUpdate(packagingMaterials);
+                var orderedUnits = units.OrderBy(u => u.Name).ToList();
+                _categoryCache.MergeFrom(categories);
+                StandardUnits.MergeFrom(orderedUnits, u => u.Id);
+                PurchaseUnits.MergeFrom(orderedUnits, u => u.Id);
+                _packagingMaterialCache.MergeFrom(packagingMaterials);
+
+                EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId);
+                SelectedCategory = Categories.FirstOrDefault(c => c.Id == panelCategoryId);
+                EditingStandardUnit = StandardUnits.FirstOrDefault(u => u.Id == standardUnitId);
+                EditingPurchaseUnit = PurchaseUnits.FirstOrDefault(u => u.Id == purchaseUnitId);
+                SelectedPackagingMaterial = PackagingMaterials.FirstOrDefault(m => m.Id == selectedId);
             });
         });
 
@@ -324,12 +334,8 @@ public class PackagingMaterialsViewModel : ViewModelBase
                 await _categoryRepository.UpdateAsync(category, CancellationToken.None);
             }
 
-            var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
-            _categoryCache.Edit(cache =>
-            {
-                cache.Clear();
-                cache.AddOrUpdate(categories);
-            });
+            // The whole screen, not just the categories: a renamed category shows in the grid too.
+            await LoadCommand.Execute();
             SelectedCategory = null;
         }));
 
@@ -337,12 +343,7 @@ public class PackagingMaterialsViewModel : ViewModelBase
             () => RunWithConfirmationAsync($"Delete the '{SelectedCategory!.Name}' category? This can't be undone.", async () =>
             {
                 await _categoryRepository.DeleteAsync(SelectedCategory!.Id, CancellationToken.None);
-                var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
-                _categoryCache.Edit(cache =>
-                {
-                    cache.Clear();
-                    cache.AddOrUpdate(categories);
-                });
+                await LoadCommand.Execute();
                 SelectedCategory = null;
             }),
             this.WhenAnyValue(x => x.SelectedCategory).Select(category => category is not null));

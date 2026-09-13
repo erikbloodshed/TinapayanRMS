@@ -43,8 +43,8 @@
                         <syncfusion:GridTextColumn MappingName="PackagingCategory.Name" HeaderText="Category" />
                         <syncfusion:GridTextColumn MappingName="StandardUnit.Abbreviation" HeaderText="Standard Unit" />
                         <syncfusion:GridTextColumn MappingName="PurchaseUnit.Abbreviation" HeaderText="Purchase Unit" />
-                        <syncfusion:GridNumericColumn MappingName="PurchaseUnitQty" HeaderText="Purchase Qty" NumberDecimalDigits="2" />
-                        <syncfusion:GridCurrencyColumn MappingName="CurrentCost" HeaderText="Current Cost" CurrencySymbol="₱" CurrencyDecimalDigits="2" />
+                        <controls:NumericColumn MappingName="PurchaseUnitQty" HeaderText="Purchase Qty" NumberDecimalDigits="2" />
+                        <controls:NumericColumn MappingName="CurrentCost" HeaderText="Current Cost" NumberDecimalDigits="2" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </Grid>
@@ -65,24 +65,18 @@
                         <syncfusion:ComboBoxAdv ItemsSource="{Binding Categories}"
                                                  DisplayMemberPath="Name"
                                                  SelectedItem="{Binding EditingCategory, Mode=TwoWay}"
-                                                 IsTextSearchEnabled="True"
-                                                 AutoCompleteMode="Suggest"
                                                  Margin="0,0,0,12" />
 
                         <TextBlock Text="Standard Unit" Style="{StaticResource FieldLabelStyle}" />
                         <syncfusion:ComboBoxAdv ItemsSource="{Binding StandardUnits}"
                                                  DisplayMemberPath="Name"
                                                  SelectedItem="{Binding EditingStandardUnit, Mode=TwoWay}"
-                                                 IsTextSearchEnabled="True"
-                                                 AutoCompleteMode="Suggest"
                                                  Margin="0,0,0,12" />
 
                         <TextBlock Text="Purchase Unit" Style="{StaticResource FieldLabelStyle}" />
                         <syncfusion:ComboBoxAdv ItemsSource="{Binding PurchaseUnits}"
                                                  DisplayMemberPath="Name"
                                                  SelectedItem="{Binding EditingPurchaseUnit, Mode=TwoWay}"
-                                                 IsTextSearchEnabled="True"
-                                                 AutoCompleteMode="Suggest"
                                                  Margin="0,0,0,12" />
 
                         <TextBlock Text="Purchase Unit Qty" Style="{StaticResource FieldLabelStyle}" />
@@ -117,7 +111,7 @@
                                                 Height="200">
                             <syncfusion:SfDataGrid.Columns>
                                 <syncfusion:GridDateTimeColumn MappingName="Date" HeaderText="Date" />
-                                <syncfusion:GridCurrencyColumn MappingName="Price" HeaderText="Price" CurrencySymbol="₱" CurrencyDecimalDigits="2" />
+                                <controls:NumericColumn MappingName="Price" HeaderText="Price" NumberDecimalDigits="2" />
                             </syncfusion:SfDataGrid.Columns>
                         </syncfusion:SfDataGrid>
 

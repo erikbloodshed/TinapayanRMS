@@ -10,6 +10,8 @@ public partial class IngredientsView : UserControl
         InitializeComponent();
         DataContext = viewModel;
         viewModel.RegisterNativeMessageBoxHandler();
-        Loaded += (_, _) => viewModel.LoadCommand.Execute().Subscribe();
+
+        // New clears the form; put the cursor in Name so typing can start straight away.
+        viewModel.NewCommand.Subscribe(_ => NameTextBox.Focus());
     }
 }

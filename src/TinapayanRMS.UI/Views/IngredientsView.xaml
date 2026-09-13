@@ -46,7 +46,7 @@
                                        AllowEditing="False"
                                        SelectionMode="Single"
                                        NavigationMode="Row"
-                                       ColumnSizer="AutoWithLastColumnFill">
+                                       ColumnSizer="Star">
                     <syncfusion:SfDataGrid.Columns>
                         <syncfusion:GridTextColumn MappingName="Name"
                                 HeaderText="Name"/>
@@ -56,17 +56,15 @@
                                 HeaderText="Source"/>
                         <syncfusion:GridTextColumn MappingName="PurchaseUnit.Abbreviation"
                                 HeaderText="Purchase Unit"/>
-                        <syncfusion:GridNumericColumn MappingName="PurchaseUnitQty"
+                        <controls:NumericColumn MappingName="PurchaseUnitQty"
                                 HeaderText="Purchase Qty"
-                                NumberDecimalDigits="2"/>
-                        <syncfusion:GridCurrencyColumn MappingName="CurrentCost"
+                                NumberDecimalDigits="1"/>
+                        <controls:NumericColumn MappingName="CurrentCost"
                                 HeaderText="Current Cost"
-                                CurrencySymbol="₱"
-                                CurrencyDecimalDigits="2"/>
-                        <syncfusion:GridCurrencyColumn MappingName="CostPerGram"
+                                NumberDecimalDigits="2"/>
+                        <controls:NumericColumn MappingName="CostPerGram"
                                 HeaderText="Cost / Gram"
-                                CurrencySymbol="₱"
-                                CurrencyDecimalDigits="4"/>
+                                NumberDecimalDigits="4"/>
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </Grid>
@@ -85,17 +83,16 @@
 
                         <TextBlock Text="Name"
                                 Style="{StaticResource FieldLabelStyle}"/>
-                        <syncfusion:SfTextBoxExt Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        <syncfusion:SfTextBoxExt x:Name="NameTextBox"
+                                                 Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  Margin="0,0,0,12"/>
 
                         <TextBlock Text="Category"
                                 Style="{StaticResource FieldLabelStyle}"/>
-                        <syncfusion:SfTextBoxExt AutoCompleteSource="{Binding Categories}"
-                                                 SearchItemPath="Name"
-                                                 SelectedItem="{Binding EditingCategory, Mode=TwoWay}"
-                                                 AutoCompleteMode="Suggest"
-                                                 SuggestionMode="Contains"
-                                                 Margin="0,0,0,12"/>
+                        <syncfusion:ComboBoxAdv ItemsSource="{Binding Categories}"
+                                                DisplayMemberPath="Name"
+                                                SelectedItem="{Binding EditingCategory, Mode=TwoWay}"
+                                                Margin="0,0,0,12"/>
 
                         <TextBlock Text="Source"
                                 Style="{StaticResource FieldLabelStyle}"/>
@@ -106,17 +103,23 @@
                         <StackPanel Visibility="{Binding IsEditingPurchased, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <TextBlock Text="Purchase Unit"
                                     Style="{StaticResource FieldLabelStyle}"/>
-                            <syncfusion:SfTextBoxExt AutoCompleteSource="{Binding PurchaseUnits}"
-                                                     SearchItemPath="Name"
-                                                     SelectedItem="{Binding EditingPurchaseUnit, Mode=TwoWay}"
-                                                     AutoCompleteMode="Suggest"
-                                                     SuggestionMode="Contains"
-                                                     Margin="0,0,0,12"/>
+                            <syncfusion:ComboBoxAdv ItemsSource="{Binding PurchaseUnits}"
+                                                    DisplayMemberPath="Name"
+                                                    SelectedItem="{Binding EditingPurchaseUnit, Mode=TwoWay}"
+                                                    Margin="0,0,0,12"/>
 
                             <TextBlock Text="Purchase Unit Qty (grams)"
                                     Style="{StaticResource FieldLabelStyle}"/>
                             <syncfusion:DoubleTextBox Value="{Binding EditingPurchaseUnitQty, Mode=TwoWay}"
                                                       Margin="0,0,0,12"/>
+
+                            <TextBlock Text="Price (per purchase unit)"
+                                    Style="{StaticResource FieldLabelStyle}"/>
+                            <syncfusion:DoubleTextBox Value="{Binding EditingPrice, Mode=TwoWay}"
+                                                      Margin="0,0,0,4"/>
+                            <TextBlock Text="Saving a new price adds it to Price History, dated today."
+                                    Style="{StaticResource CaptionStyle}"
+                                    Margin="0,0,0,12"/>
                         </StackPanel>
 
                         <StackPanel Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -169,34 +172,17 @@
                             <syncfusion:SfDataGrid.Columns>
                                 <syncfusion:GridDateTimeColumn MappingName="Date"
                                         HeaderText="Date"/>
-                                <syncfusion:GridCurrencyColumn MappingName="Price"
+                                <controls:NumericColumn MappingName="Price"
                                         HeaderText="Price"
-                                        CurrencySymbol="₱"
-                                        CurrencyDecimalDigits="2"/>
+                                        NumberDecimalDigits="2"/>
                             </syncfusion:SfDataGrid.Columns>
                         </syncfusion:SfDataGrid>
 
-                        <TextBlock Text="Date"
-                                Style="{StaticResource FieldLabelStyle}"
-                                Margin="0,12,0,4"/>
-                        <syncfusion:DateTimeEdit DateTime="{Binding EditingPriceDate, Mode=TwoWay}"
-                                                 Pattern="ShortDate"
-                                                 Margin="0,0,0,12"/>
-
-                        <TextBlock Text="Price (per purchase unit)"
-                                Style="{StaticResource FieldLabelStyle}"/>
-                        <syncfusion:DoubleTextBox Value="{Binding EditingPrice, Mode=TwoWay}"
-                                                  Margin="0,0,0,12"/>
-
-                        <StackPanel Orientation="Horizontal">
-                            <syncfusion:ButtonAdv Label="Add Price"
-                                    IconTemplate="{StaticResource AddIconTemplate}"
-                                    Command="{Binding AddPriceCommand}"
-                                    Margin="0,0,8,0"/>
-                            <syncfusion:ButtonAdv Label="Delete Price"
-                                    IconTemplate="{StaticResource DeleteIconTemplate}"
-                                    Command="{Binding DeletePriceCommand}"/>
-                        </StackPanel>
+                        <syncfusion:ButtonAdv Label="Delete Price"
+                                IconTemplate="{StaticResource DeleteIconTemplate}"
+                                Command="{Binding DeletePriceCommand}"
+                                HorizontalAlignment="Left"
+                                Margin="0,12,0,0"/>
                     </StackPanel>
                 </Border>
 
@@ -218,7 +204,7 @@
                             <syncfusion:SfDataGrid.Columns>
                                 <syncfusion:GridTextColumn MappingName="Component.Name"
                                         HeaderText="Component"/>
-                                <syncfusion:GridNumericColumn MappingName="Grams"
+                                <controls:NumericColumn MappingName="Grams"
                                         HeaderText="Grams"
                                         NumberDecimalDigits="2"/>
                             </syncfusion:SfDataGrid.Columns>

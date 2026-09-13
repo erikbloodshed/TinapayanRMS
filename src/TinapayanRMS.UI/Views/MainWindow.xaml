@@ -101,8 +101,16 @@
                     tab's content showing with no header at all in the strip. With Hide mode
                     the instance never leaves Items, so MainWindow.xaml.cs's drawer handler
                     only has to flip Visibility back to Visible and select it.
+
+                    IsDisableUnloadTabItemExtContent="True" keeps every tab's content loaded while
+                    another tab is showing (the default unloads it), so a screen's scroll position,
+                    sorting, sub-tab, focus and typed text are still there when you come back.
+                    MainWindow.xaml.cs refreshes the screen's data on each return, and each
+                    ViewModel's LoadCommand merges that data in without disturbing its state.
                 -->
-                <syncfusion:TabControlExt x:Name="MainTabControl" Margin="8" CloseMode="Hide">
+                <syncfusion:TabControlExt x:Name="MainTabControl" Margin="8" CloseMode="Hide"
+                                          IsDisableUnloadTabItemExtContent="True"
+                                          SelectionChanged="MainTabControl_SelectionChanged">
                     <syncfusion:TabItemExt x:Name="IngredientsTab" Header="Ingredients" />
                     <syncfusion:TabItemExt x:Name="PackagingMaterialsTab" Header="Packaging Materials" />
                     <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />

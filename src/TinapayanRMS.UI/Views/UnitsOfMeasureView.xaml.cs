@@ -10,6 +10,5 @@ public partial class UnitsOfMeasureView : UserControl
         InitializeComponent();
         DataContext = viewModel;
         viewModel.RegisterNativeMessageBoxHandler();
-        Loaded += (_, _) => viewModel.LoadCommand.Execute().Subscribe();
     }
 }

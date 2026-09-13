@@ -44,6 +44,10 @@ public class ReportsViewModel : ReactiveObject
     private readonly IPackagingLineRepository _packagingLineRepository;
     private readonly ICostingParametersRepository _costingParametersRepository;
 
+    // True while LoadCommand merges the material lists, so re-pointing a selection doesn't also
+    // start its own chart reload.
+    private bool _isRefreshing;
+
     public ObservableCollection<Ingredient> Ingredients { get; } = [];
 
     public ObservableCollection<PackagingMaterial> PackagingMaterials { get; } = [];
@@ -108,25 +112,44 @@ public class ReportsViewModel : ReactiveObject
             .Select(kind => kind == PriceTrendMaterialKind.Packaging)
             .ToProperty(this, x => x.IsPackagingKind);
 
+        // Skips while LoadCommand merges, which reloads the chart itself once it's done.
         this.WhenAnyValue(x => x.SelectedMaterialKind, x => x.SelectedIngredient, x => x.SelectedPackagingMaterial)
+            .Where(_ => !_isRefreshing)
             .Select(_ => Observable.FromAsync(LoadPricePointsAsync))
             .Switch()
             .Subscribe();
 
+        // Runs whenever the tab is shown (MainWindow). It merges the material lists rather than
+        // replacing them, so the chosen ingredient and material survive, and redraws both charts
+        // from current prices.
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var ingredients = await ingredientRepository.GetAllAsync(CancellationToken.None);
-            Ingredients.Clear();
-            Ingredients.AddRange(ingredients.Where(i => i.Source == IngredientSource.Purchased).OrderBy(i => i.Name));
-
             var packagingMaterials = await packagingMaterialRepository.GetAllAsync(CancellationToken.None);
-            PackagingMaterials.Clear();
-            PackagingMaterials.AddRange(packagingMaterials.OrderBy(m => m.Name));
+            var marginRows = await CalculateMarginRowsAsync();
 
-            SelectedIngredient = Ingredients.FirstOrDefault();
-            SelectedPackagingMaterial = PackagingMaterials.FirstOrDefault();
+            var ingredientId = SelectedIngredient?.Id;
+            var packagingMaterialId = SelectedPackagingMaterial?.Id;
 
-            await LoadMarginRowsAsync();
+            _isRefreshing = true;
+            try
+            {
+                Ingredients.MergeFrom([.. ingredients.Where(i => i.Source == IngredientSource.Purchased).OrderBy(i => i.Name)], i => i.Id);
+                PackagingMaterials.MergeFrom([.. packagingMaterials.OrderBy(m => m.Name)], m => m.Id);
+
+                // The first one only until something has been chosen.
+                SelectedIngredient = Ingredients.FirstOrDefault(i => i.Id == ingredientId) ?? Ingredients.FirstOrDefault();
+                SelectedPackagingMaterial = PackagingMaterials.FirstOrDefault(m => m.Id == packagingMaterialId) ?? PackagingMaterials.FirstOrDefault();
+
+                MarginRows.Clear();
+                MarginRows.AddRange(marginRows);
+            }
+            finally
+            {
+                _isRefreshing = false;
+            }
+
+            await LoadPricePointsAsync();
         });
     }
 
@@ -150,9 +173,9 @@ public class ReportsViewModel : ReactiveObject
         }
     }
 
-    private async Task LoadMarginRowsAsync()
+    private async Task<List<MarginRow>> CalculateMarginRowsAsync()
     {
-        MarginRows.Clear();
+        var marginRows = new List<MarginRow>();
 
         var products = await _productRepository.GetAllAsync(CancellationToken.None);
         foreach (var product in products)
@@ -178,7 +201,9 @@ public class ReportsViewModel : ReactiveObject
                 costingParameters?.MarginPercent ?? 0m,
                 costingParameters?.VatPercent ?? 0m);
 
-            MarginRows.Add(new MarginRow(product.Name, baseCost, sellingPrice));
+            marginRows.Add(new MarginRow(product.Name, baseCost, sellingPrice));
         }
+
+        return marginRows;
     }
 }

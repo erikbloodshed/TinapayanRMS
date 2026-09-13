@@ -42,7 +42,7 @@
                         <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
                         <syncfusion:GridTextColumn MappingName="Abbreviation" HeaderText="Abbreviation" />
                         <syncfusion:GridCheckBoxColumn MappingName="IsLengthUnit" HeaderText="Length Unit" />
-                        <syncfusion:GridNumericColumn MappingName="MillimetersPerUnit" HeaderText="mm / Unit" NumberDecimalDigits="2" />
+                        <controls:NumericColumn MappingName="MillimetersPerUnit" HeaderText="mm / Unit" NumberDecimalDigits="2" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </Grid>

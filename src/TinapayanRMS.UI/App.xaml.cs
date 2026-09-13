@@ -10,6 +10,7 @@ using Syncfusion.Licensing;
 using Syncfusion.SfSkinManager;
 using Syncfusion.Themes.Windows11Light.WPF;
 using Syncfusion.Windows.Controls.Input;
+using Syncfusion.Windows.Tools.Controls;
 using TinapayanRMS.UI.Views;
 
 namespace TinapayanRMS.UI;
@@ -49,6 +50,55 @@ public partial class App : Application
         // SfTextBoxExt exists, which is why it lives in this static constructor.
         Control.VerticalContentAlignmentProperty.OverrideMetadata(
             typeof(SfTextBoxExt), new FrameworkPropertyMetadata(VerticalAlignment.Center));
+
+        EventManager.RegisterClassHandler(
+            typeof(SfTextBoxExt), FrameworkElement.LoadedEvent, new RoutedEventHandler(AlignTextBoxText));
+
+        EventManager.RegisterClassHandler(
+            typeof(ComboBoxAdv), FrameworkElement.LoadedEvent, new RoutedEventHandler(ApplyPickerDefaults));
+    }
+
+    /// <summary>
+    /// Lines an SfTextBoxExt's text up with the other fields. The Windows11Light theme's SfTextBoxExt
+    /// template puts a fixed 10px margin before its text box, where DoubleTextBox's uses 3px of
+    /// padding, so Name's text started 13px in against 8px for a DoubleTextBox and 7px for a
+    /// ComboBoxAdv. The template passes Padding (the theme's -1) to the text presenter inside that
+    /// margin, so a left padding of -6 brings the text to 8px. It must be a local value: the theme
+    /// sets Padding through the control's default style, which outranks a type default
+    /// (OverrideMetadata) and which a SetCurrentValue at Loaded doesn't survive. A Padding set in
+    /// XAML still wins.
+    /// </summary>
+    private static void AlignTextBoxText(object sender, RoutedEventArgs e)
+    {
+        var box = (SfTextBoxExt)sender;
+
+        if (box.ReadLocalValue(Control.PaddingProperty) == DependencyProperty.UnsetValue)
+        {
+            var padding = box.Padding;
+            box.Padding = new Thickness(-6, padding.Top, padding.Right, padding.Bottom);
+        }
+    }
+
+    /// <summary>
+    /// Every picker filters its list as you type: editable, with suggestions. ComboBoxAdv owns both
+    /// properties itself, so unlike SfTextBoxExt above their defaults can't be changed with
+    /// OverrideMetadata, and a Style would replace the theme's. Instead each ComboBoxAdv gets them
+    /// as it loads, unless its XAML sets them. SetCurrentValue keeps them defaults rather than local
+    /// values, so a later Loaded (e.g. switching back to a tab) applies them again harmlessly.
+    /// </summary>
+    private static void ApplyPickerDefaults(object sender, RoutedEventArgs e)
+    {
+        var picker = (ComboBoxAdv)sender;
+
+        if (picker.ReadLocalValue(ComboBoxAdv.IsEditableProperty) == DependencyProperty.UnsetValue)
+        {
+            picker.SetCurrentValue(ComboBoxAdv.IsEditableProperty, true);
+        }
+
+        if (picker.ReadLocalValue(ComboBoxAdv.AutoCompleteModeProperty) == DependencyProperty.UnsetValue)
+        {
+            picker.SetCurrentValue(ComboBoxAdv.AutoCompleteModeProperty, AutoCompleteModes.Suggest);
+        }
     }
 
     protected override void OnStartup(StartupEventArgs e)

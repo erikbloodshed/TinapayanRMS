@@ -24,6 +24,25 @@ public class PriceHistoryRulesTests
         act.Should().NotThrow();
     }
 
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(null, 0.0)]
+    [InlineData(90.0, 90.0)]
+    public void IsNewPrice_is_false_when_the_entered_price_matches_the_current_one(double? currentPrice, double? enteredPrice)
+    {
+        PriceHistoryRules.IsNewPrice((decimal?)currentPrice, (decimal?)enteredPrice).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(null, 90.0)]
+    [InlineData(90.0, 95.5)]
+    [InlineData(90.0, null)]
+    [InlineData(90.0, 0.0)]
+    public void IsNewPrice_is_true_when_the_entered_price_differs(double? currentPrice, double? enteredPrice)
+    {
+        PriceHistoryRules.IsNewPrice((decimal?)currentPrice, (decimal?)enteredPrice).Should().BeTrue();
+    }
+
     [Fact]
     public void FindLatest_picks_the_most_recent_date()
     {

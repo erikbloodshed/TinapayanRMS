@@ -5,6 +5,7 @@ using DynamicData.Binding;
 using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
@@ -139,15 +140,16 @@ public class IngredientsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _selectedPriceHistoryEntry, value);
     }
 
-    private DateTime _editingPriceDate = DateTime.Today;
-    public DateTime EditingPriceDate
-    {
-        get => _editingPriceDate;
-        set => this.RaiseAndSetIfChanged(ref _editingPriceDate, value);
-    }
+    // The ingredient's price when the form was loaded, so Save can tell whether EditingPrice changed.
+    private decimal? _editingCurrentPrice;
 
-    private decimal _editingPrice;
-    public decimal EditingPrice
+    /// <summary>
+    /// Purchased only: the price per purchase unit, shown in the Details form. Saving the form with
+    /// a different price records it as a price history entry dated that day, which is what moves
+    /// CurrentCost; there's no separate "add price" step.
+    /// </summary>
+    private decimal? _editingPrice;
+    public decimal? EditingPrice
     {
         get => _editingPrice;
         set => this.RaiseAndSetIfChanged(ref _editingPrice, value);
@@ -174,7 +176,6 @@ public class IngredientsViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> AddPriceCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeletePriceCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddBomLineCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveBomLineCommand { get; }
@@ -231,57 +232,65 @@ public class IngredientsViewModel : ViewModelBase
             .Select(ingredient => ingredient is { Source: IngredientSource.Made })
             .ToProperty(this, x => x.ShowBomEditor);
 
+        // Every selection-driven subscription skips while LoadCommand merges in fresh data, which
+        // only re-points a selection at its refreshed copy; the form and details must stay as-is.
         this.WhenAnyValue(x => x.SelectedIngredient)
-            .Where(ingredient => ingredient is not null)
+            .Where(ingredient => ingredient is not null && !IsRefreshing)
             .Subscribe(ingredient => LoadIntoForm(ingredient!));
 
         this.WhenAnyValue(x => x.SelectedIngredient)
+            .Where(_ => !IsRefreshing)
             .Subscribe(_ =>
             {
                 SelectedPriceHistoryEntry = null;
-                EditingPriceDate = DateTime.Today;
-                EditingPrice = 0m;
                 SelectedBomLineEdit = null;
                 EditingBomComponent = null;
                 EditingBomGrams = 0m;
             });
 
         this.WhenAnyValue(x => x.SelectedIngredient)
+            .Where(_ => !IsRefreshing)
             .Select(ingredient => Observable.FromAsync(() => LoadPriceHistoryAsync(ingredient)))
             .Switch()
             .Subscribe();
 
         this.WhenAnyValue(x => x.SelectedIngredient)
+            .Where(_ => !IsRefreshing)
             .Select(ingredient => Observable.FromAsync(() => LoadBomLinesAsync(ingredient)))
             .Switch()
             .Subscribe();
 
         this.WhenAnyValue(x => x.SelectedCategory)
-            .Where(category => category is not null)
+            .Where(category => category is not null && !IsRefreshing)
             .Subscribe(category =>
             {
                 _editingCategoryId = category!.Id;
                 EditingCategoryName = category.Name;
             });
 
+        // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
+        // rather than replaces, so the screen keeps its selection, picker choices and unsaved edits
+        // while picking up what changed elsewhere, such as a unit added on another tab.
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
-            _categoryCache.Edit(cache =>
-            {
-                cache.Clear();
-                cache.AddOrUpdate(categories);
-            });
-
             var units = await unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
-            PurchaseUnits.Clear();
-            PurchaseUnits.AddRange(units.OrderBy(u => u.Name));
-
             var ingredients = await _ingredientRepository.GetAllAsync(CancellationToken.None);
-            _ingredientCache.Edit(cache =>
+
+            // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
+            var selectedId = SelectedIngredient?.Id;
+            var purchaseUnitId = EditingPurchaseUnit?.Id;
+            var bomComponentId = EditingBomComponent?.Id;
+
+            ApplyRefresh(() =>
             {
-                cache.Clear();
-                cache.AddOrUpdate(ingredients);
+                MergeCategories(categories);
+                PurchaseUnits.MergeFrom([.. units.OrderBy(u => u.Name)], u => u.Id);
+                _ingredientCache.MergeFrom(ingredients);
+
+                EditingPurchaseUnit = PurchaseUnits.FirstOrDefault(u => u.Id == purchaseUnitId);
+                EditingBomComponent = Ingredients.FirstOrDefault(i => i.Id == bomComponentId);
+                SelectedIngredient = Ingredients.FirstOrDefault(i => i.Id == selectedId);
             });
         });
 
@@ -294,6 +303,8 @@ public class IngredientsViewModel : ViewModelBase
             EditingSource = IngredientSource.Purchased;
             EditingPurchaseUnit = PurchaseUnits.FirstOrDefault();
             EditingPurchaseUnitQty = null;
+            _editingCurrentPrice = null;
+            EditingPrice = null;
             EditingWeightLossPercent = null;
         });
 
@@ -317,6 +328,25 @@ public class IngredientsViewModel : ViewModelBase
                 return;
             }
 
+            // A changed price becomes today's price history entry. Check it before saving anything,
+            // so a bad price can't leave the ingredient saved without it.
+            IngredientPriceHistory? newPrice = null;
+            if (EditingSource == IngredientSource.Purchased && PriceHistoryRules.IsNewPrice(_editingCurrentPrice, EditingPrice))
+            {
+                newPrice = new IngredientPriceHistory
+                {
+                    Date = DateOnly.FromDateTime(DateTime.Today),
+                    Price = EditingPrice ?? 0m,
+                };
+
+                var priceValidation = _priceHistoryValidator.Validate(newPrice);
+                if (!priceValidation.IsValid)
+                {
+                    ErrorMessage = string.Join(" ", priceValidation.Errors.Select(e => e.ErrorMessage));
+                    return;
+                }
+            }
+
             if (_editingId == 0)
             {
                 await _ingredientRepository.AddAsync(ingredient, CancellationToken.None);
@@ -324,6 +354,14 @@ public class IngredientsViewModel : ViewModelBase
             else
             {
                 await _ingredientRepository.UpdateAsync(ingredient, CancellationToken.None);
+            }
+
+            if (newPrice is not null)
+            {
+                // AddAsync has filled in a new ingredient's id by now.
+                newPrice.IngredientId = ingredient.Id;
+                await _priceHistoryRepository.AddAsync(newPrice, CancellationToken.None);
+                _editingCurrentPrice = newPrice.Price;
             }
 
             await LoadCommand.Execute();
@@ -337,28 +375,6 @@ public class IngredientsViewModel : ViewModelBase
                 await LoadCommand.Execute();
             }),
             this.WhenAnyValue(x => x.SelectedIngredient).Select(ingredient => ingredient is not null));
-
-        AddPriceCommand = ReactiveCommand.CreateFromTask(
-            () => RunSafelyAsync(async () =>
-            {
-                var entry = new IngredientPriceHistory
-                {
-                    IngredientId = SelectedIngredient!.Id,
-                    Date = DateOnly.FromDateTime(EditingPriceDate),
-                    Price = EditingPrice,
-                };
-
-                var validation = _priceHistoryValidator.Validate(entry);
-                if (!validation.IsValid)
-                {
-                    ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
-                    return;
-                }
-
-                await _priceHistoryRepository.AddAsync(entry, CancellationToken.None);
-                await RefreshSelectedIngredientAsync();
-            }),
-            this.WhenAnyValue(x => x.SelectedIngredient).Select(ingredient => ingredient is { Source: IngredientSource.Purchased }));
 
         DeletePriceCommand = ReactiveCommand.CreateFromTask(
             () => RunWithConfirmationAsync("Delete this price entry? This can't be undone.", async () =>
@@ -412,12 +428,8 @@ public class IngredientsViewModel : ViewModelBase
                 await _categoryRepository.UpdateAsync(category, CancellationToken.None);
             }
 
-            var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
-            _categoryCache.Edit(cache =>
-            {
-                cache.Clear();
-                cache.AddOrUpdate(categories);
-            });
+            // The whole screen, not just the categories: a renamed category shows in the grid too.
+            await LoadCommand.Execute();
             SelectedCategory = null;
         }));
 
@@ -425,15 +437,22 @@ public class IngredientsViewModel : ViewModelBase
             () => RunWithConfirmationAsync($"Delete the '{SelectedCategory!.Name}' category? This can't be undone.", async () =>
             {
                 await _categoryRepository.DeleteAsync(SelectedCategory!.Id, CancellationToken.None);
-                var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
-                _categoryCache.Edit(cache =>
-                {
-                    cache.Clear();
-                    cache.AddOrUpdate(categories);
-                });
+                await LoadCommand.Execute();
                 SelectedCategory = null;
             }),
             this.WhenAnyValue(x => x.SelectedCategory).Select(category => category is not null));
+    }
+
+    /// <summary>Merges categories in, keeping the Details form's and the management panel's picks.</summary>
+    private void MergeCategories(IReadOnlyList<IngredientCategory> categories)
+    {
+        var editingCategoryId = EditingCategory?.Id;
+        var panelCategoryId = SelectedCategory?.Id;
+
+        _categoryCache.MergeFrom(categories);
+
+        EditingCategory = Categories.FirstOrDefault(c => c.Id == editingCategoryId);
+        SelectedCategory = Categories.FirstOrDefault(c => c.Id == panelCategoryId);
     }
 
     private void LoadIntoForm(Ingredient ingredient)
@@ -444,6 +463,8 @@ public class IngredientsViewModel : ViewModelBase
         EditingSource = ingredient.Source;
         EditingPurchaseUnit = PurchaseUnits.FirstOrDefault(u => u.Id == ingredient.PurchaseUnitId);
         EditingPurchaseUnitQty = ingredient.PurchaseUnitQty;
+        _editingCurrentPrice = ingredient.CurrentCost;
+        EditingPrice = ingredient.CurrentCost;
         EditingWeightLossPercent = ingredient.WeightLossPercent;
     }
 

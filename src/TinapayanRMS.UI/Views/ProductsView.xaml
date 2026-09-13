@@ -109,9 +109,9 @@
                                                     Height="190">
                                 <syncfusion:SfDataGrid.Columns>
                                     <syncfusion:GridTextColumn MappingName="SubAssembly.Name" HeaderText="Sub-Assembly" />
-                                    <syncfusion:GridNumericColumn MappingName="WeightPerPiece" HeaderText="Wt/Piece (g)" NumberDecimalDigits="2" />
-                                    <syncfusion:GridNumericColumn MappingName="Yield" HeaderText="Yield" NumberDecimalDigits="2" />
-                                    <syncfusion:GridCurrencyColumn MappingName="CostPerPiece" HeaderText="Cost/Piece" CurrencySymbol="₱" CurrencyDecimalDigits="4" />
+                                    <controls:NumericColumn MappingName="WeightPerPiece" HeaderText="Wt/Piece (g)" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="Yield" HeaderText="Yield" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="CostPerPiece" HeaderText="Cost/Piece" NumberDecimalDigits="4" />
                                 </syncfusion:SfDataGrid.Columns>
                             </syncfusion:SfDataGrid>
 
@@ -155,9 +155,9 @@
                                 <syncfusion:SfDataGrid.Columns>
                                     <syncfusion:GridTextColumn MappingName="PackagingMaterial.Name" HeaderText="Material" />
                                     <syncfusion:GridTextColumn MappingName="EntryUnit.Abbreviation" HeaderText="Unit" />
-                                    <syncfusion:GridNumericColumn MappingName="QtyPerPiece" HeaderText="Qty/Piece" NumberDecimalDigits="4" />
-                                    <syncfusion:GridNumericColumn MappingName="PiecesPerPackagingUnit" HeaderText="Pieces/Unit" NumberDecimalDigits="4" />
-                                    <syncfusion:GridCurrencyColumn MappingName="CostPerPiece" HeaderText="Cost/Piece" CurrencySymbol="₱" CurrencyDecimalDigits="4" />
+                                    <controls:NumericColumn MappingName="QtyPerPiece" HeaderText="Qty/Piece" NumberDecimalDigits="4" />
+                                    <controls:NumericColumn MappingName="PiecesPerPackagingUnit" HeaderText="Pieces/Unit" NumberDecimalDigits="4" />
+                                    <controls:NumericColumn MappingName="CostPerPiece" HeaderText="Cost/Piece" NumberDecimalDigits="4" />
                                 </syncfusion:SfDataGrid.Columns>
                             </syncfusion:SfDataGrid>
 
@@ -171,8 +171,6 @@
                             <syncfusion:ComboBoxAdv ItemsSource="{Binding EntryUnitOptions}"
                                                      DisplayMemberPath="Name"
                                                      SelectedItem="{Binding EditingLineEntryUnit, Mode=TwoWay}"
-                                                     IsTextSearchEnabled="True"
-                                                     AutoCompleteMode="Suggest"
                                                      Margin="0,0,0,12" />
 
                             <TextBlock Text="Authored Field" Style="{StaticResource FieldLabelStyle}" />
