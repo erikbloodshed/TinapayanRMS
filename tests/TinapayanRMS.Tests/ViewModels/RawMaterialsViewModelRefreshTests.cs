@@ -243,6 +243,23 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task Leaving_a_purchased_material_while_on_price_history_goes_back_to_cost_setup()
+    {
+        await SeedPurchasedIngredientAsync("Flour");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        viewModel.ShowPriceHistory.Should().BeTrue();
+        viewModel.SelectedDetailsTab = RawMaterialsViewModel.PriceHistoryTab;
+
+        await viewModel.NewCommand.Execute();
+
+        viewModel.ShowPriceHistory.Should().BeFalse("a new material has no price history");
+        viewModel.SelectedDetailsTab.Should().Be(0, "a hidden tab can't stay the one showing");
+    }
+
+    [Fact]
     public async Task A_rejected_save_saves_nothing_and_keeps_every_edit()
     {
         await SeedPurchasedIngredientAsync("Flour");

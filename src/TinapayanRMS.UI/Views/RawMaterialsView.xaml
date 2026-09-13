@@ -121,428 +121,506 @@
             </Grid>
         </Border>
 
-        <!-- Selected raw material -->
-        <ScrollViewer Grid.Row="1" Grid.Column="2" VerticalScrollBarVisibility="Auto">
-            <StackPanel>
-                <!-- Summary header: what the material is, its base unit, and what it costs per base unit -->
-                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
-                    <StackPanel>
-                        <DockPanel>
-                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                                <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />
-                                <syncfusion:ButtonAdv Label="Save"
-                                                      IconTemplate="{StaticResource SaveIconTemplate}"
-                                                      Command="{Binding SaveCommand}"
-                                                      ToolTip="Saves the details, alternative units, price and bill of materials together."
-                                                      Margin="0,0,8,0" />
-                                <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
-                            </StackPanel>
+        <!-- Selected raw material: its summary header, then its cards in tabs along the bottom -->
+        <Grid Grid.Row="1" Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-                            <Border DockPanel.Dock="Left"
-                                    Width="52"
-                                    Height="52"
-                                    Margin="0,0,14,0"
-                                    CornerRadius="10"
-                                    Background="{StaticResource AccentSoftBrush}">
-                                <TextBlock Text="{Binding HeaderInitial}"
-                                           FontSize="24"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource AccentBrush}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center" />
-                            </Border>
+            <!-- Summary header: what the material is, its base unit, and what it costs per base unit -->
+            <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,0,16">
+                <StackPanel>
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                            <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />
+                            <syncfusion:ButtonAdv Label="Save"
+                                                  IconTemplate="{StaticResource SaveIconTemplate}"
+                                                  Command="{Binding SaveCommand}"
+                                                  ToolTip="Saves the details, alternative units, price and bill of materials together."
+                                                  Margin="0,0,8,0" />
+                            <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
+                        </StackPanel>
 
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="{Binding HeaderTitle}"
-                                           FontSize="24"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource HeadingForegroundBrush}"
-                                           TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="Manage the material's details, units of measure, and cost information."
-                                           Style="{StaticResource CaptionStyle}" />
-                            </StackPanel>
-                        </DockPanel>
-
-                        <Border Margin="0,16,0,0"
-                                Padding="16,12"
-                                BorderBrush="{StaticResource CardBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="1.4*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Name" Style="{StaticResource TileLabelStyle}" />
-                                    <syncfusion:SfTextBoxExt x:Name="NameTextBox"
-                                                             Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                </StackPanel>
-
-                                <!-- An ingredient is always in grams; packaging picks its own base unit -->
-                                <Border Grid.Column="1" Style="{StaticResource TileSeparatorStyle}" />
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="Base Unit" Style="{StaticResource TileLabelStyle}" />
-                                    <TextBlock Text="gram (g)"
-                                               Style="{StaticResource TileValueStyle}"
-                                               Visibility="{Binding IsEditingIngredient, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <syncfusion:ComboBoxAdv ItemsSource="{Binding UnitsOfMeasure}"
-                                                            DisplayMemberPath="Name"
-                                                            SelectedItem="{Binding EditingBaseUnit, Mode=TwoWay}"
-                                                            IsEnabled="{Binding CanChangeBaseUnit}"
-                                                            ToolTip="Fixed once the material has alternative units, prices or packaging lines."
-                                                            Visibility="{Binding IsEditingPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                </StackPanel>
-
-                                <Border Grid.Column="3" Style="{StaticResource TileSeparatorStyle}" />
-                                <StackPanel Grid.Column="4">
-                                    <TextBlock Text="Current Cost per Base Unit" Style="{StaticResource TileLabelStyle}" />
-                                    <TextBlock Style="{StaticResource TileValueStyle}"
-                                               FontSize="18"
-                                               FontWeight="SemiBold"
-                                               Text="{Binding CurrentCostText}" />
-                                </StackPanel>
-
-                                <Border Grid.Column="5" Style="{StaticResource TileSeparatorStyle}" />
-                                <StackPanel Grid.Column="6">
-                                    <TextBlock Text="Last Updated" Style="{StaticResource TileLabelStyle}" />
-                                    <TextBlock Text="{Binding LastUpdatedText}" Style="{StaticResource TileValueStyle}" />
-                                </StackPanel>
-                            </Grid>
+                        <Border DockPanel.Dock="Left"
+                                Width="52"
+                                Height="52"
+                                Margin="0,0,14,0"
+                                CornerRadius="10"
+                                Background="{StaticResource AccentSoftBrush}">
+                            <TextBlock Text="{Binding HeaderInitial}"
+                                       FontSize="24"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource AccentBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
                         </Border>
 
-                        <Grid Margin="0,12,0,0">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding HeaderTitle}"
+                                       FontSize="24"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource HeadingForegroundBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="Manage the material's details, units of measure, and cost information."
+                                       Style="{StaticResource CaptionStyle}" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <Border Margin="0,16,0,0"
+                            Padding="16,12"
+                            BorderBrush="{StaticResource CardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <Grid>
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.4*" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Name" Style="{StaticResource TileLabelStyle}" />
+                                <syncfusion:SfTextBoxExt x:Name="NameTextBox"
+                                                         Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <!-- An ingredient is always in grams; packaging picks its own base unit -->
+                            <Border Grid.Column="1" Style="{StaticResource TileSeparatorStyle}" />
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Base Unit" Style="{StaticResource TileLabelStyle}" />
+                                <TextBlock Text="gram (g)"
+                                           Style="{StaticResource TileValueStyle}"
+                                           Visibility="{Binding IsEditingIngredient, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <syncfusion:ComboBoxAdv ItemsSource="{Binding UnitsOfMeasure}"
+                                                        DisplayMemberPath="Name"
+                                                        SelectedItem="{Binding EditingBaseUnit, Mode=TwoWay}"
+                                                        IsEnabled="{Binding CanChangeBaseUnit}"
+                                                        ToolTip="Fixed once the material has alternative units, prices or packaging lines."
+                                                        Visibility="{Binding IsEditingPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            </StackPanel>
+
+                            <Border Grid.Column="3" Style="{StaticResource TileSeparatorStyle}" />
+                            <StackPanel Grid.Column="4">
+                                <TextBlock Text="Current Cost per Base Unit" Style="{StaticResource TileLabelStyle}" />
+                                <TextBlock Style="{StaticResource TileValueStyle}"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Text="{Binding CurrentCostText}" />
+                            </StackPanel>
+
+                            <Border Grid.Column="5" Style="{StaticResource TileSeparatorStyle}" />
+                            <StackPanel Grid.Column="6">
+                                <TextBlock Text="Last Updated" Style="{StaticResource TileLabelStyle}" />
+                                <TextBlock Text="{Binding LastUpdatedText}" Style="{StaticResource TileValueStyle}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Type" Style="{StaticResource FieldLabelStyle}" />
+                            <syncfusion:ComboBoxAdv ItemsSource="{Binding Types}"
+                                                    SelectedItem="{Binding EditingType, Mode=TwoWay}"
+                                                    IsEnabled="{Binding CanChangeTypeAndSource}"
+                                                    ToolTip="Ingredients go in recipes; packaging goes on a product's packaging lines. Fixed once saved." />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Category" Style="{StaticResource FieldLabelStyle}" />
+                            <syncfusion:ComboBoxAdv ItemsSource="{Binding Categories}"
+                                                    DisplayMemberPath="Name"
+                                                    SelectedItem="{Binding EditingCategory, Mode=TwoWay}" />
+                        </StackPanel>
+
+                        <!-- Packaging is always purchased; only an ingredient can be made -->
+                        <StackPanel Grid.Column="4"
+                                    Visibility="{Binding IsEditingIngredient, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="Source" Style="{StaticResource FieldLabelStyle}" />
+                            <syncfusion:ComboBoxAdv ItemsSource="{Binding Sources}"
+                                                    SelectedItem="{Binding EditingSource, Mode=TwoWay}"
+                                                    IsEnabled="{Binding CanChangeTypeAndSource}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="6"
+                                    Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="Weight Loss %" Style="{StaticResource FieldLabelStyle}" />
+                            <syncfusion:DoubleTextBox Value="{Binding EditingWeightLossPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+
+            <!--
+                Every tab is part of the one form Save writes, so a new material shows them too.
+                Fixed tabs, like the Settings window's: nothing to close or reopen. The strip sits
+                along the bottom (TabStripPlacement), and each tab scrolls on its own, so the
+                strip stays put. Price History only applies to a saved purchased material; while
+                it's hidden the ViewModel moves the selection off it (SelectedDetailsTab).
+            -->
+            <syncfusion:TabControlExt Grid.Row="1"
+                                      TabStripPlacement="Bottom"
+                                      CloseButtonType="Hide"
+                                      ShowTabItemContextMenu="False"
+                                      ShowTabListContextMenu="False"
+                                      SelectedIndex="{Binding SelectedDetailsTab, Mode=TwoWay}">
+                <syncfusion:TabItemExt Header="Cost Setup" CanClose="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="16" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Type" Style="{StaticResource FieldLabelStyle}" />
-                                <syncfusion:ComboBoxAdv ItemsSource="{Binding Types}"
-                                                        SelectedItem="{Binding EditingType, Mode=TwoWay}"
-                                                        IsEnabled="{Binding CanChangeTypeAndSource}"
-                                                        ToolTip="Ingredients go in recipes; packaging goes on a product's packaging lines. Fixed once saved." />
-                            </StackPanel>
+                            <!-- Purchase Cost Setup (purchased materials) -->
+                            <Border Grid.Column="0"
+                                    Style="{StaticResource CardStyle}"
+                                    Visibility="{Binding ShowPurchaseSetup, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Text="Purchase Cost Setup" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
+                                    <TextBlock Text="Enter the purchase price for one unit. The system works out the cost per base unit. Picking a unit the material doesn't have yet adds it as an alternative unit."
+                                               Style="{StaticResource CardCaptionStyle}" />
 
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="Category" Style="{StaticResource FieldLabelStyle}" />
-                                <syncfusion:ComboBoxAdv ItemsSource="{Binding Categories}"
-                                                        DisplayMemberPath="Name"
-                                                        SelectedItem="{Binding EditingCategory, Mode=TwoWay}" />
-                            </StackPanel>
-
-                            <!-- Packaging is always purchased; only an ingredient can be made -->
-                            <StackPanel Grid.Column="4"
-                                        Visibility="{Binding IsEditingIngredient, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Text="Source" Style="{StaticResource FieldLabelStyle}" />
-                                <syncfusion:ComboBoxAdv ItemsSource="{Binding Sources}"
-                                                        SelectedItem="{Binding EditingSource, Mode=TwoWay}"
-                                                        IsEnabled="{Binding CanChangeTypeAndSource}" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="6"
-                                        Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Text="Weight Loss %" Style="{StaticResource FieldLabelStyle}" />
-                                <syncfusion:DoubleTextBox Value="{Binding EditingWeightLossPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <!-- Every card below is part of the one form Save writes, so a new material shows them too -->
-                <StackPanel>
-                    <Grid Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="2*" />
-                            <ColumnDefinition Width="16" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Alternative Units -->
-                        <Border Grid.Column="0" Style="{StaticResource CardStyle}">
-                            <StackPanel>
-                                <DockPanel>
-                                    <syncfusion:ButtonAdv DockPanel.Dock="Right"
-                                                          VerticalAlignment="Top"
-                                                          Label="Add Alternative Unit"
-                                                          IconTemplate="{StaticResource AddIconTemplate}"
-                                                          Command="{Binding AddUnitCommand}" />
-                                    <StackPanel Margin="0,0,12,0">
-                                        <TextBlock Text="Alternative Units" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-                                        <TextBlock Text="Define up to two units you commonly buy or use this material in. Changes are saved with Save."
-                                                   Style="{StaticResource CardCaptionStyle}" />
-                                    </StackPanel>
-                                </DockPanel>
-
-                                <syncfusion:SfDataGrid ItemsSource="{Binding UnitRows}"
-                                                       SelectedItem="{Binding SelectedUnitRow, Mode=TwoWay}"
-                                                       AutoGenerateColumns="False"
-                                                       AllowEditing="False"
-                                                       SelectionMode="Single"
-                                                       NavigationMode="Row"
-                                                       ColumnSizer="Star"
-                                                       MinHeight="96"
-                                                       MaxHeight="240">
-                                    <syncfusion:SfDataGrid.Columns>
-                                        <syncfusion:GridTextColumn MappingName="UnitName" HeaderText="Alternative Unit" />
-                                        <syncfusion:GridTextColumn MappingName="Abbreviation" HeaderText="Abbreviation" />
-                                        <controls:NumericColumn MappingName="BaseUnitsPerUnit" HeaderText="Multiplier" NumberDecimalDigits="2" />
-                                        <syncfusion:GridTextColumn MappingName="Example" HeaderText="Example" Padding="12,0,0,0" />
-                                        <syncfusion:GridTextColumn MappingName="Description" HeaderText="Description" />
-                                    </syncfusion:SfDataGrid.Columns>
-                                </syncfusion:SfDataGrid>
-
-                                <!-- Edit and Remove act on the row picked in the grid -->
-                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                    <syncfusion:ButtonAdv Label="Edit" IconTemplate="{StaticResource EditIconTemplate}" Command="{Binding EditUnitCommand}" Margin="0,0,8,0" />
-                                    <syncfusion:ButtonAdv Label="Remove" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteUnitCommand}" />
-                                </StackPanel>
-
-                                <!-- Add / edit an alternative unit -->
-                                <Border Margin="0,12,0,0"
-                                        Padding="12"
-                                        CornerRadius="6"
-                                        Background="{StaticResource PageBackgroundBrush}"
-                                        Visibility="{Binding IsUnitFormOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding UnitFormTitle}"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource HeadingForegroundBrush}"
-                                                   Margin="0,0,0,8" />
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="12" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0">
-                                                <TextBlock Text="Unit" Style="{StaticResource FieldLabelStyle}" />
-                                                <syncfusion:ComboBoxAdv ItemsSource="{Binding UnitsOfMeasure}"
-                                                                        DisplayMemberPath="Name"
-                                                                        SelectedItem="{Binding EditingUnitOfMeasure, Mode=TwoWay}" />
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="2">
-                                                <TextBlock Style="{StaticResource FieldLabelStyle}">
-                                                    <Run Text="Multiplier (" /><Run Text="{Binding BaseUnitAbbreviation, Mode=OneWay}" /><Run Text=" per unit)" />
-                                                </TextBlock>
-                                                <syncfusion:DoubleTextBox Value="{Binding EditingUnitBaseUnitsPerUnit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                            </StackPanel>
-                                        </Grid>
-                                        <TextBlock Text="Description (optional)" Style="{StaticResource FieldLabelStyle}" Margin="0,8,0,4" />
-                                        <syncfusion:SfTextBoxExt Text="{Binding EditingUnitDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-                                            <syncfusion:ButtonAdv Label="Cancel" IconTemplate="{StaticResource CancelIconTemplate}" Command="{Binding CancelUnitCommand}" Margin="0,0,8,0" />
-                                            <syncfusion:ButtonAdv Label="Apply" IconTemplate="{StaticResource ApplyIconTemplate}" Command="{Binding ApplyUnitCommand}" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Purchase Unit" Style="{StaticResource FieldLabelStyle}" />
+                                            <!-- Also lists units the material doesn't have yet: picking one adds it as an alternative unit -->
+                                            <syncfusion:ComboBoxAdv ItemsSource="{Binding PurchaseUnitOptions}"
+                                                                    DisplayMemberPath="Name"
+                                                                    SelectedItem="{Binding EditingPurchaseUnit, Mode=TwoWay}" />
                                         </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Purchase Price" Style="{StaticResource FieldLabelStyle}" />
+                                            <DockPanel>
+                                                <Border DockPanel.Dock="Left"
+                                                        Padding="10,0"
+                                                        BorderBrush="{StaticResource CardBorderBrush}"
+                                                        BorderThickness="1,1,0,1"
+                                                        CornerRadius="4,0,0,4"
+                                                        Background="{StaticResource PageBackgroundBrush}">
+                                                    <TextBlock Text="₱" VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" />
+                                                </Border>
+                                                <syncfusion:DoubleTextBox Value="{Binding EditingPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" NumberDecimalDigits="2" />
+                                            </DockPanel>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <TextBlock Text="Quantity per Purchase Unit" Style="{StaticResource FieldLabelStyle}" Margin="0,12,0,4" />
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Right"
+                                                Padding="10,0"
+                                                BorderBrush="{StaticResource CardBorderBrush}"
+                                                BorderThickness="0,1,1,1"
+                                                CornerRadius="0,4,4,0"
+                                                Background="{StaticResource PageBackgroundBrush}">
+                                            <TextBlock Text="{Binding BaseUnitAbbreviation}" VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" />
+                                        </Border>
+                                        <!-- The unit's multiplier: typed for a unit not saved yet, read-only otherwise -->
+                                        <syncfusion:DoubleTextBox Value="{Binding EditingPurchaseQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  IsReadOnly="{Binding IsPurchaseQuantityReadOnly}"
+                                                                  NumberDecimalDigits="2"
+                                                                  ToolTip="Type it for a unit that isn't saved yet. A saved unit's multiplier changes with Edit in Alternative Units." />
+                                    </DockPanel>
+
+                                    <Border Margin="0,12,0,0" Padding="12" CornerRadius="6" Background="{StaticResource AccentSoftBrush}">
+                                        <StackPanel>
+                                            <TextBlock Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold">
+                                                <Run Text="Cost per Base Unit (" /><Run Text="{Binding BaseUnitName, Mode=OneWay}" /><Run Text=")" />
+                                            </TextBlock>
+                                            <TextBlock FontSize="22"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       Text="{Binding PurchaseCostText}" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <TextBlock Text="Save adds a changed price to Price History, dated today."
+                                               Style="{StaticResource CaptionStyle}"
+                                               Margin="0,12,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Bill of Materials (made ingredients), in Purchase Cost Setup's place: a material is one or the other -->
+                            <Border Grid.Column="0"
+                                    Style="{StaticResource CardStyle}"
+                                    Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Text="Bill of Materials" Style="{StaticResource SectionHeaderStyle}" />
+
+                                    <syncfusion:SfDataGrid ItemsSource="{Binding BomLineEdits}"
+                                                           SelectedItem="{Binding SelectedBomLineEdit, Mode=TwoWay}"
+                                                           AutoGenerateColumns="False"
+                                                           AllowEditing="False"
+                                                           SelectionMode="Single"
+                                                           NavigationMode="Row"
+                                                           ColumnSizer="Star"
+                                                           Height="200">
+                                        <syncfusion:SfDataGrid.Columns>
+                                            <syncfusion:GridTextColumn MappingName="Component.Name" HeaderText="Component" />
+                                            <controls:NumericColumn MappingName="Quantity" HeaderText="Qty" NumberDecimalDigits="2" />
+                                            <syncfusion:GridTextColumn MappingName="Unit.Abbreviation" HeaderText="Unit" Padding="12,0,0,0" />
+                                            <controls:NumericColumn MappingName="Grams" HeaderText="Grams" NumberDecimalDigits="2" />
+                                        </syncfusion:SfDataGrid.Columns>
+                                    </syncfusion:SfDataGrid>
+
+                                    <Grid Margin="0,12,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Component" Style="{StaticResource FieldLabelStyle}" />
+                                            <syncfusion:ComboBoxAdv ItemsSource="{Binding Ingredients}"
+                                                                    DisplayMemberPath="Name"
+                                                                    SelectedItem="{Binding EditingBomComponent, Mode=TwoWay}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Quantity" Style="{StaticResource FieldLabelStyle}" />
+                                            <syncfusion:DoubleTextBox Value="{Binding EditingBomQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="Unit" Style="{StaticResource FieldLabelStyle}" />
+                                            <syncfusion:ComboBoxAdv ItemsSource="{Binding BomUnitOptions}"
+                                                                    DisplayMemberPath="Name"
+                                                                    SelectedItem="{Binding EditingBomUnit, Mode=TwoWay}" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <syncfusion:ButtonAdv Label="Add Line" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding AddBomLineCommand}" Margin="0,0,8,0" />
+                                        <syncfusion:ButtonAdv Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveBomLineCommand}" />
                                     </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Border>
+                                </StackPanel>
+                            </Border>
 
-                        <!-- Unit Conversion Overview -->
-                        <Border Grid.Column="2" Style="{StaticResource CardStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Unit Conversion Overview" Style="{StaticResource SectionHeaderStyle}" />
-                                <controls:UnitConversionOverview ItemsSource="{Binding UnitRows}" BaseUnitName="{Binding BaseUnitName}" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
+                            <!-- Usage Example -->
+                            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                                <StackPanel>
+                                    <TextBlock Text="Usage Example" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
+                                    <TextBlock Text="See how the system converts different units to the base unit for costing."
+                                               Style="{StaticResource CardCaptionStyle}" />
 
-                    <!-- Purchase Cost Setup and Usage Example side by side (the first is purchased only) -->
-                    <UniformGrid Rows="1" Margin="0,0,0,16">
-                        <Border Style="{StaticResource CardStyle}"
-                                Margin="0,0,8,0"
-                                Visibility="{Binding ShowPurchaseSetup, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <StackPanel>
-                                <TextBlock Text="Purchase Cost Setup" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-                                <TextBlock Text="Enter the purchase price for one unit. The system works out the cost per base unit. A unit marked new is added as an alternative unit when picked."
-                                           Style="{StaticResource CardCaptionStyle}" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Material" Style="{StaticResource FieldLabelStyle}" />
+                                            <syncfusion:ComboBoxAdv ItemsSource="{Binding RawMaterials}"
+                                                                    DisplayMemberPath="Name"
+                                                                    SelectedItem="{Binding ExampleRawMaterial, Mode=TwoWay}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Use Quantity" Style="{StaticResource FieldLabelStyle}" />
+                                            <syncfusion:DoubleTextBox Value="{Binding ExampleQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" NumberDecimalDigits="2" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3" VerticalAlignment="Bottom">
+                                            <syncfusion:ComboBoxAdv Width="84"
+                                                                    ItemsSource="{Binding ExampleUnitOptions}"
+                                                                    DisplayMemberPath="Abbreviation"
+                                                                    SelectedItem="{Binding ExampleUnit, Mode=TwoWay}" />
+                                        </StackPanel>
+                                        <syncfusion:ButtonAdv Grid.Column="5"
+                                                              VerticalAlignment="Bottom"
+                                                              Label="Calculate"
+                                                              IconTemplate="{StaticResource CalculateIconTemplate}"
+                                                              Command="{Binding CalculateExampleCommand}" />
+                                    </Grid>
 
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="Purchase Unit" Style="{StaticResource FieldLabelStyle}" />
-                                        <!-- Units the material doesn't have yet are tagged "new": picking one adds it as an alternative unit.
-                                             The ItemTemplate only draws the dropdown; the closed box shows the option's text
-                                             (RawMaterialUnitOption.ToString), which is its name. -->
-                                        <syncfusion:ComboBoxAdv ItemsSource="{Binding PurchaseUnitOptions}"
-                                                                SelectedItem="{Binding EditingPurchaseUnit, Mode=TwoWay}">
-                                            <syncfusion:ComboBoxAdv.ItemTemplate>
-                                                <DataTemplate>
-                                                    <DockPanel>
-                                                        <TextBlock DockPanel.Dock="Right"
-                                                                   Text="new"
-                                                                   Margin="12,0,0,0"
-                                                                   Foreground="{StaticResource MutedForegroundBrush}"
-                                                                   Visibility="{Binding IsNew, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                                        <TextBlock Text="{Binding Name}" />
-                                                    </DockPanel>
-                                                </DataTemplate>
-                                            </syncfusion:ComboBoxAdv.ItemTemplate>
-                                        </syncfusion:ComboBoxAdv>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="Purchase Price" Style="{StaticResource FieldLabelStyle}" />
-                                        <DockPanel>
-                                            <Border DockPanel.Dock="Left"
-                                                    Padding="10,0"
-                                                    BorderBrush="{StaticResource CardBorderBrush}"
-                                                    BorderThickness="1,1,0,1"
-                                                    CornerRadius="4,0,0,4"
-                                                    Background="{StaticResource PageBackgroundBrush}">
-                                                <TextBlock Text="₱" VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" />
-                                            </Border>
-                                            <syncfusion:DoubleTextBox Value="{Binding EditingPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" NumberDecimalDigits="2" />
+                                    <Border Margin="0,12,0,0"
+                                            Padding="12"
+                                            CornerRadius="6"
+                                            Background="{StaticResource SuccessBackgroundBrush}"
+                                            Visibility="{Binding ExampleResult, Converter={StaticResource NotNullToVisibilityConverter}}">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding ExampleResult.Title}"
+                                                       Foreground="{StaticResource HeadingForegroundBrush}"
+                                                       FontWeight="SemiBold" />
+                                            <TextBlock FontSize="28"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource SuccessForegroundBrush}"
+                                                       Text="{Binding ExampleResult.TotalCost, StringFormat='₱{0:N2}'}" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <StackPanel Margin="0,8,0,0"
+                                                Visibility="{Binding ExampleResult, Converter={StaticResource NotNullToVisibilityConverter}}">
+                                        <TextBlock Text="Breakdown" FontWeight="SemiBold" Foreground="{StaticResource HeadingForegroundBrush}" />
+                                        <DockPanel Style="{StaticResource BreakdownRowStyle}">
+                                            <TextBlock DockPanel.Dock="Right">
+                                                <Run Text="{Binding ExampleResult.QuantityInBaseUnits, StringFormat='{}{0:#,0.####}', Mode=OneWay}" />
+                                                <Run Text="{Binding ExampleResult.BaseUnitAbbreviation, Mode=OneWay}" />
+                                            </TextBlock>
+                                            <TextBlock Text="Quantity in base unit" Style="{StaticResource CaptionStyle}" />
+                                        </DockPanel>
+                                        <DockPanel Style="{StaticResource BreakdownRowStyle}">
+                                            <TextBlock DockPanel.Dock="Right">
+                                                <Run Text="{Binding ExampleResult.CostPerBaseUnit, StringFormat='₱{0:N4} /', Mode=OneWay}" />
+                                                <Run Text="{Binding ExampleResult.BaseUnitAbbreviation, Mode=OneWay}" />
+                                            </TextBlock>
+                                            <TextBlock Text="Cost per base unit" Style="{StaticResource CaptionStyle}" />
+                                        </DockPanel>
+                                        <DockPanel Style="{StaticResource BreakdownRowStyle}">
+                                            <TextBlock DockPanel.Dock="Right" FontWeight="SemiBold" Text="{Binding ExampleResult.TotalCost, StringFormat='₱{0:N2}'}" />
+                                            <TextBlock Text="Total cost" Style="{StaticResource CaptionStyle}" />
                                         </DockPanel>
                                     </StackPanel>
-                                </Grid>
-
-                                <TextBlock Text="Quantity per Purchase Unit" Style="{StaticResource FieldLabelStyle}" Margin="0,12,0,4" />
-                                <DockPanel>
-                                    <Border DockPanel.Dock="Right"
-                                            Padding="10,0"
-                                            BorderBrush="{StaticResource CardBorderBrush}"
-                                            BorderThickness="0,1,1,1"
-                                            CornerRadius="0,4,4,0"
-                                            Background="{StaticResource PageBackgroundBrush}">
-                                        <TextBlock Text="{Binding BaseUnitAbbreviation}" VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" />
-                                    </Border>
-                                    <!-- The unit's multiplier: typed for a unit not saved yet, read-only otherwise -->
-                                    <syncfusion:DoubleTextBox Value="{Binding EditingPurchaseQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                              IsReadOnly="{Binding IsPurchaseQuantityReadOnly}"
-                                                              NumberDecimalDigits="2"
-                                                              ToolTip="Type it for a unit that isn't saved yet. A saved unit's multiplier changes with Edit in Alternative Units." />
-                                </DockPanel>
-
-                                <Border Margin="0,12,0,0" Padding="12" CornerRadius="6" Background="{StaticResource AccentSoftBrush}">
-                                    <StackPanel>
-                                        <TextBlock Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold">
-                                            <Run Text="Cost per Base Unit (" /><Run Text="{Binding BaseUnitName, Mode=OneWay}" /><Run Text=")" />
-                                        </TextBlock>
-                                        <TextBlock FontSize="22"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource AccentBrush}"
-                                                   Text="{Binding PurchaseCostText}" />
-                                    </StackPanel>
-                                </Border>
-
-                                <TextBlock Text="Save adds a changed price to Price History, dated today."
-                                           Style="{StaticResource CaptionStyle}"
-                                           Margin="0,12,0,0" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource CardStyle}" Margin="8,0,0,0">
-                            <StackPanel>
-                                <TextBlock Text="Usage Example" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-                                <TextBlock Text="See how the system converts different units to the base unit for costing."
-                                           Style="{StaticResource CardCaptionStyle}" />
-
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="Material" Style="{StaticResource FieldLabelStyle}" />
-                                        <syncfusion:ComboBoxAdv ItemsSource="{Binding RawMaterials}"
-                                                                DisplayMemberPath="Name"
-                                                                SelectedItem="{Binding ExampleRawMaterial, Mode=TwoWay}" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="Use Quantity" Style="{StaticResource FieldLabelStyle}" />
-                                        <syncfusion:DoubleTextBox Value="{Binding ExampleQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" NumberDecimalDigits="2" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="3" VerticalAlignment="Bottom">
-                                        <syncfusion:ComboBoxAdv Width="84"
-                                                                ItemsSource="{Binding ExampleUnitOptions}"
-                                                                DisplayMemberPath="Abbreviation"
-                                                                SelectedItem="{Binding ExampleUnit, Mode=TwoWay}" />
-                                    </StackPanel>
-                                    <syncfusion:ButtonAdv Grid.Column="5"
-                                                          VerticalAlignment="Bottom"
-                                                          Label="Calculate"
-                                                          IconTemplate="{StaticResource CalculateIconTemplate}"
-                                                          Command="{Binding CalculateExampleCommand}" />
-                                </Grid>
-
-                                <Border Margin="0,12,0,0"
-                                        Padding="12"
-                                        CornerRadius="6"
-                                        Background="{StaticResource SuccessBackgroundBrush}"
-                                        Visibility="{Binding ExampleResult, Converter={StaticResource NotNullToVisibilityConverter}}">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding ExampleResult.Title}"
-                                                   Foreground="{StaticResource HeadingForegroundBrush}"
-                                                   FontWeight="SemiBold" />
-                                        <TextBlock FontSize="28"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource SuccessForegroundBrush}"
-                                                   Text="{Binding ExampleResult.TotalCost, StringFormat='₱{0:N2}'}" />
-                                    </StackPanel>
-                                </Border>
-
-                                <StackPanel Margin="0,8,0,0"
-                                            Visibility="{Binding ExampleResult, Converter={StaticResource NotNullToVisibilityConverter}}">
-                                    <TextBlock Text="Breakdown" FontWeight="SemiBold" Foreground="{StaticResource HeadingForegroundBrush}" />
-                                    <DockPanel Style="{StaticResource BreakdownRowStyle}">
-                                        <TextBlock DockPanel.Dock="Right">
-                                            <Run Text="{Binding ExampleResult.QuantityInBaseUnits, StringFormat='{}{0:#,0.####}', Mode=OneWay}" />
-                                            <Run Text="{Binding ExampleResult.BaseUnitAbbreviation, Mode=OneWay}" />
-                                        </TextBlock>
-                                        <TextBlock Text="Quantity in base unit" Style="{StaticResource CaptionStyle}" />
-                                    </DockPanel>
-                                    <DockPanel Style="{StaticResource BreakdownRowStyle}">
-                                        <TextBlock DockPanel.Dock="Right">
-                                            <Run Text="{Binding ExampleResult.CostPerBaseUnit, StringFormat='₱{0:N4} /', Mode=OneWay}" />
-                                            <Run Text="{Binding ExampleResult.BaseUnitAbbreviation, Mode=OneWay}" />
-                                        </TextBlock>
-                                        <TextBlock Text="Cost per base unit" Style="{StaticResource CaptionStyle}" />
-                                    </DockPanel>
-                                    <DockPanel Style="{StaticResource BreakdownRowStyle}">
-                                        <TextBlock DockPanel.Dock="Right" FontWeight="SemiBold" Text="{Binding ExampleResult.TotalCost, StringFormat='₱{0:N2}'}" />
-                                        <TextBlock Text="Total cost" Style="{StaticResource CaptionStyle}" />
-                                    </DockPanel>
                                 </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </UniformGrid>
+                            </Border>
+                        </Grid>
+                    </ScrollViewer>
+                </syncfusion:TabItemExt>
 
-                    <!-- Price History (a saved purchased material) -->
-                    <Border Style="{StaticResource CardStyle}"
-                            Margin="0,0,0,16"
-                            Visibility="{Binding ShowPriceHistory, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <StackPanel>
-                            <TextBlock Text="Price History" Style="{StaticResource SectionHeaderStyle}" />
+                <syncfusion:TabItemExt Header="Alternative Units" CanClose="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
 
+                            <!-- Alternative Units -->
+                            <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <syncfusion:ButtonAdv DockPanel.Dock="Right"
+                                                              VerticalAlignment="Top"
+                                                              Label="Add Alternative Unit"
+                                                              IconTemplate="{StaticResource AddIconTemplate}"
+                                                              Command="{Binding AddUnitCommand}" />
+                                        <StackPanel Margin="0,0,12,0">
+                                            <TextBlock Text="Alternative Units" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
+                                            <TextBlock Text="Define up to two units you commonly buy or use this material in. Changes are saved with Save."
+                                                       Style="{StaticResource CardCaptionStyle}" />
+                                        </StackPanel>
+                                    </DockPanel>
+
+                                    <syncfusion:SfDataGrid ItemsSource="{Binding UnitRows}"
+                                                           SelectedItem="{Binding SelectedUnitRow, Mode=TwoWay}"
+                                                           AutoGenerateColumns="False"
+                                                           AllowEditing="False"
+                                                           SelectionMode="Single"
+                                                           NavigationMode="Row"
+                                                           ColumnSizer="Star"
+                                                           MinHeight="96"
+                                                           MaxHeight="240">
+                                        <syncfusion:SfDataGrid.Columns>
+                                            <syncfusion:GridTextColumn MappingName="UnitName" HeaderText="Alternative Unit" />
+                                            <syncfusion:GridTextColumn MappingName="Abbreviation" HeaderText="Abbreviation" />
+                                            <controls:NumericColumn MappingName="BaseUnitsPerUnit" HeaderText="Multiplier" NumberDecimalDigits="2" />
+                                            <syncfusion:GridTextColumn MappingName="Example" HeaderText="Example" Padding="12,0,0,0" />
+                                            <syncfusion:GridTextColumn MappingName="Description" HeaderText="Description" />
+                                        </syncfusion:SfDataGrid.Columns>
+                                    </syncfusion:SfDataGrid>
+
+                                    <!-- Edit and Remove act on the row picked in the grid -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                        <syncfusion:ButtonAdv Label="Edit" IconTemplate="{StaticResource EditIconTemplate}" Command="{Binding EditUnitCommand}" Margin="0,0,8,0" />
+                                        <syncfusion:ButtonAdv Label="Remove" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteUnitCommand}" />
+                                    </StackPanel>
+
+                                    <!-- Add / edit an alternative unit -->
+                                    <Border Margin="0,12,0,0"
+                                            Padding="12"
+                                            CornerRadius="6"
+                                            Background="{StaticResource PageBackgroundBrush}"
+                                            Visibility="{Binding IsUnitFormOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding UnitFormTitle}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource HeadingForegroundBrush}"
+                                                       Margin="0,0,0,8" />
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="12" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="Unit" Style="{StaticResource FieldLabelStyle}" />
+                                                    <syncfusion:ComboBoxAdv ItemsSource="{Binding UnitsOfMeasure}"
+                                                                            DisplayMemberPath="Name"
+                                                                            SelectedItem="{Binding EditingUnitOfMeasure, Mode=TwoWay}" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Style="{StaticResource FieldLabelStyle}">
+                                                        <Run Text="Multiplier (" /><Run Text="{Binding BaseUnitAbbreviation, Mode=OneWay}" /><Run Text=" per unit)" />
+                                                    </TextBlock>
+                                                    <syncfusion:DoubleTextBox Value="{Binding EditingUnitBaseUnitsPerUnit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                </StackPanel>
+                                            </Grid>
+                                            <TextBlock Text="Description (optional)" Style="{StaticResource FieldLabelStyle}" Margin="0,8,0,4" />
+                                            <syncfusion:SfTextBoxExt Text="{Binding EditingUnitDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+                                                <syncfusion:ButtonAdv Label="Cancel" IconTemplate="{StaticResource CancelIconTemplate}" Command="{Binding CancelUnitCommand}" Margin="0,0,8,0" />
+                                                <syncfusion:ButtonAdv Label="Apply" IconTemplate="{StaticResource ApplyIconTemplate}" Command="{Binding ApplyUnitCommand}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Unit Conversion Overview -->
+                            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                                <StackPanel>
+                                    <TextBlock Text="Unit Conversion Overview" Style="{StaticResource SectionHeaderStyle}" />
+                                    <controls:UnitConversionOverview ItemsSource="{Binding UnitRows}" BaseUnitName="{Binding BaseUnitName}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </ScrollViewer>
+                </syncfusion:TabItemExt>
+
+                <!-- Its grid fills the tab -->
+                <syncfusion:TabItemExt Header="Price History"
+                                       CanClose="False"
+                                       Visibility="{Binding ShowPriceHistory, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border Style="{StaticResource CardStyle}">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Price History" Style="{StaticResource SectionHeaderStyle}" />
+                            <syncfusion:ButtonAdv DockPanel.Dock="Bottom"
+                                                  Label="Delete Price"
+                                                  IconTemplate="{StaticResource DeleteIconTemplate}"
+                                                  Command="{Binding DeletePriceCommand}"
+                                                  HorizontalAlignment="Left"
+                                                  Margin="0,12,0,0" />
                             <syncfusion:SfDataGrid ItemsSource="{Binding PriceHistory}"
                                                    SelectedItem="{Binding SelectedPriceRow, Mode=TwoWay}"
                                                    AutoGenerateColumns="False"
                                                    AllowEditing="False"
                                                    SelectionMode="Single"
                                                    NavigationMode="Row"
-                                                   ColumnSizer="Star"
-                                                   Height="200">
+                                                   ColumnSizer="Star">
                                 <syncfusion:SfDataGrid.Columns>
                                     <syncfusion:GridDateTimeColumn MappingName="Date" HeaderText="Date" />
                                     <syncfusion:GridTextColumn MappingName="UnitName" HeaderText="Unit" />
@@ -550,72 +628,10 @@
                                     <controls:NumericColumn MappingName="CostPerBaseUnit" HeaderText="Cost / Base Unit" NumberDecimalDigits="4" />
                                 </syncfusion:SfDataGrid.Columns>
                             </syncfusion:SfDataGrid>
-
-                            <syncfusion:ButtonAdv Label="Delete Price"
-                                                  IconTemplate="{StaticResource DeleteIconTemplate}"
-                                                  Command="{Binding DeletePriceCommand}"
-                                                  HorizontalAlignment="Left"
-                                                  Margin="0,12,0,0" />
-                        </StackPanel>
+                        </DockPanel>
                     </Border>
-
-                    <!-- Bill of Materials (made ingredients) -->
-                    <Border Style="{StaticResource CardStyle}"
-                            Margin="0,0,0,16"
-                            Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <StackPanel>
-                            <TextBlock Text="Bill of Materials" Style="{StaticResource SectionHeaderStyle}" />
-
-                            <syncfusion:SfDataGrid ItemsSource="{Binding BomLineEdits}"
-                                                   SelectedItem="{Binding SelectedBomLineEdit, Mode=TwoWay}"
-                                                   AutoGenerateColumns="False"
-                                                   AllowEditing="False"
-                                                   SelectionMode="Single"
-                                                   NavigationMode="Row"
-                                                   ColumnSizer="Star"
-                                                   Height="200">
-                                <syncfusion:SfDataGrid.Columns>
-                                    <syncfusion:GridTextColumn MappingName="Component.Name" HeaderText="Component" />
-                                    <controls:NumericColumn MappingName="Quantity" HeaderText="Qty" NumberDecimalDigits="2" />
-                                    <syncfusion:GridTextColumn MappingName="Unit.Abbreviation" HeaderText="Unit" Padding="12,0,0,0" />
-                                    <controls:NumericColumn MappingName="Grams" HeaderText="Grams" NumberDecimalDigits="2" />
-                                </syncfusion:SfDataGrid.Columns>
-                            </syncfusion:SfDataGrid>
-
-                            <Grid Margin="0,12,0,12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="2*" />
-                                    <ColumnDefinition Width="12" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="12" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Component" Style="{StaticResource FieldLabelStyle}" />
-                                    <syncfusion:ComboBoxAdv ItemsSource="{Binding Ingredients}"
-                                                            DisplayMemberPath="Name"
-                                                            SelectedItem="{Binding EditingBomComponent, Mode=TwoWay}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="Quantity" Style="{StaticResource FieldLabelStyle}" />
-                                    <syncfusion:DoubleTextBox Value="{Binding EditingBomQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="4">
-                                    <TextBlock Text="Unit" Style="{StaticResource FieldLabelStyle}" />
-                                    <syncfusion:ComboBoxAdv ItemsSource="{Binding BomUnitOptions}"
-                                                            DisplayMemberPath="Name"
-                                                            SelectedItem="{Binding EditingBomUnit, Mode=TwoWay}" />
-                                </StackPanel>
-                            </Grid>
-
-                            <StackPanel Orientation="Horizontal">
-                                <syncfusion:ButtonAdv Label="Add Line" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding AddBomLineCommand}" Margin="0,0,8,0" />
-                                <syncfusion:ButtonAdv Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveBomLineCommand}" />
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </StackPanel>
-        </ScrollViewer>
+                </syncfusion:TabItemExt>
+            </syncfusion:TabControlExt>
+        </Grid>
     </Grid>
 </UserControl>

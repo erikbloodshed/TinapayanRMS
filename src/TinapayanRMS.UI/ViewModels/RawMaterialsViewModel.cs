@@ -212,6 +212,17 @@ public class RawMaterialsViewModel : ViewModelBase
     /// <summary>A saved purchased material: a new one has no price history yet.</summary>
     public bool ShowPriceHistory => _showPriceHistory.Value;
 
+    /// <summary>The details tabs along the bottom: Cost Setup, Alternative Units, then Price History.</summary>
+    public const int PriceHistoryTab = 2;
+
+    /// <summary>The details tab showing. Moves to Cost Setup when Price History is about to hide (ShowPriceHistory).</summary>
+    private int _selectedDetailsTab;
+    public int SelectedDetailsTab
+    {
+        get => _selectedDetailsTab;
+        set => this.RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
+    }
+
     private readonly ObservableAsPropertyHelper<string> _headerTitle;
     /// <summary>The summary header's big title: the material's name, or "New raw material".</summary>
     public string HeaderTitle => _headerTitle.Value;
@@ -489,6 +500,13 @@ public class RawMaterialsViewModel : ViewModelBase
         _showPurchaseSetup = this.WhenAnyValue(x => x.EditingType, x => x.EditingSource,
                 (type, source) => type == RawMaterialType.Packaging || source == RawMaterialSource.Purchased)
             .ToProperty(this, x => x.ShowPurchaseSetup);
+
+        // A hidden tab can't stay the one showing: picking a made or new material while on Price
+        // History goes back to Cost Setup. Subscribed before ShowPriceHistory, so the tab strip moves
+        // before the tab hides; a TabControlExt whose selected tab hides picks a neighbour itself.
+        this.WhenAnyValue(x => x.SelectedRawMaterial)
+            .Where(material => material is not { Source: RawMaterialSource.Purchased } && SelectedDetailsTab == PriceHistoryTab)
+            .Subscribe(_ => SelectedDetailsTab = 0);
 
         _showPriceHistory = this.WhenAnyValue(x => x.SelectedRawMaterial)
             .Select(material => material is { Source: RawMaterialSource.Purchased })
