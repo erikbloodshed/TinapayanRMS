@@ -218,6 +218,45 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task A_made_ingredient_left_at_the_default_weight_loss_saves_with_0_percent()
+    {
+        await SeedCategoryAsync("Syrups");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Simple Syrup";
+        viewModel.EditingWeightLossPercent.Should().BeNull("a purchased material has no weight loss");
+        viewModel.EditingSource = RawMaterialSource.Made;
+        viewModel.EditingWeightLossPercent.Should().Be(0m, "a made ingredient starts at 0%");
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.SingleAsync(Cancellation)).WeightLossPercent.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task A_cleared_weight_loss_box_saves_as_0_percent()
+    {
+        await SeedCategoryAsync("Syrups");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Simple Syrup";
+        viewModel.EditingSource = RawMaterialSource.Made;
+        viewModel.EditingWeightLossPercent = null; // the box shows 0.00 when it's empty
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.SingleAsync(Cancellation)).WeightLossPercent.Should().Be(0m);
+    }
+
+    [Fact]
     public async Task New_after_an_unsaved_new_material_starts_with_no_units_price_or_bom_lines()
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");

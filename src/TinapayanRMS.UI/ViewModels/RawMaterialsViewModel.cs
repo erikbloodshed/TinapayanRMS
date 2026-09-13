@@ -507,6 +507,11 @@ public class RawMaterialsViewModel : ViewModelBase
                 }
             });
 
+        // A made ingredient starts with no weight loss: 0%, which is what the empty box shows anyway.
+        this.WhenAnyValue(x => x.EditingSource)
+            .Where(source => source == RawMaterialSource.Made && !IsRefreshing)
+            .Subscribe(_ => EditingWeightLossPercent ??= 0m);
+
         // The alternative units and the purchase unit choices name the base unit, which a new
         // material can still change.
         this.WhenAnyValue(x => x.EditingType, x => x.EditingBaseUnit)
@@ -647,7 +652,8 @@ public class RawMaterialsViewModel : ViewModelBase
                 Type = type,
                 CategoryId = EditingCategory?.Id ?? 0,
                 Source = source,
-                WeightLossPercent = source == RawMaterialSource.Made ? EditingWeightLossPercent : null,
+                // A cleared box shows 0.00, so it saves as 0%.
+                WeightLossPercent = source == RawMaterialSource.Made ? EditingWeightLossPercent ?? 0m : null,
                 BaseUnitId = type == RawMaterialType.Packaging ? EditingBaseUnit?.Id : null,
             };
 
