@@ -32,12 +32,12 @@ public interface IRawMaterialRepository
     /// A price entry to add, or null for none. Its unit is named by unit of measure, since a unit added
     /// in the same save has no id yet; a null unit means a price per base unit.
     /// </param>
-    /// <param name="bomLines">A made ingredient's new BOM, replacing the old one, or null to leave the BOM as it is.</param>
+    /// <param name="bomLines">A made ingredient's new BOM, in grams, replacing the old one, or null to leave the BOM as it is.</param>
     Task<int> SaveAsync(
         RawMaterial material,
         IReadOnlyList<RawMaterialUnit> units,
         (DateOnly Date, int? UnitOfMeasureId, decimal Price)? newPrice,
-        IReadOnlyList<(int ComponentIngredientId, int? UnitId, decimal Quantity)>? bomLines,
+        IReadOnlyList<(int ComponentIngredientId, decimal Grams)>? bomLines,
         CancellationToken cancellationToken);
 
     Task DeleteAsync(int id, CancellationToken cancellationToken);

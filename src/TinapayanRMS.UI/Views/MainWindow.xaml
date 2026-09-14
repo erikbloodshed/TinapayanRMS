@@ -63,11 +63,6 @@
                         <TextBlock Text="&#xE8F1;" Style="{StaticResource NavigationIconStyle}" />
                     </syncfusion:NavigationItem.Icon>
                 </syncfusion:NavigationItem>
-                <syncfusion:NavigationItem x:Name="SubAssembliesNavItem" Header="Sub-Assemblies">
-                    <syncfusion:NavigationItem.Icon>
-                        <TextBlock Text="&#xE8FD;" Style="{StaticResource NavigationIconStyle}" />
-                    </syncfusion:NavigationItem.Icon>
-                </syncfusion:NavigationItem>
                 <syncfusion:NavigationItem x:Name="ProductsNavItem" Header="Products">
                     <syncfusion:NavigationItem.Icon>
                         <TextBlock Text="&#xE71D;" Style="{StaticResource NavigationIconStyle}" />
@@ -114,7 +109,6 @@
                                           IsDisableUnloadTabItemExtContent="True"
                                           SelectionChanged="MainTabControl_SelectionChanged">
                     <syncfusion:TabItemExt x:Name="RawMaterialsTab" Header="Raw Materials" />
-                    <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
                     <syncfusion:TabItemExt x:Name="ProductsTab" Header="Products" />
                     <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" />
                 </syncfusion:TabControlExt>

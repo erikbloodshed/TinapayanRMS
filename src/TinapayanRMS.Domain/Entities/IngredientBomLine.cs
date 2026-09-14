@@ -15,17 +15,6 @@ public class IngredientBomLine
 
     public RawMaterial? ComponentIngredient { get; set; }
 
-    /// <summary>The amount as entered, in Unit, or in grams when there's no unit.</summary>
-    public decimal Quantity { get; set; }
-
-    /// <summary>The unit Quantity was entered in: one of the component's own units, or null for grams.</summary>
-    public int? UnitId { get; set; }
-
-    public RawMaterialUnit? Unit { get; set; }
-
-    /// <summary>
-    /// Quantity in grams, which the made ingredient's cost uses. Kept in step with the unit's
-    /// multiplier when that's corrected (TinapayanRMS.Infrastructure RawMaterialUnitRepository).
-    /// </summary>
+    /// <summary>The amount, always in grams: recipe lines have no unit of their own.</summary>
     public decimal Grams { get; set; }
 }

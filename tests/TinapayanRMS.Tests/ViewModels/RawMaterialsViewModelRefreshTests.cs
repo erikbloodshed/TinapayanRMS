@@ -332,7 +332,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingWeightLossPercent = 20m;
         viewModel.ShowPurchaseSetup.Should().BeFalse("a made ingredient has a BOM instead of a price");
         viewModel.EditingBomComponent = viewModel.Ingredients.Single();
-        viewModel.EditingBomQuantity = 1000m;
+        viewModel.EditingBomGrams = 1000m;
         await viewModel.AddBomLineCommand.Execute();
         await viewModel.SaveCommand.Execute();
 
@@ -400,7 +400,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingPrice = 90m;
         viewModel.EditingSource = RawMaterialSource.Made;
         viewModel.EditingBomComponent = viewModel.Ingredients.Single();
-        viewModel.EditingBomQuantity = 100m;
+        viewModel.EditingBomGrams = 100m;
         await viewModel.AddBomLineCommand.Execute();
 
         await viewModel.NewCommand.Execute();

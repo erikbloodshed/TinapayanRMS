@@ -9,17 +9,16 @@ public class ProductRulesTests
     [Fact]
     public void EnsureValidUsages_accepts_an_empty_list()
     {
-        // Usages are set one role (tab) at a time (Phase 10) — an empty list just means
-        // this particular role currently has no usages, not that the whole product does.
+        // A product doesn't have to have a sub-assembly at all times: a new one starts empty.
         var act = () => ProductRules.EnsureValidUsages([]);
 
         act.Should().NotThrow();
     }
 
     [Fact]
-    public void EnsureValidUsages_rejects_non_positive_weight_per_piece()
+    public void EnsureValidUsages_rejects_a_non_positive_piece_size()
     {
-        var act = () => ProductRules.EnsureValidUsages([(SubAssemblyId: 1, WeightPerPiece: 0m)]);
+        var act = () => ProductRules.EnsureValidUsages([(SubAssemblyId: 1, AuthoredValue: 0m)]);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -29,8 +28,8 @@ public class ProductRulesTests
     {
         var act = () => ProductRules.EnsureValidUsages(
         [
-            (SubAssemblyId: 1, WeightPerPiece: 10m),
-            (SubAssemblyId: 1, WeightPerPiece: 20m),
+            (SubAssemblyId: 1, AuthoredValue: 10m),
+            (SubAssemblyId: 1, AuthoredValue: 20m),
         ]);
 
         act.Should().Throw<InvalidOperationException>();
@@ -41,18 +40,50 @@ public class ProductRulesTests
     {
         var act = () => ProductRules.EnsureValidUsages(
         [
-            (SubAssemblyId: 1, WeightPerPiece: 10m),
-            (SubAssemblyId: 2, WeightPerPiece: 20m),
+            (SubAssemblyId: 1, AuthoredValue: 10m),
+            (SubAssemblyId: 2, AuthoredValue: 20m),
         ]);
 
         act.Should().NotThrow();
     }
 
     [Fact]
-    public void CalculateYield_divides_total_weight_by_weight_per_piece()
+    public void ResolvePieceSize_works_out_the_yield_from_a_typed_weight_per_piece()
     {
         // 100g filling batch, used at 10g/piece -> 10 pieces.
-        ProductRules.CalculateYield(subAssemblyTotalWeight: 100m, weightPerPiece: 10m).Should().Be(10m);
+        ProductRules.ResolvePieceSize(UsageAuthoredField.WeightPerPiece, 10m, totalWeight: 100m).Should().Be((10m, 10m));
+    }
+
+    [Fact]
+    public void ResolvePieceSize_works_out_the_weight_per_piece_from_a_typed_yield()
+    {
+        // A 1,200 g dough batch that makes 24 pieces -> 50 g a piece.
+        ProductRules.ResolvePieceSize(UsageAuthoredField.Yield, 24m, totalWeight: 1200m).Should().Be((50m, 24m));
+    }
+
+    [Fact]
+    public void When_the_batch_changes_the_typed_figure_stays_put_and_the_other_follows()
+    {
+        // The batch grows from 1,200 g to 1,500 g.
+        ProductRules.ResolvePieceSize(UsageAuthoredField.WeightPerPiece, 50m, totalWeight: 1500m)
+            .Should().Be((50m, 30m), "a typed 50 g piece stays 50 g, so the batch makes more pieces");
+        ProductRules.ResolvePieceSize(UsageAuthoredField.Yield, 24m, totalWeight: 1500m)
+            .Should().Be((62.5m, 24m), "a typed 24 pieces stays 24, so each piece gets heavier");
+    }
+
+    [Fact]
+    public void ResolvePieceSize_has_no_other_figure_for_a_batch_that_weighs_nothing_yet()
+    {
+        ProductRules.ResolvePieceSize(UsageAuthoredField.WeightPerPiece, 10m, totalWeight: 0m).Should().Be((10m, 0m));
+        ProductRules.ResolvePieceSize(UsageAuthoredField.Yield, 24m, totalWeight: 0m).Should().Be((0m, 24m));
+    }
+
+    [Fact]
+    public void ResolvePieceSize_rejects_an_undefined_authored_field()
+    {
+        var act = () => ProductRules.ResolvePieceSize((UsageAuthoredField)999, 10m, 100m);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
     [Fact]
@@ -64,12 +95,12 @@ public class ProductRulesTests
     }
 
     [Fact]
-    public void CalculateLineQuantityPerPiece_takes_the_pieces_share_of_the_line()
+    public void CalculateLineGramsPerPiece_takes_the_pieces_share_of_the_line()
     {
         // A 1,200 g dough batch used at 50 g a piece: each piece takes 1/24 of every line.
-        // 0.3 kg of flour in the batch is 0.0125 kg in a piece.
-        ProductRules.CalculateLineQuantityPerPiece(lineQuantity: 0.3m, weightPerPiece: 50m, subAssemblyTotalWeight: 1200m)
-            .Should().Be(0.0125m);
+        // 300 g of flour in the batch is 12.5 g in a piece.
+        ProductRules.CalculateLineGramsPerPiece(lineGrams: 300m, weightPerPiece: 50m, subAssemblyTotalWeight: 1200m)
+            .Should().Be(12.5m);
     }
 
     [Fact]

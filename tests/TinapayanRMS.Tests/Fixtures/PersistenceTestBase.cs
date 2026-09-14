@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Infrastructure.Services;
 
@@ -93,6 +95,77 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
             .Where(u => u.RawMaterialId == ingredientId && u.UnitOfMeasure!.Name == "kilogram")
             .Select(u => u.Id)
             .SingleAsync(Cancellation);
+    }
+
+    /// <summary>An empty product, for a test to fill.</summary>
+    protected async Task<int> AddProductAsync(string name)
+    {
+        await using var dbContext = CreateDbContext();
+        var product = new Product { Name = name };
+        dbContext.Products.Add(product);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return product.Id;
+    }
+
+    /// <summary>A role for a test's sub-assemblies.</summary>
+    protected async Task<int> AddRoleAsync(string name, int sortOrder = 1)
+    {
+        await using var dbContext = CreateDbContext();
+        var role = new SubAssemblyRole { Name = name, SortOrder = sortOrder };
+        dbContext.SubAssemblyRoles.Add(role);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return role.Id;
+    }
+
+    /// <summary>A purchased ingredient, in a shared "Ingredients" category, costing <paramref name="costPerGram"/> a gram with no buffer.</summary>
+    protected async Task<int> AddIngredientAsync(string name, decimal costPerGram = 0m)
+    {
+        await using var dbContext = CreateDbContext();
+        var category = await dbContext.RawMaterialCategories.FirstOrDefaultAsync(c => c.Name == "Ingredients", Cancellation)
+            ?? new RawMaterialCategory { Name = "Ingredients" };
+        var ingredient = new RawMaterial
+        {
+            Name = name,
+            Category = category,
+            Source = RawMaterialSource.Purchased,
+            CostPerBaseUnit = costPerGram,
+            BufferedCostPerBaseUnit = costPerGram,
+        };
+        dbContext.RawMaterials.Add(ingredient);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return ingredient.Id;
+    }
+
+    /// <summary>Saves <paramref name="productId"/>'s recipe as the Products screen's Save does (ProductRepository.SaveAsync), keeping its name.</summary>
+    protected async Task SaveRecipeAsync(int productId, RecipeDraft recipe)
+    {
+        var repository = new TinapayanRMS.Infrastructure.Repositories.ProductRepository(CreateDbContextFactory());
+        var product = (await repository.GetByIdAsync(productId, Cancellation))!;
+        await repository.SaveAsync(product, recipe, packagingLines: null, costing: null, Cancellation);
+    }
+
+    /// <summary>The id of <paramref name="productId"/>'s own sub-assembly named <paramref name="name"/>.</summary>
+    protected async Task<int> OwnedSubAssemblyIdAsync(int productId, string name)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.SubAssemblies
+            .Where(s => s.OwnerProductId == productId && s.Name == name)
+            .Select(s => s.Id)
+            .SingleAsync(Cancellation);
+    }
+
+    /// <summary>
+    /// A new product owning one sub-assembly made of <paramref name="lines"/> (grams), used at
+    /// <paramref name="weightPerPiece"/> grams a piece, saved through ProductRepository.SaveAsync.
+    /// </summary>
+    protected async Task<(int ProductId, int SubAssemblyId)> AddProductWithSubAssemblyAsync(
+        string productName, string subAssemblyName, int roleId, IReadOnlyList<(int IngredientId, decimal Grams)> lines, decimal weightPerPiece = 10m)
+    {
+        var productId = await AddProductAsync(productName);
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [new OwnedSubAssemblyDraft(0, subAssemblyName, roleId, lines, UsageAuthoredField.WeightPerPiece, weightPerPiece)],
+            []));
+        return (productId, await OwnedSubAssemblyIdAsync(productId, subAssemblyName));
     }
 
     private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>

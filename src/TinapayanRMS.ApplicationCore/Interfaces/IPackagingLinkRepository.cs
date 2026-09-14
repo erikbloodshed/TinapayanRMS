@@ -1,25 +1,22 @@
 using TinapayanRMS.Domain.Entities;
-using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.ApplicationCore.Interfaces;
 
-public interface IProductTabLinkRepository
+public interface IPackagingLinkRepository
 {
-    Task<IReadOnlyList<ProductTabLink>> GetForProductAsync(int productId, CancellationToken cancellationToken);
+    /// <summary>The product's packaging link, with the product it's linked to, or null when it owns its packaging.</summary>
+    Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Links productId's tab (a SubAssemblyRole tab when subAssemblyRoleId is set, otherwise
-    /// the Packaging tab) to the same tab on linkedProductId, replacing any existing link for
-    /// that tab. The tab's own rows (if any) aren't touched — it simply reads through to
-    /// linkedProductId's tab from now on.
+    /// Links productId's packaging to linkedProductId's, replacing any existing link. Its own lines (if
+    /// any) aren't touched — it simply reads through to linkedProductId's packaging from now on.
     /// </summary>
-    Task SetLinkAsync(int productId, ProductTabKind tabKind, int? subAssemblyRoleId, int linkedProductId, CancellationToken cancellationToken);
+    Task SetLinkAsync(int productId, int linkedProductId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Un-links a tab: first materializes its currently-effective rows (resolved through
-    /// whatever it was linked to) as the product's own owned rows, then removes the link.
-    /// A no-op on the rows themselves if the tab wasn't linked. Never leaves a product with
-    /// less data than it was showing a moment before.
+    /// Un-links the packaging: first materializes the lines it currently shows (resolved through the
+    /// link) as the product's own, then removes the link. A no-op when it wasn't linked. Never leaves a
+    /// product with less than it was showing a moment before.
     /// </summary>
-    Task RemoveLinkAsync(int productId, ProductTabKind tabKind, int? subAssemblyRoleId, CancellationToken cancellationToken);
+    Task RemoveLinkAsync(int productId, CancellationToken cancellationToken);
 }

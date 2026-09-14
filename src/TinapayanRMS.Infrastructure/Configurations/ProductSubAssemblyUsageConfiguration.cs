@@ -14,12 +14,14 @@ public class ProductSubAssemblyUsageConfiguration : IEntityTypeConfiguration<Pro
             .HasForeignKey(u => u.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Deleting a sub-assembly that's in use by a product is blocked instead.
+        // Deleting a sub-assembly that another product still uses is blocked instead.
         builder.HasOne(u => u.SubAssembly)
             .WithMany()
             .HasForeignKey(u => u.SubAssemblyId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(u => new { u.ProductId, u.SubAssemblyId }).IsUnique();
+
+        builder.ToTable(t => t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "[AuthoredValue] > 0"));
     }
 }

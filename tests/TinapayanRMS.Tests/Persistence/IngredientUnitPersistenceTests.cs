@@ -131,17 +131,8 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         var sack = (await repository.GetForRawMaterialAsync(sugarId, Cancellation)).Single();
 
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = sack.Id, Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
-        await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(syrupId, [(sugarId, null, 1000m)], Cancellation);
-
-        int subAssemblyId;
-        await using (var dbContext = CreateDbContext())
-        {
-            var subAssembly = new SubAssembly { Name = "Custard", Role = new SubAssemblyRole { Name = "Filling", SortOrder = 1 } };
-            dbContext.SubAssemblies.Add(subAssembly);
-            await dbContext.SaveChangesAsync(Cancellation);
-            subAssemblyId = subAssembly.Id;
-        }
-        await new SubAssemblyLineRepository(CreateDbContextFactory()).SetLinesAsync(subAssemblyId, [(sugarId, null, 500m)], Cancellation);
+        await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation);
+        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Custard Bun", "Custard", await AddRoleAsync("Filling"), [(sugarId, 500m)]);
 
         (await GetCostPerGramAsync(sugarId)).Should().Be(0.09m);
 
@@ -159,7 +150,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
     }
 
     [Fact]
-    public async Task Correcting_a_multiplier_keeps_each_recipe_lines_quantity_and_moves_its_grams_and_totals()
+    public async Task Correcting_a_multiplier_leaves_recipe_lines_and_their_totals_alone_since_they_are_in_grams()
     {
         var eggId = await SeedIngredientAsync("Egg");
         var custardId = await SeedIngredientAsync("Custard Base", RawMaterialSource.Made);
@@ -169,38 +160,25 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         var piece = (await repository.GetForRawMaterialAsync(eggId, Cancellation)).Single();
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = eggId, Date = new DateOnly(2026, 1, 1), Price = 0.2m }, Cancellation); // per gram
 
-        await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(custardId, [(eggId, piece.Id, 2m)], Cancellation);
-        int subAssemblyId;
-        await using (var dbContext = CreateDbContext())
-        {
-            var subAssembly = new SubAssembly { Name = "Egg Wash", Role = new SubAssemblyRole { Name = "Topping", SortOrder = 1 } };
-            dbContext.SubAssemblies.Add(subAssembly);
-            await dbContext.SaveChangesAsync(Cancellation);
-            subAssemblyId = subAssembly.Id;
-        }
-        await new SubAssemblyLineRepository(CreateDbContextFactory()).SetLinesAsync(subAssemblyId, [(eggId, piece.Id, 3m)], Cancellation);
+        await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(custardId, [(eggId, 100m)], Cancellation);
+        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Egg Bun", "Egg Wash", await AddRoleAsync("Topping"), [(eggId, 150m)]);
 
         // The eggs are bigger than recorded: 60 g each.
         piece.BaseUnitsPerUnit = 60m;
         await repository.UpdateAsync(piece, Cancellation);
 
         await using var check = CreateDbContext();
-        var subAssemblyLine = await check.SubAssemblyLines.AsNoTracking().SingleAsync(Cancellation);
-        subAssemblyLine.Quantity.Should().Be(3m);
-        subAssemblyLine.Grams.Should().Be(180m);
-        var bomLine = await check.IngredientBomLines.AsNoTracking().SingleAsync(Cancellation);
-        bomLine.Quantity.Should().Be(2m);
-        bomLine.Grams.Should().Be(120m);
-
+        (await check.SubAssemblyLines.AsNoTracking().SingleAsync(Cancellation)).Grams.Should().Be(150m);
+        (await check.IngredientBomLines.AsNoTracking().SingleAsync(Cancellation)).Grams.Should().Be(100m);
         var subAssemblyAfter = await check.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == subAssemblyId, Cancellation);
-        subAssemblyAfter.TotalWeight.Should().Be(180m, "the sub-assembly's weight follows its lines' grams");
-        subAssemblyAfter.TotalCost.Should().Be(36m); // 180 g at 0.20/g
+        subAssemblyAfter.TotalWeight.Should().Be(150m);
+        subAssemblyAfter.TotalCost.Should().Be(30m); // 150 g at 0.20/g
         (await GetCostPerGramAsync(eggId)).Should().Be(0.2m, "a price per gram doesn't depend on the piece's weight");
         (await GetCostPerGramAsync(custardId)).Should().Be(0.2m);
     }
 
     [Fact]
-    public async Task DeleteAsync_rejects_a_unit_a_recipe_line_is_entered_in()
+    public async Task DeleteAsync_removes_an_ingredients_unit_even_while_recipes_use_the_ingredient()
     {
         var eggId = await SeedIngredientAsync("Egg");
         var custardId = await SeedIngredientAsync("Custard Base", RawMaterialSource.Made);
@@ -208,11 +186,11 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         var repository = CreateRepository();
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = eggId, UnitOfMeasureId = pieceUnitOfMeasureId, BaseUnitsPerUnit = 50m }, Cancellation);
         var piece = (await repository.GetForRawMaterialAsync(eggId, Cancellation)).Single();
-        await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(custardId, [(eggId, piece.Id, 2m)], Cancellation);
+        await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(custardId, [(eggId, 100m)], Cancellation);
 
-        var act = () => repository.DeleteAsync(piece.Id, Cancellation);
+        await repository.DeleteAsync(piece.Id, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'piece' is used by 1 recipe line*");
+        (await repository.GetForRawMaterialAsync(eggId, Cancellation)).Should().BeEmpty("recipe lines are in grams, never in one of its units");
     }
 
     [Fact]

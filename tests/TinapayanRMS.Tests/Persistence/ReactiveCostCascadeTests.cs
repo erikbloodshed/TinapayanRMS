@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -28,8 +29,6 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
     private RawMaterialPriceHistoryRepository CreatePriceHistoryRepository() => new(CreateDbContextFactory(), CreateIngredientCostPropagator());
 
     private IngredientBomLineRepository CreateBomRepository() => new(CreateDbContextFactory(), CreateIngredientCostPropagator());
-
-    private SubAssemblyLineRepository CreateSubAssemblyLineRepository() => new(CreateDbContextFactory());
 
     private RawMaterialPriceHistoryRepository CreatePackagingPriceHistoryRepository() => new(CreateDbContextFactory(), CreateIngredientCostPropagator());
 
@@ -74,22 +73,11 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         return ingredient.Id;
     }
 
-    private async Task<int> SeedRoleAsync(string name)
+    /// <summary>A sub-assembly of <paramref name="grams"/> of one ingredient, in a product of its own (a sub-assembly always has an owner).</summary>
+    private async Task<int> SeedSubAssemblyAsync(string name, int roleId, int ingredientId, decimal grams)
     {
-        await using var dbContext = CreateDbContext();
-        var role = new SubAssemblyRole { Name = name, SortOrder = 1 };
-        dbContext.SubAssemblyRoles.Add(role);
-        await dbContext.SaveChangesAsync(Cancellation);
-        return role.Id;
-    }
-
-    private async Task<int> SeedSubAssemblyAsync(string name, int roleId)
-    {
-        await using var dbContext = CreateDbContext();
-        var subAssembly = new SubAssembly { Name = name, RoleId = roleId };
-        dbContext.SubAssemblies.Add(subAssembly);
-        await dbContext.SaveChangesAsync(Cancellation);
-        return subAssembly.Id;
+        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync($"{name} product", name, roleId, [(ingredientId, grams)]);
+        return subAssemblyId;
     }
 
     private async Task<SubAssembly> GetSubAssemblyAsync(int id)
@@ -103,11 +91,10 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
     {
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
+        var roleId = await AddRoleAsync("Filling");
 
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation); // 0.09/g
-        await CreateSubAssemblyLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, null, 1000m)], Cancellation);
+        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, sugarId, 1000m);
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(90m);
 
@@ -124,12 +111,11 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
         var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId);
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
+        var roleId = await AddRoleAsync("Filling");
 
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
-        await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, null, 1000m)], Cancellation); // syrup: 0.09/g
-        await CreateSubAssemblyLineRepository().SetLinesAsync(subAssemblyId, [(syrupId, null, 500m)], Cancellation); // 500g syrup @ 0.09/g -> 45
+        await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation); // syrup: 0.09/g
+        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, syrupId, 500m); // 500g syrup @ 0.09/g -> 45
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(45m);
 
@@ -145,12 +131,11 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
         var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId, weightLossPercent: 0m);
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
+        var roleId = await AddRoleAsync("Filling");
 
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
-        await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, null, 1000m)], Cancellation); // syrup: 1000g -> 0.09/g
-        await CreateSubAssemblyLineRepository().SetLinesAsync(subAssemblyId, [(syrupId, null, 1000m)], Cancellation); // 1000g syrup @ 0.09/g -> 90
+        await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation); // syrup: 1000g -> 0.09/g
+        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, syrupId, 1000m); // 1000g syrup @ 0.09/g -> 90
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(90m);
 
@@ -171,13 +156,11 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
     {
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
-        var roleId = await SeedRoleAsync("Filling");
-        var custardId = await SeedSubAssemblyAsync("Custard", roleId);
-        var caramelId = await SeedSubAssemblyAsync("Caramel Sauce", roleId);
+        var roleId = await AddRoleAsync("Filling");
 
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
-        await CreateSubAssemblyLineRepository().SetLinesAsync(custardId, [(sugarId, null, 500m)], Cancellation);
-        await CreateSubAssemblyLineRepository().SetLinesAsync(caramelId, [(sugarId, null, 200m)], Cancellation);
+        var custardId = await SeedSubAssemblyAsync("Custard", roleId, sugarId, 500m);
+        var caramelId = await SeedSubAssemblyAsync("Caramel Sauce", roleId, sugarId, 200m);
 
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation); // 0.18/g
 
@@ -191,12 +174,11 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var categoryId = await SeedCategoryAsync("Dough");
         var flourId = await SeedPurchasedIngredientAsync("Flour", categoryId);
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
-        var roleId = await SeedRoleAsync("Dough");
-        var subAssemblyId = await SeedSubAssemblyAsync("Bread Dough", roleId);
+        var roleId = await AddRoleAsync("Dough");
 
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = flourId, UnitId = await KilogramUnitIdAsync(flourId), Date = new DateOnly(2026, 1, 1), Price = 50m }, Cancellation); // 0.05/g
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation); // 0.09/g
-        await CreateSubAssemblyLineRepository().SetLinesAsync(subAssemblyId, [(flourId, null, 800m), (sugarId, null, 200m)], Cancellation);
+        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Pandesal", "Bread Dough", roleId, [(flourId, 800m), (sugarId, 200m)]);
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(58m); // 800*0.05 + 200*0.09
 
@@ -214,26 +196,19 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         // stored (Phase 8) — is automatically correct.
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId);
+        var roleId = await AddRoleAsync("Filling");
 
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
-        await CreateSubAssemblyLineRepository().SetLinesAsync(subAssemblyId, [(sugarId, null, 100m)], Cancellation); // 100g @ 0.09/g -> 9, TotalWeight 100g
+        // 100g @ 0.09/g -> 9, TotalWeight 100g, used at 10g a piece.
+        var (productId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", "Custard", roleId, [(sugarId, 100m)], weightPerPiece: 10m);
 
         await using var dbContext = CreateDbContext();
-        var product = new Product { Name = "Ensaymada" };
-        dbContext.Products.Add(product);
-        await dbContext.SaveChangesAsync(Cancellation); // assigns product.Id before it's used as a FK below
-
-        dbContext.ProductSubAssemblyUsages.Add(new ProductSubAssemblyUsage { ProductId = product.Id, SubAssemblyId = subAssemblyId, WeightPerPiece = 10m });
-        await dbContext.SaveChangesAsync(Cancellation);
 
         decimal ReadUsageCostPerPiece()
         {
-            var subAssembly = dbContext.SubAssemblies.AsNoTracking().Single(s => s.Id == subAssemblyId);
-            // ProductRules.CalculateUsageCostPerPiece's own formula, inlined so this test
-            // doesn't need a ProductsViewModel — the point is SubAssembly's own columns.
-            return subAssembly.TotalCost * 10m / subAssembly.TotalWeight;
+            var usage = dbContext.ProductSubAssemblyUsages.AsNoTracking().Include(u => u.SubAssembly).Single(u => u.ProductId == productId);
+            var (weightPerPiece, _) = ProductRules.ResolvePieceSize(usage.AuthoredField, usage.AuthoredValue, usage.SubAssembly!.TotalWeight);
+            return ProductRules.CalculateUsageCostPerPiece(usage.SubAssembly.TotalCost, weightPerPiece, usage.SubAssembly.TotalWeight);
         }
 
         ReadUsageCostPerPiece().Should().Be(0.9m); // 9 * 10 / 100

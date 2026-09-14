@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
-using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
@@ -15,71 +14,33 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             .AsNoTracking()
             .Include(u => u.SubAssembly)
             .ThenInclude(s => s!.Role)
+            .Include(u => u.SubAssembly)
+            .ThenInclude(s => s!.OwnerProduct)
             .Where(u => u.ProductId == productId)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<ProductSubAssemblyUsage>> GetEffectiveForRoleAsync(int productId, int subAssemblyRoleId, CancellationToken cancellationToken)
+    /// <summary>
+    /// Replaces the product's recipe on the caller's context, which should hold a transaction: its usages,
+    /// and its own sub-assemblies — updated, added and relined as <paramref name="recipe"/> lists them,
+    /// and deleted when it no longer does. Every check runs before anything is deleted: names, lines and
+    /// piece sizes, that listed sub-assemblies are the product's own and linked ones another product's,
+    /// and that no sub-assembly being deleted is linked by another product.
+    /// </summary>
+    internal static async Task SetRecipeAsync(TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, CancellationToken cancellationToken)
     {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await ResolveEffectiveForRoleAsync(dbContext, productId, subAssemblyRoleId, [], cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<ProductSubAssemblyUsage>> GetEffectiveForProductAsync(int productId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var roleIds = await dbContext.SubAssemblyRoles.Select(r => r.Id).ToListAsync(cancellationToken);
-
-        var result = new List<ProductSubAssemblyUsage>();
-        foreach (var roleId in roleIds)
+        SubAssemblyRules.EnsureValidOwnedNames([.. recipe.Owned.Select(o => o.Name)]);
+        foreach (var owned in recipe.Owned)
         {
-            result.AddRange(await ResolveEffectiveForRoleAsync(dbContext, productId, roleId, [], cancellationToken));
+            SubAssemblyRules.EnsureValidLines(owned.Lines);
         }
 
-        return result;
-    }
-
-    /// <summary>Follows a role's tab link chain (if any) until an unlinked tab is found, then returns that tab's own rows. visitedProductIds guards against a cycle slipping past SetLinkAsync's own check (e.g. a manual data edit).</summary>
-    private static async Task<IReadOnlyList<ProductSubAssemblyUsage>> ResolveEffectiveForRoleAsync(
-        TinapayanRMSDbContext dbContext, int productId, int subAssemblyRoleId, HashSet<int> visitedProductIds, CancellationToken cancellationToken)
-    {
-        if (!visitedProductIds.Add(productId))
-        {
-            throw new InvalidOperationException("Circular product tab link detected.");
-        }
-
-        var link = await dbContext.ProductTabLinks
-            .AsNoTracking()
-            .FirstOrDefaultAsync(l => l.ProductId == productId && l.TabKind == ProductTabKind.SubAssemblyRole && l.SubAssemblyRoleId == subAssemblyRoleId, cancellationToken);
-
-        if (link is not null)
-        {
-            return await ResolveEffectiveForRoleAsync(dbContext, link.LinkedProductId, subAssemblyRoleId, visitedProductIds, cancellationToken);
-        }
-
-        return await dbContext.ProductSubAssemblyUsages
-            .AsNoTracking()
-            .Include(u => u.SubAssembly)
-            .ThenInclude(s => s!.Role)
-            .Where(u => u.ProductId == productId && u.SubAssembly!.RoleId == subAssemblyRoleId)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task SetUsagesForRoleAsync(int productId, int subAssemblyRoleId, IReadOnlyList<(int SubAssemblyId, decimal WeightPerPiece)> usages, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await SetUsagesForRoleAsync(dbContext, productId, subAssemblyRoleId, usages, cancellationToken);
-    }
-
-    /// <summary>Replaces one role's usages on the caller's context and saves them, after every check SetUsagesForRoleAsync makes.</summary>
-    internal static async Task SetUsagesForRoleAsync(
-        TinapayanRMSDbContext dbContext,
-        int productId,
-        int subAssemblyRoleId,
-        IReadOnlyList<(int SubAssemblyId, decimal WeightPerPiece)> usages,
-        CancellationToken cancellationToken)
-    {
-        ProductRules.EnsureValidUsages(usages);
+        // A new sub-assembly has no id yet: a negative stand-in keeps it distinct from every other.
+        ProductRules.EnsureValidUsages(
+        [
+            .. recipe.Owned.Select((o, i) => (o.Id > 0 ? o.Id : -(i + 1), o.AuthoredValue)),
+            .. recipe.Linked.Select(l => (l.SubAssemblyId, l.AuthoredValue)),
+        ]);
 
         var productExists = await dbContext.Products.AnyAsync(p => p.Id == productId, cancellationToken);
         if (!productExists)
@@ -87,41 +48,95 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             throw new InvalidOperationException($"Product {productId} does not exist.");
         }
 
-        var tabIsLinked = await dbContext.ProductTabLinks
-            .AnyAsync(l => l.ProductId == productId && l.TabKind == ProductTabKind.SubAssemblyRole && l.SubAssemblyRoleId == subAssemblyRoleId, cancellationToken);
-        if (tabIsLinked)
+        var roleIds = recipe.Owned.Select(o => o.RoleId).Distinct().ToList();
+        var existingRoleIds = await dbContext.SubAssemblyRoles.Where(r => roleIds.Contains(r.Id)).Select(r => r.Id).ToListAsync(cancellationToken);
+        if (roleIds.Count != existingRoleIds.Count)
         {
-            throw new InvalidOperationException("This tab is Live Template-linked — unlink it before editing its usages directly.");
+            throw new InvalidOperationException("Every sub-assembly needs a role, and that role must still exist.");
         }
 
-        var providedIds = usages.Select(u => u.SubAssemblyId).ToList();
-        var actualRoleIdBySubAssemblyId = await dbContext.SubAssemblies
-            .Where(s => providedIds.Contains(s.Id))
-            .ToDictionaryAsync(s => s.Id, s => s.RoleId, cancellationToken);
+        var existingOwned = await dbContext.SubAssemblies
+            .Where(s => s.OwnerProductId == productId)
+            .ToDictionaryAsync(s => s.Id, cancellationToken);
 
-        foreach (var id in providedIds)
+        foreach (var owned in recipe.Owned.Where(o => o.Id > 0 && !existingOwned.ContainsKey(o.Id)))
         {
-            if (!actualRoleIdBySubAssemblyId.TryGetValue(id, out var actualRoleId))
+            throw new InvalidOperationException($"Sub-assembly {owned.Id} isn't one of this product's own.");
+        }
+
+        var linkedIds = recipe.Linked.Select(l => l.SubAssemblyId).ToList();
+        var ownerByLinkedId = await dbContext.SubAssemblies
+            .Where(s => linkedIds.Contains(s.Id))
+            .ToDictionaryAsync(s => s.Id, s => s.OwnerProductId, cancellationToken);
+
+        foreach (var id in linkedIds)
+        {
+            if (!ownerByLinkedId.TryGetValue(id, out var ownerId))
             {
                 throw new InvalidOperationException($"Sub-assembly {id} does not exist.");
             }
 
-            if (actualRoleId != subAssemblyRoleId)
+            if (ownerId == productId)
             {
-                throw new InvalidOperationException($"Sub-assembly {id} doesn't belong to this tab's role.");
+                throw new InvalidOperationException("A product uses its own sub-assemblies directly; it can't link one.");
             }
         }
 
-        var subAssemblyIdsInThisRole = dbContext.SubAssemblies.Where(s => s.RoleId == subAssemblyRoleId).Select(s => s.Id);
+        HashSet<int> keptIds = [.. recipe.Owned.Where(o => o.Id > 0).Select(o => o.Id)];
+        List<int> removedIds = [.. existingOwned.Keys.Where(id => !keptIds.Contains(id))];
+        if (removedIds.Count > 0)
+        {
+            await SubAssemblyRepository.EnsureNoneLinkedElsewhereAsync(dbContext, u => removedIds.Contains(u.SubAssemblyId), cancellationToken);
+        }
+
+        // The usages go first: they reference the sub-assemblies about to be deleted. A deleted
+        // sub-assembly takes its lines with it (Cascade).
         await dbContext.ProductSubAssemblyUsages
-            .Where(u => u.ProductId == productId && subAssemblyIdsInThisRole.Contains(u.SubAssemblyId))
+            .Where(u => u.ProductId == productId)
             .ExecuteDeleteAsync(cancellationToken);
 
-        dbContext.ProductSubAssemblyUsages.AddRange(usages.Select(u => new ProductSubAssemblyUsage
+        if (removedIds.Count > 0)
+        {
+            await dbContext.SubAssemblies
+                .Where(s => removedIds.Contains(s.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
+        // Kept ones before new ones, so a new sub-assembly can take a name a kept one just gave up.
+        foreach (var owned in recipe.Owned.OrderBy(o => o.Id > 0 ? 0 : 1))
+        {
+            SubAssembly subAssembly;
+            if (owned.Id > 0)
+            {
+                subAssembly = existingOwned[owned.Id];
+                subAssembly.Name = owned.Name.Trim();
+                subAssembly.RoleId = owned.RoleId;
+            }
+            else
+            {
+                subAssembly = new SubAssembly { Name = owned.Name.Trim(), RoleId = owned.RoleId, OwnerProductId = productId };
+                dbContext.SubAssemblies.Add(subAssembly);
+            }
+
+            // Saved here so a new one has its id for its lines and usage.
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await SubAssemblyLineRepository.SetLinesAsync(dbContext, subAssembly, owned.Lines, cancellationToken);
+
+            dbContext.ProductSubAssemblyUsages.Add(new ProductSubAssemblyUsage
+            {
+                ProductId = productId,
+                SubAssemblyId = subAssembly.Id,
+                AuthoredField = owned.AuthoredField,
+                AuthoredValue = owned.AuthoredValue,
+            });
+        }
+
+        dbContext.ProductSubAssemblyUsages.AddRange(recipe.Linked.Select(l => new ProductSubAssemblyUsage
         {
             ProductId = productId,
-            SubAssemblyId = u.SubAssemblyId,
-            WeightPerPiece = u.WeightPerPiece,
+            SubAssemblyId = l.SubAssemblyId,
+            AuthoredField = l.AuthoredField,
+            AuthoredValue = l.AuthoredValue,
         }));
 
         await dbContext.SaveChangesAsync(cancellationToken);

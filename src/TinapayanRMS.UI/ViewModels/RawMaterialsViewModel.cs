@@ -13,16 +13,12 @@ using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI.ViewModels;
 
-/// <summary>An in-memory (not yet saved) BOM line, shown in the BOM editor grid: an amount of a component in one of its units.</summary>
-public class IngredientBomLineEdit(RawMaterial component, RawMaterialUnitOption unit, decimal quantity)
+/// <summary>An in-memory (not yet saved) BOM line, shown in the BOM editor grid: grams of a component.</summary>
+public class IngredientBomLineEdit(RawMaterial component, decimal grams)
 {
     public RawMaterial Component { get; } = component;
 
-    public RawMaterialUnitOption Unit { get; } = unit;
-
-    public decimal Quantity { get; } = quantity;
-
-    public decimal Grams => UnitConversionRules.ToBaseQuantity(Quantity, Unit.Unit?.BaseUnitsPerUnit);
+    public decimal Grams { get; } = grams;
 }
 
 /// <summary>
@@ -431,21 +427,12 @@ public class RawMaterialsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingBomComponent, value);
     }
 
-    /// <summary>The picked component's units, for the BOM editor's unit picker.</summary>
-    public ObservableCollection<RawMaterialUnitOption> BomUnitOptions { get; } = [];
-
-    private RawMaterialUnitOption? _editingBomUnit;
-    public RawMaterialUnitOption? EditingBomUnit
+    /// <summary>The BOM editor's amount, in grams: recipe lines have no unit of their own.</summary>
+    private decimal _editingBomGrams;
+    public decimal EditingBomGrams
     {
-        get => _editingBomUnit;
-        set => this.RaiseAndSetIfChanged(ref _editingBomUnit, value);
-    }
-
-    private decimal _editingBomQuantity;
-    public decimal EditingBomQuantity
-    {
-        get => _editingBomQuantity;
-        set => this.RaiseAndSetIfChanged(ref _editingBomQuantity, value);
+        get => _editingBomGrams;
+        set => this.RaiseAndSetIfChanged(ref _editingBomGrams, value);
     }
 
     private IngredientBomLineEdit? _selectedBomLineEdit;
@@ -456,7 +443,7 @@ public class RawMaterialsViewModel : ViewModelBase
     }
 
     /// <summary>The BOM lines as last loaded, so Save only sends the BOM when its lines were changed.</summary>
-    private List<(int ComponentIngredientId, int? UnitId, decimal Quantity)> _savedBomLines = [];
+    private List<(int ComponentIngredientId, decimal Grams)> _savedBomLines = [];
 
     private RawMaterialPriceRow? _selectedPriceRow;
     public RawMaterialPriceRow? SelectedPriceRow
@@ -685,10 +672,6 @@ public class RawMaterialsViewModel : ViewModelBase
             .Where(_ => !IsRefreshing)
             .Subscribe(material => ReplaceExampleUnitOptions(material, kept: null));
 
-        this.WhenAnyValue(x => x.EditingBomComponent)
-            .Where(_ => !IsRefreshing)
-            .Subscribe(component => ReplaceUnitOptions(BomUnitOptions, component, unit => EditingBomUnit = unit, keepUnitId: null));
-
         // A worked-out example belongs to the inputs it was worked out from.
         this.WhenAnyValue(x => x.ExampleRawMaterial, x => x.ExampleQuantity, x => x.ExampleUnit)
             .Where(_ => !IsRefreshing)
@@ -709,7 +692,6 @@ public class RawMaterialsViewModel : ViewModelBase
             var baseUnitId = EditingBaseUnit?.Id;
             var unitOfMeasureId = EditingUnitOfMeasure?.Id;
             var bomComponentId = EditingBomComponent?.Id;
-            var bomUnitId = EditingBomUnit?.UnitId;
             var exampleMaterialId = ExampleRawMaterial?.Id;
             var exampleUnit = ExampleUnit;
 
@@ -724,12 +706,7 @@ public class RawMaterialsViewModel : ViewModelBase
                 EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId);
                 EditingUnitOfMeasure = UnitsOfMeasure.FirstOrDefault(u => u.Id == unitOfMeasureId);
 
-                var previousBomComponent = EditingBomComponent;
                 EditingBomComponent = Ingredients.FirstOrDefault(m => m.Id == bomComponentId);
-                if (!ReferenceEquals(previousBomComponent, EditingBomComponent))
-                {
-                    ReplaceUnitOptions(BomUnitOptions, EditingBomComponent, unit => EditingBomUnit = unit, keepUnitId: bomUnitId);
-                }
 
                 SelectedRawMaterial = RawMaterials.FirstOrDefault(m => m.Id == selectedId);
 
@@ -938,9 +915,9 @@ public class RawMaterialsViewModel : ViewModelBase
             this.WhenAnyValue(x => x.SelectedPriceRow).Select(row => row is not null));
 
         AddBomLineCommand = ReactiveCommand.Create(
-            () => BomLineEdits.Add(new IngredientBomLineEdit(EditingBomComponent!, EditingBomUnit!, EditingBomQuantity)),
-            this.WhenAnyValue(x => x.EditingBomComponent, x => x.EditingBomUnit, x => x.EditingBomQuantity,
-                (component, unit, quantity) => component is not null && unit is not null && quantity > 0));
+            () => BomLineEdits.Add(new IngredientBomLineEdit(EditingBomComponent!, EditingBomGrams)),
+            this.WhenAnyValue(x => x.EditingBomComponent, x => x.EditingBomGrams,
+                (component, grams) => component is not null && grams > 0));
 
         RemoveBomLineCommand = ReactiveCommand.Create(
             () => { BomLineEdits.Remove(SelectedBomLineEdit!); },
@@ -980,7 +957,7 @@ public class RawMaterialsViewModel : ViewModelBase
         SelectedPriceRow = null;
         SelectedBomLineEdit = null;
         EditingBomComponent = null;
-        EditingBomQuantity = 0m;
+        EditingBomGrams = 0m;
         CloseUnitForm();
         LoadUnitRows(material);
         if (material is not null)
@@ -1213,24 +1190,6 @@ public class RawMaterialsViewModel : ViewModelBase
         CanChangeBaseUnit = SelectedRawMaterial is null || (SelectedRawMaterial.Units.Count == 0 && PriceHistory.Count == 0);
 
     /// <summary>
-    /// Fills a unit picker with <paramref name="material"/>'s units and picks the one with
-    /// <paramref name="keepUnitId"/>, falling back to the base unit.
-    /// </summary>
-    private static void ReplaceUnitOptions(
-        ObservableCollection<RawMaterialUnitOption> options, RawMaterial? material, Action<RawMaterialUnitOption?> pick, int? keepUnitId)
-    {
-        pick(null);
-        options.Clear();
-        if (material is null)
-        {
-            return;
-        }
-
-        options.AddRange(RawMaterialUnitOption.For(material));
-        pick(options.FirstOrDefault(o => o.UnitId == keepUnitId) ?? options[0]);
-    }
-
-    /// <summary>
     /// The usage example's unit choices for <paramref name="material"/>. Keeps the unit picked before
     /// (<paramref name="kept"/>, matched by id — the base unit's is null) when there was one; otherwise
     /// starts on its largest alternative unit, else its base unit.
@@ -1300,14 +1259,14 @@ public class RawMaterialsViewModel : ViewModelBase
     }
 
     /// <summary>The BOM editor's lines when they differ from those last loaded, or null to leave the saved BOM as it is.</summary>
-    private List<(int ComponentIngredientId, int? UnitId, decimal Quantity)>? ChangedBomLines()
+    private List<(int ComponentIngredientId, decimal Grams)>? ChangedBomLines()
     {
         var lines = CurrentBomLines();
         return lines.SequenceEqual(_savedBomLines) ? null : lines;
     }
 
-    private List<(int ComponentIngredientId, int? UnitId, decimal Quantity)> CurrentBomLines() =>
-        [.. BomLineEdits.Select(l => (l.Component.Id, l.Unit.UnitId, l.Quantity))];
+    private List<(int ComponentIngredientId, decimal Grams)> CurrentBomLines() =>
+        [.. BomLineEdits.Select(l => (l.Component.Id, l.Grams))];
 
     private async Task LoadBomLinesAsync(RawMaterial? material)
     {
@@ -1322,7 +1281,7 @@ public class RawMaterialsViewModel : ViewModelBase
         var lines = await _bomLineRepository.GetForIngredientAsync(material.Id, CancellationToken.None);
         foreach (var line in lines)
         {
-            BomLineEdits.Add(new IngredientBomLineEdit(line.ComponentIngredient!, new RawMaterialUnitOption(line.Unit, line.ComponentIngredient!), line.Quantity));
+            BomLineEdits.Add(new IngredientBomLineEdit(line.ComponentIngredient!, line.Grams));
         }
 
         _savedBomLines = CurrentBomLines();

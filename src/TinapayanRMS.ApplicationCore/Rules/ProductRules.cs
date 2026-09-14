@@ -5,16 +5,15 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 public static class ProductRules
 {
     /// <summary>
-    /// Usages are now set one role (tab) at a time (Phase 10), so an empty list is valid
-    /// here — it means this role currently has no usages, not that the whole product has
-    /// none. Nothing stops every tab from independently being empty; PLAN.md doesn't
-    /// require a product to have at least one usage at all times.
+    /// A product's whole set of usages: an empty set is valid (PLAN.md doesn't require a product to
+    /// have a usage at all times), but every typed piece size must be positive, and a product uses each
+    /// sub-assembly once.
     /// </summary>
-    public static void EnsureValidUsages(IReadOnlyList<(int SubAssemblyId, decimal WeightPerPiece)> usages)
+    public static void EnsureValidUsages(IReadOnlyList<(int SubAssemblyId, decimal AuthoredValue)> usages)
     {
-        if (usages.Any(u => u.WeightPerPiece <= 0))
+        if (usages.Any(u => u.AuthoredValue <= 0))
         {
-            throw new InvalidOperationException("A sub-assembly usage's weight per piece must be positive.");
+            throw new InvalidOperationException("A sub-assembly's weight per piece or yield must be positive.");
         }
 
         if (usages.Select(u => u.SubAssemblyId).Distinct().Count() != usages.Count)
@@ -23,20 +22,33 @@ public static class ProductRules
         }
     }
 
-    /// <summary>Pieces the sub-assembly's current batch yields at this usage's weight per piece. Informational only — never stored, and expected to differ across a product's usages.</summary>
-    public static decimal CalculateYield(decimal subAssemblyTotalWeight, decimal weightPerPiece) =>
-        subAssemblyTotalWeight / weightPerPiece;
+    /// <summary>
+    /// A usage's weight per piece and yield, from the one the user typed and the batch's current total
+    /// weight: the typed one as it is, the other worked out (Yield = TotalWeight / WeightPerPiece). Worked
+    /// out on every read, so the typed figure stays put when the batch changes. A batch that weighs
+    /// nothing yet (a new sub-assembly with no lines) has no other figure: it comes out as 0.
+    /// </summary>
+    public static (decimal WeightPerPiece, decimal Yield) ResolvePieceSize(UsageAuthoredField authoredField, decimal authoredValue, decimal totalWeight)
+    {
+        var other = totalWeight > 0 && authoredValue > 0 ? totalWeight / authoredValue : 0m;
+        return authoredField switch
+        {
+            UsageAuthoredField.WeightPerPiece => (authoredValue, other),
+            UsageAuthoredField.Yield => (other, authoredValue),
+            _ => throw new ArgumentOutOfRangeException(nameof(authoredField)),
+        };
+    }
 
     /// <summary>This usage's share of the sub-assembly's cost, per finished piece.</summary>
     public static decimal CalculateUsageCostPerPiece(decimal subAssemblyTotalCost, decimal weightPerPiece, decimal subAssemblyTotalWeight) =>
         subAssemblyTotalCost * weightPerPiece / subAssemblyTotalWeight;
 
     /// <summary>
-    /// How much of one sub-assembly line goes into one finished piece, in the line's own unit: the
-    /// piece takes weightPerPiece grams of the whole batch, so it takes that share of every line.
+    /// How many grams of one sub-assembly line go into one finished piece: the piece takes
+    /// weightPerPiece grams of the whole batch, so it takes that share of every line.
     /// </summary>
-    public static decimal CalculateLineQuantityPerPiece(decimal lineQuantity, decimal weightPerPiece, decimal subAssemblyTotalWeight) =>
-        lineQuantity * weightPerPiece / subAssemblyTotalWeight;
+    public static decimal CalculateLineGramsPerPiece(decimal lineGrams, decimal weightPerPiece, decimal subAssemblyTotalWeight) =>
+        lineGrams * weightPerPiece / subAssemblyTotalWeight;
 
     /// <summary>
     /// One sub-assembly line's cost per finished piece: the piece's share of the line's grams, at the

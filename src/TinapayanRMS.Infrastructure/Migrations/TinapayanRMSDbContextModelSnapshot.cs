@@ -79,18 +79,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Property<int>("IngredientId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<int?>("UnitId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ComponentIngredientId");
-
-                    b.HasIndex("UnitId");
 
                     b.HasIndex("IngredientId", "ComponentIngredientId")
                         .IsUnique();
@@ -138,6 +129,30 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.ToTable("PackagingLines");
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.PackagingLink", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("LinkedProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkedProductId");
+
+                    b.HasIndex("ProductId")
+                        .IsUnique();
+
+                    b.ToTable("PackagingLinks");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.Product", b =>
                 {
                     b.Property<int>("Id")
@@ -174,15 +189,18 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("AuthoredField")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("AuthoredValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
 
                     b.Property<int>("SubAssemblyId")
                         .HasColumnType("int");
-
-                    b.Property<decimal>("WeightPerPiece")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
 
                     b.HasKey("Id");
 
@@ -191,44 +209,10 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.HasIndex("ProductId", "SubAssemblyId")
                         .IsUnique();
 
-                    b.ToTable("ProductSubAssemblyUsages");
-                });
-
-            modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductTabLink", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("LinkedProductId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("SubAssemblyRoleId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("TabKind")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LinkedProductId");
-
-                    b.HasIndex("ProductId")
-                        .IsUnique()
-                        .HasFilter("[SubAssemblyRoleId] IS NULL");
-
-                    b.HasIndex("SubAssemblyRoleId");
-
-                    b.HasIndex("ProductId", "SubAssemblyRoleId")
-                        .IsUnique()
-                        .HasFilter("[SubAssemblyRoleId] IS NOT NULL");
-
-                    b.ToTable("ProductTabLinks");
+                    b.ToTable("ProductSubAssemblyUsages", t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "[AuthoredValue] > 0");
+                        });
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterial", b =>
@@ -391,6 +375,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int>("OwnerProductId")
+                        .HasColumnType("int");
+
                     b.Property<int>("RoleId")
                         .HasColumnType("int");
 
@@ -404,10 +391,10 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
-                        .IsUnique();
-
                     b.HasIndex("RoleId");
+
+                    b.HasIndex("OwnerProductId", "Name")
+                        .IsUnique();
 
                     b.ToTable("SubAssemblies");
                 });
@@ -427,21 +414,12 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Property<int>("IngredientId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
-
                     b.Property<int>("SubAssemblyId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("UnitId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.HasIndex("IngredientId");
-
-                    b.HasIndex("UnitId");
 
                     b.HasIndex("SubAssemblyId", "IngredientId")
                         .IsUnique();
@@ -559,16 +537,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("TinapayanRMS.Domain.Entities.RawMaterialUnit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("ComponentIngredient");
 
                     b.Navigation("Ingredient");
-
-                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.PackagingLine", b =>
@@ -597,6 +568,25 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("Unit");
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.PackagingLink", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "LinkedProduct")
+                        .WithMany()
+                        .HasForeignKey("LinkedProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LinkedProduct");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", b =>
                 {
                     b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
@@ -614,32 +604,6 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("SubAssembly");
-                });
-
-            modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductTabLink", b =>
-                {
-                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "LinkedProduct")
-                        .WithMany()
-                        .HasForeignKey("LinkedProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TinapayanRMS.Domain.Entities.SubAssemblyRole", "SubAssemblyRole")
-                        .WithMany()
-                        .HasForeignKey("SubAssemblyRoleId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("LinkedProduct");
-
-                    b.Navigation("Product");
-
-                    b.Navigation("SubAssemblyRole");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterial", b =>
@@ -699,11 +663,19 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssembly", b =>
                 {
+                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "OwnerProduct")
+                        .WithMany()
+                        .HasForeignKey("OwnerProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("TinapayanRMS.Domain.Entities.SubAssemblyRole", "Role")
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("OwnerProduct");
 
                     b.Navigation("Role");
                 });
@@ -722,16 +694,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("TinapayanRMS.Domain.Entities.RawMaterialUnit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Ingredient");
 
                     b.Navigation("SubAssembly");
-
-                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterial", b =>

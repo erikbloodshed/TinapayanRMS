@@ -33,4 +33,18 @@ public class CompositionRootTests
         viewModel.Title.Should().Be("Tinapayan Festival Bakeshoppe — Recipe & Costing");
         viewModel.Heading.Should().Be(viewModel.Title.ToUpperInvariant());
     }
+
+    [Fact]
+    public void CreateHostBuilder_resolves_every_screens_view_model()
+    {
+        using IHost host = CompositionRoot.CreateHostBuilder([]).Build();
+
+        // Building each one checks that everything its constructor asks for is registered.
+        host.Services.GetRequiredService<RawMaterialsViewModel>().Should().NotBeNull();
+        host.Services.GetRequiredService<ProductsViewModel>().Should().NotBeNull();
+        host.Services.GetRequiredService<ReportsViewModel>().Should().NotBeNull();
+        host.Services.GetRequiredService<UnitsOfMeasureViewModel>().Should().NotBeNull();
+        host.Services.GetRequiredService<CategoriesViewModel>().Should().NotBeNull();
+        host.Services.GetRequiredService<SubAssemblyRolesViewModel>().Should().NotBeNull();
+    }
 }

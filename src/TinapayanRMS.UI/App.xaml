@@ -54,6 +54,14 @@
             <TextBlock Text="&#xE8EF;" Style="{StaticResource IconGlyphStyle}" />
         </DataTemplate>
 
+        <DataTemplate x:Key="CopyIconTemplate">
+            <TextBlock Text="&#xE8C8;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="LinkIconTemplate">
+            <TextBlock Text="&#xE71B;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
         <!--
             A collapse toggle's chevron (a checkable ButtonAdv): pointing up while the section is open
             (unchecked), down once it's collapsed (checked).

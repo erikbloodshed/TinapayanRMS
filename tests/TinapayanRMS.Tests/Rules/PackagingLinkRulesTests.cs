@@ -3,12 +3,12 @@ using TinapayanRMS.ApplicationCore.Rules;
 
 namespace TinapayanRMS.Tests.Rules;
 
-public class ProductTabLinkRulesTests
+public class PackagingLinkRulesTests
 {
     [Fact]
     public void EnsureNotSelfLink_rejects_linking_a_product_to_itself()
     {
-        var act = () => ProductTabLinkRules.EnsureNotSelfLink(productId: 1, linkedProductId: 1);
+        var act = () => PackagingLinkRules.EnsureNotSelfLink(productId: 1, linkedProductId: 1);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -16,7 +16,7 @@ public class ProductTabLinkRulesTests
     [Fact]
     public void EnsureNotSelfLink_accepts_linking_to_a_different_product()
     {
-        var act = () => ProductTabLinkRules.EnsureNotSelfLink(productId: 1, linkedProductId: 2);
+        var act = () => PackagingLinkRules.EnsureNotSelfLink(productId: 1, linkedProductId: 2);
 
         act.Should().NotThrow();
     }
@@ -24,7 +24,7 @@ public class ProductTabLinkRulesTests
     [Fact]
     public void EnsureNoCycle_accepts_linking_to_a_product_with_no_further_links()
     {
-        var act = () => ProductTabLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: _ => null);
+        var act = () => PackagingLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: _ => null);
 
         act.Should().NotThrow();
     }
@@ -35,7 +35,7 @@ public class ProductTabLinkRulesTests
         // 1 wants to link to 2; 2 is linked to 3; 3 has no further link.
         var links = new Dictionary<int, int> { [2] = 3 };
 
-        var act = () => ProductTabLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: id => links.TryGetValue(id, out var v) ? v : null);
+        var act = () => PackagingLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: id => links.TryGetValue(id, out var v) ? v : null);
 
         act.Should().NotThrow();
     }
@@ -46,7 +46,7 @@ public class ProductTabLinkRulesTests
         // 1 wants to link to 2, but 2 is already linked to 1 — 1 -> 2 -> 1.
         var links = new Dictionary<int, int> { [2] = 1 };
 
-        var act = () => ProductTabLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: id => links.TryGetValue(id, out var v) ? v : null);
+        var act = () => PackagingLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: id => links.TryGetValue(id, out var v) ? v : null);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -57,7 +57,7 @@ public class ProductTabLinkRulesTests
         // 1 wants to link to 2; 2 -> 3 -> 4 -> 1 closes the loop several hops down.
         var links = new Dictionary<int, int> { [2] = 3, [3] = 4, [4] = 1 };
 
-        var act = () => ProductTabLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: id => links.TryGetValue(id, out var v) ? v : null);
+        var act = () => PackagingLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: id => links.TryGetValue(id, out var v) ? v : null);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -69,7 +69,7 @@ public class ProductTabLinkRulesTests
         // unrelated to 1 — still not safe to link into.
         var links = new Dictionary<int, int> { [2] = 3, [3] = 2 };
 
-        var act = () => ProductTabLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: id => links.TryGetValue(id, out var v) ? v : null);
+        var act = () => PackagingLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: id => links.TryGetValue(id, out var v) ? v : null);
 
         act.Should().Throw<InvalidOperationException>();
     }

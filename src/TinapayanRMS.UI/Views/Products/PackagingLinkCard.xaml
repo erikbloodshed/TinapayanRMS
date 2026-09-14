@@ -1,36 +1,32 @@
-<UserControl x:Class="TinapayanRMS.UI.Views.Products.TabLinksCard"
+<UserControl x:Class="TinapayanRMS.UI.Views.Products.PackagingLinkCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
-    <!-- Live Template links: saved as soon as they're made or removed, without Save. -->
+    <!-- A packaging link: saved as soon as it's made or removed, without Save. -->
     <Border Style="{StaticResource CardStyle}">
         <StackPanel>
-            <TextBlock Text="Live Template Links" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-            <TextBlock Text="A linked role or the packaging reads through to the same part of another product, and follows its changes. Unlinking keeps a copy of what it showed. Links apply at once."
+            <TextBlock Text="Packaging Link" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
+            <TextBlock Text="Linked packaging reads through to another product's, and follows its changes. Unlinking keeps a copy of what it showed. Links apply at once. (A sub-assembly is shared by linking it in the recipe.)"
                        Style="{StaticResource CardCaptionStyle}" />
 
-            <syncfusion:SfDataGrid ItemsSource="{Binding TabLinks}"
-                                   SelectedItem="{Binding SelectedTabLink, Mode=TwoWay}"
-                                   AutoGenerateColumns="False"
-                                   AllowEditing="False"
-                                   SelectionMode="Single"
-                                   NavigationMode="Row"
-                                   ColumnSizer="Star"
-                                   MinHeight="96"
-                                   MaxHeight="200">
-                <syncfusion:SfDataGrid.Columns>
-                    <syncfusion:GridTextColumn MappingName="TabName" HeaderText="Tab" />
-                    <syncfusion:GridTextColumn MappingName="LinkedToProductName" HeaderText="Linked To" />
-                </syncfusion:SfDataGrid.Columns>
-            </syncfusion:SfDataGrid>
-
-            <syncfusion:ButtonAdv Label="Unlink Selected Tab"
-                                  HorizontalAlignment="Left"
-                                  IconTemplate="{StaticResource RemoveIconTemplate}"
-                                  Command="{Binding UnlinkTabCommand}"
-                                  Margin="0,8,0,0" />
-
-            <TextBlock Text="Link a Tab" FontWeight="SemiBold" Foreground="{StaticResource HeadingForegroundBrush}" Margin="0,20,0,8" />
+            <Border Style="{StaticResource WarningBannerStyle}"
+                    Margin="0,0,0,12"
+                    Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <DockPanel>
+                    <syncfusion:ButtonAdv DockPanel.Dock="Right"
+                                          Label="Unlink"
+                                          IconTemplate="{StaticResource RemoveIconTemplate}"
+                                          Command="{Binding UnlinkPackagingCommand}" />
+                    <TextBlock Text="{Binding PackagingLinkedToText}"
+                               Foreground="{StaticResource WarningForegroundBrush}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,12,0" />
+                </DockPanel>
+            </Border>
+            <TextBlock Text="This product has its own packaging."
+                       Style="{StaticResource CaptionStyle}"
+                       Margin="0,0,0,12"
+                       Visibility="{Binding IsPackagingLinked, Converter={StaticResource EmptyStateVisibilityConverter}}" />
 
             <!-- Labels in the first row, fields in the second -->
             <Grid>
@@ -41,37 +37,23 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" Text="Tab Kind" Style="{StaticResource FieldLabelStyle}" />
+                <TextBlock Grid.Column="0" Text="Link Packaging To" Style="{StaticResource FieldLabelStyle}" />
                 <syncfusion:ComboBoxAdv Grid.Row="1"
                                         Grid.Column="0"
-                                        ItemsSource="{Binding TabKindOptions}"
-                                        SelectedItem="{Binding EditingLinkTabKind, Mode=TwoWay}" />
-
-                <TextBlock Grid.Column="2" Text="Role (for a role's tab)" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:ComboBoxAdv Grid.Row="1"
-                                        Grid.Column="2"
-                                        ItemsSource="{Binding Roles}"
-                                        DisplayMemberPath="Name"
-                                        SelectedItem="{Binding EditingLinkRole, Mode=TwoWay}" />
-
-                <TextBlock Grid.Column="4" Text="Link To Product" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:ComboBoxAdv Grid.Row="1"
-                                        Grid.Column="4"
                                         ItemsSource="{Binding LinkTargetProductOptions}"
                                         DisplayMemberPath="Name"
-                                        SelectedItem="{Binding EditingLinkTargetProduct, Mode=TwoWay}" />
-            </Grid>
+                                        SelectedItem="{Binding EditingPackagingLinkTarget, Mode=TwoWay}" />
 
-            <syncfusion:ButtonAdv Label="Link Tab"
-                                  HorizontalAlignment="Left"
-                                  IconTemplate="{StaticResource AddIconTemplate}"
-                                  Command="{Binding LinkTabCommand}"
-                                  Margin="0,12,0,0" />
+                <syncfusion:ButtonAdv Grid.RowSpan="2"
+                                      Grid.Column="2"
+                                      VerticalAlignment="Bottom"
+                                      Label="Link"
+                                      IconTemplate="{StaticResource LinkIconTemplate}"
+                                      Command="{Binding LinkPackagingCommand}" />
+            </Grid>
         </StackPanel>
     </Border>
 </UserControl>

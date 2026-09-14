@@ -9,7 +9,9 @@ public class SubAssemblyConfiguration : IEntityTypeConfiguration<SubAssembly>
     public void Configure(EntityTypeBuilder<SubAssembly> builder)
     {
         builder.Property(s => s.Name).HasMaxLength(100).IsRequired();
-        builder.HasIndex(s => s.Name).IsUnique();
+
+        // Unique within its owner, not across products: a copy can keep its source's name.
+        builder.HasIndex(s => new { s.OwnerProductId, s.Name }).IsUnique();
 
         // Restrict, not Cascade: this is also how "a role can't be deleted while any
         // sub-assembly uses it" (PLAN.md's SubAssemblyRole rule) is enforced — no
@@ -18,5 +20,12 @@ public class SubAssemblyConfiguration : IEntityTypeConfiguration<SubAssembly>
             .WithMany()
             .HasForeignKey(s => s.RoleId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Deleting the owner takes its sub-assemblies (and their lines) with it. ProductRepository
+        // refuses first while another product links one of them.
+        builder.HasOne(s => s.OwnerProduct)
+            .WithMany()
+            .HasForeignKey(s => s.OwnerProductId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -19,8 +19,6 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
 
-    private SubAssemblyLineRepository CreateSubAssemblyLineRepository() => new(CreateDbContextFactory());
-
     private async Task<int> SeedCategoryAsync()
     {
         await using var dbContext = CreateDbContext();
@@ -30,17 +28,12 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         return category.Id;
     }
 
-    private async Task<int> SeedSubAssemblyAsync(string name)
+    /// <summary>A sub-assembly of <paramref name="grams"/> of one ingredient, in a product of its own.</summary>
+    private async Task<int> SeedSubAssemblyAsync(string name, int ingredientId, decimal grams)
     {
-        await using var dbContext = CreateDbContext();
-        var role = new SubAssemblyRole { Name = "Filling", SortOrder = 1 };
-        dbContext.SubAssemblyRoles.Add(role);
-        await dbContext.SaveChangesAsync(Cancellation);
-
-        var subAssembly = new SubAssembly { Name = name, RoleId = role.Id };
-        dbContext.SubAssemblies.Add(subAssembly);
-        await dbContext.SaveChangesAsync(Cancellation);
-        return subAssembly.Id;
+        var roleId = await AddRoleAsync("Filling");
+        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync($"{name} Bun", name, roleId, [(ingredientId, grams)]);
+        return subAssemblyId;
     }
 
     private static RawMaterial PurchasedIngredient(string name, int categoryId, decimal costBufferPercent = 0m, int id = 0) =>
@@ -82,8 +75,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
         var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], (Today, null, 0.09m), bomLines: null, Cancellation);
-        var custardId = await SeedSubAssemblyAsync("Custard");
-        await CreateSubAssemblyLineRepository().SetLinesAsync(custardId, [(sugarId, null, 1000m)], Cancellation);
+        var custardId = await SeedSubAssemblyAsync("Custard", sugarId, 1000m);
 
         (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(90m);
 
@@ -101,9 +93,8 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
         var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 10m), [], (Today, null, 0.10m), bomLines: null, Cancellation);
-        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId), [], newPrice: null, [(sugarId, null, 1000m)], Cancellation);
-        var custardId = await SeedSubAssemblyAsync("Custard");
-        await CreateSubAssemblyLineRepository().SetLinesAsync(custardId, [(syrupId, null, 1000m)], Cancellation);
+        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId), [], newPrice: null, [(sugarId, 1000m)], Cancellation);
+        var custardId = await SeedSubAssemblyAsync("Custard", syrupId, 1000m);
 
         var syrup = await GetMaterialAsync(syrupId);
         syrup.CostPerBaseUnit.Should().Be(0.10m, "the true rollup uses sugar's true cost");
@@ -124,9 +115,8 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
         var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], (Today, null, 0.10m), bomLines: null, Cancellation);
-        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId), [], newPrice: null, [(sugarId, null, 1000m)], Cancellation);
-        var custardId = await SeedSubAssemblyAsync("Custard");
-        await CreateSubAssemblyLineRepository().SetLinesAsync(custardId, [(syrupId, null, 500m)], Cancellation);
+        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId), [], newPrice: null, [(sugarId, 1000m)], Cancellation);
+        var custardId = await SeedSubAssemblyAsync("Custard", syrupId, 500m);
 
         await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 20m, id: sugarId), [], newPrice: null, bomLines: null, Cancellation);
 

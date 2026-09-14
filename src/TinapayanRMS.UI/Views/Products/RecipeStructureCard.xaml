@@ -20,7 +20,7 @@
                 </StackPanel>
                 <TextBlock Text="Recipe Structure" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,12,0" VerticalAlignment="Center" />
             </DockPanel>
-            <TextBlock Text="What goes into one piece: each sub-assembly's ingredients, scaled to a piece, then the packaging. Changes are saved with Save."
+            <TextBlock Text="What goes into one piece: each sub-assembly's ingredients, scaled to a piece, then the packaging. A sub-assembly is made here, or linked or copied from another product. Changes are saved with Save."
                        Style="{StaticResource CardCaptionStyle}"
                        Margin="0,8,0,12" />
 

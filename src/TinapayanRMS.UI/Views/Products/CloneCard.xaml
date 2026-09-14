@@ -5,7 +5,7 @@
     <Border Style="{StaticResource CardStyle}">
         <StackPanel>
             <TextBlock Text="Clone This Product" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-            <TextBlock Text="Makes an independent copy of the product as saved: its recipe, packaging, costing and description. Unsaved changes aren't copied."
+            <TextBlock Text="Makes an independent copy of the product as saved: its own copy of every sub-assembly (linked ones too), its packaging, costing and description. The copy links nothing. Unsaved changes aren't copied."
                        Style="{StaticResource CardCaptionStyle}" />
 
             <TextBlock Text="New Product Name" Style="{StaticResource FieldLabelStyle}" />

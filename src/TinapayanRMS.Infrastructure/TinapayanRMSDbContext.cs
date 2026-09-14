@@ -36,7 +36,7 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<CostingParameters> CostingParameters => Set<CostingParameters>();
 
-    public DbSet<ProductTabLink> ProductTabLinks => Set<ProductTabLink>();
+    public DbSet<PackagingLink> PackagingLinks => Set<PackagingLink>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

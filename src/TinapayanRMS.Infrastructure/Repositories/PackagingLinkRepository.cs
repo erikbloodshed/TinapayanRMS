@@ -6,25 +6,22 @@ using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class ProductTabLinkRepository(
+public class PackagingLinkRepository(
     IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,
-    IProductSubAssemblyUsageRepository usageRepository,
-    IPackagingLineRepository packagingLineRepository) : IProductTabLinkRepository
+    IPackagingLineRepository packagingLineRepository) : IPackagingLinkRepository
 {
-    public async Task<IReadOnlyList<ProductTabLink>> GetForProductAsync(int productId, CancellationToken cancellationToken)
+    public async Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.ProductTabLinks
+        return await dbContext.PackagingLinks
             .AsNoTracking()
-            .Include(l => l.SubAssemblyRole)
             .Include(l => l.LinkedProduct)
-            .Where(l => l.ProductId == productId)
-            .ToListAsync(cancellationToken);
+            .FirstOrDefaultAsync(l => l.ProductId == productId, cancellationToken);
     }
 
-    public async Task SetLinkAsync(int productId, ProductTabKind tabKind, int? subAssemblyRoleId, int linkedProductId, CancellationToken cancellationToken)
+    public async Task SetLinkAsync(int productId, int linkedProductId, CancellationToken cancellationToken)
     {
-        ProductTabLinkRules.EnsureNotSelfLink(productId, linkedProductId);
+        PackagingLinkRules.EnsureNotSelfLink(productId, linkedProductId);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
@@ -40,26 +37,13 @@ public class ProductTabLinkRepository(
             throw new InvalidOperationException($"Product {linkedProductId} does not exist.");
         }
 
-        // Only links for this exact tab identity (same TabKind + role) can ever form a
-        // cycle with this one, so that's all that needs to be loaded for the check.
-        var linksForThisTab = await dbContext.ProductTabLinks
-            .Where(l => l.TabKind == tabKind && l.SubAssemblyRoleId == subAssemblyRoleId)
-            .ToDictionaryAsync(l => l.ProductId, l => l.LinkedProductId, cancellationToken);
+        var links = await dbContext.PackagingLinks.ToDictionaryAsync(l => l.ProductId, l => l.LinkedProductId, cancellationToken);
+        PackagingLinkRules.EnsureNoCycle(productId, linkedProductId, id => links.TryGetValue(id, out var next) ? next : null);
 
-        ProductTabLinkRules.EnsureNoCycle(productId, linkedProductId, id => linksForThisTab.TryGetValue(id, out var next) ? next : null);
-
-        var existing = await dbContext.ProductTabLinks
-            .FirstOrDefaultAsync(l => l.ProductId == productId && l.TabKind == tabKind && l.SubAssemblyRoleId == subAssemblyRoleId, cancellationToken);
-
+        var existing = await dbContext.PackagingLinks.FirstOrDefaultAsync(l => l.ProductId == productId, cancellationToken);
         if (existing is null)
         {
-            dbContext.ProductTabLinks.Add(new ProductTabLink
-            {
-                ProductId = productId,
-                TabKind = tabKind,
-                SubAssemblyRoleId = subAssemblyRoleId,
-                LinkedProductId = linkedProductId,
-            });
+            dbContext.PackagingLinks.Add(new PackagingLink { ProductId = productId, LinkedProductId = linkedProductId });
         }
         else
         {
@@ -69,42 +53,26 @@ public class ProductTabLinkRepository(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task RemoveLinkAsync(int productId, ProductTabKind tabKind, int? subAssemblyRoleId, CancellationToken cancellationToken)
+    public async Task RemoveLinkAsync(int productId, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var link = await dbContext.ProductTabLinks
-            .FirstOrDefaultAsync(l => l.ProductId == productId && l.TabKind == tabKind && l.SubAssemblyRoleId == subAssemblyRoleId, cancellationToken);
-
+        var link = await dbContext.PackagingLinks.FirstOrDefaultAsync(l => l.ProductId == productId, cancellationToken);
         if (link is null)
         {
             return;
         }
 
-        // Freeze what this tab currently shows (resolved through the link) into the
-        // product's own rows, then drop the link — never leaves less data behind.
-        if (tabKind == ProductTabKind.SubAssemblyRole)
-        {
-            var effectiveUsages = await usageRepository.GetEffectiveForRoleAsync(productId, subAssemblyRoleId!.Value, cancellationToken);
-            dbContext.ProductTabLinks.Remove(link);
-            await dbContext.SaveChangesAsync(cancellationToken);
+        // Freeze what the packaging currently shows (resolved through the link) into the product's own
+        // lines, then drop the link — never leaves less data behind.
+        var effectiveLines = await packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken);
+        dbContext.PackagingLinks.Remove(link);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
-            await usageRepository.SetUsagesForRoleAsync(
-                productId, subAssemblyRoleId.Value,
-                [.. effectiveUsages.Select(u => (u.SubAssemblyId, u.WeightPerPiece))],
-                cancellationToken);
-        }
-        else
-        {
-            var effectiveLines = await packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken);
-            dbContext.ProductTabLinks.Remove(link);
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            await packagingLineRepository.SetLinesAsync(
-                productId,
-                [.. effectiveLines.Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
-                    l.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? l.QtyPerPiece : l.PiecesPerPackagingUnit))],
-                cancellationToken);
-        }
+        await packagingLineRepository.SetLinesAsync(
+            productId,
+            [.. effectiveLines.Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
+                l.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? l.QtyPerPiece : l.PiecesPerPackagingUnit))],
+            cancellationToken);
     }
 }

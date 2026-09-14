@@ -18,24 +18,6 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
     private CostingParametersRepository CreateCostingParametersRepository() => new(CreateDbContextFactory());
 
-    private async Task<int> SeedRoleAsync(string name, int sortOrder = 1)
-    {
-        await using var dbContext = CreateDbContext();
-        var role = new SubAssemblyRole { Name = name, SortOrder = sortOrder };
-        dbContext.SubAssemblyRoles.Add(role);
-        await dbContext.SaveChangesAsync(Cancellation);
-        return role.Id;
-    }
-
-    private async Task<int> SeedSubAssemblyAsync(string name, int roleId, decimal totalWeight, decimal totalCost)
-    {
-        await using var dbContext = CreateDbContext();
-        var subAssembly = new SubAssembly { Name = name, RoleId = roleId, TotalWeight = totalWeight, TotalCost = totalCost };
-        dbContext.SubAssemblies.Add(subAssembly);
-        await dbContext.SaveChangesAsync(Cancellation);
-        return subAssembly.Id;
-    }
-
     private async Task<int> SeedPackagingCategoryAsync(string name)
     {
         await using var dbContext = CreateDbContext();
@@ -64,78 +46,14 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         return material.Id;
     }
 
-    private async Task<int> SeedProductAsync(string name)
-    {
-        await using var dbContext = CreateDbContext();
-        var product = new Product { Name = name };
-        dbContext.Products.Add(product);
-        await dbContext.SaveChangesAsync(Cancellation);
-        return product.Id;
-    }
-
-    [Fact]
-    public async Task SetUsagesForRoleAsync_stores_usages_with_the_sub_assembly_populated_on_read()
-    {
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
-        var productId = await SeedProductAsync("Ensaymada");
-
-        await CreateUsageRepository().SetUsagesForRoleAsync(productId, roleId, [(subAssemblyId, 10m)], Cancellation);
-
-        var usages = await CreateUsageRepository().GetForProductAsync(productId, Cancellation);
-        var usage = usages.Should().ContainSingle().Subject;
-        usage.WeightPerPiece.Should().Be(10m);
-        usage.SubAssembly.Should().NotBeNull();
-        usage.SubAssembly!.Name.Should().Be("Custard");
-    }
-
-    [Fact]
-    public async Task SetUsagesForRoleAsync_rejects_the_same_sub_assembly_twice()
-    {
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
-        var productId = await SeedProductAsync("Ensaymada");
-
-        var act = () => CreateUsageRepository().SetUsagesForRoleAsync(productId, roleId,
-        [
-            (subAssemblyId, 10m),
-            (subAssemblyId, 20m),
-        ], Cancellation);
-
-        await act.Should().ThrowAsync<InvalidOperationException>();
-    }
-
-    [Fact]
-    public async Task SetUsagesForRoleAsync_rejects_a_sub_assembly_that_belongs_to_a_different_role()
-    {
-        var fillingRoleId = await SeedRoleAsync("Filling");
-        var doughRoleId = await SeedRoleAsync("Dough", sortOrder: 2);
-        var doughId = await SeedSubAssemblyAsync("Bread Dough", doughRoleId, totalWeight: 1000m, totalCost: 50m);
-        var productId = await SeedProductAsync("Ensaymada");
-
-        var act = () => CreateUsageRepository().SetUsagesForRoleAsync(productId, fillingRoleId, [(doughId, 10m)], Cancellation);
-
-        await act.Should().ThrowAsync<InvalidOperationException>();
-    }
-
-    [Fact]
-    public async Task SetUsagesForRoleAsync_rejects_a_sub_assembly_that_does_not_exist_at_all()
-    {
-        var fillingRoleId = await SeedRoleAsync("Filling");
-        var productId = await SeedProductAsync("Ensaymada");
-
-        var act = () => CreateUsageRepository().SetUsagesForRoleAsync(productId, fillingRoleId, [(999_999, 10m)], Cancellation);
-
-        await act.Should().ThrowAsync<InvalidOperationException>();
-    }
+    private Task<int> SeedProductAsync(string name) => AddProductAsync(name);
 
     [Fact]
     public async Task Deleting_a_sub_assembly_in_use_by_a_product_is_blocked()
     {
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
-        var productId = await SeedProductAsync("Ensaymada");
-        await CreateUsageRepository().SetUsagesForRoleAsync(productId, roleId, [(subAssemblyId, 10m)], Cancellation);
+        var roleId = await AddRoleAsync("Filling");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Ensaymada", "Custard", roleId, [(sugarId, 100m)]);
 
         await using var dbContext = CreateDbContext();
         var act = () => dbContext.SubAssemblies.Where(s => s.Id == subAssemblyId).ExecuteDeleteAsync(Cancellation);
@@ -254,14 +172,13 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     [Fact]
     public async Task Deleting_a_product_cascades_to_its_usages_lines_and_costing_parameters()
     {
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
+        var roleId = await AddRoleAsync("Filling");
+        var sugarId = await AddIngredientAsync("Sugar");
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
         var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
-        var productId = await SeedProductAsync("Ensaymada");
+        var (productId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", "Custard", roleId, [(sugarId, 100m)]);
 
-        await CreateUsageRepository().SetUsagesForRoleAsync(productId, roleId, [(subAssemblyId, 10m)], Cancellation);
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
             (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
@@ -380,17 +297,6 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     public async Task ProductRepository_UpdateAsync_rejects_a_nonexistent_product()
     {
         var act = () => CreateProductRepository().UpdateAsync(new Product { Id = 999_999, Name = "Ghost" }, Cancellation);
-
-        await act.Should().ThrowAsync<InvalidOperationException>();
-    }
-
-    [Fact]
-    public async Task SetUsagesForRoleAsync_rejects_a_nonexistent_product()
-    {
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, totalWeight: 100m, totalCost: 24m);
-
-        var act = () => CreateUsageRepository().SetUsagesForRoleAsync(999_999, roleId, [(subAssemblyId, 10m)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }

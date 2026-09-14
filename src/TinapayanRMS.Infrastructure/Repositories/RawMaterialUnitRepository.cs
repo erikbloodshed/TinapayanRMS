@@ -32,8 +32,8 @@ public class RawMaterialUnitRepository(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        // One transaction for the unit, the cost and the lines' grams, so they can't disagree. It
-        // commits before the cascade, which reads through its own connections.
+        // One transaction for the unit and the cost, so they can't disagree. It commits before the
+        // cascade, which reads through its own connections.
         bool costChanged;
         await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
         {
@@ -43,8 +43,7 @@ public class RawMaterialUnitRepository(
 
         if (costChanged)
         {
-            // Every made ingredient using this one (its BOM lines' grams may just have changed) and
-            // every sub-assembly using any of them, including through lines entered in this unit.
+            // Every made ingredient using this one and every sub-assembly using any of them.
             await costPropagator.RecomputeAndPropagateAsync(unit.RawMaterialId, cancellationToken);
         }
     }
@@ -87,8 +86,8 @@ public class RawMaterialUnitRepository(
     /// <summary>
     /// Changes the unit, multiplier or description of <paramref name="unit"/>, which must belong to its
     /// RawMaterialId, and saves it. A new multiplier reprices the material when its latest price is in
-    /// this unit, and for an ingredient moves the grams of every recipe line entered in it. Returns
-    /// whether that changed an ingredient's cost, for the caller to cascade once its transaction commits.
+    /// this unit; recipe lines are in grams, so nothing else moves. Returns whether that changed an
+    /// ingredient's cost, for the caller to cascade once its transaction commits.
     /// </summary>
     internal static async Task<bool> UpdateAsync(TinapayanRMSDbContext dbContext, RawMaterialUnit unit, CancellationToken cancellationToken)
     {
@@ -108,6 +107,7 @@ public class RawMaterialUnitRepository(
         existing.BaseUnitsPerUnit = unit.BaseUnitsPerUnit;
         existing.Description = unit.Description;
 
+        var costChanged = false;
         if (multiplierChanged)
         {
             // The material's cost comes from its latest price, so a new multiplier only moves
@@ -121,31 +121,18 @@ public class RawMaterialUnitRepository(
             if (latest?.UnitId == existing.Id)
             {
                 RawMaterialRules.ApplyLatestPrice(material, latest.Price, existing.BaseUnitsPerUnit);
+                costChanged = true;
             }
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // Packaging lines need nothing: their cost is worked out from the unit's multiplier each
-        // time a product is read.
-        if (!multiplierChanged || material.Type == RawMaterialType.Packaging)
-        {
-            return false;
-        }
-
-        // Recipe lines entered in this unit keep their quantity; their grams follow the new multiplier.
-        var gramsPerUnit = existing.BaseUnitsPerUnit;
-        await dbContext.SubAssemblyLines
-            .Where(l => l.UnitId == existing.Id)
-            .ExecuteUpdateAsync(set => set.SetProperty(l => l.Grams, l => l.Quantity * gramsPerUnit), cancellationToken);
-        await dbContext.IngredientBomLines
-            .Where(l => l.UnitId == existing.Id)
-            .ExecuteUpdateAsync(set => set.SetProperty(l => l.Grams, l => l.Quantity * gramsPerUnit), cancellationToken);
-
-        return true;
+        // time a product is read. An ingredient's new cost has to reach what's made from it.
+        return costChanged && material.Type == RawMaterialType.Ingredient;
     }
 
-    /// <summary>Removes the unit and saves, unless a price entry, recipe line or packaging line still uses it.</summary>
+    /// <summary>Removes the unit and saves, unless a price entry or (for packaging) a packaging line still uses it.</summary>
     internal static async Task DeleteAsync(TinapayanRMSDbContext dbContext, int id, CancellationToken cancellationToken)
     {
         var unit = await dbContext.RawMaterialUnits
@@ -161,15 +148,15 @@ public class RawMaterialUnitRepository(
                 $"'{unit.UnitOfMeasure!.Name}' is used by {priceCount} price {(priceCount == 1 ? "entry" : "entries")}. Delete those first.");
         }
 
-        // An ingredient's units can only be on recipe lines, a packaging material's on packaging lines.
-        var (lineCount, lineKind) = unit.RawMaterial!.Type == RawMaterialType.Ingredient
-            ? (await dbContext.SubAssemblyLines.CountAsync(l => l.UnitId == id, cancellationToken)
-                + await dbContext.IngredientBomLines.CountAsync(l => l.UnitId == id, cancellationToken), "recipe")
-            : (await dbContext.PackagingLines.CountAsync(l => l.UnitId == id, cancellationToken), "packaging");
-        if (lineCount > 0)
+        // Recipe lines are in grams, so only a packaging material's units are ever on a line.
+        if (unit.RawMaterial!.Type == RawMaterialType.Packaging)
         {
-            throw new InvalidOperationException(
-                $"'{unit.UnitOfMeasure!.Name}' is used by {lineCount} {lineKind} {(lineCount == 1 ? "line" : "lines")}. Change those to another unit first.");
+            var lineCount = await dbContext.PackagingLines.CountAsync(l => l.UnitId == id, cancellationToken);
+            if (lineCount > 0)
+            {
+                throw new InvalidOperationException(
+                    $"'{unit.UnitOfMeasure!.Name}' is used by {lineCount} packaging {(lineCount == 1 ? "line" : "lines")}. Change those to another unit first.");
+            }
         }
 
         dbContext.RawMaterialUnits.Remove(unit);

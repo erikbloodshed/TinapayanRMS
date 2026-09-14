@@ -2,20 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
-using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ISubAssemblyLineRepository
 {
-    public async Task<IReadOnlyList<SubAssemblyLine>> GetForSubAssemblyAsync(int subAssemblyId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await WithIngredientAndUnit(dbContext.SubAssemblyLines)
-            .Where(l => l.SubAssemblyId == subAssemblyId)
-            .ToListAsync(cancellationToken);
-    }
-
     public async Task<IReadOnlyList<SubAssemblyLine>> GetForSubAssembliesAsync(IReadOnlyCollection<int> subAssemblyIds, CancellationToken cancellationToken)
     {
         if (subAssemblyIds.Count == 0)
@@ -24,29 +15,28 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
         }
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await WithIngredientAndUnit(dbContext.SubAssemblyLines)
+        return await dbContext.SubAssemblyLines
+            .AsNoTracking()
+            .Include(l => l.Ingredient)
             .Where(l => subAssemblyIds.Contains(l.SubAssemblyId))
             .OrderBy(l => l.Id)
             .ToListAsync(cancellationToken);
     }
 
-    private static IQueryable<SubAssemblyLine> WithIngredientAndUnit(IQueryable<SubAssemblyLine> lines) =>
-        lines
-            .AsNoTracking()
-            .Include(l => l.Ingredient)
-            .Include(l => l.Unit)
-            .ThenInclude(u => u!.UnitOfMeasure);
-
-    public async Task SetLinesAsync(
-        int subAssemblyId, IReadOnlyList<(int IngredientId, int? UnitId, decimal Quantity)> lines, CancellationToken cancellationToken)
+    /// <summary>
+    /// Replaces the sub-assembly's whole line set on the caller's context (edited together, like an
+    /// ingredient's BOM), recomputes its TotalWeight/TotalCost, and saves. Lines are in grams, and every
+    /// one must be an ingredient (RawMaterialRules.EnsureUsableInRecipes). Nothing is deleted until every
+    /// line passes.
+    /// </summary>
+    /// <param name="subAssembly">The sub-assembly, tracked by <paramref name="dbContext"/> and saved already (it has its id).</param>
+    internal static async Task SetLinesAsync(
+        TinapayanRMSDbContext dbContext,
+        SubAssembly subAssembly,
+        IReadOnlyList<(int IngredientId, decimal Grams)> lines,
+        CancellationToken cancellationToken)
     {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-
-        var subAssembly = await dbContext.SubAssemblies.FirstOrDefaultAsync(s => s.Id == subAssemblyId, cancellationToken)
-            ?? throw new InvalidOperationException($"Sub-assembly {subAssemblyId} does not exist.");
-
-        var grams = await IngredientQuantityConverter.ToGramsAsync(dbContext, lines, cancellationToken);
-        SubAssemblyRules.EnsureValidLines([.. lines.Select((l, i) => (l.IngredientId, grams[i]))]);
+        SubAssemblyRules.EnsureValidLines(lines);
 
         var ingredientIds = lines.Select(l => l.IngredientId).ToList();
         var ingredients = await dbContext.RawMaterials
@@ -65,19 +55,17 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
         }
 
         await dbContext.SubAssemblyLines
-            .Where(l => l.SubAssemblyId == subAssemblyId)
+            .Where(l => l.SubAssemblyId == subAssembly.Id)
             .ExecuteDeleteAsync(cancellationToken);
 
-        dbContext.SubAssemblyLines.AddRange(lines.Select((l, i) => new SubAssemblyLine
+        dbContext.SubAssemblyLines.AddRange(lines.Select(l => new SubAssemblyLine
         {
-            SubAssemblyId = subAssemblyId,
+            SubAssemblyId = subAssembly.Id,
             IngredientId = l.IngredientId,
-            Quantity = l.Quantity,
-            UnitId = l.UnitId,
-            Grams = grams[i],
+            Grams = l.Grams,
         }));
 
-        var costInputs = lines.Select((l, i) => (grams[i], IngredientCostPerGram: ingredients[l.IngredientId].BufferedCostPerBaseUnit)).ToList();
+        var costInputs = lines.Select(l => (l.Grams, IngredientCostPerGram: ingredients[l.IngredientId].BufferedCostPerBaseUnit)).ToList();
         (subAssembly.TotalWeight, subAssembly.TotalCost) = SubAssemblyRules.CalculateTotals(costInputs);
 
         await dbContext.SaveChangesAsync(cancellationToken);

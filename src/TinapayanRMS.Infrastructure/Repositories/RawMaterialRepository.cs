@@ -45,7 +45,7 @@ public class RawMaterialRepository(
         RawMaterial material,
         IReadOnlyList<RawMaterialUnit> units,
         (DateOnly Date, int? UnitOfMeasureId, decimal Price)? newPrice,
-        IReadOnlyList<(int ComponentIngredientId, int? UnitId, decimal Quantity)>? bomLines,
+        IReadOnlyList<(int ComponentIngredientId, decimal Grams)>? bomLines,
         CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);

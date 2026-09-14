@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -8,8 +9,12 @@ using TinapayanRMS.Tests.Fixtures;
 
 namespace TinapayanRMS.Tests.Persistence;
 
+/// <summary>
+/// Derived products: a packaging link reads through to another product's packaging, and a clone is an
+/// independent copy — its own copy of every sub-assembly, with no links.
+/// </summary>
 [Collection(DatabaseCollection.Name)]
-public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
+public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());
 
@@ -19,230 +24,134 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
 
     private CostingParametersRepository CreateCostingParametersRepository() => new(CreateDbContextFactory());
 
-    private ProductTabLinkRepository CreateTabLinkRepository() => new(CreateDbContextFactory(), CreateUsageRepository(), CreatePackagingLineRepository());
+    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory(), CreatePackagingLineRepository());
 
-    private ProductCloner CreateProductCloner() => new(CreateDbContextFactory(), CreateUsageRepository(), CreatePackagingLineRepository(), CreateCostingParametersRepository());
+    private ProductCloner CreateProductCloner() => new(CreateDbContextFactory());
 
-    private async Task<int> SeedRoleAsync(string name, int sortOrder = 1)
+    private async Task<int> SeedBoxAsync(string name = "6-Piece Box")
     {
-        await using var dbContext = CreateDbContext();
-        var role = new SubAssemblyRole { Name = name, SortOrder = sortOrder };
-        dbContext.SubAssemblyRoles.Add(role);
-        await dbContext.SaveChangesAsync(Cancellation);
-        return role.Id;
-    }
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
 
-    private async Task<int> SeedSubAssemblyAsync(string name, int roleId, decimal totalWeight, decimal totalCost)
-    {
         await using var dbContext = CreateDbContext();
-        var subAssembly = new SubAssembly { Name = name, RoleId = roleId, TotalWeight = totalWeight, TotalCost = totalCost };
-        dbContext.SubAssemblies.Add(subAssembly);
-        await dbContext.SaveChangesAsync(Cancellation);
-        return subAssembly.Id;
-    }
-
-    private async Task<int> SeedPackagingCategoryAsync(string name)
-    {
-        await using var dbContext = CreateDbContext();
-        var category = new RawMaterialCategory { Name = name };
-        dbContext.RawMaterialCategories.Add(category);
-        await dbContext.SaveChangesAsync(Cancellation);
-        return category.Id;
-    }
-
-    private async Task<int> SeedPackagingMaterialAsync(string name, int categoryId, int standardUnitId, decimal purchaseUnitQty, decimal currentCost)
-    {
-        await using var dbContext = CreateDbContext();
-        var material = new RawMaterial
+        var category = await dbContext.RawMaterialCategories.FirstOrDefaultAsync(c => c.Name == "Boxes", Cancellation)
+            ?? new RawMaterialCategory { Name = "Boxes" };
+        var box = new RawMaterial
         {
             Type = RawMaterialType.Packaging,
             Name = name,
-            CategoryId = categoryId,
-            BaseUnitId = standardUnitId,
-            // Priced as currentCost per purchaseUnitQty base units, as these tests were written.
-            CostPerBaseUnit = currentCost / purchaseUnitQty,
+            Category = category,
+            BaseUnitId = pieceId,
+            CostPerBaseUnit = 30m,
+            BufferedCostPerBaseUnit = 30m,
         };
-        dbContext.RawMaterials.Add(material);
+        dbContext.RawMaterials.Add(box);
         await dbContext.SaveChangesAsync(Cancellation);
-        return material.Id;
-    }
-
-    private async Task<int> SeedProductAsync(string name)
-    {
-        await using var dbContext = CreateDbContext();
-        var product = new Product { Name = name };
-        dbContext.Products.Add(product);
-        await dbContext.SaveChangesAsync(Cancellation);
-        return product.Id;
+        return box.Id;
     }
 
     [Fact]
-    public async Task SetLinkAsync_makes_the_derived_products_effective_usages_resolve_through_the_linked_product()
+    public async Task SetLinkAsync_makes_the_packaging_resolve_through_the_linked_product()
     {
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Ube Filling", roleId, totalWeight: 100m, totalCost: 24m);
-        var bigId = await SeedProductAsync("Special Ensaymada Big");
-        var smallId = await SeedProductAsync("Special Ensaymada Small");
-        await CreateUsageRepository().SetUsagesForRoleAsync(bigId, roleId, [(subAssemblyId, 15m)], Cancellation);
-
-        await CreateTabLinkRepository().SetLinkAsync(smallId, ProductTabKind.SubAssemblyRole, roleId, bigId, Cancellation);
-
-        var effective = await CreateUsageRepository().GetEffectiveForRoleAsync(smallId, roleId, Cancellation);
-        var usage = effective.Should().ContainSingle().Subject;
-        usage.WeightPerPiece.Should().Be(15m);
-        usage.SubAssembly!.Name.Should().Be("Ube Filling");
-
-        // The linked product's own usages are untouched.
-        (await CreateUsageRepository().GetForProductAsync(smallId, Cancellation)).Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task SetLinkAsync_makes_the_packaging_tab_resolve_through_the_linked_product()
-    {
-        var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
-        var bigId = await SeedProductAsync("Big");
-        var smallId = await SeedProductAsync("Small");
+        var boxId = await SeedBoxAsync();
+        var bigId = await AddProductAsync("Big");
+        var smallId = await AddProductAsync("Small");
         await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
 
-        await CreateTabLinkRepository().SetLinkAsync(smallId, ProductTabKind.Packaging, null, bigId, Cancellation);
+        await CreatePackagingLinkRepository().SetLinkAsync(smallId, bigId, Cancellation);
 
-        var effective = await CreatePackagingLineRepository().GetEffectiveForProductAsync(smallId, Cancellation);
-        effective.Should().ContainSingle(l => l.PackagingMaterial!.Name == "6-Piece Box");
+        (await CreatePackagingLineRepository().GetEffectiveForProductAsync(smallId, Cancellation))
+            .Should().ContainSingle(l => l.PackagingMaterial!.Name == "6-Piece Box");
+        (await CreatePackagingLineRepository().GetForProductAsync(smallId, Cancellation)).Should().BeEmpty("its own lines are untouched");
+        (await CreatePackagingLinkRepository().GetForProductAsync(smallId, Cancellation))!.LinkedProduct!.Name.Should().Be("Big");
     }
 
     [Fact]
-    public async Task SetLinkAsync_rejects_a_self_link()
+    public async Task GetEffectiveForProductAsync_resolves_through_a_chain_of_two_links()
     {
-        var productId = await SeedProductAsync("Solo");
-        var roleId = await SeedRoleAsync("Dough");
+        var boxId = await SeedBoxAsync();
+        var aId = await AddProductAsync("A");
+        var bId = await AddProductAsync("B");
+        var cId = await AddProductAsync("C");
+        await CreatePackagingLineRepository().SetLinesAsync(aId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
 
-        var act = () => CreateTabLinkRepository().SetLinkAsync(productId, ProductTabKind.SubAssemblyRole, roleId, productId, Cancellation);
+        var links = CreatePackagingLinkRepository();
+        await links.SetLinkAsync(bId, aId, Cancellation); // b -> a
+        await links.SetLinkAsync(cId, bId, Cancellation); // c -> b -> a
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        (await CreatePackagingLineRepository().GetEffectiveForProductAsync(cId, Cancellation)).Should().ContainSingle();
     }
 
     [Fact]
-    public async Task SetLinkAsync_rejects_a_cycle()
+    public async Task SetLinkAsync_rejects_a_self_link_and_a_cycle()
     {
-        var roleId = await SeedRoleAsync("Dough");
-        var aId = await SeedProductAsync("A");
-        var bId = await SeedProductAsync("B");
-        await CreateTabLinkRepository().SetLinkAsync(bId, ProductTabKind.SubAssemblyRole, roleId, aId, Cancellation); // b -> a
+        var aId = await AddProductAsync("A");
+        var bId = await AddProductAsync("B");
+        var links = CreatePackagingLinkRepository();
+        await links.SetLinkAsync(bId, aId, Cancellation); // b -> a
 
-        var act = () => CreateTabLinkRepository().SetLinkAsync(aId, ProductTabKind.SubAssemblyRole, roleId, bId, Cancellation); // a -> b would close the loop
+        var selfLink = () => links.SetLinkAsync(aId, aId, Cancellation);
+        var cycle = () => links.SetLinkAsync(aId, bId, Cancellation); // a -> b would close the loop
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
-    }
-
-    [Fact]
-    public async Task GetEffectiveForRoleAsync_resolves_through_a_chain_of_two_links()
-    {
-        var roleId = await SeedRoleAsync("Dough");
-        var subAssemblyId = await SeedSubAssemblyAsync("Bread Dough", roleId, totalWeight: 1000m, totalCost: 50m);
-        var aId = await SeedProductAsync("A");
-        var bId = await SeedProductAsync("B");
-        var cId = await SeedProductAsync("C");
-        await CreateUsageRepository().SetUsagesForRoleAsync(aId, roleId, [(subAssemblyId, 30m)], Cancellation);
-
-        var tabLinks = CreateTabLinkRepository();
-        await tabLinks.SetLinkAsync(bId, ProductTabKind.SubAssemblyRole, roleId, aId, Cancellation); // b -> a
-        await tabLinks.SetLinkAsync(cId, ProductTabKind.SubAssemblyRole, roleId, bId, Cancellation); // c -> b -> a
-
-        var effective = await CreateUsageRepository().GetEffectiveForRoleAsync(cId, roleId, Cancellation);
-        effective.Should().ContainSingle(u => u.SubAssembly!.Name == "Bread Dough" && u.WeightPerPiece == 30m);
+        await selfLink.Should().ThrowAsync<InvalidOperationException>();
+        await cycle.Should().ThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
     public async Task SetLinkAsync_can_repoint_an_existing_link_to_a_different_product()
     {
-        var roleId = await SeedRoleAsync("Dough");
-        var doughAId = await SeedSubAssemblyAsync("Dough A", roleId, totalWeight: 1000m, totalCost: 50m);
-        var doughBId = await SeedSubAssemblyAsync("Dough B", roleId, totalWeight: 1000m, totalCost: 80m);
-        var aId = await SeedProductAsync("A");
-        var bId = await SeedProductAsync("B");
-        var derivedId = await SeedProductAsync("Derived");
-        await CreateUsageRepository().SetUsagesForRoleAsync(aId, roleId, [(doughAId, 30m)], Cancellation);
-        await CreateUsageRepository().SetUsagesForRoleAsync(bId, roleId, [(doughBId, 30m)], Cancellation);
+        var boxId = await SeedBoxAsync();
+        var bagId = await SeedBoxAsync("Paper Bag");
+        var aId = await AddProductAsync("A");
+        var bId = await AddProductAsync("B");
+        var derivedId = await AddProductAsync("Derived");
+        await CreatePackagingLineRepository().SetLinesAsync(aId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(bId, [(bagId, null, PackagingLineAuthoredField.QtyPerPiece, 1m)], Cancellation);
 
-        var tabLinks = CreateTabLinkRepository();
-        await tabLinks.SetLinkAsync(derivedId, ProductTabKind.SubAssemblyRole, roleId, aId, Cancellation);
-        await tabLinks.SetLinkAsync(derivedId, ProductTabKind.SubAssemblyRole, roleId, bId, Cancellation); // repoint to B
+        var links = CreatePackagingLinkRepository();
+        await links.SetLinkAsync(derivedId, aId, Cancellation);
+        await links.SetLinkAsync(derivedId, bId, Cancellation); // repoint to B
 
-        var effective = await CreateUsageRepository().GetEffectiveForRoleAsync(derivedId, roleId, Cancellation);
-        effective.Should().ContainSingle(u => u.SubAssembly!.Name == "Dough B");
-
-        var links = await tabLinks.GetForProductAsync(derivedId, Cancellation);
-        links.Should().ContainSingle(); // still one link, not two
+        (await CreatePackagingLineRepository().GetEffectiveForProductAsync(derivedId, Cancellation))
+            .Should().ContainSingle(l => l.PackagingMaterial!.Name == "Paper Bag");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.PackagingLinks.CountAsync(l => l.ProductId == derivedId, Cancellation)).Should().Be(1, "still one link, not two");
     }
 
     [Fact]
-    public async Task RemoveLinkAsync_materializes_the_currently_effective_usages_then_unlinks()
+    public async Task RemoveLinkAsync_materializes_the_packaging_it_showed_then_unlinks()
     {
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Ube Filling", roleId, totalWeight: 100m, totalCost: 24m);
-        var bigId = await SeedProductAsync("Big");
-        var smallId = await SeedProductAsync("Small");
-        await CreateUsageRepository().SetUsagesForRoleAsync(bigId, roleId, [(subAssemblyId, 15m)], Cancellation);
+        var boxId = await SeedBoxAsync();
+        var bigId = await AddProductAsync("Big");
+        var smallId = await AddProductAsync("Small");
+        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        var links = CreatePackagingLinkRepository();
+        await links.SetLinkAsync(smallId, bigId, Cancellation);
 
-        var tabLinks = CreateTabLinkRepository();
-        await tabLinks.SetLinkAsync(smallId, ProductTabKind.SubAssemblyRole, roleId, bigId, Cancellation);
+        await links.RemoveLinkAsync(smallId, Cancellation);
 
-        await tabLinks.RemoveLinkAsync(smallId, ProductTabKind.SubAssemblyRole, roleId, Cancellation);
-
-        (await tabLinks.GetForProductAsync(smallId, Cancellation)).Should().BeEmpty();
-
-        // Now owns its own copy of what was effective a moment ago.
-        var ownUsages = await CreateUsageRepository().GetForProductAsync(smallId, Cancellation);
-        var usage = ownUsages.Should().ContainSingle().Subject;
-        usage.SubAssembly!.Name.Should().Be("Ube Filling");
-        usage.WeightPerPiece.Should().Be(15m);
-
-        // Changing Big's recipe from now on no longer affects Small — it's independent.
-        var subAssemblyId2 = await SeedSubAssemblyAsync("Cheese Filling", roleId, totalWeight: 100m, totalCost: 30m);
-        await CreateUsageRepository().SetUsagesForRoleAsync(bigId, roleId, [(subAssemblyId2, 20m)], Cancellation);
-
-        var smallUsagesAfter = await CreateUsageRepository().GetForProductAsync(smallId, Cancellation);
-        smallUsagesAfter.Should().ContainSingle(u => u.SubAssembly!.Name == "Ube Filling");
+        (await links.GetForProductAsync(smallId, Cancellation)).Should().BeNull();
+        (await CreatePackagingLineRepository().GetForProductAsync(smallId, Cancellation))
+            .Should().ContainSingle(l => l.PiecesPerPackagingUnit == 6m, "it owns a copy of what it showed a moment ago");
     }
 
     [Fact]
-    public async Task RemoveLinkAsync_on_an_unlinked_tab_is_a_no_op()
+    public async Task RemoveLinkAsync_on_unlinked_packaging_is_a_no_op()
     {
-        var roleId = await SeedRoleAsync("Filling");
-        var productId = await SeedProductAsync("Solo");
+        var productId = await AddProductAsync("Solo");
 
-        var act = () => CreateTabLinkRepository().RemoveLinkAsync(productId, ProductTabKind.SubAssemblyRole, roleId, Cancellation);
+        var act = () => CreatePackagingLinkRepository().RemoveLinkAsync(productId, Cancellation);
 
         await act.Should().NotThrowAsync();
     }
 
     [Fact]
-    public async Task SetUsagesForRoleAsync_rejects_editing_a_linked_tab()
+    public async Task SetLinesAsync_rejects_editing_linked_packaging()
     {
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Ube Filling", roleId, totalWeight: 100m, totalCost: 24m);
-        var bigId = await SeedProductAsync("Big");
-        var smallId = await SeedProductAsync("Small");
-        await CreateUsageRepository().SetUsagesForRoleAsync(bigId, roleId, [(subAssemblyId, 15m)], Cancellation);
-        await CreateTabLinkRepository().SetLinkAsync(smallId, ProductTabKind.SubAssemblyRole, roleId, bigId, Cancellation);
-
-        var act = () => CreateUsageRepository().SetUsagesForRoleAsync(smallId, roleId, [(subAssemblyId, 5m)], Cancellation);
-
-        await act.Should().ThrowAsync<InvalidOperationException>();
-    }
-
-    [Fact]
-    public async Task SetLinesAsync_rejects_editing_a_linked_packaging_tab()
-    {
-        var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
-        var bigId = await SeedProductAsync("Big");
-        var smallId = await SeedProductAsync("Small");
+        var boxId = await SeedBoxAsync();
+        var bigId = await AddProductAsync("Big");
+        var smallId = await AddProductAsync("Small");
         await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
-        await CreateTabLinkRepository().SetLinkAsync(smallId, ProductTabKind.Packaging, null, bigId, Cancellation);
+        await CreatePackagingLinkRepository().SetLinkAsync(smallId, bigId, Cancellation);
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(smallId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m)], Cancellation);
 
@@ -250,42 +159,40 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
     }
 
     [Fact]
-    public async Task Deleting_a_product_that_is_linked_to_by_another_products_tab_is_blocked()
+    public async Task Deleting_a_product_whose_packaging_another_product_links_is_refused()
     {
-        var roleId = await SeedRoleAsync("Dough");
-        var bigId = await SeedProductAsync("Big");
-        var smallId = await SeedProductAsync("Small");
-        await CreateTabLinkRepository().SetLinkAsync(smallId, ProductTabKind.SubAssemblyRole, roleId, bigId, Cancellation);
+        var bigId = await AddProductAsync("Big");
+        var smallId = await AddProductAsync("Small");
+        await CreatePackagingLinkRepository().SetLinkAsync(smallId, bigId, Cancellation);
 
-        await using var dbContext = CreateDbContext();
-        var act = () => dbContext.Products.Where(p => p.Id == bigId).ExecuteDeleteAsync(Cancellation);
+        var act = () => CreateProductRepository().DeleteAsync(bigId, Cancellation);
 
-        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Small links this product's packaging*");
     }
 
     [Fact]
-    public async Task Deleting_a_product_cascades_to_its_own_tab_links()
+    public async Task Deleting_a_product_cascades_to_its_own_packaging_link()
     {
-        var roleId = await SeedRoleAsync("Dough");
-        var bigId = await SeedProductAsync("Big");
-        var smallId = await SeedProductAsync("Small");
-        var tabLinks = CreateTabLinkRepository();
-        await tabLinks.SetLinkAsync(smallId, ProductTabKind.SubAssemblyRole, roleId, bigId, Cancellation);
+        var bigId = await AddProductAsync("Big");
+        var smallId = await AddProductAsync("Small");
+        var links = CreatePackagingLinkRepository();
+        await links.SetLinkAsync(smallId, bigId, Cancellation);
 
         await CreateProductRepository().DeleteAsync(smallId, Cancellation);
 
-        (await tabLinks.GetForProductAsync(smallId, Cancellation)).Should().BeEmpty();
+        (await links.GetForProductAsync(smallId, Cancellation)).Should().BeNull();
     }
 
     [Fact]
-    public async Task ProductCloner_CloneAsync_creates_an_independent_copy_with_no_links_of_its_own()
+    public async Task ProductCloner_CloneAsync_gives_the_clone_its_own_copy_of_everything_and_no_links()
     {
-        var roleId = await SeedRoleAsync("Filling");
-        var subAssemblyId = await SeedSubAssemblyAsync("Ube Filling", roleId, totalWeight: 100m, totalCost: 24m);
-        var categoryId = await SeedPackagingCategoryAsync("Boxes");
-        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
-        var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
-        var sourceId = await SeedProductAsync("Source");
+        var doughRoleId = await AddRoleAsync("Dough");
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.3m);
+        var boxId = await SeedBoxAsync();
+        var (otherId, linkedDoughId) = await AddProductWithSubAssemblyAsync("Pandesal", "Sweet Dough", doughRoleId, [(flourId, 1000m)]);
+        var sourceId = await AddProductAsync("Source");
         await using (var dbContext = CreateDbContext())
         {
             var source = await dbContext.Products.SingleAsync(p => p.Id == sourceId, Cancellation);
@@ -293,49 +200,64 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
-        await CreateUsageRepository().SetUsagesForRoleAsync(sourceId, roleId, [(subAssemblyId, 15m)], Cancellation);
-        await CreatePackagingLineRepository().SetLinesAsync(sourceId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await SaveRecipeAsync(sourceId, new RecipeDraft(
+            [new OwnedSubAssemblyDraft(0, "Ube Filling", fillingRoleId, [(ubeId, 100m)], UsageAuthoredField.Yield, 10m)],
+            [new LinkedUsageDraft(linkedDoughId, UsageAuthoredField.WeightPerPiece, 40m)]));
+        await CreatePackagingLineRepository().SetLinesAsync(otherId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLinkRepository().SetLinkAsync(sourceId, otherId, Cancellation);
         await CreateCostingParametersRepository().SetAsync(sourceId, laborCost: 5m, overheadCost: 3m, administrativeCost: 1.25m, marginPercent: 40m, vatPercent: 12m, Cancellation);
 
-        var newId = await CreateProductCloner().CloneAsync(sourceId, "Clone Of Source", Cancellation);
+        var cloneId = await CreateProductCloner().CloneAsync(sourceId, "Clone Of Source", Cancellation);
 
-        var clone = (await CreateProductRepository().GetByIdAsync(newId, Cancellation))!;
+        var clone = (await CreateProductRepository().GetByIdAsync(cloneId, Cancellation))!;
         clone.Description.Should().Be("Soft bread with ube filling");
         clone.UpdatedAt.Should().BeCloseTo(DateTime.Now, TimeSpan.FromMinutes(1), "a clone is saved when it's made");
 
-        (await CreateTabLinkRepository().GetForProductAsync(newId, Cancellation)).Should().BeEmpty();
+        var usages = await CreateUsageRepository().GetForProductAsync(cloneId, Cancellation);
+        usages.Should().HaveCount(2).And.OnlyContain(u => u.SubAssembly!.OwnerProductId == cloneId, "every sub-assembly is the clone's own copy");
+        usages.Select(u => (u.SubAssembly!.Name, u.AuthoredField, u.AuthoredValue, u.SubAssembly.TotalWeight)).Should().BeEquivalentTo(new[]
+        {
+            ("Ube Filling", UsageAuthoredField.Yield, 10m, 100m),
+            ("Sweet Dough", UsageAuthoredField.WeightPerPiece, 40m, 1000m),
+        });
 
-        var usages = await CreateUsageRepository().GetForProductAsync(newId, Cancellation);
-        usages.Should().ContainSingle(u => u.SubAssembly!.Name == "Ube Filling" && u.WeightPerPiece == 15m);
+        (await CreatePackagingLinkRepository().GetForProductAsync(cloneId, Cancellation)).Should().BeNull("a clone never inherits a link");
+        (await CreatePackagingLineRepository().GetForProductAsync(cloneId, Cancellation))
+            .Should().ContainSingle(l => l.PackagingMaterial!.Name == "6-Piece Box", "it copies the packaging the source shows");
 
-        var lines = await CreatePackagingLineRepository().GetForProductAsync(newId, Cancellation);
-        lines.Should().ContainSingle(l => l.PackagingMaterial!.Name == "6-Piece Box");
-
-        var costing = await CreateCostingParametersRepository().GetForProductAsync(newId, Cancellation);
-        costing.Should().NotBeNull();
-        costing!.MarginPercent.Should().Be(40m);
+        var costing = (await CreateCostingParametersRepository().GetForProductAsync(cloneId, Cancellation))!;
+        costing.MarginPercent.Should().Be(40m);
         costing.AdministrativeCost.Should().Be(1.25m);
 
-        // Editing the clone doesn't affect the source, and vice versa — no link exists.
-        await CreateUsageRepository().SetUsagesForRoleAsync(newId, roleId, [(subAssemblyId, 99m)], Cancellation);
-        var sourceUsagesAfter = await CreateUsageRepository().GetForProductAsync(sourceId, Cancellation);
-        sourceUsagesAfter.Should().ContainSingle(u => u.WeightPerPiece == 15m);
+        // The clone's recipe is its own: removing its copy of the dough leaves the original, and the
+        // source's link to it, alone.
+        await SaveRecipeAsync(cloneId, new RecipeDraft([], []));
+        (await CreateUsageRepository().GetForProductAsync(sourceId, Cancellation)).Should().Contain(u => u.SubAssemblyId == linkedDoughId);
     }
 
     [Fact]
-    public async Task ProductCloner_CloneAsync_copies_the_sources_effective_data_when_the_source_itself_is_linked()
+    public async Task ProductCloner_CloneAsync_renames_a_copy_whose_name_another_copy_already_took()
     {
-        var roleId = await SeedRoleAsync("Dough");
-        var subAssemblyId = await SeedSubAssemblyAsync("Bread Dough", roleId, totalWeight: 1000m, totalCost: 50m);
-        var aId = await SeedProductAsync("A");
-        var bId = await SeedProductAsync("B (linked to A)");
-        await CreateUsageRepository().SetUsagesForRoleAsync(aId, roleId, [(subAssemblyId, 30m)], Cancellation);
-        await CreateTabLinkRepository().SetLinkAsync(bId, ProductTabKind.SubAssemblyRole, roleId, aId, Cancellation);
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour");
+        var (_, otherDoughId) = await AddProductWithSubAssemblyAsync("Pandesal", "Dough", roleId, [(flourId, 800m)]);
+        var (sourceId, _) = await AddProductWithSubAssemblyAsync("Source", "Dough", roleId, [(flourId, 1000m)]);
+        await using (var dbContext = CreateDbContext())
+        {
+            // The source both owns a "Dough" and links Pandesal's "Dough".
+            dbContext.ProductSubAssemblyUsages.Add(new ProductSubAssemblyUsage
+            {
+                ProductId = sourceId,
+                SubAssemblyId = otherDoughId,
+                AuthoredField = UsageAuthoredField.WeightPerPiece,
+                AuthoredValue = 20m,
+            });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
 
-        var cloneId = await CreateProductCloner().CloneAsync(bId, "Clone Of B", Cancellation);
+        var cloneId = await CreateProductCloner().CloneAsync(sourceId, "Clone Of Source", Cancellation);
 
-        (await CreateTabLinkRepository().GetForProductAsync(cloneId, Cancellation)).Should().BeEmpty();
-        var usages = await CreateUsageRepository().GetForProductAsync(cloneId, Cancellation);
-        usages.Should().ContainSingle(u => u.SubAssembly!.Name == "Bread Dough" && u.WeightPerPiece == 30m);
+        (await CreateUsageRepository().GetForProductAsync(cloneId, Cancellation)).Select(u => u.SubAssembly!.Name)
+            .Should().BeEquivalentTo(["Dough", "Dough (copy)"]);
     }
 }

@@ -129,9 +129,14 @@ public class ReportsViewModel : ReactiveObject
         var products = await _productRepository.GetAllAsync(CancellationToken.None);
         foreach (var product in products)
         {
-            var usages = await _usageRepository.GetEffectiveForProductAsync(product.Id, CancellationToken.None);
+            var usages = await _usageRepository.GetForProductAsync(product.Id, CancellationToken.None);
             var usageCosts = usages
-                .Select(u => ProductRules.CalculateUsageCostPerPiece(u.SubAssembly!.TotalCost, u.WeightPerPiece, u.SubAssembly.TotalWeight))
+                .Select(u =>
+                {
+                    var subAssembly = u.SubAssembly!;
+                    var (weightPerPiece, _) = ProductRules.ResolvePieceSize(u.AuthoredField, u.AuthoredValue, subAssembly.TotalWeight);
+                    return ProductRules.CalculateUsageCostPerPiece(subAssembly.TotalCost, weightPerPiece, subAssembly.TotalWeight);
+                })
                 .ToList();
 
             var lines = await _packagingLineRepository.GetEffectiveForProductAsync(product.Id, CancellationToken.None);

@@ -90,7 +90,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <p:TabLinksCard VerticalAlignment="Top" />
+                        <p:PackagingLinkCard VerticalAlignment="Top" />
                         <p:CloneCard Grid.Column="2" VerticalAlignment="Top" />
                     </Grid>
                 </ScrollViewer>

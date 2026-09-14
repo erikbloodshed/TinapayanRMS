@@ -17,33 +17,32 @@ public partial class MainWindow : Window
     private readonly HashSet<TabItemExt> _loadingTabs = [];
     private readonly UnitsOfMeasureViewModel _unitsOfMeasureViewModel;
     private readonly CategoriesViewModel _categoriesViewModel;
+    private readonly SubAssemblyRolesViewModel _rolesViewModel;
 
     public MainWindow(
         MainWindowViewModel viewModel,
         RawMaterialsViewModel rawMaterialsViewModel,
-        SubAssembliesViewModel subAssembliesViewModel,
         ProductsViewModel productsViewModel,
         ReportsViewModel reportsViewModel,
         UnitsOfMeasureViewModel unitsOfMeasureViewModel,
-        CategoriesViewModel categoriesViewModel)
+        CategoriesViewModel categoriesViewModel,
+        SubAssemblyRolesViewModel rolesViewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
         _unitsOfMeasureViewModel = unitsOfMeasureViewModel;
         _categoriesViewModel = categoriesViewModel;
+        _rolesViewModel = rolesViewModel;
 
         RawMaterialsTab.Content = new RawMaterialsView(rawMaterialsViewModel);
-        SubAssembliesTab.Content = new SubAssembliesView(subAssembliesViewModel);
         ProductsTab.Content = new ProductsView(productsViewModel);
         ReportsTab.Content = new ReportsView(reportsViewModel);
 
         RawMaterialsNavItem.Tag = RawMaterialsTab;
-        SubAssembliesNavItem.Tag = SubAssembliesTab;
         ProductsNavItem.Tag = ProductsTab;
         ReportsNavItem.Tag = ReportsTab;
 
         _loadCommands[RawMaterialsTab] = rawMaterialsViewModel.LoadCommand;
-        _loadCommands[SubAssembliesTab] = subAssembliesViewModel.LoadCommand;
         _loadCommands[ProductsTab] = productsViewModel.LoadCommand;
         _loadCommands[ReportsTab] = reportsViewModel.LoadCommand;
 
@@ -74,15 +73,15 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Units of measure and categories, edited in a dialog over the current screen. Once it closes,
-    /// the screen on show refreshes so its pickers include anything added or renamed; the other tabs
-    /// pick the changes up when they're next shown, as they do for any change.
+    /// Units of measure, categories and roles, edited in a dialog over the current screen. Once it
+    /// closes, the screen on show refreshes so its pickers include anything added or renamed; the other
+    /// tabs pick the changes up when they're next shown, as they do for any change.
     /// </summary>
     private void OpenSettings()
     {
         NavigationDrawer.IsOpen = false;
 
-        var settings = new SettingsWindow(_unitsOfMeasureViewModel, _categoriesViewModel) { Owner = this };
+        var settings = new SettingsWindow(_unitsOfMeasureViewModel, _categoriesViewModel, _rolesViewModel) { Owner = this };
         SfSkinManager.SetTheme(settings, SfSkinManager.GetTheme(this));
         settings.ShowDialog();
 

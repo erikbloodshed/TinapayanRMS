@@ -17,14 +17,12 @@ public class IngredientBomLineRepository(
         return await dbContext.IngredientBomLines
             .AsNoTracking()
             .Include(l => l.ComponentIngredient)
-            .Include(l => l.Unit)
-            .ThenInclude(u => u!.UnitOfMeasure)
             .Where(l => l.IngredientId == ingredientId)
             .ToListAsync(cancellationToken);
     }
 
     public async Task SetLinesAsync(
-        int ingredientId, IReadOnlyList<(int ComponentIngredientId, int? UnitId, decimal Quantity)> lines, CancellationToken cancellationToken)
+        int ingredientId, IReadOnlyList<(int ComponentIngredientId, decimal Grams)> lines, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
@@ -47,7 +45,7 @@ public class IngredientBomLineRepository(
     internal static async Task SetLinesAsync(
         TinapayanRMSDbContext dbContext,
         int ingredientId,
-        IReadOnlyList<(int ComponentIngredientId, int? UnitId, decimal Quantity)> lines,
+        IReadOnlyList<(int ComponentIngredientId, decimal Grams)> lines,
         CancellationToken cancellationToken)
     {
         var ingredient = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == ingredientId, cancellationToken)
@@ -59,8 +57,7 @@ public class IngredientBomLineRepository(
             throw new InvalidOperationException("Only made ingredients have a BOM.");
         }
 
-        var grams = await IngredientQuantityConverter.ToGramsAsync(dbContext, lines, cancellationToken);
-        IngredientBomRules.EnsureValidLines([.. lines.Select((l, i) => (l.ComponentIngredientId, grams[i]))]);
+        IngredientBomRules.EnsureValidLines(lines);
 
         // ingredientId's own (about-to-be-replaced) lines are excluded, so the cycle
         // check only sees everyone else's current BOM.
@@ -94,13 +91,11 @@ public class IngredientBomLineRepository(
             .Where(l => l.IngredientId == ingredientId)
             .ExecuteDeleteAsync(cancellationToken);
 
-        dbContext.IngredientBomLines.AddRange(lines.Select((l, i) => new IngredientBomLine
+        dbContext.IngredientBomLines.AddRange(lines.Select(l => new IngredientBomLine
         {
             IngredientId = ingredientId,
             ComponentIngredientId = l.ComponentIngredientId,
-            Quantity = l.Quantity,
-            UnitId = l.UnitId,
-            Grams = grams[i],
+            Grams = l.Grams,
         }));
 
         await dbContext.SaveChangesAsync(cancellationToken);

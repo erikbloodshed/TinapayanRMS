@@ -38,7 +38,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 
     public async Task<int> SaveAsync(
         Product product,
-        IReadOnlyList<(int SubAssemblyRoleId, IReadOnlyList<(int SubAssemblyId, decimal WeightPerPiece)> Usages)> changedRoles,
+        RecipeDraft? recipe,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? packagingLines,
         CostingParameters? costing,
         CancellationToken cancellationToken)
@@ -62,9 +62,9 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             await UpdateAsync(dbContext, fields, cancellationToken);
         }
 
-        foreach (var (roleId, usages) in changedRoles)
+        if (recipe is not null)
         {
-            await ProductSubAssemblyUsageRepository.SetUsagesForRoleAsync(dbContext, fields.Id, roleId, usages, cancellationToken);
+            await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, fields.Id, recipe, cancellationToken);
         }
 
         if (packagingLines is not null)
@@ -95,6 +95,21 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        // Its own sub-assemblies go with it (Cascade), so none may still be in another product's recipe.
+        await SubAssemblyRepository.EnsureNoneLinkedElsewhereAsync(dbContext, u => u.SubAssembly!.OwnerProductId == id, cancellationToken);
+
+        var packagingLinkedBy = await dbContext.PackagingLinks
+            .Where(l => l.LinkedProductId == id)
+            .Select(l => l.Product!.Name)
+            .ToListAsync(cancellationToken);
+        if (packagingLinkedBy.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"{string.Join(", ", packagingLinkedBy.Order(StringComparer.CurrentCultureIgnoreCase))} "
+                + $"{(packagingLinkedBy.Count == 1 ? "links" : "link")} this product's packaging. Unlink it there first.");
+        }
+
         await dbContext.Products.Where(p => p.Id == id).ExecuteDeleteAsync(cancellationToken);
     }
 

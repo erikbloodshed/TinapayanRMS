@@ -29,6 +29,7 @@
                                   ShowTabListContextMenu="False">
             <syncfusion:TabItemExt x:Name="UnitsOfMeasureTab" Header="Units of Measure" CanClose="False" />
             <syncfusion:TabItemExt x:Name="CategoriesTab" Header="Categories" CanClose="False" />
+            <syncfusion:TabItemExt x:Name="RolesTab" Header="Roles" CanClose="False" />
         </syncfusion:TabControlExt>
 
         <Border Grid.Row="1"

@@ -3,9 +3,10 @@ using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.ApplicationCore.Validators;
-using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Fixtures;
@@ -17,7 +18,8 @@ namespace TinapayanRMS.Tests.ViewModels;
 /// <summary>
 /// Coming back to the Products tab re-runs LoadCommand (MainWindow). A cost changed on another tab
 /// must reach the selected product's recipe rows and cost summary, while the selection and the
-/// costing fields the user was typing into stay as they were. Save writes the whole form at once.
+/// costing fields the user was typing into stay as they were. Save writes the whole form at once:
+/// the product's own sub-assemblies (made in the form), the ones it links, and the rest.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
@@ -25,7 +27,9 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task Reloading_updates_usage_costs_changed_on_another_tab_and_keeps_the_selection_and_unsaved_costing()
     {
-        var (productId, subAssemblyId) = await SeedProductUsingOneSubAssemblyAsync(totalCost: 24m, totalWeight: 100m, weightPerPiece: 10m);
+        var roleId = await AddRoleAsync("Filling");
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.24m);
+        var (productId, _) = await AddProductWithSubAssemblyAsync("Ube pandesal", "Ube filling", roleId, [(ubeId, 100m)], weightPerPiece: 10m);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
@@ -37,11 +41,12 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var selected = viewModel.SelectedProduct;
         viewModel.EditingLaborCost = 5m;
 
-        // As another tab would: an ingredient price change has cascaded into the sub-assembly.
+        // As another tab would: ube's price goes up (the cascade reprices the sub-assembly too).
         await using (var dbContext = CreateDbContext())
         {
-            var subAssembly = await dbContext.SubAssemblies.FindAsync([subAssemblyId], Cancellation);
-            subAssembly!.TotalCost = 36m;
+            var ube = await dbContext.RawMaterials.SingleAsync(m => m.Id == ubeId, Cancellation);
+            ube.CostPerBaseUnit = 0.36m;
+            ube.BufferedCostPerBaseUnit = 0.36m;
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
@@ -59,20 +64,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task One_Save_writes_a_new_products_description_recipe_and_costing_together()
+    public async Task One_Save_writes_a_new_product_with_a_sub_assembly_made_in_it()
     {
-        await using (var dbContext = CreateDbContext())
-        {
-            dbContext.SubAssemblies.Add(new SubAssembly
-            {
-                Name = "Ube filling",
-                Role = new SubAssemblyRole { Name = "Filling", SortOrder = 1 },
-                TotalCost = 24m,
-                TotalWeight = 100m,
-            });
-            await dbContext.SaveChangesAsync(Cancellation);
-        }
-
+        await AddRoleAsync("Filling");
+        await AddIngredientAsync("Ube", costPerGram: 0.24m);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
@@ -80,13 +75,21 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingName = "Ube pandesal";
         viewModel.EditingDescription = "Soft bread with ube filling";
         await viewModel.AddUsageCommand.Execute();
-        viewModel.EditingUsageSubAssembly = viewModel.UsageFormSubAssemblies.Single();
+        viewModel.IsFormEditingLines.Should().BeTrue("a new sub-assembly is made in the form");
+        viewModel.EditingUsageName = "Ube filling";
+        viewModel.EditingFormLineIngredient = viewModel.Ingredients.Single();
+        viewModel.EditingFormLineGrams = 100m;
+        await viewModel.AddFormLineCommand.Execute();
+        viewModel.UsageFormTotalWeightText.Should().Be("100 g");
         viewModel.EditingUsageWeightPerPiece = 10m;
+        viewModel.EditingUsageYield.Should().Be(10m, "typing the weight per piece works out the yield");
         await viewModel.ApplyUsageCommand.Execute();
         viewModel.EditingLaborCost = 2m;
         viewModel.EditingAdministrativeCost = 0.5m;
 
-        viewModel.UsageEdits.Should().ContainSingle().Which.CostPerPiece.Should().Be(2.4m);
+        var usage = viewModel.UsageEdits.Should().ContainSingle().Subject;
+        usage.IsOwned.Should().BeTrue();
+        usage.CostPerPiece.Should().Be(2.4m);
         viewModel.Costs.BaseCost.Should().Be(4.9m, "₱2.40 of filling, ₱2 labor and ₱0.50 administrative");
 
         await viewModel.SaveCommand.Execute();
@@ -99,7 +102,13 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             productId = product.Id;
             product.Name.Should().Be("Ube pandesal");
             product.Description.Should().Be("Soft bread with ube filling");
-            (await dbContext.ProductSubAssemblyUsages.SingleAsync(Cancellation)).WeightPerPiece.Should().Be(10m);
+            var subAssembly = await dbContext.SubAssemblies.SingleAsync(Cancellation);
+            subAssembly.Name.Should().Be("Ube filling");
+            subAssembly.OwnerProductId.Should().Be(productId);
+            subAssembly.TotalWeight.Should().Be(100m);
+            var saved = await dbContext.ProductSubAssemblyUsages.SingleAsync(Cancellation);
+            saved.AuthoredField.Should().Be(UsageAuthoredField.WeightPerPiece);
+            saved.AuthoredValue.Should().Be(10m);
             var costing = await dbContext.CostingParameters.SingleAsync(Cancellation);
             costing.LaborCost.Should().Be(2m);
             costing.AdministrativeCost.Should().Be(0.5m);
@@ -114,39 +123,140 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.LastUpdatedText.Should().NotBe("—");
     }
 
+    [Fact]
+    public async Task A_typed_yield_is_kept_and_the_weight_per_piece_follows_the_batch()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var (productId, doughId) = await AddProductWithSubAssemblyAsync("Pandesal", "Bread Dough", roleId, [(flourId, 1200m)], weightPerPiece: 50m);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        await viewModel.EditUsageCommand.Execute(viewModel.UsageEdits.Single());
+        viewModel.EditingUsageYield.Should().Be(24m, "1,200 g at 50 g a piece");
+        viewModel.EditingUsageYield = 30m;
+        viewModel.EditingUsageWeightPerPiece.Should().Be(40m, "typing the yield works out the weight per piece");
+
+        // The batch grows while the form is open: the typed yield stays.
+        viewModel.SelectedFormLine = viewModel.FormLines.Single();
+        await viewModel.RemoveFormLineCommand.Execute();
+        viewModel.EditingFormLineIngredient = viewModel.Ingredients.Single();
+        viewModel.EditingFormLineGrams = 1500m;
+        await viewModel.AddFormLineCommand.Execute();
+        viewModel.EditingUsageYield.Should().Be(30m);
+        viewModel.EditingUsageWeightPerPiece.Should().Be(50m, "1,500 g over the 30 pieces typed");
+
+        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        var usage = await dbContext.ProductSubAssemblyUsages.SingleAsync(u => u.ProductId == productId, Cancellation);
+        usage.SubAssemblyId.Should().Be(doughId, "the sub-assembly is updated in place, not replaced");
+        usage.AuthoredField.Should().Be(UsageAuthoredField.Yield);
+        usage.AuthoredValue.Should().Be(30m);
+        (await dbContext.SubAssemblies.SingleAsync(s => s.Id == doughId, Cancellation)).TotalWeight.Should().Be(1500m);
+    }
+
+    [Fact]
+    public async Task A_linked_sub_assembly_follows_its_owner_and_Make_a_Copy_makes_it_the_products_own()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
+        var (bigId, doughId) = await AddProductWithSubAssemblyAsync("Cream Loaf", "Sweet Dough", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
+        var miniId = await AddProductAsync("Cream Loaf Mini");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        // Link Cream Loaf's dough into the mini, at its own weight.
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == miniId);
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == miniId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await viewModel.AddUsageCommand.Execute();
+        viewModel.EditingUsageMode = viewModel.UsageFormModes.Single(m => m.Mode == UsageFormMode.Link);
+        viewModel.IsFormEditingLines.Should().BeFalse("a link's lines are its owner's");
+        viewModel.EditingUsageSource = viewModel.LinkableSubAssemblies.Single();
+        viewModel.EditingUsageSource!.DisplayName.Should().Be("Sweet Dough — Cream Loaf (Dough)");
+        viewModel.EditingUsageWeightPerPiece = 30m;
+        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+        var linked = viewModel.UsageEdits.Single();
+        linked.IsLinked.Should().BeTrue();
+        linked.LinkedFromText.Should().Be("From Cream Loaf");
+        linked.CostPerPiece.Should().Be(1.5m, "30 g of a ₱50, 1,000 g batch");
+
+        // Cream Loaf adds butter to its dough: the mini's linked section follows on the next refresh.
+        await SaveRecipeAsync(bigId, new RecipeDraft(
+            [new OwnedSubAssemblyDraft(doughId, "Sweet Dough", roleId, [(flourId, 1000m), (butterId, 250m)], UsageAuthoredField.WeightPerPiece, 60m)], []));
+        await viewModel.LoadCommand.Execute();
+        viewModel.UsageEdits.Single().TotalWeight.Should().Be(1250m);
+        viewModel.UsageEdits.Single().CostPerPiece.Should().Be(3.6m, "30 g of a ₱150, 1,250 g batch");
+
+        // Make a Copy: the mini gets its own dough, at the same weight, and stops following.
+        await viewModel.MakeCopyCommand.Execute(viewModel.UsageEdits.Single());
+        var copy = viewModel.UsageEdits.Single();
+        copy.IsOwned.Should().BeTrue();
+        copy.Name.Should().Be("Sweet Dough");
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        var miniUsage = await dbContext.ProductSubAssemblyUsages.Include(u => u.SubAssembly).SingleAsync(u => u.ProductId == miniId, Cancellation);
+        miniUsage.SubAssemblyId.Should().NotBe(doughId);
+        miniUsage.SubAssembly!.OwnerProductId.Should().Be(miniId);
+        miniUsage.SubAssembly.TotalWeight.Should().Be(1250m);
+        miniUsage.AuthoredValue.Should().Be(30m);
+    }
+
+    [Fact]
+    public async Task Removing_a_sub_assembly_another_product_links_is_refused_on_the_spot()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var (_, doughId) = await AddProductWithSubAssemblyAsync("Cream Loaf", "Sweet Dough", roleId, [(flourId, 1000m)]);
+        var miniId = await AddProductAsync("Cream Loaf Mini");
+        await SaveRecipeAsync(miniId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m)]));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Name == "Cream Loaf");
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        var shared = viewModel.UsageEdits.Single();
+        shared.IsShared.Should().BeTrue();
+        shared.SharedText.Should().Be("Also used by Cream Loaf Mini");
+
+        await viewModel.RemoveUsageCommand.Execute(shared);
+
+        viewModel.ErrorMessage.Should().StartWith("Cream Loaf Mini links Sweet Dough");
+        viewModel.UsageEdits.Should().ContainSingle();
+    }
+
     private ProductsViewModel CreateViewModel()
     {
         ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
-        var usageRepository = new ProductSubAssemblyUsageRepository(factory);
         var packagingLineRepository = new PackagingLineRepository(factory);
-        var costingParametersRepository = new CostingParametersRepository(factory);
 
         return new ProductsViewModel(
             new ProductRepository(factory),
-            usageRepository,
+            new ProductSubAssemblyUsageRepository(factory),
             packagingLineRepository,
-            costingParametersRepository,
-            new ProductTabLinkRepository(factory, usageRepository, packagingLineRepository),
-            new ProductCloner(factory, usageRepository, packagingLineRepository, costingParametersRepository),
+            new CostingParametersRepository(factory),
+            new PackagingLinkRepository(factory, packagingLineRepository),
+            new ProductCloner(factory),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory, CreateCostPropagator()),
             new ProductValidator(),
             new CostingParametersValidator(),
+            new SubAssemblyValidator(),
             new LoggerConfiguration().CreateLogger());
-    }
-
-    private async Task<(int ProductId, int SubAssemblyId)> SeedProductUsingOneSubAssemblyAsync(decimal totalCost, decimal totalWeight, decimal weightPerPiece)
-    {
-        await using var dbContext = CreateDbContext();
-        var role = new SubAssemblyRole { Name = "Filling", SortOrder = 1 };
-        var subAssembly = new SubAssembly { Name = "Ube filling", Role = role, TotalCost = totalCost, TotalWeight = totalWeight };
-        var product = new Product { Name = "Ube pandesal" };
-        dbContext.ProductSubAssemblyUsages.Add(new ProductSubAssemblyUsage { Product = product, SubAssembly = subAssembly, WeightPerPiece = weightPerPiece });
-        await dbContext.SaveChangesAsync(Cancellation);
-        return (product.Id, subAssembly.Id);
     }
 
     /// <summary>
