@@ -266,7 +266,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         [
             (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
         ], Cancellation);
-        await CreateCostingParametersRepository().SetAsync(productId, laborCost: 5m, overheadCost: 3m, marginPercent: 40m, vatPercent: 12m, Cancellation);
+        await CreateCostingParametersRepository().SetAsync(productId, laborCost: 5m, overheadCost: 3m, administrativeCost: 1m, marginPercent: 40m, vatPercent: 12m, Cancellation);
 
         await CreateProductRepository().DeleteAsync(productId, Cancellation);
 
@@ -289,12 +289,13 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         var productId = await SeedProductAsync("Ensaymada");
         var repository = CreateCostingParametersRepository();
 
-        await repository.SetAsync(productId, laborCost: 5m, overheadCost: 3m, marginPercent: 40m, vatPercent: 12m, Cancellation);
-        await repository.SetAsync(productId, laborCost: 6m, overheadCost: 3m, marginPercent: 35m, vatPercent: 12m, Cancellation);
+        await repository.SetAsync(productId, laborCost: 5m, overheadCost: 3m, administrativeCost: 1m, marginPercent: 40m, vatPercent: 12m, Cancellation);
+        await repository.SetAsync(productId, laborCost: 6m, overheadCost: 3m, administrativeCost: 1.5m, marginPercent: 35m, vatPercent: 12m, Cancellation);
 
         var parameters = await repository.GetForProductAsync(productId, Cancellation);
         parameters.Should().NotBeNull();
         parameters!.LaborCost.Should().Be(6m);
+        parameters.AdministrativeCost.Should().Be(1.5m);
         parameters.MarginPercent.Should().Be(35m);
 
         await using var dbContext = CreateDbContext();
@@ -306,7 +307,17 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     {
         var productId = await SeedProductAsync("Ensaymada");
 
-        var act = () => CreateCostingParametersRepository().SetAsync(productId, laborCost: -1m, overheadCost: 0m, marginPercent: 0m, vatPercent: 0m, Cancellation);
+        var act = () => CreateCostingParametersRepository().SetAsync(productId, laborCost: -1m, overheadCost: 0m, administrativeCost: 0m, marginPercent: 0m, vatPercent: 0m, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task CostingParametersRepository_SetAsync_rejects_a_negative_administrative_cost()
+    {
+        var productId = await SeedProductAsync("Ensaymada");
+
+        var act = () => CreateCostingParametersRepository().SetAsync(productId, laborCost: 0m, overheadCost: 0m, administrativeCost: -1m, marginPercent: 0m, vatPercent: 0m, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -330,6 +341,33 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await repository.UpdateAsync(byId, Cancellation);
 
         (await repository.GetByIdAsync(added.Id, Cancellation))!.Name.Should().Be("Special Ensaymada Big");
+    }
+
+    [Fact]
+    public async Task ProductRepository_stores_the_description_and_stamps_each_save()
+    {
+        var repository = CreateProductRepository();
+        var product = new Product { Name = "Cream Loaf", Description = "Soft bread with a creamy filling" };
+
+        await repository.AddAsync(product, Cancellation);
+
+        var added = (await repository.GetByIdAsync(product.Id, Cancellation))!;
+        added.Description.Should().Be("Soft bread with a creamy filling");
+        added.UpdatedAt.Should().BeCloseTo(DateTime.Now, TimeSpan.FromMinutes(1));
+
+        // Pushed back, so the update's stamp is plainly a new one.
+        await using (var dbContext = CreateDbContext())
+        {
+            var stored = await dbContext.Products.SingleAsync(p => p.Id == product.Id, Cancellation);
+            stored.UpdatedAt = new DateTime(2026, 1, 1, 8, 0, 0);
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        await repository.UpdateAsync(new Product { Id = product.Id, Name = "Cream Loaf", Description = null }, Cancellation);
+
+        var updated = (await repository.GetByIdAsync(product.Id, Cancellation))!;
+        updated.Description.Should().BeNull();
+        updated.UpdatedAt.Should().BeCloseTo(DateTime.Now, TimeSpan.FromMinutes(1));
     }
 
     [Fact]

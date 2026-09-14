@@ -18,7 +18,10 @@ public class CostingParameters
     /// <summary>Overhead cost per finished piece, in pesos.</summary>
     public decimal OverheadCost { get; set; }
 
-    /// <summary>Markup on cost (materials + labor + overhead), as a percentage.</summary>
+    /// <summary>Administrative cost per finished piece, in pesos: office, permits, bookkeeping and the like.</summary>
+    public decimal AdministrativeCost { get; set; }
+
+    /// <summary>Markup on cost (materials + labor + overhead + administrative), as a percentage.</summary>
     public decimal MarginPercent { get; set; }
 
     /// <summary>Added on top of the marked-up price, as a percentage.</summary>

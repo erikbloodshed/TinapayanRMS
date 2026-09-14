@@ -1,0 +1,105 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.Products.PackagingSectionView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
+    <!--
+        The recipe's packaging: one section for every packaging line, like a sub-assembly's section.
+        Pick a line, then Edit or Remove it below; a linked Packaging tab can't be changed here.
+    -->
+    <Border BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8">
+        <DockPanel>
+            <DockPanel DockPanel.Dock="Top" Margin="12,10">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
+                        <TextBlock Text="Cost per piece" Style="{StaticResource CaptionStyle}" HorizontalAlignment="Right" />
+                        <TextBlock Text="{Binding Costs.Packaging, StringFormat='₱{0:N4}'}"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource HeadingForegroundBrush}"
+                                   HorizontalAlignment="Right" />
+                    </StackPanel>
+                    <syncfusion:ButtonAdv x:Name="CollapseToggle"
+                                          SizeMode="Small"
+                                          Label="Collapse"
+                                          IsCheckable="True"
+                                          ToolTip="Show or hide the packaging lines"
+                                          IconTemplate="{StaticResource ExpandIconTemplate}" />
+                </StackPanel>
+
+                <Border DockPanel.Dock="Left" Style="{StaticResource GlyphTileStyle}">
+                    <TextBlock Text="&#xE7B8;" Style="{StaticResource GlyphTileIconStyle}" />
+                </Border>
+
+                <Grid VerticalAlignment="Center">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="Packaging" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource HeadingForegroundBrush}" />
+                    <Border Grid.Column="1"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource LinkedBadgeStyle}"
+                            Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Text="{Binding PackagingLinkedToText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
+                    </Border>
+                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="Boxes, wrappers, ribbon and labels for one piece" Style="{StaticResource CaptionStyle}" />
+                </Grid>
+            </DockPanel>
+
+            <!-- Edit and Remove act on the line picked in the grid -->
+            <StackPanel DockPanel.Dock="Bottom"
+                        Orientation="Horizontal"
+                        Margin="12,10"
+                        Visibility="{Binding IsPackagingLinked, Converter={StaticResource EmptyStateVisibilityConverter}}">
+                <syncfusion:ButtonAdv Label="Edit" IconTemplate="{StaticResource EditIconTemplate}" Command="{Binding EditLineCommand}" Margin="0,0,8,0" />
+                <syncfusion:ButtonAdv Label="Remove" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveLineCommand}" />
+            </StackPanel>
+
+            <!-- The table's total, under its Cost per Piece column: the same widths as the grid's columns -->
+            <Border DockPanel.Dock="Bottom"
+                    BorderBrush="{StaticResource CardBorderBrush}"
+                    BorderThickness="0,1,0,1"
+                    Background="{StaticResource PageBackgroundBrush}"
+                    Visibility="{Binding IsChecked, ElementName=CollapseToggle, Converter={StaticResource EmptyStateVisibilityConverter}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="96" />
+                        <ColumnDefinition Width="52" />
+                        <ColumnDefinition Width="104" />
+                        <ColumnDefinition Width="88" />
+                        <ColumnDefinition Width="104" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Total" Style="{StaticResource SectionTotalCellStyle}" HorizontalAlignment="Left" />
+                    <TextBlock Grid.Column="5" Text="{Binding Costs.Packaging, StringFormat='{}{0:N4}'}" Style="{StaticResource SectionTotalCellStyle}" />
+                </Grid>
+            </Border>
+
+            <!-- No height of its own: it shows every line, and passes the wheel on to the tab (MouseWheelForwarding) -->
+            <syncfusion:SfDataGrid ItemsSource="{Binding LineEdits}"
+                                   SelectedItem="{Binding SelectedLineEdit, Mode=TwoWay}"
+                                   AutoGenerateColumns="False"
+                                   AllowEditing="False"
+                                   SelectionMode="Single"
+                                   NavigationMode="Row"
+                                   ColumnSizer="Star"
+                                   controls:MouseWheelForwarding.IsEnabled="True"
+                                   Visibility="{Binding IsChecked, ElementName=CollapseToggle, Converter={StaticResource EmptyStateVisibilityConverter}}">
+                <syncfusion:SfDataGrid.Columns>
+                    <syncfusion:GridTextColumn MappingName="PackagingMaterial.Name" HeaderText="Material" />
+                    <controls:NumericColumn MappingName="QtyPerPiece" HeaderText="Qty per Piece" Width="96" NumberDecimalDigits="4" />
+                    <syncfusion:GridTextColumn MappingName="Unit.Abbreviation" HeaderText="Unit" Width="52" Padding="12,0,0,0" />
+                    <controls:NumericColumn MappingName="PiecesPerPackagingUnit" HeaderText="Pieces per Unit" Width="104" NumberDecimalDigits="4" />
+                    <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" />
+                    <controls:NumericColumn MappingName="CostPerPiece" HeaderText="Cost per Piece" Width="104" NumberDecimalDigits="4" />
+                </syncfusion:SfDataGrid.Columns>
+            </syncfusion:SfDataGrid>
+        </DockPanel>
+    </Border>
+</UserControl>

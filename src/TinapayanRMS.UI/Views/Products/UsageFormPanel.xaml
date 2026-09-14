@@ -1,0 +1,61 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.Products.UsageFormPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
+    <!-- Add a sub-assembly to the recipe, or change an added one's weight per piece. Apply only puts it in the recipe; Save saves it. -->
+    <Border Padding="12" CornerRadius="6" Background="{StaticResource PageBackgroundBrush}">
+        <StackPanel>
+            <TextBlock Text="{Binding UsageFormTitle}"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource HeadingForegroundBrush}"
+                       Margin="0,0,0,8" />
+
+            <!-- Labels in the first row, fields in the second -->
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Role" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:ComboBoxAdv Grid.Row="1"
+                                        Grid.Column="0"
+                                        ItemsSource="{Binding UsageFormRoles}"
+                                        DisplayMemberPath="Name"
+                                        SelectedItem="{Binding EditingUsageRole, Mode=TwoWay}"
+                                        IsEnabled="{Binding IsAddingUsage}"
+                                        ToolTip="A linked role's sub-assemblies come from the product it's linked to, so it isn't offered." />
+
+                <TextBlock Grid.Column="2" Text="Sub-Assembly" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:ComboBoxAdv Grid.Row="1"
+                                        Grid.Column="2"
+                                        ItemsSource="{Binding UsageFormSubAssemblies}"
+                                        DisplayMemberPath="Name"
+                                        SelectedItem="{Binding EditingUsageSubAssembly, Mode=TwoWay}"
+                                        IsEnabled="{Binding IsAddingUsage}"
+                                        ToolTip="The role's sub-assemblies with lines that this product doesn't use yet." />
+
+                <TextBlock Grid.Column="4" Text="Weight per Piece (g)" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:DoubleTextBox Grid.Row="1"
+                                          Grid.Column="4"
+                                          Value="{Binding EditingUsageWeightPerPiece, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          NumberDecimalDigits="2" />
+            </Grid>
+
+            <DockPanel Margin="0,12,0,0">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <syncfusion:ButtonAdv Label="Cancel" IconTemplate="{StaticResource CancelIconTemplate}" Command="{Binding CancelUsageCommand}" Margin="0,0,8,0" />
+                    <syncfusion:ButtonAdv Label="Apply" IconTemplate="{StaticResource ApplyIconTemplate}" Command="{Binding ApplyUsageCommand}" />
+                </StackPanel>
+                <TextBlock Text="{Binding UsageFormPreviewText}" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,12,0" />
+            </DockPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

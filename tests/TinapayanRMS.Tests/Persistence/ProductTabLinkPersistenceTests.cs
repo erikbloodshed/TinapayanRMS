@@ -286,11 +286,22 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
         var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
         var sourceId = await SeedProductAsync("Source");
+        await using (var dbContext = CreateDbContext())
+        {
+            var source = await dbContext.Products.SingleAsync(p => p.Id == sourceId, Cancellation);
+            source.Description = "Soft bread with ube filling";
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
         await CreateUsageRepository().SetUsagesForRoleAsync(sourceId, roleId, [(subAssemblyId, 15m)], Cancellation);
         await CreatePackagingLineRepository().SetLinesAsync(sourceId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
-        await CreateCostingParametersRepository().SetAsync(sourceId, laborCost: 5m, overheadCost: 3m, marginPercent: 40m, vatPercent: 12m, Cancellation);
+        await CreateCostingParametersRepository().SetAsync(sourceId, laborCost: 5m, overheadCost: 3m, administrativeCost: 1.25m, marginPercent: 40m, vatPercent: 12m, Cancellation);
 
         var newId = await CreateProductCloner().CloneAsync(sourceId, "Clone Of Source", Cancellation);
+
+        var clone = (await CreateProductRepository().GetByIdAsync(newId, Cancellation))!;
+        clone.Description.Should().Be("Soft bread with ube filling");
+        clone.UpdatedAt.Should().BeCloseTo(DateTime.Now, TimeSpan.FromMinutes(1), "a clone is saved when it's made");
 
         (await CreateTabLinkRepository().GetForProductAsync(newId, Cancellation)).Should().BeEmpty();
 
@@ -303,6 +314,7 @@ public class ProductTabLinkPersistenceTests(DatabaseFixture fixture) : Persisten
         var costing = await CreateCostingParametersRepository().GetForProductAsync(newId, Cancellation);
         costing.Should().NotBeNull();
         costing!.MarginPercent.Should().Be(40m);
+        costing.AdministrativeCost.Should().Be(1.25m);
 
         // Editing the clone doesn't affect the source, and vice versa — no link exists.
         await CreateUsageRepository().SetUsagesForRoleAsync(newId, roleId, [(subAssemblyId, 99m)], Cancellation);

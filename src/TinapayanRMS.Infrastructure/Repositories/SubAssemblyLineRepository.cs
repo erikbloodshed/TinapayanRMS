@@ -11,14 +11,31 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
     public async Task<IReadOnlyList<SubAssemblyLine>> GetForSubAssemblyAsync(int subAssemblyId, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.SubAssemblyLines
-            .AsNoTracking()
-            .Include(l => l.Ingredient)
-            .Include(l => l.Unit)
-            .ThenInclude(u => u!.UnitOfMeasure)
+        return await WithIngredientAndUnit(dbContext.SubAssemblyLines)
             .Where(l => l.SubAssemblyId == subAssemblyId)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<SubAssemblyLine>> GetForSubAssembliesAsync(IReadOnlyCollection<int> subAssemblyIds, CancellationToken cancellationToken)
+    {
+        if (subAssemblyIds.Count == 0)
+        {
+            return [];
+        }
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await WithIngredientAndUnit(dbContext.SubAssemblyLines)
+            .Where(l => subAssemblyIds.Contains(l.SubAssemblyId))
+            .OrderBy(l => l.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static IQueryable<SubAssemblyLine> WithIngredientAndUnit(IQueryable<SubAssemblyLine> lines) =>
+        lines
+            .AsNoTracking()
+            .Include(l => l.Ingredient)
+            .Include(l => l.Unit)
+            .ThenInclude(u => u!.UnitOfMeasure);
 
     public async Task SetLinesAsync(
         int subAssemblyId, IReadOnlyList<(int IngredientId, int? UnitId, decimal Quantity)> lines, CancellationToken cancellationToken)

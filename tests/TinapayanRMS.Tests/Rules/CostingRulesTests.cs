@@ -8,7 +8,7 @@ public class CostingRulesTests
     [Fact]
     public void EnsureValidParameters_rejects_negative_labor_cost()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborCost: -1m, overheadCost: 0m, marginPercent: 0m, vatPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborCost: -1m, overheadCost: 0m, administrativeCost: 0m, marginPercent: 0m, vatPercent: 0m);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -16,7 +16,15 @@ public class CostingRulesTests
     [Fact]
     public void EnsureValidParameters_rejects_negative_overhead_cost()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborCost: 0m, overheadCost: -1m, marginPercent: 0m, vatPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborCost: 0m, overheadCost: -1m, administrativeCost: 0m, marginPercent: 0m, vatPercent: 0m);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void EnsureValidParameters_rejects_negative_administrative_cost()
+    {
+        var act = () => CostingRules.EnsureValidParameters(laborCost: 0m, overheadCost: 0m, administrativeCost: -1m, marginPercent: 0m, vatPercent: 0m);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -24,7 +32,7 @@ public class CostingRulesTests
     [Fact]
     public void EnsureValidParameters_rejects_negative_margin_percent()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborCost: 0m, overheadCost: 0m, marginPercent: -5m, vatPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborCost: 0m, overheadCost: 0m, administrativeCost: 0m, marginPercent: -5m, vatPercent: 0m);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -32,7 +40,7 @@ public class CostingRulesTests
     [Fact]
     public void EnsureValidParameters_rejects_negative_vat_percent()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborCost: 0m, overheadCost: 0m, marginPercent: 0m, vatPercent: -1m);
+        var act = () => CostingRules.EnsureValidParameters(laborCost: 0m, overheadCost: 0m, administrativeCost: 0m, marginPercent: 0m, vatPercent: -1m);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -40,7 +48,7 @@ public class CostingRulesTests
     [Fact]
     public void EnsureValidParameters_accepts_zeroes()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborCost: 0m, overheadCost: 0m, marginPercent: 0m, vatPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborCost: 0m, overheadCost: 0m, administrativeCost: 0m, marginPercent: 0m, vatPercent: 0m);
 
         act.Should().NotThrow();
     }
@@ -52,7 +60,7 @@ public class CostingRulesTests
         // Margin 40% markup on cost -> ₱39.20 pre-VAT price.
         // VAT 12% added on top -> ₱43.904 final selling price.
         var (baseCost, preVatPrice, sellingPrice) = CostingRules.CalculateSellingPrice(
-            materialCostPerPiece: 20m, laborCost: 5m, overheadCost: 3m, marginPercent: 40m, vatPercent: 12m);
+            materialCostPerPiece: 20m, laborCost: 5m, overheadCost: 3m, administrativeCost: 0m, marginPercent: 40m, vatPercent: 12m);
 
         baseCost.Should().Be(28m);
         preVatPrice.Should().Be(39.2m);
@@ -60,13 +68,52 @@ public class CostingRulesTests
     }
 
     [Fact]
+    public void CalculateSellingPrice_adds_the_administrative_cost_to_the_base_cost_before_the_markup()
+    {
+        // Material ₱20 + Labor ₱5 + Overhead ₱3 + Administrative ₱2 = ₱30 base cost.
+        // Margin 40% markup on cost -> ₱42 pre-VAT price; VAT 12% on top -> ₱47.04.
+        var (baseCost, preVatPrice, sellingPrice) = CostingRules.CalculateSellingPrice(
+            materialCostPerPiece: 20m, laborCost: 5m, overheadCost: 3m, administrativeCost: 2m, marginPercent: 40m, vatPercent: 12m);
+
+        baseCost.Should().Be(30m);
+        preVatPrice.Should().Be(42m);
+        sellingPrice.Should().Be(47.04m);
+    }
+
+    [Fact]
     public void CalculateSellingPrice_with_zero_margin_and_VAT_equals_base_cost()
     {
         var (baseCost, preVatPrice, sellingPrice) = CostingRules.CalculateSellingPrice(
-            materialCostPerPiece: 10m, laborCost: 2m, overheadCost: 1m, marginPercent: 0m, vatPercent: 0m);
+            materialCostPerPiece: 10m, laborCost: 2m, overheadCost: 1m, administrativeCost: 0m, marginPercent: 0m, vatPercent: 0m);
 
         baseCost.Should().Be(13m);
         preVatPrice.Should().Be(13m);
         sellingPrice.Should().Be(13m);
+    }
+
+    [Fact]
+    public void CalculateProfitMarginPercent_is_the_markups_share_of_the_pre_VAT_price()
+    {
+        // ₱100 base cost at a 30% markup sells for ₱130 before VAT: ₱30 profit, 30 / 130 of the price.
+        CostingRules.CalculateProfitMarginPercent(baseCost: 100m, preVatPrice: 130m)
+            .Should().BeApproximately(23.0769m, 0.0001m);
+    }
+
+    [Fact]
+    public void CalculateProfitMarginPercent_is_zero_with_no_price()
+    {
+        CostingRules.CalculateProfitMarginPercent(baseCost: 0m, preVatPrice: 0m).Should().Be(0m);
+    }
+
+    [Fact]
+    public void PercentOf_gives_the_parts_share_of_the_whole()
+    {
+        CostingRules.PercentOf(part: 6m, whole: 59.45m).Should().BeApproximately(10.0925m, 0.0001m);
+    }
+
+    [Fact]
+    public void PercentOf_is_zero_when_the_whole_is_zero()
+    {
+        CostingRules.PercentOf(part: 5m, whole: 0m).Should().Be(0m);
     }
 }

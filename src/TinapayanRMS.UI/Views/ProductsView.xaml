@@ -5,291 +5,96 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
+             xmlns:p="clr-namespace:TinapayanRMS.UI.Views.Products"
              mc:Ignorable="d"
-             d:DesignHeight="700" d:DesignWidth="1400">
+             d:DesignHeight="800"
+             d:DesignWidth="1400">
+    <!--
+        The list beside the selected product: its summary header, then its cards in tabs along the
+        bottom. Each card is a UserControl in Views/Products that inherits this screen's DataContext;
+        when a card shows is decided here.
+    -->
     <Grid Background="{StaticResource PageBackgroundBrush}" Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
         <!-- ErrorMessage as a toast, over the cards: it spans the whole Grid and puts itself in its bottom-right corner -->
-        <controls:ErrorToast />
+        <controls:ErrorToast Grid.RowSpan="2" Grid.ColumnSpan="3" />
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" />
-                <ColumnDefinition Width="16" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="16" />
-                <ColumnDefinition Width="260" />
-            </Grid.ColumnDefinitions>
+        <p:ProductListCard Grid.RowSpan="2" Grid.Column="0" />
 
-            <!-- Products list + product form -->
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+        <p:ProductHeaderCard x:Name="Header" Grid.Column="2" Margin="0,0,0,16" />
 
-                <Border Grid.Row="0" Style="{StaticResource CardStyle}">
+        <!--
+            Every tab but Links & Clone is part of the one form Save writes, so a new product shows them
+            too. Fixed tabs, like Raw Materials': nothing to close or reopen. The strip sits along the
+            bottom, and each tab scrolls on its own, so the strip stays put. Links & Clone only applies to a
+            saved product; while it's hidden the ViewModel moves the selection off it (SelectedDetailsTab).
+        -->
+        <syncfusion:TabControlExt Grid.Row="1"
+                                  Grid.Column="2"
+                                  TabStripPlacement="Bottom"
+                                  CloseButtonType="Hide"
+                                  ShowTabItemContextMenu="False"
+                                  ShowTabListContextMenu="False"
+                                  SelectedIndex="{Binding SelectedDetailsTab, Mode=TwoWay}">
+            <!--
+                The recipe gets two thirds: its tables need about 580 px, and the doughnut beside it about
+                310 px. Narrower than 960 px (a window under about 1,350 px wide) the side cards move under
+                it at full width instead.
+            -->
+            <syncfusion:TabItemExt Header="Recipe" CanClose="False">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <controls:ResponsiveColumnsPanel Breakpoint="960" LeadingWeight="2" TrailingWeight="1">
+                        <p:RecipeStructureCard />
+                        <p:RecipeSidePanel />
+                    </controls:ResponsiveColumnsPanel>
+                </ScrollViewer>
+            </syncfusion:TabItemExt>
+
+            <syncfusion:TabItemExt Header="Costing" CanClose="False">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="2*" />
+                        </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Row="0" Text="Products" Style="{StaticResource SectionHeaderStyle}" />
-
-                        <syncfusion:SfDataGrid Grid.Row="1"
-                                                ItemsSource="{Binding Products}"
-                                                SelectedItem="{Binding SelectedProduct, Mode=TwoWay}"
-                                                AutoGenerateColumns="False"
-                                                AllowEditing="False"
-                                                SelectionMode="Single"
-                                                NavigationMode="Row"
-                                                ColumnSizer="Star">
-                            <syncfusion:SfDataGrid.Columns>
-                                <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
-                            </syncfusion:SfDataGrid.Columns>
-                        </syncfusion:SfDataGrid>
+                        <p:CostingSummaryCard Grid.ColumnSpan="3" Margin="0,0,0,16" />
+                        <p:CostBreakdownCard Grid.Row="1" />
+                        <p:ProfitMarginCard Grid.Row="1" Grid.Column="2" VerticalAlignment="Top" />
                     </Grid>
-                </Border>
+                </ScrollViewer>
+            </syncfusion:TabItemExt>
 
-                <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="0,16,0,0">
-                    <StackPanel>
-                        <TextBlock Text="Product" Style="{StaticResource SectionHeaderStyle}" />
+            <syncfusion:TabItemExt Header="Links &amp; Clone"
+                                   CanClose="False"
+                                   Visibility="{Binding ShowLinks, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
 
-                        <TextBlock Text="Name" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:SfTextBoxExt Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                  Margin="0,0,0,12" />
-
-                        <StackPanel Orientation="Horizontal">
-                            <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />
-                            <syncfusion:ButtonAdv Label="Save" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveCommand}" Margin="0,0,8,0" />
-                            <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <!-- Product detail: sub-tabs -->
-            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="0"
-                    Visibility="{Binding SelectedProduct, Converter={StaticResource EmptyStateVisibilityConverter}}">
-                <TextBlock Text="Select a product to see its usages, packaging, costing and links." Style="{StaticResource EmptyStateStyle}" />
-            </Border>
-
-            <syncfusion:TabControlExt Grid.Column="2"
-                                       CloseButtonType="Hide"
-                                       ShowTabItemContextMenu="False"
-                                       ShowTabListContextMenu="False"
-                                       Visibility="{Binding ShowProductDetail, Converter={StaticResource BooleanToVisibilityConverter}}">
-
-                <syncfusion:TabItemExt Header="Usages" CanClose="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel Margin="16">
-                            <TextBlock Text="Role (Tab)" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:ComboBoxAdv ItemsSource="{Binding Roles}"
-                                                     DisplayMemberPath="Name"
-                                                     SelectedItem="{Binding EditingUsageRole, Mode=TwoWay}"
-                                                     Margin="0,0,0,12" />
-
-                            <Border Style="{StaticResource WarningBannerStyle}" Margin="0,0,0,12"
-                                    Visibility="{Binding IsSelectedRoleLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Text="This tab is Live Template-linked — unlink it below to edit its usages directly."
-                                           Foreground="{StaticResource WarningForegroundBrush}" TextWrapping="Wrap" />
-                            </Border>
-
-                            <syncfusion:SfDataGrid ItemsSource="{Binding UsageEdits}"
-                                                    SelectedItem="{Binding SelectedUsageEdit, Mode=TwoWay}"
-                                                    AutoGenerateColumns="False"
-                                                    AllowEditing="False"
-                                                    SelectionMode="Single"
-                                                    NavigationMode="Row"
-                                                    ColumnSizer="AutoWithLastColumnFill"
-                                                    Height="190">
-                                <syncfusion:SfDataGrid.Columns>
-                                    <syncfusion:GridTextColumn MappingName="SubAssembly.Name" HeaderText="Sub-Assembly" />
-                                    <controls:NumericColumn MappingName="WeightPerPiece" HeaderText="Wt/Piece (g)" NumberDecimalDigits="2" />
-                                    <controls:NumericColumn MappingName="Yield" HeaderText="Yield" NumberDecimalDigits="2" />
-                                    <controls:NumericColumn MappingName="CostPerPiece" HeaderText="Cost/Piece" NumberDecimalDigits="4" />
-                                </syncfusion:SfDataGrid.Columns>
-                            </syncfusion:SfDataGrid>
-
-                            <TextBlock Text="Sub-Assembly" Style="{StaticResource FieldLabelStyle}" Margin="0,12,0,4" />
-                            <syncfusion:ComboBoxAdv ItemsSource="{Binding SubAssembliesForSelectedRole}"
-                                                     DisplayMemberPath="Name"
-                                                     SelectedItem="{Binding EditingUsageSubAssembly, Mode=TwoWay}"
-                                                     Margin="0,0,0,12" />
-
-                            <TextBlock Text="Weight Per Piece (g)" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingUsageWeightPerPiece, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                       Margin="0,0,0,12" />
-
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                <syncfusion:ButtonAdv Label="Add" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding AddUsageCommand}" Margin="0,0,8,0" />
-                                <syncfusion:ButtonAdv Label="Remove" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveUsageCommand}" />
-                            </StackPanel>
-
-                            <syncfusion:ButtonAdv Label="Save Usages" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveUsagesCommand}" />
-                        </StackPanel>
-                    </ScrollViewer>
-                </syncfusion:TabItemExt>
-
-                <syncfusion:TabItemExt Header="Packaging" CanClose="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel Margin="16">
-                            <Border Style="{StaticResource WarningBannerStyle}" Margin="0,0,0,12"
-                                    Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Text="The Packaging tab is Live Template-linked — unlink it below to edit its lines directly."
-                                           Foreground="{StaticResource WarningForegroundBrush}" TextWrapping="Wrap" />
-                            </Border>
-
-                            <syncfusion:SfDataGrid ItemsSource="{Binding LineEdits}"
-                                                    SelectedItem="{Binding SelectedLineEdit, Mode=TwoWay}"
-                                                    AutoGenerateColumns="False"
-                                                    AllowEditing="False"
-                                                    SelectionMode="Single"
-                                                    NavigationMode="Row"
-                                                    ColumnSizer="AutoWithLastColumnFill"
-                                                    Height="220">
-                                <syncfusion:SfDataGrid.Columns>
-                                    <syncfusion:GridTextColumn MappingName="PackagingMaterial.Name" HeaderText="Material" />
-                                    <syncfusion:GridTextColumn MappingName="Unit.Abbreviation" HeaderText="Unit" />
-                                    <controls:NumericColumn MappingName="QtyPerPiece" HeaderText="Qty/Piece" NumberDecimalDigits="4" />
-                                    <controls:NumericColumn MappingName="PiecesPerPackagingUnit" HeaderText="Pieces/Unit" NumberDecimalDigits="4" />
-                                    <controls:NumericColumn MappingName="CostPerPiece" HeaderText="Cost/Piece" NumberDecimalDigits="4" />
-                                </syncfusion:SfDataGrid.Columns>
-                            </syncfusion:SfDataGrid>
-
-                            <TextBlock Text="Packaging Material" Style="{StaticResource FieldLabelStyle}" Margin="0,12,0,4" />
-                            <syncfusion:ComboBoxAdv ItemsSource="{Binding PackagingMaterials}"
-                                                     DisplayMemberPath="Name"
-                                                     SelectedItem="{Binding EditingLinePackagingMaterial, Mode=TwoWay}"
-                                                     Margin="0,0,0,12" />
-
-                            <TextBlock Text="Unit" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:ComboBoxAdv ItemsSource="{Binding EntryUnitOptions}"
-                                                     DisplayMemberPath="Name"
-                                                     SelectedItem="{Binding EditingLineUnit, Mode=TwoWay}"
-                                                     Margin="0,0,0,12" />
-
-                            <TextBlock Text="Authored Field" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:ComboBoxAdv ItemsSource="{Binding AuthoredFieldOptions}"
-                                                     SelectedItem="{Binding EditingLineAuthoredField, Mode=TwoWay}"
-                                                     Margin="0,0,0,12" />
-
-                            <TextBlock Text="Value (in the field above)" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingLineAuthoredValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                       Margin="0,0,0,12" />
-
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                <syncfusion:ButtonAdv Label="Add" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding AddLineCommand}" Margin="0,0,8,0" />
-                                <syncfusion:ButtonAdv Label="Remove" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveLineCommand}" />
-                            </StackPanel>
-
-                            <syncfusion:ButtonAdv Label="Save Lines" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveLinesCommand}" />
-                        </StackPanel>
-                    </ScrollViewer>
-                </syncfusion:TabItemExt>
-
-                <syncfusion:TabItemExt Header="Costing" CanClose="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel Margin="16">
-                            <TextBlock Text="Labor Cost (per piece)" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingLaborCost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                       Margin="0,0,0,12" />
-
-                            <TextBlock Text="Overhead Cost (per piece)" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingOverheadCost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                       Margin="0,0,0,12" />
-
-                            <TextBlock Text="Margin %" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingMarginPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                       Margin="0,0,0,12" />
-
-                            <TextBlock Text="VAT %" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:DoubleTextBox Value="{Binding EditingVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                       Margin="0,0,0,12" />
-
-                            <syncfusion:ButtonAdv Label="Save Costing" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveCostingCommand}" />
-                        </StackPanel>
-                    </ScrollViewer>
-                </syncfusion:TabItemExt>
-
-                <syncfusion:TabItemExt Header="Links &amp; Clone" CanClose="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel Margin="16">
-                            <TextBlock Text="Tab Links (Live Template)" Style="{StaticResource SectionHeaderStyle}" />
-
-                            <syncfusion:SfDataGrid ItemsSource="{Binding TabLinks}"
-                                                    SelectedItem="{Binding SelectedTabLink, Mode=TwoWay}"
-                                                    AutoGenerateColumns="False"
-                                                    AllowEditing="False"
-                                                    SelectionMode="Single"
-                                                    NavigationMode="Row"
-                                                    ColumnSizer="Star"
-                                                    Height="140">
-                                <syncfusion:SfDataGrid.Columns>
-                                    <syncfusion:GridTextColumn MappingName="TabName" HeaderText="Tab" />
-                                    <syncfusion:GridTextColumn MappingName="LinkedToProductName" HeaderText="Linked To" />
-                                </syncfusion:SfDataGrid.Columns>
-                            </syncfusion:SfDataGrid>
-
-                            <syncfusion:ButtonAdv Label="Unlink Selected Tab" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding UnlinkTabCommand}" Margin="0,8,0,0" />
-
-                            <TextBlock Text="Link a Tab" Style="{StaticResource SectionHeaderStyle}" Margin="0,24,0,12" />
-
-                            <TextBlock Text="Tab Kind" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:ComboBoxAdv ItemsSource="{Binding TabKindOptions}"
-                                                     SelectedItem="{Binding EditingLinkTabKind, Mode=TwoWay}"
-                                                     Margin="0,0,0,12" />
-
-                            <TextBlock Text="Role (only for a SubAssemblyRole tab)" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:ComboBoxAdv ItemsSource="{Binding Roles}"
-                                                     DisplayMemberPath="Name"
-                                                     SelectedItem="{Binding EditingLinkRole, Mode=TwoWay}"
-                                                     Margin="0,0,0,12" />
-
-                            <TextBlock Text="Link To Product" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:ComboBoxAdv ItemsSource="{Binding LinkTargetProductOptions}"
-                                                     DisplayMemberPath="Name"
-                                                     SelectedItem="{Binding EditingLinkTargetProduct, Mode=TwoWay}"
-                                                     Margin="0,0,0,12" />
-
-                            <syncfusion:ButtonAdv Label="Link Tab" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding LinkTabCommand}" />
-
-                            <TextBlock Text="Clone This Product" Style="{StaticResource SectionHeaderStyle}" Margin="0,24,0,12" />
-
-                            <TextBlock Text="New Product Name" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:SfTextBoxExt Text="{Binding EditingCloneName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                      Margin="0,0,0,12" />
-
-                            <syncfusion:ButtonAdv Label="Clone" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding CloneCommand}" />
-                        </StackPanel>
-                    </ScrollViewer>
-                </syncfusion:TabItemExt>
-            </syncfusion:TabControlExt>
-
-            <!-- Pinned price summary -->
-            <Border Grid.Column="4" Style="{StaticResource CardStyle}" VerticalAlignment="Top"
-                    Visibility="{Binding ShowProductDetail, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <StackPanel>
-                    <TextBlock Text="Price Summary" Style="{StaticResource SectionHeaderStyle}" />
-                    <TextBlock Text="Per piece" Style="{StaticResource CaptionStyle}" Margin="0,-8,0,16" />
-
-                    <TextBlock Text="Material Cost" Style="{StaticResource FieldLabelStyle}" />
-                    <TextBlock Text="{Binding MaterialCostPerPiece, StringFormat={}₱{0:N4}}" Margin="0,0,0,12" />
-
-                    <TextBlock Text="Base Cost" Style="{StaticResource FieldLabelStyle}" />
-                    <TextBlock Text="{Binding BaseCost, StringFormat={}₱{0:N4}}" Margin="0,0,0,12" />
-
-                    <TextBlock Text="Pre-VAT Price" Style="{StaticResource FieldLabelStyle}" />
-                    <TextBlock Text="{Binding PreVatPrice, StringFormat={}₱{0:N4}}" Margin="0,0,0,16" />
-
-                    <Border BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="0,1,0,0" Margin="0,0,0,16" />
-
-                    <TextBlock Text="Selling Price" Style="{StaticResource FieldLabelStyle}" />
-                    <TextBlock Text="{Binding SellingPrice, StringFormat={}₱{0:N2}}"
-                               FontSize="24" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
-                </StackPanel>
-            </Border>
-        </Grid>
+                        <p:TabLinksCard VerticalAlignment="Top" />
+                        <p:CloneCard Grid.Column="2" VerticalAlignment="Top" />
+                    </Grid>
+                </ScrollViewer>
+            </syncfusion:TabItemExt>
+        </syncfusion:TabControlExt>
     </Grid>
 </UserControl>

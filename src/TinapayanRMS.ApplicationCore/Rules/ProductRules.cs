@@ -32,6 +32,20 @@ public static class ProductRules
         subAssemblyTotalCost * weightPerPiece / subAssemblyTotalWeight;
 
     /// <summary>
+    /// How much of one sub-assembly line goes into one finished piece, in the line's own unit: the
+    /// piece takes weightPerPiece grams of the whole batch, so it takes that share of every line.
+    /// </summary>
+    public static decimal CalculateLineQuantityPerPiece(decimal lineQuantity, decimal weightPerPiece, decimal subAssemblyTotalWeight) =>
+        lineQuantity * weightPerPiece / subAssemblyTotalWeight;
+
+    /// <summary>
+    /// One sub-assembly line's cost per finished piece: the piece's share of the line's grams, at the
+    /// ingredient's cost per gram. A usage's lines add up to its CalculateUsageCostPerPiece.
+    /// </summary>
+    public static decimal CalculateLineCostPerPiece(decimal lineGrams, decimal ingredientCostPerGram, decimal weightPerPiece, decimal subAssemblyTotalWeight) =>
+        lineGrams * ingredientCostPerGram * weightPerPiece / subAssemblyTotalWeight;
+
+    /// <summary>
     /// Unlike EnsureValidUsages and the ingredient/sub-assembly line rules, an empty list
     /// is deliberately allowed here — a product may legitimately have no packaging lines
     /// entered yet, whereas a sub-assembly with no ingredient lines or a product with no

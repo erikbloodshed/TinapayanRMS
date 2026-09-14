@@ -19,4 +19,20 @@ public class ProductValidatorTests
     {
         _validator.Validate(new Product { Name = "" }).IsValid.Should().BeFalse();
     }
+
+    [Fact]
+    public void Accepts_a_description_at_the_limit()
+    {
+        var product = new Product { Name = "Ensaymada", Description = new string('a', ProductValidator.MaxDescriptionLength) };
+
+        _validator.Validate(product).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Rejects_a_description_over_the_limit()
+    {
+        var product = new Product { Name = "Ensaymada", Description = new string('a', ProductValidator.MaxDescriptionLength + 1) };
+
+        _validator.Validate(product).IsValid.Should().BeFalse();
+    }
 }

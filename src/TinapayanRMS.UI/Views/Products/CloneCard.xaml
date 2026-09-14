@@ -1,0 +1,17 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.Products.CloneCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
+    <Border Style="{StaticResource CardStyle}">
+        <StackPanel>
+            <TextBlock Text="Clone This Product" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
+            <TextBlock Text="Makes an independent copy of the product as saved: its recipe, packaging, costing and description. Unsaved changes aren't copied."
+                       Style="{StaticResource CardCaptionStyle}" />
+
+            <TextBlock Text="New Product Name" Style="{StaticResource FieldLabelStyle}" />
+            <syncfusion:SfTextBoxExt Text="{Binding EditingCloneName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+
+            <syncfusion:ButtonAdv Label="Clone" HorizontalAlignment="Left" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding CloneCommand}" />
+        </StackPanel>
+    </Border>
+</UserControl>

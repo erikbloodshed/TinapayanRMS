@@ -1,0 +1,27 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.Products.ProductListCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
+    <Border Style="{StaticResource CardStyle}">
+        <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Text="Products" Style="{StaticResource SectionHeaderStyle}" />
+            <syncfusion:SfTextBoxExt DockPanel.Dock="Top"
+                                     Margin="0,0,0,12"
+                                     Watermark="Search products"
+                                     WatermarkTemplate="{StaticResource AlignedWatermarkTemplate}"
+                                     Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+            <syncfusion:SfDataGrid ItemsSource="{Binding VisibleProducts}"
+                                   SelectedItem="{Binding SelectedProduct, Mode=TwoWay}"
+                                   AutoGenerateColumns="False"
+                                   AllowEditing="False"
+                                   SelectionMode="Single"
+                                   NavigationMode="Row"
+                                   ColumnSizer="Star">
+                <syncfusion:SfDataGrid.Columns>
+                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
+                </syncfusion:SfDataGrid.Columns>
+            </syncfusion:SfDataGrid>
+        </DockPanel>
+    </Border>
+</UserControl>

@@ -67,9 +67,19 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
 
     public async Task SetUsagesForRoleAsync(int productId, int subAssemblyRoleId, IReadOnlyList<(int SubAssemblyId, decimal WeightPerPiece)> usages, CancellationToken cancellationToken)
     {
-        ProductRules.EnsureValidUsages(usages);
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await SetUsagesForRoleAsync(dbContext, productId, subAssemblyRoleId, usages, cancellationToken);
+    }
+
+    /// <summary>Replaces one role's usages on the caller's context and saves them, after every check SetUsagesForRoleAsync makes.</summary>
+    internal static async Task SetUsagesForRoleAsync(
+        TinapayanRMSDbContext dbContext,
+        int productId,
+        int subAssemblyRoleId,
+        IReadOnlyList<(int SubAssemblyId, decimal WeightPerPiece)> usages,
+        CancellationToken cancellationToken)
+    {
+        ProductRules.EnsureValidUsages(usages);
 
         var productExists = await dbContext.Products.AnyAsync(p => p.Id == productId, cancellationToken);
         if (!productExists)

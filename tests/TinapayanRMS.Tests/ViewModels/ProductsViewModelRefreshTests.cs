@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.ApplicationCore.Validators;
@@ -15,8 +16,8 @@ namespace TinapayanRMS.Tests.ViewModels;
 
 /// <summary>
 /// Coming back to the Products tab re-runs LoadCommand (MainWindow). A cost changed on another tab
-/// must reach the selected product's usage rows and price summary, while the selection and the
-/// costing fields the user was typing into stay as they were.
+/// must reach the selected product's recipe rows and cost summary, while the selection and the
+/// costing fields the user was typing into stay as they were. Save writes the whole form at once.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
@@ -30,8 +31,8 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.SelectedProduct = viewModel.Products.Single();
         await WaitUntilSettledAsync(
-            () => viewModel.UsageEdits.Count == 1 && viewModel.EditingUsageRole is not null,
-            () => $"usage rows={viewModel.UsageEdits.Count}, role={viewModel.EditingUsageRole?.Name ?? "none"}, roles={viewModel.Roles.Count}, sub-assemblies for role={viewModel.SubAssembliesForSelectedRole.Count}");
+            () => viewModel.UsageEdits.Count == 1,
+            () => $"usage rows={viewModel.UsageEdits.Count}, roles={viewModel.Roles.Count}");
         viewModel.UsageEdits.Single().CostPerPiece.Should().Be(2.4m);
         var selected = viewModel.SelectedProduct;
         viewModel.EditingLaborCost = 5m;
@@ -51,9 +52,66 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedProduct!.Id.Should().Be(productId);
         viewModel.EditingLaborCost.Should().Be(5m, "an unsaved costing field must survive the refresh");
         viewModel.UsageEdits.Should().ContainSingle().Which.CostPerPiece.Should().Be(3.6m);
-        viewModel.MaterialCostPerPiece.Should().Be(3.6m);
-        var (expectedBaseCost, _, _) = CostingRules.CalculateSellingPrice(3.6m, 5m, 0m, 0m, 0m);
-        viewModel.BaseCost.Should().Be(expectedBaseCost);
+        viewModel.Costs.Material.Should().Be(3.6m);
+        var (expectedBaseCost, _, _) = CostingRules.CalculateSellingPrice(3.6m, 5m, 0m, 0m, 0m, 0m);
+        viewModel.Costs.BaseCost.Should().Be(expectedBaseCost);
+        viewModel.CostShares.Should().ContainSingle().Which.Amount.Should().Be(3.6m);
+    }
+
+    [Fact]
+    public async Task One_Save_writes_a_new_products_description_recipe_and_costing_together()
+    {
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.SubAssemblies.Add(new SubAssembly
+            {
+                Name = "Ube filling",
+                Role = new SubAssemblyRole { Name = "Filling", SortOrder = 1 },
+                TotalCost = 24m,
+                TotalWeight = 100m,
+            });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Ube pandesal";
+        viewModel.EditingDescription = "Soft bread with ube filling";
+        await viewModel.AddUsageCommand.Execute();
+        viewModel.EditingUsageSubAssembly = viewModel.UsageFormSubAssemblies.Single();
+        viewModel.EditingUsageWeightPerPiece = 10m;
+        await viewModel.ApplyUsageCommand.Execute();
+        viewModel.EditingLaborCost = 2m;
+        viewModel.EditingAdministrativeCost = 0.5m;
+
+        viewModel.UsageEdits.Should().ContainSingle().Which.CostPerPiece.Should().Be(2.4m);
+        viewModel.Costs.BaseCost.Should().Be(4.9m, "₱2.40 of filling, ₱2 labor and ₱0.50 administrative");
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        int productId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var product = await dbContext.Products.SingleAsync(Cancellation);
+            productId = product.Id;
+            product.Name.Should().Be("Ube pandesal");
+            product.Description.Should().Be("Soft bread with ube filling");
+            (await dbContext.ProductSubAssemblyUsages.SingleAsync(Cancellation)).WeightPerPiece.Should().Be(10m);
+            var costing = await dbContext.CostingParameters.SingleAsync(Cancellation);
+            costing.LaborCost.Should().Be(2m);
+            costing.AdministrativeCost.Should().Be(0.5m);
+        }
+
+        // The form now shows the saved product, which can be linked and cloned.
+        await WaitUntilSettledAsync(
+            () => viewModel.SelectedProduct?.Id == productId && viewModel.UsageEdits.Count == 1,
+            () => $"selected={viewModel.SelectedProduct?.Id}, usage rows={viewModel.UsageEdits.Count}");
+        viewModel.HeaderTitle.Should().Be("Ube pandesal");
+        viewModel.ShowLinks.Should().BeTrue();
+        viewModel.LastUpdatedText.Should().NotBe("—");
     }
 
     private ProductsViewModel CreateViewModel()
@@ -72,6 +130,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             new ProductTabLinkRepository(factory, usageRepository, packagingLineRepository),
             new ProductCloner(factory, usageRepository, packagingLineRepository, costingParametersRepository),
             new SubAssemblyRepository(factory),
+            new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory, CreateCostPropagator()),
             new ProductValidator(),

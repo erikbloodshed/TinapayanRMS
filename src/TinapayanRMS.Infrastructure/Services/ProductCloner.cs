@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Repositories;
 
 namespace TinapayanRMS.Infrastructure.Services;
 
@@ -21,15 +22,11 @@ public class ProductCloner(
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var sourceExists = await dbContext.Products.AnyAsync(p => p.Id == sourceProductId, cancellationToken);
-        if (!sourceExists)
-        {
-            throw new InvalidOperationException($"Product {sourceProductId} does not exist.");
-        }
+        var source = await dbContext.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == sourceProductId, cancellationToken)
+            ?? throw new InvalidOperationException($"Product {sourceProductId} does not exist.");
 
-        var newProduct = new Product { Name = newProductName };
-        dbContext.Products.Add(newProduct);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var newProduct = new Product { Name = newProductName, Description = source.Description };
+        await ProductRepository.AddAsync(dbContext, newProduct, cancellationToken);
 
         // SetUsagesForRoleAsync only ever replaces one role's rows at a time, so the
         // source's usages are grouped by role and written one group per call.
@@ -54,7 +51,7 @@ public class ProductCloner(
         if (costingParameters is not null)
         {
             await costingParametersRepository.SetAsync(
-                newProduct.Id, costingParameters.LaborCost, costingParameters.OverheadCost,
+                newProduct.Id, costingParameters.LaborCost, costingParameters.OverheadCost, costingParameters.AdministrativeCost,
                 costingParameters.MarginPercent, costingParameters.VatPercent, cancellationToken);
         }
 

@@ -147,6 +147,7 @@ public class ReportsViewModel : ReactiveObject
                 materialCostPerPiece,
                 costingParameters?.LaborCost ?? 0m,
                 costingParameters?.OverheadCost ?? 0m,
+                costingParameters?.AdministrativeCost ?? 0m,
                 costingParameters?.MarginPercent ?? 0m,
                 costingParameters?.VatPercent ?? 0m);
 

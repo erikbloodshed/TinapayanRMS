@@ -2,11 +2,11 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 
 public static class CostingRules
 {
-    public static void EnsureValidParameters(decimal laborCost, decimal overheadCost, decimal marginPercent, decimal vatPercent)
+    public static void EnsureValidParameters(decimal laborCost, decimal overheadCost, decimal administrativeCost, decimal marginPercent, decimal vatPercent)
     {
-        if (laborCost < 0 || overheadCost < 0)
+        if (laborCost < 0 || overheadCost < 0 || administrativeCost < 0)
         {
-            throw new InvalidOperationException("Labor and overhead cost can't be negative.");
+            throw new InvalidOperationException("Labor, overhead and administrative cost can't be negative.");
         }
 
         if (marginPercent < 0 || vatPercent < 0)
@@ -18,15 +18,27 @@ public static class CostingRules
     /// <summary>
     /// Cost-plus pricing: margin is a markup on cost (BaseCost × (1 + Margin%)), and VAT is
     /// added on top of that pre-VAT price (× (1 + VAT%)) as a separate step — never combined
-    /// into one formula, so each of the four inputs maps to exactly one multiplication a shop
-    /// owner can check by hand.
+    /// into one formula, so each input maps to exactly one step a shop owner can check by hand.
+    /// The base cost is the materials plus the labor, overhead and administrative costs.
     /// </summary>
     public static (decimal BaseCost, decimal PreVatPrice, decimal SellingPrice) CalculateSellingPrice(
-        decimal materialCostPerPiece, decimal laborCost, decimal overheadCost, decimal marginPercent, decimal vatPercent)
+        decimal materialCostPerPiece, decimal laborCost, decimal overheadCost, decimal administrativeCost, decimal marginPercent, decimal vatPercent)
     {
-        var baseCost = materialCostPerPiece + laborCost + overheadCost;
+        var baseCost = materialCostPerPiece + laborCost + overheadCost + administrativeCost;
         var preVatPrice = baseCost * (1 + marginPercent / 100m);
         var sellingPrice = preVatPrice * (1 + vatPercent / 100m);
         return (baseCost, preVatPrice, sellingPrice);
     }
+
+    /// <summary>
+    /// The profit on one piece as a percentage of the price before VAT: the markup's share of what
+    /// the shop keeps, since VAT is collected for the government. A 30% markup is a 23.08% margin.
+    /// Informational only; the selling price still comes from the markup (CalculateSellingPrice).
+    /// </summary>
+    public static decimal CalculateProfitMarginPercent(decimal baseCost, decimal preVatPrice) =>
+        PercentOf(preVatPrice - baseCost, preVatPrice);
+
+    /// <summary><paramref name="part"/> as a percentage of <paramref name="whole"/>, or 0 when there's nothing to share.</summary>
+    public static decimal PercentOf(decimal part, decimal whole) =>
+        whole == 0 ? 0 : part / whole * 100m;
 }

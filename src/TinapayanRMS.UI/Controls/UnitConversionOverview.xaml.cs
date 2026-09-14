@@ -8,7 +8,8 @@ namespace TinapayanRMS.UI.Controls;
 /// <summary>
 /// The "Unit Conversion Overview" diagram: one box per alternative unit ("1 bag", "25,000 g")
 /// pointing down into the item's base unit. Each item in ItemsSource needs a UnitName and a
-/// BaseEquivalentText property, which both the ingredient and packaging unit rows have.
+/// BaseEquivalentText property, which the ingredient and packaging unit rows and the Products
+/// screen's sub-assembly usages all have.
 /// </summary>
 public partial class UnitConversionOverview : UserControl
 {
@@ -17,6 +18,9 @@ public partial class UnitConversionOverview : UserControl
 
     public static readonly DependencyProperty BaseUnitNameProperty = DependencyProperty.Register(
         nameof(BaseUnitName), typeof(string), typeof(UnitConversionOverview), new PropertyMetadata(string.Empty));
+
+    public static readonly DependencyProperty ShowAsRowsProperty = DependencyProperty.Register(
+        nameof(ShowAsRows), typeof(bool), typeof(UnitConversionOverview), new PropertyMetadata(false));
 
     private static readonly DependencyPropertyKey HasItemsPropertyKey = DependencyProperty.RegisterReadOnly(
         nameof(HasItems), typeof(bool), typeof(UnitConversionOverview), new PropertyMetadata(false));
@@ -39,6 +43,17 @@ public partial class UnitConversionOverview : UserControl
     {
         get => (string)GetValue(BaseUnitNameProperty);
         set => SetValue(BaseUnitNameProperty, value);
+    }
+
+    /// <summary>
+    /// A row per unit ("1 Sweet Dough batch → 28 pc") instead of boxes side by side pointing down into the
+    /// base unit. For a narrow column, where the boxes would wrap one under another and read as a chain
+    /// of conversions (Products' Recipe tab).
+    /// </summary>
+    public bool ShowAsRows
+    {
+        get => (bool)GetValue(ShowAsRowsProperty);
+        set => SetValue(ShowAsRowsProperty, value);
     }
 
     /// <summary>Whether there's at least one alternative unit to draw; the empty-state hint shows otherwise.</summary>

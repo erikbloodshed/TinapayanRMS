@@ -1,0 +1,46 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.Products.RecipeStructureCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:local="clr-namespace:TinapayanRMS.UI.Views.Products">
+    <!--
+        What goes into one piece: a section per sub-assembly, in role order, then the packaging. The
+        Add forms open under the header; each section's own buttons edit or remove it.
+    -->
+    <Border Style="{StaticResource CardStyle}">
+        <StackPanel>
+            <!-- The title beside the Add buttons, then the caption across the whole card -->
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <syncfusion:ButtonAdv Label="Add Sub-Assembly"
+                                          IconTemplate="{StaticResource AddIconTemplate}"
+                                          Command="{Binding AddUsageCommand}"
+                                          Margin="0,0,8,0" />
+                    <syncfusion:ButtonAdv Label="Add Packaging" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding AddLineCommand}" />
+                </StackPanel>
+                <TextBlock Text="Recipe Structure" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,12,0" VerticalAlignment="Center" />
+            </DockPanel>
+            <TextBlock Text="What goes into one piece: each sub-assembly's ingredients, scaled to a piece, then the packaging. Changes are saved with Save."
+                       Style="{StaticResource CardCaptionStyle}"
+                       Margin="0,8,0,12" />
+
+            <local:UsageFormPanel Margin="0,0,0,12" Visibility="{Binding IsUsageFormOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <local:PackagingLineFormPanel Margin="0,0,0,12" Visibility="{Binding IsLineFormOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+            <TextBlock Style="{StaticResource EmptyStateStyle}"
+                       Margin="0,32"
+                       Text="Nothing in the recipe yet. Add the sub-assemblies that go into one piece, then its packaging."
+                       Visibility="{Binding HasRecipe, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+
+            <ItemsControl ItemsSource="{Binding UsageEdits}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <local:SubAssemblySectionView Margin="0,0,0,12" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <local:PackagingSectionView Visibility="{Binding HasPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        </StackPanel>
+    </Border>
+</UserControl>

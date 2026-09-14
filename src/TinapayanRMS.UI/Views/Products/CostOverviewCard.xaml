@@ -1,0 +1,103 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.Products.CostOverviewCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
+    <UserControl.Resources>
+        <!--
+            One colour per slice, in order: the amber accent first, then colours far enough apart to tell
+            neighbouring slices apart. Palette="Custom" + ColorModel colours a single series' segments
+            (a series' Interior would colour them all the same).
+        -->
+        <syncfusion:ChartColorModel x:Key="CostShareColors">
+            <syncfusion:ChartColorModel.CustomBrushes>
+                <SolidColorBrush Color="#B45309" />
+                <SolidColorBrush Color="#0F766E" />
+                <SolidColorBrush Color="#F59E0B" />
+                <SolidColorBrush Color="#475569" />
+                <SolidColorBrush Color="#BE123C" />
+                <SolidColorBrush Color="#0369A1" />
+                <SolidColorBrush Color="#65A30D" />
+                <SolidColorBrush Color="#7C3AED" />
+            </syncfusion:ChartColorModel.CustomBrushes>
+        </syncfusion:ChartColorModel>
+
+        <!-- A legend row: the slice's colour, its name, then its amount and share. Item is the CostShareRow. -->
+        <DataTemplate x:Key="CostShareLegendTemplate">
+            <Grid Margin="0,4" Width="128">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Ellipse Width="10" Height="10" Margin="0,0,8,0" Fill="{Binding Interior}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Item.Name}" Foreground="{StaticResource HeadingForegroundBrush}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource CaptionStyle}">
+                    <Run Text="{Binding Item.Amount, StringFormat='₱{0:N4}', Mode=OneWay}" /><Run Text="{Binding Item.Percent, StringFormat=' ({0:N1}%)', Mode=OneWay}" />
+                </TextBlock>
+            </Grid>
+        </DataTemplate>
+
+        <!-- What the doughnut's hole shows, for the cost summary (ProductCostSummary) it's given -->
+        <DataTemplate x:Key="MaterialCostCenterTemplate">
+            <StackPanel>
+                <TextBlock Text="Per piece" Style="{StaticResource CaptionStyle}" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding Material, StringFormat='₱{0:N2}'}"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource HeadingForegroundBrush}"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource CardStyle}">
+        <StackPanel>
+            <TextBlock Text="Recipe Cost Overview" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
+            <TextBlock Text="How the material cost of one piece splits across its sub-assemblies and packaging."
+                       Style="{StaticResource CardCaptionStyle}" />
+
+            <TextBlock Style="{StaticResource EmptyStateStyle}"
+                       Margin="0,24"
+                       Text="No material cost yet. Add sub-assemblies or packaging to see how it splits."
+                       Visibility="{Binding HasMaterialCost, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+
+            <syncfusion:SfChart Height="220"
+                                AreaBorderThickness="0"
+                                Visibility="{Binding HasMaterialCost, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <syncfusion:SfChart.Legend>
+                    <syncfusion:ChartLegend DockPosition="Right" ItemTemplate="{StaticResource CostShareLegendTemplate}" />
+                </syncfusion:SfChart.Legend>
+
+                <syncfusion:DoughnutSeries ItemsSource="{Binding CostShares}"
+                                           XBindingPath="Name"
+                                           YBindingPath="Amount"
+                                           Palette="Custom"
+                                           ColorModel="{StaticResource CostShareColors}"
+                                           DoughnutCoefficient="0.65"
+                                           LegendIcon="Circle"
+                                           ShowTooltip="True">
+                    <!-- CenterView takes a ContentControl, as in the Sample Browser's DoughnutChart.xaml (a panel is rejected at runtime) -->
+                    <syncfusion:DoughnutSeries.CenterView>
+                        <ContentControl Content="{Binding Costs}" ContentTemplate="{StaticResource MaterialCostCenterTemplate}" />
+                    </syncfusion:DoughnutSeries.CenterView>
+                </syncfusion:DoughnutSeries>
+            </syncfusion:SfChart>
+
+            <Border Style="{StaticResource WarningBannerStyle}" Margin="0,12,0,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Left"
+                               Style="{StaticResource IconGlyphStyle}"
+                               Foreground="{StaticResource WarningForegroundBrush}"
+                               Margin="0,1,8,0"
+                               Text="&#xE946;" />
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{StaticResource WarningForegroundBrush}"
+                               Text="The material cost is every sub-assembly's share, plus the packaging, that goes into one piece. Labor, overhead and the rest are added on the Costing tab." />
+                </DockPanel>
+            </Border>
+        </StackPanel>
+    </Border>
+</UserControl>

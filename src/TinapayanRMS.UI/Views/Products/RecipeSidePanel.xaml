@@ -1,0 +1,11 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.Products.RecipeSidePanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:TinapayanRMS.UI.Views.Products">
+    <!-- The Recipe tab's right-hand column, beside the Recipe Structure: what the recipe comes to. -->
+    <StackPanel>
+        <local:CostOverviewCard Margin="0,0,0,16" />
+        <local:PieceConversionCard Margin="0,0,0,16" />
+        <local:RecipeUsageExampleCard />
+    </StackPanel>
+</UserControl>

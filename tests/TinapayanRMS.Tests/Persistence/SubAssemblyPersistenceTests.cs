@@ -187,6 +187,31 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
     }
 
     [Fact]
+    public async Task GetForSubAssembliesAsync_returns_the_lines_of_only_the_sub_assemblies_asked_for()
+    {
+        var roleId = await SeedRoleAsync("Filling");
+        var categoryId = await SeedCategoryAsync("Fillings");
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
+        var milkId = await SeedPurchasedIngredientAsync("Milk", categoryId);
+        var eggId = await SeedPurchasedIngredientAsync("Egg", categoryId);
+        var eggKilogramId = await AddKilogramUnitAsync(eggId);
+        var custardId = await SeedSubAssemblyAsync("Custard", roleId);
+        var ubeId = await SeedSubAssemblyAsync("Ube Filling", roleId);
+        var otherId = await SeedSubAssemblyAsync("Cheese Filling", roleId);
+        var lineRepository = CreateLineRepository();
+        await lineRepository.SetLinesAsync(custardId, [(sugarId, null, 60m), (eggId, eggKilogramId, 0.05m)], Cancellation);
+        await lineRepository.SetLinesAsync(ubeId, [(milkId, null, 200m)], Cancellation);
+        await lineRepository.SetLinesAsync(otherId, [(sugarId, null, 10m)], Cancellation);
+
+        var lines = await lineRepository.GetForSubAssembliesAsync([custardId, ubeId], Cancellation);
+
+        lines.Select(l => l.SubAssemblyId).Should().BeEquivalentTo(new[] { custardId, custardId, ubeId });
+        lines.Should().OnlyContain(l => l.Ingredient != null, "a product's recipe shows each line's ingredient");
+        lines.Single(l => l.IngredientId == eggId).Unit!.UnitOfMeasure!.Abbreviation.Should().Be("kg");
+        (await lineRepository.GetForSubAssembliesAsync([], Cancellation)).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task SetLinesAsync_rejects_duplicate_ingredients()
     {
         var roleId = await SeedRoleAsync("Filling");

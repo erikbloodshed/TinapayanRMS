@@ -65,9 +65,18 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
         CancellationToken cancellationToken)
     {
-        ProductRules.EnsureValidPackagingLines([.. lines.Select(l => (l.PackagingMaterialId, l.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? l.AuthoredValue : 1m / l.AuthoredValue))]);
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await SetLinesAsync(dbContext, productId, lines, cancellationToken);
+    }
+
+    /// <summary>Replaces the product's packaging lines on the caller's context and saves them, after every check SetLinesAsync makes.</summary>
+    internal static async Task SetLinesAsync(
+        TinapayanRMSDbContext dbContext,
+        int productId,
+        IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
+        CancellationToken cancellationToken)
+    {
+        ProductRules.EnsureValidPackagingLines([.. lines.Select(l => (l.PackagingMaterialId, l.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? l.AuthoredValue : 1m / l.AuthoredValue))]);
 
         var productExists = await dbContext.Products.AnyAsync(p => p.Id == productId, cancellationToken);
         if (!productExists)

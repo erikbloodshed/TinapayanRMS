@@ -1,0 +1,83 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.Products.RecipeUsageExampleCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
+    <UserControl.Resources>
+        <Style x:Key="BreakdownRowStyle" TargetType="DockPanel">
+            <Setter Property="Margin" Value="0,6,0,0" />
+        </Style>
+
+        <!-- A breakdown line: a slice of the material cost, for the pieces asked about. -->
+        <DataTemplate x:Key="BreakdownRowTemplate">
+            <DockPanel Style="{StaticResource BreakdownRowStyle}">
+                <TextBlock DockPanel.Dock="Right" Text="{Binding Amount, StringFormat='₱{0:N2}'}" />
+                <TextBlock Text="{Binding Name}" Style="{StaticResource CaptionStyle}" />
+            </DockPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource CardStyle}">
+        <StackPanel>
+            <TextBlock Text="Recipe Usage Example" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
+            <TextBlock Text="See what the materials for a number of pieces come to, from the recipe as it's shown."
+                       Style="{StaticResource CardCaptionStyle}" />
+
+            <!-- A label over the quantity; "pc" and Calculate have none, so they span both rows, bottom-aligned -->
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Use Quantity" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:DoubleTextBox Grid.Row="1"
+                                          Grid.Column="0"
+                                          Value="{Binding ExampleQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          NumberDecimalDigits="0" />
+                <TextBlock Grid.RowSpan="2"
+                           Grid.Column="1"
+                           Text="pc"
+                           Margin="8,0,0,8"
+                           VerticalAlignment="Bottom"
+                           Foreground="{StaticResource MutedForegroundBrush}" />
+                <syncfusion:ButtonAdv Grid.RowSpan="2"
+                                      Grid.Column="3"
+                                      VerticalAlignment="Bottom"
+                                      Label="Calculate"
+                                      IconTemplate="{StaticResource CalculateIconTemplate}"
+                                      Command="{Binding CalculateExampleCommand}" />
+            </Grid>
+
+            <Border Margin="0,12,0,0"
+                    Padding="12"
+                    CornerRadius="6"
+                    Background="{StaticResource SuccessBackgroundBrush}"
+                    Visibility="{Binding ExampleResult, Converter={StaticResource NotNullToVisibilityConverter}}">
+                <StackPanel>
+                    <TextBlock Text="{Binding ExampleResult.Title}" Foreground="{StaticResource HeadingForegroundBrush}" FontWeight="SemiBold" />
+                    <TextBlock FontSize="28"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource SuccessForegroundBrush}"
+                               Text="{Binding ExampleResult.TotalCost, StringFormat='₱{0:N2}'}" />
+                    <TextBlock Text="Material cost: sub-assemblies and packaging" Style="{StaticResource CaptionStyle}" />
+                </StackPanel>
+            </Border>
+
+            <StackPanel Margin="0,8,0,0" Visibility="{Binding ExampleResult, Converter={StaticResource NotNullToVisibilityConverter}}">
+                <TextBlock Text="Cost Breakdown" FontWeight="SemiBold" Foreground="{StaticResource HeadingForegroundBrush}" />
+                <ItemsControl ItemsSource="{Binding ExampleResult.Breakdown}" ItemTemplate="{StaticResource BreakdownRowTemplate}" />
+                <Border Margin="0,8,0,0" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="0,1,0,0" />
+                <DockPanel Style="{StaticResource BreakdownRowStyle}">
+                    <TextBlock DockPanel.Dock="Right" FontWeight="SemiBold" Text="{Binding ExampleResult.TotalCost, StringFormat='₱{0:N2}'}" />
+                    <TextBlock Text="Total cost" FontWeight="SemiBold" Foreground="{StaticResource HeadingForegroundBrush}" />
+                </DockPanel>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>
