@@ -52,7 +52,9 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
     {
         await using var dbContext = CreateDbContext();
         var ingredient = await dbContext.RawMaterials.SingleAsync(i => i.Id == ingredientId, Cancellation);
+        // No buffer, so recipes are costed with the cost itself.
         ingredient.CostPerBaseUnit = costPerGram;
+        ingredient.BufferedCostPerBaseUnit = costPerGram;
         await dbContext.SaveChangesAsync(Cancellation);
     }
 

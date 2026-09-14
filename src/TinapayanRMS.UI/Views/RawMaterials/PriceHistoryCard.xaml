@@ -1,0 +1,32 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.RawMaterials.PriceHistoryCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
+    <!-- The grid fills the card, which fills its tab -->
+    <Border Style="{StaticResource CardStyle}">
+        <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Text="Price History" Style="{StaticResource SectionHeaderStyle}" />
+            <syncfusion:ButtonAdv DockPanel.Dock="Bottom"
+                                  Label="Delete Price"
+                                  IconTemplate="{StaticResource DeleteIconTemplate}"
+                                  Command="{Binding DeletePriceCommand}"
+                                  HorizontalAlignment="Left"
+                                  Margin="0,12,0,0" />
+            <syncfusion:SfDataGrid ItemsSource="{Binding PriceHistory}"
+                                   SelectedItem="{Binding SelectedPriceRow, Mode=TwoWay}"
+                                   AutoGenerateColumns="False"
+                                   AllowEditing="False"
+                                   SelectionMode="Single"
+                                   NavigationMode="Row"
+                                   ColumnSizer="Star">
+                <syncfusion:SfDataGrid.Columns>
+                    <syncfusion:GridDateTimeColumn MappingName="Date" HeaderText="Date" />
+                    <syncfusion:GridTextColumn MappingName="UnitName" HeaderText="Unit" />
+                    <controls:NumericColumn MappingName="Price" HeaderText="Price" NumberDecimalDigits="2" />
+                    <controls:NumericColumn MappingName="CostPerBaseUnit" HeaderText="Cost / Base Unit" NumberDecimalDigits="4" />
+                </syncfusion:SfDataGrid.Columns>
+            </syncfusion:SfDataGrid>
+        </DockPanel>
+    </Border>
+</UserControl>

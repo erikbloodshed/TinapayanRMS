@@ -45,6 +45,20 @@ public class RawMaterial
     /// </summary>
     public decimal CostPerBaseUnit { get; set; }
 
+    /// <summary>
+    /// A cushion on top of the cost for price swings, waste and yield variation, at least 0 and at
+    /// most 100. Defaults to 0, which makes the buffered cost the same as the true cost.
+    /// </summary>
+    public decimal CostBufferPercent { get; set; }
+
+    /// <summary>
+    /// The cost of one base unit with the buffer on top: what recipes, sub-assemblies, packaging lines
+    /// and products are costed with, while <see cref="CostPerBaseUnit"/> stays the true cost. Stored
+    /// alongside it: for Purchased it's CostPerBaseUnit plus the buffer, for Made the BOM rollup of the
+    /// components' buffered costs plus its own buffer, so buffers stack up the BOM tree.
+    /// </summary>
+    public decimal BufferedCostPerBaseUnit { get; set; }
+
     /// <summary>The units it's bought or used in besides its base unit.</summary>
     public List<RawMaterialUnit> Units { get; set; } = [];
 }

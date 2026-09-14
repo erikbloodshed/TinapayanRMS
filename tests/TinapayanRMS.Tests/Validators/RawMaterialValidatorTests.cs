@@ -157,6 +157,39 @@ public class RawMaterialValidatorTests
             .Which.ErrorMessage.Should().Be("Base unit is required.");
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(101)]
+    public void Rejects_a_cost_buffer_outside_0_to_100_percent(decimal bufferPercent)
+    {
+        var result = _validator.Validate(new RawMaterial
+        {
+            Type = RawMaterialType.Ingredient,
+            Name = "Flour",
+            CategoryId = 1,
+            Source = RawMaterialSource.Purchased,
+            CostBufferPercent = bufferPercent,
+        });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle(e => e.PropertyName == nameof(RawMaterial.CostBufferPercent));
+    }
+
+    [Fact]
+    public void Accepts_a_cost_buffer_of_100_percent()
+    {
+        var result = _validator.Validate(new RawMaterial
+        {
+            Type = RawMaterialType.Ingredient,
+            Name = "Flour",
+            CategoryId = 1,
+            Source = RawMaterialSource.Purchased,
+            CostBufferPercent = 100m,
+        });
+
+        result.IsValid.Should().BeTrue();
+    }
+
     [Fact]
     public void Rejects_a_made_packaging_material()
     {

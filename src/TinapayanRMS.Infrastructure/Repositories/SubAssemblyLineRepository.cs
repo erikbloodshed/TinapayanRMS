@@ -34,7 +34,7 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
         var ingredientIds = lines.Select(l => l.IngredientId).ToList();
         var ingredients = await dbContext.RawMaterials
             .Where(m => ingredientIds.Contains(m.Id))
-            .Select(m => new { m.Id, m.Name, m.Type, m.CostPerBaseUnit })
+            .Select(m => new { m.Id, m.Name, m.Type, m.BufferedCostPerBaseUnit })
             .ToDictionaryAsync(m => m.Id, cancellationToken);
 
         foreach (var line in lines)
@@ -60,7 +60,7 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
             Grams = grams[i],
         }));
 
-        var costInputs = lines.Select((l, i) => (grams[i], IngredientCostPerGram: ingredients[l.IngredientId].CostPerBaseUnit)).ToList();
+        var costInputs = lines.Select((l, i) => (grams[i], IngredientCostPerGram: ingredients[l.IngredientId].BufferedCostPerBaseUnit)).ToList();
         (subAssembly.TotalWeight, subAssembly.TotalCost) = SubAssemblyRules.CalculateTotals(costInputs);
 
         await dbContext.SaveChangesAsync(cancellationToken);

@@ -24,8 +24,8 @@ public class SubAssemblyLineEdit(RawMaterial ingredient, RawMaterialUnitOption u
 
     public decimal Grams => UnitConversionRules.ToBaseQuantity(Quantity, Unit.Unit?.BaseUnitsPerUnit);
 
-    /// <summary>What this line adds to the sub-assembly's total cost, at the ingredient's current cost per gram.</summary>
-    public decimal Cost => Grams * Ingredient.CostPerBaseUnit;
+    /// <summary>What this line adds to the sub-assembly's total cost, at the ingredient's current buffered cost per gram.</summary>
+    public decimal Cost => Grams * Ingredient.BufferedCostPerBaseUnit;
 }
 
 public class SubAssembliesViewModel : ViewModelBase

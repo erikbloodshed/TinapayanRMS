@@ -48,15 +48,23 @@ public class IngredientCostPropagator(IDbContextFactory<TinapayanRMSDbContext> d
 
         if (order.Count > 0)
         {
+            // Two rollups over the same lines: the true cost from the components' true costs, and the
+            // buffered cost from their buffered costs with this ingredient's own buffer on top.
             foreach (var id in order)
             {
                 var ingredient = ingredients[id];
-                var lines = linesByIngredientId[id]
-                    .Select(l => (l.Grams, ComponentCostPerGram: ingredients[l.ComponentIngredientId].CostPerBaseUnit))
-                    .ToList();
+                var lines = linesByIngredientId[id].ToList();
+                var weightLossPercent = ingredient.WeightLossPercent ?? 0m;
 
-                var (_, costPerGram) = IngredientBomRules.CalculateCost(lines, ingredient.WeightLossPercent ?? 0m);
+                var (_, costPerGram) = IngredientBomRules.CalculateCost(
+                    [.. lines.Select(l => (l.Grams, ComponentCostPerGram: ingredients[l.ComponentIngredientId].CostPerBaseUnit))],
+                    weightLossPercent);
+                var (_, componentsBufferedCostPerGram) = IngredientBomRules.CalculateCost(
+                    [.. lines.Select(l => (l.Grams, ComponentCostPerGram: ingredients[l.ComponentIngredientId].BufferedCostPerBaseUnit))],
+                    weightLossPercent);
+
                 ingredient.CostPerBaseUnit = costPerGram;
+                ingredient.BufferedCostPerBaseUnit = RawMaterialRules.BufferedCost(componentsBufferedCostPerGram, ingredient.CostBufferPercent);
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);

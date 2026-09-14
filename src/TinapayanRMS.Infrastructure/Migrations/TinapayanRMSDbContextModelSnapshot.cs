@@ -231,8 +231,16 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Property<int?>("BaseUnitId")
                         .HasColumnType("int");
 
+                    b.Property<decimal>("BufferedCostPerBaseUnit")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<int>("CategoryId")
                         .HasColumnType("int");
+
+                    b.Property<decimal>("CostBufferPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<decimal>("CostPerBaseUnit")
                         .HasPrecision(18, 4)
@@ -269,6 +277,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.ToTable("RawMaterials", t =>
                         {
                             t.HasCheckConstraint("CK_RawMaterials_BaseUnitMatchesType", "([Type] = 'Ingredient' AND [BaseUnitId] IS NULL) OR ([Type] = 'Packaging' AND [BaseUnitId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_RawMaterials_CostBufferPercent", "[CostBufferPercent] >= 0 AND [CostBufferPercent] <= 100");
 
                             t.HasCheckConstraint("CK_RawMaterials_OnlyIngredientsAreMade", "[Type] = 'Ingredient' OR [Source] = 'Purchased'");
                         });

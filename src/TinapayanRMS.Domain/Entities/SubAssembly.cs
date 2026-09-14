@@ -19,6 +19,6 @@ public class SubAssembly
     /// <summary>Stored, not computed: the sum of its lines' Grams. Refreshed whenever its lines are saved.</summary>
     public decimal TotalWeight { get; set; }
 
-    /// <summary>Stored, not computed: the sum of (line Grams × that line's Ingredient.CostPerBaseUnit, its cost per gram). Refreshed whenever its lines are saved.</summary>
+    /// <summary>Stored, not computed: the sum of (line Grams × that line's Ingredient.BufferedCostPerBaseUnit, its buffered cost per gram). Refreshed whenever its lines are saved.</summary>
     public decimal TotalCost { get; set; }
 }

@@ -16,6 +16,8 @@ public class RawMaterialValidator : AbstractValidator<RawMaterial>
     {
         RuleFor(m => m.Name).NotEmpty().WithMessage("Name is required.");
         RuleFor(m => m.CategoryId).GreaterThan(0).WithMessage("Category is required.");
+        RuleFor(m => m.CostBufferPercent)
+            .GreaterThanOrEqualTo(0m).LessThanOrEqualTo(100m).WithMessage("Cost buffer must be at least 0 and at most 100 percent.");
 
         When(m => m.Type == RawMaterialType.Ingredient, () =>
         {

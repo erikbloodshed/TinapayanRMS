@@ -1,0 +1,62 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.RawMaterials.MaterialListCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:converters="clr-namespace:TinapayanRMS.UI.Converters"
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
+    <UserControl.Resources>
+        <converters:RawMaterialGroupConverter x:Key="RawMaterialGroupConverter" />
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource CardStyle}">
+        <DockPanel>
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                <syncfusion:SfTextBoxExt DockPanel.Dock="Right"
+                                         Width="190"
+                                         Watermark="Search raw material"
+                                         WatermarkTemplate="{StaticResource AlignedWatermarkTemplate}"
+                                         Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Text="Raw Materials"
+                           Style="{StaticResource SectionHeaderStyle}"
+                           Margin="0"
+                           VerticalAlignment="Center" />
+            </DockPanel>
+
+            <!--
+                Grouped by type into collapsible Ingredients and Packaging sections, so the type
+                needs no column of its own: the Type column is only what the grouping keys on.
+                Sorted by name in the grid itself: a grouped grid places rows that arrive after
+                the first load (a refresh replacing a changed row) by its own sort, not by the
+                bound collection's order, so without one the order drifted between runs.
+                AllowDataShaping makes that sort apply to rows added or replaced while the app
+                runs too; by default the grid appended them to the end of their group.
+            -->
+            <syncfusion:SfDataGrid ItemsSource="{Binding VisibleRawMaterials}"
+                                   SelectedItem="{Binding SelectedRawMaterial, Mode=TwoWay}"
+                                   AutoGenerateColumns="False"
+                                   AllowEditing="False"
+                                   SelectionMode="Single"
+                                   NavigationMode="Row"
+                                   ColumnSizer="Star"
+                                   LiveDataUpdateMode="AllowDataShaping"
+                                   AutoExpandGroups="True"
+                                   ShowColumnWhenGrouped="False"
+                                   GroupCaptionTextFormat="{}{Key} ({ItemsCount})">
+                <syncfusion:SfDataGrid.GroupColumnDescriptions>
+                    <syncfusion:GroupColumnDescription ColumnName="Type" Converter="{StaticResource RawMaterialGroupConverter}" />
+                </syncfusion:SfDataGrid.GroupColumnDescriptions>
+                <syncfusion:SfDataGrid.SortColumnDescriptions>
+                    <syncfusion:SortColumnDescription ColumnName="Name" SortDirection="Ascending" />
+                </syncfusion:SfDataGrid.SortColumnDescriptions>
+                <syncfusion:SfDataGrid.Columns>
+                    <!-- Name and Category share what the two costs leave. -->
+                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
+                    <syncfusion:GridTextColumn MappingName="Type" HeaderText="Type" />
+                    <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" />
+                    <controls:NumericColumn MappingName="CostPerBaseUnit" HeaderText="Cost" Width="96" NumberDecimalDigits="4" />
+                    <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Buffered" Width="96" NumberDecimalDigits="4" />
+                </syncfusion:SfDataGrid.Columns>
+            </syncfusion:SfDataGrid>
+        </DockPanel>
+    </Border>
+</UserControl>

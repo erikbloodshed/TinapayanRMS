@@ -8,14 +8,11 @@
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="1400">
     <Grid Background="{StaticResource PageBackgroundBrush}" Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
 
-        <controls:StatusBanner Grid.Row="0" Margin="0,0,0,12" />
+        <!-- ErrorMessage as a toast, over the cards: it spans the whole Grid and puts itself in its bottom-right corner -->
+        <controls:ErrorToast />
 
-        <Grid Grid.Row="1">
+        <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="300" />
                 <ColumnDefinition Width="16" />

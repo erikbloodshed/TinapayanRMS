@@ -68,6 +68,7 @@ public class RawMaterialRepository(
                 Source = material.Source,
                 WeightLossPercent = material.WeightLossPercent,
                 BaseUnitId = material.BaseUnitId,
+                CostBufferPercent = material.CostBufferPercent,
             };
 
             if (fields.Id == 0)
@@ -122,6 +123,7 @@ public class RawMaterialRepository(
     {
         RawMaterialRules.EnsureFieldsMatchType(material);
         RawMaterialRules.EnsureFieldsMatchSource(material);
+        RawMaterialRules.EnsureValidCostBuffer(material.CostBufferPercent);
 
         dbContext.RawMaterials.Add(material);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -129,12 +131,14 @@ public class RawMaterialRepository(
 
     /// <summary>
     /// Copies the form's fields onto the stored material and saves it. Returns whether the caller must
-    /// cascade its cost: a made ingredient's weight loss percent may have just changed.
+    /// cascade its cost: a made ingredient's weight loss percent or an ingredient's buffer may have
+    /// just changed.
     /// </summary>
     internal static async Task<bool> UpdateAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
     {
         RawMaterialRules.EnsureFieldsMatchType(material);
         RawMaterialRules.EnsureFieldsMatchSource(material);
+        RawMaterialRules.EnsureValidCostBuffer(material.CostBufferPercent);
 
         var existing = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == material.Id, cancellationToken)
             ?? throw new InvalidOperationException($"Raw material {material.Id} does not exist.");
@@ -151,17 +155,29 @@ public class RawMaterialRepository(
                 hasLines: await dbContext.PackagingLines.AnyAsync(l => l.PackagingMaterialId == existing.Id, cancellationToken));
         }
 
-        // Field by field, not a blind Update(): CostPerBaseUnit is owned by the price-history and
-        // BOM rollups, and the units by RawMaterialUnitRepository, not by this form.
+        // Field by field, not a blind Update(): CostPerBaseUnit and BufferedCostPerBaseUnit are owned
+        // by the price-history and BOM rollups, and the units by RawMaterialUnitRepository, not by this form.
         existing.Name = material.Name;
         existing.CategoryId = material.CategoryId;
         existing.WeightLossPercent = material.WeightLossPercent;
         existing.BaseUnitId = material.BaseUnitId;
 
+        // A purchased material's buffered cost follows its buffer here; a made one's is a BOM rollup,
+        // which the cascade redoes.
+        var bufferChanged = existing.CostBufferPercent != material.CostBufferPercent;
+        existing.CostBufferPercent = material.CostBufferPercent;
+        if (bufferChanged && existing.Source == RawMaterialSource.Purchased)
+        {
+            existing.BufferedCostPerBaseUnit = RawMaterialRules.BufferedCost(existing.CostPerBaseUnit, existing.CostBufferPercent);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // WeightLossPercent may have just changed; the cascade recomputes the cost from its current BOM.
-        return existing.Source == RawMaterialSource.Made;
+        // A new buffer on an ingredient reaches the made ingredients and sub-assemblies using it; a
+        // packaging material's needs nothing, since products cost their packaging lines on read.
+        return existing.Source == RawMaterialSource.Made
+            || (bufferChanged && existing.Type == RawMaterialType.Ingredient);
     }
 
     /// <summary>

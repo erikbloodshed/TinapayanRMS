@@ -12,6 +12,6 @@ public partial class RawMaterialsView : UserControl
         viewModel.RegisterNativeMessageBoxHandler();
 
         // New clears the form; put the cursor in Name so typing can start straight away.
-        viewModel.NewCommand.Subscribe(_ => NameTextBox.Focus());
+        viewModel.NewCommand.Subscribe(_ => SummaryHeader.FocusName());
     }
 }

@@ -33,9 +33,10 @@ public class RawMaterialConfiguration : IEntityTypeConfiguration<RawMaterial>
             .HasForeignKey(m => m.BaseUnitId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Backstops for RawMaterialRules.EnsureFieldsMatchType, which the repository checks first
-        // with a friendlier message: an ingredient's base unit is the gram (no row), a packaging
-        // material has one of its own, and only an ingredient can be made.
+        // Backstops for RawMaterialRules.EnsureFieldsMatchType and EnsureValidCostBuffer, which the
+        // repository checks first with a friendlier message: an ingredient's base unit is the gram
+        // (no row), a packaging material has one of its own, only an ingredient can be made, and a
+        // cost buffer is 0 to 100 percent.
         builder.ToTable(table =>
         {
             table.HasCheckConstraint(
@@ -44,6 +45,9 @@ public class RawMaterialConfiguration : IEntityTypeConfiguration<RawMaterial>
             table.HasCheckConstraint(
                 "CK_RawMaterials_OnlyIngredientsAreMade",
                 "[Type] = 'Ingredient' OR [Source] = 'Purchased'");
+            table.HasCheckConstraint(
+                "CK_RawMaterials_CostBufferPercent",
+                "[CostBufferPercent] >= 0 AND [CostBufferPercent] <= 100");
         });
     }
 }

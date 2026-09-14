@@ -8,20 +8,17 @@
              mc:Ignorable="d"
              d:DesignHeight="550" d:DesignWidth="1000">
     <Grid Background="{StaticResource PageBackgroundBrush}" Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="16" />
             <ColumnDefinition Width="320" />
         </Grid.ColumnDefinitions>
 
-        <controls:StatusBanner Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,0,0,12" />
+        <!-- ErrorMessage as a toast, over the cards: it spans the whole Grid and puts itself in its bottom-right corner -->
+        <controls:ErrorToast Grid.ColumnSpan="3" />
 
         <!-- Units list -->
-        <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource CardStyle}">
+        <Border Grid.Column="0" Style="{StaticResource CardStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -47,7 +44,7 @@
         </Border>
 
         <!-- Details -->
-        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource CardStyle}" VerticalAlignment="Top">
+        <Border Grid.Column="2" Style="{StaticResource CardStyle}" VerticalAlignment="Top">
             <StackPanel>
                 <TextBlock Text="{Binding FormTitle}" Style="{StaticResource SectionHeaderStyle}" />
 

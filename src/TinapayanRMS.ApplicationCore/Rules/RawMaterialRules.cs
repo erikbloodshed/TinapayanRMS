@@ -101,15 +101,36 @@ public static class RawMaterialRules
     /// <summary>
     /// Recomputes CostPerBaseUnit from the latest price history entry: its price divided by the
     /// base units in the unit it was priced in (<paramref name="baseUnitsPerUnit"/>, null for a price
-    /// per base unit). No entry (<paramref name="latestPrice"/> null) reverts the material to
-    /// unpriced. Call after every add/update/delete of a price entry, and after the latest entry's
-    /// unit changes its multiplier.
+    /// per base unit), and BufferedCostPerBaseUnit from that with the material's buffer. No entry
+    /// (<paramref name="latestPrice"/> null) reverts the material to unpriced. Call after every
+    /// add/update/delete of a price entry, and after the latest entry's unit changes its multiplier.
     /// </summary>
     public static void ApplyLatestPrice(RawMaterial material, decimal? latestPrice, decimal? baseUnitsPerUnit)
     {
         material.CostPerBaseUnit = latestPrice is { } price
             ? UnitConversionRules.CostPerBaseUnit(price, baseUnitsPerUnit)
             : 0m;
+        material.BufferedCostPerBaseUnit = BufferedCost(material.CostPerBaseUnit, material.CostBufferPercent);
+    }
+
+    /// <summary>A cost with a buffer on top: ₱0.05 with a 5% buffer is ₱0.0525.</summary>
+    public static decimal BufferedCost(decimal cost, decimal bufferPercent) =>
+        cost * (1 + bufferPercent / 100m);
+
+    /// <summary>
+    /// BufferedCost the other way round: the buffer that takes <paramref name="cost"/> to
+    /// <paramref name="bufferedCost"/>. ₱930 buffered to ₱976.50 is a 5% buffer. The cost must be above 0.
+    /// </summary>
+    public static decimal CostBufferPercentOf(decimal cost, decimal bufferedCost) =>
+        (bufferedCost / cost - 1) * 100m;
+
+    /// <summary>A cost buffer is at least 0% (none) and at most 100% (double the cost).</summary>
+    public static void EnsureValidCostBuffer(decimal bufferPercent)
+    {
+        if (bufferPercent is < 0 or > 100)
+        {
+            throw new InvalidOperationException("Cost buffer must be at least 0 and at most 100 percent.");
+        }
     }
 
     /// <summary>

@@ -186,11 +186,81 @@ public class RawMaterialRulesTests
     [Fact]
     public void ApplyLatestPrice_with_no_price_zeroes_the_cost()
     {
-        var ingredient = new RawMaterial { Source = RawMaterialSource.Purchased, CostPerBaseUnit = 0.036m };
+        var ingredient = new RawMaterial { Source = RawMaterialSource.Purchased, CostPerBaseUnit = 0.036m, BufferedCostPerBaseUnit = 0.036m };
 
         RawMaterialRules.ApplyLatestPrice(ingredient, latestPrice: null, baseUnitsPerUnit: null);
 
         ingredient.CostPerBaseUnit.Should().Be(0m);
+        ingredient.BufferedCostPerBaseUnit.Should().Be(0m);
+    }
+
+    [Fact]
+    public void ApplyLatestPrice_puts_the_materials_buffer_on_top_of_the_buffered_cost()
+    {
+        var flour = new RawMaterial { Source = RawMaterialSource.Purchased, CostBufferPercent = 5m };
+
+        RawMaterialRules.ApplyLatestPrice(flour, latestPrice: 1250m, baseUnitsPerUnit: 25000m); // ₱1,250 a 25 kg bag
+
+        flour.CostPerBaseUnit.Should().Be(0.05m);
+        flour.BufferedCostPerBaseUnit.Should().Be(0.0525m);
+    }
+
+    [Fact]
+    public void ApplyLatestPrice_with_no_buffer_makes_the_buffered_cost_the_cost()
+    {
+        var sugar = new RawMaterial { Source = RawMaterialSource.Purchased };
+
+        RawMaterialRules.ApplyLatestPrice(sugar, latestPrice: 900m, baseUnitsPerUnit: 25000m);
+
+        sugar.BufferedCostPerBaseUnit.Should().Be(sugar.CostPerBaseUnit);
+    }
+
+    [Theory]
+    [InlineData(10, 0, 10)]
+    [InlineData(10, 5, 10.5)]
+    [InlineData(0.05, 5, 0.0525)]
+    [InlineData(10, 100, 20)]
+    public void BufferedCost_adds_the_buffer_percent_to_the_cost(decimal cost, decimal bufferPercent, decimal expected)
+    {
+        RawMaterialRules.BufferedCost(cost, bufferPercent).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(930, 976.5, 5)]
+    [InlineData(930, 930, 0)]
+    [InlineData(10, 20, 100)]
+    public void CostBufferPercentOf_works_out_the_buffer_from_the_buffered_cost(decimal cost, decimal bufferedCost, decimal expected)
+    {
+        RawMaterialRules.CostBufferPercentOf(cost, bufferedCost).Should().Be(expected);
+    }
+
+    [Fact]
+    public void CostBufferPercentOf_undoes_BufferedCost()
+    {
+        var buffered = RawMaterialRules.BufferedCost(1250m, 7.5m);
+
+        RawMaterialRules.CostBufferPercentOf(1250m, buffered).Should().Be(7.5m);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    [InlineData(100)]
+    public void EnsureValidCostBuffer_accepts_0_to_100_percent(decimal bufferPercent)
+    {
+        var act = () => RawMaterialRules.EnsureValidCostBuffer(bufferPercent);
+
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(100.01)]
+    public void EnsureValidCostBuffer_rejects_a_buffer_outside_0_to_100_percent(decimal bufferPercent)
+    {
+        var act = () => RawMaterialRules.EnsureValidCostBuffer(bufferPercent);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("Cost buffer*");
     }
 
     [Fact]

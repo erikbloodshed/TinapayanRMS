@@ -61,8 +61,15 @@ public sealed class RawMaterialPriceRow(RawMaterialPriceHistory entry, string ba
     public decimal CostPerBaseUnit => UnitConversionRules.CostPerBaseUnit(Entry.Price, Entry.Unit?.BaseUnitsPerUnit);
 }
 
-/// <summary>What the Usage Example worked out.</summary>
-public sealed record UsageExampleResult(string Title, decimal QuantityInBaseUnits, string BaseUnitAbbreviation, decimal CostPerBaseUnit, decimal TotalCost);
+/// <summary>What the Usage Example worked out: the calculated (true) cost, and that with the material's buffer on top.</summary>
+public sealed record UsageExampleResult(
+    string Title,
+    decimal QuantityInBaseUnits,
+    string BaseUnitAbbreviation,
+    decimal CostPerBaseUnit,
+    decimal TotalCost,
+    decimal BufferPercent,
+    decimal BufferedTotalCost);
 
 /// <summary>
 /// The Raw Materials screen: ingredients and packaging in one list. A material's type decides which
@@ -166,6 +173,14 @@ public class RawMaterialsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingWeightLossPercent, value);
     }
 
+    /// <summary>The material's cost buffer; empty saves as 0%, since the box shows 0.00 when cleared.</summary>
+    private decimal? _editingCostBufferPercent = 0m;
+    public decimal? EditingCostBufferPercent
+    {
+        get => _editingCostBufferPercent;
+        set => this.RaiseAndSetIfChanged(ref _editingCostBufferPercent, value);
+    }
+
     /// <summary>Packaging only; an ingredient's base unit is always the gram.</summary>
     private UnitOfMeasure? _editingBaseUnit;
     public UnitOfMeasure? EditingBaseUnit
@@ -238,8 +253,12 @@ public class RawMaterialsViewModel : ViewModelBase
     public string BaseUnitAbbreviation => _baseUnitAbbreviation.Value;
 
     private readonly ObservableAsPropertyHelper<string> _currentCostText;
-    /// <summary>E.g. "₱0.0372 / g", or "—" for a material not saved yet.</summary>
+    /// <summary>E.g. "₱0.0372", or "—" for a material not saved yet.</summary>
     public string CurrentCostText => _currentCostText.Value;
+
+    private readonly ObservableAsPropertyHelper<string> _bufferedCostText;
+    /// <summary>The saved cost with the buffer on top, e.g. "₱0.0391", or "—" for a material not saved yet.</summary>
+    public string BufferedCostText => _bufferedCostText.Value;
 
     /// <summary>The latest price's date, or "—" for an unpriced or made material.</summary>
     private string _lastUpdatedText = "—";
@@ -349,9 +368,31 @@ public class RawMaterialsViewModel : ViewModelBase
     /// </summary>
     private bool _syncingPurchaseSetup;
 
+    /// <summary>
+    /// EditingPrice with EditingCostBufferPercent on top: ₱930 at 5% is ₱976.50. Typing it works out the
+    /// buffer percent instead, which is what's saved; a new price keeps the percent and moves this.
+    /// </summary>
+    private decimal? _editingBufferedPrice;
+    public decimal? EditingBufferedPrice
+    {
+        get => _editingBufferedPrice;
+        set => this.RaiseAndSetIfChanged(ref _editingBufferedPrice, value);
+    }
+
+    private readonly ObservableAsPropertyHelper<bool> _isBufferedPriceReadOnly;
+    /// <summary>Read-only until there's a price, since the buffer percent is worked out from it.</summary>
+    public bool IsBufferedPriceReadOnly => _isBufferedPriceReadOnly.Value;
+
+    /// <summary>Set while the buffer percent or the buffered price follows the other, so that isn't taken as the user's own edit.</summary>
+    private bool _syncingCostBuffer;
+
     private readonly ObservableAsPropertyHelper<string> _purchaseCostText;
-    /// <summary>What EditingPrice comes to per base unit, recalculated as it's typed, e.g. "₱0.0372 / g".</summary>
+    /// <summary>What EditingPrice comes to per base unit, recalculated as it's typed, e.g. "₱0.0372".</summary>
     public string PurchaseCostText => _purchaseCostText.Value;
+
+    private readonly ObservableAsPropertyHelper<string> _purchaseBufferedCostText;
+    /// <summary>PurchaseCostText with EditingCostBufferPercent on top, e.g. "Buffered (5%): ₱0.0391", or empty while unpriced.</summary>
+    public string PurchaseBufferedCostText => _purchaseBufferedCostText.Value;
 
     // Usage Example.
     private RawMaterial? _exampleRawMaterial;
@@ -529,18 +570,47 @@ public class RawMaterialsViewModel : ViewModelBase
             .ToProperty(this, x => x.BaseUnitAbbreviation, "g");
 
         _currentCostText = this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Select(material => material is null ? "—" : $"₱{material.CostPerBaseUnit:N4} / {BaseUnitText.AbbreviationOf(material)}")
+            .Select(material => material is null ? "—" : $"₱{material.CostPerBaseUnit:N4}")
             .ToProperty(this, x => x.CurrentCostText, "—");
 
-        _purchaseCostText = this.WhenAnyValue(x => x.EditingPrice, x => x.EditingPurchaseQuantity, x => x.BaseUnitAbbreviation, (price, quantity, abbreviation) =>
+        _bufferedCostText = this.WhenAnyValue(x => x.SelectedRawMaterial)
+            .Select(material => material is null ? "—" : $"₱{material.BufferedCostPerBaseUnit:N4}")
+            .ToProperty(this, x => x.BufferedCostText, "—");
+
+        _purchaseCostText = this.WhenAnyValue(x => x.EditingPrice, x => x.EditingPurchaseQuantity, (price, quantity) =>
                 price is > 0 && quantity is > 0
-                    ? $"₱{UnitConversionRules.CostPerBaseUnit(price.Value, quantity):N4} / {abbreviation}"
+                    ? $"₱{UnitConversionRules.CostPerBaseUnit(price.Value, quantity):N4}"
                     : "—")
             .ToProperty(this, x => x.PurchaseCostText, "—");
+
+        _purchaseBufferedCostText = this.WhenAnyValue(x => x.EditingPrice, x => x.EditingPurchaseQuantity, x => x.EditingCostBufferPercent,
+                (price, quantity, buffer) =>
+                    price is > 0 && quantity is > 0
+                        ? $"Buffered ({buffer ?? 0m:0.##}%): ₱{RawMaterialRules.BufferedCost(UnitConversionRules.CostPerBaseUnit(price.Value, quantity), buffer ?? 0m):N4}"
+                        : string.Empty)
+            .ToProperty(this, x => x.PurchaseBufferedCostText, string.Empty);
 
         _isPurchaseQuantityReadOnly = this.WhenAnyValue(x => x.EditingPurchaseUnit)
             .Select(option => option?.Unit is not { Id: 0 })
             .ToProperty(this, x => x.IsPurchaseQuantityReadOnly, true);
+
+        _isBufferedPriceReadOnly = this.WhenAnyValue(x => x.EditingPrice)
+            .Select(price => price is not > 0)
+            .ToProperty(this, x => x.IsBufferedPriceReadOnly, true);
+
+        // The buffer percent and the buffered price follow each other: typing either works out the
+        // other from the price. The percent is what's saved, so a new price keeps it and moves the
+        // buffered price. Loading a material sets the percent and price, so this runs then too.
+        this.WhenAnyValue(x => x.EditingPrice, x => x.EditingCostBufferPercent)
+            .Where(_ => !_syncingCostBuffer)
+            .Subscribe(values => SyncCostBuffer(() => EditingBufferedPrice = values.Item1 is { } price && price > 0
+                ? Math.Round(RawMaterialRules.BufferedCost(price, values.Item2 ?? 0m), 2)
+                : null));
+
+        this.WhenAnyValue(x => x.EditingBufferedPrice)
+            .Where(bufferedPrice => !_syncingCostBuffer && bufferedPrice is not null && EditingPrice is > 0)
+            .Subscribe(bufferedPrice => SyncCostBuffer(() =>
+                EditingCostBufferPercent = Math.Round(RawMaterialRules.CostBufferPercentOf(EditingPrice!.Value, bufferedPrice!.Value), 4)));
 
         // Picking a unit the material doesn't have yet adds it as an alternative unit; picking any other
         // takes back one added that way, so browsing the picker leaves nothing behind.
@@ -705,6 +775,7 @@ public class RawMaterialsViewModel : ViewModelBase
             EditingCategory = Categories.FirstOrDefault();
             EditingSource = RawMaterialSource.Purchased;
             EditingWeightLossPercent = null;
+            EditingCostBufferPercent = 0m;
             EditingBaseUnit = null;
             ClearDetails();
         });
@@ -729,6 +800,8 @@ public class RawMaterialsViewModel : ViewModelBase
                 // A cleared box shows 0.00, so it saves as 0%.
                 WeightLossPercent = source == RawMaterialSource.Made ? EditingWeightLossPercent ?? 0m : null,
                 BaseUnitId = type == RawMaterialType.Packaging ? EditingBaseUnit?.Id : null,
+                // A cleared box shows 0.00 too.
+                CostBufferPercent = EditingCostBufferPercent ?? 0m,
             };
 
             var validation = _rawMaterialValidator.Validate(material);
@@ -845,7 +918,9 @@ public class RawMaterialsViewModel : ViewModelBase
                     baseQuantity,
                     BaseUnitText.AbbreviationOf(material),
                     material.CostPerBaseUnit,
-                    baseQuantity * material.CostPerBaseUnit);
+                    baseQuantity * material.CostPerBaseUnit,
+                    material.CostBufferPercent,
+                    baseQuantity * material.BufferedCostPerBaseUnit);
             },
             this.WhenAnyValue(x => x.ExampleRawMaterial, x => x.ExampleUnit, x => x.ExampleQuantity,
                 (material, unit, quantity) => material is not null && unit is not null && quantity > 0));
@@ -872,6 +947,20 @@ public class RawMaterialsViewModel : ViewModelBase
             this.WhenAnyValue(x => x.SelectedBomLineEdit).Select(line => line is not null));
     }
 
+    /// <summary>Sets the buffer percent or the buffered price from the other without that setting the first one back.</summary>
+    private void SyncCostBuffer(Action set)
+    {
+        _syncingCostBuffer = true;
+        try
+        {
+            set();
+        }
+        finally
+        {
+            _syncingCostBuffer = false;
+        }
+    }
+
     private void LoadIntoForm(RawMaterial material)
     {
         _editingId = material.Id;
@@ -881,6 +970,7 @@ public class RawMaterialsViewModel : ViewModelBase
         EditingCategory = Categories.FirstOrDefault(c => c.Id == material.CategoryId);
         EditingSource = material.Source;
         EditingWeightLossPercent = material.WeightLossPercent;
+        EditingCostBufferPercent = material.CostBufferPercent;
         EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId);
     }
 

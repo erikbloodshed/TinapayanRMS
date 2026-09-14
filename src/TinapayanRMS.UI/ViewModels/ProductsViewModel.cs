@@ -46,7 +46,7 @@ public class PackagingLineEdit(RawMaterial packagingMaterial, RawMaterialUnitOpt
     public decimal PiecesPerPackagingUnit => Reciprocal.PiecesPerPackagingUnit;
 
     public decimal CostPerPiece => ProductRules.CalculatePackagingLineCostPerPiece(
-        PackagingMaterial.CostPerBaseUnit, QtyPerPiece, Unit.Unit?.BaseUnitsPerUnit);
+        PackagingMaterial.BufferedCostPerBaseUnit, QtyPerPiece, Unit.Unit?.BaseUnitsPerUnit);
 }
 
 /// <summary>A row in the Tab Links grid: a link plus the display name of the role it's for (or "Packaging").</summary>

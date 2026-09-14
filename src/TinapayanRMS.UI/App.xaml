@@ -6,7 +6,6 @@
     <Application.Resources>
         <sys:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <converters:EmptyStateVisibilityConverter x:Key="EmptyStateVisibilityConverter" />
-        <converters:CostPerBaseUnitConverter x:Key="CostPerBaseUnitConverter" />
         <converters:NotNullToVisibilityConverter x:Key="NotNullToVisibilityConverter" />
 
         <!--
@@ -80,7 +79,9 @@
         <SolidColorBrush x:Key="SuccessBackgroundBrush" Color="#ECFDF5" />
         <SolidColorBrush x:Key="SuccessForegroundBrush" Color="#047857" />
 
+        <!-- The error toast (Controls/ErrorToast) -->
         <SolidColorBrush x:Key="ErrorBackgroundBrush" Color="#FEF2F2" />
+        <SolidColorBrush x:Key="ErrorBorderBrush" Color="#F87171" />
         <SolidColorBrush x:Key="ErrorForegroundBrush" Color="#B91C1C" />
         <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#FFFBEB" />
         <SolidColorBrush x:Key="WarningForegroundBrush" Color="#92400E" />
@@ -115,18 +116,17 @@
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
 
+        <!-- A card's caption under its section header, with room before the card's first field. -->
+        <Style x:Key="CardCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionStyle}">
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
         <Style x:Key="EmptyStateStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-
-        <Style x:Key="ErrorBannerStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource ErrorBackgroundBrush}" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="10,8" />
         </Style>
 
         <Style x:Key="WarningBannerStyle" TargetType="Border">

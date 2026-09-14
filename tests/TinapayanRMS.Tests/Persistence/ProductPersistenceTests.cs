@@ -56,6 +56,8 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
             BaseUnitId = standardUnitId,
             // Priced as currentCost per purchaseUnitQty base units, as these tests were written.
             CostPerBaseUnit = currentCost / purchaseUnitQty,
+            // No buffer, so products are costed with the cost itself.
+            BufferedCostPerBaseUnit = currentCost / purchaseUnitQty,
         };
         dbContext.RawMaterials.Add(material);
         await dbContext.SaveChangesAsync(Cancellation);
