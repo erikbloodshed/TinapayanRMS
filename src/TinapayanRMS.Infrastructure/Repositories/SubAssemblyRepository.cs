@@ -31,7 +31,8 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             .Include(s => s.Role)
             .Include(s => s.OwnerProduct)
             .Where(s => s.TotalWeight > 0)
-            .OrderBy(s => s.Name)
+            .OrderBy(s => s.OwnerProductId != null)
+            .ThenBy(s => s.Name)
             .ThenBy(s => s.OwnerProduct!.Name)
             .ToListAsync(cancellationToken);
     }
@@ -40,6 +41,96 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         return await GetLinkedByAsync(dbContext, u => u.SubAssembly!.OwnerProductId == ownerProductId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SubAssembly>> GetStandaloneAsync(CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await dbContext.SubAssemblies
+            .AsNoTracking()
+            .Include(s => s.Role)
+            .Where(s => s.OwnerProductId == null)
+            .OrderBy(s => s.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetStandaloneLinkedByAsync(CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await GetLinkedByAsync(dbContext, u => u.SubAssembly!.OwnerProductId == null, cancellationToken);
+    }
+
+    public async Task<int> SaveStandaloneAsync(SubAssembly subAssembly, IReadOnlyList<(int IngredientId, decimal Grams)> lines, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var name = subAssembly.Name.Trim();
+        if (name.Length == 0)
+        {
+            throw new InvalidOperationException("Every sub-assembly needs a name.");
+        }
+
+        var roleExists = await dbContext.SubAssemblyRoles.AnyAsync(r => r.Id == subAssembly.RoleId, cancellationToken);
+        if (!roleExists)
+        {
+            throw new InvalidOperationException("Every sub-assembly needs a role, and that role must still exist.");
+        }
+
+        var otherNames = await dbContext.SubAssemblies
+            .Where(s => s.OwnerProductId == null && s.Id != subAssembly.Id)
+            .Select(s => s.Name)
+            .ToListAsync(cancellationToken);
+        SubAssemblyRules.EnsureStandaloneNameAvailable(name, otherNames);
+
+        // The caller's entity is never attached, so a rolled-back save leaves no id on it.
+        SubAssembly stored;
+        if (subAssembly.Id == 0)
+        {
+            stored = new SubAssembly { Name = name, RoleId = subAssembly.RoleId };
+            dbContext.SubAssemblies.Add(stored);
+        }
+        else
+        {
+            stored = await dbContext.SubAssemblies.FirstOrDefaultAsync(s => s.Id == subAssembly.Id, cancellationToken)
+                ?? throw new InvalidOperationException($"Sub-assembly {subAssembly.Id} does not exist.");
+            if (stored.OwnerProductId is not null)
+            {
+                throw new InvalidOperationException($"{stored.Name} belongs to a product. Change it in that product's recipe.");
+            }
+
+            stored.Name = name;
+            stored.RoleId = subAssembly.RoleId;
+        }
+
+        // Saved here so a new one has its id for its lines; SetLinesAsync checks them all before replacing any.
+        SubAssemblyRules.EnsureValidLines(lines);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await SubAssemblyLineRepository.SetLinesAsync(dbContext, stored, lines, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return stored.Id;
+    }
+
+    public async Task DeleteStandaloneAsync(int id, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var ownerProductId = await dbContext.SubAssemblies
+            .Where(s => s.Id == id)
+            .Select(s => new { s.OwnerProductId })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new InvalidOperationException($"Sub-assembly {id} does not exist.");
+        if (ownerProductId.OwnerProductId is not null)
+        {
+            throw new InvalidOperationException("That sub-assembly belongs to a product. Remove it from that product's recipe instead.");
+        }
+
+        // Every product using a standalone sub-assembly links it.
+        await EnsureNoneLinkedElsewhereAsync(dbContext, u => u.SubAssemblyId == id, cancellationToken);
+
+        // Its lines go with it (Cascade).
+        await dbContext.SubAssemblies.Where(s => s.Id == id).ExecuteDeleteAsync(cancellationToken);
     }
 
     /// <summary>

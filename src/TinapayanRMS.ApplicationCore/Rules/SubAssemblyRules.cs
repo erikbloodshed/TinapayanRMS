@@ -50,6 +50,19 @@ public static class SubAssemblyRules
     }
 
     /// <summary>
+    /// A standalone sub-assembly needs a name no other standalone one has (case- and space-insensitively):
+    /// products pick them by name. <paramref name="otherStandaloneNames"/> leaves out the one being saved.
+    /// </summary>
+    public static void EnsureStandaloneNameAvailable(string name, IReadOnlyCollection<string> otherStandaloneNames)
+    {
+        var trimmed = name.Trim();
+        if (otherStandaloneNames.Any(n => string.Equals(n.Trim(), trimmed, StringComparison.CurrentCultureIgnoreCase)))
+        {
+            throw new InvalidOperationException($"There's already a standalone sub-assembly named '{trimmed}'. Give this one its own name.");
+        }
+    }
+
+    /// <summary>
     /// <paramref name="name"/> if the product has no sub-assembly by that name yet, otherwise the first
     /// free one of "name (copy)", "name (copy 2)", … — for a copy that would otherwise clash.
     /// </summary>

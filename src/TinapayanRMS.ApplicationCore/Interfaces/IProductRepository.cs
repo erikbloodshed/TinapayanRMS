@@ -15,7 +15,7 @@ public sealed record OwnedSubAssemblyDraft(
     UsageAuthoredField AuthoredField,
     decimal AuthoredValue);
 
-/// <summary>Another product's sub-assembly the product links, at the product's own piece size.</summary>
+/// <summary>A sub-assembly the product links (another product's, or a standalone one), at the product's own piece size.</summary>
 public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField AuthoredField, decimal AuthoredValue);
 
 /// <summary>

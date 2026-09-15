@@ -4,7 +4,7 @@
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
     <StackPanel>
         <TextBlock Text="Clone This Product" Style="{StaticResource PanelHeaderStyle}" />
-        <TextBlock Text="Makes an independent copy of the product as saved: its own copy of every sub-assembly (linked ones too), its packaging, costing and description. The copy links nothing. Unsaved changes aren't copied."
+        <TextBlock Text="Makes a copy of the product as saved: its own copy of every sub-assembly (another product's too), its packaging, costing and description. Standalone sub-assemblies from the Sub-Assemblies screen stay linked. Unsaved changes aren't copied."
                    Style="{StaticResource PanelCaptionStyle}" />
 
         <TextBlock Text="New Product Name" Style="{StaticResource FieldLabelStyle}" />

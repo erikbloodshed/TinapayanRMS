@@ -41,6 +41,7 @@ public class CompositionRootTests
 
         // Building each one checks that everything its constructor asks for is registered.
         host.Services.GetRequiredService<RawMaterialsViewModel>().Should().NotBeNull();
+        host.Services.GetRequiredService<SubAssembliesViewModel>().Should().NotBeNull();
         host.Services.GetRequiredService<ProductsViewModel>().Should().NotBeNull();
         host.Services.GetRequiredService<ReportsViewModel>().Should().NotBeNull();
         host.Services.GetRequiredService<UnitsOfMeasureViewModel>().Should().NotBeNull();

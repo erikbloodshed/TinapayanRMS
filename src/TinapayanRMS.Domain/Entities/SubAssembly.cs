@@ -1,14 +1,18 @@
 namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>
-/// An in-house recipe (dough, a filling, a topping, …), made inside the product that owns it. Other
-/// products can use it too: a ProductSubAssemblyUsage of another product's sub-assembly is a link.
+/// An in-house recipe (dough, a filling, a topping, …), made inside the product that owns it, or on its
+/// own (standalone) on the Sub-Assemblies screen. Other products can use it too: a
+/// ProductSubAssemblyUsage of a sub-assembly the product doesn't own is a link.
 /// </summary>
 public class SubAssembly
 {
     public int Id { get; set; }
 
-    /// <summary>Unique within its owner: two products can each have a "Sweet Dough".</summary>
+    /// <summary>
+    /// Unique within its owner, and among standalone sub-assemblies: two products can each have a
+    /// "Sweet Dough", and so can one product and the standalone list.
+    /// </summary>
     public string Name { get; set; } = string.Empty;
 
     /// <summary>Required. Decides which section of every recipe using it the sub-assembly shows in.</summary>
@@ -16,8 +20,11 @@ public class SubAssembly
 
     public SubAssemblyRole? Role { get; set; }
 
-    /// <summary>The product it was made in. Only the owner edits its lines, and the owner always uses it.</summary>
-    public int OwnerProductId { get; set; }
+    /// <summary>
+    /// The product it was made in, which alone edits its lines and always uses it; or null for a
+    /// standalone sub-assembly, edited on the Sub-Assemblies screen, which every product that uses it links.
+    /// </summary>
+    public int? OwnerProductId { get; set; }
 
     public Product? OwnerProduct { get; set; }
 

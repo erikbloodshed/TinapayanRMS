@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     public MainWindow(
         MainWindowViewModel viewModel,
         RawMaterialsViewModel rawMaterialsViewModel,
+        SubAssembliesViewModel subAssembliesViewModel,
         ProductsViewModel productsViewModel,
         ReportsViewModel reportsViewModel,
         UnitsOfMeasureViewModel unitsOfMeasureViewModel,
@@ -35,14 +36,17 @@ public partial class MainWindow : Window
         _rolesViewModel = rolesViewModel;
 
         RawMaterialsTab.Content = new RawMaterialsView(rawMaterialsViewModel);
+        SubAssembliesTab.Content = new SubAssembliesView(subAssembliesViewModel);
         ProductsTab.Content = new ProductsView(productsViewModel);
         ReportsTab.Content = new ReportsView(reportsViewModel);
 
         RawMaterialsNavItem.Tag = RawMaterialsTab;
+        SubAssembliesNavItem.Tag = SubAssembliesTab;
         ProductsNavItem.Tag = ProductsTab;
         ReportsNavItem.Tag = ReportsTab;
 
         _loadCommands[RawMaterialsTab] = rawMaterialsViewModel.LoadCommand;
+        _loadCommands[SubAssembliesTab] = subAssembliesViewModel.LoadCommand;
         _loadCommands[ProductsTab] = productsViewModel.LoadCommand;
         _loadCommands[ReportsTab] = reportsViewModel.LoadCommand;
 

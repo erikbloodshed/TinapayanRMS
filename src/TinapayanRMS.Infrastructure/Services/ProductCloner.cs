@@ -38,13 +38,21 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         var newProduct = new Product { Name = newProductName, Description = source.Description };
         await ProductRepository.AddAsync(dbContext, newProduct, cancellationToken);
 
-        // Every sub-assembly becomes the clone's own. An owned one and a linked one can share a name
-        // (they have different owners), and the clone's names must differ.
+        // A standalone sub-assembly stays linked, at the same piece size: it's kept apart to be shared.
+        // Every other one becomes the clone's own. An owned one and a linked one can share a name (they
+        // have different owners), and the clone's names must differ.
         var names = new List<string>();
         var owned = new List<OwnedSubAssemblyDraft>();
+        var linked = new List<LinkedUsageDraft>();
         foreach (var usage in usages)
         {
-            var name = SubAssemblyRules.UniqueName(usage.SubAssembly!.Name, names);
+            if (usage.SubAssembly!.OwnerProductId is null)
+            {
+                linked.Add(new LinkedUsageDraft(usage.SubAssemblyId, usage.AuthoredField, usage.AuthoredValue));
+                continue;
+            }
+
+            var name = SubAssemblyRules.UniqueName(usage.SubAssembly.Name, names);
             names.Add(name);
             owned.Add(new OwnedSubAssemblyDraft(
                 0,
@@ -55,7 +63,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                 usage.AuthoredValue));
         }
 
-        await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, newProduct.Id, new RecipeDraft(owned, []), cancellationToken);
+        await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, newProduct.Id, new RecipeDraft(owned, linked), cancellationToken);
 
         if (packagingLines.Count > 0)
         {

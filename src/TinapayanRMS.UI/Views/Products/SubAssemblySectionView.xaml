@@ -90,7 +90,7 @@
                                       Margin="0,0,4,0" />
                 <syncfusion:ButtonAdv SizeMode="Small"
                                       Label="Make a Copy"
-                                      ToolTip="Make it this product's own copy, to change its lines here. It stops following the product it's from."
+                                      ToolTip="Make it this product's own copy, to change its lines here. It stops following where it's from."
                                       IconTemplate="{StaticResource CopyIconTemplate}"
                                       Command="{Binding DataContext.MakeCopyCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                       CommandParameter="{Binding}"

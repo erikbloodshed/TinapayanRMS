@@ -4,8 +4,8 @@
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
     <!--
-        Add a sub-assembly to the recipe: a new one of the product's own, a link to another product's, or
-        a copy of one. Or change one already in it: an own one's name, role, lines and piece size, a
+        Add a sub-assembly to the recipe: a new one of the product's own, a link to an existing one
+        (another product's, or a standalone one from the Sub-Assemblies screen), or a copy of one. Or change one already in it: an own one's name, role, lines and piece size, a
         linked one's piece size only. Apply only puts it in the recipe; Save saves it. It fills its
         Recipe Structure tab, so it has no box of its own.
     -->
@@ -36,7 +36,7 @@
                                     SelectedItem="{Binding EditingUsageMode, Mode=TwoWay}" />
 
             <TextBlock Grid.Column="2"
-                       Text="Another Product's Sub-Assembly"
+                       Text="Existing Sub-Assembly"
                        Style="{StaticResource FieldLabelStyle}"
                        Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
             <syncfusion:ComboBoxAdv Grid.Row="1"
@@ -44,7 +44,7 @@
                                     ItemsSource="{Binding LinkableSubAssemblies}"
                                     DisplayMemberPath="DisplayName"
                                     SelectedItem="{Binding EditingUsageSource, Mode=TwoWay}"
-                                    ToolTip="A link follows every change its product makes to it; a copy is this product's own from then on."
+                                    ToolTip="Another product's, or a standalone one from the Sub-Assemblies screen. A link follows every change made to it where it's kept; a copy is this product's own from then on."
                                     Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
 

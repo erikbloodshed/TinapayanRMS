@@ -375,7 +375,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<int>("OwnerProductId")
+                    b.Property<int?>("OwnerProductId")
                         .HasColumnType("int");
 
                     b.Property<int>("RoleId")
@@ -666,8 +666,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.HasOne("TinapayanRMS.Domain.Entities.Product", "OwnerProduct")
                         .WithMany()
                         .HasForeignKey("OwnerProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("TinapayanRMS.Domain.Entities.SubAssemblyRole", "Role")
                         .WithMany()

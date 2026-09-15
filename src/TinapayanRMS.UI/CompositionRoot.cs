@@ -74,6 +74,7 @@ public static class CompositionRoot
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<RawMaterialsViewModel>();
+                services.AddSingleton<SubAssembliesViewModel>();
                 services.AddSingleton<ProductsViewModel>();
                 services.AddSingleton<ReportsViewModel>();
                 services.AddSingleton<UnitsOfMeasureViewModel>();

@@ -114,6 +114,22 @@ public class SubAssemblyRulesTests
     }
 
     [Fact]
+    public void EnsureStandaloneNameAvailable_accepts_a_free_name()
+    {
+        var act = () => SubAssemblyRules.EnsureStandaloneNameAvailable("Chocolate Glaze", ["Sweet Dough"]);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureStandaloneNameAvailable_rejects_a_taken_name_whatever_its_case_and_spacing()
+    {
+        var act = () => SubAssemblyRules.EnsureStandaloneNameAvailable(" sweet dough ", ["Sweet Dough"]);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("There's already a standalone sub-assembly named 'sweet dough'. Give this one its own name.");
+    }
+
+    [Fact]
     public void UniqueName_keeps_a_free_name_and_numbers_copies_of_a_taken_one()
     {
         SubAssemblyRules.UniqueName("Sweet Dough", ["Custard"]).Should().Be("Sweet Dough");

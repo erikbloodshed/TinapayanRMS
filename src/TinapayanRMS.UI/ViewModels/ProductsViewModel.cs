@@ -99,7 +99,14 @@ public sealed class ProductUsageEdit
 
     public decimal AuthoredValue { get; }
 
-    /// <summary>The product it's linked from, or null for the product's own.</summary>
+    /// <summary>Where a standalone sub-assembly (no owner product) is kept, in place of an owner's name.</summary>
+    public const string StandaloneSourceName = "Sub-Assemblies";
+
+    /// <summary>Where a linked sub-assembly comes from: its owner product, or the Sub-Assemblies screen for a standalone one.</summary>
+    public static string SourceNameOf(SubAssembly subAssembly) =>
+        subAssembly.OwnerProductId is null ? StandaloneSourceName : subAssembly.OwnerProduct?.Name ?? "another product";
+
+    /// <summary>Where it's linked from (another product, or Sub-Assemblies for a standalone one), or null for the product's own.</summary>
     public string? OwnerName { get; }
 
     public bool IsOwned => OwnerName is null;
@@ -239,10 +246,10 @@ public enum UsageFormMode
     /// <summary>A new sub-assembly of the product's own.</summary>
     New,
 
-    /// <summary>Another product's sub-assembly, used as it is and following its changes.</summary>
+    /// <summary>An existing sub-assembly (another product's, or a standalone one), used as it is and following its changes.</summary>
     Link,
 
-    /// <summary>A copy of another product's sub-assembly, the product's own from then on.</summary>
+    /// <summary>A copy of an existing sub-assembly (another product's, or a standalone one), the product's own from then on.</summary>
     Copy,
 }
 
@@ -251,17 +258,20 @@ public sealed record UsageFormModeOption(string Name, UsageFormMode Mode)
     public static IReadOnlyList<UsageFormModeOption> All { get; } =
     [
         new("New sub-assembly", UsageFormMode.New),
-        new("Link another product's", UsageFormMode.Link),
-        new("Copy another product's", UsageFormMode.Copy),
+        new("Link an existing one", UsageFormMode.Link),
+        new("Copy an existing one", UsageFormMode.Copy),
     ];
 }
 
-/// <summary>Another product's sub-assembly, in the Link and Copy picker: "Sweet Dough — Cream Loaf (Dough)".</summary>
+/// <summary>
+/// A sub-assembly in the Link and Copy picker: "Sweet Dough — Cream Loaf (Dough)" for another product's,
+/// "Chocolate Glaze — Sub-Assemblies (Glaze)" for a standalone one.
+/// </summary>
 public sealed class LinkableSubAssemblyOption(SubAssembly subAssembly)
 {
     public SubAssembly SubAssembly { get; } = subAssembly;
 
-    public string DisplayName => $"{SubAssembly.Name} — {SubAssembly.OwnerProduct?.Name} ({SubAssembly.Role?.Name})";
+    public string DisplayName => $"{SubAssembly.Name} — {ProductUsageEdit.SourceNameOf(SubAssembly)} ({SubAssembly.Role?.Name})";
 }
 
 /// <summary>One slice of the material cost per piece: a sub-assembly, or all of the packaging. Percent is its share of the material cost.</summary>
@@ -599,7 +609,7 @@ public class ProductsViewModel : ViewModelBase
         private set => this.RaiseAndSetIfChanged(ref _usageFormTitle, value);
     }
 
-    /// <summary>Adding, not editing: only then can the form's sub-assembly come from another product.</summary>
+    /// <summary>Adding, not editing: only then can the form's sub-assembly be an existing one, linked or copied.</summary>
     private bool _isAddingUsage = true;
     public bool IsAddingUsage
     {
@@ -623,7 +633,7 @@ public class ProductsViewModel : ViewModelBase
     }
 
     private bool _isFormPickingSource;
-    /// <summary>The form links or copies another product's sub-assembly: its picker shows.</summary>
+    /// <summary>The form links or copies an existing sub-assembly (another product's, or a standalone one): its picker shows.</summary>
     public bool IsFormPickingSource
     {
         get => _isFormPickingSource;
@@ -645,7 +655,7 @@ public class ProductsViewModel : ViewModelBase
     }
 
     private LinkableSubAssemblyOption? _editingUsageSource;
-    /// <summary>The other product's sub-assembly to link or copy.</summary>
+    /// <summary>The existing sub-assembly to link or copy.</summary>
     public LinkableSubAssemblyOption? EditingUsageSource
     {
         get => _editingUsageSource;
@@ -1519,7 +1529,7 @@ public class ProductsViewModel : ViewModelBase
             [.. lines.Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams))],
             usage.AuthoredField,
             usage.AuthoredValue,
-            isOwn ? null : subAssembly.OwnerProduct?.Name ?? "another product",
+            isOwn ? null : ProductUsageEdit.SourceNameOf(subAssembly),
             isOwn ? _linkedBy.GetValueOrDefault(subAssembly.Id) ?? [] : []);
     }
 
@@ -1697,7 +1707,7 @@ public class ProductsViewModel : ViewModelBase
                 [.. saved.Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams))],
                 _usageAuthoredField,
                 authoredValue,
-                source.OwnerProduct?.Name ?? "another product",
+                ProductUsageEdit.SourceNameOf(source),
                 linkedBy: []);
         }
 
@@ -2062,17 +2072,18 @@ public class ProductsViewModel : ViewModelBase
             : usage.IsOwned && string.Equals(usage.Name, previous.Name, StringComparison.CurrentCultureIgnoreCase);
 
     /// <summary>
-    /// The sub-assemblies the form can link or copy: every other product's, less (when linking) those the
-    /// recipe already uses. A pick that's no longer offered is cleared.
+    /// The sub-assemblies the form can link or copy: the standalone ones and every other product's, less
+    /// (when linking) those the recipe already uses. A pick that's no longer offered is cleared.
     /// </summary>
     private void RefreshLinkableOptions()
     {
         var linking = EditingUsageMode.Mode == UsageFormMode.Link;
         var usedIds = UsageEdits.Where(u => u.SubAssemblyId > 0).Select(u => u.SubAssemblyId).ToHashSet();
 
+        // A new product has no id yet, and a standalone sub-assembly no owner: that isn't a match.
         LinkableSubAssemblies.MergeFrom(
             [.. _linkable
-                .Where(s => s.OwnerProductId != _detailProductId && !(linking && usedIds.Contains(s.Id)))
+                .Where(s => (s.OwnerProductId is null || s.OwnerProductId != _detailProductId) && !(linking && usedIds.Contains(s.Id)))
                 .Select(s => new LinkableSubAssemblyOption(s))],
             o => o.SubAssembly.Id);
 
@@ -2129,7 +2140,7 @@ public class ProductsViewModel : ViewModelBase
                     [.. linkedLinesById[subAssembly.Id].Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams))],
                     edit.AuthoredField,
                     edit.AuthoredValue,
-                    subAssembly.OwnerProduct?.Name ?? edit.OwnerName,
+                    ProductUsageEdit.SourceNameOf(subAssembly),
                     linkedBy: []);
             }
             else

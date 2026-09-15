@@ -1,0 +1,211 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.SubAssembliesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="800"
+             d:DesignWidth="1400">
+    <UserControl.Resources>
+        <Style x:Key="TotalValueStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
+        </Style>
+    </UserControl.Resources>
+
+    <!--
+        Standalone sub-assemblies, which no product owns: the list beside the one being edited. Products
+        link them (and follow every change saved here) or copy them, from their recipe. The list is as
+        wide as its columns (Auto), and the form takes the rest.
+    -->
+    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ErrorMessage and SuccessMessage as toasts, over the cards, in the Grid's bottom-right corner -->
+        <controls:ErrorToast Grid.ColumnSpan="3" />
+        <controls:SuccessToast Grid.ColumnSpan="3" />
+
+        <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Sub-Assemblies" Style="{StaticResource SectionHeaderStyle}" />
+
+                <!-- Fixed widths, so the card is as wide as its columns and never cuts one off -->
+                <syncfusion:SfDataGrid Grid.Row="1"
+                                       ItemsSource="{Binding Rows}"
+                                       SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                                       AutoGenerateColumns="False"
+                                       AllowEditing="False"
+                                       SelectionMode="Single"
+                                       NavigationMode="Row">
+                    <syncfusion:SfDataGrid.Columns>
+                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="200" />
+                        <syncfusion:GridTextColumn MappingName="RoleName" HeaderText="Role" Width="110" />
+                        <controls:NumericColumn MappingName="TotalWeight" HeaderText="Batch (g)" Width="96" NumberDecimalDigits="2" />
+                        <controls:NumericColumn MappingName="TotalCost" HeaderText="Batch Cost" Width="96" NumberDecimalDigits="2" />
+                        <syncfusion:GridTextColumn MappingName="UsedByText" HeaderText="Used By" Width="170" Padding="12,0,0,0" />
+                    </syncfusion:SfDataGrid.Columns>
+                </syncfusion:SfDataGrid>
+            </Grid>
+        </Border>
+
+        <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,0">
+                <StackPanel>
+                    <!-- Title and caption beside New, Save and Delete -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                            <TextBlock Text="{Binding HeaderTitle}"
+                                       FontSize="24"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource HeadingForegroundBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="A standalone sub-assembly belongs to no product. Products link it from their recipe, and follow every change saved here, or copy it as their own."
+                                       Style="{StaticResource CaptionStyle}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                            <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />
+                            <syncfusion:ButtonAdv Label="Save"
+                                                  IconTemplate="{StaticResource SaveIconTemplate}"
+                                                  Command="{Binding SaveCommand}"
+                                                  ToolTip="Saves the name, role and lines together."
+                                                  Margin="0,0,8,0" />
+                            <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Style="{StaticResource SectionDividerStyle}" />
+
+                    <!-- Labels in the first row, fields and totals in the second -->
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" />
+                        <syncfusion:SfTextBoxExt Grid.Row="1"
+                                                 Grid.Column="0"
+                                                 Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Grid.Column="2" Text="Role" Style="{StaticResource FieldLabelStyle}" />
+                        <syncfusion:ComboBoxAdv Grid.Row="1"
+                                                Grid.Column="2"
+                                                ItemsSource="{Binding Roles}"
+                                                DisplayMemberPath="Name"
+                                                SelectedItem="{Binding EditingRole, Mode=TwoWay}" />
+
+                        <TextBlock Grid.Column="4" Text="Batch Weight" Style="{StaticResource FieldLabelStyle}" />
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="4"
+                                   Text="{Binding BatchWeight, StringFormat='{}{0:#,0.##} g'}"
+                                   Style="{StaticResource TotalValueStyle}"
+                                   VerticalAlignment="Center" />
+
+                        <TextBlock Grid.Column="6" Text="Batch Cost" Style="{StaticResource FieldLabelStyle}" />
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="6"
+                                   Text="{Binding BatchCost, StringFormat='₱{0:N2}'}"
+                                   Style="{StaticResource TotalValueStyle}"
+                                   VerticalAlignment="Center" />
+
+                        <TextBlock Grid.Column="8" Text="Cost per g" Style="{StaticResource FieldLabelStyle}" />
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="8"
+                                   Text="{Binding CostPerGram, StringFormat='₱{0:N4}'}"
+                                   Style="{StaticResource TotalValueStyle}"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+
+                    <TextBlock Text="Lines" Style="{StaticResource PanelHeaderStyle}" Margin="0,16,0,2" />
+                    <TextBlock Text="The ingredients that make one batch, in grams, costed at their buffered cost."
+                               Style="{StaticResource PanelCaptionStyle}" />
+
+                    <!-- Typed straight into: the add row at the bottom starts a line, Delete removes the selected one -->
+                    <syncfusion:SfDataGrid ItemsSource="{Binding Lines}"
+                                           SelectedItem="{Binding SelectedLine, Mode=TwoWay}"
+                                           AutoGenerateColumns="False"
+                                           AllowEditing="True"
+                                           AllowDeleting="True"
+                                           EditTrigger="OnTap"
+                                           AddNewRowPosition="Bottom"
+                                           AddNewRowText="Click here to add an ingredient"
+                                           SelectionMode="Single"
+                                           ColumnSizer="Star"
+                                           controls:GridEditCommit.OnFocusLeave="True"
+                                           controls:AutoCompleteDropDown.IsEnabled="True"
+                                           Height="280">
+                        <syncfusion:SfDataGrid.Columns>
+                            <!-- Typing completes the name and narrows the list to the ingredients that match -->
+                            <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
+                                                                    HeaderText="Ingredient"
+                                                                    ItemsSource="{Binding Ingredients}"
+                                                                    DisplayMember="Name"
+                                                                    ValueMember="Id"
+                                                                    AllowAutoComplete="True"
+                                                                    AllowNullInput="True"
+                                                                    AllowIncrementalFiltering="True"
+                                                                    AutoGenerateColumns="False"
+                                                                    IsAutoPopupSize="False"
+                                                                    PopUpWidth="380"
+                                                                    PopUpHeight="260"
+                                                                    GridColumnSizer="Star">
+                                <syncfusion:GridMultiColumnDropDownList.Columns>
+                                    <syncfusion:Columns>
+                                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
+                                        <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
+                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per g" Width="88" NumberDecimalDigits="4" />
+                                    </syncfusion:Columns>
+                                </syncfusion:GridMultiColumnDropDownList.Columns>
+                            </syncfusion:GridMultiColumnDropDownList>
+                            <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="120" NumberDecimalDigits="2" />
+                            <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="120" NumberDecimalDigits="2" AllowEditing="False" />
+                        </syncfusion:SfDataGrid.Columns>
+                    </syncfusion:SfDataGrid>
+
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Type the lines straight into the table. Delete removes the selected one." Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" />
+                        <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveLineCommand}" />
+                    </Grid>
+
+                    <Border Style="{StaticResource SectionDividerStyle}" />
+
+                    <TextBlock Text="Used By" Style="{StaticResource PanelHeaderStyle}" />
+                    <TextBlock Text="{Binding UsedByText}" Style="{StaticResource CaptionStyle}" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>

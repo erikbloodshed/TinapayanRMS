@@ -24,8 +24,8 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
     /// Replaces the product's recipe on the caller's context, which should hold a transaction: its usages,
     /// and its own sub-assemblies — updated, added and relined as <paramref name="recipe"/> lists them,
     /// and deleted when it no longer does. Every check runs before anything is deleted: names, lines and
-    /// piece sizes, that listed sub-assemblies are the product's own and linked ones another product's,
-    /// and that no sub-assembly being deleted is linked by another product.
+    /// piece sizes, that listed sub-assemblies are the product's own and linked ones another product's or
+    /// standalone, and that no sub-assembly being deleted is linked by another product.
     /// </summary>
     internal static async Task SetRecipeAsync(TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, CancellationToken cancellationToken)
     {

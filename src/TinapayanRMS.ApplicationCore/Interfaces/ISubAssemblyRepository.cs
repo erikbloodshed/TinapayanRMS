@@ -3,7 +3,8 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.ApplicationCore.Interfaces;
 
 /// <summary>
-/// Reads sub-assemblies. They're written with their owner, by IProductRepository.SaveAsync and
+/// Reads sub-assemblies, and writes standalone ones (no owner product), which the Sub-Assemblies screen
+/// makes and edits. A product's own are written with it, by IProductRepository.SaveAsync and
 /// IProductCloner, never on their own.
 /// </summary>
 public interface ISubAssemblyRepository
@@ -12,8 +13,8 @@ public interface ISubAssemblyRepository
     Task<IReadOnlyList<SubAssembly>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken);
 
     /// <summary>
-    /// What products can link or copy: every sub-assembly that has lines, with its role and owner, by
-    /// name then owner. A product leaves out its own.
+    /// What products can link or copy: every sub-assembly that has lines, with its role and owner,
+    /// standalone ones first, then by name and owner. A product leaves out its own.
     /// </summary>
     Task<IReadOnlyList<SubAssembly>> GetLinkableAsync(CancellationToken cancellationToken);
 
@@ -22,4 +23,22 @@ public interface ISubAssemblyRepository
     /// A sub-assembly no one else uses isn't listed.
     /// </summary>
     Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetLinkedByAsync(int ownerProductId, CancellationToken cancellationToken);
+
+    /// <summary>The standalone sub-assemblies (no owner product), with their role, by name.</summary>
+    Task<IReadOnlyList<SubAssembly>> GetStandaloneAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// For each standalone sub-assembly a product uses, the names of those products. One no product uses
+    /// isn't listed.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetStandaloneLinkedByAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Adds (Id 0) or updates a standalone sub-assembly's name and role, and replaces its lines (grams of
+    /// ingredients), in one transaction; every product linking it follows. Returns its id.
+    /// </summary>
+    Task<int> SaveStandaloneAsync(SubAssembly subAssembly, IReadOnlyList<(int IngredientId, decimal Grams)> lines, CancellationToken cancellationToken);
+
+    /// <summary>Deletes a standalone sub-assembly and its lines; refused while a product links it.</summary>
+    Task DeleteStandaloneAsync(int id, CancellationToken cancellationToken);
 }

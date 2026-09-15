@@ -364,6 +364,46 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task A_standalone_sub_assembly_is_offered_to_link_and_shows_where_its_from()
+    {
+        var roleId = await AddRoleAsync("Glaze");
+        var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
+        var glazeId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new Domain.Entities.SubAssembly { Name = "Chocolate Glaze", RoleId = roleId }, [(sugarId, 100m)], Cancellation);
+        var productId = await AddProductAsync("Cream Loaf");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        // A new product, not saved yet, is offered it too.
+        viewModel.EditingUsageMode = UsageFormModeOption.All.Single(o => o.Mode == UsageFormMode.Link);
+        viewModel.LinkableSubAssemblies.Should().ContainSingle().Which.DisplayName.Should().Be("Chocolate Glaze — Sub-Assemblies (Glaze)");
+
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(
+            () => viewModel.SelectedProduct?.Id == productId && viewModel.IsUsageFormOpen,
+            () => $"selected={viewModel.SelectedProduct?.Id}, form open={viewModel.IsUsageFormOpen}");
+        viewModel.EditingUsageMode = UsageFormModeOption.All.Single(o => o.Mode == UsageFormMode.Link);
+        viewModel.EditingUsageSource = viewModel.LinkableSubAssemblies.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageFormTotalWeightText == "100 g", () => $"batch={viewModel.UsageFormTotalWeightText}");
+        viewModel.EditingUsageWeightPerPiece = 5m;
+        await viewModel.ApplyUsageCommand.Execute();
+
+        var usage = viewModel.UsageEdits.Should().ContainSingle().Subject;
+        usage.IsLinked.Should().BeTrue();
+        usage.LinkedFromText.Should().Be("From Sub-Assemblies");
+        usage.CostPerPiece.Should().Be(0.45m, "5 g of a 100 g, ₱9 batch");
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        var saved = await dbContext.ProductSubAssemblyUsages.SingleAsync(Cancellation);
+        saved.ProductId.Should().Be(productId);
+        saved.SubAssemblyId.Should().Be(glazeId);
+        saved.AuthoredValue.Should().Be(5m);
+    }
+
+    [Fact]
     public async Task The_description_link_edits_the_description_in_a_pop_up_and_Cancel_puts_it_back()
     {
         var viewModel = CreateViewModel();
