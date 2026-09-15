@@ -10,6 +10,7 @@ using Syncfusion.Licensing;
 using Syncfusion.SfSkinManager;
 using Syncfusion.Themes.Windows11Light.WPF;
 using Syncfusion.Windows.Controls.Input;
+using Syncfusion.Windows.Shared;
 using Syncfusion.Windows.Tools.Controls;
 using TinapayanRMS.UI.Views;
 
@@ -17,6 +18,9 @@ namespace TinapayanRMS.UI;
 
 public partial class App : Application
 {
+    /// <summary>The height of every text box and button, in device-independent pixels.</summary>
+    private const double ControlHeight = 24;
+
     private IHost? _host;
 
     static App()
@@ -44,12 +48,21 @@ public partial class App : Application
 
         // The Windows11Light theme's SfTextBoxExt style — unlike its ComboBoxAdv, DoubleTextBox and
         // DateTimeEdit styles — never sets VerticalContentAlignment, so text falls back to
-        // Control's default of Top and sits against the top of the box at the 32px
-        // SizeMode="Touch" height. Changing the type's default here fixes every instance,
+        // Control's default of Top and sits against the top of any box taller than its text
+        // (every one, at SizeMode="Touch"'s 32px). Changing the type's default here fixes every instance,
         // including future ones, without a Style on the control. Must run before any
         // SfTextBoxExt exists, which is why it lives in this static constructor.
         Control.VerticalContentAlignmentProperty.OverrideMetadata(
             typeof(SfTextBoxExt), new FrameworkPropertyMetadata(VerticalAlignment.Center));
+
+        // Every text box and button is 24px tall. At SizeMode="Default" the theme sets no height on
+        // them, so each took its content's: an SfTextBoxExt 18-20px, a DoubleTextBox 22px, a
+        // ButtonAdv 24px, or whatever its layout row stretched it to. A type default is the lowest
+        // precedence, so a Height set in XAML still wins.
+        foreach (var type in new[] { typeof(SfTextBoxExt), typeof(DoubleTextBox), typeof(ButtonAdv) })
+        {
+            FrameworkElement.HeightProperty.OverrideMetadata(type, new FrameworkPropertyMetadata(ControlHeight));
+        }
 
         EventManager.RegisterClassHandler(
             typeof(SfTextBoxExt), FrameworkElement.LoadedEvent, new RoutedEventHandler(AlignTextBoxText));

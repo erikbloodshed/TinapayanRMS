@@ -12,7 +12,8 @@
     <!--
         The list beside the selected material: its summary header, then its cards in tabs along
         the bottom. Each card is a UserControl in Views/RawMaterials that inherits this screen's
-        DataContext; when a card shows is decided here.
+        DataContext; when a card shows is decided here. The list is as wide as its columns (Auto),
+        and the material's details take the rest.
     -->
     <Grid Background="{StaticResource PageBackgroundBrush}" Margin="16">
         <Grid.RowDefinitions>
@@ -20,9 +21,9 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" MinWidth="340" />
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="16" />
-            <ColumnDefinition Width="2*" />
+            <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
         <!-- ErrorMessage as a toast, over the cards: it spans the whole Grid and puts itself in its bottom-right corner -->

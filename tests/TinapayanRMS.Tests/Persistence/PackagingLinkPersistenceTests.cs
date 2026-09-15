@@ -205,7 +205,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
             [new LinkedUsageDraft(linkedDoughId, UsageAuthoredField.WeightPerPiece, 40m)]));
         await CreatePackagingLineRepository().SetLinesAsync(otherId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
         await CreatePackagingLinkRepository().SetLinkAsync(sourceId, otherId, Cancellation);
-        await CreateCostingParametersRepository().SetAsync(sourceId, laborCost: 5m, overheadCost: 3m, administrativeCost: 1.25m, marginPercent: 40m, vatPercent: 12m, Cancellation);
+        await CreateCostingParametersRepository().SetAsync(sourceId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1.25m, marginPercent: 40m, vatPercent: 12m, Cancellation);
 
         var cloneId = await CreateProductCloner().CloneAsync(sourceId, "Clone Of Source", Cancellation);
 
@@ -227,7 +227,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
 
         var costing = (await CreateCostingParametersRepository().GetForProductAsync(cloneId, Cancellation))!;
         costing.MarginPercent.Should().Be(40m);
-        costing.AdministrativeCost.Should().Be(1.25m);
+        costing.AdministrativePercent.Should().Be(1.25m);
 
         // The clone's recipe is its own: removing its copy of the dough leaves the original, and the
         // source's link to it, alone.

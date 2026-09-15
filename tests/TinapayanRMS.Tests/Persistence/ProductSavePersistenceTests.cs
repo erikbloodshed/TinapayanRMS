@@ -61,7 +61,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
                 [new OwnedSubAssemblyDraft(0, "Sweet Dough", doughRoleId, [(flourId, 1000m)], UsageAuthoredField.Yield, 40m)],
                 [new LinkedUsageDraft(linkedFillingId, UsageAuthoredField.WeightPerPiece, 10m)]),
             [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)],
-            new CostingParameters { LaborCost = 6m, OverheadCost = 5.5m, AdministrativeCost = 3.5m, MarginPercent = 30m, VatPercent = 12m },
+            new CostingParameters { LaborPercent = 6m, OverheadPercent = 5.5m, AdministrativePercent = 3.5m, MarginPercent = 30m, VatPercent = 12m },
             Cancellation);
 
         product.Id.Should().Be(0, "the caller's entity is only read");
@@ -79,8 +79,8 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await CreatePackagingLineRepository().GetForProductAsync(id, Cancellation)).Should().ContainSingle(l => l.PiecesPerPackagingUnit == 6m);
 
         var costing = (await CreateCostingParametersRepository().GetForProductAsync(id, Cancellation))!;
-        costing.LaborCost.Should().Be(6m);
-        costing.AdministrativeCost.Should().Be(3.5m);
+        costing.LaborPercent.Should().Be(6m);
+        costing.AdministrativePercent.Should().Be(3.5m);
         costing.VatPercent.Should().Be(12m);
     }
 
@@ -104,7 +104,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await CreateProductRepository().GetByIdAsync(productId, Cancellation))!.Name.Should().Be("Custard Ensaymada");
         (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Should().ContainSingle(u => u.SubAssemblyId == custardId);
         (await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation)).Should().ContainSingle();
-        (await CreateCostingParametersRepository().GetForProductAsync(productId, Cancellation))!.LaborCost.Should().Be(5m);
+        (await CreateCostingParametersRepository().GetForProductAsync(productId, Cancellation))!.LaborPercent.Should().Be(5m);
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
             new Product { Id = productId, Name = "Ube Ensaymada", Description = "Now with ube" },
             new RecipeDraft([new OwnedSubAssemblyDraft(custardId, "Ube Custard", fillingRoleId, [(ubeId, 200m)], UsageAuthoredField.WeightPerPiece, 15m)], []),
             [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m), (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m)],
-            new CostingParameters { LaborCost = 5m },
+            new CostingParameters { LaborPercent = 5m },
             Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();

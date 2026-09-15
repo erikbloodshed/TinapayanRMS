@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
@@ -280,22 +281,25 @@ public sealed class ProductCostSummary
     public ProductCostSummary(
         IReadOnlyList<decimal> usageCostsPerPiece,
         IReadOnlyList<decimal> packagingCostsPerPiece,
-        decimal laborCost,
-        decimal overheadCost,
-        decimal administrativeCost,
+        decimal laborPercent,
+        decimal overheadPercent,
+        decimal administrativePercent,
         decimal marginPercent,
         decimal vatPercent)
     {
         SubAssemblies = usageCostsPerPiece.Sum();
         Packaging = packagingCostsPerPiece.Sum();
         Material = ProductRules.CalculateMaterialCostPerPiece(usageCostsPerPiece, packagingCostsPerPiece);
-        Labor = laborCost;
-        Overhead = overheadCost;
-        Administrative = administrativeCost;
+        LaborPercent = laborPercent;
+        OverheadPercent = overheadPercent;
+        AdministrativePercent = administrativePercent;
+        Labor = CostingRules.CalculateCostFromMaterialPercent(Material, laborPercent);
+        Overhead = CostingRules.CalculateCostFromMaterialPercent(Material, overheadPercent);
+        Administrative = CostingRules.CalculateCostFromMaterialPercent(Material, administrativePercent);
         MarginPercent = marginPercent;
         VatPercent = vatPercent;
         (BaseCost, PreVatPrice, SellingPrice) = CostingRules.CalculateSellingPrice(
-            Material, laborCost, overheadCost, administrativeCost, marginPercent, vatPercent);
+            Material, laborPercent, overheadPercent, administrativePercent, marginPercent, vatPercent);
     }
 
     public decimal SubAssemblies { get; }
@@ -304,10 +308,19 @@ public sealed class ProductCostSummary
 
     public decimal Material { get; }
 
+    public decimal LaborPercent { get; }
+
+    public decimal OverheadPercent { get; }
+
+    public decimal AdministrativePercent { get; }
+
+    /// <summary>The labor cost per piece, in pesos: LaborPercent of the material cost.</summary>
     public decimal Labor { get; }
 
+    /// <summary>The overhead cost per piece, in pesos: OverheadPercent of the material cost.</summary>
     public decimal Overhead { get; }
 
+    /// <summary>The administrative cost per piece, in pesos: AdministrativePercent of the material cost.</summary>
     public decimal Administrative { get; }
 
     /// <summary>The subtotal the markup goes on: materials, labor, overhead and administrative.</summary>
@@ -361,8 +374,6 @@ public class ProductsViewModel : ViewModelBase
 
     public const int LinksTab = 2;
 
-    private const string DefaultHeaderCaption = "Build the product from sub-assemblies and packaging, then set how it's priced.";
-
     private static readonly IReadOnlyDictionary<int, IReadOnlyList<string>> NoLinks = new Dictionary<int, IReadOnlyList<string>>();
 
     private readonly IProductRepository _productRepository;
@@ -397,6 +408,33 @@ public class ProductsViewModel : ViewModelBase
     /// <summary>Every sub-assembly, saved or not, its own and linked, in recipe order (ProductUsageEdit.RecipeOrder).</summary>
     public ObservableCollection<ProductUsageEdit> UsageEdits { get; } = [];
 
+    /// <summary>
+    /// The Recipe Structure's tabs: a sub-assembly's for each of UsageEdits, at the same index (MirrorUsageTabs),
+    /// then AddSubAssemblyTab and PackagingTab.
+    /// </summary>
+    public ObservableCollection<RecipeTab> RecipeTabs { get; } = [];
+
+    public AddSubAssemblyRecipeTab AddSubAssemblyTab { get; } = new();
+
+    public PackagingRecipeTab PackagingTab { get; } = new();
+
+    private RecipeTab? _selectedRecipeTab;
+    /// <summary>The Recipe Structure tab showing. Showing Add Sub-Assembly opens the sub-assembly form.</summary>
+    public RecipeTab? SelectedRecipeTab
+    {
+        get => _selectedRecipeTab;
+        set => this.RaiseAndSetIfChanged(ref _selectedRecipeTab, value);
+    }
+
+    /// <summary>The last tab other than Add Sub-Assembly that showed, for cancelling an add.</summary>
+    private RecipeTab? _lastRecipeContentTab;
+
+    /// <summary>
+    /// Set while the sections are rebuilt. The tab strip picks a neighbour when the tab showing is removed;
+    /// that pick is ignored (Add Sub-Assembly would open the form), and ReselectRecipeTab picks one after.
+    /// </summary>
+    private bool _arrangingRecipeTabs;
+
     public ObservableCollection<PackagingLineEdit> LineEdits { get; } = [];
 
     /// <summary>The products this one's packaging can be linked to: every other product.</summary>
@@ -418,8 +456,8 @@ public class ProductsViewModel : ViewModelBase
     /// </summary>
     public ObservableCollection<LinkableSubAssemblyOption> LinkableSubAssemblies { get; } = [];
 
-    /// <summary>The sub-assembly form's lines, for a sub-assembly of the product's own.</summary>
-    public ObservableCollection<SubAssemblyLineEdit> FormLines { get; } = [];
+    /// <summary>The sub-assembly form's lines, for a sub-assembly of the product's own: typed straight into its table.</summary>
+    public ObservableCollection<IngredientLineRow> FormLines { get; } = [];
 
     private string _searchText = string.Empty;
     public string SearchText
@@ -455,30 +493,37 @@ public class ProductsViewModel : ViewModelBase
     }
 
     private readonly ObservableAsPropertyHelper<string> _headerTitle;
-    /// <summary>The summary header's big title: the product's name, or "New product".</summary>
+    /// <summary>The header's title, and the usage example's: the product's name, or "New product".</summary>
     public string HeaderTitle => _headerTitle.Value;
 
     private readonly ObservableAsPropertyHelper<string> _headerInitial;
+    /// <summary>The header tile's letter: the title's first.</summary>
     public string HeaderInitial => _headerInitial.Value;
 
-    private readonly ObservableAsPropertyHelper<string> _headerCaption;
-    /// <summary>The description under the title, or what the screen is for while there's none.</summary>
-    public string HeaderCaption => _headerCaption.Value;
+    private readonly ObservableAsPropertyHelper<string> _descriptionLinkText;
+    /// <summary>The link under the header's title: the description, or "Add description" while there's none.</summary>
+    public string DescriptionLinkText => _descriptionLinkText.Value;
 
-    /// <summary>The day the product was last saved, e.g. "Sep 14, 2026", or "—".</summary>
+    private bool _isDescriptionEditorOpen;
+    /// <summary>
+    /// The description's pop-up is open. It edits EditingDescription as it's typed; closing it any way but
+    /// Cancel keeps what was typed (EditDescriptionCommand remembers what to go back to).
+    /// </summary>
+    public bool IsDescriptionEditorOpen
+    {
+        get => _isDescriptionEditorOpen;
+        set => this.RaiseAndSetIfChanged(ref _isDescriptionEditorOpen, value);
+    }
+
+    /// <summary>The description when its pop-up opened, for Cancel.</summary>
+    private string _descriptionBeforeEdit = string.Empty;
+
+    /// <summary>When the product was last saved, e.g. "Sep 14, 2026, 6:27 PM", or "—".</summary>
     private string _lastUpdatedText = "—";
     public string LastUpdatedText
     {
         get => _lastUpdatedText;
         private set => this.RaiseAndSetIfChanged(ref _lastUpdatedText, value);
-    }
-
-    /// <summary>The time of day it was last saved, e.g. "10:24 AM", or empty.</summary>
-    private string _lastUpdatedTimeText = string.Empty;
-    public string LastUpdatedTimeText
-    {
-        get => _lastUpdatedTimeText;
-        private set => this.RaiseAndSetIfChanged(ref _lastUpdatedTimeText, value);
     }
 
     /// <summary>The details tab showing. Moves to Recipe when Links &amp; Clone is about to hide (ShowLinks).</summary>
@@ -520,14 +565,6 @@ public class ProductsViewModel : ViewModelBase
     {
         get => _hasPackaging;
         private set => this.RaiseAndSetIfChanged(ref _hasPackaging, value);
-    }
-
-    private bool _hasRecipe;
-    /// <summary>Whether there's a sub-assembly or packaging line at all: the Recipe Structure's empty state shows otherwise.</summary>
-    public bool HasRecipe
-    {
-        get => _hasRecipe;
-        private set => this.RaiseAndSetIfChanged(ref _hasRecipe, value);
     }
 
     private bool _hasMaterialCost;
@@ -618,22 +655,8 @@ public class ProductsViewModel : ViewModelBase
     /// <summary>The linked sub-assembly's lines, for the form's batch weight and preview (Link, and editing a linked section).</summary>
     private IReadOnlyList<SubAssemblyLineEdit> _sourceLines = [];
 
-    private RawMaterial? _editingFormLineIngredient;
-    public RawMaterial? EditingFormLineIngredient
-    {
-        get => _editingFormLineIngredient;
-        set => this.RaiseAndSetIfChanged(ref _editingFormLineIngredient, value);
-    }
-
-    private decimal _editingFormLineGrams;
-    public decimal EditingFormLineGrams
-    {
-        get => _editingFormLineGrams;
-        set => this.RaiseAndSetIfChanged(ref _editingFormLineGrams, value);
-    }
-
-    private SubAssemblyLineEdit? _selectedFormLine;
-    public SubAssemblyLineEdit? SelectedFormLine
+    private IngredientLineRow? _selectedFormLine;
+    public IngredientLineRow? SelectedFormLine
     {
         get => _selectedFormLine;
         set => this.RaiseAndSetIfChanged(ref _selectedFormLine, value);
@@ -742,25 +765,25 @@ public class ProductsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _selectedLineEdit, value);
     }
 
-    private decimal _editingLaborCost;
-    public decimal EditingLaborCost
+    private decimal _editingLaborPercent;
+    public decimal EditingLaborPercent
     {
-        get => _editingLaborCost;
-        set => this.RaiseAndSetIfChanged(ref _editingLaborCost, value);
+        get => _editingLaborPercent;
+        set => this.RaiseAndSetIfChanged(ref _editingLaborPercent, value);
     }
 
-    private decimal _editingOverheadCost;
-    public decimal EditingOverheadCost
+    private decimal _editingOverheadPercent;
+    public decimal EditingOverheadPercent
     {
-        get => _editingOverheadCost;
-        set => this.RaiseAndSetIfChanged(ref _editingOverheadCost, value);
+        get => _editingOverheadPercent;
+        set => this.RaiseAndSetIfChanged(ref _editingOverheadPercent, value);
     }
 
-    private decimal _editingAdministrativeCost;
-    public decimal EditingAdministrativeCost
+    private decimal _editingAdministrativePercent;
+    public decimal EditingAdministrativePercent
     {
-        get => _editingAdministrativeCost;
-        set => this.RaiseAndSetIfChanged(ref _editingAdministrativeCost, value);
+        get => _editingAdministrativePercent;
+        set => this.RaiseAndSetIfChanged(ref _editingAdministrativePercent, value);
     }
 
     private decimal _editingMarginPercent;
@@ -822,13 +845,15 @@ public class ProductsViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> EditDescriptionCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> CloseDescriptionEditorCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> CancelDescriptionEditCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddUsageCommand { get; }
     public ReactiveCommand<ProductUsageEdit, RxVoid> EditUsageCommand { get; }
     public ReactiveCommand<ProductUsageEdit, RxVoid> MakeCopyCommand { get; }
     public ReactiveCommand<ProductUsageEdit, RxVoid> RemoveUsageCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> ApplyUsageCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> CancelUsageCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> AddFormLineCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormLineCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddLineCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> EditLineCommand { get; }
@@ -869,6 +894,10 @@ public class ProductsViewModel : ViewModelBase
         _costingParametersValidator = costingParametersValidator;
         _subAssemblyValidator = subAssemblyValidator;
 
+        RecipeTabs.Add(AddSubAssemblyTab);
+        RecipeTabs.Add(PackagingTab);
+        UsageEdits.CollectionChanged += (_, e) => MirrorUsageTabs(e);
+
         var byName = SortExpressionComparer<Product>.Ascending(p => p.Name);
 
         _productCache.Connect()
@@ -893,9 +922,9 @@ public class ProductsViewModel : ViewModelBase
             .Select(title => string.IsNullOrWhiteSpace(title) ? "?" : title.Trim()[..1].ToUpperInvariant())
             .ToProperty(this, x => x.HeaderInitial, "N");
 
-        _headerCaption = this.WhenAnyValue(x => x.EditingDescription)
-            .Select(description => string.IsNullOrWhiteSpace(description) ? DefaultHeaderCaption : description.Trim())
-            .ToProperty(this, x => x.HeaderCaption, DefaultHeaderCaption);
+        _descriptionLinkText = this.WhenAnyValue(x => x.EditingDescription)
+            .Select(description => string.IsNullOrWhiteSpace(description) ? "Add description" : description.Trim())
+            .ToProperty(this, x => x.DescriptionLinkText, "Add description");
 
         // A hidden tab can't stay the one showing: leaving a saved product while on Links & Clone goes
         // back to Recipe. Subscribed before ShowLinks, so the tab strip moves before the tab hides; a
@@ -939,11 +968,24 @@ public class ProductsViewModel : ViewModelBase
             .Switch()
             .Subscribe();
 
+        this.WhenAnyValue(x => x.SelectedRecipeTab)
+            .Subscribe(RecipeTabShown);
+
         // The sub-assembly form: where its sub-assembly comes from, then the one it links or copies.
         this.WhenAnyValue(x => x.EditingUsageMode)
             .Skip(1)
             .Where(_ => !IsRefreshing && IsUsageFormOpen && IsAddingUsage)
             .Subscribe(_ => StartUsageFormMode());
+
+        // A line picked, typed or deleted in the form's table: it's priced, and the batch and preview follow.
+        FormLines.ToObservableChangeSet()
+            .AutoRefresh(l => l.IngredientId)
+            .AutoRefresh(l => l.Grams)
+            .Subscribe(_ =>
+            {
+                IngredientLineRow.Resolve(FormLines, Ingredients.ToDictionary(m => m.Id));
+                FormLinesChanged();
+            });
 
         this.WhenAnyValue(x => x.EditingUsageSource)
             .Skip(1)
@@ -968,7 +1010,7 @@ public class ProductsViewModel : ViewModelBase
             .Subscribe(material => ReplaceEntryUnitOptions(material, keepUnitId: null));
 
         this.WhenAnyValue(
-                x => x.EditingLaborCost, x => x.EditingOverheadCost, x => x.EditingAdministrativeCost, x => x.EditingMarginPercent, x => x.EditingVatPercent)
+                x => x.EditingLaborPercent, x => x.EditingOverheadPercent, x => x.EditingAdministrativePercent, x => x.EditingMarginPercent, x => x.EditingVatPercent)
             .Subscribe(_ => RecomputeCosts());
 
         // A worked-out example belongs to the quantity it was worked out for.
@@ -1004,7 +1046,6 @@ public class ProductsViewModel : ViewModelBase
             var selectedId = SelectedProduct?.Id;
             var usageRoleId = EditingUsageRole?.Id;
             var usageSourceId = EditingUsageSource?.SubAssembly.Id;
-            var formLineIngredientId = EditingFormLineIngredient?.Id;
             var linePackagingMaterialId = EditingLinePackagingMaterial?.Id;
             var lineUnitId = EditingLineUnit?.UnitId;
             var packagingLinkTargetId = EditingPackagingLinkTarget?.Id;
@@ -1033,9 +1074,10 @@ public class ProductsViewModel : ViewModelBase
                 RefreshFormLines();
                 RefreshLinkableOptions();
 
-                EditingUsageRole = Roles.FirstOrDefault(r => r.Id == usageRoleId);
+                // An add form opened before the roles were loaded (a new product's, shown at start) takes the first role, as it would have.
+                EditingUsageRole = Roles.FirstOrDefault(r => r.Id == usageRoleId)
+                    ?? (usageRoleId is null && IsUsageFormOpen && IsAddingUsage ? Roles.FirstOrDefault() : null);
                 EditingUsageSource = LinkableSubAssemblies.FirstOrDefault(o => o.SubAssembly.Id == usageSourceId);
-                EditingFormLineIngredient = Ingredients.FirstOrDefault(m => m.Id == formLineIngredientId);
 
                 var previousLineMaterial = EditingLinePackagingMaterial;
                 EditingLinePackagingMaterial = PackagingMaterials.FirstOrDefault(m => m.Id == linePackagingMaterialId);
@@ -1056,8 +1098,9 @@ public class ProductsViewModel : ViewModelBase
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
-            // A form left open is part of what's being saved.
-            if (IsUsageFormOpen)
+            // A form left open is part of what's being saved, unless it's an add form nothing was entered in:
+            // the Add Sub-Assembly tab opens one by itself.
+            if (IsUsageFormOpen && !IsUsageFormUntouched())
             {
                 await ApplyUsageFormAsync();
             }
@@ -1083,9 +1126,9 @@ public class ProductsViewModel : ViewModelBase
 
             var costing = new CostingParameters
             {
-                LaborCost = EditingLaborCost,
-                OverheadCost = EditingOverheadCost,
-                AdministrativeCost = EditingAdministrativeCost,
+                LaborPercent = EditingLaborPercent,
+                OverheadPercent = EditingOverheadPercent,
+                AdministrativePercent = EditingAdministrativePercent,
                 MarginPercent = EditingMarginPercent,
                 VatPercent = EditingVatPercent,
             };
@@ -1111,6 +1154,21 @@ public class ProductsViewModel : ViewModelBase
             await ReloadSavedProductAsync(id);
         }));
 
+        // The description is edited in a pop-up under the header's title, straight into the form; Save saves it.
+        EditDescriptionCommand = ReactiveCommand.Create(() =>
+        {
+            _descriptionBeforeEdit = EditingDescription;
+            IsDescriptionEditorOpen = true;
+        });
+
+        CloseDescriptionEditorCommand = ReactiveCommand.Create(() => { IsDescriptionEditorOpen = false; });
+
+        CancelDescriptionEditCommand = ReactiveCommand.Create(() =>
+        {
+            EditingDescription = _descriptionBeforeEdit;
+            IsDescriptionEditorOpen = false;
+        });
+
         DeleteCommand = ReactiveCommand.CreateFromTask(
             () => RunWithConfirmationAsync(
                 $"Delete '{SelectedProduct!.Name}'? Its own sub-assemblies are deleted with it. This can't be undone.",
@@ -1122,19 +1180,14 @@ public class ProductsViewModel : ViewModelBase
                 }),
             this.WhenAnyValue(x => x.SelectedProduct).Select(product => product is not null));
 
-        AddUsageCommand = ReactiveCommand.Create(() =>
-        {
-            _editingUsage = null;
-            UsageFormTitle = "Add Sub-Assembly";
-            IsAddingUsage = true;
-            EditingUsageMode = UsageFormModeOption.All[0];
-            IsUsageFormOpen = true;
-            StartUsageFormMode();
-        });
+        AddUsageCommand = ReactiveCommand.Create(() => SelectRecipeTab(AddSubAssemblyTab));
 
+        // The form opens in the sub-assembly's own tab, in place of its lines.
         EditUsageCommand = ReactiveCommand.Create<ProductUsageEdit>(usage =>
         {
+            SelectRecipeTab(TabFor(usage));
             _editingUsage = usage;
+            MarkEditingTab(usage);
             IsAddingUsage = false;
             UsageFormTitle = usage.IsOwned ? $"Edit {usage.Name}" : $"Edit {usage.Name} (from {usage.OwnerName})";
             IsFormEditingLines = usage.IsOwned;
@@ -1143,9 +1196,9 @@ public class ProductsViewModel : ViewModelBase
             EditingUsageName = usage.Name;
             EditingUsageRole = Roles.FirstOrDefault(r => r.Id == usage.RoleId) ?? usage.Role;
             FormLines.Clear();
-            FormLines.AddRange(usage.IsOwned ? usage.Lines : []);
+            FormLines.AddRange(usage.IsOwned ? usage.Lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams)) : []);
             _sourceLines = usage.IsOwned ? [] : usage.Lines;
-            ResetFormLineEditor();
+            SelectedFormLine = null;
             SetPieceSize(usage.AuthoredField, usage.AuthoredValue);
             IsUsageFormOpen = true;
         });
@@ -1173,6 +1226,14 @@ public class ProductsViewModel : ViewModelBase
                 CloseUsageForm();
             }
 
+            // Its neighbour's tab shows instead: the next sub-assembly's, else the one before, else Add Sub-Assembly.
+            if (SelectedRecipeTab is SubAssemblyRecipeTab showing && ReferenceEquals(showing.Usage, usage))
+            {
+                var index = UsageEdits.IndexOf(usage);
+                var neighbour = index + 1 < UsageEdits.Count ? UsageEdits[index + 1] : index > 0 ? UsageEdits[index - 1] : null;
+                SelectRecipeTab(neighbour is null ? AddSubAssemblyTab : TabFor(neighbour));
+            }
+
             UsageEdits.Remove(usage);
             RefreshLinkableOptions();
             RecomputeRecipe();
@@ -1181,31 +1242,21 @@ public class ProductsViewModel : ViewModelBase
 
         ApplyUsageCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(ApplyUsageFormAsync));
 
-        CancelUsageCommand = ReactiveCommand.Create(CloseUsageForm);
+        CancelUsageCommand = ReactiveCommand.Create(() =>
+        {
+            CloseUsageForm();
 
-        AddFormLineCommand = ReactiveCommand.CreateFromTask(
-            () => RunSafelyAsync(() =>
+            // Cancelling an add goes back to the tab that showed before it.
+            if (SelectedRecipeTab is AddSubAssemblyRecipeTab)
             {
-                var ingredient = EditingFormLineIngredient!;
-                if (FormLines.Any(l => l.Ingredient.Id == ingredient.Id))
-                {
-                    throw new InvalidOperationException(
-                        $"{ingredient.Name} is already in this sub-assembly. It can't use the same ingredient twice — remove its line and add it again with the total.");
-                }
-
-                FormLines.Add(new SubAssemblyLineEdit(ingredient, EditingFormLineGrams));
-                ResetFormLineEditor();
-                FormLinesChanged();
-                return Task.CompletedTask;
-            }),
-            this.WhenAnyValue(x => x.EditingFormLineIngredient, x => x.EditingFormLineGrams, (ingredient, grams) => ingredient is not null && grams > 0));
+                SelectRecipeTab(_lastRecipeContentTab is { } last && RecipeTabs.Contains(last)
+                    ? last
+                    : RecipeTabs.OfType<SubAssemblyRecipeTab>().FirstOrDefault() ?? (RecipeTab)PackagingTab);
+            }
+        });
 
         RemoveFormLineCommand = ReactiveCommand.Create(
-            () =>
-            {
-                FormLines.Remove(SelectedFormLine!);
-                FormLinesChanged();
-            },
+            () => { FormLines.Remove(SelectedFormLine!); },
             this.WhenAnyValue(x => x.SelectedFormLine).Select(line => line is not null));
 
         AddLineCommand = ReactiveCommand.Create(
@@ -1296,17 +1347,18 @@ public class ProductsViewModel : ViewModelBase
                 SelectedProduct = Products.FirstOrDefault(p => p.Id == newId);
             }),
             this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingCloneName, (product, name) => product is not null && !string.IsNullOrWhiteSpace(name)));
+
+        // A new product starts on Add Sub-Assembly, with its form open.
+        SelectRecipeTab(AddSubAssemblyTab);
     }
 
-    /// <summary>The Last Updated tile: the day on one line, the time under it; "—" for a product never saved since it was added.</summary>
-    private void ShowUpdatedAt(DateTime? updatedAt)
-    {
-        LastUpdatedText = updatedAt?.ToString("MMM d, yyyy") ?? "—";
-        LastUpdatedTimeText = updatedAt?.ToString("h:mm tt") ?? string.Empty;
-    }
+    /// <summary>The Last Updated figure: the day and the time; "—" for a product never saved since it was added.</summary>
+    private void ShowUpdatedAt(DateTime? updatedAt) =>
+        LastUpdatedText = updatedAt?.ToString("MMM d, yyyy, h:mm tt") ?? "—";
 
     private void LoadIntoForm(Product product)
     {
+        IsDescriptionEditorOpen = false;
         _editingId = product.Id;
         EditingName = product.Name;
         EditingDescription = product.Description ?? string.Empty;
@@ -1340,6 +1392,7 @@ public class ProductsViewModel : ViewModelBase
         _editingId = 0;
         EditingName = string.Empty;
         EditingDescription = string.Empty;
+        IsDescriptionEditorOpen = false;
         ShowUpdatedAt(null);
         EditingCloneName = string.Empty;
 
@@ -1354,9 +1407,20 @@ public class ProductsViewModel : ViewModelBase
     /// <summary>Empties the recipe, packaging, costing and links, and what Save compares them against.</summary>
     private void ClearDetails()
     {
+        var previousTab = SelectedRecipeTab;
         _detailProductId = null;
         _linkedBy = NoLinks;
-        UsageEdits.Clear();
+
+        _arrangingRecipeTabs = true;
+        try
+        {
+            UsageEdits.Clear();
+        }
+        finally
+        {
+            _arrangingRecipeTabs = false;
+        }
+
         LineEdits.Clear();
         SetPackagingLink(null);
         _savedRecipe = new RecipeDraft([], []);
@@ -1364,6 +1428,12 @@ public class ProductsViewModel : ViewModelBase
         SetCosting(null);
         RefreshLinkableOptions();
         RecomputeRecipe();
+
+        // A picked product's sub-assemblies are on their way, and pick the tab when they arrive.
+        if (SelectedProduct is null)
+        {
+            ReselectRecipeTab(previousTab, previousUsage: null);
+        }
     }
 
     private async Task LoadProductDetailAsync(Product? product, CancellationToken cancellationToken)
@@ -1418,14 +1488,24 @@ public class ProductsViewModel : ViewModelBase
     {
         var linesBySubAssembly = subAssemblyLines.ToLookup(l => l.SubAssemblyId);
         var ingredientsById = Ingredients.ToDictionary(m => m.Id);
+        var previousTab = SelectedRecipeTab;
 
-        UsageEdits.Clear();
-        foreach (var usage in usages.Select(u => ToUsageEdit(u, linesBySubAssembly[u.SubAssemblyId], ingredientsById)).Order(ProductUsageEdit.RecipeOrder))
+        _arrangingRecipeTabs = true;
+        try
         {
-            UsageEdits.Add(usage);
+            UsageEdits.Clear();
+            foreach (var usage in usages.Select(u => ToUsageEdit(u, linesBySubAssembly[u.SubAssemblyId], ingredientsById)).Order(ProductUsageEdit.RecipeOrder))
+            {
+                UsageEdits.Add(usage);
+            }
+        }
+        finally
+        {
+            _arrangingRecipeTabs = false;
         }
 
         _savedRecipe = CurrentRecipe();
+        ReselectRecipeTab(previousTab, (previousTab as SubAssemblyRecipeTab)?.Usage);
     }
 
     private ProductUsageEdit ToUsageEdit(ProductSubAssemblyUsage usage, IEnumerable<SubAssemblyLine> lines, IReadOnlyDictionary<int, RawMaterial> ingredientsById)
@@ -1461,16 +1541,16 @@ public class ProductsViewModel : ViewModelBase
 
     private void SetCosting(CostingParameters? costing)
     {
-        EditingLaborCost = costing?.LaborCost ?? 0m;
-        EditingOverheadCost = costing?.OverheadCost ?? 0m;
-        EditingAdministrativeCost = costing?.AdministrativeCost ?? 0m;
+        EditingLaborPercent = costing?.LaborPercent ?? 0m;
+        EditingOverheadPercent = costing?.OverheadPercent ?? 0m;
+        EditingAdministrativePercent = costing?.AdministrativePercent ?? 0m;
         EditingMarginPercent = costing?.MarginPercent ?? 0m;
         EditingVatPercent = costing?.VatPercent ?? 0m;
         _savedCosting = CurrentCosting();
     }
 
     private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) CurrentCosting() =>
-        (EditingLaborCost, EditingOverheadCost, EditingAdministrativeCost, EditingMarginPercent, EditingVatPercent);
+        (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent);
 
     private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> CurrentLines() =>
         [.. LineEdits.Select(l => (l.PackagingMaterial.Id, l.Unit.UnitId, l.AuthoredField, l.AuthoredValue))];
@@ -1527,7 +1607,7 @@ public class ProductsViewModel : ViewModelBase
         EditingUsageRole = Roles.FirstOrDefault();
         FormLines.Clear();
         _sourceLines = [];
-        ResetFormLineEditor();
+        SelectedFormLine = null;
         RefreshLinkableOptions();
         EditingUsageSource = null;
         SetPieceSize(UsageAuthoredField.WeightPerPiece, 0m);
@@ -1559,7 +1639,7 @@ public class ProductsViewModel : ViewModelBase
         if (EditingUsageMode.Mode == UsageFormMode.Copy)
         {
             FormLines.Clear();
-            FormLines.AddRange(lines);
+            FormLines.AddRange(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams)));
             if (source is not null)
             {
                 EditingUsageName = SubAssemblyRules.UniqueName(source.SubAssembly.Name, [.. UsageEdits.Where(u => u.IsOwned).Select(u => u.Name)]);
@@ -1589,7 +1669,8 @@ public class ProductsViewModel : ViewModelBase
                 throw new InvalidOperationException(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage)));
             }
 
-            if (FormLines.Count == 0)
+            var lines = IngredientLineRow.CompleteLines(FormLines, name);
+            if (lines.Count == 0)
             {
                 throw new InvalidOperationException($"Add the ingredients that go into {name}, in grams.");
             }
@@ -1598,7 +1679,7 @@ public class ProductsViewModel : ViewModelBase
             EnsurePieceSizeEntered(authoredValue, name);
 
             usage = new ProductUsageEdit(
-                _editingUsage?.SubAssemblyId ?? 0, name, EditingUsageRole, [.. FormLines], _usageAuthoredField, authoredValue, ownerName: null, _editingUsage?.LinkedBy ?? []);
+                _editingUsage?.SubAssemblyId ?? 0, name, EditingUsageRole, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams))], _usageAuthoredField, authoredValue, ownerName: null, _editingUsage?.LinkedBy ?? []);
         }
         else
         {
@@ -1622,11 +1703,15 @@ public class ProductsViewModel : ViewModelBase
 
         if (_editingUsage is not null)
         {
-            UsageEdits.Remove(_editingUsage);
+            ReplaceInRecipeOrder(_editingUsage, usage);
+        }
+        else
+        {
+            InsertInRecipeOrder(usage);
         }
 
-        InsertInRecipeOrder(usage);
         CloseUsageForm();
+        SelectRecipeTab(TabFor(usage));
         RefreshLinkableOptions();
         RecomputeRecipe();
     }
@@ -1643,14 +1728,28 @@ public class ProductsViewModel : ViewModelBase
     {
         IsUsageFormOpen = false;
         _editingUsage = null;
+        MarkEditingTab(null);
     }
 
-    private void ResetFormLineEditor()
+    /// <summary>A fresh form to add a sub-assembly, in place of any the form had open.</summary>
+    private void StartAddingUsage()
     {
-        SelectedFormLine = null;
-        EditingFormLineIngredient = null;
-        EditingFormLineGrams = 0m;
+        _editingUsage = null;
+        MarkEditingTab(null);
+        UsageFormTitle = "Add Sub-Assembly";
+        IsAddingUsage = true;
+        EditingUsageMode = UsageFormModeOption.All[0];
+        IsUsageFormOpen = true;
+        StartUsageFormMode();
     }
+
+    /// <summary>The add form as it opened: no name typed, nothing picked to link or copy, no line and no piece size.</summary>
+    private bool IsUsageFormUntouched() =>
+        IsAddingUsage
+        && string.IsNullOrWhiteSpace(EditingUsageName)
+        && EditingUsageSource is null
+        && FormLines.All(l => l.IngredientId is null && l.Grams == 0)
+        && CurrentAuthoredValue() == 0;
 
     /// <summary>The form's lines changed, or its source's were loaded: the batch weight, the other piece-size figure and the preview follow.</summary>
     private void FormLinesChanged()
@@ -1713,7 +1812,7 @@ public class ProductsViewModel : ViewModelBase
     /// <summary>Works out the figure the user didn't type from the one they did, rounded to the 2 decimals the box shows. Call with _syncingPieceSize set.</summary>
     private void UpdateOtherPieceSizeFigure()
     {
-        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(_usageAuthoredField, CurrentAuthoredValue(), UsageFormLines().Sum(l => l.Grams));
+        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(_usageAuthoredField, CurrentAuthoredValue(), UsageFormBatch().Sum(l => l.Grams));
         if (_usageAuthoredField == UsageAuthoredField.WeightPerPiece)
         {
             EditingUsageYield = Math.Round(yield, 2);
@@ -1727,14 +1826,19 @@ public class ProductsViewModel : ViewModelBase
     private decimal CurrentAuthoredValue() =>
         _usageAuthoredField == UsageAuthoredField.WeightPerPiece ? EditingUsageWeightPerPiece : EditingUsageYield;
 
-    /// <summary>The lines the form's batch is made of: its own for a sub-assembly of the product's, the linked one's otherwise.</summary>
-    private IReadOnlyList<SubAssemblyLineEdit> UsageFormLines() => IsFormEditingLines ? FormLines : _sourceLines;
+    /// <summary>
+    /// The form's batch, as each line's grams and buffered cost per gram: its own lines for a sub-assembly of the
+    /// product's (those with an ingredient picked), the linked one's otherwise.
+    /// </summary>
+    private IReadOnlyList<(decimal Grams, decimal CostPerGram)> UsageFormBatch() =>
+        IsFormEditingLines
+            ? [.. FormLines.Where(l => l.Ingredient is not null).Select(l => (l.Grams, l.Ingredient!.BufferedCostPerBaseUnit))]
+            : [.. _sourceLines.Select(l => (l.Grams, l.Ingredient.BufferedCostPerBaseUnit))];
 
     /// <summary>The form's batch weight, which figure stays put, and what a piece costs.</summary>
     private void RecomputeUsageForm()
     {
-        var lines = UsageFormLines();
-        var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals([.. lines.Select(l => (l.Grams, l.Ingredient.BufferedCostPerBaseUnit))]);
+        var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(UsageFormBatch());
         var authoredValue = CurrentAuthoredValue();
         var (weightPerPiece, _) = ProductRules.ResolvePieceSize(_usageAuthoredField, authoredValue, totalWeight);
 
@@ -1806,11 +1910,156 @@ public class ProductsViewModel : ViewModelBase
             CloseUsageForm();
         }
 
-        UsageEdits.Remove(old);
-        InsertInRecipeOrder(replacement);
+        ReplaceInRecipeOrder(old, replacement);
         RefreshLinkableOptions();
         RecomputeRecipe();
     }
+
+    /// <summary>
+    /// Puts <paramref name="replacement"/> in <paramref name="old"/>'s place, then moves it to where it sorts
+    /// (a new name or role can move it). Replacing rather than removing keeps its tab, and the tab showing.
+    /// </summary>
+    private void ReplaceInRecipeOrder(ProductUsageEdit old, ProductUsageEdit replacement)
+    {
+        var index = UsageEdits.IndexOf(old);
+        if (index < 0)
+        {
+            InsertInRecipeOrder(replacement);
+            return;
+        }
+
+        UsageEdits[index] = replacement;
+        var sortedIndex = UsageEdits.Count(u => !ReferenceEquals(u, replacement) && ProductUsageEdit.RecipeOrder.Compare(u, replacement) <= 0);
+        if (sortedIndex != index)
+        {
+            UsageEdits.Move(index, sortedIndex);
+        }
+    }
+
+    /// <summary>
+    /// Keeps RecipeTabs' sub-assembly tabs in step with UsageEdits, index for index. A replaced section keeps
+    /// its tab, and the form follows it when it was the one being edited (a refresh swaps in a copy with new
+    /// costs), so neither a refresh nor an Apply moves the tab showing or loses the form's place.
+    /// </summary>
+    private void MirrorUsageTabs(NotifyCollectionChangedEventArgs e)
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add:
+                for (var i = 0; i < e.NewItems!.Count; i++)
+                {
+                    RecipeTabs.Insert(e.NewStartingIndex + i, new SubAssemblyRecipeTab((ProductUsageEdit)e.NewItems[i]!));
+                }
+
+                break;
+
+            case NotifyCollectionChangedAction.Remove:
+                for (var i = 0; i < e.OldItems!.Count; i++)
+                {
+                    RecipeTabs.RemoveAt(e.OldStartingIndex);
+                }
+
+                break;
+
+            case NotifyCollectionChangedAction.Replace:
+            {
+                var replacement = (ProductUsageEdit)e.NewItems![0]!;
+                ((SubAssemblyRecipeTab)RecipeTabs[e.NewStartingIndex]).Usage = replacement;
+                if (ReferenceEquals(e.OldItems![0], _editingUsage))
+                {
+                    _editingUsage = replacement;
+                }
+
+                break;
+            }
+
+            case NotifyCollectionChangedAction.Move:
+                RecipeTabs.Move(e.OldStartingIndex, e.NewStartingIndex);
+                break;
+
+            default:
+                while (RecipeTabs[0] is SubAssemblyRecipeTab)
+                {
+                    RecipeTabs.RemoveAt(0);
+                }
+
+                break;
+        }
+    }
+
+    private SubAssemblyRecipeTab TabFor(ProductUsageEdit usage) =>
+        RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => ReferenceEquals(t.Usage, usage));
+
+    /// <summary>Shows the sub-assembly form in <paramref name="usage"/>'s tab, or in none.</summary>
+    private void MarkEditingTab(ProductUsageEdit? usage)
+    {
+        foreach (var tab in RecipeTabs.OfType<SubAssemblyRecipeTab>())
+        {
+            tab.IsEditing = usage is not null && ReferenceEquals(tab.Usage, usage);
+        }
+    }
+
+    /// <summary>Shows <paramref name="tab"/>, and does what showing it does even when it was already showing.</summary>
+    private void SelectRecipeTab(RecipeTab tab)
+    {
+        SelectedRecipeTab = tab;
+        RecipeTabShown(tab);
+    }
+
+    /// <summary>
+    /// A tab was picked, by the user or the screen. Add Sub-Assembly opens the form to add one (a form already
+    /// adding one is left as it is). Any other tab closes an add form nothing was entered in, so a form still
+    /// open is always one Save should apply.
+    /// </summary>
+    private void RecipeTabShown(RecipeTab? tab)
+    {
+        if (_arrangingRecipeTabs)
+        {
+            return;
+        }
+
+        if (tab is AddSubAssemblyRecipeTab)
+        {
+            if (!IsUsageFormOpen || !IsAddingUsage)
+            {
+                StartAddingUsage();
+            }
+
+            return;
+        }
+
+        if (tab is not null)
+        {
+            _lastRecipeContentTab = tab;
+        }
+
+        if (IsUsageFormOpen && IsUsageFormUntouched())
+        {
+            CloseUsageForm();
+        }
+    }
+
+    /// <summary>
+    /// After the sections were rebuilt (a product loaded, reloaded after Save, or cleared for a new one): the
+    /// tab that showed if it's still there (the same sub-assembly's, or Packaging), else the first
+    /// sub-assembly's, else Add Sub-Assembly.
+    /// </summary>
+    private void ReselectRecipeTab(RecipeTab? previous, ProductUsageEdit? previousUsage)
+    {
+        RecipeTab? tab = previous is PackagingRecipeTab ? previous : null;
+        if (previousUsage is not null)
+        {
+            tab = RecipeTabs.OfType<SubAssemblyRecipeTab>().FirstOrDefault(t => IsSameSubAssembly(t.Usage, previousUsage));
+        }
+
+        SelectRecipeTab(tab ?? RecipeTabs.OfType<SubAssemblyRecipeTab>().FirstOrDefault() ?? (RecipeTab)AddSubAssemblyTab);
+    }
+
+    /// <summary>A saved sub-assembly is known by its id; one of the product's own saved since, by its name.</summary>
+    private static bool IsSameSubAssembly(ProductUsageEdit usage, ProductUsageEdit previous) =>
+        previous.SubAssemblyId > 0
+            ? usage.SubAssemblyId == previous.SubAssemblyId
+            : usage.IsOwned && string.Equals(usage.Name, previous.Name, StringComparison.CurrentCultureIgnoreCase);
 
     /// <summary>
     /// The sub-assemblies the form can link or copy: every other product's, less (when linking) those the
@@ -1938,18 +2187,7 @@ public class ProductsViewModel : ViewModelBase
     private void RefreshFormLines()
     {
         var ingredientsById = Ingredients.ToDictionary(m => m.Id);
-        var selectedIngredientId = SelectedFormLine?.Ingredient.Id;
-
-        var repriced = Repriced([.. FormLines], ingredientsById);
-        for (var i = 0; i < repriced.Count; i++)
-        {
-            if (!ReferenceEquals(FormLines[i], repriced[i]))
-            {
-                FormLines[i] = repriced[i];
-            }
-        }
-
-        SelectedFormLine = FormLines.FirstOrDefault(l => l.Ingredient.Id == selectedIngredientId);
+        IngredientLineRow.Resolve(FormLines, ingredientsById);
         _sourceLines = Repriced(_sourceLines, ingredientsById);
     }
 
@@ -1974,7 +2212,6 @@ public class ProductsViewModel : ViewModelBase
 
         HasUsages = UsageEdits.Count > 0;
         HasPackaging = LineEdits.Count > 0;
-        HasRecipe = HasUsages || HasPackaging;
         HasMaterialCost = material > 0;
         ExampleResult = null;
     }
@@ -1984,9 +2221,9 @@ public class ProductsViewModel : ViewModelBase
         Costs = new ProductCostSummary(
             [.. UsageEdits.Select(u => u.CostPerPiece)],
             [.. LineEdits.Select(l => l.CostPerPiece)],
-            EditingLaborCost,
-            EditingOverheadCost,
-            EditingAdministrativeCost,
+            EditingLaborPercent,
+            EditingOverheadPercent,
+            EditingAdministrativePercent,
             EditingMarginPercent,
             EditingVatPercent);
 }

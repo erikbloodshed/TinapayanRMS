@@ -6,7 +6,7 @@
         Add a packaging line, or change one. Its amount is entered either way round (a ribbon as cm per
         piece, a box as pieces per box); the other is worked out. Apply only puts it in the recipe.
     -->
-    <Border Padding="12" CornerRadius="6" Background="{StaticResource PageBackgroundBrush}">
+    <Border Padding="8" CornerRadius="6" Background="{StaticResource PageBackgroundBrush}">
         <StackPanel>
             <TextBlock Text="{Binding LineFormTitle}"
                        FontWeight="SemiBold"
@@ -57,13 +57,17 @@
                                           NumberDecimalDigits="4" />
             </Grid>
 
-            <DockPanel Margin="0,12,0,0">
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding LineFormPreviewText}" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <syncfusion:ButtonAdv Label="Cancel" IconTemplate="{StaticResource CancelIconTemplate}" Command="{Binding CancelLineCommand}" Margin="0,0,8,0" />
                     <syncfusion:ButtonAdv Label="Apply" IconTemplate="{StaticResource ApplyIconTemplate}" Command="{Binding ApplyLineCommand}" />
                 </StackPanel>
-                <TextBlock Text="{Binding LineFormPreviewText}" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,12,0" />
-            </DockPanel>
+            </Grid>
         </StackPanel>
     </Border>
 </UserControl>

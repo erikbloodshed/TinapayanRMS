@@ -16,7 +16,7 @@ public class CostingParametersRepository(IDbContextFactory<TinapayanRMSDbContext
     }
 
     public async Task SetAsync(
-        int productId, decimal laborCost, decimal overheadCost, decimal administrativeCost, decimal marginPercent, decimal vatPercent, CancellationToken cancellationToken)
+        int productId, decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent, decimal vatPercent, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await SetAsync(
@@ -24,9 +24,9 @@ public class CostingParametersRepository(IDbContextFactory<TinapayanRMSDbContext
             new CostingParameters
             {
                 ProductId = productId,
-                LaborCost = laborCost,
-                OverheadCost = overheadCost,
-                AdministrativeCost = administrativeCost,
+                LaborPercent = laborPercent,
+                OverheadPercent = overheadPercent,
+                AdministrativePercent = administrativePercent,
                 MarginPercent = marginPercent,
                 VatPercent = vatPercent,
             },
@@ -37,7 +37,7 @@ public class CostingParametersRepository(IDbContextFactory<TinapayanRMSDbContext
     internal static async Task SetAsync(TinapayanRMSDbContext dbContext, CostingParameters costing, CancellationToken cancellationToken)
     {
         CostingRules.EnsureValidParameters(
-            costing.LaborCost, costing.OverheadCost, costing.AdministrativeCost, costing.MarginPercent, costing.VatPercent);
+            costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent, costing.VatPercent);
 
         var existing = await dbContext.CostingParameters.FirstOrDefaultAsync(c => c.ProductId == costing.ProductId, cancellationToken);
         if (existing is null)
@@ -46,9 +46,9 @@ public class CostingParametersRepository(IDbContextFactory<TinapayanRMSDbContext
             dbContext.CostingParameters.Add(existing);
         }
 
-        existing.LaborCost = costing.LaborCost;
-        existing.OverheadCost = costing.OverheadCost;
-        existing.AdministrativeCost = costing.AdministrativeCost;
+        existing.LaborPercent = costing.LaborPercent;
+        existing.OverheadPercent = costing.OverheadPercent;
+        existing.AdministrativePercent = costing.AdministrativePercent;
         existing.MarginPercent = costing.MarginPercent;
         existing.VatPercent = costing.VatPercent;
 

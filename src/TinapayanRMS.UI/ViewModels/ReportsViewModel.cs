@@ -150,9 +150,9 @@ public class ReportsViewModel : ReactiveObject
             var costingParameters = await _costingParametersRepository.GetForProductAsync(product.Id, CancellationToken.None);
             var (baseCost, _, sellingPrice) = CostingRules.CalculateSellingPrice(
                 materialCostPerPiece,
-                costingParameters?.LaborCost ?? 0m,
-                costingParameters?.OverheadCost ?? 0m,
-                costingParameters?.AdministrativeCost ?? 0m,
+                costingParameters?.LaborPercent ?? 0m,
+                costingParameters?.OverheadPercent ?? 0m,
+                costingParameters?.AdministrativePercent ?? 0m,
                 costingParameters?.MarginPercent ?? 0m,
                 costingParameters?.VatPercent ?? 0m);
 

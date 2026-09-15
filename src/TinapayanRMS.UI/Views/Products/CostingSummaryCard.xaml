@@ -3,16 +3,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
     <UserControl.Resources>
-        <!-- A costing input as a tile: a coloured edge, its label and field, then what it comes to in the price. -->
+        <!-- A costing input: a coloured edge beside its label and field, then what it comes to in the price. No box around it. -->
         <Style x:Key="CostTileStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource PageBackgroundBrush}" />
-            <Setter Property="BorderThickness" Value="4,0,0,0" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="12,10" />
-            <Setter Property="Margin" Value="0,0,12,0" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="Padding" Value="10,0,0,0" />
         </Style>
         <Style x:Key="TileCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionStyle}">
-            <Setter Property="Margin" Value="0,6,0,0" />
+            <Setter Property="Margin" Value="0,4,0,0" />
         </Style>
 
         <SolidColorBrush x:Key="LaborTileBrush" Color="#0F766E" />
@@ -22,56 +19,69 @@
         <SolidColorBrush x:Key="VatTileBrush" Color="#0369A1" />
     </UserControl.Resources>
 
-    <Border Style="{StaticResource CardStyle}">
-        <StackPanel>
-            <TextBlock Text="Costing Summary" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-            <TextBlock Text="Labor, overhead and administrative costs are pesos per piece. The markup goes on the base cost, then VAT on top. Changes are saved with Save."
-                       Style="{StaticResource CardCaptionStyle}" />
+    <StackPanel>
+        <TextBlock Text="Costing Summary" Style="{StaticResource PanelHeaderStyle}" />
+        <TextBlock Text="Labor, overhead and administrative are percentages of the material cost. The markup goes on the base cost, then VAT on top. Changes are saved with Save."
+                   Style="{StaticResource PanelCaptionStyle}" />
 
-            <UniformGrid Columns="5">
-                <Border Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource LaborTileBrush}">
-                    <StackPanel>
-                        <TextBlock Text="Labor" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:DoubleTextBox Value="{Binding EditingLaborCost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.LaborShare, StringFormat='{}{0:N1}% of the price'}" />
-                    </StackPanel>
-                </Border>
+        <!-- Every input is a percentage, and shows what it comes to in pesos: five equal columns with gaps between -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-                <Border Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource OverheadTileBrush}">
-                    <StackPanel>
-                        <TextBlock Text="Overhead" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:DoubleTextBox Value="{Binding EditingOverheadCost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.OverheadShare, StringFormat='{}{0:N1}% of the price'}" />
-                    </StackPanel>
-                </Border>
+            <Border Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource LaborTileBrush}">
+                <StackPanel>
+                    <TextBlock Text="Labor %" Style="{StaticResource FieldLabelStyle}" />
+                    <syncfusion:DoubleTextBox Value="{Binding EditingLaborPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.Labor, StringFormat='₱{0:N4}'}" />
+                    <TextBlock Style="{StaticResource CaptionStyle}" Text="{Binding Costs.LaborShare, StringFormat='{}{0:N1}% of the price'}" />
+                </StackPanel>
+            </Border>
 
-                <Border Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource AdministrativeTileBrush}">
-                    <StackPanel>
-                        <TextBlock Text="Administrative" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:DoubleTextBox Value="{Binding EditingAdministrativeCost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.AdministrativeShare, StringFormat='{}{0:N1}% of the price'}" />
-                    </StackPanel>
-                </Border>
+            <Border Grid.Column="2" Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource OverheadTileBrush}">
+                <StackPanel>
+                    <TextBlock Text="Overhead %" Style="{StaticResource FieldLabelStyle}" />
+                    <syncfusion:DoubleTextBox Value="{Binding EditingOverheadPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.Overhead, StringFormat='₱{0:N4}'}" />
+                    <TextBlock Style="{StaticResource CaptionStyle}" Text="{Binding Costs.OverheadShare, StringFormat='{}{0:N1}% of the price'}" />
+                </StackPanel>
+            </Border>
 
-                <!-- The two percentages also show what they come to in pesos -->
-                <Border Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource MarkupTileBrush}">
-                    <StackPanel>
-                        <TextBlock Text="Markup %" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:DoubleTextBox Value="{Binding EditingMarginPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.Markup, StringFormat='₱{0:N4}'}" />
-                        <TextBlock Style="{StaticResource CaptionStyle}" Text="{Binding Costs.MarkupShare, StringFormat='{}{0:N1}% of the price'}" />
-                    </StackPanel>
-                </Border>
+            <Border Grid.Column="4" Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource AdministrativeTileBrush}">
+                <StackPanel>
+                    <TextBlock Text="Administrative %" Style="{StaticResource FieldLabelStyle}" />
+                    <syncfusion:DoubleTextBox Value="{Binding EditingAdministrativePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.Administrative, StringFormat='₱{0:N4}'}" />
+                    <TextBlock Style="{StaticResource CaptionStyle}" Text="{Binding Costs.AdministrativeShare, StringFormat='{}{0:N1}% of the price'}" />
+                </StackPanel>
+            </Border>
 
-                <Border Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource VatTileBrush}" Margin="0">
-                    <StackPanel>
-                        <TextBlock Text="VAT %" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:DoubleTextBox Value="{Binding EditingVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.Vat, StringFormat='₱{0:N4}'}" />
-                        <TextBlock Style="{StaticResource CaptionStyle}" Text="{Binding Costs.VatShare, StringFormat='{}{0:N1}% of the price'}" />
-                    </StackPanel>
-                </Border>
-            </UniformGrid>
-        </StackPanel>
-    </Border>
+            <Border Grid.Column="6" Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource MarkupTileBrush}">
+                <StackPanel>
+                    <TextBlock Text="Markup %" Style="{StaticResource FieldLabelStyle}" />
+                    <syncfusion:DoubleTextBox Value="{Binding EditingMarginPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.Markup, StringFormat='₱{0:N4}'}" />
+                    <TextBlock Style="{StaticResource CaptionStyle}" Text="{Binding Costs.MarkupShare, StringFormat='{}{0:N1}% of the price'}" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="8" Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource VatTileBrush}">
+                <StackPanel>
+                    <TextBlock Text="VAT %" Style="{StaticResource FieldLabelStyle}" />
+                    <syncfusion:DoubleTextBox Value="{Binding EditingVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.Vat, StringFormat='₱{0:N4}'}" />
+                    <TextBlock Style="{StaticResource CaptionStyle}" Text="{Binding Costs.VatShare, StringFormat='{}{0:N1}% of the price'}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </StackPanel>
 </UserControl>

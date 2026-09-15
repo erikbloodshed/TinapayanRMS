@@ -331,9 +331,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingSource = RawMaterialSource.Made;
         viewModel.EditingWeightLossPercent = 20m;
         viewModel.ShowPurchaseSetup.Should().BeFalse("a made ingredient has a BOM instead of a price");
-        viewModel.EditingBomComponent = viewModel.Ingredients.Single();
-        viewModel.EditingBomGrams = 1000m;
-        await viewModel.AddBomLineCommand.Execute();
+        viewModel.BomLineEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single().Id, Grams = 1000m });
         await viewModel.SaveCommand.Execute();
 
         await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial is not null && viewModel.BomLineEdits.Count == 1,
@@ -399,9 +397,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await AddUnitAsync(viewModel, bagId, 25000m);
         viewModel.EditingPrice = 90m;
         viewModel.EditingSource = RawMaterialSource.Made;
-        viewModel.EditingBomComponent = viewModel.Ingredients.Single();
-        viewModel.EditingBomGrams = 100m;
-        await viewModel.AddBomLineCommand.Execute();
+        viewModel.BomLineEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single().Id, Grams = 100m });
 
         await viewModel.NewCommand.Execute();
 

@@ -2,16 +2,24 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
-    <Border Style="{StaticResource CardStyle}">
-        <DockPanel>
-            <TextBlock DockPanel.Dock="Top" Text="Products" Style="{StaticResource SectionHeaderStyle}" />
-            <syncfusion:SfTextBoxExt DockPanel.Dock="Top"
-                                     Margin="0,0,0,12"
+    <!-- The screen's first region: its title, the search box, then the list filling the rest. -->
+    <Border Style="{StaticResource CardStyle}" Padding="12">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Text="Products" Style="{StaticResource PanelHeaderStyle}" Margin="0,0,0,8" />
+            <syncfusion:SfTextBoxExt Grid.Row="1"
+                                     Margin="0,0,0,8"
                                      Watermark="Search products"
                                      WatermarkTemplate="{StaticResource AlignedWatermarkTemplate}"
                                      Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-            <syncfusion:SfDataGrid ItemsSource="{Binding VisibleProducts}"
+            <syncfusion:SfDataGrid Grid.Row="2"
+                                   ItemsSource="{Binding VisibleProducts}"
                                    SelectedItem="{Binding SelectedProduct, Mode=TwoWay}"
                                    AutoGenerateColumns="False"
                                    AllowEditing="False"
@@ -22,6 +30,6 @@
                     <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
-        </DockPanel>
+        </Grid>
     </Border>
 </UserControl>

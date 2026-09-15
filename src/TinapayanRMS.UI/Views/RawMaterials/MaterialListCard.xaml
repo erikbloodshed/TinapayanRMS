@@ -37,7 +37,6 @@
                                    AllowEditing="False"
                                    SelectionMode="Single"
                                    NavigationMode="Row"
-                                   ColumnSizer="Star"
                                    LiveDataUpdateMode="AllowDataShaping"
                                    AutoExpandGroups="True"
                                    ShowColumnWhenGrouped="False"
@@ -49,10 +48,14 @@
                     <syncfusion:SortColumnDescription ColumnName="Name" SortDirection="Ascending" />
                 </syncfusion:SfDataGrid.SortColumnDescriptions>
                 <syncfusion:SfDataGrid.Columns>
-                    <!-- Name and Category share what the two costs leave. -->
-                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
+                    <!--
+                        Fixed widths, measured in the grid's font (Segoe UI, 12 px): Name fits 30 characters and
+                        Category 25, even in capitals, and the two costs are the same width. The list's column in
+                        RawMaterialsView is Auto, so the card is as wide as these columns and never cuts one off.
+                    -->
+                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="220" />
                     <syncfusion:GridTextColumn MappingName="Type" HeaderText="Type" />
-                    <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" />
+                    <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="185" />
                     <controls:NumericColumn MappingName="CostPerBaseUnit" HeaderText="Cost" Width="96" NumberDecimalDigits="4" />
                     <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Buffered" Width="96" NumberDecimalDigits="4" />
                 </syncfusion:SfDataGrid.Columns>

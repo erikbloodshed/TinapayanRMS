@@ -16,132 +16,130 @@
     </UserControl.Resources>
 
     <!--
-        One sub-assembly of the recipe: the Recipe Structure's item, a ProductUsageEdit. Its header, then
-        its ingredient lines scaled to one piece, which add up to its cost per piece. Its buttons call the
-        screen's commands (the ItemsControl's DataContext) with the section. A linked one has read-only
-        lines: Edit changes its piece size, and Make a Copy turns it into the product's own.
+        One sub-assembly of the recipe, the content of its Recipe Structure tab: a ProductUsageEdit. Its header,
+        then its ingredient lines scaled to one piece, then their total, which is its cost per piece. Its buttons
+        call the screen's commands (the DataContext of the tab control, an ItemsControl) with the section. A linked
+        one has read-only lines: Edit changes its piece size, and Make a Copy turns it into the product's own.
     -->
-    <Border BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8">
-        <DockPanel>
-            <DockPanel DockPanel.Dock="Top" Margin="12,10">
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                    <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
-                        <TextBlock Text="Cost per piece" Style="{StaticResource CaptionStyle}" HorizontalAlignment="Right" />
-                        <TextBlock Text="{Binding CostPerPiece, StringFormat='₱{0:N4}'}"
-                                   FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource HeadingForegroundBrush}"
-                                   HorizontalAlignment="Right" />
-                    </StackPanel>
-                    <syncfusion:ButtonAdv SizeMode="Small"
-                                          Label="Edit"
-                                          ToolTip="Change its piece size, and for the product's own, its name, role and lines"
-                                          IconTemplate="{StaticResource EditIconTemplate}"
-                                          Command="{Binding DataContext.EditUsageCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                          CommandParameter="{Binding}"
-                                          Margin="0,0,4,0" />
-                    <syncfusion:ButtonAdv SizeMode="Small"
-                                          Label="Make a Copy"
-                                          ToolTip="Make it this product's own copy, to change its lines here. It stops following the product it's from."
-                                          IconTemplate="{StaticResource CopyIconTemplate}"
-                                          Command="{Binding DataContext.MakeCopyCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                          CommandParameter="{Binding}"
-                                          Visibility="{Binding IsLinked, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                          Margin="0,0,4,0" />
-                    <syncfusion:ButtonAdv SizeMode="Small"
-                                          Label="Remove"
-                                          ToolTip="Take it out of the recipe"
-                                          IconTemplate="{StaticResource RemoveIconTemplate}"
-                                          Command="{Binding DataContext.RemoveUsageCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                          CommandParameter="{Binding}"
-                                          Margin="0,0,4,0" />
-                    <syncfusion:ButtonAdv x:Name="CollapseToggle"
-                                          SizeMode="Small"
-                                          Label="Collapse"
-                                          IsCheckable="True"
-                                          ToolTip="Show or hide its ingredients"
-                                          IconTemplate="{StaticResource ExpandIconTemplate}" />
-                </StackPanel>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-                <Border DockPanel.Dock="Left" Style="{StaticResource GlyphTileStyle}">
-                    <TextBlock Text="&#xE8FD;" Style="{StaticResource GlyphTileIconStyle}" />
+        <!-- Name, badges and "Dough · 1,700 g batch · 28.33 pcs · 60 g per piece", then the cost per piece and the buttons -->
+        <Grid Margin="8,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Grid VerticalAlignment="Center">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="{Binding Name}"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource HeadingForegroundBrush}"
+                           TextTrimming="CharacterEllipsis" />
+                <Border Grid.Column="1"
+                        Style="{StaticResource LinkedBadgeStyle}"
+                        ToolTip="Its lines come from that product and follow its changes."
+                        Visibility="{Binding IsLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding LinkedFromText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
+                </Border>
+                <Border Grid.Column="2"
+                        HorizontalAlignment="Left"
+                        Style="{StaticResource LinkedBadgeStyle}"
+                        ToolTip="Changing its lines changes theirs too."
+                        Visibility="{Binding IsShared, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding SharedText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" TextTrimming="CharacterEllipsis" />
                 </Border>
 
-                <Grid VerticalAlignment="Center">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Style="{StaticResource CaptionStyle}">
+                    <Run Text="{Binding RoleName, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding BatchText, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding YieldText, Mode=OneWay}" Tag="{Binding IsYieldAuthored}" Style="{StaticResource TypedFigureRunStyle}" /><Run Text=" · " /><Run Text="{Binding WeightText, Mode=OneWay}" Tag="{Binding IsWeightAuthored}" Style="{StaticResource TypedFigureRunStyle}" />
+                </TextBlock>
+            </Grid>
 
-                    <TextBlock Text="{Binding Name}"
-                               FontSize="15"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource HeadingForegroundBrush}"
-                               TextTrimming="CharacterEllipsis" />
-                    <Border Grid.Column="1"
-                            Style="{StaticResource LinkedBadgeStyle}"
-                            ToolTip="Its lines come from that product and follow its changes."
-                            Visibility="{Binding IsLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="{Binding LinkedFromText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
-                    </Border>
-                    <Border Grid.Column="2"
-                            HorizontalAlignment="Left"
-                            Style="{StaticResource LinkedBadgeStyle}"
-                            ToolTip="Changing its lines changes theirs too."
-                            Visibility="{Binding IsShared, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="{Binding SharedText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" TextTrimming="CharacterEllipsis" />
-                    </Border>
+            <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+                <TextBlock Text="Cost per piece" Style="{StaticResource CaptionStyle}" HorizontalAlignment="Right" />
+                <TextBlock Text="{Binding CostPerPiece, StringFormat='₱{0:N4}'}"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource HeadingForegroundBrush}"
+                           HorizontalAlignment="Right" />
+            </StackPanel>
 
-                    <!-- "Dough · 1,700 g batch · 28.33 pcs · 60 g per piece" -->
-                    <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Style="{StaticResource CaptionStyle}">
-                        <Run Text="{Binding RoleName, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding BatchText, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding YieldText, Mode=OneWay}" Tag="{Binding IsYieldAuthored}" Style="{StaticResource TypedFigureRunStyle}" /><Run Text=" · " /><Run Text="{Binding WeightText, Mode=OneWay}" Tag="{Binding IsWeightAuthored}" Style="{StaticResource TypedFigureRunStyle}" />
-                    </TextBlock>
-                </Grid>
-            </DockPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <syncfusion:ButtonAdv SizeMode="Small"
+                                      Label="Edit"
+                                      ToolTip="Change its piece size, and for the product's own, its name, role and lines"
+                                      IconTemplate="{StaticResource EditIconTemplate}"
+                                      Command="{Binding DataContext.EditUsageCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                      CommandParameter="{Binding}"
+                                      Margin="0,0,4,0" />
+                <syncfusion:ButtonAdv SizeMode="Small"
+                                      Label="Make a Copy"
+                                      ToolTip="Make it this product's own copy, to change its lines here. It stops following the product it's from."
+                                      IconTemplate="{StaticResource CopyIconTemplate}"
+                                      Command="{Binding DataContext.MakeCopyCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                      CommandParameter="{Binding}"
+                                      Visibility="{Binding IsLinked, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                      Margin="0,0,4,0" />
+                <syncfusion:ButtonAdv SizeMode="Small"
+                                      Label="Remove"
+                                      ToolTip="Take it out of the recipe"
+                                      IconTemplate="{StaticResource RemoveIconTemplate}"
+                                      Command="{Binding DataContext.RemoveUsageCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                      CommandParameter="{Binding}" />
+            </StackPanel>
+        </Grid>
 
-            <!-- The table's total, under its Cost per Piece and % of Cost columns: the same widths as the grid's columns -->
-            <Border DockPanel.Dock="Bottom"
-                    CornerRadius="0,0,7,7"
-                    BorderBrush="{StaticResource CardBorderBrush}"
-                    BorderThickness="0,1,0,0"
-                    Background="{StaticResource PageBackgroundBrush}"
-                    Visibility="{Binding IsChecked, ElementName=CollapseToggle, Converter={StaticResource EmptyStateVisibilityConverter}}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="104" />
-                        <ColumnDefinition Width="88" />
-                        <ColumnDefinition Width="104" />
-                        <ColumnDefinition Width="76" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="Total" Style="{StaticResource SectionTotalCellStyle}" HorizontalAlignment="Left" />
-                    <TextBlock Grid.Column="1" Text="{Binding WeightPerPiece, StringFormat='{}{0:N4}'}" Style="{StaticResource SectionTotalCellStyle}" />
-                    <TextBlock Grid.Column="3" Text="{Binding CostPerPiece, StringFormat='{}{0:N4}'}" Style="{StaticResource SectionTotalCellStyle}" />
-                    <TextBlock Grid.Column="4" Text="{Binding PercentTotal, StringFormat='{}{0:N1}'}" Style="{StaticResource SectionTotalCellStyle}" />
-                </Grid>
-            </Border>
+        <!-- No height of its own: it shows every line, and passes the wheel on to the tab (MouseWheelForwarding) -->
+        <syncfusion:SfDataGrid Grid.Row="1"
+                               ItemsSource="{Binding IngredientRows}"
+                               AutoGenerateColumns="False"
+                               AllowEditing="False"
+                               SelectionMode="None"
+                               ColumnSizer="Star"
+                               controls:MouseWheelForwarding.IsEnabled="True">
+            <syncfusion:SfDataGrid.Columns>
+                <syncfusion:GridTextColumn MappingName="IngredientName" HeaderText="Ingredient" />
+                <controls:NumericColumn MappingName="GramsPerPiece" HeaderText="Grams per Piece" Width="104" NumberDecimalDigits="4" />
+                <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost per g" Width="88" NumberDecimalDigits="4" />
+                <controls:NumericColumn MappingName="CostPerPiece" HeaderText="Cost per Piece" Width="104" NumberDecimalDigits="4" />
+                <controls:NumericColumn MappingName="PercentOfSection" HeaderText="% of Cost" Width="76" NumberDecimalDigits="1" />
+            </syncfusion:SfDataGrid.Columns>
+        </syncfusion:SfDataGrid>
 
-            <!-- No height of its own: it shows every line, and passes the wheel on to the tab (MouseWheelForwarding) -->
-            <syncfusion:SfDataGrid ItemsSource="{Binding IngredientRows}"
-                                   AutoGenerateColumns="False"
-                                   AllowEditing="False"
-                                   SelectionMode="None"
-                                   ColumnSizer="Star"
-                                   controls:MouseWheelForwarding.IsEnabled="True"
-                                   Visibility="{Binding IsChecked, ElementName=CollapseToggle, Converter={StaticResource EmptyStateVisibilityConverter}}">
-                <syncfusion:SfDataGrid.Columns>
-                    <syncfusion:GridTextColumn MappingName="IngredientName" HeaderText="Ingredient" />
-                    <controls:NumericColumn MappingName="GramsPerPiece" HeaderText="Grams per Piece" Width="104" NumberDecimalDigits="4" />
-                    <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost per g" Width="88" NumberDecimalDigits="4" />
-                    <controls:NumericColumn MappingName="CostPerPiece" HeaderText="Cost per Piece" Width="104" NumberDecimalDigits="4" />
-                    <controls:NumericColumn MappingName="PercentOfSection" HeaderText="% of Cost" Width="76" NumberDecimalDigits="1" />
-                </syncfusion:SfDataGrid.Columns>
-            </syncfusion:SfDataGrid>
-        </DockPanel>
-    </Border>
+        <!-- The table's total, under its Cost per Piece and % of Cost columns: the same widths as the grid's columns -->
+        <Border Grid.Row="2"
+                BorderBrush="{StaticResource CardBorderBrush}"
+                BorderThickness="0,1,0,0"
+                Background="{StaticResource PageBackgroundBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="104" />
+                    <ColumnDefinition Width="88" />
+                    <ColumnDefinition Width="104" />
+                    <ColumnDefinition Width="76" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Total" Style="{StaticResource SectionTotalCellStyle}" HorizontalAlignment="Left" />
+                <TextBlock Grid.Column="1" Text="{Binding WeightPerPiece, StringFormat='{}{0:N4}'}" Style="{StaticResource SectionTotalCellStyle}" />
+                <TextBlock Grid.Column="3" Text="{Binding CostPerPiece, StringFormat='{}{0:N4}'}" Style="{StaticResource SectionTotalCellStyle}" />
+                <TextBlock Grid.Column="4" Text="{Binding PercentTotal, StringFormat='{}{0:N1}'}" Style="{StaticResource SectionTotalCellStyle}" />
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>

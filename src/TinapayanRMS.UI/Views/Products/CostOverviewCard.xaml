@@ -53,51 +53,53 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource CardStyle}">
-        <StackPanel>
-            <TextBlock Text="Recipe Cost Overview" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-            <TextBlock Text="How the material cost of one piece splits across its sub-assemblies and packaging."
-                       Style="{StaticResource CardCaptionStyle}" />
+    <StackPanel>
+        <TextBlock Text="Recipe Cost Overview" Style="{StaticResource PanelHeaderStyle}" />
+        <TextBlock Text="How the material cost of one piece splits across its sub-assemblies and packaging."
+                   Style="{StaticResource PanelCaptionStyle}" />
 
-            <TextBlock Style="{StaticResource EmptyStateStyle}"
-                       Margin="0,24"
-                       Text="No material cost yet. Add sub-assemblies or packaging to see how it splits."
-                       Visibility="{Binding HasMaterialCost, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+        <TextBlock Style="{StaticResource EmptyStateStyle}"
+                   Margin="0,16"
+                   Text="No material cost yet. Add sub-assemblies or packaging to see how it splits."
+                   Visibility="{Binding HasMaterialCost, Converter={StaticResource EmptyStateVisibilityConverter}}" />
 
-            <syncfusion:SfChart Height="220"
-                                AreaBorderThickness="0"
-                                Visibility="{Binding HasMaterialCost, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <syncfusion:SfChart.Legend>
-                    <syncfusion:ChartLegend DockPosition="Right" ItemTemplate="{StaticResource CostShareLegendTemplate}" />
-                </syncfusion:SfChart.Legend>
+        <syncfusion:SfChart Height="200"
+                            AreaBorderThickness="0"
+                            Visibility="{Binding HasMaterialCost, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <syncfusion:SfChart.Legend>
+                <syncfusion:ChartLegend DockPosition="Right" ItemTemplate="{StaticResource CostShareLegendTemplate}" />
+            </syncfusion:SfChart.Legend>
 
-                <syncfusion:DoughnutSeries ItemsSource="{Binding CostShares}"
-                                           XBindingPath="Name"
-                                           YBindingPath="Amount"
-                                           Palette="Custom"
-                                           ColorModel="{StaticResource CostShareColors}"
-                                           DoughnutCoefficient="0.65"
-                                           LegendIcon="Circle"
-                                           ShowTooltip="True">
-                    <!-- CenterView takes a ContentControl, as in the Sample Browser's DoughnutChart.xaml (a panel is rejected at runtime) -->
-                    <syncfusion:DoughnutSeries.CenterView>
-                        <ContentControl Content="{Binding Costs}" ContentTemplate="{StaticResource MaterialCostCenterTemplate}" />
-                    </syncfusion:DoughnutSeries.CenterView>
-                </syncfusion:DoughnutSeries>
-            </syncfusion:SfChart>
+            <syncfusion:DoughnutSeries ItemsSource="{Binding CostShares}"
+                                       XBindingPath="Name"
+                                       YBindingPath="Amount"
+                                       Palette="Custom"
+                                       ColorModel="{StaticResource CostShareColors}"
+                                       DoughnutCoefficient="0.65"
+                                       LegendIcon="Circle"
+                                       ShowTooltip="True">
+                <!-- CenterView takes a ContentControl, as in the Sample Browser's DoughnutChart.xaml (a panel is rejected at runtime) -->
+                <syncfusion:DoughnutSeries.CenterView>
+                    <ContentControl Content="{Binding Costs}" ContentTemplate="{StaticResource MaterialCostCenterTemplate}" />
+                </syncfusion:DoughnutSeries.CenterView>
+            </syncfusion:DoughnutSeries>
+        </syncfusion:SfChart>
 
-            <Border Style="{StaticResource WarningBannerStyle}" Margin="0,12,0,0">
-                <DockPanel>
-                    <TextBlock DockPanel.Dock="Left"
-                               Style="{StaticResource IconGlyphStyle}"
-                               Foreground="{StaticResource WarningForegroundBrush}"
-                               Margin="0,1,8,0"
-                               Text="&#xE946;" />
-                    <TextBlock TextWrapping="Wrap"
-                               Foreground="{StaticResource WarningForegroundBrush}"
-                               Text="The material cost is every sub-assembly's share, plus the packaging, that goes into one piece. Labor, overhead and the rest are added on the Costing tab." />
-                </DockPanel>
-            </Border>
-        </StackPanel>
-    </Border>
+        <Border Style="{StaticResource WarningBannerStyle}" Margin="0,8,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource IconGlyphStyle}"
+                           Foreground="{StaticResource WarningForegroundBrush}"
+                           Margin="0,1,8,0"
+                           Text="&#xE946;" />
+                <TextBlock Grid.Column="1"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource WarningForegroundBrush}"
+                           Text="The material cost is every sub-assembly's share, plus the packaging, that goes into one piece. Labor, overhead and the rest are added on the Costing tab." />
+            </Grid>
+        </Border>
+    </StackPanel>
 </UserControl>

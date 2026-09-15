@@ -2,11 +2,11 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 
 public static class CostingRules
 {
-    public static void EnsureValidParameters(decimal laborCost, decimal overheadCost, decimal administrativeCost, decimal marginPercent, decimal vatPercent)
+    public static void EnsureValidParameters(decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent, decimal vatPercent)
     {
-        if (laborCost < 0 || overheadCost < 0 || administrativeCost < 0)
+        if (laborPercent < 0 || overheadPercent < 0 || administrativePercent < 0)
         {
-            throw new InvalidOperationException("Labor, overhead and administrative cost can't be negative.");
+            throw new InvalidOperationException("Labor, overhead and administrative percentages can't be negative.");
         }
 
         if (marginPercent < 0 || vatPercent < 0)
@@ -16,14 +16,25 @@ public static class CostingRules
     }
 
     /// <summary>
+    /// A cost entered as a percentage of the material cost (labor, overhead, administrative), in pesos per piece:
+    /// 25% labor on ₱20 of materials is ₱5.
+    /// </summary>
+    public static decimal CalculateCostFromMaterialPercent(decimal materialCostPerPiece, decimal percent) =>
+        materialCostPerPiece * percent / 100m;
+
+    /// <summary>
     /// Cost-plus pricing: margin is a markup on cost (BaseCost × (1 + Margin%)), and VAT is
     /// added on top of that pre-VAT price (× (1 + VAT%)) as a separate step — never combined
     /// into one formula, so each input maps to exactly one step a shop owner can check by hand.
-    /// The base cost is the materials plus the labor, overhead and administrative costs.
+    /// The base cost is the materials plus the labor, overhead and administrative costs, each of
+    /// those a percentage of the materials (CalculateCostFromMaterialPercent).
     /// </summary>
     public static (decimal BaseCost, decimal PreVatPrice, decimal SellingPrice) CalculateSellingPrice(
-        decimal materialCostPerPiece, decimal laborCost, decimal overheadCost, decimal administrativeCost, decimal marginPercent, decimal vatPercent)
+        decimal materialCostPerPiece, decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent, decimal vatPercent)
     {
+        var laborCost = CalculateCostFromMaterialPercent(materialCostPerPiece, laborPercent);
+        var overheadCost = CalculateCostFromMaterialPercent(materialCostPerPiece, overheadPercent);
+        var administrativeCost = CalculateCostFromMaterialPercent(materialCostPerPiece, administrativePercent);
         var baseCost = materialCostPerPiece + laborCost + overheadCost + administrativeCost;
         var preVatPrice = baseCost * (1 + marginPercent / 100m);
         var sellingPrice = preVatPrice * (1 + vatPercent / 100m);

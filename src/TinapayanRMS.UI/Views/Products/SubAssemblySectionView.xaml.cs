@@ -4,7 +4,7 @@ namespace TinapayanRMS.UI.Views.Products;
 
 /// <summary>
 /// One section of the Recipe Structure: a sub-assembly the product uses (its DataContext is the
-/// Recipe Structure's item, a ProductUsageEdit) with its ingredient lines scaled to one piece.
+/// Usage of its Recipe Structure tab, a ProductUsageEdit) with its ingredient lines scaled to one piece.
 /// </summary>
 public partial class SubAssemblySectionView : UserControl
 {

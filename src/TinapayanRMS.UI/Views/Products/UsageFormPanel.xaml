@@ -6,168 +6,175 @@
     <!--
         Add a sub-assembly to the recipe: a new one of the product's own, a link to another product's, or
         a copy of one. Or change one already in it: an own one's name, role, lines and piece size, a
-        linked one's piece size only. Apply only puts it in the recipe; Save saves it.
+        linked one's piece size only. Apply only puts it in the recipe; Save saves it. It fills its
+        Recipe Structure tab, so it has no box of its own.
     -->
-    <Border Padding="12" CornerRadius="6" Background="{StaticResource PageBackgroundBrush}">
-        <StackPanel>
-            <TextBlock Text="{Binding UsageFormTitle}"
-                       FontWeight="SemiBold"
-                       Foreground="{StaticResource HeadingForegroundBrush}"
-                       Margin="0,0,0,8" />
+    <StackPanel>
+        <TextBlock Text="{Binding UsageFormTitle}"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource HeadingForegroundBrush}"
+                   Margin="0,0,0,8" />
 
-            <!-- Where it comes from, while adding. Labels in the first row, fields in the second. -->
-            <Grid Margin="0,0,0,12" Visibility="{Binding IsAddingUsage, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <!-- Where it comes from, while adding. Labels in the first row, fields in the second. -->
+        <Grid Margin="0,0,0,8" Visibility="{Binding IsAddingUsage, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="2*" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="Sub-Assembly" Style="{StaticResource FieldLabelStyle}" />
+            <syncfusion:ComboBoxAdv Grid.Row="1"
+                                    Grid.Column="0"
+                                    IsEditable="False"
+                                    ItemsSource="{Binding UsageFormModes}"
+                                    DisplayMemberPath="Name"
+                                    SelectedItem="{Binding EditingUsageMode, Mode=TwoWay}" />
+
+            <TextBlock Grid.Column="2"
+                       Text="Another Product's Sub-Assembly"
+                       Style="{StaticResource FieldLabelStyle}"
+                       Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <syncfusion:ComboBoxAdv Grid.Row="1"
+                                    Grid.Column="2"
+                                    ItemsSource="{Binding LinkableSubAssemblies}"
+                                    DisplayMemberPath="DisplayName"
+                                    SelectedItem="{Binding EditingUsageSource, Mode=TwoWay}"
+                                    ToolTip="A link follows every change its product makes to it; a copy is this product's own from then on."
+                                    Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        </Grid>
+
+        <!-- The product's own sub-assembly: its name, role and lines, in grams -->
+        <StackPanel Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid Margin="0,0,0,8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="12" />
                     <ColumnDefinition Width="2*" />
-                </Grid.ColumnDefinitions>
-
-                <TextBlock Grid.Column="0" Text="Sub-Assembly" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:ComboBoxAdv Grid.Row="1"
-                                        Grid.Column="0"
-                                        IsEditable="False"
-                                        ItemsSource="{Binding UsageFormModes}"
-                                        DisplayMemberPath="Name"
-                                        SelectedItem="{Binding EditingUsageMode, Mode=TwoWay}" />
-
-                <TextBlock Grid.Column="2"
-                           Text="Another Product's Sub-Assembly"
-                           Style="{StaticResource FieldLabelStyle}"
-                           Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                <syncfusion:ComboBoxAdv Grid.Row="1"
-                                        Grid.Column="2"
-                                        ItemsSource="{Binding LinkableSubAssemblies}"
-                                        DisplayMemberPath="DisplayName"
-                                        SelectedItem="{Binding EditingUsageSource, Mode=TwoWay}"
-                                        ToolTip="A link follows every change its product makes to it; a copy is this product's own from then on."
-                                        Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
-            </Grid>
-
-            <!-- The product's own sub-assembly: its name, role and lines, in grams -->
-            <StackPanel Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <Grid Margin="0,0,0,12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" />
-                    <syncfusion:SfTextBoxExt Grid.Row="1"
-                                             Grid.Column="0"
-                                             Text="{Binding EditingUsageName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                    <TextBlock Grid.Column="2" Text="Role" Style="{StaticResource FieldLabelStyle}" />
-                    <syncfusion:ComboBoxAdv Grid.Row="1"
-                                            Grid.Column="2"
-                                            ItemsSource="{Binding Roles}"
-                                            DisplayMemberPath="Name"
-                                            SelectedItem="{Binding EditingUsageRole, Mode=TwoWay}" />
-                </Grid>
-
-                <syncfusion:SfDataGrid ItemsSource="{Binding FormLines}"
-                                       SelectedItem="{Binding SelectedFormLine, Mode=TwoWay}"
-                                       AutoGenerateColumns="False"
-                                       AllowEditing="False"
-                                       SelectionMode="Single"
-                                       NavigationMode="Row"
-                                       ColumnSizer="Star"
-                                       Height="160">
-                    <syncfusion:SfDataGrid.Columns>
-                        <syncfusion:GridTextColumn MappingName="Ingredient.Name" HeaderText="Ingredient" />
-                        <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="110" NumberDecimalDigits="2" />
-                        <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="110" NumberDecimalDigits="2" />
-                    </syncfusion:SfDataGrid.Columns>
-                </syncfusion:SfDataGrid>
-
-                <Grid Margin="0,8,0,12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="0" Text="Ingredient" Style="{StaticResource FieldLabelStyle}" />
-                    <syncfusion:ComboBoxAdv Grid.Row="1"
-                                            Grid.Column="0"
-                                            ItemsSource="{Binding Ingredients}"
-                                            DisplayMemberPath="Name"
-                                            SelectedItem="{Binding EditingFormLineIngredient, Mode=TwoWay}" />
-
-                    <TextBlock Grid.Column="2" Text="Grams" Style="{StaticResource FieldLabelStyle}" />
-                    <syncfusion:DoubleTextBox Grid.Row="1"
-                                              Grid.Column="2"
-                                              Value="{Binding EditingFormLineGrams, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                              NumberDecimalDigits="2" />
-
-                    <StackPanel Grid.RowSpan="2" Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Bottom">
-                        <syncfusion:ButtonAdv Label="Add Line" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding AddFormLineCommand}" Margin="0,0,8,0" />
-                        <syncfusion:ButtonAdv Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveFormLineCommand}" />
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-
-            <!-- The piece size: type the yield or the weight per piece, and the other follows from the batch -->
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="12" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" Text="Total Weight (g)" Style="{StaticResource FieldLabelStyle}" />
+                <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" />
                 <syncfusion:SfTextBoxExt Grid.Row="1"
                                          Grid.Column="0"
-                                         IsReadOnly="True"
-                                         Focusable="False"
-                                         Text="{Binding UsageFormTotalWeightText, Mode=OneWay}"
-                                         ToolTip="The batch: the sum of its lines." />
+                                         Text="{Binding EditingUsageName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Grid.Column="2" Text="Yield (pcs)" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:DoubleTextBox Grid.Row="1"
-                                          Grid.Column="2"
-                                          Value="{Binding EditingUsageYield, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                          NumberDecimalDigits="2"
-                                          ToolTip="Pieces one batch makes. Type it, and the weight per piece is worked out." />
-
-                <TextBlock Grid.Column="4" Text="Weight per Piece (g)" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:DoubleTextBox Grid.Row="1"
-                                          Grid.Column="4"
-                                          Value="{Binding EditingUsageWeightPerPiece, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                          NumberDecimalDigits="2"
-                                          ToolTip="Grams of the batch in one piece. Type it, and the yield is worked out." />
+                <TextBlock Grid.Column="2" Text="Role" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:ComboBoxAdv Grid.Row="1"
+                                        Grid.Column="2"
+                                        ItemsSource="{Binding Roles}"
+                                        DisplayMemberPath="Name"
+                                        SelectedItem="{Binding EditingUsageRole, Mode=TwoWay}" />
             </Grid>
 
-            <TextBlock Text="{Binding UsageFormPieceSizeCaption}" Style="{StaticResource CaptionStyle}" Margin="0,6,0,0" />
+            <!-- Typed straight into: the add row at the bottom starts a line, Delete removes the selected one -->
+            <syncfusion:SfDataGrid ItemsSource="{Binding FormLines}"
+                                   SelectedItem="{Binding SelectedFormLine, Mode=TwoWay}"
+                                   AutoGenerateColumns="False"
+                                   AllowEditing="True"
+                                   AllowDeleting="True"
+                                   EditTrigger="OnTap"
+                                   AddNewRowPosition="Bottom"
+                                   AddNewRowText="Click here to add an ingredient"
+                                   SelectionMode="Single"
+                                   ColumnSizer="Star"
+                                   controls:GridEditCommit.OnFocusLeave="True"
+                                   controls:AutoCompleteDropDown.IsEnabled="True"
+                                   Height="200">
+                <syncfusion:SfDataGrid.Columns>
+                    <!-- Typing completes the name and narrows the list to the ingredients that match -->
+                    <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
+                                                            HeaderText="Ingredient"
+                                                            ItemsSource="{Binding Ingredients}"
+                                                            DisplayMember="Name"
+                                                            ValueMember="Id"
+                                                            AllowAutoComplete="True"
+                                                            AllowNullInput="True"
+                                                            AllowIncrementalFiltering="True"
+                                                            AutoGenerateColumns="False"
+                                                            IsAutoPopupSize="False"
+                                                            PopUpWidth="380"
+                                                            PopUpHeight="260"
+                                                            GridColumnSizer="Star">
+                        <syncfusion:GridMultiColumnDropDownList.Columns>
+                            <syncfusion:Columns>
+                                <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
+                                <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
+                                <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per g" Width="88" NumberDecimalDigits="4" />
+                            </syncfusion:Columns>
+                        </syncfusion:GridMultiColumnDropDownList.Columns>
+                    </syncfusion:GridMultiColumnDropDownList>
+                    <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="110" NumberDecimalDigits="2" />
+                    <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="110" NumberDecimalDigits="2" AllowEditing="False" />
+                </syncfusion:SfDataGrid.Columns>
+            </syncfusion:SfDataGrid>
 
-            <DockPanel Margin="0,12,0,0">
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <syncfusion:ButtonAdv Label="Cancel" IconTemplate="{StaticResource CancelIconTemplate}" Command="{Binding CancelUsageCommand}" Margin="0,0,8,0" />
-                    <syncfusion:ButtonAdv Label="Apply" IconTemplate="{StaticResource ApplyIconTemplate}" Command="{Binding ApplyUsageCommand}" />
-                </StackPanel>
-                <TextBlock Text="{Binding UsageFormPreviewText}" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,12,0" />
-            </DockPanel>
+            <Grid Margin="0,8,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Type the lines straight into the table. Delete removes the selected one." Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" />
+                <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveFormLineCommand}" />
+            </Grid>
         </StackPanel>
-    </Border>
+
+        <!-- The piece size: type the yield or the weight per piece, and the other follows from the batch -->
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="Total Weight (g)" Style="{StaticResource FieldLabelStyle}" />
+            <syncfusion:SfTextBoxExt Grid.Row="1"
+                                     Grid.Column="0"
+                                     IsReadOnly="True"
+                                     Focusable="False"
+                                     Text="{Binding UsageFormTotalWeightText, Mode=OneWay}"
+                                     ToolTip="The batch: the sum of its lines." />
+
+            <TextBlock Grid.Column="2" Text="Yield (pcs)" Style="{StaticResource FieldLabelStyle}" />
+            <syncfusion:DoubleTextBox Grid.Row="1"
+                                      Grid.Column="2"
+                                      Value="{Binding EditingUsageYield, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      NumberDecimalDigits="2"
+                                      ToolTip="Pieces one batch makes. Type it, and the weight per piece is worked out." />
+
+            <TextBlock Grid.Column="4" Text="Weight per Piece (g)" Style="{StaticResource FieldLabelStyle}" />
+            <syncfusion:DoubleTextBox Grid.Row="1"
+                                      Grid.Column="4"
+                                      Value="{Binding EditingUsageWeightPerPiece, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      NumberDecimalDigits="2"
+                                      ToolTip="Grams of the batch in one piece. Type it, and the yield is worked out." />
+        </Grid>
+
+        <TextBlock Text="{Binding UsageFormPieceSizeCaption}" Style="{StaticResource CaptionStyle}" Margin="0,6,0,0" />
+
+        <Grid Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{Binding UsageFormPreviewText}" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,12,0" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <syncfusion:ButtonAdv Label="Cancel" IconTemplate="{StaticResource CancelIconTemplate}" Command="{Binding CancelUsageCommand}" Margin="0,0,8,0" />
+                <syncfusion:ButtonAdv Label="Apply" IconTemplate="{StaticResource ApplyIconTemplate}" Command="{Binding ApplyUsageCommand}" />
+            </StackPanel>
+        </Grid>
+    </StackPanel>
 </UserControl>

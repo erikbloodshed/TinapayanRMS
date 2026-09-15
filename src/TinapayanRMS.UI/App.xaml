@@ -147,6 +147,25 @@
             <Setter Property="Margin" Value="0,0,0,12" />
         </Style>
 
+        <!--
+            The compact screen's sections (Products): unboxed sections inside one bordered region, each a
+            smaller header over its caption, set apart from the next by a divider line.
+        -->
+        <Style x:Key="PanelHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionHeaderStyle}">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+
+        <Style x:Key="PanelCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionStyle}">
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+
+        <Style x:Key="SectionDividerStyle" TargetType="Border">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Margin" Value="0,12" />
+            <Setter Property="Background" Value="{StaticResource CardBorderBrush}" />
+        </Style>
+
         <Style x:Key="EmptyStateStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
@@ -170,15 +189,6 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
-        <!-- The tinted square holding a glyph at the start of a Products recipe section. -->
-        <Style x:Key="GlyphTileStyle" TargetType="Border">
-            <Setter Property="Width" Value="40" />
-            <Setter Property="Height" Value="40" />
-            <Setter Property="Margin" Value="0,0,12,0" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
-        </Style>
-
         <!--
             A value in a Products recipe section's Total row, under its table: right-aligned like the
             grid's number cells, which the grid's own summary row doesn't do.
@@ -188,13 +198,6 @@
             <Setter Property="HorizontalAlignment" Value="Right" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
-        </Style>
-
-        <Style x:Key="GlyphTileIconStyle" TargetType="TextBlock" BasedOn="{StaticResource IconGlyphStyle}">
-            <Setter Property="FontSize" Value="18" />
-            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
-            <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="AppTitleStyle" TargetType="TextBlock">

@@ -13,7 +13,7 @@
         MinHeight="480"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
-        skinManager:SfSkinManager.SizeMode="Touch"
+        skinManager:SfSkinManager.SizeMode="Default"
         Background="{StaticResource PageBackgroundBrush}">
     <Grid>
         <Grid.RowDefinitions>

@@ -30,11 +30,11 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("AdministrativeCost")
+                    b.Property<decimal>("AdministrativePercent")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
-                    b.Property<decimal>("LaborCost")
+                    b.Property<decimal>("LaborPercent")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
@@ -42,7 +42,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
-                    b.Property<decimal>("OverheadCost")
+                    b.Property<decimal>("OverheadPercent")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 

@@ -7,49 +7,51 @@
         <StackPanel>
             <TextBlock Text="Bill of Materials" Style="{StaticResource SectionHeaderStyle}" />
 
+            <!-- Typed straight into, in grams (recipe lines have no unit of their own): the add row at the bottom starts a line, Delete removes the selected one -->
             <syncfusion:SfDataGrid ItemsSource="{Binding BomLineEdits}"
                                    SelectedItem="{Binding SelectedBomLineEdit, Mode=TwoWay}"
                                    AutoGenerateColumns="False"
-                                   AllowEditing="False"
+                                   AllowEditing="True"
+                                   AllowDeleting="True"
+                                   EditTrigger="OnTap"
+                                   AddNewRowPosition="Bottom"
+                                   AddNewRowText="Click here to add a component"
                                    SelectionMode="Single"
-                                   NavigationMode="Row"
                                    ColumnSizer="Star"
+                                   controls:GridEditCommit.OnFocusLeave="True"
+                                   controls:AutoCompleteDropDown.IsEnabled="True"
                                    Height="200">
                 <syncfusion:SfDataGrid.Columns>
-                    <syncfusion:GridTextColumn MappingName="Component.Name" HeaderText="Component" />
+                    <!-- Typing completes the name and narrows the list to the ingredients that match -->
+                    <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
+                                                            HeaderText="Component"
+                                                            ItemsSource="{Binding Ingredients}"
+                                                            DisplayMember="Name"
+                                                            ValueMember="Id"
+                                                            AllowAutoComplete="True"
+                                                            AllowNullInput="True"
+                                                            AllowIncrementalFiltering="True"
+                                                            AutoGenerateColumns="False"
+                                                            IsAutoPopupSize="False"
+                                                            PopUpWidth="380"
+                                                            PopUpHeight="260"
+                                                            GridColumnSizer="Star">
+                        <syncfusion:GridMultiColumnDropDownList.Columns>
+                            <syncfusion:Columns>
+                                <syncfusion:GridTextColumn MappingName="Name" HeaderText="Component" />
+                                <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
+                                <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per g" Width="88" NumberDecimalDigits="4" />
+                            </syncfusion:Columns>
+                        </syncfusion:GridMultiColumnDropDownList.Columns>
+                    </syncfusion:GridMultiColumnDropDownList>
                     <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="120" NumberDecimalDigits="2" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
 
-            <!-- Labels in the first row, fields in the second. Amounts are in grams: recipe lines have no unit of their own. -->
-            <Grid Margin="0,12,0,12">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <TextBlock Grid.Column="0" Text="Component" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:ComboBoxAdv Grid.Row="1"
-                                        Grid.Column="0"
-                                        ItemsSource="{Binding Ingredients}"
-                                        DisplayMemberPath="Name"
-                                        SelectedItem="{Binding EditingBomComponent, Mode=TwoWay}" />
-
-                <TextBlock Grid.Column="2" Text="Grams" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:DoubleTextBox Grid.Row="1"
-                                          Grid.Column="2"
-                                          Value="{Binding EditingBomGrams, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            </Grid>
-
-            <StackPanel Orientation="Horizontal">
-                <syncfusion:ButtonAdv Label="Add Line" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding AddBomLineCommand}" Margin="0,0,8,0" />
-                <syncfusion:ButtonAdv Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveBomLineCommand}" />
-            </StackPanel>
+            <DockPanel Margin="0,8,0,0">
+                <syncfusion:ButtonAdv DockPanel.Dock="Right" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveBomLineCommand}" />
+                <TextBlock Text="Type the lines straight into the table." Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" />
+            </DockPanel>
         </StackPanel>
     </Border>
 </UserControl>

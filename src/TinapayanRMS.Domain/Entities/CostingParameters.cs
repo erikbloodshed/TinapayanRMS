@@ -1,7 +1,7 @@
 namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>
-/// Labor, overhead, margin and VAT for one product's selling price. Always independent
+/// Labor, overhead, administrative, margin and VAT for one product's selling price. Always independent
 /// per product, even for a derived/linked product (Phase 10) — never live-templated.
 /// </summary>
 public class CostingParameters
@@ -12,14 +12,14 @@ public class CostingParameters
 
     public Product? Product { get; set; }
 
-    /// <summary>Labor cost per finished piece, in pesos.</summary>
-    public decimal LaborCost { get; set; }
+    /// <summary>Labor cost, as a percentage of the material cost per piece (sub-assemblies and packaging).</summary>
+    public decimal LaborPercent { get; set; }
 
-    /// <summary>Overhead cost per finished piece, in pesos.</summary>
-    public decimal OverheadCost { get; set; }
+    /// <summary>Overhead cost, as a percentage of the material cost per piece.</summary>
+    public decimal OverheadPercent { get; set; }
 
-    /// <summary>Administrative cost per finished piece, in pesos: office, permits, bookkeeping and the like.</summary>
-    public decimal AdministrativeCost { get; set; }
+    /// <summary>Administrative cost (office, permits, bookkeeping and the like), as a percentage of the material cost per piece.</summary>
+    public decimal AdministrativePercent { get; set; }
 
     /// <summary>Markup on cost (materials + labor + overhead + administrative), as a percentage.</summary>
     public decimal MarginPercent { get; set; }

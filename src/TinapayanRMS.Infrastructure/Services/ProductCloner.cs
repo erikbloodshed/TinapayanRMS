@@ -74,9 +74,9 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                 new CostingParameters
                 {
                     ProductId = newProduct.Id,
-                    LaborCost = costing.LaborCost,
-                    OverheadCost = costing.OverheadCost,
-                    AdministrativeCost = costing.AdministrativeCost,
+                    LaborPercent = costing.LaborPercent,
+                    OverheadPercent = costing.OverheadPercent,
+                    AdministrativePercent = costing.AdministrativePercent,
                     MarginPercent = costing.MarginPercent,
                     VatPercent = costing.VatPercent,
                 },
