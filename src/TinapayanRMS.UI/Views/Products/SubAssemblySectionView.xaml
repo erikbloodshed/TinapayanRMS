@@ -108,6 +108,7 @@
         <!-- No height of its own: it shows every line, and passes the wheel on to the tab (MouseWheelForwarding) -->
         <syncfusion:SfDataGrid Grid.Row="1"
                                ItemsSource="{Binding IngredientRows}"
+                               GridLinesVisibility="Both"
                                AutoGenerateColumns="False"
                                AllowEditing="False"
                                SelectionMode="None"
@@ -135,6 +136,10 @@
                     <ColumnDefinition Width="104" />
                     <ColumnDefinition Width="76" />
                 </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{StaticResource SectionTotalDividerStyle}" />
+                <Border Grid.Column="1" Style="{StaticResource SectionTotalDividerStyle}" />
+                <Border Grid.Column="2" Style="{StaticResource SectionTotalDividerStyle}" />
+                <Border Grid.Column="3" Style="{StaticResource SectionTotalDividerStyle}" />
                 <TextBlock Text="Total" Style="{StaticResource SectionTotalCellStyle}" HorizontalAlignment="Left" />
                 <TextBlock Grid.Column="1" Text="{Binding WeightPerPiece, StringFormat='{}{0:N4}'}" Style="{StaticResource SectionTotalCellStyle}" />
                 <TextBlock Grid.Column="3" Text="{Binding CostPerPiece, StringFormat='{}{0:N4}'}" Style="{StaticResource SectionTotalCellStyle}" />

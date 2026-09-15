@@ -10,6 +10,8 @@
             <!-- Typed straight into, in grams (recipe lines have no unit of their own): the add row at the bottom starts a line, Delete removes the selected one -->
             <syncfusion:SfDataGrid ItemsSource="{Binding BomLineEdits}"
                                    SelectedItem="{Binding SelectedBomLineEdit, Mode=TwoWay}"
+                                   GridLinesVisibility="Both"
+                                   controls:GridFillerRows.IsEnabled="True"
                                    AutoGenerateColumns="False"
                                    AllowEditing="True"
                                    AllowDeleting="True"

@@ -33,6 +33,8 @@
             -->
             <syncfusion:SfDataGrid ItemsSource="{Binding VisibleRawMaterials}"
                                    SelectedItem="{Binding SelectedRawMaterial, Mode=TwoWay}"
+                                   GridLinesVisibility="Both"
+                                   controls:GridFillerRows.IsEnabled="True"
                                    AutoGenerateColumns="False"
                                    AllowEditing="False"
                                    SelectionMode="Single"

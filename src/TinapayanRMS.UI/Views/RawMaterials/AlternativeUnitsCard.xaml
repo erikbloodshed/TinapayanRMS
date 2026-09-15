@@ -20,6 +20,7 @@
 
             <syncfusion:SfDataGrid ItemsSource="{Binding UnitRows}"
                                    SelectedItem="{Binding SelectedUnitRow, Mode=TwoWay}"
+                                   GridLinesVisibility="Both"
                                    AutoGenerateColumns="False"
                                    AllowEditing="False"
                                    SelectionMode="Single"

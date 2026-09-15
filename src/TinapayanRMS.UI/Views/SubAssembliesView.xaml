@@ -45,6 +45,8 @@
                 <syncfusion:SfDataGrid Grid.Row="1"
                                        ItemsSource="{Binding Rows}"
                                        SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                                       GridLinesVisibility="Both"
+                                       controls:GridFillerRows.IsEnabled="True"
                                        AutoGenerateColumns="False"
                                        AllowEditing="False"
                                        SelectionMode="Single"
@@ -152,6 +154,8 @@
                     <!-- Typed straight into: the add row at the bottom starts a line, Delete removes the selected one -->
                     <syncfusion:SfDataGrid ItemsSource="{Binding Lines}"
                                            SelectedItem="{Binding SelectedLine, Mode=TwoWay}"
+                                           GridLinesVisibility="Both"
+                                           controls:GridFillerRows.IsEnabled="True"
                                            AutoGenerateColumns="False"
                                            AllowEditing="True"
                                            AllowDeleting="True"

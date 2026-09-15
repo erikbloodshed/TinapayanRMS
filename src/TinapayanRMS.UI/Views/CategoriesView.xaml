@@ -35,6 +35,8 @@
                 <syncfusion:SfDataGrid Grid.Row="2"
                                        ItemsSource="{Binding Categories}"
                                        SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                                       GridLinesVisibility="Both"
+                                       controls:GridFillerRows.IsEnabled="True"
                                        AutoGenerateColumns="False"
                                        AllowEditing="False"
                                        SelectionMode="Single"

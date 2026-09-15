@@ -78,6 +78,7 @@
         <syncfusion:SfDataGrid Grid.Row="3"
                                ItemsSource="{Binding LineEdits}"
                                SelectedItem="{Binding SelectedLineEdit, Mode=TwoWay}"
+                               GridLinesVisibility="Both"
                                AutoGenerateColumns="False"
                                AllowEditing="False"
                                SelectionMode="Single"
@@ -110,6 +111,11 @@
                     <ColumnDefinition Width="88" />
                     <ColumnDefinition Width="104" />
                 </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{StaticResource SectionTotalDividerStyle}" />
+                <Border Grid.Column="1" Style="{StaticResource SectionTotalDividerStyle}" />
+                <Border Grid.Column="2" Style="{StaticResource SectionTotalDividerStyle}" />
+                <Border Grid.Column="3" Style="{StaticResource SectionTotalDividerStyle}" />
+                <Border Grid.Column="4" Style="{StaticResource SectionTotalDividerStyle}" />
                 <TextBlock Text="Total" Style="{StaticResource SectionTotalCellStyle}" HorizontalAlignment="Left" />
                 <TextBlock Grid.Column="5" Text="{Binding Costs.Packaging, StringFormat='{}{0:N4}'}" Style="{StaticResource SectionTotalCellStyle}" />
             </Grid>
