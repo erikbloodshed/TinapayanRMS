@@ -38,8 +38,14 @@
                             Background="{StaticResource PageBackgroundBrush}">
                         <TextBlock Text="{Binding BaseUnitAbbreviation}" VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" />
                     </Border>
-                    <!-- The unit's multiplier: typed for a unit not saved yet, read-only otherwise -->
+                    <!--
+                        The unit's multiplier: typed for a unit not saved yet, read-only otherwise. Empty rather
+                        than 0.00 while there's no unit, or a new one's hasn't been typed (UseNullOption, as in
+                        Syncfusion's DoubleTextBoxDemo).
+                    -->
                     <syncfusion:DoubleTextBox Value="{Binding EditingPurchaseQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              UseNullOption="True"
+                                              NullValue="{x:Null}"
                                               IsReadOnly="{Binding IsPurchaseQuantityReadOnly}"
                                               NumberDecimalDigits="2"
                                               ToolTip="Type it for a unit that isn't saved yet. A saved unit's multiplier changes with Edit in Alternative Units." />

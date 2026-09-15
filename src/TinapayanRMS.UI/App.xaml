@@ -104,6 +104,8 @@
         <SolidColorBrush x:Key="AccentSoftBrush" Color="#FEF3C7" />
         <SolidColorBrush x:Key="SuccessBackgroundBrush" Color="#ECFDF5" />
         <SolidColorBrush x:Key="SuccessForegroundBrush" Color="#047857" />
+        <!-- The success toast's border (Controls/SuccessToast) -->
+        <SolidColorBrush x:Key="SuccessBorderBrush" Color="#34D399" />
 
         <!-- The error toast (Controls/ErrorToast) -->
         <SolidColorBrush x:Key="ErrorBackgroundBrush" Color="#FEF2F2" />
@@ -111,6 +113,29 @@
         <SolidColorBrush x:Key="ErrorForegroundBrush" Color="#B91C1C" />
         <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#FFFBEB" />
         <SolidColorBrush x:Key="WarningForegroundBrush" Color="#92400E" />
+
+        <!-- The toasts' close button (Controls/ErrorToast, Controls/SuccessToast): just the glyph, with a soft highlight under the mouse -->
+        <Style x:Key="ToastCloseButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Width="24" Height="24" CornerRadius="4" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#14000000" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#24000000" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
         <!-- Chart series colors for the Reports screen — same-hue with the accent, distinguished by adornment labels rather than color alone. -->
         <SolidColorBrush x:Key="ChartBaseCostBrush" Color="#D97706" />

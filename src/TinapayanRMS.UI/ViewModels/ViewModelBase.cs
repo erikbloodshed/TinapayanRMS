@@ -9,8 +9,8 @@ namespace TinapayanRMS.UI.ViewModels;
 /// <summary>
 /// Shared behavior for every screen's ViewModel: a friendly ErrorMessage surfaced in the UI (as an
 /// error toast, Controls/ErrorToast) instead of letting a validation/business-rule exception fail
-/// silently or crash the app, and a Delete-confirmation Interaction the View wires up to a native
-/// MessageBox. Introduced in Phase 13 once every screen needed the same things — not before, since
+/// silently or crash the app, a SuccessMessage for what an action did (Controls/SuccessToast), and a
+/// Delete-confirmation Interaction the View wires up to a native MessageBox. Introduced in Phase 13 once every screen needed the same things — not before, since
 /// one screen needing them wouldn't have justified a shared base class over ReactiveObject directly.
 /// </summary>
 public abstract class ViewModelBase : ReactiveObject
@@ -27,6 +27,14 @@ public abstract class ViewModelBase : ReactiveObject
     {
         get => _errorMessage;
         protected set => this.RaiseAndSetIfChanged(ref _errorMessage, value);
+    }
+
+    private string? _successMessage;
+    /// <summary>What the last action did, e.g. "Cake Flour was saved.", shown as a success toast. Cleared with ErrorMessage before every action.</summary>
+    public string? SuccessMessage
+    {
+        get => _successMessage;
+        protected set => this.RaiseAndSetIfChanged(ref _successMessage, value);
     }
 
     /// <summary>
@@ -54,7 +62,7 @@ public abstract class ViewModelBase : ReactiveObject
     public Interaction<string, bool> ConfirmDelete { get; } = new();
 
     /// <summary>
-    /// Runs action, clearing any previous ErrorMessage first (which also closes its toast).
+    /// Runs action, clearing any previous ErrorMessage and SuccessMessage first (which also closes their toasts).
     /// A business-rule violation (InvalidOperationException, thrown by every ApplicationCore
     /// Rules class), a duplicate-name save (DbUpdateException, a unique-index violation), or
     /// a delete blocked by a Restrict foreign key (SqlException, raised by ExecuteDeleteAsync
@@ -65,6 +73,7 @@ public abstract class ViewModelBase : ReactiveObject
     protected async Task RunSafelyAsync(Func<Task> action)
     {
         ErrorMessage = null;
+        SuccessMessage = null;
         try
         {
             await action();

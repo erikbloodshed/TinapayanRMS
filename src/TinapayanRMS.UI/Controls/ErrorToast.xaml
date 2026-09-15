@@ -19,31 +19,6 @@
         the cards. The screen places it across its whole root Grid; the alignment and the Margin
         put it in that Grid's corner. Code-behind binds it to ErrorMessage and opens and closes it.
     -->
-    <UserControl.Resources>
-        <!-- The close button: just the glyph, with a soft highlight under the mouse -->
-        <Style x:Key="ToastCloseButtonStyle" TargetType="Button">
-            <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome" Width="24" Height="24" CornerRadius="4" Background="Transparent">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#14000000" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#24000000" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </UserControl.Resources>
-
     <Border Background="{StaticResource ErrorBackgroundBrush}"
             BorderBrush="{StaticResource ErrorBorderBrush}"
             BorderThickness="1"

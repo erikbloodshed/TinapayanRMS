@@ -722,20 +722,7 @@ public class RawMaterialsViewModel : ViewModelBase
             });
         });
 
-        NewCommand = ReactiveCommand.Create(() =>
-        {
-            SelectedRawMaterial = null;
-            _editingId = 0;
-            CanChangeTypeAndSource = true;
-            EditingName = string.Empty;
-            EditingType = RawMaterialType.Ingredient;
-            EditingCategory = Categories.FirstOrDefault();
-            EditingSource = RawMaterialSource.Purchased;
-            EditingWeightLossPercent = null;
-            EditingCostBufferPercent = 0m;
-            EditingBaseUnit = null;
-            ClearDetails();
-        });
+        NewCommand = ReactiveCommand.Create(ClearForm);
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
@@ -765,6 +752,13 @@ public class RawMaterialsViewModel : ViewModelBase
             if (!validation.IsValid)
             {
                 ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
+
+            // A new material's purchase unit starts empty, and a price means nothing without the unit it's for.
+            if (source == RawMaterialSource.Purchased && EditingPurchaseUnit is null && EditingPrice is not (null or 0m))
+            {
+                ErrorMessage = "Pick the purchase unit the price is for.";
                 return;
             }
 
@@ -798,13 +792,14 @@ public class RawMaterialsViewModel : ViewModelBase
             // was saved, so new units get their ids and the price history and BOM show the new rows.
             await LoadCommand.Execute();
             await ReloadSavedRawMaterialAsync(id);
+            SuccessMessage = $"{EditingName} was saved.";
         }));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
             () => RunWithConfirmationAsync($"Delete '{SelectedRawMaterial!.Name}'? This can't be undone.", async () =>
             {
                 await _rawMaterialRepository.DeleteAsync(SelectedRawMaterial!.Id, CancellationToken.None);
-                SelectedRawMaterial = null;
+                ClearForm();
                 await LoadCommand.Execute();
             }),
             this.WhenAnyValue(x => x.SelectedRawMaterial).Select(material => material is not null));
@@ -911,6 +906,28 @@ public class RawMaterialsViewModel : ViewModelBase
         {
             _syncingCostBuffer = false;
         }
+    }
+
+    /// <summary>
+    /// An empty form, for New and after Delete. It starts as a purchased ingredient, the usual kind, but
+    /// the category, purchase unit and the usage example's material start empty, so none is saved or
+    /// costed by accident. The numbers keep a value: the price and cost buffer are 0, and the usage
+    /// example's quantity stays.
+    /// </summary>
+    private void ClearForm()
+    {
+        _editingId = 0;
+        SelectedRawMaterial = null;
+        CanChangeTypeAndSource = true;
+        EditingName = string.Empty;
+        EditingType = RawMaterialType.Ingredient;
+        EditingCategory = null;
+        EditingSource = RawMaterialSource.Purchased;
+        EditingWeightLossPercent = null;
+        EditingCostBufferPercent = 0m;
+        EditingBaseUnit = null;
+        ExampleRawMaterial = null;
+        ClearDetails();
     }
 
     private void LoadIntoForm(RawMaterial material)
@@ -1200,10 +1217,16 @@ public class RawMaterialsViewModel : ViewModelBase
 
     /// <summary>
     /// The latest price's unit, or for an unpriced material its largest unit, else the base unit. Never a
-    /// new unit, which picking would add as an alternative unit.
+    /// new unit, which picking would add as an alternative unit. None for a new material, whose purchase
+    /// unit starts empty, like its category (ClearForm).
     /// </summary>
     private RawMaterialUnitOption? DefaultPurchaseUnit()
     {
+        if (SelectedRawMaterial is null)
+        {
+            return null;
+        }
+
         var latest = PriceHistory.FirstOrDefault()?.Entry;
         var options = PurchaseUnitOptions.Where(o => !o.IsNew).ToList();
         return (latest is not null

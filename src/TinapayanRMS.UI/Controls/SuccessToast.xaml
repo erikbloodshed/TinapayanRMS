@@ -1,0 +1,71 @@
+<UserControl x:Class="TinapayanRMS.UI.Controls.SuccessToast"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             x:Name="Root"
+             HorizontalAlignment="Right"
+             VerticalAlignment="Bottom"
+             MinWidth="280"
+             MaxWidth="380"
+             Margin="16"
+             Panel.ZIndex="1"
+             Visibility="Collapsed"
+             AutomationProperties.AutomationId="SuccessToast"
+             d:DesignHeight="90" d:DesignWidth="360">
+    <!--
+        The hosting screen's SuccessMessage, e.g. "Cake Flour was saved.", as a toast in the same corner
+        as ErrorToast, and laid out like it. The screen places it across its whole root Grid. Code-behind
+        binds it to SuccessMessage, and hides it a few seconds after it opens.
+    -->
+    <Border Background="{StaticResource SuccessBackgroundBrush}"
+            BorderBrush="{StaticResource SuccessBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="16,10,8,14">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.18" />
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Text="&#xE930;"
+                       Style="{StaticResource IconGlyphStyle}"
+                       FontSize="16"
+                       Foreground="{StaticResource SuccessForegroundBrush}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,8,0" />
+            <TextBlock Grid.Column="1"
+                       Text="Success"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource SuccessForegroundBrush}"
+                       VerticalAlignment="Center" />
+            <Button Grid.Column="2"
+                    Style="{StaticResource ToastCloseButtonStyle}"
+                    Click="OnCloseClick"
+                    ToolTip="Close"
+                    AutomationProperties.Name="Close">
+                <TextBlock Text="&#xE711;" Style="{StaticResource IconGlyphStyle}" FontSize="12" />
+            </Button>
+
+            <TextBlock Grid.Row="1"
+                       Grid.Column="1"
+                       Grid.ColumnSpan="2"
+                       Text="{Binding Message, ElementName=Root}"
+                       Foreground="{StaticResource HeadingForegroundBrush}"
+                       TextWrapping="Wrap"
+                       Margin="0,2,8,0"
+                       AutomationProperties.AutomationId="SuccessToastMessage" />
+        </Grid>
+    </Border>
+</UserControl>

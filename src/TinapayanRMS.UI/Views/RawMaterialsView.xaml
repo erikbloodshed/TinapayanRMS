@@ -26,8 +26,12 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- ErrorMessage as a toast, over the cards: it spans the whole Grid and puts itself in its bottom-right corner -->
+        <!--
+            ErrorMessage and SuccessMessage as toasts, over the cards: each spans the whole Grid and puts
+            itself in its bottom-right corner. An action clears both first, so only one shows at a time.
+        -->
         <controls:ErrorToast Grid.RowSpan="2" Grid.ColumnSpan="3" />
+        <controls:SuccessToast Grid.RowSpan="2" Grid.ColumnSpan="3" />
 
         <rm:MaterialListCard Grid.RowSpan="2" Grid.Column="0" />
 

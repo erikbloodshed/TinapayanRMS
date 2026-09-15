@@ -17,7 +17,8 @@ namespace TinapayanRMS.Tests.ViewModels;
 /// Coming back to the Raw Materials tab re-runs LoadCommand (MainWindow). It must pick up what other
 /// tabs changed while keeping the screen as the user left it: the selected row, unsaved form
 /// edits and picker choices. Also covers the one Save that writes a material with its units, price and
-/// BOM, the usage example, and how a new material's type decides which of its fields apply.
+/// BOM, the usage example, the empty form a new material starts with, and how its type decides which of
+/// its fields apply.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
@@ -106,6 +107,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Flour";
+        PickCategory(viewModel);
         viewModel.ShowPurchaseSetup.Should().BeTrue("a new purchased material can be priced before it's saved");
         await AddUnitAsync(viewModel, bagId, 25000m);
         viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "bag");
@@ -120,12 +122,38 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await WaitUntilSettledAsync(() => viewModel.PriceHistory.Count == 1,
             () => $"price rows={viewModel.PriceHistory.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SuccessMessage.Should().Be("Flour was saved.", "a toast says so");
         viewModel.SelectedRawMaterial!.Name.Should().Be("Flour", "saving a new material selects it");
         viewModel.IsUnitFormOpen.Should().BeFalse();
         viewModel.UnitRows.Select(r => (r.UnitName, r.Unit.Id > 0)).Should().Equal(("bag", true), ("pack", true));
         viewModel.PriceHistory.Single().Entry.UnitId.Should().Be(viewModel.UnitRows[0].Unit.Id);
         viewModel.CurrentCostText.Should().Be("₱0.0500");
         viewModel.CanChangeTypeAndSource.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_save_is_confirmed_until_the_next_action_and_confirmed_again_by_the_next_save()
+    {
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Flour";
+        PickCategory(viewModel);
+
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SuccessMessage.Should().Be("Flour was saved.");
+
+        viewModel.EditingName = string.Empty;
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().Be("Name is required.");
+        viewModel.SuccessMessage.Should().BeNull("an error replaces the confirmation");
+
+        viewModel.EditingName = "Bread Flour";
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SuccessMessage.Should().Be("Bread Flour was saved.", "it names the material as saved");
     }
 
     [Fact]
@@ -140,10 +168,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Flour";
+        PickCategory(viewModel);
         viewModel.PurchaseUnitOptions.Select(o => (o.Name, o.IsNew)).Should().Equal(
             [("gram", false), ("bag", true), ("sack", true)], "a unit of measure named like the ingredient's gram isn't offered twice");
-        viewModel.EditingPurchaseUnit!.Name.Should().Be("gram", "an unpriced material with no units starts on its base unit, never a new one");
-        viewModel.IsPurchaseQuantityReadOnly.Should().BeTrue("the base unit is always 1");
+        viewModel.EditingPurchaseUnit.Should().BeNull("a new material's purchase unit starts empty, like its other pickers");
+        viewModel.IsPurchaseQuantityReadOnly.Should().BeTrue("there's no unit to type a quantity for");
 
         viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "sack");
 
@@ -231,6 +260,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Flour";
+        PickCategory(viewModel);
         viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "sack");
         viewModel.EditingPrice = 1500m;
 
@@ -269,6 +299,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Flour"; // already taken
+        PickCategory(viewModel);
         await AddUnitAsync(viewModel, bagId, 25000m);
         viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "bag");
         viewModel.EditingPrice = 1250m;
@@ -276,6 +307,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().Be("That name is already in use.");
+        viewModel.SuccessMessage.Should().BeNull("nothing was saved");
         viewModel.SelectedRawMaterial.Should().BeNull();
         viewModel.CanChangeTypeAndSource.Should().BeTrue("the material still isn't saved");
         viewModel.UnitRows.Should().ContainSingle().Which.UnitName.Should().Be("bag");
@@ -328,6 +360,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Simple Syrup";
+        PickCategory(viewModel);
         viewModel.EditingSource = RawMaterialSource.Made;
         viewModel.EditingWeightLossPercent = 20m;
         viewModel.ShowPurchaseSetup.Should().BeFalse("a made ingredient has a BOM instead of a price");
@@ -355,6 +388,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Simple Syrup";
+        PickCategory(viewModel);
         viewModel.EditingWeightLossPercent.Should().BeNull("a purchased material has no weight loss");
         viewModel.EditingSource = RawMaterialSource.Made;
         viewModel.EditingWeightLossPercent.Should().Be(0m, "a made ingredient starts at 0%");
@@ -375,6 +409,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Simple Syrup";
+        PickCategory(viewModel);
         viewModel.EditingSource = RawMaterialSource.Made;
         viewModel.EditingWeightLossPercent = null; // the box shows 0.00 when it's empty
 
@@ -446,6 +481,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.NewCommand.Execute();
         viewModel.EditingCostBufferPercent.Should().Be(0m, "a new material starts with no buffer");
         viewModel.EditingName = "Flour";
+        PickCategory(viewModel);
         await AddUnitAsync(viewModel, bagId, 25000m);
         viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "bag");
         viewModel.EditingPrice = 1250m;
@@ -527,6 +563,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Sugar";
+        PickCategory(viewModel);
         viewModel.EditingCostBufferPercent = null; // the box shows 0.00 when it's empty
 
         await viewModel.SaveCommand.Execute();
@@ -574,6 +611,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.NewCommand.Execute();
         viewModel.IsEditingIngredient.Should().BeTrue("a new material starts as an ingredient");
         viewModel.EditingName = "Cake Box";
+        PickCategory(viewModel);
         viewModel.EditingSource = RawMaterialSource.Made;
         viewModel.EditingWeightLossPercent = 5m;
 
@@ -596,6 +634,98 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.CurrentCostText.Should().Be("₱0.0000");
         viewModel.CanChangeTypeAndSource.Should().BeFalse("the type is fixed once saved");
         viewModel.Ingredients.Should().NotContain(box, "the BOM component picker lists ingredients only");
+    }
+
+    [Fact]
+    public async Task New_starts_a_purchased_ingredient_with_the_other_pickers_empty_and_the_numbers_kept()
+    {
+        var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
+        await SeedPurchasedIngredientAsync("Flour", (bagId, 25000m));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await WaitUntilSettledAsync(() => viewModel.EditingPurchaseUnit?.Name == "bag",
+            () => $"picked={viewModel.EditingPurchaseUnit?.Name ?? "none"}");
+        viewModel.ExampleRawMaterial.Should().NotBeNull("selecting a material puts it in the usage example");
+        viewModel.EditingCostBufferPercent = 5m;
+        viewModel.ExampleQuantity = 3m;
+
+        await viewModel.NewCommand.Execute();
+
+        viewModel.EditingName.Should().BeEmpty();
+        viewModel.EditingType.Should().Be(RawMaterialType.Ingredient, "most materials are purchased ingredients");
+        viewModel.EditingSource.Should().Be(RawMaterialSource.Purchased);
+        viewModel.EditingCategory.Should().BeNull("the category isn't guessed");
+        viewModel.EditingPurchaseUnit.Should().BeNull();
+        viewModel.EditingPurchaseQuantity.Should().BeNull("there's no unit for it to be the quantity of");
+        viewModel.ExampleRawMaterial.Should().BeNull();
+        viewModel.ExampleUnit.Should().BeNull();
+        viewModel.ExampleUnitOptions.Should().BeEmpty();
+
+        viewModel.EditingPrice.Should().BeNull("the price box shows 0.00");
+        viewModel.EditingCostBufferPercent.Should().Be(0m);
+        viewModel.ExampleQuantity.Should().Be(3m, "the usage example's quantity stays");
+        viewModel.ShowPurchaseSetup.Should().BeTrue("a new purchased material can be priced before it's saved");
+        viewModel.BaseUnitAbbreviation.Should().Be("g");
+    }
+
+    [Fact]
+    public async Task Saving_a_new_material_with_its_name_and_category_still_empty_saves_nothing()
+    {
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await viewModel.NewCommand.Execute();
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().Be("Name is required. Category is required.");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_price_typed_before_a_purchase_unit_is_picked_is_refused_rather_than_dropped()
+    {
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Flour";
+        PickCategory(viewModel);
+        viewModel.EditingPrice = 1250m;
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().Be("Pick the purchase unit the price is for.");
+        viewModel.EditingPrice.Should().Be(1250m, "the edits stay to be fixed");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Deleting_a_material_leaves_an_empty_form()
+    {
+        var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
+        await SeedPurchasedIngredientAsync("Flour", (bagId, 25000m));
+        var viewModel = CreateViewModel();
+        viewModel.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await WaitUntilSettledAsync(() => viewModel.EditingPurchaseUnit?.Name == "bag",
+            () => $"picked={viewModel.EditingPurchaseUnit?.Name ?? "none"}");
+
+        await viewModel.DeleteCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.RawMaterials.Should().BeEmpty();
+        viewModel.EditingName.Should().BeEmpty("the deleted material's details don't stay in the form");
+        viewModel.EditingCategory.Should().BeNull();
+        viewModel.EditingPurchaseUnit.Should().BeNull();
+        viewModel.ExampleRawMaterial.Should().BeNull();
+        viewModel.CanChangeTypeAndSource.Should().BeTrue("the form is a new material now");
     }
 
     private RawMaterialsViewModel CreateViewModel()
@@ -625,6 +755,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.ApplyUnitCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
     }
+
+    /// <summary>Picks the first category, which a new material starts without.</summary>
+    private static void PickCategory(RawMaterialsViewModel viewModel) =>
+        viewModel.EditingCategory = viewModel.Categories.First();
 
     private async Task SeedCategoryAsync(string name)
     {
