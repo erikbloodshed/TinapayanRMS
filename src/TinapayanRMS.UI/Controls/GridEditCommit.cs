@@ -90,7 +90,7 @@ public static class GridEditCommit
         }
 
         var addNewRow = grid.GetAddNewRowController();
-        if (IsUntouched(grid, view.CurrentAddItem))
+        if (GridAddNewRow.IsUntouched(grid, view.CurrentAddItem))
         {
             addNewRow.CancelAddNew();
         }
@@ -98,17 +98,5 @@ public static class GridEditCommit
         {
             addNewRow.CommitAddNew(true);
         }
-    }
-
-    private static bool IsUntouched(SfDataGrid grid, object? item)
-    {
-        if (item?.GetType().GetConstructor(Type.EmptyTypes) is null)
-        {
-            return false;
-        }
-
-        var fresh = Activator.CreateInstance(item.GetType());
-        var properties = grid.View.GetPropertyAccessProvider();
-        return grid.Columns.All(c => Equals(properties.GetValue(item, c.MappingName), properties.GetValue(fresh, c.MappingName)));
     }
 }

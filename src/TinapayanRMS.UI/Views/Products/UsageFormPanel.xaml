@@ -84,15 +84,15 @@
                                    AllowDeleting="True"
                                    EditTrigger="OnTap"
                                    AddNewRowPosition="Bottom"
-                                   AddNewRowText="Click here to add an ingredient"
                                    SelectionMode="Single"
                                    ColumnSizer="Star"
                                    controls:GridEditCommit.OnFocusLeave="True"
+                                   controls:GridAddNewRow.DropWhenUntouched="True"
                                    controls:AutoCompleteDropDown.IsEnabled="True"
                                    controls:GridAddNewRow.ItemFactory="{Binding NewFormLine}"
                                    Height="200">
                 <syncfusion:SfDataGrid.Columns>
-                    <!-- Typing completes the name and narrows the list to the ingredients that match -->
+                    <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
                     <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
                                                             HeaderText="Ingredient"
                                                             ItemsSource="{Binding Ingredients}"
@@ -101,6 +101,7 @@
                                                             AllowAutoComplete="True"
                                                             AllowNullInput="True"
                                                             AllowIncrementalFiltering="True"
+                                                            SearchCondition="Contains"
                                                             AutoGenerateColumns="False"
                                                             IsAutoPopupSize="False"
                                                             PopUpWidth="380"

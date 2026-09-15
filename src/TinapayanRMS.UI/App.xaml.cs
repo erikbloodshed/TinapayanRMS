@@ -9,6 +9,7 @@ using Serilog;
 using Syncfusion.Licensing;
 using Syncfusion.SfSkinManager;
 using Syncfusion.Themes.Windows11Light.WPF;
+using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.Windows.Controls.Input;
 using Syncfusion.Windows.Shared;
 using Syncfusion.Windows.Tools.Controls;
@@ -69,6 +70,9 @@ public partial class App : Application
 
         EventManager.RegisterClassHandler(
             typeof(ComboBoxAdv), FrameworkElement.LoadedEvent, new RoutedEventHandler(ApplyPickerDefaults));
+
+        EventManager.RegisterClassHandler(
+            typeof(AddNewRowControl), FrameworkElement.LoadedEvent, new RoutedEventHandler(HideAddNewRowText));
     }
 
     /// <summary>
@@ -111,6 +115,22 @@ public partial class App : Application
         if (picker.ReadLocalValue(ComboBoxAdv.AutoCompleteModeProperty) == DependencyProperty.UnsetValue)
         {
             picker.SetCurrentValue(ComboBoxAdv.AutoCompleteModeProperty, AutoCompleteModes.Suggest);
+        }
+    }
+
+    /// <summary>
+    /// Shows a grid's add row as a plain empty row. Until the row is edited, the Windows11Light theme covers it with a
+    /// light-gray band carrying the add-row text ("Click here to add new row" when a grid sets none), which also hid
+    /// the column lines. With the band collapsed only the empty cells show, and clicking one still starts a line. The
+    /// band's Edit visual state collapses it too, so a local value holds in both states.
+    /// </summary>
+    private static void HideAddNewRowText(object sender, RoutedEventArgs e)
+    {
+        var row = (AddNewRowControl)sender;
+
+        if (row.Template?.FindName("PART_AddNewRowTextBorder", row) is UIElement band)
+        {
+            band.Visibility = Visibility.Collapsed;
         }
     }
 

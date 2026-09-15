@@ -18,7 +18,7 @@ namespace TinapayanRMS.UI.Controls;
 /// the decompiled Syncfusion 34.2.7:
 /// <list type="bullet">
 /// <item>They're added with ShowBelowSummary, which puts them after the bottom add-new row; without it they come
-/// before it, and "Click here to add an ingredient" would sink below them.</item>
+/// before it, and the row a line is typed into would sink below them.</item>
 /// <item>Those rows are frozen footer rows. With a short body they sit right under it (the scroll axis's
 /// ViewSize is the smaller of its render size and total extent), but once the rows outgrow the grid they'd be
 /// pinned over its last rows. So rows that no longer fit are removed at once, when records are added, a group

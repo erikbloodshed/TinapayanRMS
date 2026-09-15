@@ -37,12 +37,16 @@ public static class AutoCompleteDropDown
 }
 
 /// <summary>
-/// The multi-column drop-down cell renderer with three of its behaviours fixed for typing lines into a grid:
+/// The multi-column drop-down cell renderer, set up for typing lines into a grid:
 /// <list type="bullet">
 /// <item>The one editor serves every row of the column and kept the text typed on the last row, so a new row opened
 /// showing it. Each edit now starts from its own row's value.</item>
 /// <item>Autocomplete ran 500 ms after a keystroke (<see cref="SfMultiColumnDropDownControl.FilterDelay"/>), so a
 /// name typed and tabbed out of at once was never picked. It now runs as each key is typed.</item>
+/// <item>The list opened only with F4 or the arrow. It now opens as the first key is typed
+/// (<see cref="SfMultiColumnDropDownControl.AllowImmediatePopup"/>, which the column has no property for).</item>
+/// <item>A column with <c>SearchCondition="Contains"</c> picks a name that contains the typed text, not only one that
+/// starts with it (<see cref="ScreenAwareDropDownControl"/>).</item>
 /// <item>The pop-up is placed on the monitor the cell is on (<see cref="ScreenAwareDropDownControl"/>).</item>
 /// </list>
 /// </summary>
@@ -51,7 +55,7 @@ public sealed class AutoCompleteDropDownRenderer : GridCellMultiColumnDropDownRe
     protected override SfMultiColumnDropDownControl OnCreateEditUIElement()
     {
         // What the base renderers do to the control they create, but with the screen-aware control.
-        var editor = new ScreenAwareDropDownControl { FilterDelay = 0, BorderThickness = new Thickness(1) };
+        var editor = new ScreenAwareDropDownControl { FilterDelay = 0, AllowImmediatePopup = true, BorderThickness = new Thickness(1) };
         Validation.SetErrorTemplate(editor, null);
         VisualContainer.SetWantsMouseInput(editor, true);
         return editor;
@@ -81,15 +85,75 @@ public sealed class AutoCompleteDropDownRenderer : GridCellMultiColumnDropDownRe
 }
 
 /// <summary>
-/// An SfMultiColumnDropDownControl whose pop-up opens below the cell when it fits on the cell's monitor, and above
-/// it otherwise. The control's own placement measured the room below against the whole virtual desktop's height
+/// An SfMultiColumnDropDownControl for a grid cell that's typed into:
+/// <list type="bullet">
+/// <item>Its pop-up opens below the cell when it fits on the cell's monitor, and above it otherwise. The control's own
+/// placement measured the room below against the whole virtual desktop's height
 /// (<see cref="SystemParameters.VirtualScreenHeight"/>), so on a shorter monitor than the tallest one it opened
-/// below anyway, and Windows pushed the pop-up up over the cell being typed into.
+/// below anyway, and Windows pushed the pop-up up over the cell being typed into.</item>
+/// <item>With <see cref="SfMultiColumnDropDownControl.SearchCondition"/> set to Contains, typing picks a name that
+/// contains the text. The condition only ever filtered the list: the pick (autocomplete) took the first name starting
+/// with the text, whatever the condition, and wrote that name into the box. A name starting with the text still wins
+/// ("fir" picks First Class Flour); when none does, the first that contains it ("flour" picks All Purpose Flour). The
+/// text stays as typed.</item>
+/// </list>
 /// </summary>
 public sealed class ScreenAwareDropDownControl : SfMultiColumnDropDownControl
 {
+    /// <summary>Whether a name in the list starts with the text being typed, once worked out for that text.</summary>
+    private bool? _anyNameStartsWithText;
+
     /// <summary>Whether its template, with the text box its text is typed into, has been applied.</summary>
     internal bool HasEditor => GetTemplateChild("PART_TextBox") is TextBox;
+
+    protected override void ProcessOnEditorTextChanged(object sender, TextChangedEventArgs e)
+    {
+        // The pick for new text asks again whether a name starts with it.
+        _anyNameStartsWithText = null;
+        base.ProcessOnEditorTextChanged(sender, e);
+    }
+
+    protected override bool ProcessAppendText(object item, string exactValue, string filterText)
+    {
+        if (SearchCondition != SearchCondition.Contains)
+        {
+            return base.ProcessAppendText(item, exactValue, filterText);
+        }
+
+        // Asked of each name in list order until one is picked, both texts lower-cased as the list's filter compares
+        // them. The first name starting with the text is picked, or, when none does, the first containing it.
+        return !string.IsNullOrEmpty(filterText)
+            && (exactValue.StartsWith(filterText) || (exactValue.Contains(filterText) && !AnyNameStartsWith(filterText)));
+    }
+
+    protected override List<string> ProcessAppendStringList(object item, string value)
+    {
+        // The base writes the picked name into the box and selects the part not typed yet, which only fits a name the
+        // text starts. With Contains the box keeps what was typed: SearchText, taken just before the pick.
+        return SearchCondition == SearchCondition.Contains ? [SearchText] : base.ProcessAppendStringList(item, value);
+    }
+
+    protected override void CommitValue(bool autoCommit = false)
+    {
+        // Leaving the cell keeps the pick only when the box holds its whole name, which a contained text doesn't.
+        // With Contains, the pick typing made is kept, as Tab keeps it.
+        base.CommitValue(autoCommit || (SearchCondition == SearchCondition.Contains && SelectedItem is not null));
+    }
+
+    /// <summary>Whether any name in the list starts with the lower-cased typed text.</summary>
+    private bool AnyNameStartsWith(string filterText)
+    {
+        _anyNameStartsWithText ??= ItemsSource is IEnumerable items
+            && items.Cast<object?>().Any(item => ComparedName(item)?.StartsWith(filterText) == true);
+        return _anyNameStartsWithText.Value;
+    }
+
+    /// <summary>An item's name as the base compares it: its display member, lower-cased unless filtering is case-sensitive.</summary>
+    private string? ComparedName(object? item)
+    {
+        var name = item?.GetType().GetProperty(DisplayMember)?.GetValue(item)?.ToString();
+        return AllowCaseSensitiveFiltering ? name : name?.ToLower();
+    }
 
     protected override void ProcessOnPopupPositionCalculation()
     {
