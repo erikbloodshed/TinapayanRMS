@@ -162,6 +162,7 @@
                                            ColumnSizer="Star"
                                            controls:GridEditCommit.OnFocusLeave="True"
                                            controls:AutoCompleteDropDown.IsEnabled="True"
+                                           controls:GridAddNewRow.ItemFactory="{Binding NewLine}"
                                            Height="280">
                         <syncfusion:SfDataGrid.Columns>
                             <!-- Typing completes the name and narrows the list to the ingredients that match -->

@@ -7,13 +7,25 @@ namespace TinapayanRMS.UI.ViewModels;
 /// One row of an ingredient lines table that is typed into directly: the sub-assembly form's lines and a
 /// made ingredient's Bill of Materials. The grid's ingredient cell sets <see cref="IngredientId"/>; the
 /// screen points <see cref="Ingredient"/> at that ingredient (<see cref="Resolve"/>), which prices the row.
-/// The grid's add row makes one with the parameterless constructor, so a row can be half filled in:
-/// <see cref="CompleteLines"/> checks them all before they're used.
+/// A row can be half filled in: <see cref="CompleteLines"/> checks them all before they're used.
 /// </summary>
 public sealed class IngredientLineRow : ReactiveObject
 {
+    /// <summary>Looks up an ingredient by id as the screen has it; null for a row the screen resolves itself.</summary>
+    private readonly Func<int, RawMaterial?>? _findIngredient;
+
     public IngredientLineRow()
     {
+    }
+
+    /// <summary>
+    /// A new row that prices itself as soon as its ingredient is picked. The grid's add row edits one of these
+    /// (controls:GridAddNewRow.ItemFactory): until it's committed it isn't in the screen's lines, so the screen
+    /// can't resolve it, and its Cost would stay 0 while its grams are typed.
+    /// </summary>
+    public IngredientLineRow(Func<int, RawMaterial?> findIngredient)
+    {
+        _findIngredient = findIngredient;
     }
 
     public IngredientLineRow(RawMaterial ingredient, decimal grams)
@@ -27,7 +39,14 @@ public sealed class IngredientLineRow : ReactiveObject
     public int? IngredientId
     {
         get => _ingredientId;
-        set => this.RaiseAndSetIfChanged(ref _ingredientId, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _ingredientId, value);
+            if (_findIngredient is not null)
+            {
+                Ingredient = value is { } id ? _findIngredient(id) : null;
+            }
+        }
     }
 
     private RawMaterial? _ingredient;

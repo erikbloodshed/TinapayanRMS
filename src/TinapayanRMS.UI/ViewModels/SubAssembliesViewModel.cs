@@ -67,6 +67,9 @@ public class SubAssembliesViewModel : ViewModelBase
     /// <summary>The form's lines, typed straight into the table, in grams.</summary>
     public ObservableCollection<IngredientLineRow> Lines { get; } = [];
 
+    /// <summary>The line the table's add row edits: it prices itself as its ingredient is picked, before it's committed.</summary>
+    public Func<IngredientLineRow> NewLine => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id));
+
     private StandaloneSubAssemblyRow? _selectedRow;
     public StandaloneSubAssemblyRow? SelectedRow
     {

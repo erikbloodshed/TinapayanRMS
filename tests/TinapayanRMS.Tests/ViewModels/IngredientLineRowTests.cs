@@ -48,6 +48,25 @@ public class IngredientLineRowTests
     }
 
     [Fact]
+    public void A_new_row_with_a_lookup_prices_itself_as_its_ingredient_and_grams_are_entered()
+    {
+        var row = new IngredientLineRow(id => IngredientsById.GetValueOrDefault(id));
+        List<string> changed = [];
+        row.PropertyChanged += (_, e) => changed.Add(e.PropertyName!);
+
+        row.IngredientId = Sugar.Id;
+        row.Ingredient.Should().BeSameAs(Sugar, "the add row isn't in the screen's lines yet, so it finds its own ingredient");
+        row.Grams = 200m;
+
+        row.Cost.Should().Be(18m);
+        changed.Should().Contain(nameof(IngredientLineRow.Cost), "the grid's Cost cell updates from it");
+
+        row.IngredientId = null;
+        row.Ingredient.Should().BeNull();
+        row.Cost.Should().Be(0m);
+    }
+
+    [Fact]
     public void CompleteLines_leaves_out_a_blank_add_row()
     {
         var lines = IngredientLineRow.CompleteLines([new IngredientLineRow(Flour, 1000m), new IngredientLineRow()], "Bread Dough");

@@ -469,6 +469,9 @@ public class ProductsViewModel : ViewModelBase
     /// <summary>The sub-assembly form's lines, for a sub-assembly of the product's own: typed straight into its table.</summary>
     public ObservableCollection<IngredientLineRow> FormLines { get; } = [];
 
+    /// <summary>The line the form table's add row edits: it prices itself as its ingredient is picked, before it's committed.</summary>
+    public Func<IngredientLineRow> NewFormLine => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id));
+
     private string _searchText = string.Empty;
     public string SearchText
     {
