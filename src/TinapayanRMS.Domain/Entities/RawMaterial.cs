@@ -61,7 +61,8 @@ public class RawMaterial
 
     /// <summary>
     /// A cushion on top of the cost for price swings, waste and yield variation, at least 0 and at
-    /// most 100. Defaults to 0, which makes the buffered cost the same as the true cost.
+    /// most 100. Defaults to 0, which makes the buffered cost the same as the true cost. A Linked ingredient
+    /// inherits it from the ingredient it's linked to, and the cascade keeps it in step.
     /// </summary>
     public decimal CostBufferPercent { get; set; }
 

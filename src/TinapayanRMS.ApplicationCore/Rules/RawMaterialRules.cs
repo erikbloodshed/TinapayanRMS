@@ -103,8 +103,8 @@ public static class RawMaterialRules
     /// A linked part's cost per base unit: the linked-to ingredient's, times the share of its cost the part
     /// carries, over the share of its weight the part is. An egg at ₱0.09 a gram gives egg white (70% of the
     /// weight, 30% of the cost) ₱0.0386 a gram and egg yolk (30%, 70%) ₱0.21. The share is always of the
-    /// linked-to ingredient's true (unbuffered) cost; the part's buffered cost is BufferedCost of the result
-    /// with the part's own buffer, so the linked-to ingredient's buffer never reaches it.
+    /// linked-to ingredient's true (unbuffered) cost; the part inherits the linked-to ingredient's buffer
+    /// percent, and its buffered cost is BufferedCost of the result with that percent.
     /// </summary>
     public static decimal LinkedCost(decimal linkedToCost, decimal weightSharePercent, decimal costSharePercent) =>
         linkedToCost * costSharePercent / weightSharePercent;

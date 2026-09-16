@@ -126,15 +126,19 @@ public class RawMaterialRepository(
 
     /// <summary>
     /// Adds <paramref name="material"/> and saves it, rejecting fields that don't fit its type or source, or a
-    /// link that doesn't fit. Returns whether the caller must cascade its cost: a linked ingredient's is
-    /// worked out from the one it's linked to.
+    /// link that doesn't fit. A linked ingredient takes the buffer of the one it's linked to, whatever it was
+    /// given. Returns whether the caller must cascade its cost: a linked ingredient's is worked out from the
+    /// one it's linked to.
     /// </summary>
     internal static async Task<bool> AddAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
     {
         RawMaterialRules.EnsureFieldsMatchType(material);
         RawMaterialRules.EnsureFieldsMatchSource(material);
         RawMaterialRules.EnsureValidCostBuffer(material.CostBufferPercent);
-        await EnsureValidLinkAsync(dbContext, material, cancellationToken);
+        if (await EnsureValidLinkAsync(dbContext, material, cancellationToken) is { } inheritedBuffer)
+        {
+            material.CostBufferPercent = inheritedBuffer;
+        }
 
         dbContext.RawMaterials.Add(material);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -158,7 +162,7 @@ public class RawMaterialRepository(
 
         RawMaterialRules.EnsureTypeUnchanged(existing.Type, material.Type);
         RawMaterialRules.EnsureSourceUnchanged(existing.Source, material.Source);
-        await EnsureValidLinkAsync(dbContext, material, cancellationToken);
+        var inheritedBuffer = await EnsureValidLinkAsync(dbContext, material, cancellationToken);
 
         // Only a packaging material can get here: an ingredient's is always null (EnsureFieldsMatchType).
         if (existing.BaseUnitId != material.BaseUnitId)
@@ -180,9 +184,10 @@ public class RawMaterialRepository(
         existing.BaseUnitId = material.BaseUnitId;
 
         // A purchased material's buffered cost follows its buffer here; a made one's is a BOM rollup,
-        // which the cascade redoes.
-        var bufferChanged = existing.CostBufferPercent != material.CostBufferPercent;
-        existing.CostBufferPercent = material.CostBufferPercent;
+        // which the cascade redoes. A linked one's buffer is the linked-to ingredient's, not the form's.
+        var costBufferPercent = inheritedBuffer ?? material.CostBufferPercent;
+        var bufferChanged = existing.CostBufferPercent != costBufferPercent;
+        existing.CostBufferPercent = costBufferPercent;
         if (bufferChanged && existing.Source == RawMaterialSource.Purchased)
         {
             existing.BufferedCostPerBaseUnit = RawMaterialRules.BufferedCost(existing.CostPerBaseUnit, existing.CostBufferPercent);
@@ -201,18 +206,19 @@ public class RawMaterialRepository(
     /// <summary>
     /// A linked ingredient's link must be to another ingredient, must leave room among that ingredient's other
     /// parts (together at most 100% of its weight and of its cost), and must not close a loop through BOMs
-    /// and links. Nothing to check for any other source. Call after EnsureFieldsMatchSource.
+    /// and links. Nothing to check for any other source. Call after EnsureFieldsMatchSource. Returns the
+    /// linked-to ingredient's cost buffer, which a linked ingredient inherits, or null when it isn't linked.
     /// </summary>
-    private static async Task EnsureValidLinkAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
+    private static async Task<decimal?> EnsureValidLinkAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
     {
         if (material is not { Source: RawMaterialSource.Linked, LinkedToId: { } linkedToId, WeightSharePercent: { } weightShare, CostSharePercent: { } costShare })
         {
-            return;
+            return null;
         }
 
         var linkedTo = await dbContext.RawMaterials
             .Where(m => m.Id == linkedToId)
-            .Select(m => new { m.Name, m.Type })
+            .Select(m => new { m.Name, m.Type, m.CostBufferPercent })
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException($"Ingredient {linkedToId} does not exist.");
 
@@ -237,6 +243,8 @@ public class RawMaterialRepository(
             var dependencies = await IngredientDependencies.LoadAsync(dbContext, material.Id, cancellationToken);
             IngredientBomRules.EnsureNoCycle(material.Id, [linkedToId], dependencies);
         }
+
+        return linkedTo.CostBufferPercent;
     }
 
     /// <summary>

@@ -58,11 +58,14 @@ public class IngredientCostPropagator(IDbContextFactory<TinapayanRMSDbContext> d
             {
                 var ingredient = ingredients[id];
 
-                // A share of the linked-to ingredient's true (unbuffered) cost, and only this ingredient's own
-                // buffer on top of that: the linked-to ingredient's buffer never reaches its parts.
+                // A share of the linked-to ingredient's true (unbuffered) cost, with the linked-to ingredient's
+                // buffer percent inherited and put on top of that. The percent is copied here, so a buffer
+                // change on the linked-to ingredient (which cascades) reaches its parts, down a chain of links.
                 if (ingredient is { Source: RawMaterialSource.Linked, LinkedToId: { } linkedToId, WeightSharePercent: { } weightShare, CostSharePercent: { } costShare })
                 {
-                    ingredient.CostPerBaseUnit = RawMaterialRules.LinkedCost(ingredients[linkedToId].CostPerBaseUnit, weightShare, costShare);
+                    var linkedTo = ingredients[linkedToId];
+                    ingredient.CostBufferPercent = linkedTo.CostBufferPercent;
+                    ingredient.CostPerBaseUnit = RawMaterialRules.LinkedCost(linkedTo.CostPerBaseUnit, weightShare, costShare);
                     ingredient.BufferedCostPerBaseUnit = RawMaterialRules.BufferedCost(ingredient.CostPerBaseUnit, ingredient.CostBufferPercent);
                     continue;
                 }

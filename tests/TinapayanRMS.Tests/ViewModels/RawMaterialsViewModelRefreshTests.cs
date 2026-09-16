@@ -34,10 +34,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
         viewModel.EditingName = "Flour (unsaved rename)";
         viewModel.CanAddUnit.Should().BeTrue("one alternative unit is below the limit of two");
-        await viewModel.AddUnitCommand.Execute();
-        viewModel.EditingUnitOfMeasure = viewModel.UnitsOfMeasure.Single();
         var selected = viewModel.SelectedRawMaterial;
-        var pickedUnit = viewModel.EditingUnitOfMeasure;
+        var pickedUnit = viewModel.UnitRows.Single().Unit.UnitOfMeasure;
 
         await SeedUnitOfMeasureAsync("sack", "sk");
         await viewModel.LoadCommand.Execute();
@@ -47,8 +45,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.RawMaterials.Should().ContainSingle().Which.Should().BeSameAs(selected);
         viewModel.SelectedRawMaterial.Should().BeSameAs(selected);
         viewModel.UnitsOfMeasure.Should().Contain(unit => ReferenceEquals(unit, pickedUnit));
-        viewModel.EditingUnitOfMeasure.Should().BeSameAs(pickedUnit);
-        viewModel.IsUnitFormOpen.Should().BeTrue("the unsaved Alternative Units form stays open");
+        viewModel.UnitRows.Single().Unit.UnitOfMeasure.Should().BeSameAs(pickedUnit, "the grid's unit cell still finds the unit it shows");
         viewModel.EditingName.Should().Be("Flour (unsaved rename)");
         viewModel.UnitsOfMeasure.Select(u => u.Name).Should().Equal("bag", "sack");
     }
@@ -69,7 +66,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.SelectedRawMaterial!.Id.Should().Be(flourId);
         viewModel.SelectedRawMaterial.Units.Should().ContainSingle().Which.UnitOfMeasure!.Abbreviation.Should().Be("bg", "the row shows the renamed unit");
-        viewModel.UnitRows.Should().ContainSingle().Which.Example.Should().Be("1 bg = 25,000 g");
+        var row = viewModel.UnitRows.Should().ContainSingle().Subject;
+        (row.Abbreviation, row.BaseEquivalentText).Should().Be(("bg", "25,000 g"));
         viewModel.EditingName.Should().Be("Flour (unsaved rename)", "re-pointing the selection must not reload the form");
     }
 
@@ -92,7 +90,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         var row = viewModel.UnitRows.Should().ContainSingle().Subject;
         row.Unit.Id.Should().Be(0, "the unit still isn't saved");
-        row.Example.Should().Be("1 bg = 25,000 g");
+        (row.Abbreviation, row.BaseEquivalentText).Should().Be(("bg", "25,000 g"));
         viewModel.EditingPurchaseUnit!.Abbreviation.Should().Be("bg", "the purchase unit picked stays picked");
     }
 
@@ -113,10 +111,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "bag");
         viewModel.EditingPrice = 1250m;
 
-        // The second unit is left open in the form: Save applies it.
-        await viewModel.AddUnitCommand.Execute();
-        viewModel.EditingUnitOfMeasure = viewModel.UnitsOfMeasure.Single(u => u.Id == packId);
-        viewModel.EditingUnitBaseUnitsPerUnit = 1000m;
+        await AddUnitAsync(viewModel, packId, 1000m);
+        viewModel.CanAddUnit.Should().BeFalse("two alternative units is the limit, so the grid's add row goes");
         await viewModel.SaveCommand.Execute();
 
         await WaitUntilSettledAsync(() => viewModel.PriceHistory.Count == 1,
@@ -124,7 +120,6 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("Flour was saved.", "a toast says so");
         viewModel.SelectedRawMaterial!.Name.Should().Be("Flour", "saving a new material selects it");
-        viewModel.IsUnitFormOpen.Should().BeFalse();
         viewModel.UnitRows.Select(r => (r.UnitName, r.Unit.Id > 0)).Should().Equal(("bag", true), ("pack", true));
         viewModel.PriceHistory.Single().Entry.UnitId.Should().Be(viewModel.UnitRows[0].Unit.Id);
         viewModel.CurrentCostText.Should().Be("₱0.0500");
@@ -186,7 +181,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.EditingPurchaseQuantity = 25000m;
         viewModel.EditingPrice = 1500m;
-        viewModel.UnitRows.Single().Example.Should().Be("1 sk = 25,000 g", "the quantity typed is the unit's multiplier");
+        viewModel.UnitRows.Single().BaseEquivalentText.Should().Be("25,000 g", "the quantity typed is the unit's multiplier");
         viewModel.PurchaseCostText.Should().Be("₱0.0600");
 
         await viewModel.SaveCommand.Execute();
@@ -334,7 +329,6 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             () => $"options={viewModel.PurchaseUnitOptions.Count}, picked={viewModel.EditingPurchaseUnit?.Name ?? "none"}");
         viewModel.EditingPurchaseUnit!.Name.Should().Be("bag", "an unpriced ingredient starts on its largest unit");
         viewModel.CanAddUnit.Should().BeFalse("the ingredient already has the two alternative units allowed");
-        (await viewModel.AddUnitCommand.CanExecute.FirstAsync()).Should().BeFalse();
 
         viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "pack");
         viewModel.EditingPrice = 60m;
@@ -785,6 +779,103 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().BeNull();
     }
 
+    [Fact]
+    public async Task A_unit_typed_into_the_grid_names_itself_and_is_offered_as_a_purchase_unit_straight_away()
+    {
+        var bagId = await SeedUnitOfMeasureAsync("bag", "bg");
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await viewModel.NewCommand.Execute();
+
+        // The add row's own item, before the grid commits it: it names its unit as soon as one is picked.
+        var row = viewModel.NewUnitRow();
+        row.UnitOfMeasureId = bagId;
+        row.BaseUnitsPerUnit = 25000m;
+        (row.UnitName, row.Abbreviation, row.BaseEquivalentText).Should().Be(("bag", "bg", "25,000 g"));
+
+        viewModel.UnitRows.Add(row);
+        viewModel.PurchaseUnitOptions.Should().Contain(o => o.Name == "bag" && !o.IsNew && ReferenceEquals(o.Unit, row.Unit),
+            "a unit added in the grid can be priced in before Save");
+
+        // A multiplier corrected in the grid shows as the purchase unit's quantity.
+        viewModel.EditingPurchaseUnit = viewModel.PurchaseUnitOptions.Single(o => o.Name == "bag");
+        row.BaseUnitsPerUnit = 20000m;
+        viewModel.EditingPurchaseQuantity.Should().Be(20000m);
+    }
+
+    [Theory]
+    [InlineData(false, true, "Pick a unit for every alternative unit, or remove the empty row.")]
+    [InlineData(true, false, "Enter how many g are in one bag (Alternative Units).")]
+    public async Task Save_refuses_a_half_filled_unit_row_and_saves_nothing(bool pickUnit, bool typeMultiplier, string message)
+    {
+        var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Flour";
+        PickCategory(viewModel);
+        var row = viewModel.NewUnitRow();
+        if (pickUnit)
+        {
+            row.UnitOfMeasureId = bagId;
+        }
+
+        if (typeMultiplier)
+        {
+            row.BaseUnitsPerUnit = 25000m;
+        }
+
+        viewModel.UnitRows.Add(row);
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().Be(message);
+        viewModel.UnitRows.Should().ContainSingle("the row stays to be fixed");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Save_refuses_the_same_unit_typed_twice()
+    {
+        var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Flour";
+        PickCategory(viewModel);
+        await AddUnitAsync(viewModel, bagId, 25000m);
+        await AddUnitAsync(viewModel, bagId, 50000m);
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().Be("This material already has that unit.");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_saved_units_multiplier_corrected_in_the_grid_is_saved()
+    {
+        var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
+        await SeedPurchasedIngredientAsync("Flour", (bagId, 25000m));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        viewModel.UnitRows.Single().BaseUnitsPerUnit = 20000m;
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterialUnits.SingleAsync(Cancellation)).BaseUnitsPerUnit.Should().Be(20000m);
+    }
+
     private RawMaterialsViewModel CreateViewModel()
     {
         ReactiveUIBootstrapper.EnsureInitialized();
@@ -804,14 +895,17 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             new LoggerConfiguration().CreateLogger());
     }
 
-    /// <summary>Adds an alternative unit through the form and applies it, which only puts it in the list.</summary>
-    private static async Task AddUnitAsync(RawMaterialsViewModel viewModel, int unitOfMeasureId, decimal baseUnitsPerUnit)
+    /// <summary>
+    /// Types an alternative unit into the grid's add row as the grid does: it edits the row the screen hands it
+    /// (NewUnitRow), then adds it to the rows when it's committed. Only Save writes it.
+    /// </summary>
+    private static Task AddUnitAsync(RawMaterialsViewModel viewModel, int unitOfMeasureId, decimal baseUnitsPerUnit)
     {
-        await viewModel.AddUnitCommand.Execute();
-        viewModel.EditingUnitOfMeasure = viewModel.UnitsOfMeasure.Single(u => u.Id == unitOfMeasureId);
-        viewModel.EditingUnitBaseUnitsPerUnit = baseUnitsPerUnit;
-        await viewModel.ApplyUnitCommand.Execute();
-        viewModel.ErrorMessage.Should().BeNull();
+        var row = viewModel.NewUnitRow();
+        row.UnitOfMeasureId = unitOfMeasureId;
+        row.BaseUnitsPerUnit = baseUnitsPerUnit;
+        viewModel.UnitRows.Add(row);
+        return Task.CompletedTask;
     }
 
     /// <summary>Picks the first category, which a new material starts without.</summary>

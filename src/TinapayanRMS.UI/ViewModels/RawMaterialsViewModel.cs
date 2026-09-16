@@ -15,24 +15,102 @@ namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// A row in the Alternative Units grid and a box in the Unit Conversion Overview: one of the form's
-/// alternative units, already saved (its Unit has an Id) or not yet (Id 0). Save writes them all.
+/// alternative units, already saved (its Unit has an Id) or not yet (Id 0). Typed straight into: the grid's
+/// unit cell sets <see cref="UnitOfMeasureId"/>, which the row resolves to its unit of measure, and the multiplier
+/// cell sets <see cref="BaseUnitsPerUnit"/>. Both write through to <see cref="Unit"/>, which Save writes. A row can be
+/// half filled in; Save checks them all first.
 /// </summary>
-public sealed class RawMaterialUnitRow(RawMaterialUnit unit, string baseUnitAbbreviation)
+public sealed class RawMaterialUnitRow : ReactiveObject
 {
-    public RawMaterialUnit Unit { get; } = unit;
+    /// <summary>Looks up a unit of measure by id as the screen has it.</summary>
+    private readonly Func<int, UnitOfMeasure?>? _findUnitOfMeasure;
+
+    /// <summary>An empty row, for the grid to compare an add row against (controls:GridAddNewRow.DropWhenUntouched).</summary>
+    public RawMaterialUnitRow()
+        : this(new RawMaterialUnit(), string.Empty, findUnitOfMeasure: null)
+    {
+    }
+
+    /// <param name="findUnitOfMeasure">Resolves a picked unit of measure, so a row names its unit as soon as it's picked, even in the add row.</param>
+    public RawMaterialUnitRow(RawMaterialUnit unit, string baseUnitAbbreviation, Func<int, UnitOfMeasure?>? findUnitOfMeasure)
+    {
+        Unit = unit;
+        _baseUnitAbbreviation = baseUnitAbbreviation;
+        _findUnitOfMeasure = findUnitOfMeasure;
+    }
+
+    public RawMaterialUnit Unit { get; }
+
+    /// <summary>The unit of measure picked in the grid; null until one is.</summary>
+    public int? UnitOfMeasureId
+    {
+        get => Unit.UnitOfMeasureId > 0 ? Unit.UnitOfMeasureId : null;
+        set
+        {
+            if (value == UnitOfMeasureId)
+            {
+                return;
+            }
+
+            Unit.UnitOfMeasureId = value ?? 0;
+            Unit.UnitOfMeasure = value is { } id ? _findUnitOfMeasure?.Invoke(id) : null;
+            this.RaisePropertyChanged();
+            RaiseUnitOfMeasureChanged();
+        }
+    }
+
+    /// <summary>Points the row at the screen's current copy of its unit of measure, so one renamed in Settings shows its new name.</summary>
+    public void RefreshUnitOfMeasure()
+    {
+        if (UnitOfMeasureId is { } id && _findUnitOfMeasure?.Invoke(id) is { } refreshed && !ReferenceEquals(refreshed, Unit.UnitOfMeasure))
+        {
+            Unit.UnitOfMeasure = refreshed;
+            RaiseUnitOfMeasureChanged();
+        }
+    }
 
     public string UnitName => Unit.UnitOfMeasure?.Name ?? "?";
 
-    public string Abbreviation => Unit.UnitOfMeasure?.Abbreviation ?? "?";
+    /// <summary>Empty until a unit is picked, so the add row stays blank.</summary>
+    public string Abbreviation => Unit.UnitOfMeasure?.Abbreviation ?? string.Empty;
 
-    public decimal BaseUnitsPerUnit => Unit.BaseUnitsPerUnit;
+    /// <summary>How many base units one of this unit holds: 25,000 for a 25 kg bag of an ingredient.</summary>
+    public decimal BaseUnitsPerUnit
+    {
+        get => Unit.BaseUnitsPerUnit;
+        set
+        {
+            if (value == Unit.BaseUnitsPerUnit)
+            {
+                return;
+            }
 
-    public string BaseEquivalentText => $"{Unit.BaseUnitsPerUnit:#,0.####} {baseUnitAbbreviation}";
+            Unit.BaseUnitsPerUnit = value;
+            this.RaisePropertyChanged();
+            this.RaisePropertyChanged(nameof(BaseEquivalentText));
+        }
+    }
 
-    /// <summary>E.g. "1 bag = 25,000 g" or "1 roll = 1,000 cm".</summary>
-    public string Example => $"1 {Abbreviation} = {BaseEquivalentText}";
+    private string _baseUnitAbbreviation;
+    /// <summary>The base unit's abbreviation, which a new packaging material can still change.</summary>
+    public string BaseUnitAbbreviation
+    {
+        get => _baseUnitAbbreviation;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _baseUnitAbbreviation, value);
+            this.RaisePropertyChanged(nameof(BaseEquivalentText));
+        }
+    }
 
-    public string? Description => Unit.Description;
+    /// <summary>E.g. "25,000 g" or "1,000 cm".</summary>
+    public string BaseEquivalentText => $"{Unit.BaseUnitsPerUnit:#,0.####} {BaseUnitAbbreviation}";
+
+    private void RaiseUnitOfMeasureChanged()
+    {
+        this.RaisePropertyChanged(nameof(UnitName));
+        this.RaisePropertyChanged(nameof(Abbreviation));
+    }
 }
 
 /// <summary>A row in the Price History grid: the entry, the unit it was priced in, and what that comes to per base unit.</summary>
@@ -115,7 +193,7 @@ public class RawMaterialsViewModel : ViewModelBase
     /// <summary>What the Category picker lists: the categories, with the "&lt; Add New .. &gt;" row above them.</summary>
     public ReadOnlyObservableCollection<RawMaterialCategory> CategoryOptions => _categoryOptions;
 
-    /// <summary>Every unit of measure, for the base unit picker and the Alternative Units form.</summary>
+    /// <summary>Every unit of measure, for the base unit picker and the Alternative Units grid's unit cell.</summary>
     public ObservableCollection<UnitOfMeasure> UnitsOfMeasure { get; } = [];
 
     /// <summary>The form's alternative units, saved or not. Their units are the form's own copies, edited in place.</summary>
@@ -322,7 +400,7 @@ public class RawMaterialsViewModel : ViewModelBase
         private set => this.RaiseAndSetIfChanged(ref _lastUpdatedText, value);
     }
 
-    // Alternative Units: the row picked in the grid (Edit and Remove act on it) and the add/edit form.
+    // Alternative Units: typed straight into the grid; Remove acts on the row picked.
     private RawMaterialUnitRow? _selectedUnitRow;
     public RawMaterialUnitRow? SelectedUnitRow
     {
@@ -330,7 +408,7 @@ public class RawMaterialsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _selectedUnitRow, value);
     }
 
-    /// <summary>Whether the form can take another alternative unit (UnitConversionRules.MaxAlternativeUnits).</summary>
+    /// <summary>Whether the form can take another alternative unit (UnitConversionRules.MaxAlternativeUnits); the grid's add row shows while it can.</summary>
     private bool _canAddUnit = true;
     public bool CanAddUnit
     {
@@ -338,43 +416,14 @@ public class RawMaterialsViewModel : ViewModelBase
         private set => this.RaiseAndSetIfChanged(ref _canAddUnit, value);
     }
 
-    /// <summary>The unit the open form edits, or null when it adds one.</summary>
-    private RawMaterialUnit? _editingUnit;
+    /// <summary>
+    /// The row the grid's add row edits (controls:GridAddNewRow.ItemFactory): one that names its unit as soon as it's
+    /// picked and shows the current base unit, which a row the grid made itself couldn't.
+    /// </summary>
+    public Func<RawMaterialUnitRow> NewUnitRow => () => new RawMaterialUnitRow(new RawMaterialUnit(), BaseUnitAbbreviation, FindUnitOfMeasure);
 
-    private bool _isUnitFormOpen;
-    public bool IsUnitFormOpen
-    {
-        get => _isUnitFormOpen;
-        private set => this.RaiseAndSetIfChanged(ref _isUnitFormOpen, value);
-    }
-
-    private string _unitFormTitle = "Add Alternative Unit";
-    public string UnitFormTitle
-    {
-        get => _unitFormTitle;
-        private set => this.RaiseAndSetIfChanged(ref _unitFormTitle, value);
-    }
-
-    private UnitOfMeasure? _editingUnitOfMeasure;
-    public UnitOfMeasure? EditingUnitOfMeasure
-    {
-        get => _editingUnitOfMeasure;
-        set => this.RaiseAndSetIfChanged(ref _editingUnitOfMeasure, value);
-    }
-
-    private decimal? _editingUnitBaseUnitsPerUnit;
-    public decimal? EditingUnitBaseUnitsPerUnit
-    {
-        get => _editingUnitBaseUnitsPerUnit;
-        set => this.RaiseAndSetIfChanged(ref _editingUnitBaseUnitsPerUnit, value);
-    }
-
-    private string _editingUnitDescription = string.Empty;
-    public string EditingUnitDescription
-    {
-        get => _editingUnitDescription;
-        set => this.RaiseAndSetIfChanged(ref _editingUnitDescription, value);
-    }
+    /// <summary>Set while the screen itself replaces or changes the unit rows, so only the user's grid edits count as edits.</summary>
+    private bool _syncingUnitRows;
 
     // Purchase Cost Setup.
     private RawMaterialUnitOption? _editingPurchaseUnit;
@@ -406,7 +455,7 @@ public class RawMaterialsViewModel : ViewModelBase
     private readonly ObservableAsPropertyHelper<bool> _isPurchaseQuantityReadOnly;
     /// <summary>
     /// Read-only for the base unit (always 1) and a saved alternative unit, whose multiplier changes
-    /// with Edit in Alternative Units, since a change reprices the recipe lines measured in it.
+    /// in the Alternative Units grid, since a change reprices the material.
     /// </summary>
     public bool IsPurchaseQuantityReadOnly => _isPurchaseQuantityReadOnly.Value;
 
@@ -500,11 +549,7 @@ public class RawMaterialsViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddCategoryCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> AddUnitCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> EditUnitCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteUnitCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> ApplyUnitCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> CancelUnitCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> CalculateExampleCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeletePriceCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveBomLineCommand { get; }
@@ -599,7 +644,7 @@ public class RawMaterialsViewModel : ViewModelBase
                 (type, source) => type == RawMaterialType.Ingredient && source == RawMaterialSource.Linked)
             .ToProperty(this, x => x.IsEditingLinked);
 
-        _linkedCostPreviewText = this.WhenAnyValue(x => x.EditingLinkedTo, x => x.EditingWeightSharePercent, x => x.EditingCostSharePercent, x => x.EditingCostBufferPercent,
+        _linkedCostPreviewText = this.WhenAnyValue(x => x.EditingLinkedTo, x => x.EditingWeightSharePercent, x => x.EditingCostSharePercent,
                 LinkedCostPreview)
             .ToProperty(this, x => x.LinkedCostPreviewText, string.Empty);
 
@@ -695,10 +740,9 @@ public class RawMaterialsViewModel : ViewModelBase
             .Where(_ => !IsRefreshing && !_syncingPurchaseSetup)
             .Subscribe(quantity =>
             {
-                if (EditingPurchaseUnit?.Unit is { Id: 0 } unit)
+                if (EditingPurchaseUnit?.Unit is { Id: 0 } unit && UnitRows.FirstOrDefault(r => ReferenceEquals(r.Unit, unit)) is { } row)
                 {
-                    unit.BaseUnitsPerUnit = quantity ?? 0m;
-                    ReplaceUnitRows([.. UnitRows.Select(r => r.Unit)], SelectedUnitRow?.Unit);
+                    SyncUnitRows(() => row.BaseUnitsPerUnit = quantity ?? 0m);
                 }
             });
 
@@ -755,6 +799,14 @@ public class RawMaterialsViewModel : ViewModelBase
             .Switch()
             .Subscribe();
 
+        // A unit typed into the Alternative Units grid, or its unit or multiplier changed there, is offered as a
+        // purchase unit straight away, and the add row goes once there are two.
+        UnitRows.ToObservableChangeSet()
+            .AutoRefresh(r => r.UnitOfMeasureId)
+            .AutoRefresh(r => r.BaseUnitsPerUnit)
+            .Where(_ => !_syncingUnitRows && !IsRefreshing)
+            .Subscribe(_ => OnUnitRowsEdited());
+
         // A component picked in the BOM table is pointed at the screen's copy of it, for its name.
         BomLineEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
@@ -783,7 +835,6 @@ public class RawMaterialsViewModel : ViewModelBase
             var categoryId = EditingCategory?.Id;
             var linkedToId = EditingLinkedTo?.Id;
             var baseUnitId = EditingBaseUnit?.Id;
-            var unitOfMeasureId = EditingUnitOfMeasure?.Id;
             var exampleMaterialId = ExampleRawMaterial?.Id;
             var exampleUnit = ExampleUnit;
 
@@ -797,7 +848,6 @@ public class RawMaterialsViewModel : ViewModelBase
                 EditingLinkedTo = Ingredients.FirstOrDefault(m => m.Id == linkedToId);
                 var previousBaseUnit = EditingBaseUnit;
                 EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId);
-                EditingUnitOfMeasure = UnitsOfMeasure.FirstOrDefault(u => u.Id == unitOfMeasureId);
 
                 IngredientLineRow.Resolve(BomLineEdits, Ingredients.ToDictionary(m => m.Id));
 
@@ -806,20 +856,14 @@ public class RawMaterialsViewModel : ViewModelBase
                 // The form's alternative units may not be saved yet, so they stay rather than being
                 // reloaded from the refreshed material. Each points at its refreshed unit of measure,
                 // so one renamed in Settings shows its new name.
-                var unitRenamed = false;
-                foreach (var unit in UnitRows.Select(r => r.Unit))
+                foreach (var row in UnitRows)
                 {
-                    var refreshed = UnitsOfMeasure.FirstOrDefault(u => u.Id == unit.UnitOfMeasureId);
-                    if (refreshed is not null && !ReferenceEquals(refreshed, unit.UnitOfMeasure))
-                    {
-                        unit.UnitOfMeasure = refreshed;
-                        unitRenamed = true;
-                    }
+                    row.RefreshUnitOfMeasure();
                 }
 
-                if (unitRenamed || !ReferenceEquals(previousBaseUnit, EditingBaseUnit))
+                if (!ReferenceEquals(previousBaseUnit, EditingBaseUnit))
                 {
-                    ReplaceUnitRows([.. UnitRows.Select(r => r.Unit)], SelectedUnitRow?.Unit);
+                    UpdateUnitRowsBaseUnit();
                 }
 
                 // Every time, so a unit of measure created in Settings shows as a new purchase unit.
@@ -839,12 +883,6 @@ public class RawMaterialsViewModel : ViewModelBase
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
-            // A unit left open in the Alternative Units form is part of what's being saved.
-            if (IsUnitFormOpen)
-            {
-                ApplyUnitForm();
-            }
-
             var type = EditingType;
             var source = type == RawMaterialType.Packaging ? RawMaterialSource.Purchased : EditingSource;
             var material = new RawMaterial
@@ -860,8 +898,11 @@ public class RawMaterialsViewModel : ViewModelBase
                 WeightSharePercent = source == RawMaterialSource.Linked ? EditingWeightSharePercent : null,
                 CostSharePercent = source == RawMaterialSource.Linked ? EditingCostSharePercent : null,
                 BaseUnitId = type == RawMaterialType.Packaging ? EditingBaseUnit?.Id : null,
-                // A cleared box shows 0.00 too.
-                CostBufferPercent = EditingCostBufferPercent ?? 0m,
+                // A cleared box shows 0.00 too. A linked ingredient inherits the buffer of the one it's linked to
+                // (the repository sets it from the saved one either way).
+                CostBufferPercent = source == RawMaterialSource.Linked
+                    ? EditingLinkedTo?.CostBufferPercent ?? 0m
+                    : EditingCostBufferPercent ?? 0m,
             };
 
             var validation = _rawMaterialValidator.Validate(material);
@@ -878,13 +919,8 @@ public class RawMaterialsViewModel : ViewModelBase
                 return;
             }
 
-            // Apply checked the units added in Alternative Units, but a unit added by picking it as the
-            // purchase unit gets its multiplier from Quantity per Purchase Unit, which can still be empty.
-            if (UnitRows.Select(r => r.Unit).FirstOrDefault(u => u.Id == 0 && u.BaseUnitsPerUnit <= 0) is { } unquantified)
-            {
-                ErrorMessage = $"Enter how many {BaseUnitAbbreviation} are in one {unquantified.UnitOfMeasure?.Name ?? "unit"} (Quantity per Purchase Unit).";
-                return;
-            }
+            // The units are typed straight into the grid, so a half-filled or repeated one is caught here.
+            EnsureValidUnitRows();
 
             (DateOnly Date, int? UnitOfMeasureId, decimal Price)? newPrice = null;
             if (source == RawMaterialSource.Purchased && HasNewPrice())
@@ -953,43 +989,13 @@ public class RawMaterialsViewModel : ViewModelBase
             this.RaisePropertyChanged(nameof(EditingCategory));
         });
 
-        AddUnitCommand = ReactiveCommand.Create(
-            () =>
-            {
-                _editingUnit = null;
-                UnitFormTitle = "Add Alternative Unit";
-                EditingUnitOfMeasure = null;
-                EditingUnitBaseUnitsPerUnit = null;
-                EditingUnitDescription = string.Empty;
-                IsUnitFormOpen = true;
-            },
-            this.WhenAnyValue(x => x.CanAddUnit));
-
         var hasSelectedUnitRow = this.WhenAnyValue(x => x.SelectedUnitRow).Select(row => row is not null);
-
-        EditUnitCommand = ReactiveCommand.Create(
-            () =>
-            {
-                var unit = SelectedUnitRow!.Unit;
-                _editingUnit = unit;
-                UnitFormTitle = "Edit Alternative Unit";
-                EditingUnitOfMeasure = UnitsOfMeasure.FirstOrDefault(u => u.Id == unit.UnitOfMeasureId);
-                EditingUnitBaseUnitsPerUnit = unit.BaseUnitsPerUnit;
-                EditingUnitDescription = unit.Description ?? string.Empty;
-                IsUnitFormOpen = true;
-            },
-            hasSelectedUnitRow);
 
         // Nothing to confirm: the unit only leaves the list, and is deleted when the material is saved.
         DeleteUnitCommand = ReactiveCommand.Create(
             () =>
             {
                 var removed = SelectedUnitRow!.Unit;
-                if (ReferenceEquals(removed, _editingUnit))
-                {
-                    CloseUnitForm();
-                }
-
                 if (ReferenceEquals(removed, _purchaseAddedUnit))
                 {
                     _purchaseAddedUnit = null;
@@ -999,14 +1005,6 @@ public class RawMaterialsViewModel : ViewModelBase
                 RebuildPurchaseUnitOptions();
             },
             hasSelectedUnitRow);
-
-        ApplyUnitCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() =>
-        {
-            ApplyUnitForm();
-            return Task.CompletedTask;
-        }));
-
-        CancelUnitCommand = ReactiveCommand.Create(CloseUnitForm);
 
         CalculateExampleCommand = ReactiveCommand.Create(
             () =>
@@ -1044,25 +1042,26 @@ public class RawMaterialsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// "Egg costs ₱0.0900/g before its buffer. At 70% of its weight for 30% of its cost, this costs ₱0.0386/g, buffered ₱0.0386/g."
-    /// Worked out with the same rules the cascade saves with, from the linked-to ingredient's stored true cost:
-    /// the cost share is of the unbuffered cost, and only this part's own buffer goes on top.
+    /// "Egg costs ₱0.0900/g before its 10% buffer. At 70% of its weight for 30% of its cost, this costs ₱0.0386/g, buffered ₱0.0424/g."
+    /// Worked out with the same rules the cascade saves with, from the linked-to ingredient's stored true cost
+    /// and buffer: the cost share is of the unbuffered cost, and the linked-to ingredient's buffer percent,
+    /// which the part inherits, goes on top.
     /// </summary>
-    private static string LinkedCostPreview(RawMaterial? linkedTo, decimal? weightShare, decimal? costShare, decimal? buffer)
+    private static string LinkedCostPreview(RawMaterial? linkedTo, decimal? weightShare, decimal? costShare)
     {
         if (linkedTo is null)
         {
             return "Pick the ingredient this one is a part of.";
         }
 
-        var linkedToText = $"{linkedTo.Name} costs ₱{linkedTo.CostPerBaseUnit:N4}/g before its buffer.";
+        var linkedToText = $"{linkedTo.Name} costs ₱{linkedTo.CostPerBaseUnit:N4}/g before its {linkedTo.CostBufferPercent:0.##}% buffer.";
         if (weightShare is not (> 0 and <= 100) || costShare is not (> 0 and <= 100))
         {
             return $"{linkedToText} Enter this part's share of its weight and of its cost.";
         }
 
         var cost = RawMaterialRules.LinkedCost(linkedTo.CostPerBaseUnit, weightShare.Value, costShare.Value);
-        var buffered = RawMaterialRules.BufferedCost(cost, buffer ?? 0m);
+        var buffered = RawMaterialRules.BufferedCost(cost, linkedTo.CostBufferPercent);
         return $"{linkedToText} At {weightShare:0.##}% of its weight for {costShare:0.##}% of its cost, this costs ₱{cost:N4}/g, buffered ₱{buffered:N4}/g.";
     }
 
@@ -1153,7 +1152,6 @@ public class RawMaterialsViewModel : ViewModelBase
     {
         SelectedPriceRow = null;
         SelectedBomLineEdit = null;
-        CloseUnitForm();
         LoadUnitRows(material);
         if (material is not null)
         {
@@ -1197,21 +1195,98 @@ public class RawMaterialsViewModel : ViewModelBase
         UpdateCanChangeBaseUnit();
     }
 
-    /// <summary>Re-wraps the form's alternative units, whose text shows the base unit, and rebuilds the purchase unit choices, keeping what's picked.</summary>
+    /// <summary>Shows the base unit on the form's alternative units, and rebuilds the purchase unit choices, keeping what's picked.</summary>
     private void RebuildUnitViews()
     {
-        ReplaceUnitRows([.. UnitRows.Select(r => r.Unit)], SelectedUnitRow?.Unit);
+        UpdateUnitRowsBaseUnit();
         RebuildPurchaseUnitOptions();
+    }
+
+    /// <summary>Tells each row the base unit, which its multiplier is in, without replacing the rows the grid is showing.</summary>
+    private void UpdateUnitRowsBaseUnit()
+    {
+        var baseUnitAbbreviation = BaseUnitText.AbbreviationOf(EditingType, EditingBaseUnit);
+        foreach (var row in UnitRows)
+        {
+            row.BaseUnitAbbreviation = baseUnitAbbreviation;
+        }
     }
 
     private void ReplaceUnitRows(IReadOnlyList<RawMaterialUnit> units, RawMaterialUnit? selectedUnit)
     {
         var baseUnitAbbreviation = BaseUnitText.AbbreviationOf(EditingType, EditingBaseUnit);
-        SelectedUnitRow = null;
-        UnitRows.Clear();
-        UnitRows.AddRange(units.Select(u => new RawMaterialUnitRow(u, baseUnitAbbreviation)));
-        SelectedUnitRow = UnitRows.FirstOrDefault(r => ReferenceEquals(r.Unit, selectedUnit));
+        SyncUnitRows(() =>
+        {
+            SelectedUnitRow = null;
+            UnitRows.Clear();
+            UnitRows.AddRange(units.Select(u => new RawMaterialUnitRow(u, baseUnitAbbreviation, FindUnitOfMeasure)));
+            SelectedUnitRow = UnitRows.FirstOrDefault(r => ReferenceEquals(r.Unit, selectedUnit));
+        });
         CanAddUnit = UnitRows.Count < UnitConversionRules.MaxAlternativeUnits;
+    }
+
+    /// <summary>Changes the unit rows for the user without that counting as their edit (OnUnitRowsEdited).</summary>
+    private void SyncUnitRows(Action change)
+    {
+        _syncingUnitRows = true;
+        try
+        {
+            change();
+        }
+        finally
+        {
+            _syncingUnitRows = false;
+        }
+    }
+
+    private UnitOfMeasure? FindUnitOfMeasure(int id) => UnitsOfMeasure.FirstOrDefault(u => u.Id == id);
+
+    /// <summary>
+    /// What an edit in the Alternative Units grid does: a row added there, or a row's unit or multiplier changed, shows in
+    /// the purchase unit choices straight away, and the add row goes once there are two units.
+    /// </summary>
+    private void OnUnitRowsEdited()
+    {
+        CanAddUnit = UnitRows.Count < UnitConversionRules.MaxAlternativeUnits;
+        RebuildPurchaseUnitOptions();
+    }
+
+    /// <summary>
+    /// The checks the Alternative Units form's Apply used to make, now that units are typed straight into the grid: every row has a
+    /// unit and a positive multiplier, none is the base unit or repeats another's unit, and there are at most two. Throws
+    /// InvalidOperationException for the first problem, which RunSafelyAsync shows.
+    /// </summary>
+    private void EnsureValidUnitRows()
+    {
+        var units = UnitRows.Select(r => r.Unit).ToList();
+        foreach (var unit in units)
+        {
+            if (unit.UnitOfMeasureId <= 0)
+            {
+                throw new InvalidOperationException("Pick a unit for every alternative unit, or remove the empty row.");
+            }
+
+            if (unit.BaseUnitsPerUnit <= 0)
+            {
+                // A unit added by picking it as the purchase unit gets its multiplier from Quantity per Purchase Unit.
+                var where = ReferenceEquals(unit, _purchaseAddedUnit) ? "Quantity per Purchase Unit" : "Alternative Units";
+                throw new InvalidOperationException($"Enter how many {BaseUnitAbbreviation} are in one {unit.UnitOfMeasure?.Name ?? "unit"} ({where}).");
+            }
+
+            var validation = _unitValidator.Validate(unit);
+            if (!validation.IsValid)
+            {
+                throw new InvalidOperationException(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage)));
+            }
+
+            RawMaterialRules.EnsureNotTheBaseUnit(EditingType == RawMaterialType.Packaging ? EditingBaseUnit?.Id : null, unit.UnitOfMeasureId);
+            RawMaterialRules.EnsureUnitNotAlreadyAdded(units.Any(u => !ReferenceEquals(u, unit) && u.UnitOfMeasureId == unit.UnitOfMeasureId));
+        }
+
+        if (units.Count > UnitConversionRules.MaxAlternativeUnits)
+        {
+            UnitConversionRules.EnsureCanAddAlternativeUnit(units.Count - 1);
+        }
     }
 
     /// <summary>
@@ -1309,11 +1384,6 @@ public class RawMaterialsViewModel : ViewModelBase
         }
 
         _purchaseAddedUnit = null;
-        if (ReferenceEquals(added, _editingUnit))
-        {
-            CloseUnitForm();
-        }
-
         ReplaceUnitRows([.. UnitRows.Select(r => r.Unit).Where(u => !ReferenceEquals(u, added))], SelectedUnitRow?.Unit);
         if (PurchaseUnitOptions.FirstOrDefault(o => ReferenceEquals(o.Unit, added)) is { } option)
         {
@@ -1336,51 +1406,6 @@ public class RawMaterialsViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// Puts the Alternative Units form's unit in the list and closes the form; Save writes it. Makes
-    /// the checks Save would, so a mistake shows while the form is still open. Throws
-    /// InvalidOperationException for one, which RunSafelyAsync shows.
-    /// </summary>
-    private void ApplyUnitForm()
-    {
-        var candidate = new RawMaterialUnit
-        {
-            UnitOfMeasureId = EditingUnitOfMeasure?.Id ?? 0,
-            UnitOfMeasure = EditingUnitOfMeasure,
-            BaseUnitsPerUnit = EditingUnitBaseUnitsPerUnit ?? 0m,
-            Description = string.IsNullOrWhiteSpace(EditingUnitDescription) ? null : EditingUnitDescription.Trim(),
-        };
-
-        var validation = _unitValidator.Validate(candidate);
-        if (!validation.IsValid)
-        {
-            throw new InvalidOperationException(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage)));
-        }
-
-        RawMaterialRules.EnsureNotTheBaseUnit(EditingType == RawMaterialType.Packaging ? EditingBaseUnit?.Id : null, candidate.UnitOfMeasureId);
-        RawMaterialRules.EnsureUnitNotAlreadyAdded(
-            UnitRows.Any(r => !ReferenceEquals(r.Unit, _editingUnit) && r.Unit.UnitOfMeasureId == candidate.UnitOfMeasureId));
-
-        var units = UnitRows.Select(r => r.Unit).ToList();
-        if (_editingUnit is null)
-        {
-            UnitConversionRules.EnsureCanAddAlternativeUnit(units.Count);
-            units.Add(candidate);
-        }
-        else
-        {
-            // In place, so a purchase price being entered in this unit stays in it.
-            _editingUnit.UnitOfMeasureId = candidate.UnitOfMeasureId;
-            _editingUnit.UnitOfMeasure = candidate.UnitOfMeasure;
-            _editingUnit.BaseUnitsPerUnit = candidate.BaseUnitsPerUnit;
-            _editingUnit.Description = candidate.Description;
-        }
-
-        CloseUnitForm();
-        ReplaceUnitRows(units, SelectedUnitRow?.Unit);
-        RebuildPurchaseUnitOptions();
-    }
-
     private void UpdateCanChangeBaseUnit() =>
         CanChangeBaseUnit = SelectedRawMaterial is null || (SelectedRawMaterial.Units.Count == 0 && PriceHistory.Count == 0);
 
@@ -1396,12 +1421,6 @@ public class RawMaterialsViewModel : ViewModelBase
         ExampleUnit = (kept is null ? null : ExampleUnitOptions.FirstOrDefault(o => o.UnitId == kept.UnitId))
             ?? ExampleUnitOptions.Skip(1).FirstOrDefault()
             ?? ExampleUnitOptions.FirstOrDefault();
-    }
-
-    private void CloseUnitForm()
-    {
-        IsUnitFormOpen = false;
-        _editingUnit = null;
     }
 
     /// <summary>

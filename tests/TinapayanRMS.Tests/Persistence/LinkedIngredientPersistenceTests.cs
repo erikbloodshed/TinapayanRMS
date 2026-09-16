@@ -130,30 +130,60 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
     }
 
     [Fact]
-    public async Task The_cost_share_is_of_the_eggs_unbuffered_cost_with_only_the_parts_own_buffer_on_top()
+    public async Task A_part_inherits_the_eggs_buffer_percent_on_top_of_its_share_of_the_eggs_unbuffered_cost()
     {
         var categoryId = await SeedCategoryAsync();
         var eggId = await SaveEggAsync(categoryId, costBufferPercent: 10m);
 
+        // A buffer given to the part itself is ignored: it takes the egg's.
         var yolkId = await SaveAsync(Linked("Egg Yolk", categoryId, eggId, weightShare: 30m, costShare: 70m, costBufferPercent: 20m));
         var whiteId = await SaveAsync(Linked("Egg White", categoryId, eggId, weightShare: 70m, costShare: 30m));
 
         (await GetMaterialAsync(eggId)).BufferedCostPerBaseUnit.Should().Be(0.099m);
 
         var yolk = await GetMaterialAsync(yolkId);
+        yolk.CostBufferPercent.Should().Be(10m, "inherited from the egg, not the 20% it was given");
         yolk.CostPerBaseUnit.Should().Be(0.21m, "70% of the egg's unbuffered ₱0.09, over 30% of its weight");
-        yolk.BufferedCostPerBaseUnit.Should().Be(0.252m, "₱0.21 with the yolk's own 20%, and none of the egg's 10%");
+        yolk.BufferedCostPerBaseUnit.Should().Be(0.231m, "₱0.21 with the egg's 10%");
 
         var white = await GetMaterialAsync(whiteId);
-        white.BufferedCostPerBaseUnit.Should().Be(white.CostPerBaseUnit, "a part with no buffer of its own gets none from the egg");
+        white.CostBufferPercent.Should().Be(10m);
+        white.BufferedCostPerBaseUnit.Should().BeApproximately(0.0424286m, StoredPrecision, "₱0.0385714 with the egg's 10%");
 
-        // The egg's buffer changing leaves its parts where they were (a new egg price does move them: see above).
+        // A buffer change on the egg reaches its parts.
         await CreateRepository().SaveAsync(Purchased("Egg", categoryId, costBufferPercent: 50m, id: eggId), await UnitsOfAsync(eggId), newPrice: null, bomLines: null, Cancellation);
-        (await GetMaterialAsync(yolkId)).BufferedCostPerBaseUnit.Should().Be(0.252m);
+        yolk = await GetMaterialAsync(yolkId);
+        yolk.CostBufferPercent.Should().Be(50m);
+        yolk.BufferedCostPerBaseUnit.Should().Be(0.315m, "₱0.21 with the egg's new 50%");
 
-        // A new buffer on the part itself reprices it.
-        await SaveAsync(Linked("Egg Yolk", categoryId, eggId, weightShare: 30m, costShare: 70m, costBufferPercent: 10m, id: yolkId));
-        (await GetMaterialAsync(yolkId)).BufferedCostPerBaseUnit.Should().Be(0.231m, "₱0.21 with the yolk's new 10%");
+        // Resaving the part with a buffer of its own still leaves it on the egg's.
+        await SaveAsync(Linked("Egg Yolk", categoryId, eggId, weightShare: 30m, costShare: 70m, costBufferPercent: 5m, id: yolkId));
+        (await GetMaterialAsync(yolkId)).CostBufferPercent.Should().Be(50m);
+    }
+
+    [Fact]
+    public async Task The_buffer_is_inherited_on_AddAsync_down_a_chain_of_links_and_from_a_new_link()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var eggId = await SaveEggAsync(categoryId, costBufferPercent: 10m);
+        var yolkId = await SaveAsync(Linked("Egg Yolk", categoryId, eggId, weightShare: 30m, costShare: 70m));
+
+        // A part of a part: half of the yolk's weight for half of its cost.
+        var yolkHalf = Linked("Half Yolk", categoryId, yolkId, weightShare: 50m, costShare: 50m, costBufferPercent: 0m);
+        await CreateRepository().AddAsync(yolkHalf, Cancellation);
+
+        var half = await GetMaterialAsync(yolkHalf.Id);
+        half.CostBufferPercent.Should().Be(10m, "the yolk's, which is the egg's");
+        half.BufferedCostPerBaseUnit.Should().Be(0.231m);
+
+        await CreateRepository().SaveAsync(Purchased("Egg", categoryId, costBufferPercent: 20m, id: eggId), await UnitsOfAsync(eggId), newPrice: null, bomLines: null, Cancellation);
+        (await GetMaterialAsync(yolkHalf.Id)).CostBufferPercent.Should().Be(20m, "an egg buffer change reaches every link down the chain");
+
+        // Relinked to a duck egg with no buffer, the yolk takes the duck egg's.
+        var duckEggId = await SaveAsync(Purchased("Duck Egg", categoryId));
+        await SaveAsync(Linked("Egg Yolk", categoryId, duckEggId, weightShare: 30m, costShare: 70m, id: yolkId));
+        (await GetMaterialAsync(yolkId)).CostBufferPercent.Should().Be(0m);
+        (await GetMaterialAsync(yolkHalf.Id)).CostBufferPercent.Should().Be(0m);
     }
 
     [Fact]

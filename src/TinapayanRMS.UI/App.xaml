@@ -101,6 +101,8 @@
         <SolidColorBrush x:Key="CardBorderBrush" Color="#E7E5E4" />
         <SolidColorBrush x:Key="HeadingForegroundBrush" Color="#1C1917" />
         <SolidColorBrush x:Key="MutedForegroundBrush" Color="#57534E" />
+        <!-- A read-only value's text, greyed out so it doesn't look typeable (Controls/ReadOnlyText) -->
+        <SolidColorBrush x:Key="ReadOnlyForegroundBrush" Color="#A8A29E" />
         <SolidColorBrush x:Key="AccentBrush" Color="#B45309" />
         <SolidColorBrush x:Key="AccentSoftBrush" Color="#FEF3C7" />
         <SolidColorBrush x:Key="SuccessBackgroundBrush" Color="#ECFDF5" />

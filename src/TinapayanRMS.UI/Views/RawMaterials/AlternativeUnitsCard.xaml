@@ -5,88 +5,64 @@
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
     <Border Style="{StaticResource CardStyle}">
         <StackPanel>
-            <DockPanel>
-                <syncfusion:ButtonAdv DockPanel.Dock="Right"
-                                      VerticalAlignment="Top"
-                                      Label="Add Alternative Unit"
-                                      IconTemplate="{StaticResource AddIconTemplate}"
-                                      Command="{Binding AddUnitCommand}" />
-                <StackPanel Margin="0,0,12,0">
-                    <TextBlock Text="Alternative Units" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-                    <TextBlock Text="Define up to two units you commonly buy or use this material in. Changes are saved with Save."
-                               Style="{StaticResource CardCaptionStyle}" />
-                </StackPanel>
-            </DockPanel>
+            <TextBlock Text="Alternative Units" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
+            <TextBlock Text="Define up to two units you commonly buy or use this material in. Changes are saved with Save."
+                       Style="{StaticResource CardCaptionStyle}" />
 
+            <!--
+                Typed straight into, like the Bill of Materials: the add row at the bottom starts a unit, and goes once
+                there are two (CanAddUnit). That goes through GridAddNewRow.ShowWhen, not a binding on AddNewRowPosition,
+                which crashes the grid when committing the second unit is what hides the add row. The add row's item
+                comes from the screen (NewUnitRow), so it names its unit as soon as one is picked.
+            -->
             <syncfusion:SfDataGrid ItemsSource="{Binding UnitRows}"
                                    SelectedItem="{Binding SelectedUnitRow, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
+                                   controls:GridFillerRows.IsEnabled="True"
                                    AutoGenerateColumns="False"
-                                   AllowEditing="False"
+                                   AllowEditing="True"
+                                   EditTrigger="OnTap"
+                                   controls:GridAddNewRow.ShowWhen="{Binding CanAddUnit}"
                                    SelectionMode="Single"
-                                   NavigationMode="Row"
                                    ColumnSizer="Star"
-                                   MinHeight="96"
-                                   MaxHeight="240">
+                                   controls:GridEditCommit.OnFocusLeave="True"
+                                   controls:GridAddNewRow.ItemFactory="{Binding NewUnitRow}"
+                                   controls:GridAddNewRow.DropWhenUntouched="True"
+                                   controls:AutoCompleteDropDown.IsEnabled="True"
+                                   Height="160">
                 <syncfusion:SfDataGrid.Columns>
-                    <syncfusion:GridTextColumn MappingName="UnitName" HeaderText="Alternative Unit" />
-                    <syncfusion:GridTextColumn MappingName="Abbreviation" HeaderText="Abbreviation" />
+                    <!-- Typing opens the list of units containing the text and picks one: the first starting with it, else the first containing it -->
+                    <syncfusion:GridMultiColumnDropDownList MappingName="UnitOfMeasureId"
+                                                            HeaderText="Alternative Unit"
+                                                            ItemsSource="{Binding UnitsOfMeasure}"
+                                                            DisplayMember="Name"
+                                                            ValueMember="Id"
+                                                            AllowAutoComplete="True"
+                                                            AllowNullInput="True"
+                                                            AllowIncrementalFiltering="True"
+                                                            SearchCondition="Contains"
+                                                            AutoGenerateColumns="False"
+                                                            IsAutoPopupSize="False"
+                                                            PopUpWidth="260"
+                                                            PopUpHeight="220"
+                                                            GridColumnSizer="Star">
+                        <syncfusion:GridMultiColumnDropDownList.Columns>
+                            <syncfusion:Columns>
+                                <syncfusion:GridTextColumn MappingName="Name" HeaderText="Unit" />
+                                <syncfusion:GridTextColumn MappingName="Abbreviation" HeaderText="Abbreviation" Width="100" />
+                            </syncfusion:Columns>
+                        </syncfusion:GridMultiColumnDropDownList.Columns>
+                    </syncfusion:GridMultiColumnDropDownList>
+                    <syncfusion:GridTextColumn MappingName="Abbreviation" HeaderText="Abbreviation" AllowEditing="False" />
                     <controls:NumericColumn MappingName="BaseUnitsPerUnit" HeaderText="Multiplier" NumberDecimalDigits="2" />
-                    <syncfusion:GridTextColumn MappingName="Example" HeaderText="Example" Padding="12,0,0,0" />
-                    <syncfusion:GridTextColumn MappingName="Description" HeaderText="Description" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
 
-            <!-- Edit and Remove act on the row picked in the grid -->
-            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                <syncfusion:ButtonAdv Label="Edit" IconTemplate="{StaticResource EditIconTemplate}" Command="{Binding EditUnitCommand}" Margin="0,0,8,0" />
-                <syncfusion:ButtonAdv Label="Remove" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteUnitCommand}" />
-            </StackPanel>
-
-            <!-- Add / edit an alternative unit -->
-            <Border Margin="0,12,0,0"
-                    Padding="12"
-                    CornerRadius="6"
-                    Background="{StaticResource PageBackgroundBrush}"
-                    Visibility="{Binding IsUnitFormOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <StackPanel>
-                    <TextBlock Text="{Binding UnitFormTitle}"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource HeadingForegroundBrush}"
-                               Margin="0,0,0,8" />
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="12" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Grid.Column="0" Text="Unit" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:ComboBoxAdv Grid.Row="1"
-                                                Grid.Column="0"
-                                                ItemsSource="{Binding UnitsOfMeasure}"
-                                                DisplayMemberPath="Name"
-                                                SelectedItem="{Binding EditingUnitOfMeasure, Mode=TwoWay}" />
-
-                        <TextBlock Grid.Column="2" Style="{StaticResource FieldLabelStyle}">
-                            <Run Text="Multiplier (" /><Run Text="{Binding BaseUnitAbbreviation, Mode=OneWay}" /><Run Text=" per unit)" />
-                        </TextBlock>
-                        <syncfusion:DoubleTextBox Grid.Row="1"
-                                                  Grid.Column="2"
-                                                  Value="{Binding EditingUnitBaseUnitsPerUnit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    </Grid>
-                    <TextBlock Text="Description (optional)" Style="{StaticResource FieldLabelStyle}" Margin="0,8,0,4" />
-                    <syncfusion:SfTextBoxExt Text="{Binding EditingUnitDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-                        <syncfusion:ButtonAdv Label="Cancel" IconTemplate="{StaticResource CancelIconTemplate}" Command="{Binding CancelUnitCommand}" Margin="0,0,8,0" />
-                        <syncfusion:ButtonAdv Label="Apply" IconTemplate="{StaticResource ApplyIconTemplate}" Command="{Binding ApplyUnitCommand}" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
+            <!-- Remove acts on the row picked in the grid -->
+            <DockPanel Margin="0,8,0,0">
+                <syncfusion:ButtonAdv DockPanel.Dock="Right" Label="Remove" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding DeleteUnitCommand}" />
+                <TextBlock Text="Type the units straight into the table." Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" />
+            </DockPanel>
         </StackPanel>
     </Border>
 </UserControl>

@@ -3,7 +3,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.ApplicationCore.Validators;
 
-/// <summary>Friendly pre-check for the Alternative Units form; RawMaterialUnitRepository enforces the same rules itself.</summary>
+/// <summary>Friendly pre-check for the Alternative Units grid, run when the Raw Materials screen saves; RawMaterialUnitRepository enforces the same rules itself.</summary>
 public class RawMaterialUnitValidator : AbstractValidator<RawMaterialUnit>
 {
     public RawMaterialUnitValidator()
