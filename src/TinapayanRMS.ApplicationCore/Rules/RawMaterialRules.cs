@@ -29,37 +29,129 @@ public static class RawMaterialRules
 
         if (material.Source != RawMaterialSource.Purchased)
         {
-            throw new InvalidOperationException("Only an ingredient can be made; packaging is always purchased.");
+            throw new InvalidOperationException("Only an ingredient can be made or linked; packaging is always purchased.");
         }
     }
 
     /// <summary>
     /// A Purchased material has no weight loss percent; its CostPerBaseUnit comes from price history
     /// (ApplyLatestPrice below). A Made ingredient needs a weight loss percent — its cost comes from
-    /// a BOM instead (IngredientBomRules). Either kind can have alternative units (RawMaterialUnit);
-    /// only a purchased one is ever priced in them.
+    /// a BOM instead (IngredientBomRules). A Linked ingredient needs the ingredient it's linked to and
+    /// both shares — its cost is a share of that one's (LinkedCost). Only a linked one has link fields.
+    /// Every kind can have alternative units (RawMaterialUnit); only a purchased one is ever priced in them.
     /// </summary>
     public static void EnsureFieldsMatchSource(RawMaterial material)
     {
-        if (material.Source == RawMaterialSource.Purchased)
+        if (material.Source != RawMaterialSource.Linked
+            && (material.LinkedToId is not null || material.WeightSharePercent is not null || material.CostSharePercent is not null))
         {
-            if (material.WeightLossPercent is not null)
-            {
-                throw new InvalidOperationException("A purchased material has no weight loss percent.");
-            }
+            throw new InvalidOperationException("Only a linked ingredient is linked to another.");
         }
-        else
-        {
-            if (material.WeightLossPercent is not { } weightLossPercent)
-            {
-                throw new InvalidOperationException("A made ingredient needs a weight loss percent.");
-            }
 
-            if (weightLossPercent is < 0 or >= 100)
-            {
-                throw new InvalidOperationException("Weight loss percent must be at least 0 and less than 100.");
-            }
+        switch (material.Source)
+        {
+            case RawMaterialSource.Purchased:
+                if (material.WeightLossPercent is not null)
+                {
+                    throw new InvalidOperationException("A purchased material has no weight loss percent.");
+                }
+
+                break;
+
+            case RawMaterialSource.Made:
+                if (material.WeightLossPercent is not { } weightLossPercent)
+                {
+                    throw new InvalidOperationException("A made ingredient needs a weight loss percent.");
+                }
+
+                if (weightLossPercent is < 0 or >= 100)
+                {
+                    throw new InvalidOperationException("Weight loss percent must be at least 0 and less than 100.");
+                }
+
+                break;
+
+            case RawMaterialSource.Linked:
+                if (material.WeightLossPercent is not null)
+                {
+                    throw new InvalidOperationException("A linked ingredient has no weight loss percent.");
+                }
+
+                if (material.LinkedToId is not > 0)
+                {
+                    throw new InvalidOperationException("Pick the ingredient it's linked to.");
+                }
+
+                EnsureValidShare(material.WeightSharePercent, "Weight share");
+                EnsureValidShare(material.CostSharePercent, "Cost share");
+                break;
+
+            default:
+                throw new InvalidOperationException($"Unknown source {material.Source}.");
         }
+    }
+
+    private static void EnsureValidShare(decimal? sharePercent, string label)
+    {
+        if (sharePercent is not (> 0 and <= 100))
+        {
+            throw new InvalidOperationException($"{label} must be above 0 and at most 100 percent.");
+        }
+    }
+
+    /// <summary>
+    /// A linked part's cost per base unit: the linked-to ingredient's, times the share of its cost the part
+    /// carries, over the share of its weight the part is. An egg at ₱0.09 a gram gives egg white (70% of the
+    /// weight, 30% of the cost) ₱0.0386 a gram and egg yolk (30%, 70%) ₱0.21. The share is always of the
+    /// linked-to ingredient's true (unbuffered) cost; the part's buffered cost is BufferedCost of the result
+    /// with the part's own buffer, so the linked-to ingredient's buffer never reaches it.
+    /// </summary>
+    public static decimal LinkedCost(decimal linkedToCost, decimal weightSharePercent, decimal costSharePercent) =>
+        linkedToCost * costSharePercent / weightSharePercent;
+
+    /// <summary>A linked ingredient is a part of another ingredient: never of itself, and never of packaging.</summary>
+    public static void EnsureValidLinkTarget(int id, int linkedToId, RawMaterialType linkedToType, string linkedToName)
+    {
+        if (id != 0 && id == linkedToId)
+        {
+            throw new InvalidOperationException("An ingredient can't be linked to itself.");
+        }
+
+        if (linkedToType != RawMaterialType.Ingredient)
+        {
+            throw new InvalidOperationException($"'{linkedToName}' is packaging, and an ingredient can only be linked to another ingredient.");
+        }
+    }
+
+    /// <summary>
+    /// The parts linked to one ingredient can't add up to more than all of it: together they take at most 100%
+    /// of its weight and at most 100% of its cost. Less is fine — an egg's shell is neither white nor yolk.
+    /// <paramref name="otherParts"/> are the ingredient's other linked parts, without the one being saved.
+    /// </summary>
+    public static void EnsureLinkSharesFit(
+        string name,
+        string linkedToName,
+        decimal weightSharePercent,
+        decimal costSharePercent,
+        IReadOnlyList<(string Name, decimal WeightSharePercent, decimal CostSharePercent)> otherParts)
+    {
+        EnsureShareFits(name, linkedToName, "weight", weightSharePercent, [.. otherParts.Select(p => (p.Name, p.WeightSharePercent))]);
+        EnsureShareFits(name, linkedToName, "cost", costSharePercent, [.. otherParts.Select(p => (p.Name, p.CostSharePercent))]);
+    }
+
+    private static void EnsureShareFits(
+        string name, string linkedToName, string what, decimal sharePercent, IReadOnlyList<(string Name, decimal SharePercent)> otherParts)
+    {
+        var taken = otherParts.Sum(p => p.SharePercent);
+        if (taken + sharePercent <= 100m)
+        {
+            return;
+        }
+
+        var takers = string.Join(", ", otherParts.Select(p => $"{p.Name} ({p.SharePercent:0.##}%)"));
+        var verb = otherParts.Count == 1 ? "takes" : "take";
+        throw new InvalidOperationException(
+            $"{takers} already {verb} {taken:0.##}% of {linkedToName}'s {what}, so {name} can take at most {100m - taken:0.##}%.");
     }
 
     /// <summary>A material's type is set at creation and can never change afterwards: its recipe or packaging lines depend on it.</summary>

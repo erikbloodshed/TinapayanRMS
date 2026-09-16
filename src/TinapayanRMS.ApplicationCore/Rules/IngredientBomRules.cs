@@ -22,9 +22,11 @@ public static class IngredientBomRules
     }
 
     /// <summary>
-    /// An ingredient can't appear anywhere in its own BOM tree. componentIdsByIngredientId
-    /// is every OTHER made ingredient's current component list (ingredientId's own
-    /// about-to-be-replaced lines are excluded by the caller).
+    /// An ingredient can't appear anywhere in its own cost tree. componentIdsByIngredientId
+    /// is what every OTHER ingredient's cost currently depends on — a made ingredient's BOM
+    /// components, and a linked ingredient's linked-to one (ingredientId's own about-to-be-
+    /// replaced lines or link are excluded by the caller). newComponentIds are its new BOM
+    /// components, or the one ingredient it's being linked to.
     /// </summary>
     public static void EnsureNoCycle(
         int ingredientId,
@@ -41,7 +43,7 @@ public static class IngredientBomRules
             if (IsReachable(componentId, ingredientId, componentIdsByIngredientId))
             {
                 throw new InvalidOperationException(
-                    $"That would create a cycle: ingredient {componentId} already contains ingredient {ingredientId} somewhere in its own BOM.");
+                    $"That would create a cycle: ingredient {componentId} already uses ingredient {ingredientId} somewhere in its BOM or links.");
             }
         }
     }

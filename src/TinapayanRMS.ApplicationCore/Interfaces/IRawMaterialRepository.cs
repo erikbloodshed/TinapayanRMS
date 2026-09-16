@@ -9,12 +9,17 @@ public interface IRawMaterialRepository
 
     Task<RawMaterial?> GetByIdAsync(int id, CancellationToken cancellationToken);
 
-    /// <summary>Rejects fields that don't fit the material's type or source (RawMaterialRules).</summary>
+    /// <summary>
+    /// Rejects fields that don't fit the material's type or source (RawMaterialRules), and a linked
+    /// ingredient's link to itself, to packaging, past 100% of the linked-to ingredient's weight or cost
+    /// together with its other parts, or round a loop. A linked ingredient is costed as it's added.
+    /// </summary>
     Task AddAsync(RawMaterial material, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Changes the name, category, weight loss percent and (packaging only, while nothing is measured
-    /// in it yet) base unit. The type and source are fixed once created.
+    /// Changes the name, category, weight loss percent, a linked ingredient's link and shares (checked
+    /// as AddAsync checks them, and cascaded), and (packaging only, while nothing is measured in it yet)
+    /// base unit. The type and source are fixed once created.
     /// </summary>
     Task UpdateAsync(RawMaterial material, CancellationToken cancellationToken);
 

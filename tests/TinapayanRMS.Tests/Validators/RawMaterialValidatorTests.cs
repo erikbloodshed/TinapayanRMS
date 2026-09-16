@@ -206,4 +206,78 @@ public class RawMaterialValidatorTests
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.Source));
     }
+
+    private static RawMaterial EggWhite(int? linkedToId = 1, decimal? weightShare = 70m, decimal? costShare = 30m) => new()
+    {
+        Type = RawMaterialType.Ingredient,
+        Name = "Egg White",
+        CategoryId = 1,
+        Source = RawMaterialSource.Linked,
+        LinkedToId = linkedToId,
+        WeightSharePercent = weightShare,
+        CostSharePercent = costShare,
+    };
+
+    [Fact]
+    public void Accepts_a_valid_linked_ingredient()
+    {
+        _validator.Validate(EggWhite()).IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    public void Rejects_a_linked_ingredient_without_a_link(int? linkedToId)
+    {
+        var result = _validator.Validate(EggWhite(linkedToId: linkedToId));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.LinkedToId) && e.ErrorMessage == "Pick the ingredient it's linked to.");
+    }
+
+    [Theory]
+    [InlineData(null, 30d, nameof(RawMaterial.WeightSharePercent))]
+    [InlineData(0d, 30d, nameof(RawMaterial.WeightSharePercent))]
+    [InlineData(101d, 30d, nameof(RawMaterial.WeightSharePercent))]
+    [InlineData(70d, null, nameof(RawMaterial.CostSharePercent))]
+    [InlineData(70d, -1d, nameof(RawMaterial.CostSharePercent))]
+    [InlineData(70d, 100.5d, nameof(RawMaterial.CostSharePercent))]
+    public void Rejects_a_missing_or_out_of_range_share(double? weightShare, double? costShare, string propertyName)
+    {
+        var result = _validator.Validate(EggWhite(weightShare: (decimal?)weightShare, costShare: (decimal?)costShare));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == propertyName);
+    }
+
+    [Fact]
+    public void Rejects_link_fields_on_a_purchased_ingredient()
+    {
+        var result = _validator.Validate(new RawMaterial
+        {
+            Type = RawMaterialType.Ingredient,
+            Name = "Egg",
+            CategoryId = 1,
+            Source = RawMaterialSource.Purchased,
+            LinkedToId = 1,
+            WeightSharePercent = 70m,
+        });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.LinkedToId));
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.WeightSharePercent));
+    }
+
+    [Fact]
+    public void Rejects_a_linked_packaging_material()
+    {
+        var packaging = EggWhite();
+        packaging.Type = RawMaterialType.Packaging;
+        packaging.BaseUnitId = 1;
+
+        var result = _validator.Validate(packaging);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.Source));
+    }
 }

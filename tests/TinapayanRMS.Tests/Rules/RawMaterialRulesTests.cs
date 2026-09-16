@@ -112,6 +112,180 @@ public class RawMaterialRulesTests
     }
 
     [Fact]
+    public void EnsureFieldsMatchSource_accepts_a_linked_ingredient_with_a_link_and_both_shares()
+    {
+        var eggWhite = new RawMaterial { Source = RawMaterialSource.Linked, LinkedToId = 1, WeightSharePercent = 70m, CostSharePercent = 30m };
+
+        var act = () => RawMaterialRules.EnsureFieldsMatchSource(eggWhite);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureFieldsMatchSource_accepts_a_part_that_is_all_of_the_weight_and_cost()
+    {
+        var eggWhite = new RawMaterial { Source = RawMaterialSource.Linked, LinkedToId = 1, WeightSharePercent = 100m, CostSharePercent = 100m };
+
+        var act = () => RawMaterialRules.EnsureFieldsMatchSource(eggWhite);
+
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(null, 70, 30)]
+    [InlineData(0, 70, 30)]
+    public void EnsureFieldsMatchSource_rejects_a_linked_ingredient_without_a_link(int? linkedToId, int weightShare, int costShare)
+    {
+        var eggWhite = new RawMaterial { Source = RawMaterialSource.Linked, LinkedToId = linkedToId, WeightSharePercent = weightShare, CostSharePercent = costShare };
+
+        var act = () => RawMaterialRules.EnsureFieldsMatchSource(eggWhite);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*linked to*");
+    }
+
+    [Theory]
+    [InlineData(null, 30d)]
+    [InlineData(0d, 30d)]
+    [InlineData(-5d, 30d)]
+    [InlineData(100.01d, 30d)]
+    [InlineData(70d, null)]
+    [InlineData(70d, 0d)]
+    [InlineData(70d, 101d)]
+    public void EnsureFieldsMatchSource_rejects_a_missing_or_out_of_range_share(double? weightShare, double? costShare)
+    {
+        var eggWhite = new RawMaterial
+        {
+            Source = RawMaterialSource.Linked,
+            LinkedToId = 1,
+            WeightSharePercent = (decimal?)weightShare,
+            CostSharePercent = (decimal?)costShare,
+        };
+
+        var act = () => RawMaterialRules.EnsureFieldsMatchSource(eggWhite);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*share must be above 0 and at most 100*");
+    }
+
+    [Fact]
+    public void EnsureFieldsMatchSource_rejects_a_linked_ingredient_with_a_weight_loss_percent()
+    {
+        var eggWhite = new RawMaterial { Source = RawMaterialSource.Linked, LinkedToId = 1, WeightSharePercent = 70m, CostSharePercent = 30m, WeightLossPercent = 0m };
+
+        var act = () => RawMaterialRules.EnsureFieldsMatchSource(eggWhite);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*weight loss*");
+    }
+
+    [Theory]
+    [InlineData(RawMaterialSource.Purchased)]
+    [InlineData(RawMaterialSource.Made)]
+    public void EnsureFieldsMatchSource_rejects_link_fields_on_a_material_that_is_not_linked(RawMaterialSource source)
+    {
+        var material = new RawMaterial
+        {
+            Source = source,
+            WeightLossPercent = source == RawMaterialSource.Made ? 0m : null,
+            LinkedToId = 1,
+        };
+
+        var act = () => RawMaterialRules.EnsureFieldsMatchSource(material);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("Only a linked ingredient*");
+    }
+
+    [Fact]
+    public void EnsureFieldsMatchType_rejects_a_linked_packaging_material()
+    {
+        var packaging = new RawMaterial { Type = RawMaterialType.Packaging, BaseUnitId = 1, Source = RawMaterialSource.Linked };
+
+        var act = () => RawMaterialRules.EnsureFieldsMatchType(packaging);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*packaging is always purchased*");
+    }
+
+    [Fact]
+    public void LinkedCost_splits_an_eggs_cost_between_its_white_and_yolk_by_their_shares()
+    {
+        // ₱135 for 1,500 g is ₱0.09 a gram. White is 70% of the weight for 30% of the cost, yolk 30% for 70%.
+        var eggCostPerGram = 135m / 1500m;
+
+        var white = RawMaterialRules.LinkedCost(eggCostPerGram, weightSharePercent: 70m, costSharePercent: 30m);
+        var yolk = RawMaterialRules.LinkedCost(eggCostPerGram, weightSharePercent: 30m, costSharePercent: 70m);
+
+        white.Should().BeApproximately(0.0385714286m, 0.0000000001m);
+        yolk.Should().Be(0.21m);
+
+        // The whole egg's cost is accounted for: 1,050 g of white and 450 g of yolk.
+        (1050m * white).Should().BeApproximately(40.50m, 0.0000001m);
+        (450m * yolk).Should().Be(94.50m);
+    }
+
+    [Fact]
+    public void LinkedCost_keeps_the_cost_per_gram_when_the_shares_match()
+    {
+        RawMaterialRules.LinkedCost(0.09m, weightSharePercent: 40m, costSharePercent: 40m).Should().Be(0.09m);
+    }
+
+    [Fact]
+    public void EnsureValidLinkTarget_accepts_another_ingredient()
+    {
+        var act = () => RawMaterialRules.EnsureValidLinkTarget(id: 2, linkedToId: 1, RawMaterialType.Ingredient, "Egg");
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureValidLinkTarget_rejects_a_link_to_itself()
+    {
+        var act = () => RawMaterialRules.EnsureValidLinkTarget(id: 1, linkedToId: 1, RawMaterialType.Ingredient, "Egg");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*itself*");
+    }
+
+    [Fact]
+    public void EnsureValidLinkTarget_rejects_a_link_to_packaging()
+    {
+        var act = () => RawMaterialRules.EnsureValidLinkTarget(id: 0, linkedToId: 1, RawMaterialType.Packaging, "Egg Tray");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("'Egg Tray' is packaging*");
+    }
+
+    [Fact]
+    public void EnsureLinkSharesFit_accepts_parts_that_add_up_to_exactly_all_of_it()
+    {
+        var act = () => RawMaterialRules.EnsureLinkSharesFit("Egg White", "Egg", 70m, 30m, [("Egg Yolk", 30m, 70m)]);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureLinkSharesFit_accepts_parts_that_leave_some_over()
+    {
+        // The shell is neither: 60% + 30% of the weight leaves 10%.
+        var act = () => RawMaterialRules.EnsureLinkSharesFit("Egg White", "Egg", 60m, 30m, [("Egg Yolk", 30m, 70m)]);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureLinkSharesFit_rejects_more_than_all_of_the_weight_naming_the_other_parts()
+    {
+        var act = () => RawMaterialRules.EnsureLinkSharesFit("Egg White", "Egg", 75m, 30m, [("Egg Yolk", 30m, 70m)]);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("Egg Yolk (30%) already takes 30% of Egg's weight, so Egg White can take at most 70%.");
+    }
+
+    [Fact]
+    public void EnsureLinkSharesFit_rejects_more_than_all_of_the_cost_naming_the_other_parts()
+    {
+        var act = () => RawMaterialRules.EnsureLinkSharesFit("Egg Shell", "Egg", 10m, 5m, [("Egg White", 60m, 30m), ("Egg Yolk", 30m, 70m)]);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("Egg White (30%), Egg Yolk (70%) already take 100% of Egg's cost, so Egg Shell can take at most 0%.");
+    }
+
+    [Fact]
     public void EnsureTypeUnchanged_accepts_the_same_type()
     {
         var act = () => RawMaterialRules.EnsureTypeUnchanged(RawMaterialType.Packaging, RawMaterialType.Packaging);

@@ -79,6 +79,7 @@ public class RawMaterialsViewModel : ViewModelBase
     private readonly ReadOnlyObservableCollection<RawMaterial> _rawMaterials;
     private readonly ReadOnlyObservableCollection<RawMaterial> _visibleRawMaterials;
     private readonly ReadOnlyObservableCollection<RawMaterial> _ingredients;
+    private readonly ReadOnlyObservableCollection<RawMaterial> _linkTargets;
     private readonly SourceCache<RawMaterialCategory, int> _categoryCache = new(c => c.Id);
     private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categories;
     private readonly SourceCache<RawMaterialCategory, int> _addNewCategoryOption = new(c => c.Id);
@@ -92,6 +93,9 @@ public class RawMaterialsViewModel : ViewModelBase
 
     /// <summary>The ingredients only, for the BOM editor's component picker: packaging never goes in a recipe.</summary>
     public ReadOnlyObservableCollection<RawMaterial> Ingredients => _ingredients;
+
+    /// <summary>The ingredients a linked ingredient can be linked to: every one but the material being edited.</summary>
+    public ReadOnlyObservableCollection<RawMaterial> LinkTargets => _linkTargets;
 
     public ObservableCollection<RawMaterialPriceRow> PriceHistory { get; } = [];
 
@@ -187,6 +191,30 @@ public class RawMaterialsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingWeightLossPercent, value);
     }
 
+    /// <summary>Linked only: the ingredient this one is a part of.</summary>
+    private RawMaterial? _editingLinkedTo;
+    public RawMaterial? EditingLinkedTo
+    {
+        get => _editingLinkedTo;
+        set => this.RaiseAndSetIfChanged(ref _editingLinkedTo, value);
+    }
+
+    /// <summary>Linked only: how much of the linked-to ingredient's weight this part is.</summary>
+    private decimal? _editingWeightSharePercent;
+    public decimal? EditingWeightSharePercent
+    {
+        get => _editingWeightSharePercent;
+        set => this.RaiseAndSetIfChanged(ref _editingWeightSharePercent, value);
+    }
+
+    /// <summary>Linked only: how much of the linked-to ingredient's cost this part carries.</summary>
+    private decimal? _editingCostSharePercent;
+    public decimal? EditingCostSharePercent
+    {
+        get => _editingCostSharePercent;
+        set => this.RaiseAndSetIfChanged(ref _editingCostSharePercent, value);
+    }
+
     /// <summary>The material's cost buffer; empty saves as 0%, since the box shows 0.00 when cleared.</summary>
     private decimal? _editingCostBufferPercent = 0m;
     public decimal? EditingCostBufferPercent
@@ -232,6 +260,18 @@ public class RawMaterialsViewModel : ViewModelBase
     private readonly ObservableAsPropertyHelper<bool> _isEditingMade;
     /// <summary>A made ingredient: it has a weight loss percent and a BOM instead of a purchase price.</summary>
     public bool IsEditingMade => _isEditingMade.Value;
+
+    private readonly ObservableAsPropertyHelper<bool> _isEditingLinked;
+    /// <summary>A linked ingredient: its cost is a share of another ingredient's, instead of a price or a BOM.</summary>
+    public bool IsEditingLinked => _isEditingLinked.Value;
+
+    private readonly ObservableAsPropertyHelper<string> _linkedCostPreviewText;
+    /// <summary>What the link works out to as it's filled in: the linked-to ingredient's cost per gram, and this part's.</summary>
+    public string LinkedCostPreviewText => _linkedCostPreviewText.Value;
+
+    private readonly ObservableAsPropertyHelper<string> _linkedPartsText;
+    /// <summary>The linked-to ingredient's other parts, and how much of its weight and cost all of them take with this one.</summary>
+    public string LinkedPartsText => _linkedPartsText.Value;
 
     private readonly ObservableAsPropertyHelper<bool> _showPurchaseSetup;
     /// <summary>A purchased material, saved or still being filled in, so a new one can be priced before its first Save.</summary>
@@ -518,6 +558,16 @@ public class RawMaterialsViewModel : ViewModelBase
             .SortAndBind(out _ingredients, byName)
             .Subscribe();
 
+        var notTheSelection = this.WhenAnyValue(x => x.SelectedRawMaterial)
+            .Select(selected => selected?.Id ?? 0)
+            .DistinctUntilChanged()
+            .Select(selectedId => (Func<RawMaterial, bool>)(m => m.Type == RawMaterialType.Ingredient && m.Id != selectedId));
+
+        _rawMaterialCache.Connect()
+            .Filter(notTheSelection)
+            .SortAndBind(out _linkTargets, byName)
+            .Subscribe();
+
         _categoryCache.Connect()
             .SortAndBind(out _categories, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name))
             .Subscribe();
@@ -544,6 +594,18 @@ public class RawMaterialsViewModel : ViewModelBase
         _isEditingMade = this.WhenAnyValue(x => x.EditingType, x => x.EditingSource,
                 (type, source) => type == RawMaterialType.Ingredient && source == RawMaterialSource.Made)
             .ToProperty(this, x => x.IsEditingMade);
+
+        _isEditingLinked = this.WhenAnyValue(x => x.EditingType, x => x.EditingSource,
+                (type, source) => type == RawMaterialType.Ingredient && source == RawMaterialSource.Linked)
+            .ToProperty(this, x => x.IsEditingLinked);
+
+        _linkedCostPreviewText = this.WhenAnyValue(x => x.EditingLinkedTo, x => x.EditingWeightSharePercent, x => x.EditingCostSharePercent, x => x.EditingCostBufferPercent,
+                LinkedCostPreview)
+            .ToProperty(this, x => x.LinkedCostPreviewText, string.Empty);
+
+        _linkedPartsText = this.WhenAnyValue(x => x.EditingLinkedTo, x => x.EditingWeightSharePercent, x => x.EditingCostSharePercent,
+                LinkedPartsSummary)
+            .ToProperty(this, x => x.LinkedPartsText, string.Empty);
 
         // The cards follow the form, not the selection, so a new material can be filled in completely
         // before its one Save.
@@ -650,6 +712,9 @@ public class RawMaterialsViewModel : ViewModelBase
                 {
                     EditingSource = RawMaterialSource.Purchased;
                     EditingWeightLossPercent = null;
+                    EditingLinkedTo = null;
+                    EditingWeightSharePercent = null;
+                    EditingCostSharePercent = null;
                 }
                 else
                 {
@@ -716,6 +781,7 @@ public class RawMaterialsViewModel : ViewModelBase
             // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
             var selectedId = SelectedRawMaterial?.Id;
             var categoryId = EditingCategory?.Id;
+            var linkedToId = EditingLinkedTo?.Id;
             var baseUnitId = EditingBaseUnit?.Id;
             var unitOfMeasureId = EditingUnitOfMeasure?.Id;
             var exampleMaterialId = ExampleRawMaterial?.Id;
@@ -728,6 +794,7 @@ public class RawMaterialsViewModel : ViewModelBase
                 _rawMaterialCache.MergeFrom(rawMaterials);
 
                 EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId);
+                EditingLinkedTo = Ingredients.FirstOrDefault(m => m.Id == linkedToId);
                 var previousBaseUnit = EditingBaseUnit;
                 EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId);
                 EditingUnitOfMeasure = UnitsOfMeasure.FirstOrDefault(u => u.Id == unitOfMeasureId);
@@ -789,6 +856,9 @@ public class RawMaterialsViewModel : ViewModelBase
                 Source = source,
                 // A cleared box shows 0.00, so it saves as 0%.
                 WeightLossPercent = source == RawMaterialSource.Made ? EditingWeightLossPercent ?? 0m : null,
+                LinkedToId = source == RawMaterialSource.Linked ? EditingLinkedTo?.Id : null,
+                WeightSharePercent = source == RawMaterialSource.Linked ? EditingWeightSharePercent : null,
+                CostSharePercent = source == RawMaterialSource.Linked ? EditingCostSharePercent : null,
                 BaseUnitId = type == RawMaterialType.Packaging ? EditingBaseUnit?.Id : null,
                 // A cleared box shows 0.00 too.
                 CostBufferPercent = EditingCostBufferPercent ?? 0m,
@@ -973,6 +1043,56 @@ public class RawMaterialsViewModel : ViewModelBase
             this.WhenAnyValue(x => x.SelectedBomLineEdit).Select(line => line is not null));
     }
 
+    /// <summary>
+    /// "Egg costs ₱0.0900/g before its buffer. At 70% of its weight for 30% of its cost, this costs ₱0.0386/g, buffered ₱0.0386/g."
+    /// Worked out with the same rules the cascade saves with, from the linked-to ingredient's stored true cost:
+    /// the cost share is of the unbuffered cost, and only this part's own buffer goes on top.
+    /// </summary>
+    private static string LinkedCostPreview(RawMaterial? linkedTo, decimal? weightShare, decimal? costShare, decimal? buffer)
+    {
+        if (linkedTo is null)
+        {
+            return "Pick the ingredient this one is a part of.";
+        }
+
+        var linkedToText = $"{linkedTo.Name} costs ₱{linkedTo.CostPerBaseUnit:N4}/g before its buffer.";
+        if (weightShare is not (> 0 and <= 100) || costShare is not (> 0 and <= 100))
+        {
+            return $"{linkedToText} Enter this part's share of its weight and of its cost.";
+        }
+
+        var cost = RawMaterialRules.LinkedCost(linkedTo.CostPerBaseUnit, weightShare.Value, costShare.Value);
+        var buffered = RawMaterialRules.BufferedCost(cost, buffer ?? 0m);
+        return $"{linkedToText} At {weightShare:0.##}% of its weight for {costShare:0.##}% of its cost, this costs ₱{cost:N4}/g, buffered ₱{buffered:N4}/g.";
+    }
+
+    /// <summary>
+    /// "Also linked to Egg: Egg Yolk (30% of the weight, 70% of the cost). With this one, 100% of its weight and 100% of its cost."
+    /// The other parts come from the list's copies, so they're as of the last load; Save checks the saved ones.
+    /// </summary>
+    private string LinkedPartsSummary(RawMaterial? linkedTo, decimal? weightShare, decimal? costShare)
+    {
+        if (linkedTo is null)
+        {
+            return string.Empty;
+        }
+
+        var others = RawMaterials
+            .Where(m => m.LinkedToId == linkedTo.Id && m.Id != _editingId)
+            .ToList();
+        var totalWeight = others.Sum(m => m.WeightSharePercent ?? 0m) + (weightShare ?? 0m);
+        var totalCost = others.Sum(m => m.CostSharePercent ?? 0m) + (costShare ?? 0m);
+        var totals = $"{totalWeight:0.##}% of its weight and {totalCost:0.##}% of its cost";
+
+        if (others.Count == 0)
+        {
+            return $"Nothing else is linked to {linkedTo.Name}. This part takes {totals}.";
+        }
+
+        var parts = string.Join(", ", others.Select(m => $"{m.Name} ({m.WeightSharePercent:0.##}% of the weight, {m.CostSharePercent:0.##}% of the cost)"));
+        return $"Also linked to {linkedTo.Name}: {parts}. With this one, {totals} (at most 100% each).";
+    }
+
     /// <summary>Sets the buffer percent or the buffered price from the other without that setting the first one back.</summary>
     private void SyncCostBuffer(Action set)
     {
@@ -1003,6 +1123,9 @@ public class RawMaterialsViewModel : ViewModelBase
         EditingCategory = null;
         EditingSource = RawMaterialSource.Purchased;
         EditingWeightLossPercent = null;
+        EditingLinkedTo = null;
+        EditingWeightSharePercent = null;
+        EditingCostSharePercent = null;
         EditingCostBufferPercent = 0m;
         EditingBaseUnit = null;
         ExampleRawMaterial = null;
@@ -1018,6 +1141,9 @@ public class RawMaterialsViewModel : ViewModelBase
         EditingCategory = Categories.FirstOrDefault(c => c.Id == material.CategoryId);
         EditingSource = material.Source;
         EditingWeightLossPercent = material.WeightLossPercent;
+        EditingLinkedTo = Ingredients.FirstOrDefault(m => m.Id == material.LinkedToId);
+        EditingWeightSharePercent = material.WeightSharePercent;
+        EditingCostSharePercent = material.CostSharePercent;
         EditingCostBufferPercent = material.CostBufferPercent;
         EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId);
     }

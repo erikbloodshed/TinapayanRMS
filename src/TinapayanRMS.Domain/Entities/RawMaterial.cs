@@ -21,11 +21,25 @@ public class RawMaterial
 
     public RawMaterialCategory? Category { get; set; }
 
-    /// <summary>Set at creation and never changed afterwards. Only an ingredient can be Made; packaging is always Purchased.</summary>
+    /// <summary>Set at creation and never changed afterwards. Only an ingredient can be Made or Linked; packaging is always Purchased.</summary>
     public RawMaterialSource Source { get; set; }
 
     /// <summary>Made only: weight lost while making it, at least 0 and less than 100.</summary>
     public decimal? WeightLossPercent { get; set; }
+
+    /// <summary>
+    /// Linked only: the ingredient this one is a part of, whose cost it takes a share of — egg white
+    /// is linked to the egg. Its cost per gram is the linked-to one's × CostSharePercent ÷ WeightSharePercent.
+    /// </summary>
+    public int? LinkedToId { get; set; }
+
+    public RawMaterial? LinkedTo { get; set; }
+
+    /// <summary>Linked only: how much of the linked-to ingredient's weight this part is (egg white, 70%). Above 0, at most 100.</summary>
+    public decimal? WeightSharePercent { get; set; }
+
+    /// <summary>Linked only: how much of the linked-to ingredient's cost this part carries (egg white, 30%). Above 0, at most 100.</summary>
+    public decimal? CostSharePercent { get; set; }
 
     /// <summary>
     /// Packaging only: the unit its quantities and cost are tracked in, chosen per material —
@@ -40,8 +54,8 @@ public class RawMaterial
     /// <summary>
     /// The cost of one base unit (one gram, for an ingredient). Stored rather than computed, matching
     /// SubAssembly/Product costs elsewhere in the cascade: for Purchased it's the latest price divided
-    /// by the base units in that price's unit, for Made it's a BOM-tree rollup (Phase 6). Defaults to
-    /// 0 until priced / given a BOM.
+    /// by the base units in that price's unit, for Made it's a BOM-tree rollup (Phase 6), for Linked a
+    /// share of the linked-to ingredient's. Defaults to 0 until priced / given a BOM.
     /// </summary>
     public decimal CostPerBaseUnit { get; set; }
 

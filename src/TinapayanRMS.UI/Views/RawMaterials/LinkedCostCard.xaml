@@ -1,0 +1,75 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.RawMaterials.LinkedCostCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
+    <Border Style="{StaticResource CardStyle}">
+        <StackPanel>
+            <TextBlock Text="Linked Cost" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
+            <TextBlock Text="A part of another ingredient, like egg white of the egg. Enter how much of its weight this part is and how much of its cost it carries; the cost follows that ingredient's whenever it changes."
+                       Style="{StaticResource CardCaptionStyle}" />
+
+            <!-- The ingredient it's a part of, then the two shares and its own buffer -->
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="12" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.ColumnSpan="5" Text="Linked To" Style="{StaticResource FieldLabelStyle}" />
+                <!-- Typing with the list open jumps to the first name starting with it -->
+                <syncfusion:ComboBoxAdv Grid.Row="1"
+                                        Grid.ColumnSpan="5"
+                                        ItemsSource="{Binding LinkTargets}"
+                                        DisplayMemberPath="Name"
+                                        IsTextSearchEnabled="True"
+                                        SelectedItem="{Binding EditingLinkedTo, Mode=TwoWay}"
+                                        ToolTip="The ingredient this one is a part of. Any ingredient but this one: purchased, made or linked." />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Weight Share %" Style="{StaticResource FieldLabelStyle}" />
+                <!-- Empty rather than 0.00 until typed, as Quantity per Purchase Unit is (UseNullOption) -->
+                <syncfusion:DoubleTextBox Grid.Row="4"
+                                          Grid.Column="0"
+                                          Value="{Binding EditingWeightSharePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          UseNullOption="True"
+                                          NullValue="{x:Null}"
+                                          NumberDecimalDigits="2"
+                                          ToolTip="How much of the linked ingredient's weight this part is: egg white is about 70% of an egg." />
+
+                <TextBlock Grid.Row="3" Grid.Column="2" Text="Cost Share %" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:DoubleTextBox Grid.Row="4"
+                                          Grid.Column="2"
+                                          Value="{Binding EditingCostSharePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          UseNullOption="True"
+                                          NullValue="{x:Null}"
+                                          NumberDecimalDigits="2"
+                                          ToolTip="How much of the linked ingredient's cost this part carries: egg white might carry 30% of the egg's." />
+
+                <TextBlock Grid.Row="3" Grid.Column="4" Text="Cost Buffer %" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:DoubleTextBox Grid.Row="4"
+                                          Grid.Column="4"
+                                          Value="{Binding EditingCostBufferPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          ToolTip="A cushion on top of this part's cost. The cost share is of the linked ingredient's cost before its buffer, so that ingredient's buffer doesn't carry over." />
+            </Grid>
+
+            <!-- Follows the link and both shares as they're typed -->
+            <Border Margin="0,12,0,0" Padding="12" CornerRadius="6" Background="{StaticResource AccentSoftBrush}">
+                <TextBlock Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Text="{Binding LinkedCostPreviewText}" />
+            </Border>
+
+            <TextBlock Text="{Binding LinkedPartsText}"
+                       Style="{StaticResource CaptionStyle}"
+                       TextWrapping="Wrap"
+                       Margin="0,12,0,0" />
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -51,7 +51,7 @@
                                   ShowTabItemContextMenu="False"
                                   ShowTabListContextMenu="False"
                                   SelectedIndex="{Binding SelectedDetailsTab, Mode=TwoWay}">
-            <!-- A material is purchased (a price) or made (a BOM), so one of the first two cards shows -->
+            <!-- A material is purchased (a price), made (a BOM) or linked (a share of another's cost), so one of the first three cards shows -->
             <syncfusion:TabItemExt Header="Cost Setup" CanClose="False">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <Grid>
@@ -63,6 +63,7 @@
 
                         <rm:PurchaseCostSetupCard Visibility="{Binding ShowPurchaseSetup, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <rm:BillOfMaterialsCard Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <rm:LinkedCostCard Visibility="{Binding IsEditingLinked, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <rm:UsageExampleCard Grid.Column="2" />
                     </Grid>
                 </ScrollViewer>

@@ -21,8 +21,10 @@ namespace TinapayanRMS.UI.Controls;
 /// before it, and the row a line is typed into would sink below them.</item>
 /// <item>Those rows are frozen footer rows. With a short body they sit right under it (the scroll axis's
 /// ViewSize is the smaller of its render size and total extent), but once the rows outgrow the grid they'd be
-/// pinned over its last rows. So rows that no longer fit are removed at once, when records are added, a group
-/// is expanded or the grid shrinks; adding them waits for the change to settle.</item>
+/// pinned over its last rows, which a grouped grid's row generation can't survive. So rows that no longer fit are
+/// removed at once, when records are added, a group is expanded or the grid shrinks, and after any layout that
+/// finds them overflowing (growth nothing announces, such as ExpandAllGroup); adding them waits for the change to
+/// settle.</item>
 /// <item>The space is measured on the grid's row scroll axis (render size against total extent), which counts
 /// the header, group captions and the add-new row as they're drawn, rather than by counting records.</item>
 /// <item>Only the difference is added or removed, never a Clear(): UnBoundRows' Reset handling miscounts its
@@ -34,7 +36,8 @@ namespace TinapayanRMS.UI.Controls;
 /// <item>Changing unbound rows reaches the grid's selection (GridSelectionController.ProcessUnBoundRowChanged):
 /// it ends an edit of an existing row without committing it, and adding one while the current cell is on the row
 /// above the add-new row moves the current cell onto it. So nothing changes while a row is being edited (it's
-/// tried again shortly after), and a current cell moved by an addition is put back.</item>
+/// tried again shortly after), and a current cell moved by an addition is put back, but only from the add-new row
+/// onto a record that still exists.</item>
 /// </list>
 /// </summary>
 public static class GridFillerRows
@@ -204,6 +207,7 @@ public static class GridFillerRows
         private readonly DispatcherTimer _settleTimer;
         private readonly List<GridUnBoundRow> _rows = [];
         private INotifyCollectionChanged? _view;
+        private bool _watchingLayout;
         private bool _pending;
         private double _lastHeight;
 
@@ -233,6 +237,12 @@ public static class GridFillerRows
         /// <summary>Follows the grid's current view: records added, removed or filtered out change the space left.</summary>
         public void WatchView()
         {
+            if (!_watchingLayout)
+            {
+                _grid.LayoutUpdated += OnLayoutUpdated;
+                _watchingLayout = true;
+            }
+
             var view = _grid.View as INotifyCollectionChanged;
             if (ReferenceEquals(view, _view))
             {
@@ -254,6 +264,12 @@ public static class GridFillerRows
         public void StopWatching()
         {
             _settleTimer.Stop();
+            if (_watchingLayout)
+            {
+                _grid.LayoutUpdated -= OnLayoutUpdated;
+                _watchingLayout = false;
+            }
+
             if (_view is not null)
             {
                 _view.CollectionChanged -= OnViewChanged;
@@ -309,6 +325,23 @@ public static class GridFillerRows
 
         private void OnViewChanged(object? sender, NotifyCollectionChangedEventArgs e) => ContentGrew();
 
+        /// <summary>
+        /// Takes away rows that no longer fit, after any layout that grew the grid's rows without an event this class
+        /// hears: ExpandAllGroup raises no GroupExpanded and changes no records. Left there, they cover the rows they
+        /// were pinned over, and a grouped grid's row generation broke under them (an ArgumentOutOfRangeException from
+        /// GroupDisplayElements.GetItemAt during layout, which closed the app; GridFillerRowsGroupedTests). It only
+        /// compares two numbers until something doesn't fit.
+        /// </summary>
+        private void OnLayoutUpdated(object? sender, EventArgs e)
+        {
+            if (_rows.Count > 0
+                && _grid.GetVisualContainer()?.ScrollRows is PixelScrollAxis rows
+                && FillerRowCount(rows.RenderSize, rows.TotalExtent - (_rows.Count * _grid.RowHeight), _grid.RowHeight) < _rows.Count)
+            {
+                Apply(allowAdding: false);
+            }
+        }
+
         private void Apply(bool allowAdding)
         {
             if (!_grid.IsLoaded || !_grid.IsVisible || _grid.GetVisualContainer()?.ScrollRows is not PixelScrollAxis rows)
@@ -345,14 +378,27 @@ public static class GridFillerRows
                 _grid.UnBoundRows.Add(row);
             }
 
-            // With the current cell on the last line, an addition moves it onto the add-new row.
-            if (currentCell.RowIndex >= 0
+            // With the current cell on the last line, an addition moves it onto the add-new row: put it back. Only
+            // that move is undone, and only onto a cell that still exists. The grid holds on to the current cell of a
+            // row that's gone — a selected line's, after the lines were replaced (another sub-assembly's form on the
+            // Products screen) — and drops it itself when rows are added. Moving back there threw "InValid
+            // RowColumnIndex" (GridCurrentCellManager.CanMoveCurrentCell) from this dispatcher callback, which closed
+            // the app (GridFillerRowsCurrentCellTests).
+            if (IsRecordCell(currentCell)
                 && _grid.SelectionController?.CurrentCellManager is { } manager
-                && manager.CurrentRowColumnIndex != currentCell)
+                && manager.CurrentRowColumnIndex != currentCell
+                && _grid.IsAddNewIndex(manager.CurrentRowColumnIndex.RowIndex))
             {
                 _grid.MoveCurrentCell(currentCell, needToClearSelection: false);
             }
         }
+
+        /// <summary>Whether <paramref name="cell"/> is a cell of one of the grid's records, in one of its visible columns.</summary>
+        private bool IsRecordCell(RowColumnIndex cell) =>
+            cell.RowIndex >= 0
+            && _grid.ResolveToRecordIndex(cell.RowIndex) >= 0
+            && cell.ColumnIndex >= _grid.GetFirstColumnIndex()
+            && cell.ColumnIndex <= _grid.GetLastColumnIndex();
 
         private void RemoveLastRow()
         {

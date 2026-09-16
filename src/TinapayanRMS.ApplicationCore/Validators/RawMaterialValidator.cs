@@ -29,12 +29,33 @@ public class RawMaterialValidator : AbstractValidator<RawMaterial>
             RuleFor(m => m.BaseUnitId)
                 .NotNull().WithMessage("Base unit is required.")
                 .GreaterThan(0).WithMessage("Base unit is required.");
-            RuleFor(m => m.Source).Equal(RawMaterialSource.Purchased).WithMessage("Only an ingredient can be made; packaging is always purchased.");
+            RuleFor(m => m.Source).Equal(RawMaterialSource.Purchased).WithMessage("Only an ingredient can be made or linked; packaging is always purchased.");
         });
 
         When(m => m.Source == RawMaterialSource.Purchased, () =>
         {
             RuleFor(m => m.WeightLossPercent).Null().WithMessage("A purchased material has no weight loss percent.");
+        });
+
+        When(m => m.Source != RawMaterialSource.Linked, () =>
+        {
+            RuleFor(m => m.LinkedToId).Null().WithMessage("Only a linked ingredient is linked to another.");
+            RuleFor(m => m.WeightSharePercent).Null().WithMessage("Only a linked ingredient is linked to another.");
+            RuleFor(m => m.CostSharePercent).Null().WithMessage("Only a linked ingredient is linked to another.");
+        });
+
+        When(m => m.Source == RawMaterialSource.Linked, () =>
+        {
+            RuleFor(m => m.WeightLossPercent).Null().WithMessage("A linked ingredient has no weight loss percent.");
+            RuleFor(m => m.LinkedToId)
+                .NotNull().WithMessage("Pick the ingredient it's linked to.")
+                .GreaterThan(0).WithMessage("Pick the ingredient it's linked to.");
+            RuleFor(m => m.WeightSharePercent)
+                .NotNull().WithMessage("Weight share is required.")
+                .GreaterThan(0m).LessThanOrEqualTo(100m).WithMessage("Weight share must be above 0 and at most 100 percent.");
+            RuleFor(m => m.CostSharePercent)
+                .NotNull().WithMessage("Cost share is required.")
+                .GreaterThan(0m).LessThanOrEqualTo(100m).WithMessage("Cost share must be above 0 and at most 100 percent.");
         });
 
         When(m => m.Source == RawMaterialSource.Made, () =>

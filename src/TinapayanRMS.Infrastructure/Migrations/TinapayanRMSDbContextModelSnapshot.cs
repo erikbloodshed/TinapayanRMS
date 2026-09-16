@@ -241,6 +241,13 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
+                    b.Property<decimal?>("CostSharePercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int?>("LinkedToId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -260,11 +267,17 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
+                    b.Property<decimal?>("WeightSharePercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("BaseUnitId");
 
                     b.HasIndex("CategoryId");
+
+                    b.HasIndex("LinkedToId");
 
                     b.HasIndex("Name")
                         .IsUnique();
@@ -274,6 +287,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_RawMaterials_BaseUnitMatchesType", "([Type] = 'Ingredient' AND [BaseUnitId] IS NULL) OR ([Type] = 'Packaging' AND [BaseUnitId] IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_RawMaterials_CostBufferPercent", "[CostBufferPercent] >= 0 AND [CostBufferPercent] <= 100");
+
+                            t.HasCheckConstraint("CK_RawMaterials_LinkMatchesSource", "([Source] = 'Linked' AND [LinkedToId] IS NOT NULL AND [WeightSharePercent] > 0 AND [WeightSharePercent] <= 100 AND [CostSharePercent] > 0 AND [CostSharePercent] <= 100) OR ([Source] <> 'Linked' AND [LinkedToId] IS NULL AND [WeightSharePercent] IS NULL AND [CostSharePercent] IS NULL)");
 
                             t.HasCheckConstraint("CK_RawMaterials_OnlyIngredientsAreMade", "[Type] = 'Ingredient' OR [Source] = 'Purchased'");
                         });
@@ -654,9 +669,16 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("TinapayanRMS.Domain.Entities.RawMaterial", "LinkedTo")
+                        .WithMany()
+                        .HasForeignKey("LinkedToId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("BaseUnit");
 
                     b.Navigation("Category");
+
+                    b.Navigation("LinkedTo");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterialPriceHistory", b =>

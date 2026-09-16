@@ -60,14 +60,9 @@ public class IngredientBomLineRepository(
         IngredientBomRules.EnsureValidLines(lines);
 
         // ingredientId's own (about-to-be-replaced) lines are excluded, so the cycle
-        // check only sees everyone else's current BOM.
-        var otherBomLines = await dbContext.IngredientBomLines
-            .Where(l => l.IngredientId != ingredientId)
-            .ToListAsync(cancellationToken);
-
-        var componentIdsByIngredientId = otherBomLines
-            .GroupBy(l => l.IngredientId)
-            .ToDictionary(g => g.Key, g => (IReadOnlyList<int>)g.Select(l => l.ComponentIngredientId).ToList());
+        // check only sees everyone else's current BOM and links: a component linked to
+        // this ingredient closes a loop as surely as one made from it.
+        var componentIdsByIngredientId = await IngredientDependencies.LoadAsync(dbContext, ingredientId, cancellationToken);
 
         IngredientBomRules.EnsureNoCycle(ingredientId, lines.Select(l => l.ComponentIngredientId), componentIdsByIngredientId);
 

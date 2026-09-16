@@ -29,7 +29,10 @@ public class RawMaterialRepository(
     public async Task AddAsync(RawMaterial material, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await AddAsync(dbContext, material, cancellationToken);
+        if (await AddAsync(dbContext, material, cancellationToken))
+        {
+            await costPropagator.RecomputeAndPropagateAsync(material.Id, cancellationToken);
+        }
     }
 
     public async Task UpdateAsync(RawMaterial material, CancellationToken cancellationToken)
@@ -67,13 +70,16 @@ public class RawMaterialRepository(
                 CategoryId = material.CategoryId,
                 Source = material.Source,
                 WeightLossPercent = material.WeightLossPercent,
+                LinkedToId = material.LinkedToId,
+                WeightSharePercent = material.WeightSharePercent,
+                CostSharePercent = material.CostSharePercent,
                 BaseUnitId = material.BaseUnitId,
                 CostBufferPercent = material.CostBufferPercent,
             };
 
             if (fields.Id == 0)
             {
-                await AddAsync(dbContext, fields, cancellationToken);
+                costChanged = await AddAsync(dbContext, fields, cancellationToken);
             }
             else
             {
@@ -118,21 +124,28 @@ public class RawMaterialRepository(
         await dbContext.RawMaterials.Where(m => m.Id == id).ExecuteDeleteAsync(cancellationToken);
     }
 
-    /// <summary>Adds <paramref name="material"/> and saves it, rejecting fields that don't fit its type or source.</summary>
-    internal static async Task AddAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
+    /// <summary>
+    /// Adds <paramref name="material"/> and saves it, rejecting fields that don't fit its type or source, or a
+    /// link that doesn't fit. Returns whether the caller must cascade its cost: a linked ingredient's is
+    /// worked out from the one it's linked to.
+    /// </summary>
+    internal static async Task<bool> AddAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
     {
         RawMaterialRules.EnsureFieldsMatchType(material);
         RawMaterialRules.EnsureFieldsMatchSource(material);
         RawMaterialRules.EnsureValidCostBuffer(material.CostBufferPercent);
+        await EnsureValidLinkAsync(dbContext, material, cancellationToken);
 
         dbContext.RawMaterials.Add(material);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        return material.Source == RawMaterialSource.Linked;
     }
 
     /// <summary>
     /// Copies the form's fields onto the stored material and saves it. Returns whether the caller must
-    /// cascade its cost: a made ingredient's weight loss percent or an ingredient's buffer may have
-    /// just changed.
+    /// cascade its cost: a made ingredient's weight loss percent, a linked ingredient's link or shares,
+    /// or an ingredient's buffer may have just changed.
     /// </summary>
     internal static async Task<bool> UpdateAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
     {
@@ -145,6 +158,7 @@ public class RawMaterialRepository(
 
         RawMaterialRules.EnsureTypeUnchanged(existing.Type, material.Type);
         RawMaterialRules.EnsureSourceUnchanged(existing.Source, material.Source);
+        await EnsureValidLinkAsync(dbContext, material, cancellationToken);
 
         // Only a packaging material can get here: an ingredient's is always null (EnsureFieldsMatchType).
         if (existing.BaseUnitId != material.BaseUnitId)
@@ -160,6 +174,9 @@ public class RawMaterialRepository(
         existing.Name = material.Name;
         existing.CategoryId = material.CategoryId;
         existing.WeightLossPercent = material.WeightLossPercent;
+        existing.LinkedToId = material.LinkedToId;
+        existing.WeightSharePercent = material.WeightSharePercent;
+        existing.CostSharePercent = material.CostSharePercent;
         existing.BaseUnitId = material.BaseUnitId;
 
         // A purchased material's buffered cost follows its buffer here; a made one's is a BOM rollup,
@@ -173,11 +190,53 @@ public class RawMaterialRepository(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // WeightLossPercent may have just changed; the cascade recomputes the cost from its current BOM.
-        // A new buffer on an ingredient reaches the made ingredients and sub-assemblies using it; a
-        // packaging material's needs nothing, since products cost their packaging lines on read.
-        return existing.Source == RawMaterialSource.Made
+        // WeightLossPercent, or the link and its shares, may have just changed; the cascade recomputes the
+        // cost from its current BOM or link. A new buffer on an ingredient reaches the made and linked
+        // ingredients and sub-assemblies using it; a packaging material's needs nothing, since products
+        // cost their packaging lines on read.
+        return existing.Source is RawMaterialSource.Made or RawMaterialSource.Linked
             || (bufferChanged && existing.Type == RawMaterialType.Ingredient);
+    }
+
+    /// <summary>
+    /// A linked ingredient's link must be to another ingredient, must leave room among that ingredient's other
+    /// parts (together at most 100% of its weight and of its cost), and must not close a loop through BOMs
+    /// and links. Nothing to check for any other source. Call after EnsureFieldsMatchSource.
+    /// </summary>
+    private static async Task EnsureValidLinkAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
+    {
+        if (material is not { Source: RawMaterialSource.Linked, LinkedToId: { } linkedToId, WeightSharePercent: { } weightShare, CostSharePercent: { } costShare })
+        {
+            return;
+        }
+
+        var linkedTo = await dbContext.RawMaterials
+            .Where(m => m.Id == linkedToId)
+            .Select(m => new { m.Name, m.Type })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new InvalidOperationException($"Ingredient {linkedToId} does not exist.");
+
+        RawMaterialRules.EnsureValidLinkTarget(material.Id, linkedToId, linkedTo.Type, linkedTo.Name);
+
+        var otherParts = await dbContext.RawMaterials
+            .Where(m => m.LinkedToId == linkedToId && m.Id != material.Id)
+            .OrderBy(m => m.Name)
+            .Select(m => new { m.Name, m.WeightSharePercent, m.CostSharePercent })
+            .ToListAsync(cancellationToken);
+
+        RawMaterialRules.EnsureLinkSharesFit(
+            material.Name,
+            linkedTo.Name,
+            weightShare,
+            costShare,
+            [.. otherParts.Select(p => (p.Name, p.WeightSharePercent ?? 0m, p.CostSharePercent ?? 0m))]);
+
+        // A new ingredient has nothing depending on it yet, so it can't close a loop.
+        if (material.Id != 0)
+        {
+            var dependencies = await IngredientDependencies.LoadAsync(dbContext, material.Id, cancellationToken);
+            IngredientBomRules.EnsureNoCycle(material.Id, [linkedToId], dependencies);
+        }
     }
 
     /// <summary>
