@@ -14,9 +14,10 @@ using TinapayanRMS.UI.Converters;
 namespace TinapayanRMS.Tests.Controls;
 
 /// <summary>
-/// GridFillerRows in a list set up as the Raw Materials list is (MaterialListCard.xaml: grouped by type, sorted by
-/// name, live data shaping). Filler rows are frozen footer rows, so ones that no longer fit sit over the list's rows,
-/// and a grouped grid's row generation breaks under them: an ArgumentOutOfRangeException from
+/// GridFillerRows in a grouped, name-sorted, live-data-shaped list — how the Raw Materials list (MaterialListCard.xaml)
+/// was set up before its grouping was removed (2026-09-17). Kept as a regression test for any grid set up this way,
+/// since GridFillerRows is still used elsewhere. Filler rows are frozen footer rows, so ones that no longer fit sit
+/// over the list's rows, and a grouped grid's row generation breaks under them: an ArgumentOutOfRangeException from
 /// GroupDisplayElements.GetItemAt during layout closed the app (2026-09-16). Fuzzing the list reproduced it only
 /// after filler rows had been left overflowing, and never with them kept to what fits.
 /// </summary>

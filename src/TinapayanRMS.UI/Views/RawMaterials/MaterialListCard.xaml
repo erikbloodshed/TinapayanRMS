@@ -2,11 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
-             xmlns:converters="clr-namespace:TinapayanRMS.UI.Converters"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
-    <UserControl.Resources>
-        <converters:RawMaterialGroupConverter x:Key="RawMaterialGroupConverter" />
-    </UserControl.Resources>
 
     <Border Style="{StaticResource CardStyle}">
         <DockPanel>
@@ -23,13 +19,9 @@
             </DockPanel>
 
             <!--
-                Grouped by type into collapsible Ingredients and Packaging sections, so the type
-                needs no column of its own: the Type column is only what the grouping keys on.
-                Sorted by name in the grid itself: a grouped grid places rows that arrive after
-                the first load (a refresh replacing a changed row) by its own sort, not by the
-                bound collection's order, so without one the order drifted between runs.
-                AllowDataShaping makes that sort apply to rows added or replaced while the app
-                runs too; by default the grid appended them to the end of their group.
+                Sorted by name in the grid itself. LiveDataUpdateMode="AllowDataShaping" makes that
+                sort apply live to rows added or replaced while the app runs too (a refresh replacing
+                a changed row); by default they landed at the end of the list instead of in order.
             -->
             <syncfusion:SfDataGrid ItemsSource="{Binding VisibleRawMaterials}"
                                    SelectedItem="{Binding SelectedRawMaterial, Mode=TwoWay}"
@@ -39,13 +31,7 @@
                                    AllowEditing="False"
                                    SelectionMode="Single"
                                    NavigationMode="Row"
-                                   LiveDataUpdateMode="AllowDataShaping"
-                                   AutoExpandGroups="True"
-                                   ShowColumnWhenGrouped="False"
-                                   GroupCaptionTextFormat="{}{Key} ({ItemsCount})">
-                <syncfusion:SfDataGrid.GroupColumnDescriptions>
-                    <syncfusion:GroupColumnDescription ColumnName="Type" Converter="{StaticResource RawMaterialGroupConverter}" />
-                </syncfusion:SfDataGrid.GroupColumnDescriptions>
+                                   LiveDataUpdateMode="AllowDataShaping">
                 <syncfusion:SfDataGrid.SortColumnDescriptions>
                     <syncfusion:SortColumnDescription ColumnName="Name" SortDirection="Ascending" />
                 </syncfusion:SfDataGrid.SortColumnDescriptions>
@@ -56,7 +42,6 @@
                         RawMaterialsView is Auto, so the card is as wide as these columns and never cuts one off.
                     -->
                     <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="220" />
-                    <syncfusion:GridTextColumn MappingName="Type" HeaderText="Type" />
                     <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="185" />
                     <controls:NumericColumn MappingName="CostPerBaseUnit" HeaderText="Cost" Width="96" NumberDecimalDigits="4" />
                     <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Buffered" Width="96" NumberDecimalDigits="4" />
