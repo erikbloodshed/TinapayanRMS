@@ -23,6 +23,8 @@
                                    ItemsSource="{Binding VisibleProducts}"
                                    SelectedItem="{Binding SelectedProduct, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
+                                   CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                   CurrentCellBorderThickness="1"
                                    controls:GridFillerRows.IsEnabled="True"
                                    AutoGenerateColumns="False"
                                    AllowEditing="False"

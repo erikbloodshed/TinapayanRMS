@@ -16,6 +16,8 @@
             <syncfusion:SfDataGrid ItemsSource="{Binding PriceHistory}"
                                    SelectedItem="{Binding SelectedPriceRow, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
+                                   CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                   CurrentCellBorderThickness="1"
                                    controls:GridFillerRows.IsEnabled="True"
                                    AutoGenerateColumns="False"
                                    AllowEditing="False"

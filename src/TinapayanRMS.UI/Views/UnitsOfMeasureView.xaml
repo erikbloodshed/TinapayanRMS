@@ -31,6 +31,8 @@
                                         ItemsSource="{Binding Units}"
                                         SelectedItem="{Binding SelectedUnit, Mode=TwoWay}"
                                         GridLinesVisibility="Both"
+                                        CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                        CurrentCellBorderThickness="1"
                                         controls:GridFillerRows.IsEnabled="True"
                                         AutoGenerateColumns="False"
                                         AllowEditing="False"

@@ -79,6 +79,8 @@
                                ItemsSource="{Binding LineEdits}"
                                SelectedItem="{Binding SelectedLineEdit, Mode=TwoWay}"
                                GridLinesVisibility="Both"
+                               CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                               CurrentCellBorderThickness="1"
                                AutoGenerateColumns="False"
                                AllowEditing="False"
                                SelectionMode="Single"

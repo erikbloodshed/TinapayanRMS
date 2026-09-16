@@ -26,6 +26,8 @@
             <syncfusion:SfDataGrid ItemsSource="{Binding VisibleRawMaterials}"
                                    SelectedItem="{Binding SelectedRawMaterial, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
+                                   CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                   CurrentCellBorderThickness="1"
                                    controls:GridFillerRows.IsEnabled="True"
                                    AutoGenerateColumns="False"
                                    AllowEditing="False"

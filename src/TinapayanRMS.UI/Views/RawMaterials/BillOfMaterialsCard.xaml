@@ -11,6 +11,8 @@
             <syncfusion:SfDataGrid ItemsSource="{Binding BomLineEdits}"
                                    SelectedItem="{Binding SelectedBomLineEdit, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
+                                   CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                   CurrentCellBorderThickness="1"
                                    controls:GridFillerRows.IsEnabled="True"
                                    AutoGenerateColumns="False"
                                    AllowEditing="True"
