@@ -48,6 +48,7 @@ public sealed class ProductUsageEdit
     /// <param name="subAssemblyId">The saved sub-assembly's id, or 0 for one of the product's own not saved yet.</param>
     /// <param name="ownerName">Null for the product's own sub-assembly; otherwise the product it's linked from.</param>
     /// <param name="linkedBy">For the product's own sub-assembly, the other products linking it.</param>
+    /// <param name="addIns">This product's own extra ingredients on top of a linked recipe; always empty for its own sub-assembly.</param>
     public ProductUsageEdit(
         int subAssemblyId,
         string name,
@@ -56,7 +57,8 @@ public sealed class ProductUsageEdit
         UsageAuthoredField authoredField,
         decimal authoredValue,
         string? ownerName,
-        IReadOnlyList<string> linkedBy)
+        IReadOnlyList<string> linkedBy,
+        IReadOnlyList<SubAssemblyLineEdit>? addIns = null)
     {
         SubAssemblyId = subAssemblyId;
         Name = name;
@@ -66,19 +68,19 @@ public sealed class ProductUsageEdit
         AuthoredValue = authoredValue;
         OwnerName = ownerName;
         LinkedBy = linkedBy;
+        AddIns = addIns ?? [];
 
-        (TotalWeight, TotalCost) = SubAssemblyRules.CalculateTotals([.. lines.Select(l => (l.Grams, l.Ingredient.BufferedCostPerBaseUnit))]);
+        // The sub-assembly's own batch, then this product's on top of it: add-ins go into the batch, so a
+        // piece takes its weight-per-piece share of the two together.
+        (BaseTotalWeight, var baseCost) = SubAssemblyRules.CalculateTotals([.. lines.Select(l => (l.Grams, l.Ingredient.BufferedCostPerBaseUnit))]);
+        (TotalWeight, TotalCost) = ProductRules.CalculateEffectiveBatch(
+            BaseTotalWeight, baseCost, [.. AddIns.Select(a => (a.Grams, a.Ingredient.BufferedCostPerBaseUnit))]);
         (WeightPerPiece, Yield) = ProductRules.ResolvePieceSize(authoredField, authoredValue, TotalWeight);
 
         // A batch that weighs nothing has nothing to share out per piece.
         if (TotalWeight > 0 && WeightPerPiece > 0)
         {
             CostPerPiece = ProductRules.CalculateUsageCostPerPiece(TotalCost, WeightPerPiece, TotalWeight);
-            IngredientRows = [.. lines.Select(l => new RecipeIngredientRow(l, WeightPerPiece, TotalWeight, CostPerPiece))];
-        }
-        else
-        {
-            IngredientRows = [];
         }
     }
 
@@ -93,6 +95,12 @@ public sealed class ProductUsageEdit
     public string RoleName => Role?.Name ?? string.Empty;
 
     public IReadOnlyList<SubAssemblyLineEdit> Lines { get; }
+
+    /// <summary>
+    /// This product's own extra ingredients on top of a recipe it links — a colouring, a flavouring, an
+    /// inclusion. Empty for a sub-assembly of the product's own, whose lines it edits directly.
+    /// </summary>
+    public IReadOnlyList<SubAssemblyLineEdit> AddIns { get; }
 
     /// <summary>Which figure the user typed; it stays put when the batch changes, and the other follows.</summary>
     public UsageAuthoredField AuthoredField { get; }
@@ -122,6 +130,10 @@ public sealed class ProductUsageEdit
 
     public string SharedText => $"Also used by {string.Join(", ", LinkedBy)}";
 
+    /// <summary>The sub-assembly's own batch, before this product's add-ins: what the form's caption compares against.</summary>
+    public decimal BaseTotalWeight { get; }
+
+    /// <summary>The batch a piece is cut from: the sub-assembly's own plus this product's add-ins.</summary>
     public decimal TotalWeight { get; }
 
     public decimal TotalCost { get; }
@@ -136,11 +148,6 @@ public sealed class ProductUsageEdit
     public bool IsWeightAuthored => AuthoredField == UsageAuthoredField.WeightPerPiece;
 
     public decimal CostPerPiece { get; }
-
-    public IReadOnlyList<RecipeIngredientRow> IngredientRows { get; }
-
-    /// <summary>The lines' shares added up, for the table's Total row: 100% whenever the sub-assembly costs anything.</summary>
-    public decimal PercentTotal => IngredientRows.Sum(r => r.PercentOfSection);
 
     /// <summary>E.g. "1,700 g batch".</summary>
     public string BatchText => $"{TotalWeight:#,0.##} g batch";
@@ -157,15 +164,17 @@ public sealed class ProductUsageEdit
     /// <summary>...and the pieces it makes.</summary>
     public string BaseEquivalentText => $"{Yield:#,0.##} pc";
 
-    /// <summary>The same section with other lines (repriced ingredients, or the owner's edits) or a new role.</summary>
-    public ProductUsageEdit With(SubAssemblyRole? role, IReadOnlyList<SubAssemblyLineEdit> lines, IReadOnlyList<string> linkedBy) =>
-        new(SubAssemblyId, Name, role, lines, AuthoredField, AuthoredValue, OwnerName, linkedBy);
+    /// <summary>The same section with other lines (repriced ingredients, or the owner's edits), add-ins or role.</summary>
+    public ProductUsageEdit With(
+        SubAssemblyRole? role, IReadOnlyList<SubAssemblyLineEdit> lines, IReadOnlyList<string> linkedBy, IReadOnlyList<SubAssemblyLineEdit>? addIns = null) =>
+        new(SubAssemblyId, Name, role, lines, AuthoredField, AuthoredValue, OwnerName, linkedBy, addIns ?? AddIns);
 
-    /// <summary>The same section at another piece size.</summary>
-    public ProductUsageEdit WithPieceSize(UsageAuthoredField authoredField, decimal authoredValue) =>
-        new(SubAssemblyId, Name, Role, Lines, authoredField, authoredValue, OwnerName, LinkedBy);
+    /// <summary>The same linked section at another piece size, with the add-ins the form now holds.</summary>
+    public ProductUsageEdit WithPieceSizeAndAddIns(
+        UsageAuthoredField authoredField, decimal authoredValue, IReadOnlyList<SubAssemblyLineEdit> addIns) =>
+        new(SubAssemblyId, Name, Role, Lines, authoredField, authoredValue, OwnerName, LinkedBy, addIns);
 
-    /// <summary>Whether <paramref name="other"/> shows the same thing: the same name, role, owner, sharing, piece size, and lines at the same costs.</summary>
+    /// <summary>Whether <paramref name="other"/> shows the same thing: the same name, role, owner, sharing, piece size, and lines and add-ins at the same costs.</summary>
     public bool ShowsSameAs(ProductUsageEdit other) =>
         SubAssemblyId == other.SubAssemblyId
         && Name == other.Name
@@ -175,33 +184,9 @@ public sealed class ProductUsageEdit
         && AuthoredField == other.AuthoredField
         && AuthoredValue == other.AuthoredValue
         && Lines.Count == other.Lines.Count
-        && Lines.Zip(other.Lines).All(pair => pair.First.Grams == pair.Second.Grams && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient));
-}
-
-/// <summary>One ingredient line of a sub-assembly in the Recipe Structure, scaled to one finished piece.</summary>
-public sealed class RecipeIngredientRow
-{
-    public RecipeIngredientRow(SubAssemblyLineEdit line, decimal weightPerPiece, decimal subAssemblyTotalWeight, decimal sectionCostPerPiece)
-    {
-        IngredientName = line.Ingredient.Name;
-        CostPerGram = line.Ingredient.BufferedCostPerBaseUnit;
-        GramsPerPiece = ProductRules.CalculateLineGramsPerPiece(line.Grams, weightPerPiece, subAssemblyTotalWeight);
-        CostPerPiece = ProductRules.CalculateLineCostPerPiece(line.Grams, CostPerGram, weightPerPiece, subAssemblyTotalWeight);
-        PercentOfSection = CostingRules.PercentOf(CostPerPiece, sectionCostPerPiece);
-    }
-
-    public string IngredientName { get; }
-
-    /// <summary>How many grams of the line go into one piece.</summary>
-    public decimal GramsPerPiece { get; }
-
-    /// <summary>What a gram of the ingredient costs, buffered: what recipes are costed with.</summary>
-    public decimal CostPerGram { get; }
-
-    public decimal CostPerPiece { get; }
-
-    /// <summary>This line's share of its sub-assembly's cost per piece.</summary>
-    public decimal PercentOfSection { get; }
+        && Lines.Zip(other.Lines).All(pair => pair.First.Grams == pair.Second.Grams && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient))
+        && AddIns.Count == other.AddIns.Count
+        && AddIns.Zip(other.AddIns).All(pair => pair.First.Grams == pair.Second.Grams && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient));
 }
 
 /// <summary>An in-memory (not yet saved) packaging line, shown in the Recipe Structure's Packaging section: quantities in one of the material's units.</summary>
@@ -439,6 +424,12 @@ public class ProductsViewModel : ViewModelBase
     /// <summary>The last tab other than Add Sub-Assembly that showed, for cancelling an add.</summary>
     private RecipeTab? _lastRecipeContentTab;
 
+    /// <summary>The tab whose form is open: the one a change of tab is leaving, whose form is applied on the way out.</summary>
+    private RecipeTab? _shownRecipeTab;
+
+    /// <summary>Set while a refused form puts the tab showing back, so the tab it puts back doesn't apply its own form again.</summary>
+    private bool _revertingRecipeTab;
+
     /// <summary>
     /// Set while the sections are rebuilt. The tab strip picks a neighbour when the tab showing is removed;
     /// that pick is ignored (Add Sub-Assembly would open the form), and ReselectRecipeTab picks one after.
@@ -471,6 +462,15 @@ public class ProductsViewModel : ViewModelBase
 
     /// <summary>The line the form table's add row edits: it prices itself as its ingredient is picked, before it's committed.</summary>
     public Func<IngredientLineRow> NewFormLine => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id));
+
+    /// <summary>
+    /// The form's add-ins, for a sub-assembly the product links: its own extras on top of the owner's
+    /// recipe, typed straight into their own table under it.
+    /// </summary>
+    public ObservableCollection<IngredientLineRow> FormAddIns { get; } = [];
+
+    /// <summary>The add-in the form table's add row edits, priced as its ingredient is picked.</summary>
+    public Func<IngredientLineRow> NewFormAddIn => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id));
 
     private string _searchText = string.Empty;
     public string SearchText
@@ -598,6 +598,27 @@ public class ProductsViewModel : ViewModelBase
     // The add/edit sub-assembly form: the section it edits (null when it adds one), and its fields.
     private ProductUsageEdit? _editingUsage;
 
+    /// <summary>
+    /// The section the form edits, or null while it adds one. A sub-assembly's tab is its form, so this is the
+    /// tab's own section whenever one shows; the form's header reads its name, badges and where it's linked from.
+    /// </summary>
+    public ProductUsageEdit? EditingUsage
+    {
+        get => _editingUsage;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _editingUsage, value);
+            this.RaisePropertyChanged(nameof(IsEditingLinkedUsage));
+        }
+    }
+
+    /// <summary>
+    /// The form edits a section linked from elsewhere, so Make a Copy has something to copy. A plain
+    /// <c>EditingUsage.IsLinked</c> binding can't say this: with no section it has no value at all, and the
+    /// button would fall back to showing.
+    /// </summary>
+    public bool IsEditingLinkedUsage => EditingUsage?.IsLinked == true;
+
     private bool _isUsageFormOpen;
     public bool IsUsageFormOpen
     {
@@ -628,12 +649,30 @@ public class ProductsViewModel : ViewModelBase
     }
 
     private bool _isFormEditingLines = true;
-    /// <summary>The form edits a sub-assembly of the product's own: its name, role and lines show.</summary>
+    /// <summary>The form edits a sub-assembly of the product's own: its name and role show, and its lines are typed into.</summary>
     public bool IsFormEditingLines
     {
         get => _isFormEditingLines;
-        private set => this.RaiseAndSetIfChanged(ref _isFormEditingLines, value);
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _isFormEditingLines, value);
+            this.RaisePropertyChanged(nameof(IsFormShowingLines));
+            this.RaisePropertyChanged(nameof(IsFormShowingAddIns));
+        }
     }
+
+    /// <summary>
+    /// The form's lines table shows: the product's own lines, to type into, or a linked one's, read-only. A link
+    /// has none to show until the sub-assembly it comes from has been picked and its lines loaded.
+    /// </summary>
+    public bool IsFormShowingLines => IsFormEditingLines || FormLines.Count > 0;
+
+    /// <summary>
+    /// The form's add-ins table shows: only for a sub-assembly the product links, and only once the recipe
+    /// it sits on top of is there to sit on. A sub-assembly of the product's own has no add-ins — its
+    /// extras just go in its lines.
+    /// </summary>
+    public bool IsFormShowingAddIns => !IsFormEditingLines && IsFormShowingLines;
 
     private bool _isFormPickingSource;
     /// <summary>The form links or copies an existing sub-assembly (another product's, or a standalone one): its picker shows.</summary>
@@ -665,14 +704,18 @@ public class ProductsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingUsageSource, value);
     }
 
-    /// <summary>The linked sub-assembly's lines, for the form's batch weight and preview (Link, and editing a linked section).</summary>
-    private IReadOnlyList<SubAssemblyLineEdit> _sourceLines = [];
-
     private IngredientLineRow? _selectedFormLine;
     public IngredientLineRow? SelectedFormLine
     {
         get => _selectedFormLine;
         set => this.RaiseAndSetIfChanged(ref _selectedFormLine, value);
+    }
+
+    private IngredientLineRow? _selectedFormAddIn;
+    public IngredientLineRow? SelectedFormAddIn
+    {
+        get => _selectedFormAddIn;
+        set => this.RaiseAndSetIfChanged(ref _selectedFormAddIn, value);
     }
 
     // The piece size: the user types either figure, and the other follows from the batch weight. Only
@@ -711,11 +754,27 @@ public class ProductsViewModel : ViewModelBase
     }
 
     private string _usageFormPreviewText = string.Empty;
-    /// <summary>What a piece of the form's sub-assembly costs, e.g. "₱0.5000 a piece".</summary>
+    /// <summary>What a piece of the form's sub-assembly costs, e.g. "₱0.5000 a piece": the add form's footer.</summary>
     public string UsageFormPreviewText
     {
         get => _usageFormPreviewText;
         private set => this.RaiseAndSetIfChanged(ref _usageFormPreviewText, value);
+    }
+
+    private string _usageFormAddInsCaption = string.Empty;
+    /// <summary>The batch the two tables come to, e.g. "1,700 g from Sweet Dough + 20 g of add-ins = a 1,720 g batch."</summary>
+    public string UsageFormAddInsCaption
+    {
+        get => _usageFormAddInsCaption;
+        private set => this.RaiseAndSetIfChanged(ref _usageFormAddInsCaption, value);
+    }
+
+    private string _usageFormCostPerPieceText = "—";
+    /// <summary>The same figure on its own, e.g. "₱0.5000": the form header's, for a section being edited.</summary>
+    public string UsageFormCostPerPieceText
+    {
+        get => _usageFormCostPerPieceText;
+        private set => this.RaiseAndSetIfChanged(ref _usageFormCostPerPieceText, value);
     }
 
     // The add/edit packaging form: the line it edits (null when it adds one), and its fields.
@@ -868,6 +927,8 @@ public class ProductsViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> ApplyUsageCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> CancelUsageCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormLineCommand { get; }
+
+    public ReactiveCommand<RxVoid, RxVoid> RemoveFormAddInCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddLineCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> EditLineCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
@@ -1000,6 +1061,16 @@ public class ProductsViewModel : ViewModelBase
                 FormLinesChanged();
             });
 
+        // An add-in picked, typed or deleted: it's priced, and the batch it joins follows.
+        FormAddIns.ToObservableChangeSet()
+            .AutoRefresh(l => l.IngredientId)
+            .AutoRefresh(l => l.Grams)
+            .Subscribe(_ =>
+            {
+                IngredientLineRow.Resolve(FormAddIns, Ingredients.ToDictionary(m => m.Id));
+                FormLinesChanged();
+            });
+
         this.WhenAnyValue(x => x.EditingUsageSource)
             .Skip(1)
             .Where(_ => !IsRefreshing && IsUsageFormOpen && IsAddingUsage)
@@ -1115,7 +1186,7 @@ public class ProductsViewModel : ViewModelBase
             // the Add Sub-Assembly tab opens one by itself.
             if (IsUsageFormOpen && !IsUsageFormUntouched())
             {
-                await ApplyUsageFormAsync();
+                ApplyUsageForm();
             }
 
             if (IsLineFormOpen)
@@ -1195,33 +1266,19 @@ public class ProductsViewModel : ViewModelBase
 
         AddUsageCommand = ReactiveCommand.Create(() => SelectRecipeTab(AddSubAssemblyTab));
 
-        // The form opens in the sub-assembly's own tab, in place of its lines.
-        EditUsageCommand = ReactiveCommand.Create<ProductUsageEdit>(usage =>
-        {
-            SelectRecipeTab(TabFor(usage));
-            _editingUsage = usage;
-            MarkEditingTab(usage);
-            IsAddingUsage = false;
-            UsageFormTitle = usage.IsOwned ? $"Edit {usage.Name}" : $"Edit {usage.Name} (from {usage.OwnerName})";
-            IsFormEditingLines = usage.IsOwned;
-            IsFormPickingSource = false;
-            EditingUsageSource = null;
-            EditingUsageName = usage.Name;
-            EditingUsageRole = Roles.FirstOrDefault(r => r.Id == usage.RoleId) ?? usage.Role;
-            FormLines.Clear();
-            FormLines.AddRange(usage.IsOwned ? usage.Lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams)) : []);
-            _sourceLines = usage.IsOwned ? [] : usage.Lines;
-            SelectedFormLine = null;
-            SetPieceSize(usage.AuthoredField, usage.AuthoredValue);
-            IsUsageFormOpen = true;
-        });
+        // A sub-assembly's tab is its form, so editing one is just showing its tab (RecipeTabShown opens the form).
+        EditUsageCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => SelectRecipeTab(TabFor(usage)));
 
         // A linked sub-assembly becomes the product's own copy, at the same piece size; saved with Save.
         MakeCopyCommand = ReactiveCommand.Create<ProductUsageEdit>(usage =>
         {
             var ownNames = UsageEdits.Where(u => u.IsOwned).Select(u => u.Name).ToList();
+
+            // Its add-ins become plain lines of the copy: the batch it was showing is the batch it keeps.
+            // Never a duplicate ingredient, since an add-in can't be one the recipe already has.
             var copy = new ProductUsageEdit(
-                0, SubAssemblyRules.UniqueName(usage.Name, ownNames), usage.Role, usage.Lines, usage.AuthoredField, usage.AuthoredValue, ownerName: null, linkedBy: []);
+                0, SubAssemblyRules.UniqueName(usage.Name, ownNames), usage.Role, [.. usage.Lines, .. usage.AddIns],
+                usage.AuthoredField, usage.AuthoredValue, ownerName: null, linkedBy: []);
             ReplaceUsage(usage, copy);
         });
 
@@ -1234,7 +1291,7 @@ public class ProductsViewModel : ViewModelBase
                 SubAssemblyRules.EnsureNotLinkedElsewhere(usage.Name, usage.LinkedBy);
             }
 
-            if (ReferenceEquals(usage, _editingUsage))
+            if (ReferenceEquals(usage, EditingUsage))
             {
                 CloseUsageForm();
             }
@@ -1253,10 +1310,22 @@ public class ProductsViewModel : ViewModelBase
             return Task.CompletedTask;
         }));
 
-        ApplyUsageCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(ApplyUsageFormAsync));
+        // Apply puts the form's sub-assembly in the recipe, then shows its tab, where its form stays open.
+        ApplyUsageCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() =>
+        {
+            SelectRecipeTab(TabFor(ApplyUsageForm()));
+            return Task.CompletedTask;
+        }));
 
         CancelUsageCommand = ReactiveCommand.Create(() =>
         {
+            // A section's tab has nothing else to show, so Cancel puts back what was last applied to it.
+            if (EditingUsage is { } editing)
+            {
+                OpenUsageForm(editing);
+                return;
+            }
+
             CloseUsageForm();
 
             // Cancelling an add goes back to the tab that showed before it.
@@ -1271,6 +1340,10 @@ public class ProductsViewModel : ViewModelBase
         RemoveFormLineCommand = ReactiveCommand.Create(
             () => { FormLines.Remove(SelectedFormLine!); },
             this.WhenAnyValue(x => x.SelectedFormLine).Select(line => line is not null));
+
+        RemoveFormAddInCommand = ReactiveCommand.Create(
+            () => { FormAddIns.Remove(SelectedFormAddIn!); },
+            this.WhenAnyValue(x => x.SelectedFormAddIn).Select(line => line is not null));
 
         AddLineCommand = ReactiveCommand.Create(
             () =>
@@ -1462,6 +1535,7 @@ public class ProductsViewModel : ViewModelBase
         var costing = await _costingParametersRepository.GetForProductAsync(product.Id, cancellationToken);
         var subAssemblyLines = await _subAssemblyLineRepository.GetForSubAssembliesAsync(
             [.. usages.Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
+        var addIns = await _usageRepository.GetAddInsForProductAsync(product.Id, cancellationToken);
         var linkedBy = await _subAssemblyRepository.GetLinkedByAsync(product.Id, cancellationToken);
 
         // Only the product picked last is shown; a newer pick cancels this load.
@@ -1470,7 +1544,7 @@ public class ProductsViewModel : ViewModelBase
         _detailProductId = product.Id;
         _linkedBy = linkedBy;
         SetPackagingLink(packagingLink);
-        ReplaceUsages(usages, subAssemblyLines);
+        ReplaceUsages(usages, subAssemblyLines, addIns);
         ReplaceLines(lines);
         SetCosting(costing);
         RefreshLinkableOptions();
@@ -1497,9 +1571,14 @@ public class ProductsViewModel : ViewModelBase
     }
 
     /// <summary>The saved usages as sections, in recipe order; they're also what Save compares the recipe against.</summary>
-    private void ReplaceUsages(IReadOnlyList<ProductSubAssemblyUsage> usages, IReadOnlyList<SubAssemblyLine> subAssemblyLines)
+    private void ReplaceUsages(
+        IReadOnlyList<ProductSubAssemblyUsage> usages, IReadOnlyList<SubAssemblyLine> subAssemblyLines, IReadOnlyList<UsageAddInLine> addIns)
     {
         var linesBySubAssembly = subAssemblyLines.ToLookup(l => l.SubAssemblyId);
+
+        // Add-ins key on the usage, not the sub-assembly: they're this product's own, so two products
+        // linking the same one have different sets.
+        var addInsByUsage = addIns.ToLookup(a => a.UsageId);
         var ingredientsById = Ingredients.ToDictionary(m => m.Id);
         var previousTab = SelectedRecipeTab;
 
@@ -1507,7 +1586,9 @@ public class ProductsViewModel : ViewModelBase
         try
         {
             UsageEdits.Clear();
-            foreach (var usage in usages.Select(u => ToUsageEdit(u, linesBySubAssembly[u.SubAssemblyId], ingredientsById)).Order(ProductUsageEdit.RecipeOrder))
+            foreach (var usage in usages
+                .Select(u => ToUsageEdit(u, linesBySubAssembly[u.SubAssemblyId], addInsByUsage[u.Id], ingredientsById))
+                .Order(ProductUsageEdit.RecipeOrder))
             {
                 UsageEdits.Add(usage);
             }
@@ -1521,7 +1602,11 @@ public class ProductsViewModel : ViewModelBase
         ReselectRecipeTab(previousTab, (previousTab as SubAssemblyRecipeTab)?.Usage);
     }
 
-    private ProductUsageEdit ToUsageEdit(ProductSubAssemblyUsage usage, IEnumerable<SubAssemblyLine> lines, IReadOnlyDictionary<int, RawMaterial> ingredientsById)
+    private ProductUsageEdit ToUsageEdit(
+        ProductSubAssemblyUsage usage,
+        IEnumerable<SubAssemblyLine> lines,
+        IEnumerable<UsageAddInLine> addIns,
+        IReadOnlyDictionary<int, RawMaterial> ingredientsById)
     {
         var subAssembly = usage.SubAssembly!;
         var isOwn = subAssembly.OwnerProductId == usage.ProductId;
@@ -1533,7 +1618,8 @@ public class ProductsViewModel : ViewModelBase
             usage.AuthoredField,
             usage.AuthoredValue,
             isOwn ? null : ProductUsageEdit.SourceNameOf(subAssembly),
-            isOwn ? _linkedBy.GetValueOrDefault(subAssembly.Id) ?? [] : []);
+            isOwn ? _linkedBy.GetValueOrDefault(subAssembly.Id) ?? [] : [],
+            [.. addIns.Select(a => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(a.IngredientId) ?? a.Ingredient!, a.Grams))]);
     }
 
     private void ReplaceLines(IReadOnlyList<PackagingLine> lines)
@@ -1573,11 +1659,24 @@ public class ProductsViewModel : ViewModelBase
         new(
             [.. UsageEdits.Where(u => u.IsOwned).Select(u => new OwnedSubAssemblyDraft(
                 u.SubAssemblyId, u.Name, u.RoleId, [.. u.Lines.Select(l => (l.Ingredient.Id, l.Grams))], u.AuthoredField, u.AuthoredValue))],
-            [.. UsageEdits.Where(u => u.IsLinked).Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue))]);
+            [.. UsageEdits.Where(u => u.IsLinked).Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
+            {
+                AddIns = [.. u.AddIns.Select(a => (a.Ingredient.Id, a.Grams))],
+            })]);
 
-    /// <summary>Whether two recipes would save the same: the same sub-assemblies, names, roles, lines and piece sizes, in the same order.</summary>
+    /// <summary>
+    /// Whether two recipes would save the same: the same sub-assemblies, names, roles, lines, add-ins and
+    /// piece sizes, in the same order. A linked draft is compared field by field rather than as a record,
+    /// as an owned one already is: a record's own Equals compares its AddIns list by reference, which no
+    /// two recipes built separately ever share, so Save would write the recipe every time.
+    /// </summary>
     private static bool IsSameRecipe(RecipeDraft a, RecipeDraft b) =>
-        a.Linked.SequenceEqual(b.Linked)
+        a.Linked.Count == b.Linked.Count
+        && a.Linked.Zip(b.Linked).All(pair =>
+            pair.First.SubAssemblyId == pair.Second.SubAssemblyId
+            && pair.First.AuthoredField == pair.Second.AuthoredField
+            && pair.First.AuthoredValue == pair.Second.AuthoredValue
+            && pair.First.AddIns.SequenceEqual(pair.Second.AddIns))
         && a.Owned.Count == b.Owned.Count
         && a.Owned.Zip(b.Owned).All(pair =>
             pair.First.Id == pair.Second.Id
@@ -1619,8 +1718,9 @@ public class ProductsViewModel : ViewModelBase
         EditingUsageName = string.Empty;
         EditingUsageRole = Roles.FirstOrDefault();
         FormLines.Clear();
-        _sourceLines = [];
+        FormAddIns.Clear();
         SelectedFormLine = null;
+        SelectedFormAddIn = null;
         RefreshLinkableOptions();
         EditingUsageSource = null;
         SetPieceSize(UsageAuthoredField.WeightPerPiece, 0m);
@@ -1648,30 +1748,30 @@ public class ProductsViewModel : ViewModelBase
             return;
         }
 
-        _sourceLines = lines;
-        if (EditingUsageMode.Mode == UsageFormMode.Copy)
+        ShowFormLines(lines);
+        if (EditingUsageMode.Mode == UsageFormMode.Copy && source is not null)
         {
-            FormLines.Clear();
-            FormLines.AddRange(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams)));
-            if (source is not null)
-            {
-                EditingUsageName = SubAssemblyRules.UniqueName(source.SubAssembly.Name, [.. UsageEdits.Where(u => u.IsOwned).Select(u => u.Name)]);
-                EditingUsageRole = Roles.FirstOrDefault(r => r.Id == source.SubAssembly.RoleId) ?? EditingUsageRole;
-            }
+            EditingUsageName = SubAssemblyRules.UniqueName(source.SubAssembly.Name, [.. UsageEdits.Where(u => u.IsOwned).Select(u => u.Name)]);
+            EditingUsageRole = Roles.FirstOrDefault(r => r.Id == source.SubAssembly.RoleId) ?? EditingUsageRole;
         }
 
         FormLinesChanged();
     }
 
-    private async Task ApplyUsageFormAsync()
+    /// <summary>
+    /// Puts the form's sub-assembly in the recipe and closes the form, without moving the tab showing: the caller
+    /// decides which tab follows, since Apply shows the sub-assembly's own and a tab change shows the one left for.
+    /// An edit that changes nothing is left alone, so merely looking at a section doesn't churn the recipe.
+    /// </summary>
+    private ProductUsageEdit ApplyUsageForm()
     {
         var authoredValue = CurrentAuthoredValue();
         ProductUsageEdit usage;
 
-        if (_editingUsage is { IsLinked: true } linked)
+        if (EditingUsage is { IsLinked: true } linked)
         {
             EnsurePieceSizeEntered(authoredValue, linked.Name);
-            usage = linked.WithPieceSize(_usageAuthoredField, authoredValue);
+            usage = linked.WithPieceSizeAndAddIns(_usageAuthoredField, authoredValue, CompleteAddIns(linked.Name, linked.Lines));
         }
         else if (IsFormEditingLines)
         {
@@ -1688,11 +1788,11 @@ public class ProductsViewModel : ViewModelBase
                 throw new InvalidOperationException($"Add the ingredients that go into {name}, in grams.");
             }
 
-            SubAssemblyRules.EnsureValidOwnedNames([.. UsageEdits.Where(u => u.IsOwned && !ReferenceEquals(u, _editingUsage)).Select(u => u.Name), name]);
+            SubAssemblyRules.EnsureValidOwnedNames([.. UsageEdits.Where(u => u.IsOwned && !ReferenceEquals(u, EditingUsage)).Select(u => u.Name), name]);
             EnsurePieceSizeEntered(authoredValue, name);
 
             usage = new ProductUsageEdit(
-                _editingUsage?.SubAssemblyId ?? 0, name, EditingUsageRole, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams))], _usageAuthoredField, authoredValue, ownerName: null, _editingUsage?.LinkedBy ?? []);
+                EditingUsage?.SubAssemblyId ?? 0, name, EditingUsageRole, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams))], _usageAuthoredField, authoredValue, ownerName: null, EditingUsage?.LinkedBy ?? []);
         }
         else
         {
@@ -1700,23 +1800,37 @@ public class ProductsViewModel : ViewModelBase
                 ?? throw new InvalidOperationException("Pick the sub-assembly to link, or cancel the form.");
             EnsurePieceSizeEntered(authoredValue, source.Name);
 
-            // Fetched again rather than trusting a pick that may still be loading its lines.
-            var saved = await _subAssemblyLineRepository.GetForSubAssembliesAsync([source.Id], CancellationToken.None);
-            var ingredientsById = Ingredients.ToDictionary(m => m.Id);
+            // The table's read-only lines are the ones LoadUsageSourceAsync loaded for this very pick; a pick
+            // whose lines are still on their way has none yet, and linking it would make a batch of nothing.
+            if (FormLines.Count == 0)
+            {
+                throw new InvalidOperationException($"{source.Name} is still loading its ingredients. Try again in a moment.");
+            }
+
+            IReadOnlyList<SubAssemblyLineEdit> sourceLines =
+                [.. FormLines.Where(l => l.Ingredient is not null).Select(l => new SubAssemblyLineEdit(l.Ingredient!, l.Grams))];
+
             usage = new ProductUsageEdit(
                 source.Id,
                 source.Name,
                 Roles.FirstOrDefault(r => r.Id == source.RoleId) ?? source.Role,
-                [.. saved.Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams))],
+                sourceLines,
                 _usageAuthoredField,
                 authoredValue,
                 ProductUsageEdit.SourceNameOf(source),
-                linkedBy: []);
+                linkedBy: [],
+                CompleteAddIns(source.Name, sourceLines));
         }
 
-        if (_editingUsage is not null)
+        if (EditingUsage is { } editing)
         {
-            ReplaceInRecipeOrder(_editingUsage, usage);
+            if (usage.ShowsSameAs(editing))
+            {
+                CloseUsageForm();
+                return editing;
+            }
+
+            ReplaceInRecipeOrder(editing, usage);
         }
         else
         {
@@ -1724,9 +1838,56 @@ public class ProductsViewModel : ViewModelBase
         }
 
         CloseUsageForm();
-        SelectRecipeTab(TabFor(usage));
         RefreshLinkableOptions();
         RecomputeRecipe();
+        return usage;
+    }
+
+    /// <summary>
+    /// Applies the form of a tab being left, so nothing typed into it is lost (the grids commit the same way when
+    /// focus leaves them). False when a rule refused it: the message shows and the caller stays on the tab.
+    /// </summary>
+    private bool CommitUsageFormOnLeave()
+    {
+        if (!IsUsageFormOpen)
+        {
+            return true;
+        }
+
+        // An add form nothing was entered in was opened by the Add Sub-Assembly tab, not by the user.
+        if (IsUsageFormUntouched())
+        {
+            CloseUsageForm();
+            return true;
+        }
+
+        try
+        {
+            ErrorMessage = null;
+            ApplyUsageForm();
+            return true;
+        }
+        catch (InvalidOperationException ex)
+        {
+            ErrorMessage = ex.Message;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The add-ins table as lines, refused if one is an ingredient <paramref name="baseLines"/> already has.
+    /// The repository checks the same rule as it writes them; this is what puts the message on the screen
+    /// the moment Apply is pressed, or the tab is left.
+    /// </summary>
+    private IReadOnlyList<SubAssemblyLineEdit> CompleteAddIns(string subAssemblyName, IReadOnlyList<SubAssemblyLineEdit> baseLines)
+    {
+        var addIns = IngredientLineRow.CompleteLines(FormAddIns, subAssemblyName);
+        ProductRules.EnsureValidAddIns(
+            [.. addIns.Select(a => (a.Ingredient.Id, a.Grams, a.Ingredient.Name))],
+            subAssemblyName,
+            [.. baseLines.Select(l => l.Ingredient.Id)]);
+
+        return [.. addIns.Select(a => new SubAssemblyLineEdit(a.Ingredient, a.Grams))];
     }
 
     private static void EnsurePieceSizeEntered(decimal authoredValue, string name)
@@ -1740,15 +1901,35 @@ public class ProductsViewModel : ViewModelBase
     private void CloseUsageForm()
     {
         IsUsageFormOpen = false;
-        _editingUsage = null;
-        MarkEditingTab(null);
+        EditingUsage = null;
+    }
+
+    /// <summary>The form on <paramref name="usage"/>, as it was last applied: the whole of its tab.</summary>
+    private void OpenUsageForm(ProductUsageEdit usage)
+    {
+        EditingUsage = usage;
+        IsAddingUsage = false;
+        UsageFormTitle = usage.IsOwned ? $"Edit {usage.Name}" : $"Edit {usage.Name} (from {usage.OwnerName})";
+        IsFormEditingLines = usage.IsOwned;
+        IsFormPickingSource = false;
+        EditingUsageSource = null;
+        EditingUsageName = usage.Name;
+        EditingUsageRole = Roles.FirstOrDefault(r => r.Id == usage.RoleId) ?? usage.Role;
+
+        // A linked one's lines show too, read-only: they're its owner's. What is this product's is its piece
+        // size and its add-ins, which go in the table under them.
+        ShowFormLines(usage.Lines);
+        ShowFormAddIns(usage.AddIns);
+        SelectedFormLine = null;
+        SelectedFormAddIn = null;
+        SetPieceSize(usage.AuthoredField, usage.AuthoredValue);
+        IsUsageFormOpen = true;
     }
 
     /// <summary>A fresh form to add a sub-assembly, in place of any the form had open.</summary>
     private void StartAddingUsage()
     {
-        _editingUsage = null;
-        MarkEditingTab(null);
+        EditingUsage = null;
         UsageFormTitle = "Add Sub-Assembly";
         IsAddingUsage = true;
         EditingUsageMode = UsageFormModeOption.All[0];
@@ -1762,11 +1943,14 @@ public class ProductsViewModel : ViewModelBase
         && string.IsNullOrWhiteSpace(EditingUsageName)
         && EditingUsageSource is null
         && FormLines.All(l => l.IngredientId is null && l.Grams == 0)
+        && FormAddIns.All(l => l.IngredientId is null && l.Grams == 0)
         && CurrentAuthoredValue() == 0;
 
     /// <summary>The form's lines changed, or its source's were loaded: the batch weight, the other piece-size figure and the preview follow.</summary>
     private void FormLinesChanged()
     {
+        this.RaisePropertyChanged(nameof(IsFormShowingLines));
+        this.RaisePropertyChanged(nameof(IsFormShowingAddIns));
         _syncingPieceSize = true;
         try
         {
@@ -1840,13 +2024,13 @@ public class ProductsViewModel : ViewModelBase
         _usageAuthoredField == UsageAuthoredField.WeightPerPiece ? EditingUsageWeightPerPiece : EditingUsageYield;
 
     /// <summary>
-    /// The form's batch, as each line's grams and buffered cost per gram: its own lines for a sub-assembly of the
-    /// product's (those with an ingredient picked), the linked one's otherwise.
+    /// The form's batch, as each line's grams and buffered cost per gram: both its tables, the recipe and
+    /// this product's add-ins on top of it, leaving out any row with no ingredient picked yet. Everything
+    /// the form works out from the batch — the total weight, the other piece-size figure, the caption and
+    /// the cost preview — reads it here, so add-ins reach all of them at once.
     /// </summary>
     private IReadOnlyList<(decimal Grams, decimal CostPerGram)> UsageFormBatch() =>
-        IsFormEditingLines
-            ? [.. FormLines.Where(l => l.Ingredient is not null).Select(l => (l.Grams, l.Ingredient!.BufferedCostPerBaseUnit))]
-            : [.. _sourceLines.Select(l => (l.Grams, l.Ingredient.BufferedCostPerBaseUnit))];
+        [.. FormLines.Concat(FormAddIns).Where(l => l.Ingredient is not null).Select(l => (l.Grams, l.Ingredient!.BufferedCostPerBaseUnit))];
 
     /// <summary>The form's batch weight, which figure stays put, and what a piece costs.</summary>
     private void RecomputeUsageForm()
@@ -1861,9 +2045,20 @@ public class ProductsViewModel : ViewModelBase
             : _usageAuthoredField == UsageAuthoredField.WeightPerPiece
                 ? $"Weight per piece stays at {authoredValue:#,0.##} g if the batch changes."
                 : $"The yield stays at {authoredValue:#,0.##} pieces if the batch changes.";
-        UsageFormPreviewText = totalWeight > 0 && weightPerPiece > 0
-            ? $"₱{ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight):N4} a piece"
-            : string.Empty;
+
+        var costPerPiece = totalWeight > 0 && weightPerPiece > 0
+            ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight)
+            : (decimal?)null;
+        UsageFormPreviewText = costPerPiece is { } preview ? $"₱{preview:N4} a piece" : string.Empty;
+        UsageFormCostPerPieceText = costPerPiece is { } figure ? $"₱{figure:N4}" : "—";
+
+        // The arithmetic of the two tables, in words: the recipe's grams, this product's on top, the batch.
+        var recipeName = EditingUsage?.Name ?? EditingUsageSource?.SubAssembly.Name ?? "the recipe";
+        var addInWeight = FormAddIns.Where(l => l.Ingredient is not null).Sum(l => l.Grams);
+        var baseWeight = totalWeight - addInWeight;
+        UsageFormAddInsCaption = addInWeight > 0
+            ? $"{baseWeight:#,0.##} g from {recipeName} + {addInWeight:#,0.##} g of add-ins = a {totalWeight:#,0.##} g batch."
+            : $"Nothing extra yet — the batch is {recipeName}'s {baseWeight:#,0.##} g.";
     }
 
     private void ApplyLineForm()
@@ -1918,7 +2113,8 @@ public class ProductsViewModel : ViewModelBase
 
     private void ReplaceUsage(ProductUsageEdit old, ProductUsageEdit replacement)
     {
-        if (ReferenceEquals(old, _editingUsage))
+        var wasEditing = ReferenceEquals(old, EditingUsage);
+        if (wasEditing)
         {
             CloseUsageForm();
         }
@@ -1926,6 +2122,12 @@ public class ProductsViewModel : ViewModelBase
         ReplaceInRecipeOrder(old, replacement);
         RefreshLinkableOptions();
         RecomputeRecipe();
+
+        // Its tab is its form, so the form opens again on what took its place.
+        if (wasEditing)
+        {
+            OpenUsageForm(replacement);
+        }
     }
 
     /// <summary>
@@ -1978,9 +2180,15 @@ public class ProductsViewModel : ViewModelBase
             {
                 var replacement = (ProductUsageEdit)e.NewItems![0]!;
                 ((SubAssemblyRecipeTab)RecipeTabs[e.NewStartingIndex]).Usage = replacement;
-                if (ReferenceEquals(e.OldItems![0], _editingUsage))
+                if (ReferenceEquals(e.OldItems![0], EditingUsage))
                 {
-                    _editingUsage = replacement;
+                    EditingUsage = replacement;
+
+                    // A linked one's lines aren't the form's to keep: show the owner's, as they now are.
+                    if (replacement.IsLinked)
+                    {
+                        ShowFormLines(replacement.Lines);
+                    }
                 }
 
                 break;
@@ -2003,15 +2211,6 @@ public class ProductsViewModel : ViewModelBase
     private SubAssemblyRecipeTab TabFor(ProductUsageEdit usage) =>
         RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => ReferenceEquals(t.Usage, usage));
 
-    /// <summary>Shows the sub-assembly form in <paramref name="usage"/>'s tab, or in none.</summary>
-    private void MarkEditingTab(ProductUsageEdit? usage)
-    {
-        foreach (var tab in RecipeTabs.OfType<SubAssemblyRecipeTab>())
-        {
-            tab.IsEditing = usage is not null && ReferenceEquals(tab.Usage, usage);
-        }
-    }
-
     /// <summary>Shows <paramref name="tab"/>, and does what showing it does even when it was already showing.</summary>
     private void SelectRecipeTab(RecipeTab tab)
     {
@@ -2020,35 +2219,61 @@ public class ProductsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// A tab was picked, by the user or the screen. Add Sub-Assembly opens the form to add one (a form already
-    /// adding one is left as it is). Any other tab closes an add form nothing was entered in, so a form still
-    /// open is always one Save should apply.
+    /// A tab was picked, by the user or the screen. Leaving one applies the form it was showing, so nothing typed
+    /// is lost; a rule refusing it keeps the tab it was on, with the message shown. A sub-assembly's tab then
+    /// opens its form, which is all it shows, and Add Sub-Assembly opens a form to add one (a form already adding
+    /// one is left as it is). So a form still open is always one Save should apply.
     /// </summary>
     private void RecipeTabShown(RecipeTab? tab)
     {
-        if (_arrangingRecipeTabs)
+        if (_arrangingRecipeTabs || _revertingRecipeTab)
         {
             return;
         }
 
-        if (tab is AddSubAssemblyRecipeTab)
+        if (!ReferenceEquals(_shownRecipeTab, tab) && !CommitUsageFormOnLeave())
         {
-            if (!IsUsageFormOpen || !IsAddingUsage)
+            _revertingRecipeTab = true;
+            try
             {
-                StartAddingUsage();
+                SelectedRecipeTab = _shownRecipeTab;
+            }
+            finally
+            {
+                _revertingRecipeTab = false;
             }
 
             return;
         }
 
-        if (tab is not null)
-        {
-            _lastRecipeContentTab = tab;
-        }
+        _shownRecipeTab = tab;
 
-        if (IsUsageFormOpen && IsUsageFormUntouched())
+        switch (tab)
         {
-            CloseUsageForm();
+            case SubAssemblyRecipeTab subAssembly:
+                _lastRecipeContentTab = tab;
+                if (!ReferenceEquals(EditingUsage, subAssembly.Usage))
+                {
+                    OpenUsageForm(subAssembly.Usage);
+                }
+
+                break;
+
+            case AddSubAssemblyRecipeTab:
+                if (!IsUsageFormOpen || !IsAddingUsage)
+                {
+                    StartAddingUsage();
+                }
+
+                break;
+
+            default:
+                if (tab is not null)
+                {
+                    _lastRecipeContentTab = tab;
+                }
+
+                break;
         }
     }
 
@@ -2136,6 +2361,8 @@ public class ProductsViewModel : ViewModelBase
                     continue;
                 }
 
+                // Its lines come fresh from its owner; its add-ins are this product's own, so they only
+                // need their ingredients' new costs.
                 fresh = new ProductUsageEdit(
                     subAssembly.Id,
                     subAssembly.Name,
@@ -2144,7 +2371,8 @@ public class ProductsViewModel : ViewModelBase
                     edit.AuthoredField,
                     edit.AuthoredValue,
                     ProductUsageEdit.SourceNameOf(subAssembly),
-                    linkedBy: []);
+                    linkedBy: [],
+                    Repriced(edit.AddIns, ingredientsById));
             }
             else
             {
@@ -2197,12 +2425,29 @@ public class ProductsViewModel : ViewModelBase
         }
     }
 
-    /// <summary>The form's lines, and a linked section's, at their ingredients' refreshed costs.</summary>
+    /// <summary>
+    /// The form's lines and add-ins at their ingredients' refreshed costs. It reprices in place rather than
+    /// refilling the tables, so a refresh arriving while an add-in is being typed doesn't throw it away.
+    /// </summary>
     private void RefreshFormLines()
     {
         var ingredientsById = Ingredients.ToDictionary(m => m.Id);
         IngredientLineRow.Resolve(FormLines, ingredientsById);
-        _sourceLines = Repriced(_sourceLines, ingredientsById);
+        IngredientLineRow.Resolve(FormAddIns, ingredientsById);
+    }
+
+    /// <summary>Puts <paramref name="lines"/> in the form's table, in place of whatever it held.</summary>
+    private void ShowFormLines(IEnumerable<SubAssemblyLineEdit> lines)
+    {
+        FormLines.Clear();
+        FormLines.AddRange(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams)));
+    }
+
+    /// <summary>The same for the add-ins table under it.</summary>
+    private void ShowFormAddIns(IEnumerable<SubAssemblyLineEdit> addIns)
+    {
+        FormAddIns.Clear();
+        FormAddIns.AddRange(addIns.Select(a => new IngredientLineRow(a.Ingredient, a.Grams)));
     }
 
     /// <summary><paramref name="lines"/> with each ingredient swapped for its refreshed copy when that differs; unchanged lines are kept as they are.</summary>

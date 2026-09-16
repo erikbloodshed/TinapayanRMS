@@ -223,6 +223,58 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
     }
 
     [Fact]
+    public async Task A_clone_keeps_a_standalone_links_add_ins()
+    {
+        var glazeRoleId = await AddRoleAsync("Glaze");
+        var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
+        var ubeId = await AddIngredientAsync("Ube Flavour", costPerGram: 0.8m);
+        var glazeId = await SaveStandaloneAsync("Glaze", glazeRoleId, [(sugarId, 100m)]);
+        var productId = await AddProductAsync("Cream Loaf");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [],
+            [new LinkedUsageDraft(glazeId, UsageAuthoredField.WeightPerPiece, 5m) { AddIns = [(ubeId, 20m)] }]));
+
+        var cloneId = await new ProductCloner(CreateDbContextFactory()).CloneAsync(productId, "Cream Loaf Mini", Cancellation);
+
+        // Still a link, so the extras stay extras: the clone puts the same ube in its own glaze.
+        await using var dbContext = CreateDbContext();
+        var addIns = await dbContext.UsageAddInLines.AsNoTracking()
+            .Where(l => l.Usage!.ProductId == cloneId)
+            .ToListAsync(Cancellation);
+        addIns.Select(l => (l.IngredientId, l.Grams)).Should().Equal((ubeId, 20m));
+        (await dbContext.SubAssemblyLines.CountAsync(l => l.SubAssemblyId == glazeId, Cancellation))
+            .Should().Be(1, "the shared glaze itself is untouched");
+    }
+
+    [Fact]
+    public async Task A_clone_folds_another_products_add_ins_into_its_own_copy_of_the_sub_assembly()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var ubeId = await AddIngredientAsync("Ube Flavour", costPerGram: 0.8m);
+        var (ownerId, doughId) = await AddProductWithSubAssemblyAsync(
+            "Cream Loaf", "Sweet Dough", doughRoleId, [(flourId, 1000m)], weightPerPiece: 60m);
+        var linkerId = await AddProductAsync("Cream Loaf Ube");
+        await SaveRecipeAsync(linkerId, new RecipeDraft(
+            [],
+            [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m) { AddIns = [(ubeId, 20m)] }]));
+
+        var cloneId = await new ProductCloner(CreateDbContextFactory()).CloneAsync(linkerId, "Cream Loaf Ube Mini", Cancellation);
+
+        // The link is broken, so the add-ins become plain lines: the batch it had is the batch it keeps.
+        var usage = (await CreateUsageRepository().GetForProductAsync(cloneId, Cancellation)).Should().ContainSingle().Subject;
+        usage.SubAssembly!.OwnerProductId.Should().Be(cloneId);
+        usage.SubAssembly.TotalWeight.Should().Be(1020m, "1,000 g of dough plus the 20 g of ube it was adding");
+        usage.SubAssembly.TotalCost.Should().Be(66m, "1000*0.05 + 20*0.80");
+
+        await using var dbContext = CreateDbContext();
+        (await dbContext.UsageAddInLines.CountAsync(l => l.Usage!.ProductId == cloneId, Cancellation))
+            .Should().Be(0, "a sub-assembly of the product's own has no add-ins; its lines are its own");
+        (await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == doughId, Cancellation))
+            .TotalWeight.Should().Be(1000m, "the source dough is untouched");
+    }
+
+    [Fact]
     public async Task Repricing_an_ingredient_reprices_a_standalone_sub_assembly()
     {
         var roleId = await AddRoleAsync("Glaze");

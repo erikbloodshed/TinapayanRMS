@@ -16,7 +16,15 @@ public sealed record OwnedSubAssemblyDraft(
     decimal AuthoredValue);
 
 /// <summary>A sub-assembly the product links (another product's, or a standalone one), at the product's own piece size.</summary>
-public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField AuthoredField, decimal AuthoredValue);
+public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField AuthoredField, decimal AuthoredValue)
+{
+    /// <summary>
+    /// This product's own extra ingredients on top of the linked recipe, in grams, and never one the recipe
+    /// already has (ProductRules.EnsureValidAddIns). They go into the batch, so the piece size shares out the
+    /// owner's lines plus these. Empty for a usage that takes the recipe as it is.
+    /// </summary>
+    public IReadOnlyList<(int IngredientId, decimal Grams)> AddIns { get; init; } = [];
+}
 
 /// <summary>
 /// A product's whole recipe of sub-assemblies: the ones it owns and the ones it links. Saving it replaces

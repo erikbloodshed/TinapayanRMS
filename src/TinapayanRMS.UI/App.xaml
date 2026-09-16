@@ -6,6 +6,7 @@
              xmlns:sys="clr-namespace:System.Windows.Controls;assembly=PresentationFramework">
     <Application.Resources>
         <sys:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <converters:AddNewRowPositionConverter x:Key="AddNewRowPositionConverter" />
         <converters:EmptyStateVisibilityConverter x:Key="EmptyStateVisibilityConverter" />
         <converters:NotNullToVisibilityConverter x:Key="NotNullToVisibilityConverter" />
 

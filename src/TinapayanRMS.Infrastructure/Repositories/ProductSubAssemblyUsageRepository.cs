@@ -20,6 +20,19 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductAsync(int productId, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        // The Ingredient comes with it: every add-in is priced from its BufferedCostPerBaseUnit on read.
+        return await dbContext.UsageAddInLines
+            .AsNoTracking()
+            .Include(l => l.Ingredient)
+            .Where(l => l.Usage!.ProductId == productId)
+            .OrderBy(l => l.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     /// <summary>
     /// Replaces the product's recipe on the caller's context, which should hold a transaction: its usages,
     /// and its own sub-assemblies — updated, added and relined as <paramref name="recipe"/> lists them,
@@ -65,20 +78,45 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
         }
 
         var linkedIds = recipe.Linked.Select(l => l.SubAssemblyId).ToList();
-        var ownerByLinkedId = await dbContext.SubAssemblies
+        var linkedSubAssemblies = await dbContext.SubAssemblies
             .Where(s => linkedIds.Contains(s.Id))
-            .ToDictionaryAsync(s => s.Id, s => s.OwnerProductId, cancellationToken);
+            .Select(s => new { s.Id, s.Name, s.OwnerProductId })
+            .ToDictionaryAsync(s => s.Id, cancellationToken);
 
         foreach (var id in linkedIds)
         {
-            if (!ownerByLinkedId.TryGetValue(id, out var ownerId))
+            if (!linkedSubAssemblies.TryGetValue(id, out var linked))
             {
                 throw new InvalidOperationException($"Sub-assembly {id} does not exist.");
             }
 
-            if (ownerId == productId)
+            if (linked.OwnerProductId == productId)
             {
                 throw new InvalidOperationException("A product uses its own sub-assemblies directly; it can't link one.");
+            }
+        }
+
+        // Add-ins go on top of a linked recipe, so they're only for what it doesn't already have. Checked
+        // here, before anything is deleted; SetLinesAsync checks them again as it writes them.
+        if (recipe.Linked.Any(l => l.AddIns.Count > 0))
+        {
+            var baseIngredientIds = (await dbContext.SubAssemblyLines
+                    .Where(l => linkedIds.Contains(l.SubAssemblyId))
+                    .Select(l => new { l.SubAssemblyId, l.IngredientId })
+                    .ToListAsync(cancellationToken))
+                .ToLookup(l => l.SubAssemblyId, l => l.IngredientId);
+
+            var addInIds = recipe.Linked.SelectMany(l => l.AddIns.Select(a => a.IngredientId)).Distinct().ToList();
+            var addInNames = await dbContext.RawMaterials
+                .Where(m => addInIds.Contains(m.Id))
+                .ToDictionaryAsync(m => m.Id, m => m.Name, cancellationToken);
+
+            foreach (var link in recipe.Linked.Where(l => l.AddIns.Count > 0))
+            {
+                ProductRules.EnsureValidAddIns(
+                    [.. link.AddIns.Select(a => (a.IngredientId, a.Grams, addInNames.GetValueOrDefault(a.IngredientId, $"Ingredient {a.IngredientId}")))],
+                    linkedSubAssemblies[link.SubAssemblyId].Name,
+                    [.. baseIngredientIds[link.SubAssemblyId]]);
             }
         }
 
@@ -131,13 +169,30 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             });
         }
 
-        dbContext.ProductSubAssemblyUsages.AddRange(recipe.Linked.Select(l => new ProductSubAssemblyUsage
+        // The linked usages go in together, then one save gives every one of them the id its add-ins need.
+        // (An owned sub-assembly is saved one at a time above, because each one's lines must be written
+        // before the next one's name is checked.)
+        List<(LinkedUsageDraft Draft, ProductSubAssemblyUsage Usage)> linkedUsages =
+        [
+            .. recipe.Linked.Select(l => (l, new ProductSubAssemblyUsage
+            {
+                ProductId = productId,
+                SubAssemblyId = l.SubAssemblyId,
+                AuthoredField = l.AuthoredField,
+                AuthoredValue = l.AuthoredValue,
+            })),
+        ];
+
+        dbContext.ProductSubAssemblyUsages.AddRange(linkedUsages.Select(p => p.Usage));
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        // This product's own extra ingredients on top of a linked recipe. They belong to the usage, not to
+        // the sub-assembly, so two products linking the same one each keep their own.
+        foreach (var (draft, usage) in linkedUsages.Where(p => p.Draft.AddIns.Count > 0))
         {
-            ProductId = productId,
-            SubAssemblyId = l.SubAssemblyId,
-            AuthoredField = l.AuthoredField,
-            AuthoredValue = l.AuthoredValue,
-        }));
+            await UsageAddInLineRepository.SetLinesAsync(
+                dbContext, usage, linkedSubAssemblies[usage.SubAssemblyId].Name, draft.AddIns, cancellationToken);
+        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

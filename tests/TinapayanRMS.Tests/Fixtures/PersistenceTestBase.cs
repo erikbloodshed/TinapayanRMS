@@ -154,6 +154,16 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
             .SingleAsync(Cancellation);
     }
 
+    /// <summary>The id of <paramref name="productId"/>'s usage of <paramref name="subAssemblyId"/>, which its add-ins hang off.</summary>
+    protected async Task<int> UsageIdAsync(int productId, int subAssemblyId)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.ProductSubAssemblyUsages
+            .Where(u => u.ProductId == productId && u.SubAssemblyId == subAssemblyId)
+            .Select(u => u.Id)
+            .SingleAsync(Cancellation);
+    }
+
     /// <summary>
     /// A new product owning one sub-assembly made of <paramref name="lines"/> (grams), used at
     /// <paramref name="weightPerPiece"/> grams a piece, saved through ProductRepository.SaveAsync.

@@ -512,6 +512,34 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.ToTable("UnitsOfMeasure");
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.UsageAddInLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Grams")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("IngredientId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UsageId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngredientId");
+
+                    b.HasIndex("UsageId", "IngredientId")
+                        .IsUnique();
+
+                    b.ToTable("UsageAddInLines");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.CostingParameters", b =>
                 {
                     b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
@@ -696,6 +724,25 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("Ingredient");
 
                     b.Navigation("SubAssembly");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.UsageAddInLine", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Entities.RawMaterial", "Ingredient")
+                        .WithMany()
+                        .HasForeignKey("IngredientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", "Usage")
+                        .WithMany()
+                        .HasForeignKey("UsageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ingredient");
+
+                    b.Navigation("Usage");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterial", b =>

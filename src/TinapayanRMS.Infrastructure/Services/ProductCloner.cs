@@ -32,6 +32,16 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                 .OrderBy(l => l.Id)
                 .ToListAsync(cancellationToken))
             .ToLookup(l => l.SubAssemblyId);
+
+        // Keyed on the usage, not the sub-assembly: an add-in is the source product's own, and two
+        // products linking the same sub-assembly each have their own set.
+        var usageIds = usages.Select(u => u.Id).ToList();
+        var addInsByUsage = (await dbContext.UsageAddInLines
+                .AsNoTracking()
+                .Where(l => usageIds.Contains(l.UsageId))
+                .OrderBy(l => l.Id)
+                .ToListAsync(cancellationToken))
+            .ToLookup(l => l.UsageId);
         var packagingLines = await PackagingLineRepository.ResolveEffectiveAsync(dbContext, sourceProductId, [], cancellationToken);
         var costing = await dbContext.CostingParameters.AsNoTracking().FirstOrDefaultAsync(c => c.ProductId == sourceProductId, cancellationToken);
 
@@ -48,17 +58,28 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         {
             if (usage.SubAssembly!.OwnerProductId is null)
             {
-                linked.Add(new LinkedUsageDraft(usage.SubAssemblyId, usage.AuthoredField, usage.AuthoredValue));
+                // Still a link, so its add-ins stay add-ins: the clone puts the same extras in.
+                linked.Add(new LinkedUsageDraft(usage.SubAssemblyId, usage.AuthoredField, usage.AuthoredValue)
+                {
+                    AddIns = [.. addInsByUsage[usage.Id].Select(l => (l.IngredientId, l.Grams))],
+                });
                 continue;
             }
 
             var name = SubAssemblyRules.UniqueName(usage.SubAssembly.Name, names);
             names.Add(name);
+
+            // The link is broken here, so the source's add-ins become plain lines of the clone's own copy:
+            // the batch it had is the batch it keeps. Never a duplicate ingredient, since an add-in can't
+            // be one the recipe already has (ProductRules.EnsureValidAddIns).
             owned.Add(new OwnedSubAssemblyDraft(
                 0,
                 name,
                 usage.SubAssembly.RoleId,
-                [.. linesBySubAssembly[usage.SubAssemblyId].Select(l => (l.IngredientId, l.Grams))],
+                [
+                    .. linesBySubAssembly[usage.SubAssemblyId].Select(l => (l.IngredientId, l.Grams)),
+                    .. addInsByUsage[usage.Id].Select(l => (l.IngredientId, l.Grams)),
+                ],
                 usage.AuthoredField,
                 usage.AuthoredValue));
         }

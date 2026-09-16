@@ -179,6 +179,9 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.IsFormEditingLines.Should().BeFalse("a link's lines are its owner's");
         viewModel.EditingUsageSource = viewModel.LinkableSubAssemblies.Single();
         viewModel.EditingUsageSource!.DisplayName.Should().Be("Sweet Dough — Cream Loaf (Dough)");
+        await WaitUntilSettledAsync(() => viewModel.FormLines.Count == 1, () => $"form lines={viewModel.FormLines.Count}");
+        viewModel.IsFormShowingLines.Should().BeTrue("the sub-assembly picked to link shows the lines it brings, read-only");
+        viewModel.FormLines.Single().Grams.Should().Be(1000m);
         viewModel.EditingUsageWeightPerPiece = 30m;
         await viewModel.ApplyUsageCommand.Execute();
         await viewModel.SaveCommand.Execute();
@@ -190,12 +193,20 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         linked.LinkedFromText.Should().Be("From Cream Loaf");
         linked.CostPerPiece.Should().Be(1.5m, "30 g of a ₱50, 1,000 g batch");
 
+        // Its tab shows its form, with its owner's lines in it to look at but not to change.
+        viewModel.EditingUsage.Should().BeSameAs(linked);
+        viewModel.IsFormShowingLines.Should().BeTrue();
+        viewModel.IsFormEditingLines.Should().BeFalse();
+        viewModel.FormLines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal(("Flour", 1000m));
+
         // Cream Loaf adds butter to its dough: the mini's linked section follows on the next refresh.
         await SaveRecipeAsync(bigId, new RecipeDraft(
             [new OwnedSubAssemblyDraft(doughId, "Sweet Dough", roleId, [(flourId, 1000m), (butterId, 250m)], UsageAuthoredField.WeightPerPiece, 60m)], []));
         await viewModel.LoadCommand.Execute();
         viewModel.UsageEdits.Single().TotalWeight.Should().Be(1250m);
         viewModel.UsageEdits.Single().CostPerPiece.Should().Be(3.6m, "30 g of a ₱150, 1,250 g batch");
+        viewModel.FormLines.Select(l => (l.Ingredient!.Name, l.Grams)).Should()
+            .Equal([("Flour", 1000m), ("Butter", 250m)], "the read-only lines show the owner's, as they now are");
 
         // Make a Copy: the mini gets its own dough, at the same weight, and stops following.
         await viewModel.MakeCopyCommand.Execute(viewModel.UsageEdits.Single());
@@ -262,7 +273,8 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Sweet Dough", "Ube Filling", "Add Sub-Assembly", "Packaging");
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.RecipeTabs[0]);
-        viewModel.IsUsageFormOpen.Should().BeFalse("an add form nothing was entered in closes when another tab shows");
+        viewModel.IsAddingUsage.Should().BeFalse("an add form nothing was entered in closes when another tab shows");
+        viewModel.EditingUsage.Should().BeSameAs(((SubAssemblyRecipeTab)viewModel.RecipeTabs[0]).Usage, "a sub-assembly's tab is the form that edits it");
     }
 
     [Fact]
@@ -297,7 +309,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var tab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single();
 
         await viewModel.EditUsageCommand.Execute(tab.Usage);
-        tab.IsEditing.Should().BeTrue();
+        viewModel.EditingUsage.Should().BeSameAs(tab.Usage);
         viewModel.EditingUsageName = "Ube halaya";
 
         // As another tab would, while the form is open: ube's price goes up, and the refresh swaps in a repriced copy.
@@ -311,7 +323,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await viewModel.LoadCommand.Execute();
         tab.Usage.CostPerPiece.Should().Be(3.6m);
-        tab.IsEditing.Should().BeTrue();
+        viewModel.EditingUsage.Should().BeSameAs(tab.Usage, "the form follows the repriced copy that took its place");
 
         await viewModel.ApplyUsageCommand.Execute();
 
@@ -319,7 +331,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageEdits.Should().ContainSingle("Apply replaces the refreshed copy instead of adding a second").Which.Name.Should().Be("Ube halaya");
         viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Should().ContainSingle().Which.Should().BeSameAs(tab);
         viewModel.SelectedRecipeTab.Should().BeSameAs(tab);
-        tab.IsEditing.Should().BeFalse();
+        viewModel.EditingUsage.Should().BeSameAs(tab.Usage, "the tab has nothing else to show, so its form stays open on what was applied");
         tab.Header.Should().Be("Ube halaya");
     }
 
@@ -476,5 +488,225 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         }
 
         throw new TimeoutException($"The product's detail never finished loading: {describe()}.");
+    }
+
+    [Fact]
+    public async Task Leaving_a_sub_assemblys_tab_applies_its_form_and_a_refused_one_keeps_the_tab()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var productId = await AddProductAsync("Twin Rolls");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [
+                new OwnedSubAssemblyDraft(0, "Brioche Dough", roleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m),
+                new OwnedSubAssemblyDraft(0, "Sweet Dough", roleId, [(flourId, 800m)], UsageAuthoredField.WeightPerPiece, 40m),
+            ],
+            []));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 2, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        var brioche = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Brioche Dough");
+        var sweet = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Sweet Dough");
+
+        // Typed into Brioche's form, then away to Sweet Dough's tab: the typing is applied on the way out.
+        viewModel.SelectedRecipeTab = brioche;
+        viewModel.EditingUsage.Should().BeSameAs(brioche.Usage, "showing a sub-assembly's tab opens its form");
+        viewModel.FormLines.Single().Grams = 1500m;
+        viewModel.SelectedRecipeTab = sweet;
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SelectedRecipeTab.Should().BeSameAs(sweet);
+        viewModel.EditingUsage.Should().BeSameAs(sweet.Usage);
+        brioche.Usage.TotalWeight.Should().Be(1500m, "leaving its tab applied what was typed");
+
+        // A form a rule refuses keeps its own tab, with the message shown.
+        viewModel.SelectedRecipeTab = brioche;
+        viewModel.EditingUsageName = string.Empty;
+        viewModel.SelectedRecipeTab = sweet;
+
+        viewModel.SelectedRecipeTab.Should().BeSameAs(brioche, "the form has to be put right before another tab can show");
+        viewModel.ErrorMessage.Should().NotBeNull();
+        viewModel.EditingUsage.Should().BeSameAs(brioche.Usage);
+
+        // Cancel puts back what was last applied, and the tab can be left again.
+        await viewModel.CancelUsageCommand.Execute();
+        viewModel.EditingUsageName.Should().Be("Brioche Dough");
+        viewModel.SelectedRecipeTab = sweet;
+        viewModel.SelectedRecipeTab.Should().BeSameAs(sweet);
+    }
+
+    [Fact]
+    public async Task Merely_showing_a_sub_assemblys_tab_leaves_the_recipe_as_it_was()
+    {
+        var roleId = await AddRoleAsync("Filling");
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.24m);
+        await AddProductWithSubAssemblyAsync("Ube pandesal", "Ube filling", roleId, [(ubeId, 100m)], weightPerPiece: 10m);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        var tab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single();
+        var usage = tab.Usage;
+
+        viewModel.SelectedRecipeTab = viewModel.PackagingTab;
+        viewModel.SelectedRecipeTab = tab;
+        viewModel.SelectedRecipeTab = viewModel.PackagingTab;
+
+        viewModel.ErrorMessage.Should().BeNull();
+        tab.Usage.Should().BeSameAs(usage, "a form nothing was typed into is applied to nothing");
+        viewModel.IsUsageFormOpen.Should().BeFalse("Packaging has no sub-assembly form");
+    }
+
+    /// <summary>Cream Loaf owns a 1,000 g / ₱50 Sweet Dough; a second product links it. Returns the linker, the dough and ube.</summary>
+    private async Task<(int LinkerId, int DoughId, int UbeId, int FlourId)> SeedLinkableDoughAsync()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var ubeId = await AddIngredientAsync("Ube Flavour", costPerGram: 0.8m);
+        await AddProductWithSubAssemblyAsync("Cream Loaf", "Sweet Dough", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
+        var linkerId = await AddProductAsync("Cream Loaf Ube");
+        var doughId = await OwnedSubAssemblyIdAsync(
+            (await new ProductRepository(CreateDbContextFactory()).GetAllAsync(Cancellation)).Single(p => p.Name == "Cream Loaf").Id,
+            "Sweet Dough");
+        return (linkerId, doughId, ubeId, flourId);
+    }
+
+    /// <summary>Selects <paramref name="productId"/> and links the dough into it with <paramref name="addInGrams"/> of ube.</summary>
+    private static async Task LinkWithUbeAsync(ProductsViewModel viewModel, int ubeId, decimal addInGrams, decimal weightPerPiece)
+    {
+        await viewModel.AddUsageCommand.Execute();
+        viewModel.EditingUsageMode = viewModel.UsageFormModes.Single(m => m.Mode == UsageFormMode.Link);
+        viewModel.EditingUsageSource = viewModel.LinkableSubAssemblies.Single();
+        await WaitUntilSettledAsync(() => viewModel.FormLines.Count == 1, () => $"form lines={viewModel.FormLines.Count}");
+        viewModel.FormAddIns.Add(new IngredientLineRow(viewModel.Ingredients.Single(m => m.Id == ubeId), addInGrams));
+        viewModel.EditingUsageWeightPerPiece = weightPerPiece;
+        await viewModel.ApplyUsageCommand.Execute();
+    }
+
+    [Fact]
+    public async Task Add_ins_go_into_a_linked_usages_batch_and_its_cost_per_piece()
+    {
+        var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId, () => $"selected={viewModel.SelectedProduct?.Id}");
+
+        await LinkWithUbeAsync(viewModel, ubeId, addInGrams: 20m, weightPerPiece: 30m);
+
+        viewModel.ErrorMessage.Should().BeNull();
+        var usage = viewModel.UsageEdits.Should().ContainSingle().Subject;
+        usage.IsLinked.Should().BeTrue();
+        usage.BaseTotalWeight.Should().Be(1000m, "the dough itself is still the dough");
+        usage.TotalWeight.Should().Be(1020m, "the 20 g of ube goes into the batch");
+        usage.TotalCost.Should().Be(66m, "1000*0.05 + 20*0.80");
+        usage.CostPerPiece.Should().Be(66m * 30m / 1020m);
+
+        // The form is showing it, and its two tables add up to the batch the piece is cut from.
+        viewModel.IsFormShowingAddIns.Should().BeTrue();
+        viewModel.UsageFormTotalWeightText.Should().Be("1,020 g");
+        viewModel.FormAddIns.Single().Grams.Should().Be(20m);
+
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+
+        await using var dbContext = CreateDbContext();
+        var saved = await dbContext.UsageAddInLines.AsNoTracking().Where(l => l.Usage!.ProductId == linkerId).ToListAsync(Cancellation);
+        saved.Select(l => (l.IngredientId, l.Grams)).Should().Equal((ubeId, 20m));
+    }
+
+    [Fact]
+    public async Task An_add_in_already_in_the_linked_recipe_is_refused_on_the_spot()
+    {
+        var (linkerId, _, _, flourId) = await SeedLinkableDoughAsync();
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId, () => $"selected={viewModel.SelectedProduct?.Id}");
+
+        await LinkWithUbeAsync(viewModel, flourId, addInGrams: 100m, weightPerPiece: 30m);
+
+        viewModel.ErrorMessage.Should().NotBeNull();
+        viewModel.ErrorMessage.Should().Contain("Flour").And.Contain("Sweet Dough");
+        viewModel.UsageEdits.Should().BeEmpty("nothing goes into the recipe until the form is put right");
+    }
+
+    [Fact]
+    public async Task Make_a_Copy_folds_the_add_ins_into_the_products_own_lines()
+    {
+        var (linkerId, _, ubeId, flourId) = await SeedLinkableDoughAsync();
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await LinkWithUbeAsync(viewModel, ubeId, addInGrams: 20m, weightPerPiece: 30m);
+
+        await viewModel.MakeCopyCommand.Execute(viewModel.UsageEdits.Single());
+
+        var copy = viewModel.UsageEdits.Should().ContainSingle().Subject;
+        copy.IsOwned.Should().BeTrue();
+        copy.AddIns.Should().BeEmpty("a sub-assembly of the product's own has no add-ins; its lines are its own");
+        copy.Lines.Select(l => (l.Ingredient.Id, l.Grams)).Should().Equal([(flourId, 1000m), (ubeId, 20m)]);
+        copy.TotalWeight.Should().Be(1020m, "the batch it was showing is the batch it keeps");
+        copy.CostPerPiece.Should().Be(66m * 30m / 1020m);
+    }
+
+    [Fact]
+    public async Task Saving_twice_with_no_change_leaves_a_linked_usages_add_ins_alone()
+    {
+        var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await LinkWithUbeAsync(viewModel, ubeId, addInGrams: 20m, weightPerPiece: 30m);
+        await viewModel.SaveCommand.Execute();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        int AddInIdAsync()
+        {
+            using var dbContext = CreateDbContext();
+            return dbContext.UsageAddInLines.Single(l => l.Usage!.ProductId == linkerId).Id;
+        }
+
+        var before = AddInIdAsync();
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        AddInIdAsync().Should().Be(before, "a recipe that didn't change isn't rewritten — the draft is compared field by field, not by record equality");
+    }
+
+    [Fact]
+    public async Task A_repriced_add_in_ingredient_reaches_the_usage_on_a_refresh()
+    {
+        var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await LinkWithUbeAsync(viewModel, ubeId, addInGrams: 20m, weightPerPiece: 30m);
+        await viewModel.SaveCommand.Execute();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+        viewModel.UsageEdits.Single().TotalCost.Should().Be(66m);
+
+        // The ube doubles on the Raw Materials screen; coming back to Products re-reads it.
+        await using (var dbContext = CreateDbContext())
+        {
+            var ube = await dbContext.RawMaterials.SingleAsync(m => m.Id == ubeId, Cancellation);
+            ube.CostPerBaseUnit = 1.6m;
+            ube.BufferedCostPerBaseUnit = 1.6m;
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        await viewModel.LoadCommand.Execute();
+
+        var usage = viewModel.UsageEdits.Single();
+        usage.TotalCost.Should().Be(82m, "1000*0.05 + 20*1.60 — the add-in is repriced like any other line");
+        usage.CostPerPiece.Should().Be(82m * 30m / 1020m);
+        viewModel.FormAddIns.Single().Cost.Should().Be(32m, "the form's own table is repriced in place, not refilled");
     }
 }

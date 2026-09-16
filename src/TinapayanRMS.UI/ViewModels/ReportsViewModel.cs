@@ -130,12 +130,22 @@ public class ReportsViewModel : ReactiveObject
         foreach (var product in products)
         {
             var usages = await _usageRepository.GetForProductAsync(product.Id, CancellationToken.None);
+
+            // A linked usage can carry this product's own extra ingredients. They go into the batch, so the
+            // piece size shares out the sub-assembly's lines plus these, and the cost follows.
+            var addInsByUsage = (await _usageRepository.GetAddInsForProductAsync(product.Id, CancellationToken.None))
+                .ToLookup(l => l.UsageId);
+
             var usageCosts = usages
                 .Select(u =>
                 {
                     var subAssembly = u.SubAssembly!;
-                    var (weightPerPiece, _) = ProductRules.ResolvePieceSize(u.AuthoredField, u.AuthoredValue, subAssembly.TotalWeight);
-                    return ProductRules.CalculateUsageCostPerPiece(subAssembly.TotalCost, weightPerPiece, subAssembly.TotalWeight);
+                    var (totalWeight, totalCost) = ProductRules.CalculateEffectiveBatch(
+                        subAssembly.TotalWeight,
+                        subAssembly.TotalCost,
+                        [.. addInsByUsage[u.Id].Select(l => (l.Grams, l.Ingredient!.BufferedCostPerBaseUnit))]);
+                    var (weightPerPiece, _) = ProductRules.ResolvePieceSize(u.AuthoredField, u.AuthoredValue, totalWeight);
+                    return ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight);
                 })
                 .ToList();
 

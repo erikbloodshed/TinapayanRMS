@@ -15,8 +15,9 @@ public abstract class RecipeTab : ReactiveObject
 }
 
 /// <summary>
-/// A sub-assembly's tab. When its section is replaced (edited, copied, or refreshed with new costs) the tab
-/// is kept and shows the replacement, so it stays the tab showing.
+/// A sub-assembly's tab, which shows the form that edits it (ProductsViewModel.EditingUsage). When its section
+/// is replaced (applied, copied, or refreshed with new costs) the tab is kept and shows the replacement, so it
+/// stays the tab showing.
 /// </summary>
 public sealed class SubAssemblyRecipeTab(ProductUsageEdit usage) : RecipeTab
 {
@@ -36,14 +37,6 @@ public sealed class SubAssemblyRecipeTab(ProductUsageEdit usage) : RecipeTab
 
     /// <summary>A list for the product's own sub-assembly, a link for another product's.</summary>
     public override string Glyph => Usage.IsLinked ? "" : "";
-
-    private bool _isEditing;
-    /// <summary>The sub-assembly form is open on this one: the tab shows the form instead of its lines.</summary>
-    public bool IsEditing
-    {
-        get => _isEditing;
-        set => this.RaiseAndSetIfChanged(ref _isEditing, value);
-    }
 }
 
 /// <summary>The tab that adds a sub-assembly: showing it opens the sub-assembly form.</summary>

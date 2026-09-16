@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
@@ -216,6 +217,54 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation);
 
         ReadUsageCostPerPiece().Should().Be(1.8m); // sugar doubled -> usage cost doubled, with zero product-level code involved
+    }
+
+    [Fact]
+    public async Task A_price_change_reaches_a_linked_usages_add_in_with_nothing_stored_to_propagate()
+    {
+        // Add-ins are the third branch that needs no propagation code. They hang off the usage, and their
+        // cost is read off the ingredient, so nothing derived about them is stored — and the sub-assembly
+        // they sit on top of must not move, since it belongs to another product.
+        var categoryId = await SeedCategoryAsync("Fillings");
+        var flourId = await SeedPurchasedIngredientAsync("Flour", categoryId);
+        var ubeId = await SeedPurchasedIngredientAsync("Ube Flavour", categoryId);
+        var roleId = await AddRoleAsync("Dough");
+
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = flourId, UnitId = await KilogramUnitIdAsync(flourId), Date = new DateOnly(2026, 1, 1), Price = 50m }, Cancellation);
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = ubeId, UnitId = await KilogramUnitIdAsync(ubeId), Date = new DateOnly(2026, 1, 1), Price = 800m }, Cancellation);
+
+        // Cream Loaf owns a 1,000 g / ₱50 dough; Cream Loaf Ube links it and stirs in 20 g of ube (₱16).
+        var (_, doughId) = await AddProductWithSubAssemblyAsync("Cream Loaf", "Sweet Dough", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
+        var linkerId = await AddProductAsync("Cream Loaf Ube");
+        await SaveRecipeAsync(linkerId, new RecipeDraft(
+            [],
+            [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m) { AddIns = [(ubeId, 20m)] }]));
+
+        await using var dbContext = CreateDbContext();
+
+        decimal ReadUsageCostPerPiece()
+        {
+            var usage = dbContext.ProductSubAssemblyUsages.AsNoTracking().Include(u => u.SubAssembly).Single(u => u.ProductId == linkerId);
+            var addIns = dbContext.UsageAddInLines.AsNoTracking().Include(l => l.Ingredient).Where(l => l.UsageId == usage.Id).ToList();
+            var (totalWeight, totalCost) = ProductRules.CalculateEffectiveBatch(
+                usage.SubAssembly!.TotalWeight,
+                usage.SubAssembly.TotalCost,
+                [.. addIns.Select(l => (l.Grams, l.Ingredient!.BufferedCostPerBaseUnit))]);
+            var (weightPerPiece, _) = ProductRules.ResolvePieceSize(usage.AuthoredField, usage.AuthoredValue, totalWeight);
+            return ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight);
+        }
+
+        // A 1,020 g / ₱66 effective batch at 30 g a piece.
+        ReadUsageCostPerPiece().Should().Be(66m * 30m / 1020m);
+
+        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = ubeId, UnitId = await KilogramUnitIdAsync(ubeId), Date = new DateOnly(2026, 2, 1), Price = 1600m }, Cancellation);
+
+        // ₱82 now: the ube doubled to ₱32, with no add-in-level propagation code anywhere.
+        ReadUsageCostPerPiece().Should().Be(82m * 30m / 1020m);
+
+        var dough = await GetSubAssemblyAsync(doughId);
+        dough.TotalWeight.Should().Be(1000m, "the ube is the linking product's own; the dough is Cream Loaf's");
+        dough.TotalCost.Should().Be(50m);
     }
 
     [Fact]

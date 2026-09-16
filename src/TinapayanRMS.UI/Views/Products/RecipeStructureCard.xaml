@@ -7,20 +7,15 @@
     <!--
         What goes into one piece, in tabs (RecipeTabs): a sub-assembly's for each one in the recipe, in role
         order, then Add Sub-Assembly, which opens the form to add one, then Packaging, which is always there.
-        Each tab's content is picked by its type from the templates below; the ones showing the screen's forms
-        and packaging take the screen's DataContext back from this card.
+        Each tab's content is picked by its type from the templates below, and each takes the screen's DataContext
+        back from this card: they all show one of the screen's forms, or its packaging.
     -->
     <UserControl.Resources>
-        <!-- A sub-assembly's lines, or the sub-assembly form while it's being edited (SubAssemblyRecipeTab.IsEditing) -->
+        <!-- A sub-assembly's tab is the form that edits it: its lines for the product's own, read-only for a link -->
         <DataTemplate DataType="{x:Type vm:SubAssemblyRecipeTab}">
-            <Grid>
-                <Border Visibility="{Binding IsEditing, Converter={StaticResource EmptyStateVisibilityConverter}}">
-                    <local:SubAssemblySectionView DataContext="{Binding Usage}" />
-                </Border>
-                <Border Padding="8" Visibility="{Binding IsEditing, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <local:UsageFormPanel DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=local:RecipeStructureCard}}" />
-                </Border>
-            </Grid>
+            <Border Padding="8">
+                <local:UsageFormPanel DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=local:RecipeStructureCard}}" />
+            </Border>
         </DataTemplate>
 
         <DataTemplate DataType="{x:Type vm:AddSubAssemblyRecipeTab}">
@@ -37,7 +32,7 @@
 
     <StackPanel>
         <TextBlock Text="Recipe Structure" Style="{StaticResource PanelHeaderStyle}" />
-        <TextBlock Text="What goes into one piece: each sub-assembly's ingredients, scaled to a piece, then the packaging. A sub-assembly is made here, or linked or copied from another product or the Sub-Assemblies screen. Changes are saved with Save."
+        <TextBlock Text="What goes into one piece: each sub-assembly's ingredients, in grams a batch, then the packaging. A sub-assembly is made here, or linked or copied from another product or the Sub-Assemblies screen. Moving to another tab applies what you typed; Save saves it."
                    Style="{StaticResource PanelCaptionStyle}" />
 
         <!--

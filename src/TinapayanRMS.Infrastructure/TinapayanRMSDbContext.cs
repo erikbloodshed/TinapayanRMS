@@ -32,6 +32,8 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<ProductSubAssemblyUsage> ProductSubAssemblyUsages => Set<ProductSubAssemblyUsage>();
 
+    public DbSet<UsageAddInLine> UsageAddInLines => Set<UsageAddInLine>();
+
     public DbSet<PackagingLine> PackagingLines => Set<PackagingLine>();
 
     public DbSet<CostingParameters> CostingParameters => Set<CostingParameters>();

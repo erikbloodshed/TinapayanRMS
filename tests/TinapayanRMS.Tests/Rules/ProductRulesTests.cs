@@ -218,4 +218,69 @@ public class ProductRulesTests
     {
         ProductRules.CalculateMaterialCostPerPiece([2.4m, 1.1m], [0.5715m, 0.3m]).Should().Be(4.3715m);
     }
+
+    [Fact]
+    public void CalculateEffectiveBatch_adds_the_add_ins_to_the_sub_assemblys_batch()
+    {
+        // 1,700 g of dough costing ₱85, plus 20 g of ube flavouring @ ₱0.80/g (₱16).
+        var (totalWeight, totalCost) = ProductRules.CalculateEffectiveBatch(
+            subAssemblyTotalWeight: 1700m,
+            subAssemblyTotalCost: 85m,
+            [(Grams: 20m, IngredientCostPerGram: 0.8m)]);
+
+        totalWeight.Should().Be(1720m);
+        totalCost.Should().Be(101m);
+    }
+
+    [Fact]
+    public void CalculateEffectiveBatch_with_no_add_ins_is_the_sub_assemblys_own_batch()
+    {
+        ProductRules.CalculateEffectiveBatch(1700m, 85m, []).Should().Be((1700m, 85m));
+    }
+
+    [Fact]
+    public void EnsureValidAddIns_refuses_an_ingredient_the_linked_recipe_already_has()
+    {
+        var act = () => ProductRules.EnsureValidAddIns(
+            [(IngredientId: 7, Grams: 10m, IngredientName: "Butter")],
+            "Sweet Dough",
+            [7, 9]);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Butter*").WithMessage("*Sweet Dough*");
+    }
+
+    [Fact]
+    public void EnsureValidAddIns_refuses_the_same_ingredient_on_two_add_in_lines()
+    {
+        var act = () => ProductRules.EnsureValidAddIns(
+            [
+                (IngredientId: 7, Grams: 10m, IngredientName: "Ube Flavour"),
+                (IngredientId: 7, Grams: 5m, IngredientName: "Ube Flavour"),
+            ],
+            "Sweet Dough",
+            []);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Ube Flavour*");
+    }
+
+    [Fact]
+    public void EnsureValidAddIns_refuses_grams_that_arent_positive()
+    {
+        var act = () => ProductRules.EnsureValidAddIns(
+            [(IngredientId: 7, Grams: 0m, IngredientName: "Ube Flavour")],
+            "Sweet Dough",
+            []);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void EnsureValidAddIns_allows_a_usage_with_no_add_ins()
+    {
+        // Unlike a sub-assembly's own lines: most linked usages take the recipe as it is.
+        var act = () => ProductRules.EnsureValidAddIns([], "Sweet Dough", [7, 9]);
+
+        act.Should().NotThrow();
+    }
 }

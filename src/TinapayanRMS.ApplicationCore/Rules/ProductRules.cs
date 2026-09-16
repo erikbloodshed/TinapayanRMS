@@ -23,6 +23,55 @@ public static class ProductRules
     }
 
     /// <summary>
+    /// A usage's add-ins: this product's own extra ingredients on top of a recipe it links — a colouring,
+    /// a flavouring, an inclusion. Unlike a sub-assembly's own lines, an empty set is valid: most linked
+    /// usages take the recipe as it is. What isn't valid is an ingredient the recipe already has, since
+    /// add-ins are only for what it doesn't. <paramref name="baseIngredientIds"/> are the linked
+    /// sub-assembly's own lines' ingredients.
+    /// </summary>
+    public static void EnsureValidAddIns(
+        IReadOnlyList<(int IngredientId, decimal Grams, string IngredientName)> addIns,
+        string subAssemblyName,
+        IReadOnlyCollection<int> baseIngredientIds)
+    {
+        if (addIns.Any(a => a.Grams <= 0))
+        {
+            throw new InvalidOperationException("An add-in's grams must be positive.");
+        }
+
+        var duplicate = addIns.GroupBy(a => a.IngredientId).FirstOrDefault(g => g.Count() > 1);
+        if (duplicate is not null)
+        {
+            throw new InvalidOperationException(
+                $"{duplicate.First().IngredientName} is on two add-in lines. Put its total on one line and delete the other.");
+        }
+
+        var alreadyThere = addIns.Where(a => baseIngredientIds.Contains(a.IngredientId)).Select(a => a.IngredientName).FirstOrDefault();
+        if (alreadyThere is not null)
+        {
+            throw new InvalidOperationException(
+                $"{alreadyThere} is already in {subAssemblyName}. Add-ins are only for what its recipe doesn't have — "
+                + $"change how much it uses where {subAssemblyName} is kept, or make this product a copy of it.");
+        }
+    }
+
+    /// <summary>
+    /// A usage's effective batch: the sub-assembly's own, plus this product's add-ins. Add-ins go into the
+    /// batch, so 1,700 g of dough with 20 g of flavouring is a 1,720 g batch and a piece takes its
+    /// weight-per-piece share of the whole thing. Pass the sub-assembly's stored TotalWeight and TotalCost,
+    /// or the same figures worked out from its lines — they're the same figures. A sub-assembly of the
+    /// product's own never has add-ins, so its effective batch is its own.
+    /// </summary>
+    public static (decimal TotalWeight, decimal TotalCost) CalculateEffectiveBatch(
+        decimal subAssemblyTotalWeight,
+        decimal subAssemblyTotalCost,
+        IReadOnlyList<(decimal Grams, decimal IngredientCostPerGram)> addIns)
+    {
+        var (addInWeight, addInCost) = SubAssemblyRules.CalculateTotals(addIns);
+        return (subAssemblyTotalWeight + addInWeight, subAssemblyTotalCost + addInCost);
+    }
+
+    /// <summary>
     /// A usage's weight per piece and yield, from the one the user typed and the batch's current total
     /// weight: the typed one as it is, the other worked out (Yield = TotalWeight / WeightPerPiece). Worked
     /// out on every read, so the typed figure stays put when the batch changes. A batch that weighs
