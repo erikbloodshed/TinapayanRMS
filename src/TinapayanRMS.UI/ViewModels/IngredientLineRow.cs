@@ -57,9 +57,13 @@ public sealed class IngredientLineRow : ReactiveObject
         private set
         {
             this.RaiseAndSetIfChanged(ref _ingredient, value);
+            this.RaisePropertyChanged(nameof(CostPerGram));
             this.RaisePropertyChanged(nameof(Cost));
         }
     }
+
+    /// <summary>What a gram of this line's ingredient costs, buffered; 0 until one is picked.</summary>
+    public decimal CostPerGram => Ingredient?.BufferedCostPerBaseUnit ?? 0m;
 
     private decimal _grams;
     public decimal Grams

@@ -193,6 +193,7 @@
                                 </syncfusion:GridMultiColumnDropDownList.Columns>
                             </syncfusion:GridMultiColumnDropDownList>
                             <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="120" NumberDecimalDigits="2" />
+                            <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost per g" Width="120" NumberDecimalDigits="4" AllowEditing="False" />
                             <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="120" NumberDecimalDigits="2" AllowEditing="False" />
                         </syncfusion:SfDataGrid.Columns>
                     </syncfusion:SfDataGrid>

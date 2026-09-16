@@ -728,6 +728,63 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.CanChangeTypeAndSource.Should().BeTrue("the form is a new material now");
     }
 
+    [Fact]
+    public async Task The_category_picker_lists_Add_New_above_the_categories_and_keeps_it_through_a_refresh()
+    {
+        await SeedCategoryAsync("Dry goods");
+        await SeedCategoryAsync("Butter");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.CategoryOptions.Select(c => c.Name).Should().Equal("< Add New .. >", "Butter", "Dry goods");
+        viewModel.Categories.Select(c => c.Name).Should().Equal(["Butter", "Dry goods"], "the row is the picker's, not a category");
+
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.CategoryOptions[0].Should().BeSameAs(RawMaterialsViewModel.AddNewCategory, "the refresh merges categories, not the row");
+    }
+
+    [Fact]
+    public async Task Picking_Add_New_saves_the_category_it_asks_for_and_files_the_material_under_it()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.PromptForNewCategory.RegisterHandler(interaction => interaction.SetOutput("Spices"));
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.EditingCategory = RawMaterialsViewModel.AddNewCategory;
+
+        await WaitUntilSettledAsync(() => viewModel.EditingCategory is not null,
+            () => $"picked={viewModel.EditingCategory?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SuccessMessage.Should().Be("Spices was added.", "a toast says so");
+        viewModel.EditingCategory!.Name.Should().Be("Spices", "the material is filed under the category just added");
+        viewModel.Categories.Select(c => c.Name).Should().Equal("Spices");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterialCategories.SingleAsync(Cancellation)).Name.Should().Be("Spices");
+    }
+
+    [Fact]
+    public async Task Cancelling_the_new_category_prompt_leaves_the_category_that_was_picked()
+    {
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        var prompted = false;
+        viewModel.PromptForNewCategory.RegisterHandler(interaction =>
+        {
+            prompted = true;
+            interaction.SetOutput(null);
+        });
+        await viewModel.LoadCommand.Execute();
+        PickCategory(viewModel);
+
+        viewModel.EditingCategory = RawMaterialsViewModel.AddNewCategory;
+
+        await WaitUntilSettledAsync(() => prompted, () => "the prompt was never asked for");
+        viewModel.EditingCategory!.Name.Should().Be("Dry goods", "the row was never a category to file it under");
+        viewModel.Categories.Should().ContainSingle("nothing was added");
+        viewModel.ErrorMessage.Should().BeNull();
+    }
+
     private RawMaterialsViewModel CreateViewModel()
     {
         ReactiveUIBootstrapper.EnsureInitialized();
@@ -739,6 +796,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             new RawMaterialPriceHistoryRepository(factory, costPropagator),
             new IngredientBomLineRepository(factory, costPropagator),
             new RawMaterialCategoryRepository(factory),
+            new RawMaterialCategoryValidator(),
             new RawMaterialValidator(),
             new RawMaterialUnitValidator(),
             new RawMaterialPriceHistoryValidator(),

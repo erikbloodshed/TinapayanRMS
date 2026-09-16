@@ -1,7 +1,8 @@
 <UserControl x:Class="TinapayanRMS.UI.Views.RawMaterials.SummaryHeaderCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:viewModels="clr-namespace:TinapayanRMS.UI.ViewModels">
     <UserControl.Resources>
         <!-- A value tile: a muted label over a larger value. -->
         <Style x:Key="TileLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource FieldLabelStyle}">
@@ -12,6 +13,36 @@
             <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
+        <!--
+            The Category picker's rows: a line under its "< Add New .. >" row (RawMaterialsViewModel.AddNewCategory)
+            sets it apart from the categories below it. Styling the row rather than templating it, since the picker
+            needs DisplayMemberPath: the closed box shows ComboBoxAdv.Text, which is the picked item's ToString()
+            unless DisplayMemberPath names the property to read — and ItemsControl refuses both that and ItemTemplate.
+        -->
+        <DataTemplate x:Key="AddNewCategoryTemplate">
+            <Border HorizontalAlignment="Stretch"
+                    BorderBrush="{StaticResource CardBorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="0,0,0,5"
+                    Margin="0,0,0,3">
+                <TextBlock Text="{Binding Name}" />
+            </Border>
+        </DataTemplate>
+
+        <!--
+            The row's own template, not the picker's ItemTemplate: the theme's row draws no border of its own to
+            thicken, and ContentTemplate wins over the ContentTemplateSelector that DisplayMemberPath puts on every
+            row. The categories keep that selector, so they're drawn as the theme draws any row.
+        -->
+        <Style x:Key="CategoryOptionStyle" TargetType="syncfusion:ComboBoxItemAdv" BasedOn="{StaticResource {x:Type syncfusion:ComboBoxItemAdv}}">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Id}" Value="{x:Static viewModels:RawMaterialsViewModel.AddNewCategoryId}">
+                    <Setter Property="ContentTemplate" Value="{StaticResource AddNewCategoryTemplate}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="TileSeparatorStyle" TargetType="Border">
             <Setter Property="Width" Value="1" />
             <Setter Property="Margin" Value="16,0" />
@@ -155,9 +186,11 @@
                 <TextBlock Grid.Column="2" Text="Category" Style="{StaticResource FieldLabelStyle}" />
                 <syncfusion:ComboBoxAdv Grid.Row="1"
                                         Grid.Column="2"
-                                        ItemsSource="{Binding Categories}"
+                                        ItemsSource="{Binding CategoryOptions}"
                                         DisplayMemberPath="Name"
-                                        SelectedItem="{Binding EditingCategory, Mode=TwoWay}" />
+                                        ItemContainerStyle="{StaticResource CategoryOptionStyle}"
+                                        SelectedItem="{Binding EditingCategory, Mode=TwoWay}"
+                                        ToolTip="Pick a category, or &quot;&lt; Add New .. &gt;&quot; to name one now." />
 
                 <TextBlock Grid.Column="4"
                            Text="Source"

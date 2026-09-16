@@ -71,6 +71,7 @@ public class RawMaterialsViewModel : ViewModelBase
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
     private readonly IIngredientBomLineRepository _bomLineRepository;
     private readonly IRawMaterialCategoryRepository _categoryRepository;
+    private readonly IValidator<RawMaterialCategory> _categoryValidator;
     private readonly IValidator<RawMaterial> _rawMaterialValidator;
     private readonly IValidator<RawMaterialUnit> _unitValidator;
     private readonly IValidator<RawMaterialPriceHistory> _priceHistoryValidator;
@@ -80,6 +81,8 @@ public class RawMaterialsViewModel : ViewModelBase
     private readonly ReadOnlyObservableCollection<RawMaterial> _ingredients;
     private readonly SourceCache<RawMaterialCategory, int> _categoryCache = new(c => c.Id);
     private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categories;
+    private readonly SourceCache<RawMaterialCategory, int> _addNewCategoryOption = new(c => c.Id);
+    private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categoryOptions;
 
     /// <summary>Every raw material, for the usage example's picker.</summary>
     public ReadOnlyObservableCollection<RawMaterial> RawMaterials => _rawMaterials;
@@ -95,6 +98,18 @@ public class RawMaterialsViewModel : ViewModelBase
     public ObservableCollection<IngredientLineRow> BomLineEdits { get; } = [];
 
     public ReadOnlyObservableCollection<RawMaterialCategory> Categories => _categories;
+
+    /// <summary>
+    /// The Category picker's "&lt; Add New .. &gt;" row: a category-shaped stand-in for adding one, not a category
+    /// itself. Its Id tells it apart from a saved category (a positive Id) and an unsaved one (0), and it's kept out
+    /// of Categories, so the lookups and the refresh merge that work over real categories never see it.
+    /// </summary>
+    public const int AddNewCategoryId = -1;
+
+    public static readonly RawMaterialCategory AddNewCategory = new() { Id = AddNewCategoryId, Name = "< Add New .. >" };
+
+    /// <summary>What the Category picker lists: the categories, with the "&lt; Add New .. &gt;" row above them.</summary>
+    public ReadOnlyObservableCollection<RawMaterialCategory> CategoryOptions => _categoryOptions;
 
     /// <summary>Every unit of measure, for the base unit picker and the Alternative Units form.</summary>
     public ObservableCollection<UnitOfMeasure> UnitsOfMeasure { get; } = [];
@@ -144,7 +159,18 @@ public class RawMaterialsViewModel : ViewModelBase
     public RawMaterialCategory? EditingCategory
     {
         get => _editingCategory;
-        set => this.RaiseAndSetIfChanged(ref _editingCategory, value);
+        set
+        {
+            // The "< Add New .. >" row isn't a category to file the material under: AddCategoryCommand takes over,
+            // and puts a category back in the picker once it's done.
+            if (ReferenceEquals(value, AddNewCategory))
+            {
+                AddCategoryCommand.Execute().Subscribe();
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _editingCategory, value);
+        }
     }
 
     private RawMaterialSource _editingSource = RawMaterialSource.Purchased;
@@ -433,6 +459,7 @@ public class RawMaterialsViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> AddCategoryCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddUnitCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> EditUnitCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteUnitCommand { get; }
@@ -442,11 +469,18 @@ public class RawMaterialsViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> DeletePriceCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveBomLineCommand { get; }
 
+    /// <summary>
+    /// Input: the label to put over the box. Output: the name typed for the new category, or null if it was
+    /// cancelled. The View registers a handler that shows a prompt dialog (Views/TextPromptWindow).
+    /// </summary>
+    public Interaction<string, string?> PromptForNewCategory { get; } = new();
+
     public RawMaterialsViewModel(
         IRawMaterialRepository rawMaterialRepository,
         IRawMaterialPriceHistoryRepository priceHistoryRepository,
         IIngredientBomLineRepository bomLineRepository,
         IRawMaterialCategoryRepository categoryRepository,
+        IValidator<RawMaterialCategory> categoryValidator,
         IValidator<RawMaterial> rawMaterialValidator,
         IValidator<RawMaterialUnit> unitValidator,
         IValidator<RawMaterialPriceHistory> priceHistoryValidator,
@@ -458,6 +492,7 @@ public class RawMaterialsViewModel : ViewModelBase
         _priceHistoryRepository = priceHistoryRepository;
         _bomLineRepository = bomLineRepository;
         _categoryRepository = categoryRepository;
+        _categoryValidator = categoryValidator;
         _rawMaterialValidator = rawMaterialValidator;
         _unitValidator = unitValidator;
         _priceHistoryValidator = priceHistoryValidator;
@@ -485,6 +520,17 @@ public class RawMaterialsViewModel : ViewModelBase
 
         _categoryCache.Connect()
             .SortAndBind(out _categories, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name))
+            .Subscribe();
+
+        // The "< Add New .. >" row comes from a cache of its own rather than _categoryCache, which LoadCommand's
+        // MergeFrom diffs against the categories it loaded — the row isn't one of them, so it would be dropped.
+        _addNewCategoryOption.AddOrUpdate(AddNewCategory);
+
+        _categoryCache.Connect()
+            .Or(_addNewCategoryOption.Connect())
+            .SortAndBind(out _categoryOptions, SortExpressionComparer<RawMaterialCategory>
+                .Ascending(c => c.Id == AddNewCategoryId ? 0 : 1)
+                .ThenByAscending(c => c.Name))
             .Subscribe();
 
         _isEditingIngredient = this.WhenAnyValue(x => x.EditingType)
@@ -803,6 +849,39 @@ public class RawMaterialsViewModel : ViewModelBase
                 await LoadCommand.Execute();
             }),
             this.WhenAnyValue(x => x.SelectedRawMaterial).Select(material => material is not null));
+
+        // The Category picker's "< Add New .. >" row: names a category, saves it, and picks it for the material
+        // being edited, so filing one under a new category doesn't mean a trip to Settings and back.
+        AddCategoryCommand = ReactiveCommand.CreateFromTask(async () =>
+        {
+            var name = await PromptForNewCategory.Handle("Name for the new category:");
+
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                await RunSafelyAsync(async () =>
+                {
+                    var category = new RawMaterialCategory { Name = name.Trim() };
+
+                    var validation = _categoryValidator.Validate(category);
+                    if (!validation.IsValid)
+                    {
+                        ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                        return;
+                    }
+
+                    // AddAsync fills in the saved Id, which the reloaded copy to pick is found by.
+                    await _categoryRepository.AddAsync(category, CancellationToken.None);
+                    await LoadCommand.Execute();
+                    EditingCategory = Categories.FirstOrDefault(c => c.Id == category.Id);
+                    SuccessMessage = $"{category.Name} was added.";
+                });
+            }
+
+            // The picker is still showing the row that was picked, so the category goes back into it: the new one,
+            // or the one it had when the prompt was cancelled or the name refused. Pushed back here rather than
+            // from the setter, since a value raised during the pick's own binding update is ignored.
+            this.RaisePropertyChanged(nameof(EditingCategory));
+        });
 
         AddUnitCommand = ReactiveCommand.Create(
             () =>
