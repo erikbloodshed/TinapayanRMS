@@ -709,4 +709,153 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.CostPerPiece.Should().Be(82m * 30m / 1020m);
         viewModel.FormAddIns.Single().Cost.Should().Be(32m, "the form's own table is repriced in place, not refilled");
     }
+
+    [Fact]
+    public async Task Ticking_a_line_as_the_base_is_saved_and_reads_as_a_hundred_percent()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var waterId = await AddIngredientAsync("Water", costPerGram: 0m);
+        var productId = await AddProductAsync("Pandesal");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [new OwnedSubAssemblyDraft(0, "Bread Dough", roleId, [(flourId, 1000m), (waterId, 650m)], UsageAuthoredField.WeightPerPiece, 50m)],
+            []));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        // Nothing ticked yet, so no line has a figure at all.
+        viewModel.FormLines.Should().OnlyContain(l => l.BakersPercent == null);
+
+        viewModel.FormLines.Single(l => l.Ingredient!.Id == flourId).IsFormulaBase = true;
+
+        viewModel.FormLines.Single(l => l.Ingredient!.Id == flourId).BakersPercent.Should().Be(100m);
+        viewModel.FormLines.Single(l => l.Ingredient!.Id == waterId).BakersPercent.Should().Be(65m, "650 g of water on 1,000 g of flour");
+        viewModel.UsageFormBaseCaption.Should().Contain("1,000 g").And.Contain("165");
+
+        // This is the trap: without CurrentRecipe() carrying the tick, Save treats the recipe as unchanged.
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+
+        await using var dbContext = CreateDbContext();
+        var lines = await dbContext.SubAssemblyLines.AsNoTracking()
+            .Where(l => l.SubAssembly!.OwnerProductId == productId)
+            .ToListAsync(Cancellation);
+        lines.Single(l => l.IngredientId == flourId).IsFormulaBase.Should().BeTrue();
+        lines.Single(l => l.IngredientId == waterId).IsFormulaBase.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Make_a_Copy_keeps_the_linked_recipes_base()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var waterId = await AddIngredientAsync("Water", costPerGram: 0m);
+        var ownerId = await AddProductAsync("Cream Loaf");
+        await SaveRecipeAsync(ownerId, new RecipeDraft(
+            [
+                new OwnedSubAssemblyDraft(0, "Sweet Dough", roleId,
+                    [new RecipeLine(flourId, 1000m, IsFormulaBase: true), new RecipeLine(waterId, 650m)],
+                    UsageAuthoredField.WeightPerPiece, 60m),
+            ],
+            []));
+        var doughId = await OwnedSubAssemblyIdAsync(ownerId, "Sweet Dough");
+        var linkerId = await AddProductAsync("Cream Loaf Mini");
+        await SaveRecipeAsync(linkerId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m)]));
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        // The link shows the owner's base, read-only, and the percentages that follow from it.
+        viewModel.FormLines.Single(l => l.Ingredient!.Id == flourId).BakersPercent.Should().Be(100m);
+        viewModel.IsFormEditingLines.Should().BeFalse("a linked recipe's base is its owner's to set");
+
+        await viewModel.MakeCopyCommand.Execute(viewModel.UsageEdits.Single());
+
+        var copy = viewModel.UsageEdits.Should().ContainSingle().Subject;
+        copy.IsOwned.Should().BeTrue();
+        copy.Lines.Single(l => l.Ingredient.Id == flourId).IsFormulaBase.Should().BeTrue("the copy is the same formula");
+        copy.Lines.Single(l => l.Ingredient.Id == waterId).IsFormulaBase.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Add_ins_take_their_percentage_from_the_linked_recipes_base()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var ubeId = await AddIngredientAsync("Ube Flavour", costPerGram: 0.8m);
+        var ownerId = await AddProductAsync("Cream Loaf");
+        await SaveRecipeAsync(ownerId, new RecipeDraft(
+            [
+                new OwnedSubAssemblyDraft(0, "Sweet Dough", roleId,
+                    [new RecipeLine(flourId, 1000m, IsFormulaBase: true)], UsageAuthoredField.WeightPerPiece, 60m),
+            ],
+            []));
+        var doughId = await OwnedSubAssemblyIdAsync(ownerId, "Sweet Dough");
+        var linkerId = await AddProductAsync("Cream Loaf Ube");
+        await SaveRecipeAsync(linkerId, new RecipeDraft(
+            [],
+            [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m) { AddIns = [(ubeId, 20m)] }]));
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        // 20 g of ube on the recipe's 1,000 g of flour is 2% — not 100% of its own 20 g.
+        viewModel.FormAddIns.Single().BakersPercent.Should().Be(2m);
+    }
+
+    [Fact]
+    public async Task A_typed_percentage_is_saved_and_follows_the_flour_while_typed_grams_stay_put()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var waterId = await AddIngredientAsync("Water", costPerGram: 0m);
+        var eggsId = await AddIngredientAsync("Eggs", costPerGram: 0.1m);
+        var productId = await AddProductAsync("Pandesal");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [
+                new OwnedSubAssemblyDraft(0, "Bread Dough", roleId,
+                    [new RecipeLine(flourId, 1000m, IsFormulaBase: true), (waterId, 600m), (eggsId, 100m)],
+                    UsageAuthoredField.WeightPerPiece, 50m),
+            ],
+            []));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        var water = viewModel.FormLines.Single(l => l.Ingredient!.Id == waterId);
+        water.CanTypeBakersPercent.Should().BeTrue();
+        water.BakersPercent = 65m;
+        water.Grams.Should().Be(650m);
+
+        // The trap: Save only writes a recipe it sees as changed, so the typed percentage has to reach the draft.
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        // Reopened from what was saved, the flour doubles: the typed 65% follows it, the typed 100 g of eggs doesn't.
+        viewModel.FormLines.Single(l => l.Ingredient!.Id == flourId).Grams = 2000m;
+
+        viewModel.FormLines.Single(l => l.Ingredient!.Id == waterId).Grams.Should().Be(1300m);
+        viewModel.FormLines.Single(l => l.Ingredient!.Id == waterId).IsPercentTyped.Should().BeTrue();
+        viewModel.FormLines.Single(l => l.Ingredient!.Id == eggsId).Grams.Should().Be(100m);
+
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+
+        await using var dbContext = CreateDbContext();
+        var lines = await dbContext.SubAssemblyLines.AsNoTracking()
+            .Where(l => l.SubAssembly!.OwnerProductId == productId)
+            .ToListAsync(Cancellation);
+        lines.Single(l => l.IngredientId == waterId).Grams.Should().Be(1300m);
+        lines.Single(l => l.IngredientId == waterId).AuthoredBakersPercent.Should().Be(65m);
+        lines.Single(l => l.IngredientId == eggsId).Grams.Should().Be(100m);
+        lines.Single(l => l.IngredientId == eggsId).AuthoredBakersPercent.Should().BeNull();
+    }
 }

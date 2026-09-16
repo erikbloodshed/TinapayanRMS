@@ -77,8 +77,9 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                 name,
                 usage.SubAssembly.RoleId,
                 [
-                    .. linesBySubAssembly[usage.SubAssemblyId].Select(l => (l.IngredientId, l.Grams)),
-                    .. addInsByUsage[usage.Id].Select(l => (l.IngredientId, l.Grams)),
+                    // The formula's base comes with its lines; the add-ins folded in beside them never are one.
+                    .. linesBySubAssembly[usage.SubAssemblyId].Select(l => new RecipeLine(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)),
+                    .. addInsByUsage[usage.Id].Select(l => new RecipeLine(l.IngredientId, l.Grams)),
                 ],
                 usage.AuthoredField,
                 usage.AuthoredValue));

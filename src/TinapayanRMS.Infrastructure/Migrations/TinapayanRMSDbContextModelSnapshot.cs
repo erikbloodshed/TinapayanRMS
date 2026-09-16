@@ -407,12 +407,19 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<decimal?>("AuthoredBakersPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<decimal>("Grams")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
                     b.Property<int>("IngredientId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsFormulaBase")
+                        .HasColumnType("bit");
 
                     b.Property<int>("SubAssemblyId")
                         .HasColumnType("int");

@@ -156,4 +156,30 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
 
         throw new TimeoutException($"The sub-assembly never finished loading: {describe()}.");
     }
+
+    [Fact]
+    public async Task A_typed_percentage_is_saved_and_reopens_as_typed()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var waterId = await AddIngredientAsync("Water", costPerGram: 0m);
+        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Name = "House Dough", RoleId = roleId },
+            [new RecipeLine(flourId, 1000m, IsFormulaBase: true), (waterId, 600m)],
+            Cancellation);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedRow = viewModel.Rows.Single();
+        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
+
+        viewModel.Lines.Single(l => l.Ingredient!.Id == waterId).BakersPercent = 62.5m;
+        viewModel.FormulaBaseCaption.Should().Contain("162.5");
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+
+        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
+        var water = viewModel.Lines.Single(l => l.Ingredient!.Id == waterId);
+        water.Grams.Should().Be(625m);
+        water.IsPercentTyped.Should().BeTrue("the form reopens with the percentage as the figure that was typed");
+    }
 }

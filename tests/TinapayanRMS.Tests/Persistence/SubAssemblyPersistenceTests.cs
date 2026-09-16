@@ -31,7 +31,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         return await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == id, Cancellation);
     }
 
-    private static OwnedSubAssemblyDraft Owned(int id, string name, int roleId, IReadOnlyList<(int IngredientId, decimal Grams)> lines, decimal weightPerPiece = 10m) =>
+    private static OwnedSubAssemblyDraft Owned(int id, string name, int roleId, IReadOnlyList<RecipeLine> lines, decimal weightPerPiece = 10m) =>
         new(id, name, roleId, lines, UsageAuthoredField.WeightPerPiece, weightPerPiece);
 
     [Fact]

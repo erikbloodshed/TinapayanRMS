@@ -1,9 +1,11 @@
+using TinapayanRMS.ApplicationCore.Interfaces;
+
 namespace TinapayanRMS.ApplicationCore.Rules;
 
 public static class SubAssemblyRules
 {
     /// <summary>A sub-assembly needs at least one line, positive grams, and no ingredient used twice.</summary>
-    public static void EnsureValidLines(IReadOnlyList<(int IngredientId, decimal Grams)> lines)
+    public static void EnsureValidLines(IReadOnlyList<RecipeLine> lines)
     {
         if (lines.Count == 0)
         {
@@ -19,6 +21,17 @@ public static class SubAssemblyRules
         {
             throw new InvalidOperationException("A sub-assembly can't use the same ingredient more than once — combine it into a single line instead.");
         }
+
+        // The base is 100% between its lines by definition, so a base line is always given in grams.
+        if (lines.Any(l => l.IsFormulaBase && l.AuthoredBakersPercent is not null))
+        {
+            throw new InvalidOperationException("A base line is given in grams, not as a percentage.");
+        }
+
+        if (lines.Any(l => l.AuthoredBakersPercent is <= 0))
+        {
+            throw new InvalidOperationException("A sub-assembly line's baker's percentage must be positive.");
+        }
     }
 
     /// <summary>TotalWeight = Σ grams; TotalCost = Σ (grams × that line's ingredient cost per gram, its CostPerBaseUnit).</summary>
@@ -28,6 +41,31 @@ public static class SubAssemblyRules
         var totalCost = lines.Sum(l => l.Grams * l.IngredientCostPerGram);
         return (totalWeight, totalCost);
     }
+
+    /// <summary>
+    /// The formula's 100% base: the weight of the lines ticked as base, which is what every line's baker's
+    /// percentage is read against. Usually the flour, and more than one flour ticks together to make 100%
+    /// between them. Nothing ticked gives 0, which means the formula has no base.
+    /// </summary>
+    public static decimal FormulaBaseWeight(IReadOnlyList<(decimal Grams, bool IsFormulaBase)> lines) =>
+        lines.Where(l => l.IsFormulaBase).Sum(l => l.Grams);
+
+    /// <summary>
+    /// A line in baker's percentage: its weight against the formula's base (<see cref="FormulaBaseWeight"/>),
+    /// so the base itself comes to 100 and 650 g of water on 1,000 g of flour comes to 65. Null when nothing
+    /// is ticked — a glaze or a filling needn't have a base, and no figure is the honest answer, not zero.
+    /// </summary>
+    public static decimal? CalculateBakersPercent(decimal grams, decimal baseWeight) =>
+        baseWeight <= 0 ? null : grams / baseWeight * 100m;
+
+    /// <summary>
+    /// The other way: a line's grams from its baker's percentage, so 65% on 1,000 g of flour is 650 g. What a line typed as
+    /// a percentage is worked out from, again, whenever the base weight changes. Rounded to the 4 decimals grams are stored
+    /// in, so a line saved this way reads back exactly as it was worked out — unrounded, reopening it could move its grams
+    /// by a ten-thousandth and make a recipe nobody touched look changed.
+    /// </summary>
+    public static decimal GramsFromBakersPercent(decimal percent, decimal baseWeight) =>
+        Math.Round(baseWeight * percent / 100m, 4);
 
     /// <summary>
     /// A product's own sub-assemblies need a name each, and different names: the owner's recipe shows

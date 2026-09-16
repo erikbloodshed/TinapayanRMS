@@ -71,7 +71,7 @@ public class IngredientLineRowTests
     {
         var lines = IngredientLineRow.CompleteLines([new IngredientLineRow(Flour, 1000m), new IngredientLineRow()], "Bread Dough");
 
-        lines.Should().Equal((Flour, 1000m));
+        lines.Should().Equal((Flour, 1000m, false, (decimal?)null));
     }
 
     [Fact]
@@ -99,5 +99,97 @@ public class IngredientLineRowTests
         var act = () => IngredientLineRow.CompleteLines([new IngredientLineRow(Sugar, 100m), new IngredientLineRow(Sugar, 50m)], "Bread Dough");
 
         act.Should().Throw<InvalidOperationException>().WithMessage("Sugar is on two lines of Bread Dough. Put its total on one line and delete the other.");
+    }
+
+    /// <summary>A 1,000 g flour base, then water given as 65% and eggs given as 100 g, the base worked out across them.</summary>
+    private static (IngredientLineRow Flour, IngredientLineRow Water, IngredientLineRow Eggs, List<IngredientLineRow> Rows) DoughWithTypedFigures()
+    {
+        var eggs = new RawMaterial { Id = 3, Name = "Eggs", BufferedCostPerBaseUnit = 0.1m };
+        var flour = new IngredientLineRow(Flour, 1000m, isFormulaBase: true);
+        var water = new IngredientLineRow(Sugar, 0m);
+        var eggRow = new IngredientLineRow(eggs, 100m);
+        List<IngredientLineRow> rows = [flour, water, eggRow];
+        IngredientLineRow.ApplyFormulaBase(rows);
+        water.BakersPercent = 65m;
+        return (flour, water, eggRow, rows);
+    }
+
+    [Fact]
+    public void Typing_a_percentage_works_out_the_grams_and_keeps_the_percentage()
+    {
+        var (_, water, _, _) = DoughWithTypedFigures();
+
+        water.Grams.Should().Be(650m);
+        water.BakersPercent.Should().Be(65m);
+        water.IsPercentTyped.Should().BeTrue();
+        water.AuthoredBakersPercent.Should().Be(65m);
+    }
+
+    [Fact]
+    public void Typing_grams_lets_a_typed_percentage_go()
+    {
+        var (_, water, _, _) = DoughWithTypedFigures();
+
+        water.Grams = 700m;
+
+        water.IsPercentTyped.Should().BeFalse("the grams are now the figure that was typed");
+        water.BakersPercent.Should().Be(70m);
+    }
+
+    [Fact]
+    public void A_line_typed_as_a_percentage_follows_the_base_and_one_typed_in_grams_doesnt()
+    {
+        var (flour, water, eggs, rows) = DoughWithTypedFigures();
+
+        flour.Grams = 2000m;
+        IngredientLineRow.ApplyFormulaBase(rows);
+
+        water.Grams.Should().Be(1300m, "65% was typed, so it stays 65% of the bigger base");
+        water.BakersPercent.Should().Be(65m);
+        eggs.Grams.Should().Be(100m, "100 g was typed, so it stays 100 g");
+        eggs.BakersPercent.Should().Be(5m);
+    }
+
+    [Fact]
+    public void Ticking_a_line_typed_as_a_percentage_makes_it_a_base_line_given_in_grams()
+    {
+        var (_, water, _, rows) = DoughWithTypedFigures();
+
+        water.IsFormulaBase = true;
+        IngredientLineRow.ApplyFormulaBase(rows);
+
+        water.IsPercentTyped.Should().BeFalse("a base line is 100% between its lines, and given in grams");
+        water.Grams.Should().Be(650m, "ticking it changes what the percentages are read against, not how much there is");
+    }
+
+    [Fact]
+    public void A_percentage_cant_be_typed_on_a_base_line_or_without_a_base()
+    {
+        var (flour, _, _, _) = DoughWithTypedFigures();
+        flour.CanTypeBakersPercent.Should().BeFalse("the base is 100% by definition");
+
+        var loose = new IngredientLineRow(Sugar, 200m);
+        IngredientLineRow.ApplyFormulaBase([loose]);
+        loose.CanTypeBakersPercent.Should().BeFalse("nothing is ticked, so there's no base to take a share of");
+
+        loose.BakersPercent = 50m;
+        loose.Grams.Should().Be(200m, "a percentage typed where it can't be has nothing to be a percentage of");
+        loose.IsPercentTyped.Should().BeFalse();
+    }
+
+    [Fact]
+    public void With_no_base_a_typed_percentage_keeps_its_grams_and_comes_back_with_the_base()
+    {
+        var (flour, water, _, rows) = DoughWithTypedFigures();
+
+        flour.IsFormulaBase = false;
+        IngredientLineRow.ApplyFormulaBase(rows);
+        water.Grams.Should().Be(650m, "with no base, it keeps its last grams");
+        water.BakersPercent.Should().BeNull();
+
+        flour.IsFormulaBase = true;
+        flour.Grams = 2000m;
+        IngredientLineRow.ApplyFormulaBase(rows);
+        water.Grams.Should().Be(1300m, "its 65% waited for a base to come back");
     }
 }

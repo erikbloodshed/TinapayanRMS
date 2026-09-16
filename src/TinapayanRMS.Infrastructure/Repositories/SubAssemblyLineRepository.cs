@@ -33,7 +33,7 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
     internal static async Task SetLinesAsync(
         TinapayanRMSDbContext dbContext,
         SubAssembly subAssembly,
-        IReadOnlyList<(int IngredientId, decimal Grams)> lines,
+        IReadOnlyList<RecipeLine> lines,
         CancellationToken cancellationToken)
     {
         SubAssemblyRules.EnsureValidLines(lines);
@@ -63,6 +63,8 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
             SubAssemblyId = subAssembly.Id,
             IngredientId = l.IngredientId,
             Grams = l.Grams,
+            IsFormulaBase = l.IsFormulaBase,
+            AuthoredBakersPercent = l.AuthoredBakersPercent,
         }));
 
         var costInputs = lines.Select(l => (l.Grams, IngredientCostPerGram: ingredients[l.IngredientId].BufferedCostPerBaseUnit)).ToList();

@@ -1,4 +1,5 @@
 using ReactiveUI;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.UI.ViewModels;
@@ -23,16 +24,21 @@ public sealed class IngredientLineRow : ReactiveObject
     /// (controls:GridAddNewRow.ItemFactory): until it's committed it isn't in the screen's lines, so the screen
     /// can't resolve it, and its Cost would stay 0 while its grams are typed.
     /// </summary>
-    public IngredientLineRow(Func<int, RawMaterial?> findIngredient)
+    /// <param name="baseWeight">The formula's base as the table has it, so a percentage can be typed into the add row too.</param>
+    public IngredientLineRow(Func<int, RawMaterial?> findIngredient, decimal baseWeight = 0m)
     {
         _findIngredient = findIngredient;
+        _baseWeight = baseWeight;
     }
 
-    public IngredientLineRow(RawMaterial ingredient, decimal grams)
+    /// <param name="authoredBakersPercent">The percentage typed for the line, or null when its grams were.</param>
+    public IngredientLineRow(RawMaterial ingredient, decimal grams, bool isFormulaBase = false, decimal? authoredBakersPercent = null)
     {
         _ingredientId = ingredient.Id;
         _ingredient = ingredient;
         _grams = grams;
+        _isFormulaBase = isFormulaBase;
+        _authoredBakersPercent = isFormulaBase ? null : authoredBakersPercent;
     }
 
     private int? _ingredientId;
@@ -66,13 +72,113 @@ public sealed class IngredientLineRow : ReactiveObject
     public decimal CostPerGram => Ingredient?.BufferedCostPerBaseUnit ?? 0m;
 
     private decimal _grams;
+    /// <summary>The line's grams. Typing them makes them the figure that stays put, so any typed percentage is let go.</summary>
     public decimal Grams
     {
         get => _grams;
         set
         {
-            this.RaiseAndSetIfChanged(ref _grams, value);
-            this.RaisePropertyChanged(nameof(Cost));
+            AuthoredBakersPercent = null;
+            SetGrams(value);
+        }
+    }
+
+    /// <summary>Grams worked out rather than typed: from a typed percentage, which stays the figure that's kept.</summary>
+    private void SetGrams(decimal value)
+    {
+        this.RaiseAndSetIfChanged(ref _grams, value, nameof(Grams));
+        this.RaisePropertyChanged(nameof(BakersPercent));
+        this.RaisePropertyChanged(nameof(Cost));
+    }
+
+    private bool _isFormulaBase;
+    /// <summary>
+    /// Ticked as part of the formula's 100% base — usually the flour. Every line's <see cref="BakersPercent"/>
+    /// is read against the ticked lines' total, so ticking one changes the whole table: the screen sums them
+    /// and pushes the total back through <see cref="ApplyFormulaBase"/>.
+    /// </summary>
+    public bool IsFormulaBase
+    {
+        get => _isFormulaBase;
+        set
+        {
+            // The base is 100% between its lines, so a line ticked into it keeps its grams and lets its percentage go.
+            if (value)
+            {
+                AuthoredBakersPercent = null;
+            }
+
+            this.RaiseAndSetIfChanged(ref _isFormulaBase, value);
+            this.RaisePropertyChanged(nameof(CanTypeBakersPercent));
+        }
+    }
+
+    private decimal _baseWeight;
+    /// <summary>The formula's base weight, as the screen last worked it out. Not the row's own business to know.</summary>
+    public decimal BaseWeight
+    {
+        get => _baseWeight;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _baseWeight, value);
+            this.RaisePropertyChanged(nameof(BakersPercent));
+            this.RaisePropertyChanged(nameof(CanTypeBakersPercent));
+        }
+    }
+
+    private decimal? _authoredBakersPercent;
+    /// <summary>
+    /// The percentage typed for the line, which is then the figure that stays put: when the base changes, its grams are
+    /// worked out again from it. Null when its grams were typed, as a base line's always are. Saved with the line.
+    /// </summary>
+    public decimal? AuthoredBakersPercent
+    {
+        get => _authoredBakersPercent;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _authoredBakersPercent, value);
+            this.RaisePropertyChanged(nameof(IsPercentTyped));
+        }
+    }
+
+    /// <summary>The line's percentage, not its grams, is what was typed: the table shows it in bold.</summary>
+    public bool IsPercentTyped => AuthoredBakersPercent is not null;
+
+    /// <summary>
+    /// Whether a percentage can be typed for the line: not for a base line, which is 100% between its lines by
+    /// definition and given in grams, and not while nothing is ticked, since there's no base to take a share of.
+    /// </summary>
+    public bool CanTypeBakersPercent => !IsFormulaBase && BaseWeight > 0;
+
+    /// <summary>
+    /// This line in baker's percentage: its weight against the formula's base, so the base comes to 100 and 650 g of
+    /// water on 1,000 g of flour comes to 65. Null when nothing is ticked, which shows as a blank rather than a nought — a
+    /// glaze needn't have a base. Typing one works out the grams (SubAssemblyRules.GramsFromBakersPercent) and makes the
+    /// percentage the figure that stays put; clearing it keeps the grams and makes those the figure instead.
+    /// </summary>
+    public decimal? BakersPercent
+    {
+        get => AuthoredBakersPercent is { } typed && BaseWeight > 0
+            ? typed
+            : SubAssemblyRules.CalculateBakersPercent(Grams, BaseWeight);
+        set
+        {
+            if (value is not > 0m)
+            {
+                AuthoredBakersPercent = null;
+                this.RaisePropertyChanged(nameof(BakersPercent));
+                return;
+            }
+
+            // The grid won't open the cell where it can't be typed (controls:GridCellEditing); this is the backstop.
+            if (!CanTypeBakersPercent)
+            {
+                this.RaisePropertyChanged(nameof(BakersPercent));
+                return;
+            }
+
+            AuthoredBakersPercent = value;
+            SetGrams(SubAssemblyRules.GramsFromBakersPercent(value.Value, BaseWeight));
         }
     }
 
@@ -101,12 +207,46 @@ public sealed class IngredientLineRow : ReactiveObject
     }
 
     /// <summary>
+    /// Works out the formula's base from <paramref name="rows"/> — the ticked lines' total weight — and gives
+    /// it to every row, so each can read its own percentage. Returns the base, which the screen also puts in
+    /// its caption. Call it wherever <see cref="Resolve"/> is called: a tick, a gram or a line coming or going
+    /// all move it.
+    /// </summary>
+    public static decimal ApplyFormulaBase(IReadOnlyList<IngredientLineRow> rows)
+    {
+        // A typed percentage is never on a base line, so reworking those lines' grams can't move the base itself.
+        var baseWeight = SubAssemblyRules.FormulaBaseWeight([.. rows.Select(r => (r.Grams, r.IsFormulaBase))]);
+        ApplyFormulaBase(rows, baseWeight);
+        return baseWeight;
+    }
+
+    /// <summary>
+    /// The same, against a base worked out elsewhere: a linked recipe's add-ins are read against the recipe's
+    /// base, not against their own weight, since an add-in is never part of the base.
+    /// </summary>
+    public static void ApplyFormulaBase(IEnumerable<IngredientLineRow> rows, decimal baseWeight)
+    {
+        foreach (var row in rows)
+        {
+            row.BaseWeight = baseWeight;
+
+            // A line typed as a percentage keeps it: its grams follow the base. With no base there's nothing to take a
+            // share of, so it keeps its last grams, and its percentage waits for a base to come back.
+            if (row.AuthoredBakersPercent is { } percent && baseWeight > 0)
+            {
+                row.SetGrams(SubAssemblyRules.GramsFromBakersPercent(percent, baseWeight));
+            }
+        }
+    }
+
+    /// <summary>
     /// The rows as lines, leaving out blank ones. A row with only an ingredient or only grams is refused, and so
     /// is an ingredient on two rows, each with a message naming it and <paramref name="madeInto"/>.
     /// </summary>
-    public static IReadOnlyList<(RawMaterial Ingredient, decimal Grams)> CompleteLines(IEnumerable<IngredientLineRow> rows, string madeInto)
+    public static IReadOnlyList<(RawMaterial Ingredient, decimal Grams, bool IsFormulaBase, decimal? AuthoredBakersPercent)> CompleteLines(
+        IEnumerable<IngredientLineRow> rows, string madeInto)
     {
-        List<(RawMaterial Ingredient, decimal Grams)> lines = [];
+        List<(RawMaterial Ingredient, decimal Grams, bool IsFormulaBase, decimal? AuthoredBakersPercent)> lines = [];
         foreach (var row in rows.Where(r => !r.IsBlank))
         {
             if (row.Ingredient is not { } ingredient)
@@ -124,7 +264,7 @@ public sealed class IngredientLineRow : ReactiveObject
                 throw new InvalidOperationException($"{ingredient.Name} is on two lines of {madeInto}. Put its total on one line and delete the other.");
             }
 
-            lines.Add((ingredient, row.Grams));
+            lines.Add((ingredient, row.Grams, row.IsFormulaBase, row.AuthoredBakersPercent));
         }
 
         return lines;

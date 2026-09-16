@@ -153,6 +153,9 @@
 
                     <!-- Typed straight into: the add row at the bottom starts a line, Delete removes the selected one -->
                     <syncfusion:SfDataGrid ItemsSource="{Binding Lines}"
+                                           controls:GridAddNewRow.HideCheckBoxes="True"
+                                           controls:GridCellEditing.IsEnabled="True"
+                                           controls:GridCellEmphasis.IsEnabled="True"
                                            SelectedItem="{Binding SelectedLine, Mode=TwoWay}"
                                            GridLinesVisibility="Both"
                                            controls:GridFillerRows.IsEnabled="True"
@@ -192,7 +195,18 @@
                                     </syncfusion:Columns>
                                 </syncfusion:GridMultiColumnDropDownList.Columns>
                             </syncfusion:GridMultiColumnDropDownList>
+                            <!-- The formula's 100% base for baker's percentage, usually the flour; more than one can be ticked. -->
+                            <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"
+                                                           HeaderText="Base"
+                                                           Width="54"
+                                                           HorizontalHeaderContentAlignment="Center" />
                             <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="120" NumberDecimalDigits="2" />
+                            <controls:NumericColumn MappingName="BakersPercent"
+                                                    HeaderText="Baker's %"
+                                                    Width="86"
+                                                    NumberDecimalDigits="1"
+                                                    controls:GridCellEditing.AllowWhen="CanTypeBakersPercent"
+                                                    controls:GridCellEmphasis.When="IsPercentTyped" />
                             <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost per g" Width="120" NumberDecimalDigits="4" AllowEditing="False" />
                             <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="120" NumberDecimalDigits="2" AllowEditing="False" />
                         </syncfusion:SfDataGrid.Columns>
@@ -203,7 +217,11 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Type the lines straight into the table. Delete removes the selected one." Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Type the lines straight into the table. Delete removes the selected one." Style="{StaticResource CaptionStyle}" />
+                            <!-- What the percentages are read against, and the figure a batch is scaled by. -->
+                            <TextBlock Text="{Binding FormulaBaseCaption}" Style="{StaticResource CaptionStyle}" Margin="0,2,0,0" />
+                        </StackPanel>
                         <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveLineCommand}" />
                     </Grid>
 

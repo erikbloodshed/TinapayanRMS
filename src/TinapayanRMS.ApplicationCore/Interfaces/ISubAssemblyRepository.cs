@@ -37,7 +37,7 @@ public interface ISubAssemblyRepository
     /// Adds (Id 0) or updates a standalone sub-assembly's name and role, and replaces its lines (grams of
     /// ingredients), in one transaction; every product linking it follows. Returns its id.
     /// </summary>
-    Task<int> SaveStandaloneAsync(SubAssembly subAssembly, IReadOnlyList<(int IngredientId, decimal Grams)> lines, CancellationToken cancellationToken);
+    Task<int> SaveStandaloneAsync(SubAssembly subAssembly, IReadOnlyList<RecipeLine> lines, CancellationToken cancellationToken);
 
     /// <summary>Deletes a standalone sub-assembly and its lines; refused while a product links it.</summary>
     Task DeleteStandaloneAsync(int id, CancellationToken cancellationToken);

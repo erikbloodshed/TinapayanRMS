@@ -169,7 +169,7 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
     /// <paramref name="weightPerPiece"/> grams a piece, saved through ProductRepository.SaveAsync.
     /// </summary>
     protected async Task<(int ProductId, int SubAssemblyId)> AddProductWithSubAssemblyAsync(
-        string productName, string subAssemblyName, int roleId, IReadOnlyList<(int IngredientId, decimal Grams)> lines, decimal weightPerPiece = 10m)
+        string productName, string subAssemblyName, int roleId, IReadOnlyList<RecipeLine> lines, decimal weightPerPiece = 10m)
     {
         var productId = await AddProductAsync(productName);
         await SaveRecipeAsync(productId, new RecipeDraft(

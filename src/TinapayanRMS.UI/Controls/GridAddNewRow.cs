@@ -1,5 +1,6 @@
 using System.Windows;
 using Syncfusion.UI.Xaml.Grid;
+using Syncfusion.UI.Xaml.Grid.Cells;
 using Syncfusion.UI.Xaml.Grid.Helpers;
 
 namespace TinapayanRMS.UI.Controls;
@@ -15,6 +16,9 @@ namespace TinapayanRMS.UI.Controls;
 /// <item><c>controls:GridAddNewRow.DropWhenUntouched="True"</c> drops an add row nothing was typed into when it's left
 /// for another row, instead of adding it as an empty line (<see cref="UntouchedAddRowSelectionController"/>). For a
 /// grid with row selection, the default <c>SelectionUnit</c>.</item>
+/// <item><c>controls:GridAddNewRow.HideCheckBoxes="True"</c> leaves a <c>GridCheckBoxColumn</c>'s cell blank in the add row, so
+/// the row stays the plain empty row the other grids show, instead of offering a tick for a line that doesn't exist yet
+/// (<see cref="AddRowHiddenCheckBoxRenderer"/>). The tick appears once the line is committed.</item>
 /// </list>
 /// </summary>
 public static class GridAddNewRow
@@ -25,6 +29,9 @@ public static class GridAddNewRow
     public static readonly DependencyProperty DropWhenUntouchedProperty = DependencyProperty.RegisterAttached(
         "DropWhenUntouched", typeof(bool), typeof(GridAddNewRow), new PropertyMetadata(false, OnDropWhenUntouchedChanged));
 
+    public static readonly DependencyProperty HideCheckBoxesProperty = DependencyProperty.RegisterAttached(
+        "HideCheckBoxes", typeof(bool), typeof(GridAddNewRow), new PropertyMetadata(false, OnHideCheckBoxesChanged));
+
     public static Func<object>? GetItemFactory(DependencyObject element) => (Func<object>?)element.GetValue(ItemFactoryProperty);
 
     public static void SetItemFactory(DependencyObject element, Func<object>? value) => element.SetValue(ItemFactoryProperty, value);
@@ -32,6 +39,22 @@ public static class GridAddNewRow
     public static bool GetDropWhenUntouched(DependencyObject element) => (bool)element.GetValue(DropWhenUntouchedProperty);
 
     public static void SetDropWhenUntouched(DependencyObject element, bool value) => element.SetValue(DropWhenUntouchedProperty, value);
+
+    public static bool GetHideCheckBoxes(DependencyObject element) => (bool)element.GetValue(HideCheckBoxesProperty);
+
+    public static void SetHideCheckBoxes(DependencyObject element, bool value) => element.SetValue(HideCheckBoxesProperty, value);
+
+    private static void OnHideCheckBoxesChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not SfDataGrid grid || !(bool)e.NewValue)
+        {
+            return;
+        }
+
+        // The documented way to change how a cell type draws: swap the grid's renderer for it.
+        grid.CellRenderers.Remove(AddRowHiddenCheckBoxRenderer.CellType);
+        grid.CellRenderers.Add(AddRowHiddenCheckBoxRenderer.CellType, new AddRowHiddenCheckBoxRenderer());
+    }
 
     /// <summary>
     /// Whether an add row's item is as it started: every column still at a new item's value. An item without a
@@ -108,5 +131,24 @@ internal sealed class UntouchedAddRowSelectionController(SfDataGrid grid) : Grid
         }
 
         base.CommitAddNew(changeState);
+    }
+}
+
+/// <summary>
+/// A <c>GridCheckBoxColumn</c>'s renderer that hides the tick in the add row. The same checkbox serves every row as rows
+/// scroll and recycle, and the grid re-initializes it each time (<c>OnUpdateEditBinding</c> calls
+/// <see cref="OnInitializeEditElement"/>), so it's shown again whenever the row it lands on is a real one.
+/// </summary>
+public sealed class AddRowHiddenCheckBoxRenderer : GridCellCheckBoxRenderer
+{
+    public const string CellType = "CheckBox";
+
+    public override void OnInitializeEditElement(DataColumnBase dataColumn, System.Windows.Controls.CheckBox uiElement, object dataContext)
+    {
+        base.OnInitializeEditElement(dataColumn, uiElement, dataContext);
+        if (dataColumn is not null && uiElement is not null)
+        {
+            uiElement.Visibility = DataGrid.IsAddNewIndex(dataColumn.RowIndex) ? Visibility.Hidden : Visibility.Visible;
+        }
     }
 }

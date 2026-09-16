@@ -27,7 +27,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         return await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == id, Cancellation);
     }
 
-    private Task<int> SaveStandaloneAsync(string name, int roleId, IReadOnlyList<(int IngredientId, decimal Grams)> lines, int id = 0) =>
+    private Task<int> SaveStandaloneAsync(string name, int roleId, IReadOnlyList<RecipeLine> lines, int id = 0) =>
         CreateRepository().SaveStandaloneAsync(new SubAssembly { Id = id, Name = name, RoleId = roleId }, lines, Cancellation);
 
     private Task LinkAsync(int productId, int subAssemblyId, decimal weightPerPiece) =>

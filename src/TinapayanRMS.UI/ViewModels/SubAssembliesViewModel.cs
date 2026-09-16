@@ -68,7 +68,10 @@ public class SubAssembliesViewModel : ViewModelBase
     public ObservableCollection<IngredientLineRow> Lines { get; } = [];
 
     /// <summary>The line the table's add row edits: it prices itself as its ingredient is picked, before it's committed.</summary>
-    public Func<IngredientLineRow> NewLine => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id));
+    public Func<IngredientLineRow> NewLine => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id), _formulaBase);
+
+    /// <summary>The formula base as last worked out, for a line started in the add row.</summary>
+    private decimal _formulaBase;
 
     private StandaloneSubAssemblyRow? _selectedRow;
     public StandaloneSubAssemblyRow? SelectedRow
@@ -104,6 +107,14 @@ public class SubAssembliesViewModel : ViewModelBase
     {
         get => _headerTitle;
         private set => this.RaiseAndSetIfChanged(ref _headerTitle, value);
+    }
+
+    private string _formulaBaseCaption = "Tick the ingredients that make 100% — usually the flour.";
+    /// <summary>The formula in baker's terms, e.g. "Base 1,000 g · whole formula 167.7%" — the figure a batch is scaled by.</summary>
+    public string FormulaBaseCaption
+    {
+        get => _formulaBaseCaption;
+        private set => this.RaiseAndSetIfChanged(ref _formulaBaseCaption, value);
     }
 
     private decimal _batchWeight;
@@ -180,6 +191,12 @@ public class SubAssembliesViewModel : ViewModelBase
             .AutoRefresh(l => l.Cost)
             .Subscribe(_ => RecomputeTotals());
 
+        // The formula's base: what's ticked, and how much of it there is.
+        Lines.ToObservableChangeSet()
+            .AutoRefresh(l => l.IsFormulaBase)
+            .AutoRefresh(l => l.Grams)
+            .Subscribe(_ => RecomputeFormulaBase());
+
         // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
         // rather than replaces, so the screen keeps its selection and unsaved lines while picking up
         // what changed elsewhere: a repriced ingredient, a renamed role, a product that links one.
@@ -235,7 +252,7 @@ public class SubAssembliesViewModel : ViewModelBase
 
             var id = await _subAssemblyRepository.SaveStandaloneAsync(
                 new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id },
-                [.. lines.Select(l => (l.Ingredient.Id, l.Grams))],
+                [.. lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
                 CancellationToken.None);
 
             // The list picks up the new totals; then the form reloads what was saved.
@@ -300,7 +317,7 @@ public class SubAssembliesViewModel : ViewModelBase
         EditingRole = Roles.FirstOrDefault(r => r.Id == row.SubAssembly.RoleId);
         SelectedLine = null;
         Lines.Clear();
-        Lines.AddRange(saved.Select(l => new IngredientLineRow(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams)));
+        Lines.AddRange(saved.Select(l => new IngredientLineRow(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)));
         ShowUsedBy(row.GetUsedBy());
     }
 
@@ -309,6 +326,17 @@ public class SubAssembliesViewModel : ViewModelBase
         UsedByText = productNames.Count == 0
             ? NotUsedText
             : $"Used by {string.Join(", ", productNames)}. They follow every change saved here, and it can't be deleted while they use it.";
+    }
+
+    /// <summary>The formula's base, given to every row so each reads its own percentage, and said in the caption.</summary>
+    private void RecomputeFormulaBase()
+    {
+        var baseWeight = IngredientLineRow.ApplyFormulaBase([.. Lines]);
+        _formulaBase = baseWeight;
+        var totalWeight = Lines.Where(l => l.Ingredient is not null).Sum(l => l.Grams);
+        FormulaBaseCaption = baseWeight > 0
+            ? $"Base {baseWeight:#,0.##} g · whole formula {totalWeight / baseWeight * 100m:#,0.#}%"
+            : "Tick the ingredients that make 100% — usually the flour.";
     }
 
     private void RecomputeTotals()

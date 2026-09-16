@@ -11,7 +11,7 @@ public sealed record OwnedSubAssemblyDraft(
     int Id,
     string Name,
     int RoleId,
-    IReadOnlyList<(int IngredientId, decimal Grams)> Lines,
+    IReadOnlyList<RecipeLine> Lines,
     UsageAuthoredField AuthoredField,
     decimal AuthoredValue);
 

@@ -15,11 +15,17 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>One ingredient line of a sub-assembly, saved or not: grams of an ingredient, costed at its buffered cost per gram.</summary>
-public sealed class SubAssemblyLineEdit(RawMaterial ingredient, decimal grams)
+public sealed class SubAssemblyLineEdit(RawMaterial ingredient, decimal grams, bool isFormulaBase = false, decimal? authoredBakersPercent = null)
 {
     public RawMaterial Ingredient { get; } = ingredient;
 
     public decimal Grams { get; } = grams;
+
+    /// <summary>Part of the formula's 100% base, which every line's baker's percentage is read against.</summary>
+    public bool IsFormulaBase { get; } = isFormulaBase;
+
+    /// <summary>The percentage typed for the line, or null when its grams were: whichever was typed is what stays put.</summary>
+    public decimal? AuthoredBakersPercent { get; } = authoredBakersPercent;
 
     /// <summary>What this line adds to the batch's cost, at the ingredient's buffered cost per gram.</summary>
     public decimal Cost => Grams * Ingredient.BufferedCostPerBaseUnit;
@@ -184,7 +190,11 @@ public sealed class ProductUsageEdit
         && AuthoredField == other.AuthoredField
         && AuthoredValue == other.AuthoredValue
         && Lines.Count == other.Lines.Count
-        && Lines.Zip(other.Lines).All(pair => pair.First.Grams == pair.Second.Grams && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient))
+        && Lines.Zip(other.Lines).All(pair =>
+            pair.First.Grams == pair.Second.Grams
+            && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
+            && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent
+            && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient))
         && AddIns.Count == other.AddIns.Count
         && AddIns.Zip(other.AddIns).All(pair => pair.First.Grams == pair.Second.Grams && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient));
 }
@@ -461,7 +471,7 @@ public class ProductsViewModel : ViewModelBase
     public ObservableCollection<IngredientLineRow> FormLines { get; } = [];
 
     /// <summary>The line the form table's add row edits: it prices itself as its ingredient is picked, before it's committed.</summary>
-    public Func<IngredientLineRow> NewFormLine => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id));
+    public Func<IngredientLineRow> NewFormLine => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id), _formFormulaBase);
 
     /// <summary>
     /// The form's add-ins, for a sub-assembly the product links: its own extras on top of the owner's
@@ -470,7 +480,10 @@ public class ProductsViewModel : ViewModelBase
     public ObservableCollection<IngredientLineRow> FormAddIns { get; } = [];
 
     /// <summary>The add-in the form table's add row edits, priced as its ingredient is picked.</summary>
-    public Func<IngredientLineRow> NewFormAddIn => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id));
+    public Func<IngredientLineRow> NewFormAddIn => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id), _formFormulaBase);
+
+    /// <summary>The form's formula base as last worked out, for a line started in either table's add row.</summary>
+    private decimal _formFormulaBase;
 
     private string _searchText = string.Empty;
     public string SearchText
@@ -759,6 +772,14 @@ public class ProductsViewModel : ViewModelBase
     {
         get => _usageFormPreviewText;
         private set => this.RaiseAndSetIfChanged(ref _usageFormPreviewText, value);
+    }
+
+    private string _usageFormBaseCaption = string.Empty;
+    /// <summary>The formula in baker's terms, e.g. "Base 1,000 g · whole formula 167.7%" — the figure a batch is scaled by.</summary>
+    public string UsageFormBaseCaption
+    {
+        get => _usageFormBaseCaption;
+        private set => this.RaiseAndSetIfChanged(ref _usageFormBaseCaption, value);
     }
 
     private string _usageFormAddInsCaption = string.Empty;
@@ -1055,6 +1076,7 @@ public class ProductsViewModel : ViewModelBase
         FormLines.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
             .AutoRefresh(l => l.Grams)
+            .AutoRefresh(l => l.IsFormulaBase)
             .Subscribe(_ =>
             {
                 IngredientLineRow.Resolve(FormLines, Ingredients.ToDictionary(m => m.Id));
@@ -1614,7 +1636,7 @@ public class ProductsViewModel : ViewModelBase
             subAssembly.Id,
             subAssembly.Name,
             Roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role,
-            [.. lines.Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams))],
+            [.. lines.Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
             usage.AuthoredField,
             usage.AuthoredValue,
             isOwn ? null : ProductUsageEdit.SourceNameOf(subAssembly),
@@ -1658,7 +1680,7 @@ public class ProductsViewModel : ViewModelBase
     private RecipeDraft CurrentRecipe() =>
         new(
             [.. UsageEdits.Where(u => u.IsOwned).Select(u => new OwnedSubAssemblyDraft(
-                u.SubAssemblyId, u.Name, u.RoleId, [.. u.Lines.Select(l => (l.Ingredient.Id, l.Grams))], u.AuthoredField, u.AuthoredValue))],
+                u.SubAssemblyId, u.Name, u.RoleId, [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], u.AuthoredField, u.AuthoredValue))],
             [.. UsageEdits.Where(u => u.IsLinked).Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
             {
                 AddIns = [.. u.AddIns.Select(a => (a.Ingredient.Id, a.Grams))],
@@ -1792,7 +1814,7 @@ public class ProductsViewModel : ViewModelBase
             EnsurePieceSizeEntered(authoredValue, name);
 
             usage = new ProductUsageEdit(
-                EditingUsage?.SubAssemblyId ?? 0, name, EditingUsageRole, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams))], _usageAuthoredField, authoredValue, ownerName: null, EditingUsage?.LinkedBy ?? []);
+                EditingUsage?.SubAssemblyId ?? 0, name, EditingUsageRole, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], _usageAuthoredField, authoredValue, ownerName: null, EditingUsage?.LinkedBy ?? []);
         }
         else
         {
@@ -1808,7 +1830,7 @@ public class ProductsViewModel : ViewModelBase
             }
 
             IReadOnlyList<SubAssemblyLineEdit> sourceLines =
-                [.. FormLines.Where(l => l.Ingredient is not null).Select(l => new SubAssemblyLineEdit(l.Ingredient!, l.Grams))];
+                [.. FormLines.Where(l => l.Ingredient is not null).Select(l => new SubAssemblyLineEdit(l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
 
             usage = new ProductUsageEdit(
                 source.Id,
@@ -2051,6 +2073,14 @@ public class ProductsViewModel : ViewModelBase
             : (decimal?)null;
         UsageFormPreviewText = costPerPiece is { } preview ? $"₱{preview:N4} a piece" : string.Empty;
         UsageFormCostPerPieceText = costPerPiece is { } figure ? $"₱{figure:N4}" : "—";
+
+        // The formula's base, given to both tables: an add-in is read against the recipe's base, never its own.
+        var formulaBase = IngredientLineRow.ApplyFormulaBase([.. FormLines]);
+        _formFormulaBase = formulaBase;
+        IngredientLineRow.ApplyFormulaBase(FormAddIns, formulaBase);
+        UsageFormBaseCaption = formulaBase > 0
+            ? $"Base {formulaBase:#,0.##} g · whole formula {totalWeight / formulaBase * 100m:#,0.#}%"
+            : "Tick the ingredients that make 100% — usually the flour.";
 
         // The arithmetic of the two tables, in words: the recipe's grams, this product's on top, the batch.
         var recipeName = EditingUsage?.Name ?? EditingUsageSource?.SubAssembly.Name ?? "the recipe";
@@ -2367,7 +2397,7 @@ public class ProductsViewModel : ViewModelBase
                     subAssembly.Id,
                     subAssembly.Name,
                     Roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role,
-                    [.. linkedLinesById[subAssembly.Id].Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams))],
+                    [.. linkedLinesById[subAssembly.Id].Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
                     edit.AuthoredField,
                     edit.AuthoredValue,
                     ProductUsageEdit.SourceNameOf(subAssembly),
@@ -2440,7 +2470,7 @@ public class ProductsViewModel : ViewModelBase
     private void ShowFormLines(IEnumerable<SubAssemblyLineEdit> lines)
     {
         FormLines.Clear();
-        FormLines.AddRange(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams)));
+        FormLines.AddRange(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)));
     }
 
     /// <summary>The same for the add-ins table under it.</summary>
@@ -2453,7 +2483,7 @@ public class ProductsViewModel : ViewModelBase
     /// <summary><paramref name="lines"/> with each ingredient swapped for its refreshed copy when that differs; unchanged lines are kept as they are.</summary>
     private static IReadOnlyList<SubAssemblyLineEdit> Repriced(IReadOnlyList<SubAssemblyLineEdit> lines, IReadOnlyDictionary<int, RawMaterial> ingredientsById) =>
         [.. lines.Select(l => ingredientsById.TryGetValue(l.Ingredient.Id, out var fresh) && !CollectionMerge.HasSameValues(fresh, l.Ingredient)
-            ? new SubAssemblyLineEdit(fresh, l.Grams)
+            ? new SubAssemblyLineEdit(fresh, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)
             : l)];
 
     /// <summary>After the recipe or packaging changed: each part's share of the material cost, and everything priced from them.</summary>

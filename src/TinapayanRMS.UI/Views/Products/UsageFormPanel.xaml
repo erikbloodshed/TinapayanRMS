@@ -128,6 +128,9 @@
                        Visibility="{Binding IsFormShowingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
             <syncfusion:SfDataGrid ItemsSource="{Binding FormLines}"
+                                   controls:GridAddNewRow.HideCheckBoxes="True"
+                                   controls:GridCellEditing.IsEnabled="True"
+                                   controls:GridCellEmphasis.IsEnabled="True"
                                    SelectedItem="{Binding SelectedFormLine, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
                                    controls:GridFillerRows.IsEnabled="True"
@@ -167,7 +170,19 @@
                             </syncfusion:Columns>
                         </syncfusion:GridMultiColumnDropDownList.Columns>
                     </syncfusion:GridMultiColumnDropDownList>
+                    <!-- The formula's 100% base for baker's percentage, usually the flour; a linked one's is its owner's to set. -->
+                    <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"
+                                                   HeaderText="Base"
+                                                   Width="54"
+                                                   HorizontalHeaderContentAlignment="Center"
+                                                   AllowEditing="{Binding IsFormEditingLines}" />
                     <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="110" NumberDecimalDigits="2" />
+                    <controls:NumericColumn MappingName="BakersPercent"
+                                            HeaderText="Baker's %"
+                                            Width="86"
+                                            NumberDecimalDigits="1"
+                                            controls:GridCellEditing.AllowWhen="CanTypeBakersPercent"
+                                            controls:GridCellEmphasis.When="IsPercentTyped" />
                     <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="110" NumberDecimalDigits="2" AllowEditing="False" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
@@ -180,6 +195,9 @@
                 <TextBlock Text="Type the lines straight into the table. Delete removes the selected one." Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" />
                 <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveFormLineCommand}" />
             </Grid>
+
+            <!-- What the percentages are read against, and the figure a batch is scaled by. -->
+            <TextBlock Text="{Binding UsageFormBaseCaption}" Style="{StaticResource CaptionStyle}" Margin="0,8,0,0" TextWrapping="Wrap" />
 
             <TextBlock Text="Its lines are its owner's: change them where it's kept, or make this product a copy of it. To put something extra in just for this product, add it below."
                        Style="{StaticResource CaptionStyle}"
@@ -200,6 +218,7 @@
                        Style="{StaticResource PanelCaptionStyle}" />
 
             <syncfusion:SfDataGrid ItemsSource="{Binding FormAddIns}"
+                                   controls:GridCellEditing.IsEnabled="True"
                                    SelectedItem="{Binding SelectedFormAddIn, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
                                    controls:GridFillerRows.IsEnabled="True"
@@ -240,6 +259,11 @@
                         </syncfusion:GridMultiColumnDropDownList.Columns>
                     </syncfusion:GridMultiColumnDropDownList>
                     <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="110" NumberDecimalDigits="2" />
+                    <controls:NumericColumn MappingName="BakersPercent"
+                                            HeaderText="Baker's %"
+                                            Width="86"
+                                            NumberDecimalDigits="1"
+                                            controls:GridCellEditing.AllowWhen="CanTypeBakersPercent" />
                     <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="110" NumberDecimalDigits="2" AllowEditing="False" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>

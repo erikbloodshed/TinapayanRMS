@@ -60,7 +60,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         return await GetLinkedByAsync(dbContext, u => u.SubAssembly!.OwnerProductId == null, cancellationToken);
     }
 
-    public async Task<int> SaveStandaloneAsync(SubAssembly subAssembly, IReadOnlyList<(int IngredientId, decimal Grams)> lines, CancellationToken cancellationToken)
+    public async Task<int> SaveStandaloneAsync(SubAssembly subAssembly, IReadOnlyList<RecipeLine> lines, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
