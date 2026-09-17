@@ -1,4 +1,6 @@
+using System.Windows;
 using System.Windows.Controls;
+using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Views.RawMaterials;
 
@@ -16,4 +18,7 @@ public partial class SummaryHeaderCard : UserControl
 
     /// <summary>Puts the cursor in Name, so typing can start straight away.</summary>
     public void FocusName() => NameTextBox.Focus();
+
+    /// <summary>Checks the name against the other materials as soon as the field is left, not just on Save.</summary>
+    private void NameTextBox_LostFocus(object sender, RoutedEventArgs e) => ((RawMaterialsViewModel)DataContext).CheckNameAvailability();
 }

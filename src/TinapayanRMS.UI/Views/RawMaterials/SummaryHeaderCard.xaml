@@ -115,7 +115,8 @@
                     <syncfusion:SfTextBoxExt x:Name="NameTextBox"
                                              Grid.Row="1"
                                              Grid.Column="0"
-                                             Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                             Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             LostFocus="NameTextBox_LostFocus" />
 
                     <!-- An ingredient is always in grams; packaging picks its own base unit -->
                     <Border Grid.Column="1" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />

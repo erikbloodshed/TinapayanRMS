@@ -29,7 +29,7 @@
                     <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
                     <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
                                                             HeaderText="Component"
-                                                            ItemsSource="{Binding Ingredients}"
+                                                            ItemsSource="{Binding BomComponentOptions}"
                                                             DisplayMember="Name"
                                                             ValueMember="Id"
                                                             AllowAutoComplete="True"

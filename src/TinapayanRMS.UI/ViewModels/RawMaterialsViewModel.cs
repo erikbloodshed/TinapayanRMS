@@ -158,6 +158,7 @@ public class RawMaterialsViewModel : ViewModelBase
     private readonly ReadOnlyObservableCollection<RawMaterial> _visibleRawMaterials;
     private readonly ReadOnlyObservableCollection<RawMaterial> _ingredients;
     private readonly ReadOnlyObservableCollection<RawMaterial> _linkTargets;
+    private readonly ReadOnlyObservableCollection<RawMaterial> _bomComponentOptions;
     private readonly SourceCache<RawMaterialCategory, int> _categoryCache = new(c => c.Id);
     private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categories;
     private readonly SourceCache<RawMaterialCategory, int> _addNewCategoryOption = new(c => c.Id);
@@ -169,11 +170,18 @@ public class RawMaterialsViewModel : ViewModelBase
     /// <summary>The materials the list shows: those whose name matches SearchText.</summary>
     public ReadOnlyObservableCollection<RawMaterial> VisibleRawMaterials => _visibleRawMaterials;
 
-    /// <summary>The ingredients only, for the BOM editor's component picker: packaging never goes in a recipe.</summary>
+    /// <summary>
+    /// The ingredients only: packaging never goes in a recipe. Resolves a BOM line's IngredientId and a saved
+    /// LinkedToId back to their material; a picker that shouldn't offer the material being edited uses
+    /// BomComponentOptions or LinkTargets instead.
+    /// </summary>
     public ReadOnlyObservableCollection<RawMaterial> Ingredients => _ingredients;
 
     /// <summary>The ingredients a linked ingredient can be linked to: every one but the material being edited.</summary>
     public ReadOnlyObservableCollection<RawMaterial> LinkTargets => _linkTargets;
+
+    /// <summary>The Bill of Materials component picker's list: every ingredient but the made one being edited — a made ingredient can't be its own component.</summary>
+    public ReadOnlyObservableCollection<RawMaterial> BomComponentOptions => _bomComponentOptions;
 
     public ObservableCollection<RawMaterialPriceRow> PriceHistory { get; } = [];
 
@@ -228,6 +236,28 @@ public class RawMaterialsViewModel : ViewModelBase
     {
         get => _editingName;
         set => this.RaiseAndSetIfChanged(ref _editingName, value);
+    }
+
+    /// <summary>
+    /// Flags EditingName as taken the moment it's left (SummaryHeaderCard's NameTextBox LostFocus), rather than
+    /// waiting for Save to hit the same message from the unique-index violation (ViewModelBase.RunSafelyAsync).
+    /// Case-insensitive and trimmed, matching the database's default collation the unique index relies on. Fixing
+    /// the name and leaving the field again clears the message this raised, without touching an unrelated one.
+    /// </summary>
+    public void CheckNameAvailability()
+    {
+        var name = EditingName.Trim();
+        var isTaken = name.Length > 0
+            && RawMaterials.Any(m => m.Id != _editingId && string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        if (isTaken)
+        {
+            ErrorMessage = "That name is already in use.";
+        }
+        else if (ErrorMessage == "That name is already in use.")
+        {
+            ErrorMessage = null;
+        }
     }
 
     private RawMaterialType _editingType = RawMaterialType.Ingredient;
@@ -603,6 +633,7 @@ public class RawMaterialsViewModel : ViewModelBase
             .SortAndBind(out _ingredients, byName)
             .Subscribe();
 
+        // Shared by every picker that must leave out the ingredient being edited: Linked's target and the BOM's component.
         var notTheSelection = this.WhenAnyValue(x => x.SelectedRawMaterial)
             .Select(selected => selected?.Id ?? 0)
             .DistinctUntilChanged()
@@ -611,6 +642,11 @@ public class RawMaterialsViewModel : ViewModelBase
         _rawMaterialCache.Connect()
             .Filter(notTheSelection)
             .SortAndBind(out _linkTargets, byName)
+            .Subscribe();
+
+        _rawMaterialCache.Connect()
+            .Filter(notTheSelection)
+            .SortAndBind(out _bomComponentOptions, byName)
             .Subscribe();
 
         _categoryCache.Connect()
@@ -921,6 +957,17 @@ public class RawMaterialsViewModel : ViewModelBase
 
             // The units are typed straight into the grid, so a half-filled or repeated one is caught here.
             EnsureValidUnitRows();
+
+            // The picker already leaves the material being edited out of BomComponentOptions, so this can't be
+            // picked through the UI. But a self-reference already in the database (only reachable by editing it
+            // directly, never through this app) would otherwise slip past: ChangedBomLines only re-validates a
+            // BOM that changed, so an untouched one skips IngredientBomRules.EnsureNoCycle entirely on a Save
+            // that touches something else. This runs unconditionally, whether or not the BOM itself changed.
+            if (source == RawMaterialSource.Made && BomLineEdits.Any(l => l.IngredientId == _editingId))
+            {
+                ErrorMessage = "An ingredient can't be a component of itself.";
+                return;
+            }
 
             (DateOnly Date, int? UnitOfMeasureId, decimal Price)? newPrice = null;
             if (source == RawMaterialSource.Purchased && HasNewPrice())

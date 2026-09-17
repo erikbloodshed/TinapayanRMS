@@ -316,6 +316,45 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task Leaving_the_name_field_flags_a_name_already_taken()
+    {
+        await SeedPurchasedIngredientAsync("Flour");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "  flour  "; // different case, padded — still the same name
+
+        viewModel.CheckNameAvailability();
+
+        viewModel.ErrorMessage.Should().Be("That name is already in use.");
+    }
+
+    [Fact]
+    public async Task Leaving_the_name_field_does_not_flag_the_materials_own_name_and_clears_once_fixed()
+    {
+        await SeedPurchasedIngredientAsync("Flour");
+        await SeedPurchasedIngredientAsync("Sugar");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        // Selecting Flour and leaving its name untouched isn't a conflict with itself.
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Name == "Flour");
+        viewModel.CheckNameAvailability();
+        viewModel.ErrorMessage.Should().BeNull();
+
+        // Renaming it to another material's name is flagged...
+        viewModel.EditingName = "Sugar";
+        viewModel.CheckNameAvailability();
+        viewModel.ErrorMessage.Should().Be("That name is already in use.");
+
+        // ...and fixing it clears the message this check raised.
+        viewModel.EditingName = "Cake Flour";
+        viewModel.CheckNameAvailability();
+        viewModel.ErrorMessage.Should().BeNull("the name is free again, so the message it raised clears itself");
+    }
+
+    [Fact]
     public async Task Saving_a_price_in_an_alternative_unit_records_the_unit_and_prices_the_ingredient_per_gram()
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
@@ -371,6 +410,59 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.ErrorMessage.Should().BeNull();
         (await BomLineIdAsync()).Should().Be(lineId, "an untouched BOM isn't sent, so its line isn't replaced");
+    }
+
+    [Fact]
+    public async Task The_BOM_component_picker_leaves_out_the_made_ingredient_being_edited()
+    {
+        await SeedPurchasedIngredientAsync("Sugar");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Simple Syrup";
+        PickCategory(viewModel);
+        viewModel.EditingSource = RawMaterialSource.Made;
+        viewModel.EditingWeightLossPercent = 20m;
+        viewModel.BomLineEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single().Id, Grams = 1000m });
+        await viewModel.SaveCommand.Execute();
+
+        await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial?.Name == "Simple Syrup",
+            () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
+
+        viewModel.BomComponentOptions.Should().NotContain(m => m.Name == "Simple Syrup", "a made ingredient can't be a component of itself");
+        viewModel.BomComponentOptions.Should().Contain(m => m.Name == "Sugar");
+    }
+
+    [Fact]
+    public async Task A_self_referencing_BOM_line_is_refused_even_when_the_rest_of_the_BOM_is_left_untouched()
+    {
+        await SeedPurchasedIngredientAsync("Sugar");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Simple Syrup";
+        PickCategory(viewModel);
+        viewModel.EditingSource = RawMaterialSource.Made;
+        viewModel.EditingWeightLossPercent = 20m;
+        viewModel.BomLineEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single().Id, Grams = 1000m });
+        await viewModel.SaveCommand.Execute();
+        await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial?.Name == "Simple Syrup",
+            () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
+
+        // Only reachable by editing the database directly — the picker already leaves the material itself out of
+        // BomComponentOptions — but this pins the guard that catches it anyway, added straight to BomLineEdits.
+        viewModel.BomLineEdits.Add(new IngredientLineRow { IngredientId = viewModel.SelectedRawMaterial!.Id, Grams = 50m });
+        viewModel.EditingWeightLossPercent = 25m; // an unrelated edit, so the BOM change isn't what's exercised
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().Be("An ingredient can't be a component of itself.");
+        viewModel.SuccessMessage.Should().BeNull("nothing was saved");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.SingleAsync(m => m.Name == "Simple Syrup", Cancellation)).WeightLossPercent.Should().Be(20m, "the unrelated edit wasn't saved either");
+        (await dbContext.IngredientBomLines.CountAsync(Cancellation)).Should().Be(1, "the bad line was never persisted");
     }
 
     [Fact]
