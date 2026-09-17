@@ -769,6 +769,124 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.HeaderInitial.Should().Be("C");
     }
 
+    [Fact]
+    public async Task Save_puts_the_product_in_the_picked_category_which_shows_again_when_it_is_selected_and_New_clears_it()
+    {
+        await AddProductCategoryAsync("Breads");
+        var cakesId = await AddProductCategoryAsync("Cakes");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.Categories.Select(c => c.Name).Should().Equal("Breads", "Cakes");
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Chocolate Cake";
+        viewModel.EditingCategory = viewModel.Categories.Single(c => c.Name == "Cakes");
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using (var dbContext = CreateDbContext())
+        {
+            (await dbContext.Products.SingleAsync(Cancellation)).CategoryId.Should().Be(cakesId);
+        }
+
+        viewModel.Products.Should().ContainSingle().Which.Category!.Name.Should().Be("Cakes", "the list groups the product under it");
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingCategory.Should().BeNull("a new product starts uncategorized");
+
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        viewModel.EditingCategory!.Name.Should().Be("Cakes");
+    }
+
+    [Fact]
+    public async Task A_product_saved_without_a_category_is_uncategorized()
+    {
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Pandesal";
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull("a category is optional");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.Products.SingleAsync(Cancellation)).CategoryId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Reloading_keeps_the_picked_category_and_shows_a_rename_made_in_Settings()
+    {
+        var cakesId = await AddProductCategoryAsync("Cakes");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingCategory = viewModel.Categories.Single();
+
+        await new ProductCategoryRepository(CreateDbContextFactory()).UpdateAsync(new ProductCategory { Id = cakesId, Name = "Cakes & Tortes" }, Cancellation);
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.EditingCategory!.Name.Should().Be("Cakes & Tortes", "the unsaved pick points at the refreshed category");
+        viewModel.CategoryOptions.Select(c => c.Name).Should().Equal("< Add New .. >", "Cakes & Tortes");
+    }
+
+    [Fact]
+    public async Task Picking_Add_New_saves_the_category_it_asks_for_and_picks_it_for_the_product()
+    {
+        var viewModel = CreateViewModel();
+        (string Label, string InitialValue) promptedWith = default;
+        viewModel.PromptForNewCategory.RegisterHandler(interaction =>
+        {
+            promptedWith = interaction.Input;
+            interaction.SetOutput("Pastries");
+        });
+        await viewModel.LoadCommand.Execute();
+        viewModel.CategorySearchText = "Pas";
+
+        viewModel.CategoryOptions.Should().ContainSingle(c => c.Id == ProductsViewModel.AddNewCategoryId)
+            .Which.Name.Should().Be("< Add New \"Pas\" .. >", "the row keeps matching what's typed");
+        viewModel.EditingCategory = viewModel.CategoryOptions.Single(c => c.Id == ProductsViewModel.AddNewCategoryId);
+
+        await WaitUntilSettledAsync(() => viewModel.EditingCategory is not null,
+            () => $"picked={viewModel.EditingCategory?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
+        promptedWith.InitialValue.Should().Be("Pas", "the prompt starts with what was typed");
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SuccessMessage.Should().Be("Pastries was added.");
+        viewModel.EditingCategory!.Name.Should().Be("Pastries");
+        viewModel.Categories.Select(c => c.Name).Should().Equal("Pastries");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.ProductCategories.SingleAsync(Cancellation)).Name.Should().Be("Pastries");
+    }
+
+    [Fact]
+    public async Task Cancelling_the_new_category_prompt_leaves_the_category_that_was_picked()
+    {
+        await AddProductCategoryAsync("Breads");
+        var viewModel = CreateViewModel();
+        var prompted = false;
+        viewModel.PromptForNewCategory.RegisterHandler(interaction =>
+        {
+            prompted = true;
+            interaction.SetOutput(null);
+        });
+        await viewModel.LoadCommand.Execute();
+        viewModel.EditingCategory = viewModel.Categories.Single();
+
+        viewModel.EditingCategory = ProductsViewModel.AddNewCategory;
+
+        await WaitUntilSettledAsync(() => prompted, () => "the prompt was never asked for");
+        viewModel.EditingCategory!.Name.Should().Be("Breads");
+        viewModel.Categories.Should().ContainSingle("nothing was added");
+    }
+
+    private async Task<int> AddProductCategoryAsync(string name)
+    {
+        await using var dbContext = CreateDbContext();
+        var category = new ProductCategory { Name = name };
+        dbContext.ProductCategories.Add(category);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return category.Id;
+    }
+
     private ProductsViewModel CreateViewModel()
     {
         ReactiveUIBootstrapper.EnsureInitialized();
@@ -786,8 +904,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory, CreateCostPropagator()),
+            new ProductCategoryRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),
+            new ProductCategoryValidator(),
             new LoggerConfiguration().CreateLogger());
     }
 
@@ -1134,13 +1254,18 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedProduct = viewModel.Products.Single();
         await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
 
-        // Nothing ticked yet, so no line has a figure at all.
-        viewModel.FormLines.Should().OnlyContain(l => l.BakersPercent == null);
+        // Nothing ticked yet, so the lines read as absolute percentages: their shares of the 1,650 g batch.
+        viewModel.UsageFormPercentHeader.Should().Be("Absolute %");
+        viewModel.FormLines.Single(l => l.Ingredient!.Id == flourId).Percent.Should().Be(1000m / 1650m * 100m);
+        viewModel.FormLines.Sum(l => l.Percent).Should().BeApproximately(100m, 0.0001m);
+        viewModel.FormLines.Should().OnlyContain(l => !l.CanTypeBakersPercent, "an absolute percentage isn't typed");
 
         viewModel.FormLines.Single(l => l.Ingredient!.Id == flourId).IsFormulaBase = true;
 
-        viewModel.FormLines.Single(l => l.Ingredient!.Id == flourId).BakersPercent.Should().Be(100m);
-        viewModel.FormLines.Single(l => l.Ingredient!.Id == waterId).BakersPercent.Should().Be(65m, "650 g of water on 1,000 g of flour");
+        viewModel.UsageFormPercentHeader.Should().Be("Baker's %");
+
+        viewModel.FormLines.Single(l => l.Ingredient!.Id == flourId).Percent.Should().Be(100m);
+        viewModel.FormLines.Single(l => l.Ingredient!.Id == waterId).Percent.Should().Be(65m, "650 g of water on 1,000 g of flour");
         viewModel.UsageFormBaseCaption.Should().Contain("1,000 g").And.Contain("165");
 
         // This is the trap: without CurrentRecipe() carrying the tick, Save treats the recipe as unchanged.
@@ -1179,7 +1304,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
 
         // The link shows the owner's base, read-only, and the percentages that follow from it.
-        viewModel.FormLines.Single(l => l.Ingredient!.Id == flourId).BakersPercent.Should().Be(100m);
+        viewModel.FormLines.Single(l => l.Ingredient!.Id == flourId).Percent.Should().Be(100m);
         viewModel.IsFormEditingLines.Should().BeFalse("a linked recipe's base is its owner's to set");
 
         await viewModel.MakeCopyCommand.Execute(viewModel.UsageEdits.Single());
@@ -1215,7 +1340,35 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
 
         // 20 g of ube on the recipe's 1,000 g of flour is 2% — not 100% of its own 20 g.
-        viewModel.FormAddIns.Single().BakersPercent.Should().Be(2m);
+        viewModel.FormAddIns.Single().Percent.Should().Be(2m);
+    }
+
+    [Fact]
+    public async Task With_no_base_a_linked_recipe_and_its_add_ins_read_as_shares_of_the_whole_batch()
+    {
+        var roleId = await AddRoleAsync("Glaze");
+        var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.05m);
+        var ubeId = await AddIngredientAsync("Ube Flavour", costPerGram: 0.8m);
+        var ownerId = await AddProductAsync("Glazed Bun");
+        await SaveRecipeAsync(ownerId, new RecipeDraft(
+            [new OwnedSubAssemblyDraft(0, roleId, [(sugarId, 900m)], UsageAuthoredField.WeightPerPiece, 10m)],
+            []));
+        var glazeId = await OwnedSubAssemblyIdAsync(ownerId, roleId);
+        var linkerId = await AddProductAsync("Ube Glazed Bun");
+        await SaveRecipeAsync(linkerId, new RecipeDraft(
+            [],
+            [new LinkedUsageDraft(glazeId, UsageAuthoredField.WeightPerPiece, 10m) { AddIns = [(ubeId, 100m)] }]));
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        // The batch is the recipe's 900 g and the 100 g add-in: 90% and 10%, together 100%.
+        viewModel.UsageFormPercentHeader.Should().Be("Absolute %");
+        viewModel.UsageFormBaseCaption.Should().StartWith("Absolute %");
+        viewModel.FormLines.Single().Percent.Should().Be(90m);
+        viewModel.FormAddIns.Single().Percent.Should().Be(10m);
     }
 
     [Fact]
@@ -1240,7 +1393,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         var water = viewModel.FormLines.Single(l => l.Ingredient!.Id == waterId);
         water.CanTypeBakersPercent.Should().BeTrue();
-        water.BakersPercent = 65m;
+        water.Percent = 65m;
         water.Grams.Should().Be(650m);
 
         // The trap: Save only writes a recipe it sees as changed, so the typed percentage has to reach the draft.

@@ -46,6 +46,7 @@ public class CompositionRootTests
         host.Services.GetRequiredService<ReportsViewModel>().Should().NotBeNull();
         host.Services.GetRequiredService<UnitsOfMeasureViewModel>().Should().NotBeNull();
         host.Services.GetRequiredService<CategoriesViewModel>().Should().NotBeNull();
+        host.Services.GetRequiredService<ProductCategoriesViewModel>().Should().NotBeNull();
         host.Services.GetRequiredService<SubAssemblyRolesViewModel>().Should().NotBeNull();
     }
 }

@@ -7,7 +7,7 @@ namespace TinapayanRMS.UI.Views;
 
 /// <summary>
 /// The lookups every screen picks from, opened from the navigation drawer's Settings item: units of
-/// measure, raw material categories and sub-assembly roles, one tab each. Built afresh each time it
+/// measure, raw material categories, product categories and sub-assembly roles, one tab each. Built afresh each time it
 /// opens, over the same long-lived ViewModels, so a tab keeps its selection and unsaved edits between
 /// visits.
 /// </summary>
@@ -16,18 +16,21 @@ public partial class SettingsWindow : Window
     public SettingsWindow(
         UnitsOfMeasureViewModel unitsOfMeasureViewModel,
         CategoriesViewModel categoriesViewModel,
+        ProductCategoriesViewModel productCategoriesViewModel,
         SubAssemblyRolesViewModel rolesViewModel)
     {
         InitializeComponent();
 
         UnitsOfMeasureTab.Content = new UnitsOfMeasureView(unitsOfMeasureViewModel);
         CategoriesTab.Content = new CategoriesView(categoriesViewModel);
+        ProductCategoriesTab.Content = new ProductCategoriesView(productCategoriesViewModel);
         RolesTab.Content = new SubAssemblyRolesView(rolesViewModel);
 
         // The ViewModels outlive this window, so their delete confirmations are removed with it.
         var confirmDeletes = new CompositeDisposable(
             unitsOfMeasureViewModel.RegisterNativeMessageBoxHandler(),
             categoriesViewModel.RegisterNativeMessageBoxHandler(),
+            productCategoriesViewModel.RegisterNativeMessageBoxHandler(),
             rolesViewModel.RegisterNativeMessageBoxHandler());
         Closed += (_, _) => confirmDeletes.Dispose();
 
@@ -36,6 +39,7 @@ public partial class SettingsWindow : Window
         {
             unitsOfMeasureViewModel.LoadCommand.Execute().Subscribe();
             categoriesViewModel.LoadCommand.Execute().Subscribe();
+            productCategoriesViewModel.LoadCommand.Execute().Subscribe();
             rolesViewModel.LoadCommand.Execute().Subscribe();
         };
     }

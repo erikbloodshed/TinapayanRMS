@@ -170,6 +170,15 @@ public class SubAssemblyRulesTests
     }
 
     [Fact]
+    public void CalculateAbsolutePercent_is_the_lines_share_of_the_whole_batch()
+    {
+        // A 1,000 g glaze with no base: 150 g of butter is 15% of it, and the lines come to 100 between them.
+        SubAssemblyRules.CalculateAbsolutePercent(150m, batchWeight: 1000m).Should().Be(15m);
+        SubAssemblyRules.CalculateAbsolutePercent(850m, batchWeight: 1000m).Should().Be(85m);
+        SubAssemblyRules.CalculateAbsolutePercent(150m, batchWeight: 0m).Should().BeNull("an empty batch has nothing to take a share of");
+    }
+
+    [Fact]
     public void GramsFromBakersPercent_is_the_percentage_of_the_base()
     {
         // 65% on 1,000 g of flour is 650 g of water.

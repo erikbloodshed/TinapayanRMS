@@ -172,7 +172,8 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.SelectedRow = viewModel.Rows.Single();
         await WaitUntilSettledAsync(() => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
 
-        viewModel.Lines.Single(l => l.Ingredient!.Id == waterId).BakersPercent = 62.5m;
+        viewModel.PercentHeader.Should().Be("Baker's %");
+        viewModel.Lines.Single(l => l.Ingredient!.Id == waterId).Percent = 62.5m;
         viewModel.FormulaBaseCaption.Should().Contain("162.5");
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
@@ -181,5 +182,29 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var water = viewModel.Lines.Single(l => l.Ingredient!.Id == waterId);
         water.Grams.Should().Be(625m);
         water.IsPercentTyped.Should().BeTrue("the form reopens with the percentage as the figure that was typed");
+    }
+
+    [Fact]
+    public async Task Unticking_the_base_switches_the_lines_to_absolute_percentages()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var waterId = await AddIngredientAsync("Water", costPerGram: 0m);
+        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Name = "House Dough", RoleId = roleId },
+            [new RecipeLine(flourId, 1500m, IsFormulaBase: true), (waterId, 500m)],
+            Cancellation);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedRow = viewModel.Rows.Single();
+        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
+        viewModel.Lines.Single(l => l.Ingredient!.Id == waterId).Percent.Should().Be(500m / 1500m * 100m);
+
+        viewModel.Lines.Single(l => l.Ingredient!.Id == flourId).IsFormulaBase = false;
+
+        viewModel.PercentHeader.Should().Be("Absolute %");
+        viewModel.FormulaBaseCaption.Should().StartWith("Absolute %");
+        viewModel.Lines.Single(l => l.Ingredient!.Id == flourId).Percent.Should().Be(75m, "1,500 g of the 2,000 g batch");
+        viewModel.Lines.Single(l => l.Ingredient!.Id == waterId).Percent.Should().Be(25m);
     }
 }

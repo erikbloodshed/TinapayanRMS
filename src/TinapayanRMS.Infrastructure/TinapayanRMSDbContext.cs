@@ -28,6 +28,8 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<SubAssemblyLine> SubAssemblyLines => Set<SubAssemblyLine>();
 
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+
     public DbSet<Product> Products => Set<Product>();
 
     public DbSet<ProductSubAssemblyUsage> ProductSubAssemblyUsages => Set<ProductSubAssemblyUsage>();

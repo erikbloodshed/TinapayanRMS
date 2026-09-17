@@ -1,0 +1,108 @@
+version=2.2
+
+# This file caches language service data to improve the performance of C# Dev Kit.
+# It is not intended for manual editing. It can safely be deleted and will be
+# regenerated automatically. For more information, see https://aka.ms/lscache
+#
+# To control where cache files are stored, use the following VS Code setting:
+#   "dotnet.projectsystem.cacheInProjectFolder": true
+
+[project]
+project=TinapayanRMS.Domain.csproj
+language=C#
+primary
+lastDtbSucceeded
+
+[properties]
+AssemblyName=TinapayanRMS.Domain
+BaseIntermediateOutputPath=obj/
+BaseOutputPath=bin/
+MaxSupportedLangVersion=14.0
+OutputType=Library
+ProjectAssetsFile=<PATH>obj/project.assets.json
+RootNamespace=TinapayanRMS.Domain
+TargetFramework=net10.0
+TargetFrameworkIdentifier=.NETCoreApp
+TargetFrameworkVersion=v10.0
+TargetPath=<PATH>bin/Release/net10.0/TinapayanRMS.Domain.dll
+TargetRefPath=<PATH>obj/Release/net10.0/ref/TinapayanRMS.Domain.dll
+TemporaryDependencyNodeTargetIdentifier=net10.0
+
+[commandLineArguments]
+/noconfig
+/unsafe-
+/checked-
+/nowarn:1701,1702,1701,1702,8002
+/fullpaths
+/nostdlib+
+/errorreport:prompt
+/warn:10
+/define:TRACE;RELEASE;NET;NET10_0;NETCOREAPP;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NET9_0_OR_GREATER;NET10_0_OR_GREATER;NETCOREAPP1_0_OR_GREATER;NETCOREAPP1_1_OR_GREATER;NETCOREAPP2_0_OR_GREATER;NETCOREAPP2_1_OR_GREATER;NETCOREAPP2_2_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER
+/highentropyva+
+/nullable:enable
+/features:"InterceptorsNamespaces=;Microsoft.Extensions.Validation.Generated"
+/debug-
+/debug:portable
+/filealign:512
+/optimize+
+/out:obj/Release/net10.0/TinapayanRMS.Domain.dll
+/refout:obj/Release/net10.0/refint/TinapayanRMS.Domain.dll
+/target:library
+/warnaserror-
+/utf8output
+/deterministic+
+/langversion:14.0
+/warnaserror+:NU1605,SYSLIB0011
+
+[sourceFiles]
+Entities/
+ CostingParameters.cs
+ IngredientBomLine.cs
+ PackagingLine.cs
+ PackagingLink.cs
+ Product.cs
+ ProductCategory.cs
+ ProductSubAssemblyUsage.cs
+ RawMaterial.cs
+ RawMaterialCategory.cs
+ RawMaterialPriceHistory.cs
+ RawMaterialUnit.cs
+ SubAssembly.cs
+ SubAssemblyLine.cs
+ SubAssemblyRole.cs
+ UnitOfMeasure.cs
+ UsageAddInLine.cs
+Enums/
+ PackagingLineAuthoredField.cs
+ RawMaterialSource.cs
+ RawMaterialType.cs
+ UsageAuthoredField.cs
+Interfaces/IPriceHistoryEntry.cs
+obj/Release/net10.0/
+ .NETCoreApp,Version=v10.0.AssemblyAttributes.cs
+ TinapayanRMS.Domain.AssemblyInfo.cs
+ TinapayanRMS.Domain.GlobalUsings.g.cs
+
+[frameworkPacks]
+Microsoft.NETCore.App.Ref
+
+[metadataReferences]
+
+[analyzerReferences]
+<NETSDK>/Sdks/Microsoft.NET.Sdk/analyzers/
+ Microsoft.CodeAnalysis.CSharp.NetAnalyzers.dll
+ Microsoft.CodeAnalysis.NetAnalyzers.dll
+
+[sdkAnalyzerConfigPolicy]
+Microsoft.NET.Sdk/analyzers|AnalysisLevelSuffix=recommended
+
+[analyzerConfigFiles]
+../../.editorconfig
+obj/Release/net10.0/TinapayanRMS.Domain.GeneratedMSBuildEditorConfig.editorconfig
+
+[projectReferences]
+
+[capabilities]
+NativeAOT
+Pack
+SupportsHotReload

@@ -6,7 +6,7 @@ namespace TinapayanRMS.UI.Views.Products;
 
 /// <summary>
 /// Products' summary header: the product's title and description (edited in a pop-up from the link under
-/// the title), New/Save/Delete, then its name, cost and price per piece, and when it was last saved.
+/// the title), New/Save/Delete, then its name, category, cost and price per piece, and when it was last saved.
 /// Inherits the Products screen's DataContext (ProductsViewModel).
 /// </summary>
 public partial class ProductHeaderCard : UserControl

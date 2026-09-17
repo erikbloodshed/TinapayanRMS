@@ -110,7 +110,7 @@ public class IngredientLineRowTests
         var eggRow = new IngredientLineRow(eggs, 100m);
         List<IngredientLineRow> rows = [flour, water, eggRow];
         IngredientLineRow.ApplyFormulaBase(rows);
-        water.BakersPercent = 65m;
+        water.Percent = 65m;
         return (flour, water, eggRow, rows);
     }
 
@@ -120,7 +120,7 @@ public class IngredientLineRowTests
         var (_, water, _, _) = DoughWithTypedFigures();
 
         water.Grams.Should().Be(650m);
-        water.BakersPercent.Should().Be(65m);
+        water.Percent.Should().Be(65m);
         water.IsPercentTyped.Should().BeTrue();
         water.AuthoredBakersPercent.Should().Be(65m);
     }
@@ -133,7 +133,7 @@ public class IngredientLineRowTests
         water.Grams = 700m;
 
         water.IsPercentTyped.Should().BeFalse("the grams are now the figure that was typed");
-        water.BakersPercent.Should().Be(70m);
+        water.Percent.Should().Be(70m);
     }
 
     [Fact]
@@ -145,9 +145,9 @@ public class IngredientLineRowTests
         IngredientLineRow.ApplyFormulaBase(rows);
 
         water.Grams.Should().Be(1300m, "65% was typed, so it stays 65% of the bigger base");
-        water.BakersPercent.Should().Be(65m);
+        water.Percent.Should().Be(65m);
         eggs.Grams.Should().Be(100m, "100 g was typed, so it stays 100 g");
-        eggs.BakersPercent.Should().Be(5m);
+        eggs.Percent.Should().Be(5m);
     }
 
     [Fact]
@@ -172,9 +172,25 @@ public class IngredientLineRowTests
         IngredientLineRow.ApplyFormulaBase([loose]);
         loose.CanTypeBakersPercent.Should().BeFalse("nothing is ticked, so there's no base to take a share of");
 
-        loose.BakersPercent = 50m;
-        loose.Grams.Should().Be(200m, "a percentage typed where it can't be has nothing to be a percentage of");
+        loose.Percent = 50m;
+        loose.Grams.Should().Be(200m, "without a base the absolute percentage is only a reading of the grams");
         loose.IsPercentTyped.Should().BeFalse();
+        loose.Percent.Should().Be(100m, "the only line is the whole batch");
+    }
+
+    [Fact]
+    public void With_no_base_each_line_reads_as_its_share_of_the_whole_batch()
+    {
+        var butter = new IngredientLineRow(Flour, 150m);
+        var sugar = new IngredientLineRow(Sugar, 850m);
+        List<IngredientLineRow> rows = [butter, sugar];
+
+        IngredientLineRow.ApplyFormulaBase(rows).Should().Be(0m);
+
+        butter.Percent.Should().Be(15m);
+        sugar.Percent.Should().Be(85m);
+        IngredientLineRow.PercentHeader(0m).Should().Be("Absolute %");
+        IngredientLineRow.PercentHeader(1000m).Should().Be("Baker's %");
     }
 
     [Fact]
@@ -185,7 +201,10 @@ public class IngredientLineRowTests
         flour.IsFormulaBase = false;
         IngredientLineRow.ApplyFormulaBase(rows);
         water.Grams.Should().Be(650m, "with no base, it keeps its last grams");
-        water.BakersPercent.Should().BeNull();
+        water.Percent.Should().Be(650m / 1750m * 100m, "with no base it reads as its share of the 1,750 g batch");
+        water.IsPercentTyped.Should().BeFalse("the absolute percentage showing wasn't typed");
+        water.Percent = null;
+        water.AuthoredBakersPercent.Should().Be(65m, "nothing can be typed without a base, so the typed 65% isn't cleared either");
 
         flour.IsFormulaBase = true;
         flour.Grams = 2000m;

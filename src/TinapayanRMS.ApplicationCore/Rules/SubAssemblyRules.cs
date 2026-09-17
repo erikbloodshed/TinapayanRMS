@@ -60,6 +60,14 @@ public static class SubAssemblyRules
         baseWeight <= 0 ? null : grams / baseWeight * 100m;
 
     /// <summary>
+    /// A line in absolute percentage: its weight against the whole batch, so every line together comes to 100 and 150 g
+    /// of butter in a 1,000 g glaze comes to 15. What a formula with nothing ticked as its base shows instead of baker's
+    /// percentage. Null for an empty batch.
+    /// </summary>
+    public static decimal? CalculateAbsolutePercent(decimal grams, decimal batchWeight) =>
+        batchWeight <= 0 ? null : grams / batchWeight * 100m;
+
+    /// <summary>
     /// The other way: a line's grams from its baker's percentage, so 65% on 1,000 g of flour is 650 g. What a line typed as
     /// a percentage is worked out from, again, whenever the base weight changes. Rounded to the 4 decimals grams are stored
     /// in, so a line saved this way reads back exactly as it was worked out — unrounded, reopening it could move its grams

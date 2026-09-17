@@ -161,6 +161,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -175,10 +178,33 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CategoryId");
+
                     b.HasIndex("Name")
                         .IsUnique();
 
                     b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("ProductCategories");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", b =>
@@ -635,6 +661,16 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("LinkedProduct");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.Product", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Entities.ProductCategory", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Category");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", b =>

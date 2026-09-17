@@ -19,6 +19,7 @@
                                      WatermarkTemplate="{StaticResource AlignedWatermarkTemplate}"
                                      Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
+            <!-- A flat, name-sorted list (VisibleProducts is sorted). Category has a fixed width and Name takes the rest; a product without a category shows an empty cell. -->
             <syncfusion:SfDataGrid Grid.Row="2"
                                    ItemsSource="{Binding VisibleProducts}"
                                    SelectedItem="{Binding SelectedProduct, Mode=TwoWay}"
@@ -33,6 +34,7 @@
                                    ColumnSizer="Star">
                 <syncfusion:SfDataGrid.Columns>
                     <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
+                    <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="110" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
         </Grid>

@@ -370,15 +370,34 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
     private readonly IValidator<Product> _productValidator;
     private readonly IValidator<CostingParameters> _costingParametersValidator;
+    private readonly IProductCategoryRepository _categoryRepository;
+    private readonly IValidator<ProductCategory> _categoryValidator;
     private readonly SourceCache<Product, int> _productCache = new(p => p.Id);
     private readonly ReadOnlyObservableCollection<Product> _products;
     private readonly ReadOnlyObservableCollection<Product> _visibleProducts;
+    private readonly SourceCache<ProductCategory, int> _categoryCache = new(c => c.Id);
+    private readonly ReadOnlyObservableCollection<ProductCategory> _categories;
+    private readonly SourceCache<ProductCategory, int> _addNewCategoryOption = new(c => c.Id);
+    private readonly ReadOnlyObservableCollection<ProductCategory> _categoryOptions;
 
     /// <summary>Every product, for the packaging link and clone pickers.</summary>
     public ReadOnlyObservableCollection<Product> Products => _products;
 
     /// <summary>The products the list shows: those whose name matches SearchText.</summary>
     public ReadOnlyObservableCollection<Product> VisibleProducts => _visibleProducts;
+
+    public ReadOnlyObservableCollection<ProductCategory> Categories => _categories;
+
+    /// <summary>
+    /// The Category picker's "&lt; Add New .. &gt;" row, as on Raw Materials (RawMaterialsViewModel.AddNewCategoryId):
+    /// a category-shaped stand-in for adding one, told apart by its Id and kept out of Categories.
+    /// </summary>
+    public const int AddNewCategoryId = -1;
+
+    public static readonly ProductCategory AddNewCategory = new() { Id = AddNewCategoryId, Name = "< Add New .. >" };
+
+    /// <summary>What the Category picker lists: the categories, with the "&lt; Add New .. &gt;" row above them.</summary>
+    public ReadOnlyObservableCollection<ProductCategory> CategoryOptions => _categoryOptions;
 
     public ObservableCollection<SubAssemblyRole> Roles { get; } = [];
 
@@ -514,6 +533,36 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     {
         get => _editingDescription;
         set => this.RaiseAndSetIfChanged(ref _editingDescription, value);
+    }
+
+    private string _categorySearchText = string.Empty;
+    /// <summary>
+    /// What's typed into the Category picker (bound to its Text). Renames the "&lt; Add New .. &gt;" row to include
+    /// it, so the row survives the picker's own AutoComplete filtering, as on Raw Materials.
+    /// </summary>
+    public string CategorySearchText
+    {
+        get => _categorySearchText;
+        set => this.RaiseAndSetIfChanged(ref _categorySearchText, value);
+    }
+
+    private ProductCategory? _editingCategory;
+    /// <summary>The product's category, or null for none: a product doesn't need one.</summary>
+    public ProductCategory? EditingCategory
+    {
+        get => _editingCategory;
+        set
+        {
+            // The "< Add New .. >" row isn't a category to put the product in: AddCategoryCommand takes over, and puts
+            // a category back in the picker once it's done. By id, since the row is replaced as CategorySearchText changes.
+            if (value?.Id == AddNewCategoryId)
+            {
+                AddCategoryCommand.Execute().Subscribe();
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _editingCategory, value);
+        }
     }
 
     private readonly ObservableAsPropertyHelper<string> _headerTitle;
@@ -799,11 +848,22 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     }
 
     private string _usageFormBaseCaption = string.Empty;
-    /// <summary>The formula in baker's terms, e.g. "Base 1,000 g · whole formula 167.7%" — the figure a batch is scaled by.</summary>
+    /// <summary>
+    /// The formula in baker's terms, e.g. "Base 1,000 g · whole formula 167.7%" — the figure a batch is scaled by — or,
+    /// with nothing ticked, what the absolute percentages are read against.
+    /// </summary>
     public string UsageFormBaseCaption
     {
         get => _usageFormBaseCaption;
         private set => this.RaiseAndSetIfChanged(ref _usageFormBaseCaption, value);
+    }
+
+    private string _usageFormPercentHeader = IngredientLineRow.PercentHeader(0m);
+    /// <summary>Both form tables' percentage header: "Baker's %" while the recipe has a base, "Absolute %" while it has none.</summary>
+    public string UsageFormPercentHeader
+    {
+        get => _usageFormPercentHeader;
+        private set => this.RaiseAndSetIfChanged(ref _usageFormPercentHeader, value);
     }
 
     private string _usageFormAddInsCaption = string.Empty;
@@ -912,6 +972,13 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<RxVoid, RxVoid> EditDescriptionCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> CloseDescriptionEditorCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> CancelDescriptionEditCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> AddCategoryCommand { get; }
+
+    /// <summary>
+    /// Input: the label over the box, and what was already typed into the Category picker, which the box starts with.
+    /// Output: the name typed for the new category, or null if it was cancelled. The View shows a TextPromptWindow.
+    /// </summary>
+    public Interaction<(string Label, string InitialValue), string?> PromptForNewCategory { get; } = new();
     public ReactiveCommand<RxVoid, RxVoid> AddUsageCommand { get; }
     public ReactiveCommand<ProductUsageEdit, RxVoid> EditUsageCommand { get; }
     public ReactiveCommand<ProductUsageEdit, RxVoid> MakeCopyCommand { get; }
@@ -943,8 +1010,10 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         ISubAssemblyLineRepository subAssemblyLineRepository,
         ISubAssemblyRoleRepository subAssemblyRoleRepository,
         IRawMaterialRepository rawMaterialRepository,
+        IProductCategoryRepository categoryRepository,
         IValidator<Product> productValidator,
         IValidator<CostingParameters> costingParametersValidator,
+        IValidator<ProductCategory> categoryValidator,
         ILogger logger)
         : base(logger)
     {
@@ -958,6 +1027,8 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         _subAssemblyLineRepository = subAssemblyLineRepository;
         _productValidator = productValidator;
         _costingParametersValidator = costingParametersValidator;
+        _categoryRepository = categoryRepository;
+        _categoryValidator = categoryValidator;
 
         RecipeTabs.Add(PackagingTab);
         UsageEdits.CollectionChanged += (_, e) => MirrorUsageTabs(e);
@@ -977,6 +1048,31 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             .Filter(nameFilter)
             .SortAndBind(out _visibleProducts, byName)
             .Subscribe();
+
+        _categoryCache.Connect()
+            .SortAndBind(out _categories, SortExpressionComparer<ProductCategory>.Ascending(c => c.Name))
+            .Subscribe();
+
+        // The "< Add New .. >" row has a cache of its own, which LoadCommand's merge of the categories never touches.
+        _addNewCategoryOption.AddOrUpdate(AddNewCategory);
+
+        _categoryCache.Connect()
+            .Or(_addNewCategoryOption.Connect())
+            .SortAndBind(out _categoryOptions, SortExpressionComparer<ProductCategory>
+                .Ascending(c => c.Id == AddNewCategoryId ? 0 : 1)
+                .ThenByAscending(c => c.Name))
+            .Subscribe();
+
+        // The picker's AutoComplete filters its rows by what's typed, Add New's too, so the row takes the typed text into
+        // its name and always matches (RawMaterialsViewModel explains it in full).
+        this.WhenAnyValue(x => x.CategorySearchText)
+            .Select(text => text.Trim())
+            .DistinctUntilChanged()
+            .Subscribe(text => _addNewCategoryOption.AddOrUpdate(new ProductCategory
+            {
+                Id = AddNewCategoryId,
+                Name = text.Length == 0 ? "< Add New .. >" : $"< Add New \"{text}\" .. >",
+            }));
 
         _headerTitle = this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingName, (product, name) =>
                 product is null && string.IsNullOrWhiteSpace(name) ? "New product" : name)
@@ -1091,6 +1187,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var roles = await subAssemblyRoleRepository.GetAllAsync(CancellationToken.None);
+            var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
             var rawMaterials = await rawMaterialRepository.GetAllAsync(CancellationToken.None);
             var products = await _productRepository.GetAllAsync(CancellationToken.None);
             var linkable = await _subAssemblyRepository.GetLinkableAsync(CancellationToken.None);
@@ -1111,6 +1208,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
             // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
             var selectedId = SelectedProduct?.Id;
+            var categoryId = EditingCategory?.Id;
             var usageRoleId = EditingUsageRole?.Id;
             var usageSourceId = EditingUsageSource?.SubAssembly.Id;
             var packagingLinkTargetId = EditingPackagingLinkTarget?.Id;
@@ -1118,6 +1216,8 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             ApplyRefresh(() =>
             {
                 Roles.MergeFrom(roles, r => r.Id);
+                _categoryCache.MergeFrom(categories);
+                EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId);
                 Ingredients.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Ingredient).OrderBy(m => m.Name)], m => m.Id);
                 PackagingMaterials.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Packaging).OrderBy(m => m.Name)], m => m.Id);
                 _productCache.MergeFrom(products);
@@ -1169,6 +1269,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                 Id = _editingId,
                 Name = EditingName,
                 Description = string.IsNullOrWhiteSpace(EditingDescription) ? null : EditingDescription.Trim(),
+                CategoryId = EditingCategory?.Id,
             };
 
             var validation = _productValidator.Validate(product);
@@ -1221,6 +1322,40 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         {
             EditingDescription = _descriptionBeforeEdit;
             IsDescriptionEditorOpen = false;
+        });
+
+        // The Category picker's "< Add New .. >" row: names a category, saves it, and picks it for the product, so a
+        // product can go in a new category without a trip to Settings. Save saves the product's choice.
+        AddCategoryCommand = ReactiveCommand.CreateFromTask(async () =>
+        {
+            var name = await PromptForNewCategory.Handle(("Name for the new category:", CategorySearchText.Trim()));
+
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                await RunSafelyAsync(async () =>
+                {
+                    var category = new ProductCategory { Name = name.Trim() };
+
+                    var validation = _categoryValidator.Validate(category);
+                    if (!validation.IsValid)
+                    {
+                        ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                        return;
+                    }
+
+                    // AddAsync fills in the saved Id, which the reloaded copy to pick is found by. Only the categories are
+                    // reloaded: nothing else on the screen changes with a new category.
+                    await _categoryRepository.AddAsync(category, CancellationToken.None);
+                    var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
+                    ApplyRefresh(() => _categoryCache.MergeFrom(categories));
+                    EditingCategory = Categories.FirstOrDefault(c => c.Id == category.Id);
+                    SuccessMessage = $"{category.Name} was added.";
+                });
+            }
+
+            // The picker is still showing the row that was picked, so the category goes back into it: the new one, or
+            // the one it had when the prompt was cancelled or the name refused (as RawMaterialsViewModel does).
+            this.RaisePropertyChanged(nameof(EditingCategory));
         });
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
@@ -1392,6 +1527,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         _editingId = product.Id;
         EditingName = product.Name;
         EditingDescription = product.Description ?? string.Empty;
+        EditingCategory = Categories.FirstOrDefault(c => c.Id == product.CategoryId);
         ShowUpdatedAt(product.UpdatedAt);
         EditingCloneName = $"{product.Name} Copy";
     }
@@ -1421,6 +1557,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         _editingId = 0;
         EditingName = string.Empty;
         EditingDescription = string.Empty;
+        EditingCategory = null;
         IsDescriptionEditorOpen = false;
         ShowUpdatedAt(null);
         EditingCloneName = string.Empty;
@@ -2033,13 +2170,15 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         UsageFormPreviewText = costPerPiece is { } preview ? $"₱{preview:N4} a piece" : string.Empty;
         UsageFormCostPerPieceText = costPerPiece is { } figure ? $"₱{figure:N4}" : "—";
 
-        // The formula's base, given to both tables: an add-in is read against the recipe's base, never its own.
-        var formulaBase = IngredientLineRow.ApplyFormulaBase([.. FormLines]);
+        // The formula's base and the batch, given to both tables: an add-in is read against the recipe's base, never its own,
+        // and with no base every line of both is read against the whole batch, add-ins included, so they come to 100%.
+        var formulaBase = IngredientLineRow.ApplyFormulaBase([.. FormLines], totalWeight);
         _formFormulaBase = formulaBase;
-        IngredientLineRow.ApplyFormulaBase(FormAddIns, formulaBase);
+        IngredientLineRow.ApplyFormulaBase(FormAddIns, formulaBase, totalWeight);
+        UsageFormPercentHeader = IngredientLineRow.PercentHeader(formulaBase);
         UsageFormBaseCaption = formulaBase > 0
             ? $"Base {formulaBase:#,0.##} g · whole formula {totalWeight / formulaBase * 100m:#,0.#}%"
-            : "Tick the ingredients that make 100% — usually the flour.";
+            : SubAssembliesViewModel.NoBaseCaption;
 
         // The arithmetic of the two tables, in words: the recipe's grams, this product's on top, the batch.
         var recipeName = EditingUsage?.DisplayName
@@ -2466,5 +2605,10 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             EditingMarginPercent,
             EditingVatPercent);
 
-    public void Dispose() => _productCache.Dispose();
+    public void Dispose()
+    {
+        _productCache.Dispose();
+        _categoryCache.Dispose();
+        _addNewCategoryOption.Dispose();
+    }
 }

@@ -1,0 +1,72 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.ProductCategoriesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="500" d:DesignWidth="900">
+    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="320" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ErrorMessage as a toast, over the cards: it spans the whole Grid and puts itself in its bottom-right corner -->
+        <controls:ErrorToast Grid.ColumnSpan="3" />
+
+        <!-- Product categories list -->
+        <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Product Categories" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
+                <TextBlock Grid.Row="1"
+                           Text="What the Products list groups products under. A product without one is listed as Uncategorized."
+                           Style="{StaticResource CaptionStyle}"
+                           Margin="0,0,0,12" />
+
+                <syncfusion:SfDataGrid Grid.Row="2"
+                                       ItemsSource="{Binding Categories}"
+                                       SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                                       GridLinesVisibility="Both"
+                                       CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                       CurrentCellBorderThickness="1"
+                                       controls:GridFillerRows.IsEnabled="True"
+                                       AutoGenerateColumns="False"
+                                       AllowEditing="False"
+                                       SelectionMode="Single"
+                                       NavigationMode="Row"
+                                       ColumnSizer="Star">
+                    <syncfusion:SfDataGrid.Columns>
+                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
+                    </syncfusion:SfDataGrid.Columns>
+                </syncfusion:SfDataGrid>
+            </Grid>
+        </Border>
+
+        <!-- New / edit a category -->
+        <Border Grid.Column="2" Style="{StaticResource CardStyle}" VerticalAlignment="Top">
+            <StackPanel>
+                <TextBlock Text="{Binding FormTitle}" Style="{StaticResource SectionHeaderStyle}" />
+
+                <TextBlock Text="Name" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:SfTextBoxExt x:Name="NameTextBox"
+                                         Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,12" />
+
+                <StackPanel Orientation="Horizontal">
+                    <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />
+                    <syncfusion:ButtonAdv Label="Save" IconTemplate="{StaticResource SaveIconTemplate}" Command="{Binding SaveCommand}" Margin="0,0,8,0" />
+                    <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

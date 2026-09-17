@@ -9,6 +9,14 @@
              d:DesignHeight="800"
              d:DesignWidth="1400">
     <UserControl.Resources>
+        <!--
+            The percentage column's header, "Baker's %" or "Absolute %" (PercentHeader). A template binding the view's own
+            DataContext, not HeaderText="{Binding}": a bound HeaderText reaches the header cell only through the grid's
+            row generator, which left each Recipe Structure tab's grid showing the header of the tab shown before it.
+        -->
+        <DataTemplate x:Key="PercentHeaderTemplate">
+            <TextBlock Text="{Binding DataContext.PercentHeader, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+        </DataTemplate>
         <Style x:Key="TotalValueStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="16" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -56,9 +64,6 @@
                     <syncfusion:SfDataGrid.Columns>
                         <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="200" />
                         <syncfusion:GridTextColumn MappingName="RoleName" HeaderText="Role" Width="110" />
-                        <controls:NumericColumn MappingName="TotalWeight" HeaderText="Batch (g)" Width="96" NumberDecimalDigits="2" />
-                        <controls:NumericColumn MappingName="TotalCost" HeaderText="Batch Cost" Width="96" NumberDecimalDigits="2" />
-                        <syncfusion:GridTextColumn MappingName="UsedByText" HeaderText="Used By" Width="170" Padding="12,0,0,0" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </Grid>
@@ -201,8 +206,8 @@
                                 </syncfusion:GridMultiColumnDropDownList.Columns>
                             </syncfusion:GridMultiColumnDropDownList>
                             <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="120" NumberDecimalDigits="2" />
-                            <controls:NumericColumn MappingName="BakersPercent"
-                                                    HeaderText="Baker's %"
+                            <controls:NumericColumn MappingName="Percent"
+                                                    HeaderTemplate="{StaticResource PercentHeaderTemplate}"
                                                     Width="86"
                                                     NumberDecimalDigits="1"
                                                     controls:GridCellEditing.AllowWhen="CanTypeBakersPercent"

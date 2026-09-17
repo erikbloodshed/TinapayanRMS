@@ -41,7 +41,7 @@ public interface IProductRepository
     /// <summary>Adds the product and stamps its UpdatedAt.</summary>
     Task AddAsync(Product product, CancellationToken cancellationToken);
 
-    /// <summary>Changes the name and description, and stamps UpdatedAt.</summary>
+    /// <summary>Changes the name, description and category, and stamps UpdatedAt.</summary>
     Task UpdateAsync(Product product, CancellationToken cancellationToken);
 
     /// <summary>
@@ -50,7 +50,7 @@ public interface IProductRepository
     /// its recipe, its packaging lines and its costing parameters, each checked as their own repositories
     /// check them. Returns the product's id.
     /// </summary>
-    /// <param name="product">Only its Id, Name and Description are read; it's never given an id.</param>
+    /// <param name="product">Only its Id, Name, Description and CategoryId are read; it's never given an id.</param>
     /// <param name="recipe">
     /// The product's complete recipe of sub-assemblies, or null to leave it as it is. An owned
     /// sub-assembly it no longer lists is deleted, unless another product links it.

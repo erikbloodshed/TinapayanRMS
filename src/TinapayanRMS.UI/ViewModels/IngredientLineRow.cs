@@ -87,15 +87,15 @@ public sealed class IngredientLineRow : ReactiveObject
     private void SetGrams(decimal value)
     {
         this.RaiseAndSetIfChanged(ref _grams, value, nameof(Grams));
-        this.RaisePropertyChanged(nameof(BakersPercent));
+        this.RaisePropertyChanged(nameof(Percent));
         this.RaisePropertyChanged(nameof(Cost));
     }
 
     private bool _isFormulaBase;
     /// <summary>
-    /// Ticked as part of the formula's 100% base — usually the flour. Every line's <see cref="BakersPercent"/>
+    /// Ticked as part of the formula's 100% base — usually the flour. Every line's <see cref="Percent"/>
     /// is read against the ticked lines' total, so ticking one changes the whole table: the screen sums them
-    /// and pushes the total back through <see cref="ApplyFormulaBase"/>.
+    /// and pushes the total back through <see cref="ApplyFormulaBase(IReadOnlyList{IngredientLineRow})"/>.
     /// </summary>
     public bool IsFormulaBase
     {
@@ -121,8 +121,24 @@ public sealed class IngredientLineRow : ReactiveObject
         private set
         {
             this.RaiseAndSetIfChanged(ref _baseWeight, value);
-            this.RaisePropertyChanged(nameof(BakersPercent));
+            this.RaisePropertyChanged(nameof(Percent));
             this.RaisePropertyChanged(nameof(CanTypeBakersPercent));
+            this.RaisePropertyChanged(nameof(IsPercentTyped));
+        }
+    }
+
+    private decimal _batchWeight;
+    /// <summary>
+    /// The whole batch's weight, as the screen last worked it out: what <see cref="Percent"/> is read against while
+    /// nothing is ticked as the base. On a linked recipe that's the recipe and its add-ins together.
+    /// </summary>
+    public decimal BatchWeight
+    {
+        get => _batchWeight;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _batchWeight, value);
+            this.RaisePropertyChanged(nameof(Percent));
         }
     }
 
@@ -141,39 +157,46 @@ public sealed class IngredientLineRow : ReactiveObject
         }
     }
 
-    /// <summary>The line's percentage, not its grams, is what was typed: the table shows it in bold.</summary>
-    public bool IsPercentTyped => AuthoredBakersPercent is not null;
+    /// <summary>
+    /// The line's percentage, not its grams, is what was typed: the table shows it in bold. Only while there's a base,
+    /// since the figure showing without one is the absolute percentage, which is never typed.
+    /// </summary>
+    public bool IsPercentTyped => AuthoredBakersPercent is not null && BaseWeight > 0;
 
     /// <summary>
     /// Whether a percentage can be typed for the line: not for a base line, which is 100% between its lines by
-    /// definition and given in grams, and not while nothing is ticked, since there's no base to take a share of.
+    /// definition and given in grams, and not while nothing is ticked, when the absolute percentage showing is
+    /// only a reading of the grams.
     /// </summary>
     public bool CanTypeBakersPercent => !IsFormulaBase && BaseWeight > 0;
 
     /// <summary>
-    /// This line in baker's percentage: its weight against the formula's base, so the base comes to 100 and 650 g of
-    /// water on 1,000 g of flour comes to 65. Null when nothing is ticked, which shows as a blank rather than a nought — a
-    /// glaze needn't have a base. Typing one works out the grams (SubAssemblyRules.GramsFromBakersPercent) and makes the
+    /// The line's percentage column. With a base ticked it's baker's percentage: the line's weight against the base, so
+    /// the base comes to 100 and 650 g of water on 1,000 g of flour comes to 65. With nothing ticked (a glaze or a filling
+    /// needn't have a base) it's absolute percentage instead: the line's weight against the whole batch, so the lines come
+    /// to 100 between them (SubAssemblyRules.CalculateAbsolutePercent), and the column's header says which it is. Only a
+    /// baker's percentage can be typed: that works out the grams (SubAssemblyRules.GramsFromBakersPercent) and makes the
     /// percentage the figure that stays put; clearing it keeps the grams and makes those the figure instead.
     /// </summary>
-    public decimal? BakersPercent
+    public decimal? Percent
     {
-        get => AuthoredBakersPercent is { } typed && BaseWeight > 0
-            ? typed
-            : SubAssemblyRules.CalculateBakersPercent(Grams, BaseWeight);
+        get => BaseWeight <= 0
+            ? SubAssemblyRules.CalculateAbsolutePercent(Grams, BatchWeight)
+            : AuthoredBakersPercent ?? SubAssemblyRules.CalculateBakersPercent(Grams, BaseWeight);
         set
         {
-            if (value is not > 0m)
+            // The grid won't open the cell where it can't be typed (controls:GridCellEditing); this is the backstop. Checked
+            // first, so a line whose typed baker's percentage is waiting for a base to come back doesn't lose it.
+            if (!CanTypeBakersPercent)
             {
-                AuthoredBakersPercent = null;
-                this.RaisePropertyChanged(nameof(BakersPercent));
+                this.RaisePropertyChanged(nameof(Percent));
                 return;
             }
 
-            // The grid won't open the cell where it can't be typed (controls:GridCellEditing); this is the backstop.
-            if (!CanTypeBakersPercent)
+            if (value is not > 0m)
             {
-                this.RaisePropertyChanged(nameof(BakersPercent));
+                AuthoredBakersPercent = null;
+                this.RaisePropertyChanged(nameof(Percent));
                 return;
             }
 
@@ -208,27 +231,32 @@ public sealed class IngredientLineRow : ReactiveObject
 
     /// <summary>
     /// Works out the formula's base from <paramref name="rows"/> — the ticked lines' total weight — and gives
-    /// it to every row, so each can read its own percentage. Returns the base, which the screen also puts in
-    /// its caption. Call it wherever <see cref="Resolve"/> is called: a tick, a gram or a line coming or going
-    /// all move it.
+    /// it to every row, with the rows' batch weight, so each can read its own percentage. Returns the base, which the
+    /// screen also puts in its caption. Call it wherever <see cref="Resolve"/> is called: a tick, a gram or a line
+    /// coming or going all move it.
     /// </summary>
-    public static decimal ApplyFormulaBase(IReadOnlyList<IngredientLineRow> rows)
+    public static decimal ApplyFormulaBase(IReadOnlyList<IngredientLineRow> rows) =>
+        ApplyFormulaBase(rows, BatchWeightOf(rows));
+
+    /// <summary>The same, against a batch weight worked out elsewhere: a linked recipe's, which its add-ins are part of.</summary>
+    public static decimal ApplyFormulaBase(IReadOnlyList<IngredientLineRow> rows, decimal batchWeight)
     {
         // A typed percentage is never on a base line, so reworking those lines' grams can't move the base itself.
         var baseWeight = SubAssemblyRules.FormulaBaseWeight([.. rows.Select(r => (r.Grams, r.IsFormulaBase))]);
-        ApplyFormulaBase(rows, baseWeight);
+        ApplyFormulaBase(rows, baseWeight, batchWeight);
         return baseWeight;
     }
 
     /// <summary>
-    /// The same, against a base worked out elsewhere: a linked recipe's add-ins are read against the recipe's
+    /// The same, against a base and a batch worked out elsewhere: a linked recipe's add-ins are read against the recipe's
     /// base, not against their own weight, since an add-in is never part of the base.
     /// </summary>
-    public static void ApplyFormulaBase(IEnumerable<IngredientLineRow> rows, decimal baseWeight)
+    public static void ApplyFormulaBase(IEnumerable<IngredientLineRow> rows, decimal baseWeight, decimal batchWeight)
     {
         foreach (var row in rows)
         {
             row.BaseWeight = baseWeight;
+            row.BatchWeight = batchWeight;
 
             // A line typed as a percentage keeps it: its grams follow the base. With no base there's nothing to take a
             // share of, so it keeps its last grams, and its percentage waits for a base to come back.
@@ -238,6 +266,13 @@ public sealed class IngredientLineRow : ReactiveObject
             }
         }
     }
+
+    /// <summary>The batch the rows make: the grams of every row with its ingredient picked, as the screens' batch weight counts them.</summary>
+    public static decimal BatchWeightOf(IEnumerable<IngredientLineRow> rows) =>
+        rows.Where(r => r.Ingredient is not null).Sum(r => r.Grams);
+
+    /// <summary>The percentage column's header: "Baker's %" while there's a base, "Absolute %" while nothing is ticked.</summary>
+    public static string PercentHeader(decimal baseWeight) => baseWeight > 0 ? "Baker's %" : "Absolute %";
 
     /// <summary>
     /// The rows as lines, leaving out blank ones. A row with only an ingredient or only grams is refused, and so

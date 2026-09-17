@@ -46,6 +46,7 @@ public static class CompositionRoot
                 services.AddSingleton<IngredientCostPropagator>();
                 services.AddSingleton<IUnitOfMeasureRepository, UnitOfMeasureRepository>();
                 services.AddSingleton<IRawMaterialCategoryRepository, RawMaterialCategoryRepository>();
+                services.AddSingleton<IProductCategoryRepository, ProductCategoryRepository>();
                 services.AddSingleton<IRawMaterialRepository, RawMaterialRepository>();
                 services.AddSingleton<IRawMaterialUnitRepository, RawMaterialUnitRepository>();
                 services.AddSingleton<IRawMaterialPriceHistoryRepository, RawMaterialPriceHistoryRepository>();
@@ -63,6 +64,7 @@ public static class CompositionRoot
                 services.AddSingleton(Log.Logger);
                 services.AddSingleton<IValidator<UnitOfMeasure>, UnitOfMeasureValidator>();
                 services.AddSingleton<IValidator<RawMaterialCategory>, RawMaterialCategoryValidator>();
+                services.AddSingleton<IValidator<ProductCategory>, ProductCategoryValidator>();
                 services.AddSingleton<IValidator<RawMaterial>, RawMaterialValidator>();
                 services.AddSingleton<IValidator<RawMaterialUnit>, RawMaterialUnitValidator>();
                 services.AddSingleton<IValidator<SubAssemblyRole>, SubAssemblyRoleValidator>();
@@ -79,6 +81,7 @@ public static class CompositionRoot
                 services.AddSingleton<ReportsViewModel>();
                 services.AddSingleton<UnitsOfMeasureViewModel>();
                 services.AddSingleton<CategoriesViewModel>();
+                services.AddSingleton<ProductCategoriesViewModel>();
                 services.AddSingleton<SubAssemblyRolesViewModel>();
             });
     }

@@ -109,12 +109,26 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _headerTitle, value);
     }
 
-    private string _formulaBaseCaption = "Tick the ingredients that make 100% — usually the flour.";
-    /// <summary>The formula in baker's terms, e.g. "Base 1,000 g · whole formula 167.7%" — the figure a batch is scaled by.</summary>
+    private string _formulaBaseCaption = NoBaseCaption;
+    /// <summary>
+    /// The formula in baker's terms, e.g. "Base 1,000 g · whole formula 167.7%" — the figure a batch is scaled by — or,
+    /// with nothing ticked, what the absolute percentages are read against.
+    /// </summary>
     public string FormulaBaseCaption
     {
         get => _formulaBaseCaption;
         private set => this.RaiseAndSetIfChanged(ref _formulaBaseCaption, value);
+    }
+
+    /// <summary>With nothing ticked as the base, the percentages are absolute: each line's share of the batch.</summary>
+    internal const string NoBaseCaption = "Absolute %: each line's share of the batch. Tick the base — usually the flour — for baker's %.";
+
+    private string _percentHeader = IngredientLineRow.PercentHeader(0m);
+    /// <summary>The lines table's percentage header: "Baker's %" while a base is ticked, "Absolute %" while none is.</summary>
+    public string PercentHeader
+    {
+        get => _percentHeader;
+        private set => this.RaiseAndSetIfChanged(ref _percentHeader, value);
     }
 
     private decimal _batchWeight;
@@ -331,12 +345,13 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
     /// <summary>The formula's base, given to every row so each reads its own percentage, and said in the caption.</summary>
     private void RecomputeFormulaBase()
     {
-        var baseWeight = IngredientLineRow.ApplyFormulaBase([.. Lines]);
+        var totalWeight = IngredientLineRow.BatchWeightOf(Lines);
+        var baseWeight = IngredientLineRow.ApplyFormulaBase([.. Lines], totalWeight);
         _formulaBase = baseWeight;
-        var totalWeight = Lines.Where(l => l.Ingredient is not null).Sum(l => l.Grams);
+        PercentHeader = IngredientLineRow.PercentHeader(baseWeight);
         FormulaBaseCaption = baseWeight > 0
             ? $"Base {baseWeight:#,0.##} g · whole formula {totalWeight / baseWeight * 100m:#,0.#}%"
-            : "Tick the ingredients that make 100% — usually the flour.";
+            : NoBaseCaption;
     }
 
     private void RecomputeTotals()

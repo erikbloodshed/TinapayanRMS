@@ -44,7 +44,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         var packagingLines = await PackagingLineRepository.ResolveEffectiveAsync(dbContext, sourceProductId, [], cancellationToken);
         var costing = await dbContext.CostingParameters.AsNoTracking().FirstOrDefaultAsync(c => c.ProductId == sourceProductId, cancellationToken);
 
-        var newProduct = new Product { Name = newProductName, Description = source.Description };
+        var newProduct = new Product { Name = newProductName, Description = source.Description, CategoryId = source.CategoryId };
         await ProductRepository.AddAsync(dbContext, newProduct, cancellationToken);
 
         // A standalone sub-assembly stays linked, at the same piece size: it's kept apart to be shared.

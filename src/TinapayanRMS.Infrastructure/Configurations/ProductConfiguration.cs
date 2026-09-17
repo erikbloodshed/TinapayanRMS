@@ -13,5 +13,11 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(p => p.Name).IsUnique();
 
         builder.Property(p => p.Description).HasMaxLength(ProductValidator.MaxDescriptionLength);
+
+        // A category is optional, so deleting one leaves its products uncategorized rather than being refused.
+        builder.HasOne(p => p.Category)
+            .WithMany()
+            .HasForeignKey(p => p.CategoryId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

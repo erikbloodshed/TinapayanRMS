@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private readonly HashSet<TabItemExt> _loadingTabs = [];
     private readonly UnitsOfMeasureViewModel _unitsOfMeasureViewModel;
     private readonly CategoriesViewModel _categoriesViewModel;
+    private readonly ProductCategoriesViewModel _productCategoriesViewModel;
     private readonly SubAssemblyRolesViewModel _rolesViewModel;
 
     public MainWindow(
@@ -27,12 +28,14 @@ public partial class MainWindow : Window
         ReportsViewModel reportsViewModel,
         UnitsOfMeasureViewModel unitsOfMeasureViewModel,
         CategoriesViewModel categoriesViewModel,
+        ProductCategoriesViewModel productCategoriesViewModel,
         SubAssemblyRolesViewModel rolesViewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
         _unitsOfMeasureViewModel = unitsOfMeasureViewModel;
         _categoriesViewModel = categoriesViewModel;
+        _productCategoriesViewModel = productCategoriesViewModel;
         _rolesViewModel = rolesViewModel;
 
         RawMaterialsTab.Content = new RawMaterialsView(rawMaterialsViewModel);
@@ -85,7 +88,7 @@ public partial class MainWindow : Window
     {
         NavigationDrawer.IsOpen = false;
 
-        var settings = new SettingsWindow(_unitsOfMeasureViewModel, _categoriesViewModel, _rolesViewModel) { Owner = this };
+        var settings = new SettingsWindow(_unitsOfMeasureViewModel, _categoriesViewModel, _productCategoriesViewModel, _rolesViewModel) { Owner = this };
         SfSkinManager.SetTheme(settings, SfSkinManager.GetTheme(this));
         settings.ShowDialog();
 
