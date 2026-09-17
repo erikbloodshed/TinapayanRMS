@@ -10,12 +10,17 @@ public class SubAssembly
     public int Id { get; set; }
 
     /// <summary>
-    /// Unique within its owner, and among standalone sub-assemblies: two products can each have a
-    /// "Sweet Dough", and so can one product and the standalone list.
+    /// A standalone sub-assembly's name, unique among standalone ones: products pick it to link or copy by
+    /// it. Null for a product's own, which goes by its role: a product has one sub-assembly in each role, and
+    /// its recipe's tabs are called by them (since 2026-09-17; a name saved before then is cleared the next
+    /// time its product's recipe is saved, and nothing shows it).
     /// </summary>
-    public string Name { get; set; } = string.Empty;
+    public string? Name { get; set; }
 
-    /// <summary>Required. Decides which section of every recipe using it the sub-assembly shows in.</summary>
+    /// <summary>
+    /// Required. Decides which section of every recipe using it the sub-assembly shows in, and what that
+    /// section is called; a recipe has one sub-assembly in each role.
+    /// </summary>
     public int RoleId { get; set; }
 
     public SubAssemblyRole? Role { get; set; }

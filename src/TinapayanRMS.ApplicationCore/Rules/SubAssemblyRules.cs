@@ -1,4 +1,5 @@
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.ApplicationCore.Rules;
 
@@ -68,24 +69,28 @@ public static class SubAssemblyRules
         Math.Round(baseWeight * percent / 100m, 4);
 
     /// <summary>
-    /// A product's own sub-assemblies need a name each, and different names: the owner's recipe shows
-    /// them side by side.
+    /// A product has one sub-assembly in each role, its own and the ones it links together: its recipe's
+    /// sections are called by their roles, so two in one role couldn't be told apart.
     /// </summary>
-    public static void EnsureValidOwnedNames(IReadOnlyList<string> names)
+    public static void EnsureOnePerRole(IReadOnlyList<(int RoleId, string RoleName)> roles)
     {
-        if (names.Any(string.IsNullOrWhiteSpace))
+        var repeated = roles.GroupBy(r => r.RoleId).FirstOrDefault(g => g.Count() > 1);
+        if (repeated is not null)
         {
-            throw new InvalidOperationException("Every sub-assembly needs a name.");
-        }
-
-        var duplicate = names
-            .GroupBy(n => n.Trim(), StringComparer.CurrentCultureIgnoreCase)
-            .FirstOrDefault(g => g.Count() > 1);
-        if (duplicate is not null)
-        {
-            throw new InvalidOperationException($"This product already has a sub-assembly named '{duplicate.Key}'. Give each one its own name.");
+            throw new InvalidOperationException(
+                $"This recipe has more than one sub-assembly in the {repeated.First().RoleName} role. A product takes one in each role: give one of them another role, or take it out.");
         }
     }
+
+    /// <summary>
+    /// What a sub-assembly is called where it isn't plain whose it is: a standalone one by its name, and a
+    /// product's own, which has no name, as that product's role, e.g. "Cream Loaf's Dough". Needs its Role and,
+    /// for a product's own, its OwnerProduct.
+    /// </summary>
+    public static string DisplayName(SubAssembly subAssembly) =>
+        subAssembly.OwnerProductId is null
+            ? subAssembly.Name ?? string.Empty
+            : $"{subAssembly.OwnerProduct?.Name ?? "Another product"}'s {subAssembly.Role?.Name ?? "sub-assembly"}";
 
     /// <summary>
     /// A standalone sub-assembly needs a name no other standalone one has (case- and space-insensitively):
@@ -98,28 +103,6 @@ public static class SubAssemblyRules
         {
             throw new InvalidOperationException($"There's already a standalone sub-assembly named '{trimmed}'. Give this one its own name.");
         }
-    }
-
-    /// <summary>
-    /// <paramref name="name"/> if the product has no sub-assembly by that name yet, otherwise the first
-    /// free one of "name (copy)", "name (copy 2)", … — for a copy that would otherwise clash.
-    /// </summary>
-    public static string UniqueName(string name, IReadOnlyCollection<string> takenNames)
-    {
-        var taken = new HashSet<string>(takenNames.Select(n => n.Trim()), StringComparer.CurrentCultureIgnoreCase);
-        var trimmed = name.Trim();
-        if (!taken.Contains(trimmed))
-        {
-            return trimmed;
-        }
-
-        var candidate = $"{trimmed} (copy)";
-        for (var n = 2; taken.Contains(candidate); n++)
-        {
-            candidate = $"{trimmed} (copy {n})";
-        }
-
-        return candidate;
     }
 
     /// <summary>

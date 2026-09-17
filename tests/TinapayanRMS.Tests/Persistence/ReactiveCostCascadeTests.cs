@@ -77,7 +77,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
     /// <summary>A sub-assembly of <paramref name="grams"/> of one ingredient, in a product of its own (a sub-assembly always has an owner).</summary>
     private async Task<int> SeedSubAssemblyAsync(string name, int roleId, int ingredientId, decimal grams)
     {
-        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync($"{name} product", name, roleId, [(ingredientId, grams)]);
+        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync($"{name} product", roleId, [(ingredientId, grams)]);
         return subAssemblyId;
     }
 
@@ -179,7 +179,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
 
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = flourId, UnitId = await KilogramUnitIdAsync(flourId), Date = new DateOnly(2026, 1, 1), Price = 50m }, Cancellation); // 0.05/g
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation); // 0.09/g
-        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Pandesal", "Bread Dough", roleId, [(flourId, 800m), (sugarId, 200m)]);
+        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 800m), (sugarId, 200m)]);
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(58m); // 800*0.05 + 200*0.09
 
@@ -201,7 +201,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
 
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
         // 100g @ 0.09/g -> 9, TotalWeight 100g, used at 10g a piece.
-        var (productId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", "Custard", roleId, [(sugarId, 100m)], weightPerPiece: 10m);
+        var (productId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", roleId, [(sugarId, 100m)], weightPerPiece: 10m);
 
         await using var dbContext = CreateDbContext();
 
@@ -234,7 +234,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = ubeId, UnitId = await KilogramUnitIdAsync(ubeId), Date = new DateOnly(2026, 1, 1), Price = 800m }, Cancellation);
 
         // Cream Loaf owns a 1,000 g / ₱50 dough; Cream Loaf Ube links it and stirs in 20 g of ube (₱16).
-        var (_, doughId) = await AddProductWithSubAssemblyAsync("Cream Loaf", "Sweet Dough", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
+        var (_, doughId) = await AddProductWithSubAssemblyAsync("Cream Loaf", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
         var linkerId = await AddProductAsync("Cream Loaf Ube");
         await SaveRecipeAsync(linkerId, new RecipeDraft(
             [],

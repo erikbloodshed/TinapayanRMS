@@ -36,13 +36,13 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
     /// <summary>
     /// Replaces the product's recipe on the caller's context, which should hold a transaction: its usages,
     /// and its own sub-assemblies — updated, added and relined as <paramref name="recipe"/> lists them,
-    /// and deleted when it no longer does. Every check runs before anything is deleted: names, lines and
-    /// piece sizes, that listed sub-assemblies are the product's own and linked ones another product's or
-    /// standalone, and that no sub-assembly being deleted is linked by another product.
+    /// and deleted when it no longer does. Every check runs before anything is deleted: one sub-assembly in
+    /// each role, lines and piece sizes, that listed sub-assemblies are the product's own and linked ones
+    /// another product's or standalone, that no product linking one of its own gets a second in a role it
+    /// moves to, and that no sub-assembly being deleted is linked by another product.
     /// </summary>
     internal static async Task SetRecipeAsync(TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, CancellationToken cancellationToken)
     {
-        SubAssemblyRules.EnsureValidOwnedNames([.. recipe.Owned.Select(o => o.Name)]);
         foreach (var owned in recipe.Owned)
         {
             SubAssemblyRules.EnsureValidLines(owned.Lines);
@@ -61,9 +61,9 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             throw new InvalidOperationException($"Product {productId} does not exist.");
         }
 
-        var roleIds = recipe.Owned.Select(o => o.RoleId).Distinct().ToList();
-        var existingRoleIds = await dbContext.SubAssemblyRoles.Where(r => roleIds.Contains(r.Id)).Select(r => r.Id).ToListAsync(cancellationToken);
-        if (roleIds.Count != existingRoleIds.Count)
+        var ownedRoleIds = recipe.Owned.Select(o => o.RoleId).Distinct().ToList();
+        var roleNames = await dbContext.SubAssemblyRoles.Where(r => ownedRoleIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, r => r.Name, cancellationToken);
+        if (ownedRoleIds.Count != roleNames.Count)
         {
             throw new InvalidOperationException("Every sub-assembly needs a role, and that role must still exist.");
         }
@@ -77,10 +77,13 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             throw new InvalidOperationException($"Sub-assembly {owned.Id} isn't one of this product's own.");
         }
 
+        // With their role and owner, which a linked one is called by when it has no name of its own.
         var linkedIds = recipe.Linked.Select(l => l.SubAssemblyId).ToList();
         var linkedSubAssemblies = await dbContext.SubAssemblies
+            .AsNoTracking()
+            .Include(s => s.Role)
+            .Include(s => s.OwnerProduct)
             .Where(s => linkedIds.Contains(s.Id))
-            .Select(s => new { s.Id, s.Name, s.OwnerProductId })
             .ToDictionaryAsync(s => s.Id, cancellationToken);
 
         foreach (var id in linkedIds)
@@ -94,6 +97,18 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             {
                 throw new InvalidOperationException("A product uses its own sub-assemblies directly; it can't link one.");
             }
+        }
+
+        SubAssemblyRules.EnsureOnePerRole(
+        [
+            .. recipe.Owned.Select(o => (o.RoleId, roleNames[o.RoleId])),
+            .. recipe.Linked.Select(l => (linkedSubAssemblies[l.SubAssemblyId].RoleId, linkedSubAssemblies[l.SubAssemblyId].Role?.Name ?? string.Empty)),
+        ]);
+
+        // One of its own moving to another role moves in every product linking it too, which may have one there already.
+        foreach (var owned in recipe.Owned.Where(o => o.Id > 0 && existingOwned[o.Id].RoleId != o.RoleId))
+        {
+            await SubAssemblyRepository.EnsureRoleFreeWhereLinkedAsync(dbContext, owned.Id, owned.RoleId, cancellationToken);
         }
 
         // Add-ins go on top of a linked recipe, so they're only for what it doesn't already have. Checked
@@ -115,7 +130,7 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             {
                 ProductRules.EnsureValidAddIns(
                     [.. link.AddIns.Select(a => (a.IngredientId, a.Grams, addInNames.GetValueOrDefault(a.IngredientId, $"Ingredient {a.IngredientId}")))],
-                    linkedSubAssemblies[link.SubAssemblyId].Name,
+                    SubAssemblyRules.DisplayName(linkedSubAssemblies[link.SubAssemblyId]),
                     [.. baseIngredientIds[link.SubAssemblyId]]);
             }
         }
@@ -140,19 +155,19 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 .ExecuteDeleteAsync(cancellationToken);
         }
 
-        // Kept ones before new ones, so a new sub-assembly can take a name a kept one just gave up.
-        foreach (var owned in recipe.Owned.OrderBy(o => o.Id > 0 ? 0 : 1))
+        // A product's own has no name, only its role; one saved with a name before names went loses it here.
+        foreach (var owned in recipe.Owned)
         {
             SubAssembly subAssembly;
             if (owned.Id > 0)
             {
                 subAssembly = existingOwned[owned.Id];
-                subAssembly.Name = owned.Name.Trim();
+                subAssembly.Name = null;
                 subAssembly.RoleId = owned.RoleId;
             }
             else
             {
-                subAssembly = new SubAssembly { Name = owned.Name.Trim(), RoleId = owned.RoleId, OwnerProductId = productId };
+                subAssembly = new SubAssembly { RoleId = owned.RoleId, OwnerProductId = productId };
                 dbContext.SubAssemblies.Add(subAssembly);
             }
 
@@ -170,8 +185,7 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
         }
 
         // The linked usages go in together, then one save gives every one of them the id its add-ins need.
-        // (An owned sub-assembly is saved one at a time above, because each one's lines must be written
-        // before the next one's name is checked.)
+        // (An owned sub-assembly is saved one at a time above, for the id its lines are written against.)
         List<(LinkedUsageDraft Draft, ProductSubAssemblyUsage Usage)> linkedUsages =
         [
             .. recipe.Linked.Select(l => (l, new ProductSubAssemblyUsage
@@ -191,7 +205,7 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
         foreach (var (draft, usage) in linkedUsages.Where(p => p.Draft.AddIns.Count > 0))
         {
             await UsageAddInLineRepository.SetLinesAsync(
-                dbContext, usage, linkedSubAssemblies[usage.SubAssemblyId].Name, draft.AddIns, cancellationToken);
+                dbContext, usage, SubAssemblyRules.DisplayName(linkedSubAssemblies[usage.SubAssemblyId]), draft.AddIns, cancellationToken);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

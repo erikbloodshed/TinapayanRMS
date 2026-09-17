@@ -38,7 +38,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var (ownerId, doughId) = await AddProductWithSubAssemblyAsync(
-            "Cream Loaf", "Sweet Dough", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
+            "Cream Loaf", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
         var linkerId = await AddProductAsync("Cream Loaf Mini");
         return (ownerId, linkerId, doughId, flourId);
     }
@@ -112,7 +112,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         var act = async () => await SaveRecipeAsync(linkerId, new RecipeDraft([], [Linked(doughId, 30m, (flourId, 100m))]));
 
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Flour*").WithMessage("*Sweet Dough*");
+            .WithMessage("*Flour*").WithMessage("*Cream Loaf's Dough*");
         (await CreateUsageRepository().GetForProductAsync(linkerId, Cancellation)).Should().ContainSingle("the recipe it refused is left as it was");
         (await AddInsAsync(linkerId)).Select(l => l.IngredientId).Should().Equal(ubeId);
     }

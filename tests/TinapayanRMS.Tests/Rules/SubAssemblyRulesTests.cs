@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Tests.Rules;
 
@@ -73,27 +74,31 @@ public class SubAssemblyRulesTests
     }
 
     [Fact]
-    public void EnsureValidOwnedNames_accepts_different_names()
+    public void EnsureOnePerRole_accepts_one_sub_assembly_in_each_role()
     {
-        var act = () => SubAssemblyRules.EnsureValidOwnedNames(["Sweet Dough", "Custard"]);
+        var act = () => SubAssemblyRules.EnsureOnePerRole([(1, "Dough"), (2, "Filling"), (3, "Topping")]);
 
         act.Should().NotThrow();
     }
 
     [Fact]
-    public void EnsureValidOwnedNames_rejects_a_blank_name()
+    public void EnsureOnePerRole_rejects_two_in_one_role_and_names_it()
     {
-        var act = () => SubAssemblyRules.EnsureValidOwnedNames(["Sweet Dough", "  "]);
+        var act = () => SubAssemblyRules.EnsureOnePerRole([(1, "Dough"), (2, "Filling"), (1, "Dough")]);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*needs a name*");
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("This recipe has more than one sub-assembly in the Dough role. A product takes one in each role: give one of them another role, or take it out.");
     }
 
     [Fact]
-    public void EnsureValidOwnedNames_rejects_the_same_name_twice_whatever_its_case_and_spacing()
+    public void DisplayName_is_a_standalone_ones_name_and_a_products_own_role_as_that_products()
     {
-        var act = () => SubAssemblyRules.EnsureValidOwnedNames(["Sweet Dough", " sweet dough"]);
+        var dough = new SubAssemblyRole { Id = 1, Name = "Dough" };
+        var standalone = new SubAssembly { Name = "Variety Bread Dough", RoleId = 1, Role = dough };
+        var owned = new SubAssembly { Name = "Sweet Dough", RoleId = 1, Role = dough, OwnerProductId = 7, OwnerProduct = new Product { Id = 7, Name = "Cream Loaf" } };
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*already has a sub-assembly named 'Sweet Dough'*");
+        SubAssemblyRules.DisplayName(standalone).Should().Be("Variety Bread Dough");
+        SubAssemblyRules.DisplayName(owned).Should().Be("Cream Loaf's Dough", "a product's own goes by its role, even with a name saved before names went");
     }
 
     [Fact]
@@ -128,14 +133,6 @@ public class SubAssemblyRulesTests
         var act = () => SubAssemblyRules.EnsureStandaloneNameAvailable(" sweet dough ", ["Sweet Dough"]);
 
         act.Should().Throw<InvalidOperationException>().WithMessage("There's already a standalone sub-assembly named 'sweet dough'. Give this one its own name.");
-    }
-
-    [Fact]
-    public void UniqueName_keeps_a_free_name_and_numbers_copies_of_a_taken_one()
-    {
-        SubAssemblyRules.UniqueName("Sweet Dough", ["Custard"]).Should().Be("Sweet Dough");
-        SubAssemblyRules.UniqueName(" Sweet Dough ", ["sweet dough"]).Should().Be("Sweet Dough (copy)");
-        SubAssemblyRules.UniqueName("Sweet Dough", ["Sweet Dough", "Sweet Dough (copy)"]).Should().Be("Sweet Dough (copy 2)");
     }
 
     [Fact]

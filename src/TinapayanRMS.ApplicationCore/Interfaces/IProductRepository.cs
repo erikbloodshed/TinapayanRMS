@@ -4,12 +4,11 @@ using TinapayanRMS.Domain.Enums;
 namespace TinapayanRMS.ApplicationCore.Interfaces;
 
 /// <summary>
-/// One of the product's own sub-assemblies as Save writes it: its name, role and gram lines, and the
-/// product's piece size for it (an owner always uses its own sub-assemblies). Id is 0 for a new one.
+/// One of the product's own sub-assemblies as Save writes it: its role, which is what it's called, its gram
+/// lines, and the product's piece size for it (an owner always uses its own sub-assemblies). Id is 0 for a new one.
 /// </summary>
 public sealed record OwnedSubAssemblyDraft(
     int Id,
-    string Name,
     int RoleId,
     IReadOnlyList<RecipeLine> Lines,
     UsageAuthoredField AuthoredField,

@@ -32,7 +32,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     private async Task<int> SeedSubAssemblyAsync(string name, int ingredientId, decimal grams)
     {
         var roleId = await AddRoleAsync("Filling");
-        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync($"{name} Bun", name, roleId, [(ingredientId, grams)]);
+        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync($"{name} Bun", roleId, [(ingredientId, grams)]);
         return subAssemblyId;
     }
 

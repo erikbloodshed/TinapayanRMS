@@ -5,11 +5,24 @@
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
     <!--
         Add a sub-assembly to the recipe: a new one of the product's own, a link to an existing one
-        (another product's, or a standalone one from the Sub-Assemblies screen), or a copy of one. Or change one already in it: an own one's name, role, lines and piece size, a
-        linked one's piece size only. Apply only puts it in the recipe; Save saves it. It is the whole of its
+        (another product's, or a standalone one from the Sub-Assemblies screen), or a copy of one. Or change one already in it: an own one's role, lines and piece size, a
+        linked one's piece size and add-ins only. Apply only puts it in the recipe; Save saves it. It is the whole of its
         Recipe Structure tab, so it has no box of its own, and for a section already in the recipe it carries
-        that section's heading (EditingUsage) in place of the add form's title.
+        that section's heading (EditingUsage) in place of the add form's title. A section has no name: it's called
+        by its role, and a product has one in each. Taking one out of the recipe is the card's Delete Sub-Assembly.
     -->
+    <UserControl.Resources>
+        <!-- Show Add-Ins' chevron: down while the add-ins table is shut, up once it's open, as ExpandChevronStyle points. -->
+        <DataTemplate x:Key="AddInsToggleIconTemplate">
+            <TextBlock x:Name="Chevron" Text="&#xE70D;" Style="{StaticResource IconGlyphStyle}" />
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsFormAddInsExpanded, RelativeSource={RelativeSource AncestorType=syncfusion:ButtonAdv}}" Value="True">
+                    <Setter TargetName="Chevron" Property="Text" Value="&#xE70E;" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </UserControl.Resources>
+
     <StackPanel>
         <TextBlock Text="{Binding UsageFormTitle}"
                    FontWeight="SemiBold"
@@ -17,7 +30,7 @@
                    Margin="0,0,0,8"
                    Visibility="{Binding IsAddingUsage, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-        <!-- The section's name and badges, and what a piece of it costs as the form stands. -->
+        <!-- The section's role, which is what it's called, its badges, and what a piece of it costs as the form stands. -->
         <Grid Margin="0,0,0,10" Visibility="{Binding IsAddingUsage, Converter={StaticResource EmptyStateVisibilityConverter}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -26,7 +39,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <TextBlock Text="{Binding EditingUsage.Name}"
+            <TextBlock Text="{Binding EditingUsage.RoleName}"
                        FontSize="15"
                        FontWeight="SemiBold"
                        Foreground="{StaticResource HeadingForegroundBrush}"
@@ -34,7 +47,7 @@
                        VerticalAlignment="Center" />
             <Border Grid.Column="1"
                     Style="{StaticResource LinkedBadgeStyle}"
-                    ToolTip="Its lines come from that product and follow its changes."
+                    ToolTip="Its lines come from where it's kept, and follow its changes."
                     Visibility="{Binding EditingUsage.IsLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <TextBlock Text="{Binding EditingUsage.LinkedFromText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
             </Border>
@@ -89,32 +102,30 @@
                                     Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
 
-        <!-- The product's own sub-assembly: its name and role. A linked one's are its owner's. -->
-        <StackPanel Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <Grid Margin="0,0,0,8">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+        <!--
+            The product's own sub-assembly's role, which is what it's called: only the roles the recipe doesn't have
+            yet are offered, beside its own (FormRoleOptions). A linked one's is its owner's. In the add form's first
+            column, under the Sub-Assembly picker.
+        -->
+        <Grid Margin="0,0,0,8" Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="2*" />
+            </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:SfTextBoxExt Grid.Row="1"
-                                         Grid.Column="0"
-                                         Text="{Binding EditingUsageName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                <TextBlock Grid.Column="2" Text="Role" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:ComboBoxAdv Grid.Row="1"
-                                        Grid.Column="2"
-                                        ItemsSource="{Binding Roles}"
-                                        DisplayMemberPath="Name"
-                                        SelectedItem="{Binding EditingUsageRole, Mode=TwoWay}" />
-            </Grid>
-        </StackPanel>
+            <TextBlock Grid.Column="0" Text="Role" Style="{StaticResource FieldLabelStyle}" />
+            <syncfusion:ComboBoxAdv Grid.Row="1"
+                                    Grid.Column="0"
+                                    ItemsSource="{Binding FormRoleOptions}"
+                                    DisplayMemberPath="Name"
+                                    SelectedItem="{Binding EditingUsageRole, Mode=TwoWay}"
+                                    ToolTip="What it's called in the recipe. A product has one sub-assembly in each role; roles are added in Settings → Roles." />
+        </Grid>
 
         <!--
             The lines that make one batch, in grams. The product's own are typed straight into: the add row at
@@ -122,10 +133,10 @@
             only show: AllowEditing is off and the add row goes with it (AddNewRowPositionConverter).
         -->
         <StackPanel Visibility="{Binding IsFormShowingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <!-- Named only when the add-ins table sits under it; a product's own lines are just "the lines". -->
+            <!-- Named only when it's a linked recipe, which add-ins go on top of; a product's own lines are just "the lines". -->
             <TextBlock Text="Linked Recipe"
                        Style="{StaticResource PanelHeaderStyle}"
-                       Visibility="{Binding IsFormShowingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                       Visibility="{Binding IsFormOfferingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
             <syncfusion:SfDataGrid ItemsSource="{Binding FormLines}"
                                    controls:GridAddNewRow.HideCheckBoxes="True"
@@ -201,20 +212,33 @@
             <!-- What the percentages are read against, and the figure a batch is scaled by. -->
             <TextBlock Text="{Binding UsageFormBaseCaption}" Style="{StaticResource CaptionStyle}" Margin="0,8,0,0" TextWrapping="Wrap" />
 
-            <TextBlock Text="Its lines are its owner's: change them where it's kept, or make this product a copy of it. To put something extra in just for this product, add it below."
-                       Style="{StaticResource CaptionStyle}"
-                       Margin="0,8,0,0"
-                       TextWrapping="Wrap"
-                       Visibility="{Binding IsFormEditingLines, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+            <!-- Whose a linked one's lines are, and Show Add-Ins, which opens the table of this product's own extras under them -->
+            <Grid Margin="0,8,0,8" Visibility="{Binding IsFormEditingLines, Converter={StaticResource EmptyStateVisibilityConverter}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Its lines are its owner's: change them where it's kept, or make this product a copy of it. Anything extra just for this product goes in its add-ins."
+                           Style="{StaticResource CaptionStyle}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0" />
+                <syncfusion:ButtonAdv Grid.Column="1"
+                                      VerticalAlignment="Center"
+                                      Label="{Binding FormAddInsToggleText}"
+                                      ToolTip="This product's own extras on top of the linked recipe: a colouring, a flavouring, an inclusion"
+                                      IconTemplate="{StaticResource AddInsToggleIconTemplate}"
+                                      Command="{Binding ToggleFormAddInsCommand}" />
+            </Grid>
         </StackPanel>
 
         <!--
             This product's own extras on top of the linked recipe: colouring, flavouring, inclusions. They go
             into the batch, so the Total Weight below is the recipe's lines plus these, and a piece takes its
-            share of the whole thing. Only a linked sub-assembly has them, and it's always this product's to
-            type into, so the grid is plainly editable rather than bound like the one above.
+            share of the whole thing, shown or not. Only a linked sub-assembly has them, and it's always this
+            product's to type into, so the grid is plainly editable rather than bound like the one above. Show
+            Add-Ins opens it; it's open to start with only when there are add-ins (IsFormAddInsExpanded).
         -->
-        <StackPanel Margin="0,14,0,0" Visibility="{Binding IsFormShowingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <StackPanel Margin="0,6,0,0" Visibility="{Binding IsFormShowingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}">
             <TextBlock Text="This Product's Add-Ins" Style="{StaticResource PanelHeaderStyle}" />
             <TextBlock Text="Extra ingredients only this product puts in, in grams. They can't be ones the recipe above already has."
                        Style="{StaticResource PanelCaptionStyle}" />
@@ -338,13 +362,6 @@
                                       Command="{Binding MakeCopyCommand}"
                                       CommandParameter="{Binding EditingUsage}"
                                       Visibility="{Binding IsEditingLinkedUsage, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                      Margin="0,0,8,0" />
-                <syncfusion:ButtonAdv Label="Remove"
-                                      ToolTip="Take it out of the recipe"
-                                      IconTemplate="{StaticResource RemoveIconTemplate}"
-                                      Command="{Binding RemoveUsageCommand}"
-                                      CommandParameter="{Binding EditingUsage}"
-                                      Visibility="{Binding IsAddingUsage, Converter={StaticResource EmptyStateVisibilityConverter}}"
                                       Margin="0,0,8,0" />
                 <syncfusion:ButtonAdv Label="Cancel" IconTemplate="{StaticResource CancelIconTemplate}" Command="{Binding CancelUsageCommand}" Margin="0,0,8,0" />
                 <syncfusion:ButtonAdv Label="Apply" IconTemplate="{StaticResource ApplyIconTemplate}" Command="{Binding ApplyUsageCommand}" />

@@ -191,7 +191,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.3m);
         var boxId = await SeedBoxAsync();
-        var (otherId, linkedDoughId) = await AddProductWithSubAssemblyAsync("Pandesal", "Sweet Dough", doughRoleId, [(flourId, 1000m)]);
+        var (otherId, linkedDoughId) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [(flourId, 1000m)]);
         var sourceId = await AddProductAsync("Source");
         await using (var dbContext = CreateDbContext())
         {
@@ -201,7 +201,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         }
 
         await SaveRecipeAsync(sourceId, new RecipeDraft(
-            [new OwnedSubAssemblyDraft(0, "Ube Filling", fillingRoleId, [(ubeId, 100m)], UsageAuthoredField.Yield, 10m)],
+            [new OwnedSubAssemblyDraft(0, fillingRoleId, [(ubeId, 100m)], UsageAuthoredField.Yield, 10m)],
             [new LinkedUsageDraft(linkedDoughId, UsageAuthoredField.WeightPerPiece, 40m)]));
         await CreatePackagingLineRepository().SetLinesAsync(otherId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
         await CreatePackagingLinkRepository().SetLinkAsync(sourceId, otherId, Cancellation);
@@ -215,11 +215,12 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
 
         var usages = await CreateUsageRepository().GetForProductAsync(cloneId, Cancellation);
         usages.Should().HaveCount(2).And.OnlyContain(u => u.SubAssembly!.OwnerProductId == cloneId, "every sub-assembly is the clone's own copy");
-        usages.Select(u => (u.SubAssembly!.Name, u.AuthoredField, u.AuthoredValue, u.SubAssembly.TotalWeight)).Should().BeEquivalentTo(new[]
+        usages.Select(u => (u.SubAssembly!.Role!.Name, u.AuthoredField, u.AuthoredValue, u.SubAssembly.TotalWeight)).Should().BeEquivalentTo(new[]
         {
-            ("Ube Filling", UsageAuthoredField.Yield, 10m, 100m),
-            ("Sweet Dough", UsageAuthoredField.WeightPerPiece, 40m, 1000m),
+            ("Filling", UsageAuthoredField.Yield, 10m, 100m),
+            ("Dough", UsageAuthoredField.WeightPerPiece, 40m, 1000m),
         });
+        usages.Should().OnlyContain(u => u.SubAssembly!.Name == null, "the clone's own go by their roles");
 
         (await CreatePackagingLinkRepository().GetForProductAsync(cloneId, Cancellation)).Should().BeNull("a clone never inherits a link");
         (await CreatePackagingLineRepository().GetForProductAsync(cloneId, Cancellation))
@@ -236,15 +237,15 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task ProductCloner_CloneAsync_renames_a_copy_whose_name_another_copy_already_took()
+    public async Task ProductCloner_CloneAsync_refuses_a_source_with_two_sub_assemblies_in_one_role_and_makes_nothing()
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour");
-        var (_, otherDoughId) = await AddProductWithSubAssemblyAsync("Pandesal", "Dough", roleId, [(flourId, 800m)]);
-        var (sourceId, _) = await AddProductWithSubAssemblyAsync("Source", "Dough", roleId, [(flourId, 1000m)]);
+        var (_, otherDoughId) = await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 800m)]);
+        var (sourceId, _) = await AddProductWithSubAssemblyAsync("Source", roleId, [(flourId, 1000m)]);
         await using (var dbContext = CreateDbContext())
         {
-            // The source both owns a "Dough" and links Pandesal's "Dough".
+            // The source both owns a Dough and links Pandesal's, as one saved before a recipe took one in each role could.
             dbContext.ProductSubAssemblyUsages.Add(new ProductSubAssemblyUsage
             {
                 ProductId = sourceId,
@@ -255,9 +256,9 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
-        var cloneId = await CreateProductCloner().CloneAsync(sourceId, "Clone Of Source", Cancellation);
+        var act = () => CreateProductCloner().CloneAsync(sourceId, "Clone Of Source", Cancellation);
 
-        (await CreateUsageRepository().GetForProductAsync(cloneId, Cancellation)).Select(u => u.SubAssembly!.Name)
-            .Should().BeEquivalentTo(["Dough", "Dough (copy)"]);
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("This recipe has more than one sub-assembly in the Dough role*");
+        (await CreateProductRepository().GetAllAsync(Cancellation)).Select(p => p.Name).Should().BeEquivalentTo(["Pandesal", "Source"]);
     }
 }

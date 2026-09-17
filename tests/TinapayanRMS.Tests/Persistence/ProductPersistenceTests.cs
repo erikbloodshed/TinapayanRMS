@@ -53,7 +53,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     {
         var roleId = await AddRoleAsync("Filling");
         var sugarId = await AddIngredientAsync("Sugar");
-        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Ensaymada", "Custard", roleId, [(sugarId, 100m)]);
+        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Ensaymada", roleId, [(sugarId, 100m)]);
 
         await using var dbContext = CreateDbContext();
         var act = () => dbContext.SubAssemblies.Where(s => s.Id == subAssemblyId).ExecuteDeleteAsync(Cancellation);
@@ -177,7 +177,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
         var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
         var boxId = await SeedPackagingMaterialAsync("6-Piece Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
-        var (productId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", "Custard", roleId, [(sugarId, 100m)]);
+        var (productId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", roleId, [(sugarId, 100m)]);
 
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [

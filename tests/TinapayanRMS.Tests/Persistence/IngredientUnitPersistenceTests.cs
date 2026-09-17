@@ -132,7 +132,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
 
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = sack.Id, Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
         await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation);
-        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Custard Bun", "Custard", await AddRoleAsync("Filling"), [(sugarId, 500m)]);
+        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Custard Bun", await AddRoleAsync("Filling"), [(sugarId, 500m)]);
 
         (await GetCostPerGramAsync(sugarId)).Should().Be(0.09m);
 
@@ -161,7 +161,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = eggId, Date = new DateOnly(2026, 1, 1), Price = 0.2m }, Cancellation); // per gram
 
         await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(custardId, [(eggId, 100m)], Cancellation);
-        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Egg Bun", "Egg Wash", await AddRoleAsync("Topping"), [(eggId, 150m)]);
+        var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Egg Bun", await AddRoleAsync("Topping"), [(eggId, 150m)]);
 
         // The eggs are bigger than recorded: 60 g each.
         piece.BaseUnitsPerUnit = 60m;

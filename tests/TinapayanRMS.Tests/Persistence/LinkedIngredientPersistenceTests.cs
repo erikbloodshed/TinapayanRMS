@@ -116,7 +116,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         var whiteId = await SaveAsync(Linked("Egg White", categoryId, eggId, weightShare: 70m, costShare: 30m));
         var yolkId = await SaveAsync(Linked("Egg Yolk", categoryId, eggId, weightShare: 30m, costShare: 70m));
         var roleId = await AddRoleAsync("Filling");
-        var (_, custardId) = await AddProductWithSubAssemblyAsync("Custard Bun", "Custard", roleId, [(yolkId, 450m)]);
+        var (_, custardId) = await AddProductWithSubAssemblyAsync("Custard Bun", roleId, [(yolkId, 450m)]);
 
         (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(94.50m, "450 g of yolk is 70% of a ₱135 tray");
 

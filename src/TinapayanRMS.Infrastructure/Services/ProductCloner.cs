@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -49,9 +48,8 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         await ProductRepository.AddAsync(dbContext, newProduct, cancellationToken);
 
         // A standalone sub-assembly stays linked, at the same piece size: it's kept apart to be shared.
-        // Every other one becomes the clone's own. An owned one and a linked one can share a name (they
-        // have different owners), and the clone's names must differ.
-        var names = new List<string>();
+        // Every other one becomes the clone's own, in the role it has: the source has one in each role, so
+        // the clone does too (SetRecipeAsync checks it).
         var owned = new List<OwnedSubAssemblyDraft>();
         var linked = new List<LinkedUsageDraft>();
         foreach (var usage in usages)
@@ -66,15 +64,11 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                 continue;
             }
 
-            var name = SubAssemblyRules.UniqueName(usage.SubAssembly.Name, names);
-            names.Add(name);
-
             // The link is broken here, so the source's add-ins become plain lines of the clone's own copy:
             // the batch it had is the batch it keeps. Never a duplicate ingredient, since an add-in can't
             // be one the recipe already has (ProductRules.EnsureValidAddIns).
             owned.Add(new OwnedSubAssemblyDraft(
                 0,
-                name,
                 usage.SubAssembly.RoleId,
                 [
                     // The formula's base comes with its lines; the add-ins folded in beside them never are one.

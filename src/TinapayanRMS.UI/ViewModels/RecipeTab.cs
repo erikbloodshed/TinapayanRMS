@@ -4,7 +4,7 @@ namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// A tab of the Products screen's Recipe Structure (ProductsViewModel.RecipeTabs): one per sub-assembly, in
-/// recipe order, then Add Sub-Assembly, then Packaging, which is always there.
+/// recipe order, then New Sub-Assembly while one is being added, then Packaging, which is always there.
 /// </summary>
 public abstract class RecipeTab : ReactiveObject
 {
@@ -33,16 +33,20 @@ public sealed class SubAssemblyRecipeTab(ProductUsageEdit usage) : RecipeTab
         }
     }
 
-    public override string Header => Usage.Name;
+    /// <summary>Its role: a product has one sub-assembly in each, and it's what the sub-assembly is called.</summary>
+    public override string Header => Usage.RoleName;
 
     /// <summary>A list for the product's own sub-assembly, a link for another product's.</summary>
     public override string Glyph => Usage.IsLinked ? "" : "";
 }
 
-/// <summary>The tab that adds a sub-assembly: showing it opens the sub-assembly form.</summary>
+/// <summary>
+/// The tab a sub-assembly is added in, with the add form. Add Sub-Assembly opens it; it goes again once the add is
+/// applied, cancelled, or left with nothing entered.
+/// </summary>
 public sealed class AddSubAssemblyRecipeTab : RecipeTab
 {
-    public override string Header => "Add Sub-Assembly";
+    public override string Header => "New Sub-Assembly";
 
     public override string Glyph => "";
 }

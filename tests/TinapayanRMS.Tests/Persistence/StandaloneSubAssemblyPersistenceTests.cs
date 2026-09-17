@@ -70,7 +70,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
     }
 
     [Fact]
-    public async Task Two_standalone_sub_assemblies_cant_share_a_name_but_a_products_own_can()
+    public async Task Two_standalone_sub_assemblies_cant_share_a_name_and_products_own_ones_have_none_to_clash()
     {
         var roleId = await AddRoleAsync("Glaze");
         var sugarId = await AddIngredientAsync("Sugar");
@@ -79,8 +79,28 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         var act = () => SaveStandaloneAsync(" glaze ", roleId, [(sugarId, 50m)]);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("There's already a standalone sub-assembly named 'glaze'*");
-        var productAct = () => AddProductWithSubAssemblyAsync("Cream Loaf", "Glaze", roleId, [(sugarId, 100m)]);
-        await productAct.Should().NotThrowAsync("a product's own sub-assembly is named within that product");
+        await AddProductWithSubAssemblyAsync("Cream Loaf", roleId, [(sugarId, 100m)]);
+        var secondProductAct = () => AddProductWithSubAssemblyAsync("Cream Loaf Mini", roleId, [(sugarId, 100m)]);
+        await secondProductAct.Should().NotThrowAsync("a product's own sub-assembly has no name, so the unique name index leaves it out");
+    }
+
+    [Fact]
+    public async Task A_new_role_for_a_standalone_sub_assembly_is_refused_where_a_product_linking_it_already_has_one()
+    {
+        var glazeRoleId = await AddRoleAsync("Glaze");
+        var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 2);
+        var sugarId = await AddIngredientAsync("Sugar");
+        var glazeId = await SaveStandaloneAsync("Glaze", glazeRoleId, [(sugarId, 100m)]);
+        var productId = await AddProductAsync("Cream Loaf");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [new OwnedSubAssemblyDraft(0, toppingRoleId, [(sugarId, 50m)], UsageAuthoredField.WeightPerPiece, 10m)],
+            [new LinkedUsageDraft(glazeId, UsageAuthoredField.WeightPerPiece, 5m)]));
+
+        var act = () => SaveStandaloneAsync("Glaze", toppingRoleId, [(sugarId, 100m)], glazeId);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Cream Loaf links this sub-assembly and already has one in the Topping role*");
+        (await GetSubAssemblyAsync(glazeId)).RoleId.Should().Be(glazeRoleId);
     }
 
     [Fact]
@@ -100,7 +120,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour");
-        var (_, doughId) = await AddProductWithSubAssemblyAsync("Pandesal", "Bread Dough", roleId, [(flourId, 1000m)]);
+        var (_, doughId) = await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 1000m)]);
 
         var act = () => SaveStandaloneAsync("Bread Dough", roleId, [(flourId, 10m)], doughId);
 
@@ -135,7 +155,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         var productId = await AddProductAsync("Cream Loaf");
 
         var act = () => SaveRecipeAsync(productId, new RecipeDraft(
-            [new OwnedSubAssemblyDraft(glazeId, "Glaze", roleId, [(sugarId, 10m)], UsageAuthoredField.WeightPerPiece, 5m)], []));
+            [new OwnedSubAssemblyDraft(glazeId, roleId, [(sugarId, 10m)], UsageAuthoredField.WeightPerPiece, 5m)], []));
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*isn't one of this product's own*");
     }
@@ -188,12 +208,12 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour");
-        await AddProductWithSubAssemblyAsync("Pandesal", "Bread Dough", roleId, [(flourId, 1000m)]);
+        await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 1000m)]);
         await SaveStandaloneAsync("Sweet Dough", roleId, [(flourId, 1000m)]);
 
         var linkable = await CreateRepository().GetLinkableAsync(Cancellation);
 
-        linkable.Select(s => s.Name).Should().Equal("Sweet Dough", "Bread Dough");
+        linkable.Select(s => s.OwnerProductId is null ? s.Name : s.OwnerProduct!.Name).Should().Equal("Sweet Dough", "Pandesal");
     }
 
     [Fact]
@@ -206,7 +226,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         var glazeId = await SaveStandaloneAsync("Glaze", glazeRoleId, [(sugarId, 100m)]);
         var productId = await AddProductAsync("Cream Loaf");
         await SaveRecipeAsync(productId, new RecipeDraft(
-            [new OwnedSubAssemblyDraft(0, "Sweet Dough", doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 60m)],
+            [new OwnedSubAssemblyDraft(0, doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 60m)],
             [new LinkedUsageDraft(glazeId, UsageAuthoredField.Yield, 20m)]));
 
         var cloneId = await new ProductCloner(CreateDbContextFactory()).CloneAsync(productId, "Cream Loaf Mini", Cancellation);
@@ -218,7 +238,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         glaze.AuthoredValue.Should().Be(20m);
         var dough = usages.Should().ContainSingle(u => u.SubAssemblyId != glazeId).Subject;
         dough.SubAssembly!.OwnerProductId.Should().Be(cloneId, "the source's own sub-assembly becomes the clone's own copy");
-        dough.SubAssembly.Name.Should().Be("Sweet Dough");
+        dough.SubAssembly.RoleId.Should().Be(doughRoleId);
         (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation))[glazeId].Should().Equal("Cream Loaf", "Cream Loaf Mini");
     }
 
@@ -253,7 +273,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var ubeId = await AddIngredientAsync("Ube Flavour", costPerGram: 0.8m);
         var (ownerId, doughId) = await AddProductWithSubAssemblyAsync(
-            "Cream Loaf", "Sweet Dough", doughRoleId, [(flourId, 1000m)], weightPerPiece: 60m);
+            "Cream Loaf", doughRoleId, [(flourId, 1000m)], weightPerPiece: 60m);
         var linkerId = await AddProductAsync("Cream Loaf Ube");
         await SaveRecipeAsync(linkerId, new RecipeDraft(
             [],

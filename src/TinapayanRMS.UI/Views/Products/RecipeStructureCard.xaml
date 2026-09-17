@@ -6,9 +6,10 @@
              xmlns:vm="clr-namespace:TinapayanRMS.UI.ViewModels">
     <!--
         What goes into one piece, in tabs (RecipeTabs): a sub-assembly's for each one in the recipe, in role
-        order, then Add Sub-Assembly, which opens the form to add one, then Packaging, which is always there.
-        Each tab's content is picked by its type from the templates below, and each takes the screen's DataContext
-        back from this card: they all show one of the screen's forms, or its packaging.
+        order, then New Sub-Assembly while Add Sub-Assembly's form is open, then Packaging, which is always there.
+        Add Sub-Assembly and Delete Sub-Assembly sit in the header. Each tab's content is picked by its type from
+        the templates below, and each takes the screen's DataContext back from this card: they all show one of
+        the screen's forms, or its packaging.
     -->
     <UserControl.Resources>
         <!-- A sub-assembly's tab is the form that edits it: its lines for the product's own, read-only for a link -->
@@ -31,19 +32,50 @@
     </UserControl.Resources>
 
     <StackPanel>
-        <TextBlock Text="Recipe Structure" Style="{StaticResource PanelHeaderStyle}" />
-        <TextBlock Text="What goes into one piece: each sub-assembly's ingredients, in grams a batch, then the packaging. A sub-assembly is made here, or linked or copied from another product or the Sub-Assemblies screen. Moving to another tab applies what you typed; Save saves it."
-                   Style="{StaticResource PanelCaptionStyle}" />
+        <!-- The header, with the buttons that add a sub-assembly and delete the one whose tab is showing -->
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="Recipe Structure" Style="{StaticResource PanelHeaderStyle}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,4">
+                <syncfusion:ButtonAdv Label="Add Sub-Assembly"
+                                      ToolTip="Make a new sub-assembly, or link or copy an existing one, in a tab of its own"
+                                      IconTemplate="{StaticResource AddIconTemplate}"
+                                      Command="{Binding AddUsageCommand}"
+                                      Margin="0,0,8,0" />
+                <syncfusion:ButtonAdv Label="Delete Sub-Assembly"
+                                      ToolTip="Take the sub-assembly showing out of the recipe. Save deletes the product's own; a linked one stays where it's from."
+                                      IconTemplate="{StaticResource DeleteIconTemplate}"
+                                      Command="{Binding RemoveUsageCommand}" />
+            </StackPanel>
+
+            <TextBlock Grid.Row="1"
+                       Grid.ColumnSpan="2"
+                       Text="What goes into one piece: each sub-assembly's ingredients, in grams a batch, then the packaging. A sub-assembly is made here, or linked or copied from another product or the Sub-Assemblies screen. Moving to another tab applies what you typed; Save saves it."
+                       Style="{StaticResource PanelCaptionStyle}" />
+        </Grid>
 
         <!--
             Fixed tabs, like the screen's own: nothing to close, and no tab menus. Headers are the tab's glyph
             and name. The scroll arrows only show when the tabs don't fit. The ViewModel picks the tab showing
             when tabs come and go (SelectedRecipeTab), so the control mustn't pick one itself: CloseMode="Hide"
             (its default) reselects the tab shown before when one is removed (removing a sub-assembly jumped to
-            Add Sub-Assembly), and SelectOnCreatingNewItem selects every tab added.
+            the add tab), and SelectOnCreatingNewItem selects every tab added.
+            Nor can the tabs be dragged into another order: with ItemsSource bound, TabControlExt turns
+            AllowDragDrop on unless it's set False (its coercion), and a tab dropped on another is removed from
+            RecipeTabs and inserted at the drop (TabLayoutPanel.MoveItem). That took the tabs out of role order,
+            and out of step with UsageEdits, which MirrorUsageTabs keeps them in index for index.
         -->
         <syncfusion:TabControlExt ItemsSource="{Binding RecipeTabs}"
                                   SelectedItem="{Binding SelectedRecipeTab, Mode=TwoWay}"
+                                  AllowDragDrop="False"
                                   CloseButtonType="Hide"
                                   CloseMode="Delete"
                                   SelectOnCreatingNewItem="False"

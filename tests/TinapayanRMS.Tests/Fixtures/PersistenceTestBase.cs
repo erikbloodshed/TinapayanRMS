@@ -144,12 +144,12 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
         await repository.SaveAsync(product, recipe, packagingLines: null, costing: null, Cancellation);
     }
 
-    /// <summary>The id of <paramref name="productId"/>'s own sub-assembly named <paramref name="name"/>.</summary>
-    protected async Task<int> OwnedSubAssemblyIdAsync(int productId, string name)
+    /// <summary>The id of <paramref name="productId"/>'s own sub-assembly in the role <paramref name="roleId"/>, which it has one of.</summary>
+    protected async Task<int> OwnedSubAssemblyIdAsync(int productId, int roleId)
     {
         await using var dbContext = CreateDbContext();
         return await dbContext.SubAssemblies
-            .Where(s => s.OwnerProductId == productId && s.Name == name)
+            .Where(s => s.OwnerProductId == productId && s.RoleId == roleId)
             .Select(s => s.Id)
             .SingleAsync(Cancellation);
     }
@@ -165,17 +165,17 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
     }
 
     /// <summary>
-    /// A new product owning one sub-assembly made of <paramref name="lines"/> (grams), used at
-    /// <paramref name="weightPerPiece"/> grams a piece, saved through ProductRepository.SaveAsync.
+    /// A new product owning one sub-assembly, in the role <paramref name="roleId"/>, made of <paramref name="lines"/>
+    /// (grams), used at <paramref name="weightPerPiece"/> grams a piece, saved through ProductRepository.SaveAsync.
     /// </summary>
     protected async Task<(int ProductId, int SubAssemblyId)> AddProductWithSubAssemblyAsync(
-        string productName, string subAssemblyName, int roleId, IReadOnlyList<RecipeLine> lines, decimal weightPerPiece = 10m)
+        string productName, int roleId, IReadOnlyList<RecipeLine> lines, decimal weightPerPiece = 10m)
     {
         var productId = await AddProductAsync(productName);
         await SaveRecipeAsync(productId, new RecipeDraft(
-            [new OwnedSubAssemblyDraft(0, subAssemblyName, roleId, lines, UsageAuthoredField.WeightPerPiece, weightPerPiece)],
+            [new OwnedSubAssemblyDraft(0, roleId, lines, UsageAuthoredField.WeightPerPiece, weightPerPiece)],
             []));
-        return (productId, await OwnedSubAssemblyIdAsync(productId, subAssemblyName));
+        return (productId, await OwnedSubAssemblyIdAsync(productId, roleId));
     }
 
     private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>

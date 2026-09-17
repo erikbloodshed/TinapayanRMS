@@ -191,6 +191,7 @@
                                         DisplayMemberPath="Name"
                                         ItemContainerStyle="{StaticResource CategoryOptionStyle}"
                                         SelectedItem="{Binding EditingCategory, Mode=TwoWay}"
+                                        Text="{Binding CategorySearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                         ToolTip="Pick a category, or &quot;&lt; Add New .. &gt;&quot; to name one now." />
 
                 <TextBlock Grid.Column="4"

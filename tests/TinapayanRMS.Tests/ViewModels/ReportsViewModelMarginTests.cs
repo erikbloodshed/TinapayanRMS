@@ -41,7 +41,7 @@ public class ReportsViewModelMarginTests(DatabaseFixture fixture) : PersistenceT
 
         // Cream Loaf owns a 1,000 g / ₱50 dough. Both linkers use 100 g a piece, but only one adds ube.
         var (_, doughId) = await AddProductWithSubAssemblyAsync(
-            "Cream Loaf", "Sweet Dough", roleId, [(flourId, 1000m)], weightPerPiece: 100m);
+            "Cream Loaf", roleId, [(flourId, 1000m)], weightPerPiece: 100m);
         var plainId = await AddProductAsync("Cream Loaf Plain");
         var ubeLoafId = await AddProductAsync("Cream Loaf Ube");
         await SaveRecipeAsync(plainId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 100m)]));

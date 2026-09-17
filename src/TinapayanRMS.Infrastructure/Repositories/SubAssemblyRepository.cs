@@ -34,6 +34,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             .OrderBy(s => s.OwnerProductId != null)
             .ThenBy(s => s.Name)
             .ThenBy(s => s.OwnerProduct!.Name)
+            .ThenBy(s => s.Role!.SortOrder)
             .ToListAsync(cancellationToken);
     }
 
@@ -65,7 +66,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        var name = subAssembly.Name.Trim();
+        var name = subAssembly.Name?.Trim() ?? string.Empty;
         if (name.Length == 0)
         {
             throw new InvalidOperationException("Every sub-assembly needs a name.");
@@ -79,7 +80,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
 
         var otherNames = await dbContext.SubAssemblies
             .Where(s => s.OwnerProductId == null && s.Id != subAssembly.Id)
-            .Select(s => s.Name)
+            .Select(s => s.Name ?? string.Empty)
             .ToListAsync(cancellationToken);
         SubAssemblyRules.EnsureStandaloneNameAvailable(name, otherNames);
 
@@ -96,7 +97,13 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
                 ?? throw new InvalidOperationException($"Sub-assembly {subAssembly.Id} does not exist.");
             if (stored.OwnerProductId is not null)
             {
-                throw new InvalidOperationException($"{stored.Name} belongs to a product. Change it in that product's recipe.");
+                throw new InvalidOperationException("That sub-assembly belongs to a product. Change it in that product's recipe.");
+            }
+
+            // Every product using it links it, and takes its new role with it.
+            if (stored.RoleId != subAssembly.RoleId)
+            {
+                await EnsureRoleFreeWhereLinkedAsync(dbContext, stored.Id, subAssembly.RoleId, cancellationToken);
             }
 
             stored.Name = name;
@@ -170,7 +177,32 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         }
 
         var (subAssemblyId, productNames) = linkedBy.First();
-        var name = await dbContext.SubAssemblies.Where(s => s.Id == subAssemblyId).Select(s => s.Name).FirstAsync(cancellationToken);
-        SubAssemblyRules.EnsureNotLinkedElsewhere(name, productNames);
+        var subAssembly = await dbContext.SubAssemblies
+            .AsNoTracking()
+            .Include(s => s.Role)
+            .Include(s => s.OwnerProduct)
+            .FirstAsync(s => s.Id == subAssemblyId, cancellationToken);
+        SubAssemblyRules.EnsureNotLinkedElsewhere(SubAssemblyRules.DisplayName(subAssembly), productNames);
+    }
+
+    /// <summary>
+    /// Refuses <paramref name="roleId"/> as the new role of a sub-assembly other products link, when one of them
+    /// already has a sub-assembly in it: a product has one in each role (SubAssemblyRules.EnsureOnePerRole), and
+    /// the link would give it a second.
+    /// </summary>
+    internal static async Task EnsureRoleFreeWhereLinkedAsync(TinapayanRMSDbContext dbContext, int subAssemblyId, int roleId, CancellationToken cancellationToken)
+    {
+        var clash = await dbContext.ProductSubAssemblyUsages
+            .Where(u => u.SubAssemblyId == subAssemblyId && u.ProductId != u.SubAssembly!.OwnerProductId)
+            .SelectMany(link => dbContext.ProductSubAssemblyUsages.Where(other =>
+                other.ProductId == link.ProductId && other.SubAssemblyId != subAssemblyId && other.SubAssembly!.RoleId == roleId))
+            .Select(other => new { ProductName = other.Product!.Name, RoleName = other.SubAssembly!.Role!.Name })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (clash is not null)
+        {
+            throw new InvalidOperationException(
+                $"{clash.ProductName} links this sub-assembly and already has one in the {clash.RoleName} role, and a product takes only one in each role. Change or take out {clash.ProductName}'s {clash.RoleName} first, or keep this role.");
+        }
     }
 }

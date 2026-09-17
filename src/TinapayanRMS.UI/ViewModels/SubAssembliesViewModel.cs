@@ -23,7 +23,7 @@ public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyL
 
     public int Id => SubAssembly.Id;
 
-    public string Name => SubAssembly.Name;
+    public string Name => SubAssembly.Name ?? string.Empty;
 
     public string RoleName => SubAssembly.Role?.Name ?? string.Empty;
 

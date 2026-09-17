@@ -825,9 +825,57 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.CategoryOptions.Select(c => c.Name).Should().Equal("< Add New .. >", "Butter", "Dry goods");
         viewModel.Categories.Select(c => c.Name).Should().Equal(["Butter", "Dry goods"], "the row is the picker's, not a category");
 
+        // Not RawMaterialsViewModel.AddNewCategory itself: CategorySearchText's own subscription already replaced
+        // it once, at construction, with a fresh row of the same name (see CategorySearchText's doc comment).
+        var addNewRow = viewModel.CategoryOptions[0];
         await viewModel.LoadCommand.Execute();
 
-        viewModel.CategoryOptions[0].Should().BeSameAs(RawMaterialsViewModel.AddNewCategory, "the refresh merges categories, not the row");
+        viewModel.CategoryOptions[0].Should().BeSameAs(addNewRow, "the refresh merges categories, not the row");
+    }
+
+    [Fact]
+    public async Task Typing_a_category_that_does_not_exist_renames_Add_New_so_it_still_matches_the_search()
+    {
+        await SeedCategoryAsync("Butter");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        // The picker's own AutoComplete (ComboBoxAdv.FilterItem) is what filters "Butter" out as the user types
+        // something that doesn't match it — that happens inside the control's own CollectionView, invisible to
+        // CategoryOptions here. This only pins the rename that keeps the Add New row surviving that same filter.
+        viewModel.CategorySearchText = "Choco";
+
+        viewModel.CategoryOptions.Should().ContainSingle(c => c.Id == RawMaterialsViewModel.AddNewCategoryId)
+            .Which.Name.Should().Be("< Add New \"Choco\" .. >");
+        viewModel.CategoryOptions.Should().Contain(c => c.Name == "Butter", "CategoryOptions itself isn't filtered — only the picker's own CollectionView is");
+
+        viewModel.CategorySearchText = "";
+
+        viewModel.CategoryOptions.Should().ContainSingle(c => c.Id == RawMaterialsViewModel.AddNewCategoryId)
+            .Which.Name.Should().Be("< Add New .. >", "an empty search is back to the plain row");
+    }
+
+    [Fact]
+    public async Task Picking_the_renamed_Add_New_row_still_starts_the_add_category_flow()
+    {
+        var viewModel = CreateViewModel();
+        (string Label, string InitialValue) promptedWith = default;
+        viewModel.PromptForNewCategory.RegisterHandler(interaction =>
+        {
+            promptedWith = interaction.Input;
+            interaction.SetOutput("Spices");
+        });
+        await viewModel.LoadCommand.Execute();
+        viewModel.CategorySearchText = "Spi";
+
+        // By id, not the same instance as RawMaterialsViewModel.AddNewCategory — this is the row a user would
+        // actually click after typing, and EditingCategory's setter must still recognize it as the Add New row.
+        viewModel.EditingCategory = viewModel.CategoryOptions.Single(c => c.Id == RawMaterialsViewModel.AddNewCategoryId);
+
+        await WaitUntilSettledAsync(() => viewModel.EditingCategory is not null,
+            () => $"picked={viewModel.EditingCategory?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
+        viewModel.EditingCategory!.Name.Should().Be("Spices");
+        promptedWith.InitialValue.Should().Be("Spi", "the prompt should start with what was already typed, not an empty box");
     }
 
     [Fact]

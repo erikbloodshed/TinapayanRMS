@@ -9,18 +9,26 @@ namespace TinapayanRMS.UI.Views;
 /// </summary>
 public partial class TextPromptWindow : Window
 {
-    private TextPromptWindow(string title, string label)
+    private TextPromptWindow(string title, string label, string initialValue)
     {
         InitializeComponent();
         Title = title;
         PromptLabel.Text = label;
+        ValueTextBox.Text = initialValue;
     }
 
-    /// <summary>Shows the prompt over <paramref name="owner"/>. Returns what was typed, or null if it was cancelled or left empty.</summary>
-    public static string? Prompt(string title, string label, Window? owner)
+    /// <summary>
+    /// Shows the prompt over <paramref name="owner"/>, starting with <paramref name="initialValue"/> selected so
+    /// typing replaces it outright. Returns what was typed, or null if it was cancelled or left empty.
+    /// </summary>
+    public static string? Prompt(string title, string label, string initialValue, Window? owner)
     {
-        var window = new TextPromptWindow(title, label) { Owner = owner };
-        window.ValueTextBox.Loaded += (_, _) => window.ValueTextBox.Focus();
+        var window = new TextPromptWindow(title, label, initialValue) { Owner = owner };
+        window.ValueTextBox.Loaded += (_, _) =>
+        {
+            window.ValueTextBox.Focus();
+            window.ValueTextBox.SelectAll();
+        };
 
         return window.ShowDialog() == true && !string.IsNullOrWhiteSpace(window.ValueTextBox.Text)
             ? window.ValueTextBox.Text
@@ -28,4 +36,9 @@ public partial class TextPromptWindow : Window
     }
 
     private void OkButton_Click(object sender, RoutedEventArgs e) => DialogResult = true;
+
+    // ButtonAdv.IsCancel only wires the Escape key to a Click (per Syncfusion's own docs); unlike a native
+    // Button.IsCancel, it doesn't also set DialogResult on its own, so both the Escape shortcut and a mouse
+    // click on Cancel did nothing without this — the window just sat there.
+    private void CancelButton_Click(object sender, RoutedEventArgs e) => DialogResult = false;
 }

@@ -20,7 +20,7 @@ public partial class RawMaterialsView : UserControl
         viewModel.PromptForNewCategory.RegisterHandler(async interaction =>
         {
             await Dispatcher.Yield(DispatcherPriority.Background);
-            interaction.SetOutput(TextPromptWindow.Prompt("New Category", interaction.Input, Window.GetWindow(this)));
+            interaction.SetOutput(TextPromptWindow.Prompt("New Category", interaction.Input.Label, interaction.Input.InitialValue, Window.GetWindow(this)));
         });
 
         // New clears the form; put the cursor in Name so typing can start straight away.

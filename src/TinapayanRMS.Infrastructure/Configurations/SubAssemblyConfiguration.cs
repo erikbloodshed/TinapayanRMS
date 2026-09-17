@@ -8,12 +8,14 @@ public class SubAssemblyConfiguration : IEntityTypeConfiguration<SubAssembly>
 {
     public void Configure(EntityTypeBuilder<SubAssembly> builder)
     {
-        builder.Property(s => s.Name).HasMaxLength(100).IsRequired();
+        // Only a standalone sub-assembly has a name; a product's own goes by its role.
+        builder.Property(s => s.Name).HasMaxLength(100);
 
-        // Unique within its owner, not across products: a copy can keep its source's name. No filter:
-        // EF would otherwise leave out rows with no owner (IS NOT NULL), and SQL Server's unique index
-        // counts NULLs as equal, which keeps standalone names unique among themselves.
-        builder.HasIndex(s => new { s.OwnerProductId, s.Name }).IsUnique().HasFilter(null);
+        // Standalone names are unique among themselves: rows with no owner are kept in the index, where SQL
+        // Server's unique index counts their NULL owners as equal. A product's own has no name, so it's left out
+        // (the filter), or its NULL names would clash too. A name one saved before 2026-09-17 still has stays
+        // unique within its product until that product's recipe is saved again and clears it.
+        builder.HasIndex(s => new { s.OwnerProductId, s.Name }).IsUnique().HasFilter("[Name] IS NOT NULL");
 
         // Restrict, not Cascade: this is also how "a role can't be deleted while any
         // sub-assembly uses it" (PLAN.md's SubAssemblyRole rule) is enforced — no

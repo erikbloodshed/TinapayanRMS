@@ -222,6 +222,18 @@ public class RawMaterialsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _searchText, value);
     }
 
+    private string _categorySearchText = string.Empty;
+    /// <summary>
+    /// What's typed into the Category picker (bound to its Text). Renames the "&lt; Add New .. &gt;" row to include
+    /// it, so the row always survives the picker's own AutoComplete filtering — see the subscription in the
+    /// constructor that reacts to this.
+    /// </summary>
+    public string CategorySearchText
+    {
+        get => _categorySearchText;
+        set => this.RaiseAndSetIfChanged(ref _categorySearchText, value);
+    }
+
     private RawMaterial? _selectedRawMaterial;
     public RawMaterial? SelectedRawMaterial
     {
@@ -274,8 +286,10 @@ public class RawMaterialsViewModel : ViewModelBase
         set
         {
             // The "< Add New .. >" row isn't a category to file the material under: AddCategoryCommand takes over,
-            // and puts a category back in the picker once it's done.
-            if (ReferenceEquals(value, AddNewCategory))
+            // and puts a category back in the picker once it's done. By id, not ReferenceEquals(value, AddNewCategory):
+            // the row is replaced (not mutated) every time CategorySearchText changes, so it's rarely still that exact
+            // instance by the time it's picked.
+            if (value?.Id == AddNewCategoryId)
             {
                 AddCategoryCommand.Execute().Subscribe();
                 return;
@@ -585,10 +599,12 @@ public class RawMaterialsViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> RemoveBomLineCommand { get; }
 
     /// <summary>
-    /// Input: the label to put over the box. Output: the name typed for the new category, or null if it was
-    /// cancelled. The View registers a handler that shows a prompt dialog (Views/TextPromptWindow).
+    /// Input: the label to put over the box, and the value it starts with — what was already typed into the
+    /// Category picker, so confirming a category from "&lt; Add New "X" .. &gt;" doesn't mean typing X again.
+    /// Output: the name typed for the new category, or null if it was cancelled. The View registers a handler
+    /// that shows a prompt dialog (Views/TextPromptWindow).
     /// </summary>
-    public Interaction<string, string?> PromptForNewCategory { get; } = new();
+    public Interaction<(string Label, string InitialValue), string?> PromptForNewCategory { get; } = new();
 
     public RawMaterialsViewModel(
         IRawMaterialRepository rawMaterialRepository,
@@ -663,6 +679,24 @@ public class RawMaterialsViewModel : ViewModelBase
                 .Ascending(c => c.Id == AddNewCategoryId ? 0 : 1)
                 .ThenByAscending(c => c.Name))
             .Subscribe();
+
+        // The picker's own AutoComplete (ComboBoxAdv.FilterItem) re-filters CategoryOptions by the same typed text
+        // against every item's Name, including "< Add New .. >" itself — so as soon as nothing matches, it filters
+        // that out too and the picker shows "No Records Found" exactly when Add New is the one useful option. There's
+        // no per-item exemption from that filter, so the row is renamed to always contain whatever's typed, the same
+        // way a search box with a "+ Create 'X'" row does: it can never fail to match, without touching how the real
+        // categories are filtered (still entirely AutoCompleteMode="Suggest", untouched). CategorySearchText is bound
+        // to the picker's Text (not SelectedItem), and AddOrUpdate replaces the row through the same SourceCache path
+        // a real category's rename already flows through, so the picker's own CollectionView sees a proper replace
+        // notification — no dependence on RawMaterialCategory raising PropertyChanged, which it doesn't.
+        this.WhenAnyValue(x => x.CategorySearchText)
+            .Select(text => text.Trim())
+            .DistinctUntilChanged()
+            .Subscribe(text => _addNewCategoryOption.AddOrUpdate(new RawMaterialCategory
+            {
+                Id = AddNewCategoryId,
+                Name = text.Length == 0 ? "< Add New .. >" : $"< Add New \"{text}\" .. >",
+            }));
 
         _isEditingIngredient = this.WhenAnyValue(x => x.EditingType)
             .Select(type => type == RawMaterialType.Ingredient)
@@ -1007,7 +1041,7 @@ public class RawMaterialsViewModel : ViewModelBase
         // being edited, so filing one under a new category doesn't mean a trip to Settings and back.
         AddCategoryCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var name = await PromptForNewCategory.Handle("Name for the new category:");
+            var name = await PromptForNewCategory.Handle(("Name for the new category:", CategorySearchText.Trim()));
 
             if (!string.IsNullOrWhiteSpace(name))
             {

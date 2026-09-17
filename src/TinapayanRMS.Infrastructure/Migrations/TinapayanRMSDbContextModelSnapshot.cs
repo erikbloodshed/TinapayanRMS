@@ -386,7 +386,6 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
-                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
@@ -409,7 +408,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.HasIndex("RoleId");
 
                     b.HasIndex("OwnerProductId", "Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[Name] IS NOT NULL");
 
                     b.ToTable("SubAssemblies");
                 });
