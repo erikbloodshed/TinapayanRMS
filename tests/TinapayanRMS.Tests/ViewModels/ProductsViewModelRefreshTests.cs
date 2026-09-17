@@ -7,6 +7,7 @@ using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.ApplicationCore.Validators;
+using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
@@ -128,6 +129,120 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.ShowLinks.Should().BeTrue();
         viewModel.LastUpdatedText.Should().NotBe("—");
     }
+
+    [Fact]
+    public async Task Packaging_lines_are_typed_into_the_table_in_each_materials_base_unit_and_saved()
+    {
+        int boxId, ribbonId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var category = new RawMaterialCategory { Name = "Packaging" };
+            var box = new RawMaterial
+            {
+                Name = "Cake Box", Type = RawMaterialType.Packaging, Category = category, BaseUnit = new UnitOfMeasure { Name = "piece", Abbreviation = "pc" },
+                CostPerBaseUnit = 12m, BufferedCostPerBaseUnit = 12m,
+            };
+            var ribbon = new RawMaterial
+            {
+                Name = "Ribbon", Type = RawMaterialType.Packaging, Category = category, BaseUnit = new UnitOfMeasure { Name = "centimeter", Abbreviation = "cm" },
+                CostPerBaseUnit = 0.02m, BufferedCostPerBaseUnit = 0.02m,
+            };
+            dbContext.RawMaterials.AddRange(box, ribbon);
+            await dbContext.SaveChangesAsync(Cancellation);
+            (boxId, ribbonId) = (box.Id, ribbon.Id);
+        }
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Gift loaf";
+        viewModel.IsPackagingEditable.Should().BeTrue();
+
+        // The row the add row edits shows the material's base unit and prices itself as soon as the material is picked.
+        var boxLine = viewModel.NewLineEdit();
+        boxLine.PackagingMaterialId = boxId;
+        boxLine.QtyPerPiece = 0.5m;
+        boxLine.Unit.Should().Be("pc");
+        boxLine.UnitCost.Should().Be(12m);
+        boxLine.CostPerPiece.Should().Be(6m, "half a ₱12 box a piece");
+        viewModel.LineEdits.Add(boxLine);
+
+        var ribbonLine = viewModel.NewLineEdit();
+        ribbonLine.PackagingMaterialId = ribbonId;
+        ribbonLine.QtyPerPiece = 30m;
+        ribbonLine.Unit.Should().Be("cm");
+        viewModel.LineEdits.Add(ribbonLine);
+        viewModel.Costs.Packaging.Should().Be(6.6m, "₱6 of box and 30 cm of ribbon at ₱0.02 a cm");
+
+        // A line with a material but no quantity is refused, and deleting it lets Save through.
+        var halfLine = viewModel.NewLineEdit();
+        halfLine.PackagingMaterialId = boxId;
+        viewModel.LineEdits.Add(halfLine);
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().Contain("Cake Box");
+        viewModel.SelectedLineEdit = halfLine;
+        await viewModel.RemoveLineCommand.Execute();
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using (var dbContext = CreateDbContext())
+        {
+            var lines = await dbContext.PackagingLines.OrderBy(l => l.PackagingMaterialId).ToListAsync(Cancellation);
+            lines.Should().HaveCount(2);
+            lines.Should().AllSatisfy(l =>
+            {
+                l.UnitId.Should().BeNull("a line is always in its material's base unit");
+                l.AuthoredField.Should().Be(PackagingLineAuthoredField.QtyPerPiece);
+            });
+            lines[0].PackagingMaterialId.Should().Be(boxId);
+            lines[0].QtyPerPiece.Should().Be(0.5m);
+            lines[1].QtyPerPiece.Should().Be(30m);
+        }
+
+        await WaitUntilSettledAsync(
+            () => viewModel.SelectedProduct is not null && viewModel.LineEdits.Count == 2 && !viewModel.LineEdits.Contains(boxLine),
+            () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.LineEdits.Count}");
+        viewModel.LineEdits.Single(l => l.PackagingMaterialId == ribbonId).QtyPerPiece.Should().Be(30m);
+        viewModel.Costs.Packaging.Should().Be(6.6m);
+    }
+
+    [Fact]
+    public async Task A_packaging_line_saved_in_another_unit_shows_in_the_materials_base_unit_at_the_same_cost()
+    {
+        var productId = await AddProductAsync("Gift loaf");
+        await using (var dbContext = CreateDbContext())
+        {
+            var roll = new RawMaterialUnit { UnitOfMeasure = new UnitOfMeasure { Name = "roll", Abbreviation = "roll" }, BaseUnitsPerUnit = 1000m };
+            var ribbon = new RawMaterial
+            {
+                Name = "Ribbon", Type = RawMaterialType.Packaging, Category = new RawMaterialCategory { Name = "Packaging" },
+                BaseUnit = new UnitOfMeasure { Name = "centimeter", Abbreviation = "cm" },
+                CostPerBaseUnit = 0.02m, BufferedCostPerBaseUnit = 0.02m, Units = [roll],
+            };
+            dbContext.RawMaterials.Add(ribbon);
+            await dbContext.SaveChangesAsync(Cancellation);
+
+            // One roll serves 50 pieces: 20 cm a piece.
+            dbContext.PackagingLines.Add(new PackagingLine
+            {
+                ProductId = productId, PackagingMaterialId = ribbon.Id, UnitId = roll.Id,
+                AuthoredField = PackagingLineAuthoredField.PiecesPerPackagingUnit, PiecesPerPackagingUnit = 50m, QtyPerPiece = 0.02m,
+            });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.LineEdits.Count == 1, () => $"lines={viewModel.LineEdits.Count}");
+
+        var line = viewModel.LineEdits.Single();
+        line.QtyPerPiece.Should().Be(20m);
+        line.Unit.Should().Be("cm");
+        viewModel.Costs.Packaging.Should().Be(0.4m);
+    }
+
 
     [Fact]
     public async Task A_typed_yield_is_kept_and_the_weight_per_piece_follows_the_batch()

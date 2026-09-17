@@ -147,6 +147,7 @@
                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                    CurrentCellBorderThickness="1"
                                    controls:GridFillerRows.IsEnabled="True"
+                                   ShowRowHeader="True"
                                    AutoGenerateColumns="False"
                                    AllowEditing="{Binding IsFormEditingLines}"
                                    AllowDeleting="{Binding IsFormEditingLines}"
@@ -183,12 +184,6 @@
                             </syncfusion:Columns>
                         </syncfusion:GridMultiColumnDropDownList.Columns>
                     </syncfusion:GridMultiColumnDropDownList>
-                    <!-- The formula's 100% base for baker's percentage, usually the flour; a linked one's is its owner's to set. -->
-                    <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"
-                                                   HeaderText="Base"
-                                                   Width="54"
-                                                   HorizontalHeaderContentAlignment="Center"
-                                                   AllowEditing="{Binding IsFormEditingLines}" />
                     <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="110" NumberDecimalDigits="2" />
                     <controls:NumericColumn MappingName="BakersPercent"
                                             HeaderText="Baker's %"
@@ -197,6 +192,12 @@
                                             controls:GridCellEditing.AllowWhen="CanTypeBakersPercent"
                                             controls:GridCellEmphasis.When="IsPercentTyped" />
                     <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="110" NumberDecimalDigits="2" AllowEditing="False" />
+                    <!-- The formula's 100% base for baker's percentage, usually the flour; a linked one's is its owner's to set. -->
+                    <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"
+                                                   HeaderText="Base"
+                                                   Width="54"
+                                                   HorizontalHeaderContentAlignment="Center"
+                                                   AllowEditing="{Binding IsFormEditingLines}" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
 
@@ -250,6 +251,7 @@
                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                    CurrentCellBorderThickness="1"
                                    controls:GridFillerRows.IsEnabled="True"
+                                   ShowRowHeader="True"
                                    AutoGenerateColumns="False"
                                    AllowEditing="True"
                                    AllowDeleting="True"

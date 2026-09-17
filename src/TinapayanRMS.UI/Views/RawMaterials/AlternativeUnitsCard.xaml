@@ -21,6 +21,7 @@
                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                    CurrentCellBorderThickness="1"
                                    controls:GridFillerRows.IsEnabled="True"
+                                   ShowRowHeader="True"
                                    AutoGenerateColumns="False"
                                    AllowEditing="True"
                                    EditTrigger="OnTap"

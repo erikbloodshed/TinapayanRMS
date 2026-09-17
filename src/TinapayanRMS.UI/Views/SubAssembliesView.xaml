@@ -163,6 +163,7 @@
                                            CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                            CurrentCellBorderThickness="1"
                                            controls:GridFillerRows.IsEnabled="True"
+                                           ShowRowHeader="True"
                                            AutoGenerateColumns="False"
                                            AllowEditing="True"
                                            AllowDeleting="True"
@@ -199,11 +200,6 @@
                                     </syncfusion:Columns>
                                 </syncfusion:GridMultiColumnDropDownList.Columns>
                             </syncfusion:GridMultiColumnDropDownList>
-                            <!-- The formula's 100% base for baker's percentage, usually the flour; more than one can be ticked. -->
-                            <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"
-                                                           HeaderText="Base"
-                                                           Width="54"
-                                                           HorizontalHeaderContentAlignment="Center" />
                             <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="120" NumberDecimalDigits="2" />
                             <controls:NumericColumn MappingName="BakersPercent"
                                                     HeaderText="Baker's %"
@@ -213,6 +209,11 @@
                                                     controls:GridCellEmphasis.When="IsPercentTyped" />
                             <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost per g" Width="120" NumberDecimalDigits="4" AllowEditing="False" />
                             <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="120" NumberDecimalDigits="2" AllowEditing="False" />
+                            <!-- The formula's 100% base for baker's percentage, usually the flour; more than one can be ticked. -->
+                            <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"
+                                                           HeaderText="Base"
+                                                           Width="54"
+                                                           HorizontalHeaderContentAlignment="Center" />
                         </syncfusion:SfDataGrid.Columns>
                     </syncfusion:SfDataGrid>
 

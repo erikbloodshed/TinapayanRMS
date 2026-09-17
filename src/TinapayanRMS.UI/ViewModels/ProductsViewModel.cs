@@ -211,42 +211,6 @@ public sealed class ProductUsageEdit
         && AddIns.Zip(other.AddIns).All(pair => pair.First.Grams == pair.Second.Grams && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient));
 }
 
-/// <summary>An in-memory (not yet saved) packaging line, shown in the Recipe Structure's Packaging section: quantities in one of the material's units.</summary>
-public class PackagingLineEdit(RawMaterial packagingMaterial, RawMaterialUnitOption unit, PackagingLineAuthoredField authoredField, decimal authoredValue)
-{
-    public RawMaterial PackagingMaterial { get; } = packagingMaterial;
-
-    /// <summary>The unit QtyPerPiece and PiecesPerPackagingUnit are in: the material's base unit or one of its alternative units.</summary>
-    public RawMaterialUnitOption Unit { get; } = unit;
-
-    public PackagingLineAuthoredField AuthoredField { get; } = authoredField;
-
-    public decimal AuthoredValue { get; } = authoredValue;
-
-    private (decimal QtyPerPiece, decimal PiecesPerPackagingUnit) Reciprocal =>
-        ProductRules.ReconcileReciprocal(AuthoredField, AuthoredValue);
-
-    public decimal QtyPerPiece => Reciprocal.QtyPerPiece;
-
-    public decimal PiecesPerPackagingUnit => Reciprocal.PiecesPerPackagingUnit;
-
-    /// <summary>What one Unit of the material costs, buffered: what products are costed with.</summary>
-    public decimal UnitCost => PackagingMaterial.BufferedCostPerBaseUnit * UnitConversionRules.ToBaseQuantity(1m, Unit.Unit?.BaseUnitsPerUnit);
-
-    public decimal CostPerPiece => ProductRules.CalculatePackagingLineCostPerPiece(
-        PackagingMaterial.BufferedCostPerBaseUnit, QtyPerPiece, Unit.Unit?.BaseUnitsPerUnit);
-}
-
-/// <summary>How a packaging line's amount is entered (PackagingLine.AuthoredField): an amount per piece, or pieces per unit.</summary>
-public sealed record PackagingEntryOption(string Name, PackagingLineAuthoredField Field)
-{
-    public static IReadOnlyList<PackagingEntryOption> All { get; } =
-    [
-        new("Quantity per piece", PackagingLineAuthoredField.QtyPerPiece),
-        new("Pieces per unit", PackagingLineAuthoredField.PiecesPerPackagingUnit),
-    ];
-}
-
 /// <summary>Where the Add Sub-Assembly form's sub-assembly comes from.</summary>
 public enum UsageFormMode
 {
@@ -480,18 +444,17 @@ public class ProductsViewModel : ViewModelBase
     /// </summary>
     private bool _isRecipeClearedForAnother;
 
-    public ObservableCollection<PackagingLineEdit> LineEdits { get; } = [];
+    /// <summary>The packaging lines, typed straight into the Packaging tab's table.</summary>
+    public ObservableCollection<PackagingLineRow> LineEdits { get; } = [];
+
+    /// <summary>The line the packaging table's add row edits: it offers its material's units and prices itself before it's committed.</summary>
+    public Func<PackagingLineRow> NewLineEdit => () => new PackagingLineRow(id => PackagingMaterials.FirstOrDefault(m => m.Id == id));
 
     /// <summary>The products this one's packaging can be linked to: every other product.</summary>
     public ObservableCollection<Product> LinkTargetProductOptions { get; } = [];
 
     /// <summary>Each sub-assembly's, and the packaging's, share of the material cost per piece: the Recipe Cost Overview.</summary>
     public ObservableCollection<CostShareRow> CostShares { get; } = [];
-
-    /// <summary>The picked packaging material's units, for the packaging form's unit picker.</summary>
-    public ObservableCollection<RawMaterialUnitOption> EntryUnitOptions { get; } = [];
-
-    public IReadOnlyList<PackagingEntryOption> EntryOptions => PackagingEntryOption.All;
 
     public IReadOnlyList<UsageFormModeOption> UsageFormModes => UsageFormModeOption.All;
 
@@ -602,8 +565,15 @@ public class ProductsViewModel : ViewModelBase
     public bool IsPackagingLinked
     {
         get => _isPackagingLinked;
-        private set => this.RaiseAndSetIfChanged(ref _isPackagingLinked, value);
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _isPackagingLinked, value);
+            this.RaisePropertyChanged(nameof(IsPackagingEditable));
+        }
     }
+
+    /// <summary>The packaging is the product's own, so its table can be typed into; linked packaging is the linked product's.</summary>
+    public bool IsPackagingEditable => !IsPackagingLinked;
 
     private string _packagingLinkedToText = string.Empty;
     /// <summary>"Linked to Cream Loaf", or empty while the product has its own packaging.</summary>
@@ -851,61 +821,8 @@ public class ProductsViewModel : ViewModelBase
         private set => this.RaiseAndSetIfChanged(ref _usageFormCostPerPieceText, value);
     }
 
-    // The add/edit packaging form: the line it edits (null when it adds one), and its fields.
-    private PackagingLineEdit? _editingLine;
-
-    private bool _isLineFormOpen;
-    public bool IsLineFormOpen
-    {
-        get => _isLineFormOpen;
-        private set => this.RaiseAndSetIfChanged(ref _isLineFormOpen, value);
-    }
-
-    private string _lineFormTitle = "Add Packaging";
-    public string LineFormTitle
-    {
-        get => _lineFormTitle;
-        private set => this.RaiseAndSetIfChanged(ref _lineFormTitle, value);
-    }
-
-    private RawMaterial? _editingLinePackagingMaterial;
-    public RawMaterial? EditingLinePackagingMaterial
-    {
-        get => _editingLinePackagingMaterial;
-        set => this.RaiseAndSetIfChanged(ref _editingLinePackagingMaterial, value);
-    }
-
-    private RawMaterialUnitOption? _editingLineUnit;
-    public RawMaterialUnitOption? EditingLineUnit
-    {
-        get => _editingLineUnit;
-        set => this.RaiseAndSetIfChanged(ref _editingLineUnit, value);
-    }
-
-    private PackagingEntryOption? _editingLineEntry = PackagingEntryOption.All[0];
-    public PackagingEntryOption? EditingLineEntry
-    {
-        get => _editingLineEntry;
-        set => this.RaiseAndSetIfChanged(ref _editingLineEntry, value);
-    }
-
-    private decimal _editingLineAuthoredValue;
-    public decimal EditingLineAuthoredValue
-    {
-        get => _editingLineAuthoredValue;
-        set => this.RaiseAndSetIfChanged(ref _editingLineAuthoredValue, value);
-    }
-
-    private readonly ObservableAsPropertyHelper<string> _lineValueLabel;
-    /// <summary>What the packaging form's value is: "cm per piece" or "Pieces per box".</summary>
-    public string LineValueLabel => _lineValueLabel.Value;
-
-    private readonly ObservableAsPropertyHelper<string> _lineFormPreviewText;
-    /// <summary>What the typed line costs a piece, e.g. "₱0.5715 a piece".</summary>
-    public string LineFormPreviewText => _lineFormPreviewText.Value;
-
-    private PackagingLineEdit? _selectedLineEdit;
-    public PackagingLineEdit? SelectedLineEdit
+    private PackagingLineRow? _selectedLineEdit;
+    public PackagingLineRow? SelectedLineEdit
     {
         get => _selectedLineEdit;
         set => this.RaiseAndSetIfChanged(ref _selectedLineEdit, value);
@@ -1008,11 +925,7 @@ public class ProductsViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> ToggleFormAddInsCommand { get; }
 
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormAddInCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> AddLineCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> EditLineCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> ApplyLineCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> CancelLineCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> CalculateExampleCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> LinkPackagingCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> UnlinkPackagingCommand { get; }
@@ -1087,20 +1000,6 @@ public class ProductsViewModel : ViewModelBase
             .Select(product => product is not null)
             .ToProperty(this, x => x.ShowLinks);
 
-        _lineValueLabel = this.WhenAnyValue(x => x.EditingLineEntry, x => x.EditingLineUnit, (entry, unit) =>
-                entry?.Field == PackagingLineAuthoredField.PiecesPerPackagingUnit
-                    ? $"Pieces per {unit?.Abbreviation ?? "unit"}"
-                    : $"{unit?.Abbreviation ?? "Quantity"} per piece")
-            .ToProperty(this, x => x.LineValueLabel, "Quantity per piece");
-
-        _lineFormPreviewText = this.WhenAnyValue(
-                x => x.EditingLinePackagingMaterial, x => x.EditingLineUnit, x => x.EditingLineEntry, x => x.EditingLineAuthoredValue,
-                (material, unit, entry, value) =>
-                    material is not null && unit is not null && entry is not null && value > 0
-                        ? $"₱{new PackagingLineEdit(material, unit, entry.Field, value).CostPerPiece:N4} a piece"
-                        : string.Empty)
-            .ToProperty(this, x => x.LineFormPreviewText, string.Empty);
-
         // Every selection-driven subscription skips while LoadCommand merges in fresh data, which only
         // re-points a selection at its refreshed copy; the form, recipe and unsaved edits stay as-is.
         this.WhenAnyValue(x => x.SelectedProduct)
@@ -1166,9 +1065,15 @@ public class ProductsViewModel : ViewModelBase
             .Where(_ => !_syncingPieceSize && !IsRefreshing)
             .Subscribe(_ => PieceSizeTyped(UsageAuthoredField.Yield));
 
-        this.WhenAnyValue(x => x.EditingLinePackagingMaterial)
-            .Where(_ => !IsRefreshing)
-            .Subscribe(material => ReplaceEntryUnitOptions(material, keepUnitId: null));
+        // A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.
+        LineEdits.ToObservableChangeSet()
+            .AutoRefresh(l => l.PackagingMaterialId)
+            .AutoRefresh(l => l.CostPerPiece)
+            .Subscribe(_ =>
+            {
+                PackagingLineRow.Resolve(LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
+                RecomputeRecipe();
+            });
 
         this.WhenAnyValue(
                 x => x.EditingLaborPercent, x => x.EditingOverheadPercent, x => x.EditingAdministrativePercent, x => x.EditingMarginPercent, x => x.EditingVatPercent)
@@ -1207,8 +1112,6 @@ public class ProductsViewModel : ViewModelBase
             var selectedId = SelectedProduct?.Id;
             var usageRoleId = EditingUsageRole?.Id;
             var usageSourceId = EditingUsageSource?.SubAssembly.Id;
-            var linePackagingMaterialId = EditingLinePackagingMaterial?.Id;
-            var lineUnitId = EditingLineUnit?.UnitId;
             var packagingLinkTargetId = EditingPackagingLinkTarget?.Id;
 
             ApplyRefresh(() =>
@@ -1240,13 +1143,6 @@ public class ProductsViewModel : ViewModelBase
                     ?? (usageRoleId is null && IsUsageFormOpen && IsAddingUsage ? FormRoleOptions.FirstOrDefault() : null);
                 EditingUsageSource = LinkableSubAssemblies.FirstOrDefault(o => o.SubAssembly.Id == usageSourceId);
 
-                var previousLineMaterial = EditingLinePackagingMaterial;
-                EditingLinePackagingMaterial = PackagingMaterials.FirstOrDefault(m => m.Id == linePackagingMaterialId);
-                if (!ReferenceEquals(previousLineMaterial, EditingLinePackagingMaterial))
-                {
-                    ReplaceEntryUnitOptions(EditingLinePackagingMaterial, lineUnitId);
-                }
-
                 RefreshLinkTargetProductOptions();
                 EditingPackagingLinkTarget = LinkTargetProductOptions.FirstOrDefault(p => p.Id == packagingLinkTargetId);
 
@@ -1265,11 +1161,6 @@ public class ProductsViewModel : ViewModelBase
             if (IsUsageFormOpen && !IsUsageFormUntouched())
             {
                 SelectRecipeTab(TabFor(ApplyUsageForm()));
-            }
-
-            if (IsLineFormOpen)
-            {
-                ApplyLineForm();
             }
 
             var product = new Product
@@ -1443,55 +1334,9 @@ public class ProductsViewModel : ViewModelBase
             () => { FormAddIns.Remove(SelectedFormAddIn!); },
             this.WhenAnyValue(x => x.SelectedFormAddIn).Select(line => line is not null));
 
-        AddLineCommand = ReactiveCommand.Create(
-            () =>
-            {
-                _editingLine = null;
-                LineFormTitle = "Add Packaging";
-                EditingLinePackagingMaterial = null;
-                EditingLineEntry = PackagingEntryOption.All[0];
-                EditingLineAuthoredValue = 0m;
-                IsLineFormOpen = true;
-            },
-            this.WhenAnyValue(x => x.IsPackagingLinked).Select(linked => !linked));
-
-        var canChangeSelectedLine = this.WhenAnyValue(x => x.SelectedLineEdit, x => x.IsPackagingLinked, (line, linked) => line is not null && !linked);
-
-        EditLineCommand = ReactiveCommand.Create(
-            () =>
-            {
-                var line = SelectedLineEdit!;
-                _editingLine = line;
-                LineFormTitle = $"Edit {line.PackagingMaterial.Name}";
-                EditingLinePackagingMaterial = PackagingMaterials.FirstOrDefault(m => m.Id == line.PackagingMaterial.Id) ?? line.PackagingMaterial;
-                EditingLineUnit = EntryUnitOptions.FirstOrDefault(o => o.UnitId == line.Unit.UnitId) ?? EntryUnitOptions.FirstOrDefault();
-                EditingLineEntry = PackagingEntryOption.All.First(o => o.Field == line.AuthoredField);
-                EditingLineAuthoredValue = line.AuthoredValue;
-                IsLineFormOpen = true;
-            },
-            canChangeSelectedLine);
-
         RemoveLineCommand = ReactiveCommand.Create(
-            () =>
-            {
-                var line = SelectedLineEdit!;
-                if (ReferenceEquals(line, _editingLine))
-                {
-                    CloseLineForm();
-                }
-
-                LineEdits.Remove(line);
-                RecomputeRecipe();
-            },
-            canChangeSelectedLine);
-
-        ApplyLineCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() =>
-        {
-            ApplyLineForm();
-            return Task.CompletedTask;
-        }));
-
-        CancelLineCommand = ReactiveCommand.Create(CloseLineForm);
+            () => { LineEdits.Remove(SelectedLineEdit!); },
+            this.WhenAnyValue(x => x.SelectedLineEdit, x => x.IsPackagingLinked, (line, linked) => line is not null && !linked));
 
         CalculateExampleCommand = ReactiveCommand.Create(
             () =>
@@ -1557,7 +1402,6 @@ public class ProductsViewModel : ViewModelBase
     private void ResetDetails(Product? product)
     {
         CloseUsageForm();
-        CloseLineForm();
         SelectedLineEdit = null;
         EditingPackagingLinkTarget = null;
         ExampleResult = null;
@@ -1582,7 +1426,6 @@ public class ProductsViewModel : ViewModelBase
 
         // After an unsaved new product nothing was selected, so the selection subscriptions don't run.
         CloseUsageForm();
-        CloseLineForm();
         SelectedLineEdit = null;
         EditingPackagingLinkTarget = null;
         ClearDetails();
@@ -1658,7 +1501,6 @@ public class ProductsViewModel : ViewModelBase
         var link = await _packagingLinkRepository.GetForProductAsync(productId, CancellationToken.None);
         var lines = await _packagingLineRepository.GetEffectiveForProductAsync(productId, CancellationToken.None);
 
-        CloseLineForm();
         SetPackagingLink(link);
         ReplaceLines(lines);
         RecomputeRecipe();
@@ -1730,11 +1572,11 @@ public class ProductsViewModel : ViewModelBase
         LineEdits.Clear();
         foreach (var line in lines)
         {
-            LineEdits.Add(new PackagingLineEdit(
-                line.PackagingMaterial!,
-                new RawMaterialUnitOption(line.Unit, line.PackagingMaterial!),
-                line.AuthoredField,
-                line.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? line.QtyPerPiece : line.PiecesPerPackagingUnit));
+            // The table's quantity is in the material's base unit. A line saved before it was (in an alternative unit,
+            // or as pieces per unit) shows as that, at the same cost, and is saved that way once the packaging changes.
+            var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? line.QtyPerPiece : line.PiecesPerPackagingUnit;
+            var qtyPerPiece = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerPiece;
+            LineEdits.Add(new PackagingLineRow(line.PackagingMaterial!, UnitConversionRules.ToBaseQuantity(qtyPerPiece, line.Unit?.BaseUnitsPerUnit)));
         }
 
         _savedLines = CurrentLines();
@@ -1753,8 +1595,9 @@ public class ProductsViewModel : ViewModelBase
     private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) CurrentCosting() =>
         (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent);
 
+    /// <summary>The packaging lines as Save writes them, in each material's base unit; a line half filled in is refused (PackagingLineRow.CompleteLines).</summary>
     private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> CurrentLines() =>
-        [.. LineEdits.Select(l => (l.PackagingMaterial.Id, l.Unit.UnitId, l.AuthoredField, l.AuthoredValue))];
+        [.. PackagingLineRow.CompleteLines(LineEdits).Select(l => (l.PackagingMaterial.Id, (int?)null, PackagingLineAuthoredField.QtyPerPiece, l.QtyPerPiece))];
 
     /// <summary>The recipe as Save writes it: the product's own sub-assemblies with their lines, and the ones it links.</summary>
     private RecipeDraft CurrentRecipe() =>
@@ -2207,45 +2050,6 @@ public class ProductsViewModel : ViewModelBase
             : $"Nothing extra yet — the batch is {recipeName}'s {baseWeight:#,0.##} g.";
     }
 
-    private void ApplyLineForm()
-    {
-        var material = EditingLinePackagingMaterial
-            ?? throw new InvalidOperationException("Pick a packaging material, or cancel the form.");
-        var unit = EditingLineUnit ?? throw new InvalidOperationException($"Pick the unit {material.Name} is measured in.");
-        var entry = EditingLineEntry ?? throw new InvalidOperationException("Pick how the amount is entered.");
-        if (EditingLineAuthoredValue <= 0)
-        {
-            throw new InvalidOperationException($"Enter the {LineValueLabel.ToLowerInvariant()}.");
-        }
-
-        if (LineEdits.Any(l => !ReferenceEquals(l, _editingLine) && l.PackagingMaterial.Id == material.Id))
-        {
-            throw new InvalidOperationException(
-                $"{material.Name} is already in the packaging. A product can't use the same packaging material more than once — edit its line instead.");
-        }
-
-        var line = new PackagingLineEdit(material, unit, entry.Field, EditingLineAuthoredValue);
-        var index = _editingLine is null ? -1 : LineEdits.IndexOf(_editingLine);
-        if (index >= 0)
-        {
-            LineEdits[index] = line;
-        }
-        else
-        {
-            LineEdits.Add(line);
-        }
-
-        SelectedLineEdit = line;
-        CloseLineForm();
-        RecomputeRecipe();
-    }
-
-    private void CloseLineForm()
-    {
-        IsLineFormOpen = false;
-        _editingLine = null;
-    }
-
     private void InsertInRecipeOrder(ProductUsageEdit usage)
     {
         var index = 0;
@@ -2530,15 +2334,6 @@ public class ProductsViewModel : ViewModelBase
             p => p.Id);
     }
 
-    /// <summary>Fills the packaging form's unit picker with <paramref name="material"/>'s units and picks the one with <paramref name="keepUnitId"/>, else its base unit.</summary>
-    private void ReplaceEntryUnitOptions(RawMaterial? material, int? keepUnitId)
-    {
-        EditingLineUnit = null;
-        EntryUnitOptions.Clear();
-        EntryUnitOptions.AddRange(RawMaterialUnitOption.For(material));
-        EditingLineUnit = EntryUnitOptions.FirstOrDefault(o => o.UnitId == keepUnitId) ?? EntryUnitOptions.FirstOrDefault();
-    }
-
     /// <summary>
     /// Points the recipe's sections, saved or not, at the refreshed ingredients and roles, and a linked
     /// section at its refreshed sub-assembly and lines, keeping each section's own piece size, so costs
@@ -2605,26 +2400,8 @@ public class ProductsViewModel : ViewModelBase
             }
         }
 
-        for (var i = 0; i < LineEdits.Count; i++)
-        {
-            var edit = LineEdits[i];
-            var material = PackagingMaterials.FirstOrDefault(m => m.Id == edit.PackagingMaterial.Id);
-            if (material is null || CollectionMerge.HasSameValues(material, edit.PackagingMaterial))
-            {
-                continue;
-            }
-
-            // The same unit on the refreshed material, or its base unit if that unit is gone.
-            var options = RawMaterialUnitOption.For(material);
-            var unit = options.FirstOrDefault(o => o.UnitId == edit.Unit.UnitId) ?? options[0];
-
-            var wasSelected = ReferenceEquals(SelectedLineEdit, edit);
-            LineEdits[i] = new PackagingLineEdit(material, unit, edit.AuthoredField, edit.AuthoredValue);
-            if (wasSelected)
-            {
-                SelectedLineEdit = LineEdits[i];
-            }
-        }
+        // The packaging lines at their materials' refreshed costs and units, in place, so a line being typed isn't lost.
+        PackagingLineRow.Resolve(LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
     }
 
     /// <summary>

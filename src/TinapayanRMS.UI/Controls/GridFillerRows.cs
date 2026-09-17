@@ -168,10 +168,17 @@ public static class GridFillerRows
         }
     }
 
-    /// <summary>A press on a filler row goes no further, so the grid neither selects nor starts an edit for it.</summary>
+    /// <summary>
+    /// A press on a filler row goes no further, so the grid neither selects nor starts an edit for it. Only a press in the
+    /// grid's own window counts: a cell's drop-down list is a pop-up window inside the grid's tree, so a press on it reaches
+    /// here too, and where the list opens over the filler rows its position is a filler row's. Stopping that press kept the
+    /// list from ever selecting the item clicked, and a material or ingredient picked with the mouse was left blank.
+    /// </summary>
     private static void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is SfDataGrid grid
+            && e.OriginalSource is DependencyObject source
+            && ReferenceEquals(PresentationSource.FromDependencyObject(source), PresentationSource.FromVisual(grid))
             && GetState(grid) is { } state
             && grid.GetVisualContainer() is { } container
             && state.IsFillerRowIndex(container.PointToCellRowColumnIndex(e.GetPosition(container), false).RowIndex))
