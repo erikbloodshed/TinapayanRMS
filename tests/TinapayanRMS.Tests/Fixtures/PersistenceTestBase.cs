@@ -21,11 +21,15 @@ namespace TinapayanRMS.Tests.Fixtures;
 /// </summary>
 public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifetime
 {
-    protected CancellationToken Cancellation => TestContext.Current.CancellationToken;
+    protected static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
     public ValueTask InitializeAsync() => new(fixture.ResetAsync());
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
 
     protected TinapayanRMSDbContext CreateDbContext() =>
         new(CreateDbContextOptions());

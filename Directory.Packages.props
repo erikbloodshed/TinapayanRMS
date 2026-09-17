@@ -1,0 +1,43 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <EFCoreVersion>10.0.12</EFCoreVersion>
+    <!-- Every Syncfusion package must be on the same version: upgrade them together. -->
+    <SyncfusionVersion>34.2.7</SyncfusionVersion>
+  </PropertyGroup>
+
+  <ItemGroup Label="Application">
+    <PackageVersion Include="DynamicData" Version="9.4.33" />
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EFCoreVersion)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(EFCoreVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+    <PackageVersion Include="ReactiveUI.WPF" Version="24.2.0" />
+    <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageVersion Include="System.Reactive" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Syncfusion">
+    <PackageVersion Include="Syncfusion.Licensing" Version="$(SyncfusionVersion)" />
+    <PackageVersion Include="Syncfusion.SfChart.WPF" Version="$(SyncfusionVersion)" />
+    <PackageVersion Include="Syncfusion.SfGrid.WPF" Version="$(SyncfusionVersion)" />
+    <PackageVersion Include="Syncfusion.SfInput.WPF" Version="$(SyncfusionVersion)" />
+    <PackageVersion Include="Syncfusion.SfNavigationDrawer.WPF" Version="$(SyncfusionVersion)" />
+    <PackageVersion Include="Syncfusion.SfSkinManager.WPF" Version="$(SyncfusionVersion)" />
+    <PackageVersion Include="Syncfusion.SfTextInputLayout.WPF" Version="$(SyncfusionVersion)" />
+    <PackageVersion Include="Syncfusion.Themes.Windows11Light.WPF" Version="$(SyncfusionVersion)" />
+    <PackageVersion Include="Syncfusion.Tools.WPF" Version="$(SyncfusionVersion)" />
+  </ItemGroup>
+
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2" />
+    <PackageVersion Include="Respawn" Version="7.0.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <PackageVersion Include="xunit.v3" Version="4.0.0" />
+  </ItemGroup>
+
+</Project>

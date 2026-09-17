@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -123,14 +124,14 @@ public sealed class ScreenAwareDropDownControl : SfMultiColumnDropDownControl
         // Asked of each name in list order until one is picked, both texts lower-cased as the list's filter compares
         // them. The first name starting with the text is picked, or, when none does, the first containing it.
         return !string.IsNullOrEmpty(filterText)
-            && (exactValue.StartsWith(filterText) || (exactValue.Contains(filterText) && !AnyNameStartsWith(filterText)));
+            && (exactValue.StartsWith(filterText, StringComparison.CurrentCulture) || (exactValue.Contains(filterText) && !AnyNameStartsWith(filterText)));
     }
 
-    protected override List<string> ProcessAppendStringList(object item, string value)
+    protected override List<string> ProcessAppendStringList(object item, string _value)
     {
         // The base writes the picked name into the box and selects the part not typed yet, which only fits a name the
         // text starts. With Contains the box keeps what was typed: SearchText, taken just before the pick.
-        return SearchCondition == SearchCondition.Contains ? [SearchText] : base.ProcessAppendStringList(item, value);
+        return SearchCondition == SearchCondition.Contains ? [SearchText] : base.ProcessAppendStringList(item, _value);
     }
 
     protected override void CommitValue(bool autoCommit = false)
@@ -144,7 +145,7 @@ public sealed class ScreenAwareDropDownControl : SfMultiColumnDropDownControl
     private bool AnyNameStartsWith(string filterText)
     {
         _anyNameStartsWithText ??= ItemsSource is IEnumerable items
-            && items.Cast<object?>().Any(item => ComparedName(item)?.StartsWith(filterText) == true);
+            && items.Cast<object?>().Any(item => ComparedName(item)?.StartsWith(filterText, StringComparison.CurrentCulture) == true);
         return _anyNameStartsWithText.Value;
     }
 
@@ -152,7 +153,7 @@ public sealed class ScreenAwareDropDownControl : SfMultiColumnDropDownControl
     private string? ComparedName(object? item)
     {
         var name = item?.GetType().GetProperty(DisplayMember)?.GetValue(item)?.ToString();
-        return AllowCaseSensitiveFiltering ? name : name?.ToLower();
+        return AllowCaseSensitiveFiltering ? name : name?.ToLower(CultureInfo.CurrentCulture);
     }
 
     protected override void ProcessOnPopupPositionCalculation()

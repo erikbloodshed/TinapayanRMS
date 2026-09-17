@@ -1,0 +1,15 @@
+root = true
+
+[*.cs]
+# CA1716 flags member names that are keywords in other .NET languages, such as `Date` in Visual Basic.
+# This app is C# only, and IPriceHistoryEntry.Date maps to a database column.
+dotnet_diagnostic.CA1716.severity = none
+
+# Migrations are scaffolded by `dotnet ef migrations add` and never edited by hand,
+# so analyzer warnings in them can't be acted on.
+[src/TinapayanRMS.Infrastructure/Migrations/**.cs]
+generated_code = true
+
+[tests/**.cs]
+# Test methods are named Method_Scenario_Result.
+dotnet_diagnostic.CA1707.severity = none

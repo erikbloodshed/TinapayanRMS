@@ -64,5 +64,9 @@ public class DatabaseFixture : IAsyncLifetime
         await _respawner.ResetAsync(connection);
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
 }

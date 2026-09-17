@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
@@ -143,7 +144,7 @@ public sealed record UsageExampleResult(
 /// packaging material has a base unit of its own and is always purchased. Its details, alternative
 /// units, purchase price and BOM are all edited in memory, and Save writes them together.
 /// </summary>
-public class RawMaterialsViewModel : ViewModelBase
+public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
 {
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
@@ -1420,8 +1421,8 @@ public class RawMaterialsViewModel : ViewModelBase
     }
 
     private bool IsNamedLikeTheBaseUnit(UnitOfMeasure unit) =>
-        string.Equals(unit.Name, BaseUnitName, StringComparison.CurrentCultureIgnoreCase)
-        || string.Equals(unit.Abbreviation, BaseUnitAbbreviation, StringComparison.CurrentCultureIgnoreCase);
+        string.Equals(unit.Name, BaseUnitName, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(unit.Abbreviation, BaseUnitAbbreviation, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// What picking a purchase unit does: a new one becomes an alternative unit, and any other takes back
@@ -1600,7 +1601,7 @@ public class RawMaterialsViewModel : ViewModelBase
             PriceHistory.AddRange(entries.Select(e => new RawMaterialPriceRow(e, baseUnitName)));
         }
 
-        LastUpdatedText = PriceHistory.FirstOrDefault()?.Date.ToString("MMM d, yyyy") ?? "—";
+        LastUpdatedText = PriceHistory.FirstOrDefault()?.Date.ToString("MMM d, yyyy", CultureInfo.CurrentCulture) ?? "—";
         UpdateCanChangeBaseUnit();
         ResetPurchaseSetup();
     }
@@ -1617,5 +1618,12 @@ public class RawMaterialsViewModel : ViewModelBase
             _rawMaterialCache.AddOrUpdate(saved);
             SelectedRawMaterial = saved;
         }
+    }
+
+    public void Dispose()
+    {
+        _rawMaterialCache.Dispose();
+        _categoryCache.Dispose();
+        _addNewCategoryOption.Dispose();
     }
 }

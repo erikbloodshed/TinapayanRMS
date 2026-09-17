@@ -99,7 +99,7 @@ public static class SubAssemblyRules
     public static void EnsureStandaloneNameAvailable(string name, IReadOnlyCollection<string> otherStandaloneNames)
     {
         var trimmed = name.Trim();
-        if (otherStandaloneNames.Any(n => string.Equals(n.Trim(), trimmed, StringComparison.CurrentCultureIgnoreCase)))
+        if (otherStandaloneNames.Any(n => string.Equals(n.Trim(), trimmed, StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException($"There's already a standalone sub-assembly named '{trimmed}'. Give this one its own name.");
         }

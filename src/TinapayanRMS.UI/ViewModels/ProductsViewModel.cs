@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Globalization;
 using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
@@ -48,7 +49,7 @@ public sealed class ProductUsageEdit
         var byRole = (a.Role?.SortOrder ?? int.MaxValue).CompareTo(b.Role?.SortOrder ?? int.MaxValue);
         if (byRole == 0)
         {
-            byRole = string.Compare(a.RoleName, b.RoleName, StringComparison.CurrentCultureIgnoreCase);
+            byRole = StringComparer.CurrentCultureIgnoreCase.Compare(a.RoleName, b.RoleName);
         }
 
         return byRole != 0 ? byRole : SavedOrder(a).CompareTo(SavedOrder(b));
@@ -350,7 +351,7 @@ public sealed class ProductCostSummary
 /// recipe, packaging and costing are edited in memory, and Save writes them together
 /// (IProductRepository.SaveAsync).
 /// </summary>
-public class ProductsViewModel : ViewModelBase
+public sealed class ProductsViewModel : ViewModelBase, IDisposable
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, then Links &amp; Clone.</summary>
     public const int RecipeTab = 0;
@@ -456,7 +457,7 @@ public class ProductsViewModel : ViewModelBase
     /// <summary>Each sub-assembly's, and the packaging's, share of the material cost per piece: the Recipe Cost Overview.</summary>
     public ObservableCollection<CostShareRow> CostShares { get; } = [];
 
-    public IReadOnlyList<UsageFormModeOption> UsageFormModes => UsageFormModeOption.All;
+    public IReadOnlyList<UsageFormModeOption> UsageFormModes { get; } = UsageFormModeOption.All;
 
     /// <summary>
     /// Other products' sub-assemblies the form can link or copy. Linking leaves out the ones the recipe
@@ -1383,7 +1384,7 @@ public class ProductsViewModel : ViewModelBase
 
     /// <summary>The Last Updated figure: the day and the time; "—" for a product never saved since it was added.</summary>
     private void ShowUpdatedAt(DateTime? updatedAt) =>
-        LastUpdatedText = updatedAt?.ToString("MMM d, yyyy, h:mm tt") ?? "—";
+        LastUpdatedText = updatedAt?.ToString("MMM d, yyyy, h:mm tt", CultureInfo.CurrentCulture) ?? "—";
 
     private void LoadIntoForm(Product product)
     {
@@ -2430,7 +2431,7 @@ public class ProductsViewModel : ViewModelBase
     }
 
     /// <summary><paramref name="lines"/> with each ingredient swapped for its refreshed copy when that differs; unchanged lines are kept as they are.</summary>
-    private static IReadOnlyList<SubAssemblyLineEdit> Repriced(IReadOnlyList<SubAssemblyLineEdit> lines, IReadOnlyDictionary<int, RawMaterial> ingredientsById) =>
+    private static IReadOnlyList<SubAssemblyLineEdit> Repriced(IReadOnlyList<SubAssemblyLineEdit> lines, Dictionary<int, RawMaterial> ingredientsById) =>
         [.. lines.Select(l => ingredientsById.TryGetValue(l.Ingredient.Id, out var fresh) && !CollectionMerge.HasSameValues(fresh, l.Ingredient)
             ? new SubAssemblyLineEdit(fresh, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)
             : l)];
@@ -2464,4 +2465,6 @@ public class ProductsViewModel : ViewModelBase
             EditingAdministrativePercent,
             EditingMarginPercent,
             EditingVatPercent);
+
+    public void Dispose() => _productCache.Dispose();
 }

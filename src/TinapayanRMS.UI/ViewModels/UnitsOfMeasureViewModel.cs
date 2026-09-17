@@ -16,7 +16,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// a Save or Delete, clears the form, so the next Save always adds a unit rather than changing the
 /// last one touched.
 /// </summary>
-public class UnitsOfMeasureViewModel : ViewModelBase
+public sealed class UnitsOfMeasureViewModel : ViewModelBase, IDisposable
 {
     private readonly IUnitOfMeasureRepository _unitOfMeasureRepository;
     private readonly IValidator<UnitOfMeasure> _unitOfMeasureValidator;
@@ -143,4 +143,6 @@ public class UnitsOfMeasureViewModel : ViewModelBase
         EditingName = string.Empty;
         EditingAbbreviation = string.Empty;
     }
+
+    public void Dispose() => _unitCache.Dispose();
 }

@@ -43,7 +43,7 @@ public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyL
 /// follow every change saved here) or copy them, from their recipe on the Products screen. One Save writes
 /// the name, the role and the lines together.
 /// </summary>
-public class SubAssembliesViewModel : ViewModelBase
+public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
 {
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _lineRepository;
@@ -345,4 +345,6 @@ public class SubAssembliesViewModel : ViewModelBase
         BatchCost = Lines.Sum(l => l.Cost);
         CostPerGram = BatchWeight > 0 ? BatchCost / BatchWeight : 0m;
     }
+
+    public void Dispose() => _rowCache.Dispose();
 }

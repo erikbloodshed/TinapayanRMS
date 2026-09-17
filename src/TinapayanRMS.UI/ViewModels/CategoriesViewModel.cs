@@ -16,7 +16,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// Picking a category loads it for renaming; New, or finishing a Save or Delete, clears the form, so
 /// the next Save always adds a category rather than renaming the last one touched.
 /// </summary>
-public class CategoriesViewModel : ViewModelBase
+public sealed class CategoriesViewModel : ViewModelBase, IDisposable
 {
     private readonly IRawMaterialCategoryRepository _categoryRepository;
     private readonly IValidator<RawMaterialCategory> _categoryValidator;
@@ -129,4 +129,6 @@ public class CategoriesViewModel : ViewModelBase
         _editingId = 0;
         EditingName = string.Empty;
     }
+
+    public void Dispose() => _categoryCache.Dispose();
 }

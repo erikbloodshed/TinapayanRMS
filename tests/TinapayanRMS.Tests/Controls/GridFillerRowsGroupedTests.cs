@@ -56,13 +56,15 @@ public class GridFillerRowsGroupedTests
         return GridFillerRows.FillerRowCount(rows.RenderSize, rows.TotalExtent - (grid.UnBoundRows.Count * grid.RowHeight), grid.RowHeight);
     }
 
+    private static readonly string[] MaterialNames = ["Butter", "Egg", "Egg White", "Egg Yolk", "Flour", "Salt", "Sugar"];
+
     /// <summary>A 200 px list of seven ingredients, grouped, sorted and shaped as the Raw Materials list is, with filler rows.</summary>
     private static SfDataGrid MaterialList()
     {
         var grid = new SfDataGrid
         {
             ItemsSource = new ObservableCollection<RawMaterial>(
-                new[] { "Butter", "Egg", "Egg White", "Egg Yolk", "Flour", "Salt", "Sugar" }.Select((name, i) => Material(i + 1, name, cost: 0.01m * (i + 1)))),
+                MaterialNames.Select((name, i) => Material(i + 1, name, cost: 0.01m * (i + 1)))),
             AutoGenerateColumns = false,
             AllowEditing = false,
             SelectionMode = GridSelectionMode.Single,

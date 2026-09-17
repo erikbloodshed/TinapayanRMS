@@ -16,7 +16,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// in their order. Picking a role loads it for editing; New, or finishing a Save or Delete, clears the
 /// form, so the next Save always adds a role rather than renaming the last one touched.
 /// </summary>
-public class SubAssemblyRolesViewModel : ViewModelBase
+public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
 {
     private readonly ISubAssemblyRoleRepository _roleRepository;
     private readonly IValidator<SubAssemblyRole> _roleValidator;
@@ -148,4 +148,6 @@ public class SubAssemblyRolesViewModel : ViewModelBase
     }
 
     private int NextSortOrder() => Roles.Count == 0 ? 1 : Roles.Max(r => r.SortOrder) + 1;
+
+    public void Dispose() => _roleCache.Dispose();
 }

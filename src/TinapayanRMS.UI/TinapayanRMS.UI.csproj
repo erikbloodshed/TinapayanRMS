@@ -2,29 +2,27 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DynamicData" Version="9.4.33" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
-    <PackageReference Include="ReactiveUI.WPF" Version="24.2.0" />
-    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
-    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
-    <PackageReference Include="Syncfusion.Licensing" Version="34.2.7" />
-    <PackageReference Include="Syncfusion.SfChart.WPF" Version="34.2.7" />
-    <PackageReference Include="Syncfusion.SfGrid.WPF" Version="34.2.7" />
-    <PackageReference Include="Syncfusion.SfInput.WPF" Version="34.2.7" />
-    <PackageReference Include="Syncfusion.SfNavigationDrawer.WPF" Version="34.2.7" />
-    <PackageReference Include="Syncfusion.SfSkinManager.WPF" Version="34.2.7" />
-    <PackageReference Include="Syncfusion.SfTextInputLayout.WPF" Version="34.2.7" />
-    <PackageReference Include="Syncfusion.Themes.Windows11Light.WPF" Version="34.2.7" />
-    <PackageReference Include="Syncfusion.Tools.WPF" Version="34.2.7" />
-    <PackageReference Include="System.Reactive" Version="7.0.0" />
+    <PackageReference Include="DynamicData" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="ReactiveUI.WPF" />
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Syncfusion.Licensing" />
+    <PackageReference Include="Syncfusion.SfChart.WPF" />
+    <PackageReference Include="Syncfusion.SfGrid.WPF" />
+    <PackageReference Include="Syncfusion.SfInput.WPF" />
+    <PackageReference Include="Syncfusion.SfNavigationDrawer.WPF" />
+    <PackageReference Include="Syncfusion.SfSkinManager.WPF" />
+    <PackageReference Include="Syncfusion.SfTextInputLayout.WPF" />
+    <PackageReference Include="Syncfusion.Themes.Windows11Light.WPF" />
+    <PackageReference Include="Syncfusion.Tools.WPF" />
+    <PackageReference Include="System.Reactive" />
   </ItemGroup>
 
   <ItemGroup>

@@ -25,6 +25,7 @@ dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infras
 - **Migrations come only from `dotnet ef migrations add`.** Never write or edit one by hand. `TinapayanRMSDbContextFactory` provides the design-time DbContext.
 - **Work counts as done** when the solution builds, all tests pass, and any new migration applies cleanly to the local database.
 - **The app needs the `SYNCFUSION_LICENSE_KEY` user environment variable.** `App`'s static constructor throws at startup without it. The build doesn't need it.
+- **Build settings are centralized.** `Directory.Build.props` sets the shared compiler settings, the .NET analyzers (`AnalysisLevel` `latest-recommended`, with per-folder exceptions in `.editorconfig`) and the target frameworks (`net10.0` by default; UI and Tests use `$(WindowsTargetFramework)`). `Directory.Packages.props` turns on Central Package Management, so a `PackageReference` never carries a `Version`: add or bump versions there.
 - **Docker isn't used anywhere in this project.**
 - **`ilspycmd` (11.0, a global dotnet tool) is installed for decompiling and inspecting .NET assemblies.** Use it instead of writing reflection scripts. For example, `ilspycmd -l c <dll>` lists the classes in an assembly, `ilspycmd -t <Full.Type.Name> <dll>` decompiles one type, and `ilspycmd -m "M:Namespace.Type.Method(System.String)" <dll>` decompiles one member. The Syncfusion assemblies are in the NuGet cache under `~/.nuget/packages/syncfusion.*/<version>/lib/`.
 
@@ -49,6 +50,6 @@ dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infras
 
 ## UI work
 
-- **Prefer a Syncfusion control over its native WPF equivalent.** All Syncfusion packages are pinned to one version in `TinapayanRMS.UI.csproj`, so upgrade them together. The theme is the `Syncfusion.Themes.Windows11Light.WPF` package.
+- **Prefer a Syncfusion control over its native WPF equivalent.** All Syncfusion packages share one version, the `SyncfusionVersion` property in `Directory.Packages.props`, so they upgrade together. The theme is the `Syncfusion.Themes.Windows11Light.WPF` package.
 - **To learn how a Syncfusion control is meant to be used**, start with the `syncfusion-wpf-*` skills in `.claude/skills/`. Next, check the local Sample Browser source at `C:\Users\Public\Documents\Syncfusion\WPF\34.2.2\SampleBrowser\`, and grep file contents there, since demo filenames often don't name the control. Only then decompile the assembly with `ilspycmd`.
 - **Before launching the app to test it**, close any copy the user already has open. Run the app on the secondary monitor. PLAN.md's Application Architecture section has the UI-automation notes (DPI awareness, which Syncfusion controls need real clicks).

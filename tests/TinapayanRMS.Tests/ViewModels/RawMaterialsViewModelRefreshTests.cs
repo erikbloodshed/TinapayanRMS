@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -635,7 +636,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
 
         await WaitUntilSettledAsync(() => viewModel.EditingPrice == 930m,
-            () => $"price={viewModel.EditingPrice?.ToString() ?? "none"}");
+            () => $"price={viewModel.EditingPrice?.ToString(CultureInfo.InvariantCulture) ?? "none"}");
         viewModel.EditingCostBufferPercent.Should().Be(5m);
         viewModel.EditingBufferedPrice.Should().Be(976.5m);
     }

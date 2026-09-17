@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -31,7 +32,8 @@ public partial class App : Application
             .WriteTo.File(
                 Path.Combine(AppContext.BaseDirectory, "logs", "tinapayanrms-.log"),
                 rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 31)
+                retainedFileCountLimit: 31,
+                formatProvider: CultureInfo.InvariantCulture)
             .CreateLogger();
 
         try
