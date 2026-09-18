@@ -4,16 +4,16 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Tests.Validators;
 
-public class PriceHistoryValidatorTests
+public class BrandPriceValidatorTests
 {
-    private readonly RawMaterialPriceHistoryValidator _validator = new();
+    private readonly RawMaterialBrandPriceValidator _validator = new();
 
     [Theory]
     [InlineData(90)]
     [InlineData(1)]
     public void Accepts_a_positive_price(decimal price)
     {
-        _validator.Validate(new RawMaterialPriceHistory { Price = price }).IsValid.Should().BeTrue();
+        _validator.Validate(new RawMaterialBrandPrice { Price = price }).IsValid.Should().BeTrue();
     }
 
     [Theory]
@@ -21,6 +21,14 @@ public class PriceHistoryValidatorTests
     [InlineData(-5)]
     public void Rejects_a_non_positive_price(decimal price)
     {
-        _validator.Validate(new RawMaterialPriceHistory { Price = price }).IsValid.Should().BeFalse();
+        _validator.Validate(new RawMaterialBrandPrice { Price = price }).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Rejects_a_brand_past_the_column_length()
+    {
+        var brand = new string('x', RawMaterialBrandPriceValidator.MaxBrandLength + 1);
+
+        _validator.Validate(new RawMaterialBrandPrice { Brand = brand, Price = 1m }).IsValid.Should().BeFalse();
     }
 }

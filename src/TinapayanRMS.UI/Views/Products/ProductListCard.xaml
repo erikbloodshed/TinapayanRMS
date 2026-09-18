@@ -12,7 +12,7 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <TextBlock Text="Products" Style="{StaticResource PanelHeaderStyle}" Margin="0,0,0,8" />
+            <TextBlock Text="Products" Style="{StaticResource PanelHeaderStyle}" />
             <syncfusion:SfTextBoxExt Grid.Row="1"
                                      Margin="0,0,0,8"
                                      Watermark="Search products"

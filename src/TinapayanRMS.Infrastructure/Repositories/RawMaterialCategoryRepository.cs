@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
@@ -29,7 +30,14 @@ public class RawMaterialCategoryRepository(IDbContextFactory<TinapayanRMSDbConte
         var existing = await dbContext.RawMaterialCategories.FirstOrDefaultAsync(c => c.Id == category.Id, cancellationToken)
             ?? throw new InvalidOperationException($"Category {category.Id} does not exist.");
 
+        if (existing.Type != category.Type)
+        {
+            RawMaterialRules.EnsureCategoryTypeCanChange(
+                existing.Name, await dbContext.RawMaterials.CountAsync(m => m.CategoryId == existing.Id, cancellationToken));
+        }
+
         existing.Name = category.Name;
+        existing.Type = category.Type;
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

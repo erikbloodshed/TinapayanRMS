@@ -8,8 +8,6 @@
     -->
     <StackPanel>
         <TextBlock Text="Unit Conversion Overview" Style="{StaticResource PanelHeaderStyle}" />
-        <TextBlock Text="How many pieces one batch of each sub-assembly makes, at its weight per piece."
-                   Style="{StaticResource PanelCaptionStyle}" />
 
         <TextBlock Style="{StaticResource EmptyStateStyle}"
                    Margin="0,16"

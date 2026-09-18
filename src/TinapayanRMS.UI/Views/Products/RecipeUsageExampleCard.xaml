@@ -23,8 +23,6 @@
 
     <StackPanel>
         <TextBlock Text="Recipe Usage Example" Style="{StaticResource PanelHeaderStyle}" />
-        <TextBlock Text="See what the materials for a number of pieces come to, from the recipe as it's shown."
-                   Style="{StaticResource PanelCaptionStyle}" />
 
         <!-- A label over the quantity; "pc" and Calculate have none, so they span both rows, bottom-aligned -->
         <Grid>

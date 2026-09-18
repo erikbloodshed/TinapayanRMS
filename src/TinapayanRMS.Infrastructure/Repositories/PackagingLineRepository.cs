@@ -22,7 +22,11 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         return await ResolveEffectiveAsync(dbContext, productId, [], cancellationToken);
     }
 
-    /// <summary>Follows the packaging's link chain (if any) until an unlinked product is found, then returns that product's own lines. visitedProductIds guards against a cycle slipping past SetLinkAsync's own check (e.g. a manual data edit).</summary>
+    /// <summary>
+    /// Follows the packaging's link chain (if any) until an unlinked product or a packaging set is found, then
+    /// returns that product's own lines, or the set's lines as this product's (<see cref="SetLinesAsPackagingLines"/>).
+    /// visitedProductIds guards against a cycle slipping past SetLinkAsync's own check (e.g. a manual data edit).
+    /// </summary>
     internal static async Task<IReadOnlyList<PackagingLine>> ResolveEffectiveAsync(
         TinapayanRMSDbContext dbContext, int productId, HashSet<int> visitedProductIds, CancellationToken cancellationToken)
     {
@@ -35,9 +39,14 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             .AsNoTracking()
             .FirstOrDefaultAsync(l => l.ProductId == productId, cancellationToken);
 
-        if (link is not null)
+        if (link?.LinkedSubAssemblyId is { } setId)
         {
-            return await ResolveEffectiveAsync(dbContext, link.LinkedProductId, visitedProductIds, cancellationToken);
+            return await SetLinesAsPackagingLines(dbContext, productId, setId, cancellationToken);
+        }
+
+        if (link?.LinkedProductId is { } linkedProductId)
+        {
+            return await ResolveEffectiveAsync(dbContext, linkedProductId, visitedProductIds, cancellationToken);
         }
 
         // Per-piece lines only. A packaging link says "this product's packaging is that product's", and
@@ -47,6 +56,37 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         return await WithMaterialAndUnits(dbContext.PackagingLines)
             .Where(l => l.ProductId == productId && l.PackId == null)
             .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// A packaging set's lines as <paramref name="productId"/>'s per-piece packaging lines, never saved: one set per
+    /// piece, so a set's quantity is a piece's, in the material's base unit, typed as the quantity. Everything that
+    /// reads a product's packaging (the Products screen, Reports, unlinking's copy, a clone) takes them as they are.
+    /// </summary>
+    private static async Task<IReadOnlyList<PackagingLine>> SetLinesAsPackagingLines(
+        TinapayanRMSDbContext dbContext, int productId, int setId, CancellationToken cancellationToken)
+    {
+        var setLines = await SubAssemblyRepository.WithMaterialAndUnits(dbContext.SubAssemblyPackagingLines)
+            .Where(l => l.SubAssemblyId == setId)
+            .OrderBy(l => l.Id)
+            .ToListAsync(cancellationToken);
+
+        return
+        [
+            .. setLines.Select(l =>
+            {
+                var (qtyPerUnit, unitsPerPackagingUnit) = ProductRules.ReconcileReciprocal(PackagingLineAuthoredField.QtyPerUnit, l.QtyPerSet);
+                return new PackagingLine
+                {
+                    ProductId = productId,
+                    PackagingMaterialId = l.PackagingMaterialId,
+                    PackagingMaterial = l.PackagingMaterial,
+                    QtyPerUnit = qtyPerUnit,
+                    UnitsPerPackagingUnit = unitsPerPackagingUnit,
+                    AuthoredField = PackagingLineAuthoredField.QtyPerUnit,
+                };
+            }),
+        ];
     }
 
     /// <summary>

@@ -28,16 +28,28 @@ public interface ISubAssemblyRepository
     Task<IReadOnlyList<SubAssembly>> GetStandaloneAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// For each standalone sub-assembly a product uses, the names of those products. One no product uses
-    /// isn't listed.
+    /// For each standalone sub-assembly a product uses, the names of those products: a recipe's linking usages,
+    /// a packaging set's packaging links. One no product uses isn't listed.
     /// </summary>
     Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetStandaloneLinkedByAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Adds (Id 0) or updates a standalone sub-assembly's name and role, and replaces its lines (grams of
-    /// ingredients), in one transaction; every product linking it follows. Returns its id.
+    /// ingredients), in one transaction; every product linking it follows. Refused in the Packaging role, and
+    /// for a saved packaging set. Returns its id.
     /// </summary>
     Task<int> SaveStandaloneAsync(SubAssembly subAssembly, IReadOnlyList<RecipeLine> lines, CancellationToken cancellationToken);
+
+    /// <summary>A packaging set's lines, each with its material, the material's base unit and alternative units.</summary>
+    Task<IReadOnlyList<SubAssemblyPackagingLine>> GetPackagingLinesAsync(int subAssemblyId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Adds (Id 0) or updates a standalone packaging set — a sub-assembly in the Packaging role — and replaces its
+    /// lines (packaging materials, per set, in their base unit), in one transaction; every product whose packaging
+    /// links it follows. A saved recipe can't become a set. Returns its id.
+    /// </summary>
+    Task<int> SaveStandalonePackagingAsync(
+        SubAssembly subAssembly, IReadOnlyList<(int PackagingMaterialId, decimal QtyPerSet)> lines, CancellationToken cancellationToken);
 
     /// <summary>Deletes a standalone sub-assembly and its lines; refused while a product links it.</summary>
     Task DeleteStandaloneAsync(int id, CancellationToken cancellationToken);

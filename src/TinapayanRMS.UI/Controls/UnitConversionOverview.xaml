@@ -149,18 +149,5 @@
                 </StackPanel>
             </Border>
         </StackPanel>
-
-        <Border Style="{StaticResource WarningBannerStyle}" Margin="0,16,0,0">
-            <DockPanel>
-                <TextBlock DockPanel.Dock="Left"
-                           Style="{StaticResource IconGlyphStyle}"
-                           Foreground="{StaticResource WarningForegroundBrush}"
-                           Margin="0,1,8,0"
-                           Text="&#xE946;" />
-                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource WarningForegroundBrush}">
-                    <Run Text="The base unit (" /><Run Text="{Binding BaseUnitName, ElementName=Root, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=") is the common unit used for costing and recipe calculations." />
-                </TextBlock>
-            </DockPanel>
-        </Border>
     </StackPanel>
 </UserControl>

@@ -5,9 +5,7 @@
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
     <Border Style="{StaticResource CardStyle}">
         <StackPanel>
-            <TextBlock Text="Alternative Units" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-            <TextBlock Text="Define up to two units you commonly buy or use this material in. Changes are saved with Save."
-                       Style="{StaticResource CardCaptionStyle}" />
+            <TextBlock Text="Alternative Units" Style="{StaticResource SectionHeaderStyle}" />
 
             <!--
                 Typed straight into, like the Bill of Materials: the add row at the bottom starts a unit, and goes once
@@ -62,10 +60,7 @@
             </syncfusion:SfDataGrid>
 
             <!-- Remove acts on the row picked in the grid -->
-            <DockPanel Margin="0,8,0,0">
-                <syncfusion:ButtonAdv DockPanel.Dock="Right" Label="Remove" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding DeleteUnitCommand}" />
-                <TextBlock Text="Type the units straight into the table." Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" />
-            </DockPanel>
+            <syncfusion:ButtonAdv HorizontalAlignment="Right" Margin="0,8,0,0" Label="Remove" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding DeleteUnitCommand}" />
         </StackPanel>
     </Border>
 </UserControl>

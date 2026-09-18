@@ -5,11 +5,11 @@
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
     <!--
         Add a sub-assembly to the recipe: a new one of the product's own, a link to an existing one
-        (another product's, or a standalone one from the Sub-Assemblies screen), or a copy of one. Or change one already in it: an own one's role, lines and piece size, a
+        (another product's, or a standalone one from the Sub-Assemblies screen), or a copy of one. Or change one already in it: an own one's role, name, lines and piece size, a
         linked one's piece size and add-ins only. Apply only puts it in the recipe; Save saves it. It is the whole of its
         Recipe Structure tab, so it has no box of its own, and for a section already in the recipe it carries
-        that section's heading (EditingUsage) in place of the add form's title. A section has no name: it's called
-        by its role, and a product has one in each. Taking one out of the recipe is the card's Delete Sub-Assembly.
+        that section's heading (EditingUsage) in place of the add form's title. A section is called by its role, and
+        by its name too where the recipe has more than one in the role. Taking one out of the recipe is the card's Delete Sub-Assembly.
     -->
     <UserControl.Resources>
         <!--
@@ -48,7 +48,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <TextBlock Text="{Binding EditingUsage.RoleName}"
+            <TextBlock Text="{Binding EditingUsage.SectionName}"
                        FontSize="15"
                        FontWeight="SemiBold"
                        Foreground="{StaticResource HeadingForegroundBrush}"
@@ -99,7 +99,7 @@
                                     SelectedItem="{Binding EditingUsageMode, Mode=TwoWay}" />
 
             <TextBlock Grid.Column="2"
-                       Text="Existing Sub-Assembly"
+                       Text="Existing Sub-Assembly or Packaging"
                        Style="{StaticResource FieldLabelStyle}"
                        Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
             <syncfusion:ComboBoxAdv Grid.Row="1"
@@ -107,14 +107,14 @@
                                     ItemsSource="{Binding LinkableSubAssemblies}"
                                     DisplayMemberPath="DisplayName"
                                     SelectedItem="{Binding EditingUsageSource, Mode=TwoWay}"
-                                    ToolTip="Another product's, or a standalone one from the Sub-Assemblies screen. A link follows every change made to it where it's kept; a copy is this product's own from then on."
+                                    ToolTip="Another product's, or a standalone one from the Sub-Assemblies screen; or packaging: a packaging set, or another product's. A link follows every change made to it where it's kept; a copy is this product's own from then on."
                                     Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
 
         <!--
-            The product's own sub-assembly's role, which is what it's called: only the roles the recipe doesn't have
-            yet are offered, beside its own (FormRoleOptions). A linked one's is its owner's. In the add form's first
-            column, under the Sub-Assembly picker.
+            The product's own sub-assembly's role, which is what it's called, and its optional name, which tells it apart
+            from others in that role ("Filling: Ube" beside "Filling: Cheese"). A linked one's are its owner's. In the add
+            form's columns, under the Sub-Assembly and source pickers. Packaging has no name: there's only ever one.
         -->
         <Grid Margin="0,0,0,8" Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid.RowDefinitions>
@@ -133,47 +133,51 @@
                                     ItemsSource="{Binding FormRoleOptions}"
                                     DisplayMemberPath="Name"
                                     SelectedItem="{Binding EditingUsageRole, Mode=TwoWay}"
-                                    ToolTip="What it's called in the recipe. A product has one sub-assembly in each role; roles are added in Settings → Roles." />
+                                    ToolTip="What it's called in the recipe. Roles are added in Settings → Roles." />
+
+            <TextBlock Grid.Column="2"
+                       Text="Name (optional)"
+                       Style="{StaticResource FieldLabelStyle}"
+                       Visibility="{Binding IsFormPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+            <syncfusion:SfTextBoxExt Grid.Row="1"
+                                     Grid.Column="2"
+                                     Text="{Binding EditingUsageName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Watermark="e.g. Ube"
+                                     ToolTip="Tells it apart from the recipe's other sub-assemblies in the same role: its tab reads Filling: Ube beside Filling: Cheese. One in a role can go without."
+                                     Visibility="{Binding IsFormPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
         </Grid>
 
         <!--
-            The lines that make one batch, in grams. The product's own are typed straight into: the add row at
-            the bottom starts a line, Delete removes the selected one. A linked one's are its owner's, so they
-            only show: AllowEditing is off and the add row goes with it (AddNewRowPositionConverter).
+            The product's packaging, when the form adds it (IsFormPackaging: the Packaging role, or packaging picked to
+            link or copy): how much of each material one piece takes, the Packaging tab's own columns. Typed into for a
+            new or copied one; a link's lines are kept where it's from, so they only show.
         -->
-        <StackPanel Visibility="{Binding IsFormShowingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <!-- Named only when it's a linked recipe, which add-ins go on top of; a product's own lines are just "the lines". -->
-            <TextBlock Text="Linked Recipe"
-                       Style="{StaticResource PanelHeaderStyle}"
-                       Visibility="{Binding IsFormOfferingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}" />
-
-            <syncfusion:SfDataGrid ItemsSource="{Binding FormLines}"
-                                   controls:GridAddNewRow.HideCheckBoxes="True"
-                                   controls:GridCellEditing.IsEnabled="True"
-                                   controls:GridCellEmphasis.IsEnabled="True"
-                                   SelectedItem="{Binding SelectedFormLine, Mode=TwoWay}"
+        <StackPanel Visibility="{Binding IsFormPackaging, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <syncfusion:SfDataGrid ItemsSource="{Binding FormPackagingLines}"
+                                   controls:NumericEditing.IsEnabled="True"
+                                   SelectedItem="{Binding SelectedFormPackagingLine, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                    CurrentCellBorderThickness="1"
                                    controls:GridFillerRows.IsEnabled="True"
                                    ShowRowHeader="True"
                                    AutoGenerateColumns="False"
-                                   AllowEditing="{Binding IsFormEditingLines}"
-                                   AllowDeleting="{Binding IsFormEditingLines}"
+                                   AllowEditing="{Binding IsFormEditingPackaging}"
+                                   AllowDeleting="{Binding IsFormEditingPackaging}"
                                    EditTrigger="OnTap"
-                                   AddNewRowPosition="{Binding IsFormEditingLines, Converter={StaticResource AddNewRowPositionConverter}}"
+                                   AddNewRowPosition="{Binding IsFormEditingPackaging, Converter={StaticResource AddNewRowPositionConverter}}"
                                    SelectionMode="Single"
                                    ColumnSizer="Star"
                                    controls:GridEditCommit.OnFocusLeave="True"
                                    controls:GridAddNewRow.DropWhenUntouched="True"
                                    controls:AutoCompleteDropDown.IsEnabled="True"
-                                   controls:GridAddNewRow.ItemFactory="{Binding NewFormLine}"
+                                   controls:GridAddNewRow.ItemFactory="{Binding NewFormPackagingLine}"
                                    Height="200">
                 <syncfusion:SfDataGrid.Columns>
                     <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
-                    <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
-                                                            HeaderText="Ingredient"
-                                                            ItemsSource="{Binding Ingredients}"
+                    <syncfusion:GridMultiColumnDropDownList MappingName="PackagingMaterialId"
+                                                            HeaderText="Material"
+                                                            ItemsSource="{Binding PackagingMaterials}"
                                                             DisplayMember="Name"
                                                             ValueMember="Id"
                                                             AllowAutoComplete="True"
@@ -187,123 +191,17 @@
                                                             GridColumnSizer="Star">
                         <syncfusion:GridMultiColumnDropDownList.Columns>
                             <syncfusion:Columns>
-                                <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
+                                <syncfusion:GridTextColumn MappingName="Name" HeaderText="Material" />
                                 <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
-                                <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per g" Width="88" NumberDecimalDigits="4" />
+                                <syncfusion:GridTextColumn MappingName="BaseUnit.Abbreviation" HeaderText="Unit" Width="52" />
+                                <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per Unit" Width="96" NumberDecimalDigits="4" />
                             </syncfusion:Columns>
                         </syncfusion:GridMultiColumnDropDownList.Columns>
                     </syncfusion:GridMultiColumnDropDownList>
-                    <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="110" NumberDecimalDigits="2" />
-                    <controls:NumericColumn MappingName="Percent"
-                                            HeaderTemplate="{StaticResource PercentHeaderTemplate}"
-                                            Width="86"
-                                            NumberDecimalDigits="1"
-                                            controls:GridCellEditing.AllowWhen="CanTypeBakersPercent"
-                                            controls:GridCellEmphasis.When="IsPercentTyped" />
-                    <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="110" NumberDecimalDigits="2" AllowEditing="False" />
-                    <!-- The formula's 100% base for baker's percentage, usually the flour; a linked one's is its owner's to set. -->
-                    <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"
-                                                   HeaderText="Base"
-                                                   Width="54"
-                                                   HorizontalHeaderContentAlignment="Center"
-                                                   AllowEditing="{Binding IsFormEditingLines}" />
-                </syncfusion:SfDataGrid.Columns>
-            </syncfusion:SfDataGrid>
-
-            <Grid Margin="0,8,0,8" Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="Type the lines straight into the table. Delete removes the selected one." Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" />
-                <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveFormLineCommand}" />
-            </Grid>
-
-            <!-- What the percentages are read against, and the figure a batch is scaled by. -->
-            <TextBlock Text="{Binding UsageFormBaseCaption}" Style="{StaticResource CaptionStyle}" Margin="0,8,0,0" TextWrapping="Wrap" />
-
-            <!-- Whose a linked one's lines are, and Show Add-Ins, which opens the table of this product's own extras under them -->
-            <Grid Margin="0,8,0,8" Visibility="{Binding IsFormEditingLines, Converter={StaticResource EmptyStateVisibilityConverter}}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="Its lines are its owner's: change them where it's kept, or make this product a copy of it. Anything extra just for this product goes in its add-ins."
-                           Style="{StaticResource CaptionStyle}"
-                           VerticalAlignment="Center"
-                           Margin="0,0,12,0" />
-                <syncfusion:ButtonAdv Grid.Column="1"
-                                      VerticalAlignment="Center"
-                                      Label="{Binding FormAddInsToggleText}"
-                                      ToolTip="This product's own extras on top of the linked recipe: a colouring, a flavouring, an inclusion"
-                                      IconTemplate="{StaticResource AddInsToggleIconTemplate}"
-                                      Command="{Binding ToggleFormAddInsCommand}" />
-            </Grid>
-        </StackPanel>
-
-        <!--
-            This product's own extras on top of the linked recipe: colouring, flavouring, inclusions. They go
-            into the batch, so the Total Weight below is the recipe's lines plus these, and a piece takes its
-            share of the whole thing, shown or not. Only a linked sub-assembly has them, and it's always this
-            product's to type into, so the grid is plainly editable rather than bound like the one above. Show
-            Add-Ins opens it; it's open to start with only when there are add-ins (IsFormAddInsExpanded).
-        -->
-        <StackPanel Margin="0,6,0,0" Visibility="{Binding IsFormShowingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <TextBlock Text="This Product's Add-Ins" Style="{StaticResource PanelHeaderStyle}" />
-            <TextBlock Text="Extra ingredients only this product puts in, in grams. They can't be ones the recipe above already has."
-                       Style="{StaticResource PanelCaptionStyle}" />
-
-            <syncfusion:SfDataGrid ItemsSource="{Binding FormAddIns}"
-                                   controls:GridCellEditing.IsEnabled="True"
-                                   SelectedItem="{Binding SelectedFormAddIn, Mode=TwoWay}"
-                                   GridLinesVisibility="Both"
-                                   CurrentCellBorderBrush="{StaticResource AccentBrush}"
-                                   CurrentCellBorderThickness="1"
-                                   controls:GridFillerRows.IsEnabled="True"
-                                   ShowRowHeader="True"
-                                   AutoGenerateColumns="False"
-                                   AllowEditing="True"
-                                   AllowDeleting="True"
-                                   EditTrigger="OnTap"
-                                   AddNewRowPosition="Bottom"
-                                   SelectionMode="Single"
-                                   ColumnSizer="Star"
-                                   controls:GridEditCommit.OnFocusLeave="True"
-                                   controls:GridAddNewRow.DropWhenUntouched="True"
-                                   controls:AutoCompleteDropDown.IsEnabled="True"
-                                   controls:GridAddNewRow.ItemFactory="{Binding NewFormAddIn}"
-                                   Height="140">
-                <syncfusion:SfDataGrid.Columns>
-                    <!-- The same columns as the recipe above, so the two tables read as one batch. -->
-                    <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
-                                                            HeaderText="Ingredient"
-                                                            ItemsSource="{Binding Ingredients}"
-                                                            DisplayMember="Name"
-                                                            ValueMember="Id"
-                                                            AllowAutoComplete="True"
-                                                            AllowNullInput="True"
-                                                            AllowIncrementalFiltering="True"
-                                                            SearchCondition="Contains"
-                                                            AutoGenerateColumns="False"
-                                                            IsAutoPopupSize="False"
-                                                            PopUpWidth="380"
-                                                            PopUpHeight="260"
-                                                            GridColumnSizer="Star">
-                        <syncfusion:GridMultiColumnDropDownList.Columns>
-                            <syncfusion:Columns>
-                                <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
-                                <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
-                                <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per g" Width="88" NumberDecimalDigits="4" />
-                            </syncfusion:Columns>
-                        </syncfusion:GridMultiColumnDropDownList.Columns>
-                    </syncfusion:GridMultiColumnDropDownList>
-                    <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="110" NumberDecimalDigits="2" />
-                    <controls:NumericColumn MappingName="Percent"
-                                            HeaderTemplate="{StaticResource PercentHeaderTemplate}"
-                                            Width="86"
-                                            NumberDecimalDigits="1"
-                                            controls:GridCellEditing.AllowWhen="CanTypeBakersPercent" />
-                    <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="110" NumberDecimalDigits="2" AllowEditing="False" />
+                    <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
+                    <syncfusion:GridTextColumn MappingName="Unit" HeaderText="Unit" Width="64" AllowEditing="False" />
+                    <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" AllowEditing="False" />
+                    <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Piece" Width="104" NumberDecimalDigits="4" AllowEditing="False" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
 
@@ -312,49 +210,249 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="{Binding UsageFormAddInsCaption}" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,12,0" />
-                <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Add-In" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveFormAddInCommand}" />
+                <TextBlock Text="How much of each material one piece takes, in its unit. It's the product's packaging: Apply puts it on the Packaging tab."
+                           Style="{StaticResource CaptionStyle}"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,0,12,0"
+                           Visibility="{Binding IsFormEditingPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock Text="Linked: its lines are kept where it's from, and follow every change there, one set per piece."
+                           Style="{StaticResource CaptionStyle}"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,0,12,0"
+                           Visibility="{Binding IsFormEditingPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+                <syncfusion:ButtonAdv Grid.Column="1"
+                                      Label="Remove Line"
+                                      IconTemplate="{StaticResource RemoveIconTemplate}"
+                                      Command="{Binding RemoveFormPackagingLineCommand}"
+                                      Visibility="{Binding IsFormEditingPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </Grid>
         </StackPanel>
 
-        <!-- The piece size: type the yield or the weight per piece, and the other follows from the batch -->
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <!-- A recipe section's lines, add-ins and piece size: none of it applies to packaging. -->
+        <StackPanel Visibility="{Binding IsFormPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}">
+            <!--
+                The lines that make one batch, in grams. The product's own are typed straight into: the add row at
+                the bottom starts a line, Delete removes the selected one. A linked one's are its owner's, so they
+                only show: AllowEditing is off and the add row goes with it (AddNewRowPositionConverter).
+            -->
+            <StackPanel Visibility="{Binding IsFormShowingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <!-- Named only when it's a linked recipe, which add-ins go on top of; a product's own lines are just "the lines". -->
+                <TextBlock Text="Linked Recipe"
+                           Style="{StaticResource PanelHeaderStyle}"
+                           Visibility="{Binding IsFormOfferingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-            <TextBlock Grid.Column="0" Text="Total Weight (g)" Style="{StaticResource FieldLabelStyle}" />
-            <syncfusion:SfTextBoxExt Grid.Row="1"
-                                     Grid.Column="0"
-                                     IsReadOnly="True"
-                                     Focusable="False"
-                                     Text="{Binding UsageFormTotalWeightText, Mode=OneWay}"
-                                     ToolTip="The batch: the sum of its lines, and of this product's add-ins to them." />
+                <syncfusion:SfDataGrid ItemsSource="{Binding FormLines}"
+                                       controls:NumericEditing.IsEnabled="True"
+                                       controls:GridAddNewRow.HideCheckBoxes="True"
+                                       controls:GridCellEditing.IsEnabled="True"
+                                       controls:GridCellEmphasis.IsEnabled="True"
+                                       SelectedItem="{Binding SelectedFormLine, Mode=TwoWay}"
+                                       GridLinesVisibility="Both"
+                                       CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                       CurrentCellBorderThickness="1"
+                                       controls:GridFillerRows.IsEnabled="True"
+                                       ShowRowHeader="True"
+                                       AutoGenerateColumns="False"
+                                       AllowEditing="{Binding IsFormEditingLines}"
+                                       AllowDeleting="{Binding IsFormEditingLines}"
+                                       EditTrigger="OnTap"
+                                       AddNewRowPosition="{Binding IsFormEditingLines, Converter={StaticResource AddNewRowPositionConverter}}"
+                                       SelectionMode="Single"
+                                       ColumnSizer="Star"
+                                       controls:GridEditCommit.OnFocusLeave="True"
+                                       controls:GridAddNewRow.DropWhenUntouched="True"
+                                       controls:AutoCompleteDropDown.IsEnabled="True"
+                                       controls:GridAddNewRow.ItemFactory="{Binding NewFormLine}"
+                                       Height="200">
+                    <syncfusion:SfDataGrid.Columns>
+                        <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
+                        <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
+                                                                HeaderText="Ingredient"
+                                                                ItemsSource="{Binding Ingredients}"
+                                                                DisplayMember="Name"
+                                                                ValueMember="Id"
+                                                                AllowAutoComplete="True"
+                                                                AllowNullInput="True"
+                                                                AllowIncrementalFiltering="True"
+                                                                SearchCondition="Contains"
+                                                                AutoGenerateColumns="False"
+                                                                IsAutoPopupSize="False"
+                                                                PopUpWidth="380"
+                                                                PopUpHeight="260"
+                                                                GridColumnSizer="Star">
+                            <syncfusion:GridMultiColumnDropDownList.Columns>
+                                <syncfusion:Columns>
+                                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
+                                    <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
+                                    <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per g" Width="88" NumberDecimalDigits="4" />
+                                </syncfusion:Columns>
+                            </syncfusion:GridMultiColumnDropDownList.Columns>
+                        </syncfusion:GridMultiColumnDropDownList>
+                        <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="110" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
+                        <controls:NumericColumn MappingName="Percent"
+                                                HeaderTemplate="{StaticResource PercentHeaderTemplate}"
+                                                Width="86"
+                                                NumberDecimalDigits="1"
+                                                AllowNullValue="True"
+                                                controls:GridCellEditing.AllowWhen="CanTypeBakersPercent"
+                                                controls:GridCellEmphasis.When="IsPercentTyped" />
+                        <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="110" NumberDecimalDigits="2" AllowEditing="False" />
+                        <!-- The formula's 100% base for baker's percentage, usually the flour; a linked one's is its owner's to set. -->
+                        <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"
+                                                       HeaderText="Base"
+                                                       Width="54"
+                                                       HorizontalHeaderContentAlignment="Center"
+                                                       AllowEditing="{Binding IsFormEditingLines}" />
+                    </syncfusion:SfDataGrid.Columns>
+                </syncfusion:SfDataGrid>
 
-            <TextBlock Grid.Column="2" Text="Yield (pcs)" Style="{StaticResource FieldLabelStyle}" />
-            <syncfusion:DoubleTextBox Grid.Row="1"
-                                      Grid.Column="2"
-                                      Value="{Binding EditingUsageYield, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                      NumberDecimalDigits="2"
-                                      ToolTip="Pieces one batch makes. Type it, and the weight per piece is worked out." />
+                <Grid Margin="0,8,0,8" Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveFormLineCommand}" />
+                </Grid>
 
-            <TextBlock Grid.Column="4" Text="Weight per Piece (g)" Style="{StaticResource FieldLabelStyle}" />
-            <syncfusion:DoubleTextBox Grid.Row="1"
-                                      Grid.Column="4"
-                                      Value="{Binding EditingUsageWeightPerPiece, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                      NumberDecimalDigits="2"
-                                      ToolTip="Grams of the batch in one piece. Type it, and the yield is worked out." />
-        </Grid>
+                <!-- What the percentages are read against, and the figure a batch is scaled by. -->
+                <TextBlock Text="{Binding UsageFormBaseCaption}" Style="{StaticResource CaptionStyle}" Margin="0,8,0,0" TextWrapping="Wrap" />
 
-        <TextBlock Text="{Binding UsageFormPieceSizeCaption}" Style="{StaticResource CaptionStyle}" Margin="0,6,0,0" />
+                <!-- Whose a linked one's lines are, and Show Add-Ins, which opens the table of this product's own extras under them -->
+                <Grid Margin="0,8,0,8" Visibility="{Binding IsFormEditingLines, Converter={StaticResource EmptyStateVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Its lines are its owner's: change them where it's kept, or make this product a copy of it. Anything extra just for this product goes in its add-ins."
+                               Style="{StaticResource CaptionStyle}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,12,0" />
+                    <syncfusion:ButtonAdv Grid.Column="1"
+                                          VerticalAlignment="Center"
+                                          Label="{Binding FormAddInsToggleText}"
+                                          ToolTip="This product's own extras on top of the linked recipe: a colouring, a flavouring, an inclusion"
+                                          IconTemplate="{StaticResource AddInsToggleIconTemplate}"
+                                          Command="{Binding ToggleFormAddInsCommand}" />
+                </Grid>
+            </StackPanel>
+
+            <!--
+                This product's own extras on top of the linked recipe: colouring, flavouring, inclusions. They go
+                into the batch, so the Total Weight below is the recipe's lines plus these, and a piece takes its
+                share of the whole thing, shown or not. Only a linked sub-assembly has them, and it's always this
+                product's to type into, so the grid is plainly editable rather than bound like the one above. Show
+                Add-Ins opens it; it's open to start with only when there are add-ins (IsFormAddInsExpanded).
+            -->
+            <StackPanel Margin="0,6,0,0" Visibility="{Binding IsFormShowingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="This Product's Add-Ins" Style="{StaticResource PanelHeaderStyle}" />
+
+                <syncfusion:SfDataGrid ItemsSource="{Binding FormAddIns}"
+                                       controls:NumericEditing.IsEnabled="True"
+                                       controls:GridCellEditing.IsEnabled="True"
+                                       SelectedItem="{Binding SelectedFormAddIn, Mode=TwoWay}"
+                                       GridLinesVisibility="Both"
+                                       CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                       CurrentCellBorderThickness="1"
+                                       controls:GridFillerRows.IsEnabled="True"
+                                       ShowRowHeader="True"
+                                       AutoGenerateColumns="False"
+                                       AllowEditing="True"
+                                       AllowDeleting="True"
+                                       EditTrigger="OnTap"
+                                       AddNewRowPosition="Bottom"
+                                       SelectionMode="Single"
+                                       ColumnSizer="Star"
+                                       controls:GridEditCommit.OnFocusLeave="True"
+                                       controls:GridAddNewRow.DropWhenUntouched="True"
+                                       controls:AutoCompleteDropDown.IsEnabled="True"
+                                       controls:GridAddNewRow.ItemFactory="{Binding NewFormAddIn}"
+                                       Height="140">
+                    <syncfusion:SfDataGrid.Columns>
+                        <!-- The same columns as the recipe above, so the two tables read as one batch. -->
+                        <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
+                                                                HeaderText="Ingredient"
+                                                                ItemsSource="{Binding Ingredients}"
+                                                                DisplayMember="Name"
+                                                                ValueMember="Id"
+                                                                AllowAutoComplete="True"
+                                                                AllowNullInput="True"
+                                                                AllowIncrementalFiltering="True"
+                                                                SearchCondition="Contains"
+                                                                AutoGenerateColumns="False"
+                                                                IsAutoPopupSize="False"
+                                                                PopUpWidth="380"
+                                                                PopUpHeight="260"
+                                                                GridColumnSizer="Star">
+                            <syncfusion:GridMultiColumnDropDownList.Columns>
+                                <syncfusion:Columns>
+                                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
+                                    <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
+                                    <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per g" Width="88" NumberDecimalDigits="4" />
+                                </syncfusion:Columns>
+                            </syncfusion:GridMultiColumnDropDownList.Columns>
+                        </syncfusion:GridMultiColumnDropDownList>
+                        <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="110" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
+                        <controls:NumericColumn MappingName="Percent"
+                                                HeaderTemplate="{StaticResource PercentHeaderTemplate}"
+                                                Width="86"
+                                                NumberDecimalDigits="1"
+                                                AllowNullValue="True"
+                                                controls:GridCellEditing.AllowWhen="CanTypeBakersPercent" />
+                        <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="110" NumberDecimalDigits="2" AllowEditing="False" />
+                    </syncfusion:SfDataGrid.Columns>
+                </syncfusion:SfDataGrid>
+
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding UsageFormAddInsCaption}" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Add-In" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveFormAddInCommand}" />
+                </Grid>
+            </StackPanel>
+
+            <!-- The piece size: type the yield or the weight per piece, and the other follows from the batch -->
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Total Weight (g)" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:SfTextBoxExt Grid.Row="1"
+                                         Grid.Column="0"
+                                         IsReadOnly="True"
+                                         Focusable="False"
+                                         Text="{Binding UsageFormTotalWeightText, Mode=OneWay}"
+                                         ToolTip="The batch: the sum of its lines, and of this product's add-ins to them." />
+
+                <TextBlock Grid.Column="2" Text="Yield (pcs)" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:DoubleTextBox Grid.Row="1"
+                                          Grid.Column="2"
+                                          Value="{Binding EditingUsageYield, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          NumberDecimalDigits="2"
+                                          ToolTip="Pieces one batch makes. Type it, and the weight per piece is worked out." />
+
+                <TextBlock Grid.Column="4" Text="Weight per Piece (g)" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:DoubleTextBox Grid.Row="1"
+                                          Grid.Column="4"
+                                          Value="{Binding EditingUsageWeightPerPiece, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          NumberDecimalDigits="2"
+                                          ToolTip="Grams of the batch in one piece. Type it, and the yield is worked out." />
+            </Grid>
+
+            <TextBlock Text="{Binding UsageFormPieceSizeCaption}" Style="{StaticResource CaptionStyle}" Margin="0,6,0,0" />
+        </StackPanel>
 
         <Grid Margin="0,8,0,0">
             <Grid.ColumnDefinitions>

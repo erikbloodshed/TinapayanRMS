@@ -4,8 +4,6 @@
     <!-- The markup is the profit on a piece; its margin is that profit's share of the price before VAT. -->
     <StackPanel>
         <TextBlock Text="Profit Margin" Style="{StaticResource PanelHeaderStyle}" />
-        <TextBlock Text="What the shop keeps from one piece once its costs are covered. VAT isn't counted: it goes to the government."
-                   Style="{StaticResource PanelCaptionStyle}" />
 
         <Grid>
             <Grid.ColumnDefinitions>

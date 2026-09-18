@@ -85,8 +85,6 @@
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource HeadingForegroundBrush}"
                                        TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="A standalone sub-assembly belongs to no product. Products link it from their recipe, and follow every change saved here, or copy it as their own."
-                                       Style="{StaticResource CaptionStyle}" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
@@ -132,34 +130,115 @@
                                                 DisplayMemberPath="Name"
                                                 SelectedItem="{Binding EditingRole, Mode=TwoWay}" />
 
-                        <TextBlock Grid.Column="4" Text="Batch Weight" Style="{StaticResource FieldLabelStyle}" />
+                        <!-- A recipe's batch totals; a packaging set has its set cost in their place -->
+                        <TextBlock Grid.Column="4"
+                                   Text="Batch Weight"
+                                   Style="{StaticResource FieldLabelStyle}"
+                                   Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
                                    Grid.Column="4"
                                    Text="{Binding BatchWeight, StringFormat='{}{0:#,0.##} g'}"
                                    Style="{StaticResource TotalValueStyle}"
-                                   VerticalAlignment="Center" />
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
 
-                        <TextBlock Grid.Column="6" Text="Batch Cost" Style="{StaticResource FieldLabelStyle}" />
+                        <TextBlock Grid.Column="6"
+                                   Text="Batch Cost"
+                                   Style="{StaticResource FieldLabelStyle}"
+                                   Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
                                    Grid.Column="6"
                                    Text="{Binding BatchCost, StringFormat='₱{0:N2}'}"
                                    Style="{StaticResource TotalValueStyle}"
-                                   VerticalAlignment="Center" />
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
 
-                        <TextBlock Grid.Column="8" Text="Cost per g" Style="{StaticResource FieldLabelStyle}" />
+                        <TextBlock Grid.Column="8"
+                                   Text="Cost per g"
+                                   Style="{StaticResource FieldLabelStyle}"
+                                   Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
                                    Grid.Column="8"
                                    Text="{Binding CostPerGram, StringFormat='₱{0:N4}'}"
                                    Style="{StaticResource TotalValueStyle}"
-                                   VerticalAlignment="Center" />
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+
+                        <TextBlock Grid.Column="8"
+                                   Text="Set Cost"
+                                   Style="{StaticResource FieldLabelStyle}"
+                                   Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="8"
+                                   Text="{Binding SetCost, StringFormat='₱{0:N4}'}"
+                                   Style="{StaticResource TotalValueStyle}"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </Grid>
 
-                    <TextBlock Text="Lines" Style="{StaticResource PanelHeaderStyle}" Margin="0,16,0,2" />
-                    <TextBlock Text="The ingredients that make one batch, in grams, costed at their buffered cost."
-                               Style="{StaticResource PanelCaptionStyle}" />
+                    <TextBlock Text="Lines" Style="{StaticResource PanelHeaderStyle}" Margin="0,16,0,8" />
+
+                    <!--
+                        A packaging set's lines: how much of each material one set takes, in its base unit. The same
+                        columns as a product's Packaging tab, which a product linking the set shows them in, one set per piece.
+                    -->
+                    <syncfusion:SfDataGrid ItemsSource="{Binding PackagingLines}"
+                                           controls:NumericEditing.IsEnabled="True"
+                                           Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                           SelectedItem="{Binding SelectedPackagingLine, Mode=TwoWay}"
+                                           GridLinesVisibility="Both"
+                                           CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                           CurrentCellBorderThickness="1"
+                                           controls:GridFillerRows.IsEnabled="True"
+                                           ShowRowHeader="True"
+                                           AutoGenerateColumns="False"
+                                           AllowEditing="True"
+                                           AllowDeleting="True"
+                                           EditTrigger="OnTap"
+                                           AddNewRowPosition="Bottom"
+                                           SelectionMode="Single"
+                                           ColumnSizer="Star"
+                                           controls:GridEditCommit.OnFocusLeave="True"
+                                           controls:GridAddNewRow.DropWhenUntouched="True"
+                                           controls:AutoCompleteDropDown.IsEnabled="True"
+                                           controls:GridAddNewRow.ItemFactory="{Binding NewPackagingLine}"
+                                           Height="280">
+                        <syncfusion:SfDataGrid.Columns>
+                            <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
+                            <syncfusion:GridMultiColumnDropDownList MappingName="PackagingMaterialId"
+                                                                    HeaderText="Material"
+                                                                    ItemsSource="{Binding PackagingMaterials}"
+                                                                    DisplayMember="Name"
+                                                                    ValueMember="Id"
+                                                                    AllowAutoComplete="True"
+                                                                    AllowNullInput="True"
+                                                                    AllowIncrementalFiltering="True"
+                                                                    SearchCondition="Contains"
+                                                                    AutoGenerateColumns="False"
+                                                                    IsAutoPopupSize="False"
+                                                                    PopUpWidth="380"
+                                                                    PopUpHeight="260"
+                                                                    GridColumnSizer="Star">
+                                <syncfusion:GridMultiColumnDropDownList.Columns>
+                                    <syncfusion:Columns>
+                                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Material" />
+                                        <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
+                                        <syncfusion:GridTextColumn MappingName="BaseUnit.Abbreviation" HeaderText="Unit" Width="52" />
+                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per Unit" Width="96" NumberDecimalDigits="4" />
+                                    </syncfusion:Columns>
+                                </syncfusion:GridMultiColumnDropDownList.Columns>
+                            </syncfusion:GridMultiColumnDropDownList>
+                            <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
+                            <syncfusion:GridTextColumn MappingName="Unit" HeaderText="Unit" Width="64" AllowEditing="False" />
+                            <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" AllowEditing="False" />
+                            <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Set" Width="104" NumberDecimalDigits="4" AllowEditing="False" />
+                        </syncfusion:SfDataGrid.Columns>
+                    </syncfusion:SfDataGrid>
 
                     <!-- Typed straight into: the add row at the bottom starts a line, Delete removes the selected one -->
                     <syncfusion:SfDataGrid ItemsSource="{Binding Lines}"
+                                           controls:NumericEditing.IsEnabled="True"
+                                           Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}"
                                            controls:GridAddNewRow.HideCheckBoxes="True"
                                            controls:GridCellEditing.IsEnabled="True"
                                            controls:GridCellEmphasis.IsEnabled="True"
@@ -205,11 +284,12 @@
                                     </syncfusion:Columns>
                                 </syncfusion:GridMultiColumnDropDownList.Columns>
                             </syncfusion:GridMultiColumnDropDownList>
-                            <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="120" NumberDecimalDigits="2" />
+                            <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="120" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
                             <controls:NumericColumn MappingName="Percent"
                                                     HeaderTemplate="{StaticResource PercentHeaderTemplate}"
                                                     Width="86"
                                                     NumberDecimalDigits="1"
+                                                    AllowNullValue="True"
                                                     controls:GridCellEditing.AllowWhen="CanTypeBakersPercent"
                                                     controls:GridCellEmphasis.When="IsPercentTyped" />
                             <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost per g" Width="120" NumberDecimalDigits="4" AllowEditing="False" />
@@ -228,16 +308,20 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Type the lines straight into the table. Delete removes the selected one." Style="{StaticResource CaptionStyle}" />
                             <!-- What the percentages are read against, and the figure a batch is scaled by. -->
-                            <TextBlock Text="{Binding FormulaBaseCaption}" Style="{StaticResource CaptionStyle}" Margin="0,2,0,0" />
+                            <TextBlock Text="{Binding FormulaBaseCaption}"
+                                       Style="{StaticResource CaptionStyle}"
+                                       Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+                            <TextBlock Text="A product whose packaging links this set takes one set per piece."
+                                       Style="{StaticResource CaptionStyle}"
+                                       Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
                         <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveLineCommand}" />
                     </Grid>
 
                     <Border Style="{StaticResource SectionDividerStyle}" />
 
-                    <TextBlock Text="Used By" Style="{StaticResource PanelHeaderStyle}" />
+                    <TextBlock Text="Used By" Style="{StaticResource PanelHeaderStyle}" Margin="0,0,0,2" />
                     <TextBlock Text="{Binding UsedByText}" Style="{StaticResource CaptionStyle}" />
                 </StackPanel>
             </ScrollViewer>

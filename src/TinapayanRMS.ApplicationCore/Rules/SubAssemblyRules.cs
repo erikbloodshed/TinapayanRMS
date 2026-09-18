@@ -35,6 +35,55 @@ public static class SubAssemblyRules
         }
     }
 
+    /// <summary>
+    /// A packaging set needs at least one line, a positive quantity per set, and no material used twice. The
+    /// materials' type is checked where they're loaded (RawMaterialRules.EnsureUsableAsPackaging).
+    /// </summary>
+    public static void EnsureValidPackagingLines(IReadOnlyList<(int PackagingMaterialId, decimal QtyPerSet)> lines)
+    {
+        if (lines.Count == 0)
+        {
+            throw new InvalidOperationException("A packaging set needs at least one line.");
+        }
+
+        if (lines.Any(l => l.QtyPerSet <= 0))
+        {
+            throw new InvalidOperationException("A packaging set line's quantity must be positive.");
+        }
+
+        if (lines.Select(l => l.PackagingMaterialId).Distinct().Count() != lines.Count)
+        {
+            throw new InvalidOperationException("A packaging set can't use the same material more than once — put its quantity on a single line instead.");
+        }
+    }
+
+    /// <summary>
+    /// A saved sub-assembly keeps its kind: a recipe (ingredients in grams) can't move to the Packaging role, nor a
+    /// packaging set to a recipe role, since its lines are of the other kind and products use the two differently.
+    /// </summary>
+    public static void EnsureKindUnchanged(bool wasPackaging, bool isPackaging)
+    {
+        if (wasPackaging != isPackaging)
+        {
+            throw new InvalidOperationException(wasPackaging
+                ? "A packaging set stays in the Packaging role. Make a new sub-assembly for a recipe instead."
+                : "A recipe can't move to the Packaging role. Make a new sub-assembly for a packaging set instead.");
+        }
+    }
+
+    /// <summary>
+    /// A recipe's sub-assemblies are ingredients in grams, so none of them takes the Packaging role: a product's
+    /// packaging is its Packaging tab, which can link a packaging set instead.
+    /// </summary>
+    public static void EnsureRecipeRole(SubAssemblyRole role)
+    {
+        if (role.IsPackaging)
+        {
+            throw new InvalidOperationException(
+                $"The {role.Name} role is for packaging sets on the Sub-Assemblies screen, not a recipe section. A product takes one as its packaging: Add Sub-Assembly in the Packaging role.");
+        }
+    }
+
     /// <summary>TotalWeight = Σ grams; TotalCost = Σ (grams × that line's ingredient cost per gram, its CostPerBaseUnit).</summary>
     public static (decimal TotalWeight, decimal TotalCost) CalculateTotals(IReadOnlyList<(decimal Grams, decimal IngredientCostPerGram)> lines)
     {
@@ -76,29 +125,74 @@ public static class SubAssemblyRules
     public static decimal GramsFromBakersPercent(decimal percent, decimal baseWeight) =>
         Math.Round(baseWeight * percent / 100m, 4);
 
+    /// <summary>The longest name a sub-assembly can have (the Name column's length).</summary>
+    public const int MaxNameLength = 100;
+
+    /// <summary>A name as it's saved: trimmed, and null when nothing's left, since a product's own needn't have one.</summary>
+    public static string? NormalizeName(string? name) => string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+
     /// <summary>
-    /// A product has one sub-assembly in each role, its own and the ones it links together: its recipe's
-    /// sections are called by their roles, so two in one role couldn't be told apart.
+    /// The name a recipe section goes by beside its role, once the recipe has more than one in that role: a product's
+    /// own by its name, which it needn't have, and a linked one by its name, or else by its owner product's.
+    /// Needs a linked one's OwnerProduct.
     /// </summary>
-    public static void EnsureOnePerRole(IReadOnlyList<(int RoleId, string RoleName)> roles)
+    public static string? SectionLabel(SubAssembly subAssembly, int productId) =>
+        subAssembly.OwnerProductId == productId
+            ? NormalizeName(subAssembly.Name)
+            : NormalizeName(subAssembly.Name) ?? subAssembly.OwnerProduct?.Name ?? "another product";
+
+    /// <summary>
+    /// A product can have several sub-assemblies in one role (an ube filling and a cheese filling), its own and the ones
+    /// it links together, as long as they can be told apart: within a role no two go by the same name
+    /// (<see cref="SectionLabel"/>, case- and space-insensitively), and at most one goes without one. Its tab reads
+    /// "Filling: Ube" beside "Filling: Cheese", or "Filling" beside "Filling: Cheese".
+    /// </summary>
+    /// <param name="recipe">Whose recipe the message is about: "This recipe", or a product's.</param>
+    public static void EnsureSectionsDistinct(IReadOnlyList<(int RoleId, string RoleName, string? Label)> sections, string recipe = "This recipe")
     {
-        var repeated = roles.GroupBy(r => r.RoleId).FirstOrDefault(g => g.Count() > 1);
-        if (repeated is not null)
+        foreach (var role in sections.GroupBy(s => s.RoleId))
         {
-            throw new InvalidOperationException(
-                $"This recipe has more than one sub-assembly in the {repeated.First().RoleName} role. A product takes one in each role: give one of them another role, or take it out.");
+            var clash = role.GroupBy(s => NormalizeName(s.Label), StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
+            if (clash is null)
+            {
+                continue;
+            }
+
+            var roleName = role.First().RoleName;
+            throw new InvalidOperationException(clash.Key is null
+                ? $"{recipe} has more than one {roleName} without a name. Name them, such as Ube and Cheese, so their tabs can be told apart."
+                : $"{recipe} has two {roleName} sub-assemblies called {clash.Key}. Give one of them another name.");
+        }
+    }
+
+    /// <summary>
+    /// A product's own sub-assemblies' names: optional, at most <see cref="MaxNameLength"/> characters, and no two alike
+    /// (case- and space-insensitively), whatever their roles, as the database keeps them unique within their product.
+    /// </summary>
+    public static void EnsureValidOwnedNames(IReadOnlyList<string?> names)
+    {
+        var named = names.Select(NormalizeName).OfType<string>().ToList();
+        if (named.FirstOrDefault(n => n.Length > MaxNameLength) is { } tooLong)
+        {
+            throw new InvalidOperationException($"'{tooLong[..20]}…' is too long for a sub-assembly's name: keep it to {MaxNameLength} characters.");
+        }
+
+        if (named.GroupBy(n => n, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1) is { } repeated)
+        {
+            throw new InvalidOperationException($"This product has two sub-assemblies of its own named {repeated.Key}. Give one of them another name.");
         }
     }
 
     /// <summary>
     /// What a sub-assembly is called where it isn't plain whose it is: a standalone one by its name, and a
-    /// product's own, which has no name, as that product's role, e.g. "Cream Loaf's Dough". Needs its Role and,
-    /// for a product's own, its OwnerProduct.
+    /// product's own as that product's role, with its name when it has one, e.g. "Cream Loaf's Dough" or
+    /// "Cream Loaf's Filling: Ube". Needs its Role and, for a product's own, its OwnerProduct.
     /// </summary>
     public static string DisplayName(SubAssembly subAssembly) =>
         subAssembly.OwnerProductId is null
             ? subAssembly.Name ?? string.Empty
-            : $"{subAssembly.OwnerProduct?.Name ?? "Another product"}'s {subAssembly.Role?.Name ?? "sub-assembly"}";
+            : $"{subAssembly.OwnerProduct?.Name ?? "Another product"}'s {subAssembly.Role?.Name ?? "sub-assembly"}"
+                + (NormalizeName(subAssembly.Name) is { } name ? $": {name}" : string.Empty);
 
     /// <summary>
     /// A standalone sub-assembly needs a name no other standalone one has (case- and space-insensitively):

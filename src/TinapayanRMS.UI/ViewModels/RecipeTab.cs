@@ -33,8 +33,11 @@ public sealed class SubAssemblyRecipeTab(ProductUsageEdit usage) : RecipeTab
         }
     }
 
-    /// <summary>Its role: a product has one sub-assembly in each, and it's what the sub-assembly is called.</summary>
-    public override string Header => Usage.RoleName;
+    /// <summary>What the sub-assembly is called: its role, with its name when the recipe has more than one in the role.</summary>
+    public override string Header => Usage.SectionName;
+
+    /// <summary>Shows the header again once the recipe has gained or lost another section in the role (ProductUsageEdit.IsRoleRepeated).</summary>
+    public void RefreshHeader() => this.RaisePropertyChanged(nameof(Header));
 
     /// <summary>A list for the product's own sub-assembly, a link for another product's.</summary>
     public override string Glyph => Usage.IsLinked ? "" : "";

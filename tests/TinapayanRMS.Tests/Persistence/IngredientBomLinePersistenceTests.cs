@@ -14,9 +14,6 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
     private IngredientBomLineRepository CreateBomRepository() =>
         new(CreateDbContextFactory(), CreateCostPropagator());
 
-    private RawMaterialPriceHistoryRepository CreatePriceHistoryRepository() =>
-        new(CreateDbContextFactory(), CreateCostPropagator());
-
     private async Task<int> SeedCategoryAsync(string name)
     {
         await using var dbContext = CreateDbContext();
@@ -72,13 +69,7 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
         var waterId = await SeedPurchasedIngredientAsync("Water", categoryId); // never priced: CostPerBaseUnit stays 0
         var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId, weightLossPercent: 20m);
 
-        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory
-        {
-            RawMaterialId = sugarId,
-            UnitId = await KilogramUnitIdAsync(sugarId),
-            Date = new DateOnly(2026, 1, 1),
-            Price = 90m, // per kilogram -> ₱0.09/g
-        }, Cancellation);
+        await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 90m);
 
         await CreateBomRepository().SetLinesAsync(syrupId,
         [
@@ -96,9 +87,7 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
         var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId);
-        await CreatePriceHistoryRepository().AddAsync(
-            new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m },
-            Cancellation); // ₱0.09/g
+        await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 90m); // ₱0.09/g
 
         await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, 2000m)], Cancellation); // 2 kg of sugar, in grams
 
@@ -133,10 +122,9 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
         var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId);
         var caramelId = await SeedMadeIngredientAsync("Caramel", categoryId);
 
-        var priceHistory = CreatePriceHistoryRepository();
         var bom = CreateBomRepository();
 
-        await priceHistory.AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
+        await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 90m);
         await bom.SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation); // syrup: 1000g @ 0.09/g, no weight loss -> 0.09/g
         await bom.SetLinesAsync(caramelId, [(syrupId, 1000m)], Cancellation); // caramel: 1000g syrup @ 0.09/g -> 0.09/g
 
@@ -144,7 +132,7 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
         (await GetIngredientAsync(caramelId)).CostPerBaseUnit.Should().Be(0.09m);
 
         // Sugar's price doubles.
-        await priceHistory.AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 2, 1), Price = 180m }, Cancellation);
+        await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m);
 
         (await GetIngredientAsync(syrupId)).CostPerBaseUnit.Should().Be(0.18m);
         (await GetIngredientAsync(caramelId)).CostPerBaseUnit.Should().Be(0.18m);
@@ -157,7 +145,7 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
         var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId, weightLossPercent: 0m);
 
-        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = await KilogramUnitIdAsync(sugarId), Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
+        await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 90m);
         await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation);
 
         (await GetIngredientAsync(syrupId)).CostPerBaseUnit.Should().Be(0.09m);

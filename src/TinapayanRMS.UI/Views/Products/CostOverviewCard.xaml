@@ -55,8 +55,6 @@
 
     <StackPanel>
         <TextBlock Text="Recipe Cost Overview" Style="{StaticResource PanelHeaderStyle}" />
-        <TextBlock Text="How the material cost of one piece splits across its sub-assemblies and packaging."
-                   Style="{StaticResource PanelCaptionStyle}" />
 
         <TextBlock Style="{StaticResource EmptyStateStyle}"
                    Margin="0,16"
@@ -84,22 +82,5 @@
                 </syncfusion:DoughnutSeries.CenterView>
             </syncfusion:DoughnutSeries>
         </syncfusion:SfChart>
-
-        <Border Style="{StaticResource WarningBannerStyle}" Margin="0,8,0,0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Style="{StaticResource IconGlyphStyle}"
-                           Foreground="{StaticResource WarningForegroundBrush}"
-                           Margin="0,1,8,0"
-                           Text="&#xE946;" />
-                <TextBlock Grid.Column="1"
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource WarningForegroundBrush}"
-                           Text="The material cost is every sub-assembly's share, plus the packaging, that goes into one piece. Labor, overhead and the rest are added on the Costing tab." />
-            </Grid>
-        </Border>
     </StackPanel>
 </UserControl>

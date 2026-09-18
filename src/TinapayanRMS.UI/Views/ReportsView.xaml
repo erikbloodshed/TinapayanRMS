@@ -47,8 +47,7 @@
         <!-- Margin Overview -->
         <Border Grid.Column="2" Style="{StaticResource CardStyle}">
             <StackPanel>
-                <TextBlock Text="Margin Overview" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,0" />
-                <TextBlock Text="As of today — not historized." Style="{StaticResource CaptionStyle}" Margin="0,-8,0,12" />
+                <TextBlock Text="Margin Overview" Style="{StaticResource SectionHeaderStyle}" />
 
                 <syncfusion:SfChart Header="Cost vs. Selling Price, Per Piece" Height="530">
                     <syncfusion:SfChart.PrimaryAxis>

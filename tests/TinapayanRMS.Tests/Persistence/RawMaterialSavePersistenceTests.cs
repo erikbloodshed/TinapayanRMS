@@ -14,7 +14,7 @@ namespace TinapayanRMS.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private static readonly DateOnly Today = new(2026, 9, 13);
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
 
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
 
@@ -46,7 +46,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         var packId = await SeedUnitOfMeasureAsync("pack", "pack");
         var flour = PurchasedIngredient("Flour", categoryId);
 
-        var flourId = await CreateRepository().SaveAsync(flour, [Unit(bagId, 25000m), Unit(packId, 1000m)], (Today, bagId, 1250m), bomLines: null, Cancellation);
+        var flourId = await CreateRepository().SaveAsync(flour, [Unit(bagId, 25000m), Unit(packId, 1000m)], [(null, bagId, 1250m)], bomLines: null, Cancellation);
 
         flour.Id.Should().Be(0, "the caller's entity is only read, never attached");
         var saved = await CreateRepository().GetByIdAsync(flourId, Cancellation);
@@ -56,7 +56,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         await using var dbContext = CreateDbContext();
         var price = await dbContext.RawMaterialPriceHistories.AsNoTracking().SingleAsync(Cancellation);
         price.UnitId.Should().Be(saved.Units[0].Id, "the price is in the bag added by the same save");
-        price.Date.Should().Be(Today);
+        price.Date.Should().Be(Today, "a new cost is logged the day it's saved");
         price.Price.Should().Be(1250m);
     }
 
@@ -66,9 +66,9 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         var categoryId = await SeedCategoryAsync();
         var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm");
         var rollId = await SeedUnitOfMeasureAsync("roll", "roll");
-        var ribbon = new RawMaterial { Name = "Satin Ribbon", Type = RawMaterialType.Packaging, CategoryId = categoryId, BaseUnitId = centimeterId };
+        var ribbon = new RawMaterial { Name = "Satin Ribbon", Type = RawMaterialType.Packaging, CategoryId = await AddPackagingCategoryAsync(), BaseUnitId = centimeterId };
 
-        var ribbonId = await CreateRepository().SaveAsync(ribbon, [Unit(rollId, 1000m)], (Today, rollId, 45m), bomLines: null, Cancellation);
+        var ribbonId = await CreateRepository().SaveAsync(ribbon, [Unit(rollId, 1000m)], [(null, rollId, 45m)], bomLines: null, Cancellation);
 
         var saved = await CreateRepository().GetByIdAsync(ribbonId, Cancellation);
         saved!.BaseUnit!.Abbreviation.Should().Be("cm");
@@ -81,9 +81,9 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
     {
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
-        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], (Today, null, 0.09m), bomLines: null, Cancellation);
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], [(null, null, 0.09m)], bomLines: null, Cancellation);
 
-        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId, 20m), [], newPrice: null, [(sugarId, 1000m)], Cancellation);
+        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId, 20m), [], brandPrices: null, [(sugarId, 1000m)], Cancellation);
 
         (await repository.GetByIdAsync(syrupId, Cancellation))!.CostPerBaseUnit
             .Should().Be(0.1125m, "₱90 of sugar over the 800 g left after 20% weight loss");
@@ -98,10 +98,10 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
         var repository = CreateRepository();
         var boxId = await repository.SaveAsync(
-            new RawMaterial { Name = "Cake Box", Type = RawMaterialType.Packaging, CategoryId = categoryId, BaseUnitId = pieceId },
-            [], newPrice: null, bomLines: null, Cancellation);
+            new RawMaterial { Name = "Cake Box", Type = RawMaterialType.Packaging, CategoryId = await AddPackagingCategoryAsync(), BaseUnitId = pieceId },
+            [], brandPrices: null, bomLines: null, Cancellation);
 
-        var act = () => repository.SaveAsync(MadeIngredient("Custard", categoryId, 0m), [Unit(bagId, 25000m)], newPrice: null, [(boxId, 1m)], Cancellation);
+        var act = () => repository.SaveAsync(MadeIngredient("Custard", categoryId, 0m), [Unit(bagId, 25000m)], brandPrices: null, [(boxId, 1m)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'Cake Box' is packaging*");
         await using var dbContext = CreateDbContext();
@@ -116,7 +116,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         var sackId = await SeedUnitOfMeasureAsync("sack", "sk");
 
-        var act = () => CreateRepository().SaveAsync(PurchasedIngredient("Flour", categoryId), [Unit(bagId, 25000m)], (Today, sackId, 900m), bomLines: null, Cancellation);
+        var act = () => CreateRepository().SaveAsync(PurchasedIngredient("Flour", categoryId), [Unit(bagId, 25000m)], [(null, sackId, 900m)], bomLines: null, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*own units*");
         await using var dbContext = CreateDbContext();
@@ -132,13 +132,13 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         var packId = await SeedUnitOfMeasureAsync("pack", "pack");
         var cupId = await SeedUnitOfMeasureAsync("cup", "cup");
         var repository = CreateRepository();
-        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [Unit(bagId, 1000m), Unit(packId, 500m)], (Today, bagId, 90m), bomLines: null, Cancellation);
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [Unit(bagId, 1000m), Unit(packId, 500m)], [(null, bagId, 90m)], bomLines: null, Cancellation);
         var bag = (await repository.GetByIdAsync(sugarId, Cancellation))!.Units.Single(u => u.UnitOfMeasureId == bagId);
-        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId, 0m), [], newPrice: null, [(sugarId, 1000m)], Cancellation);
+        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId, 0m), [], brandPrices: null, [(sugarId, 1000m)], Cancellation);
 
         // The bag really holds 900 g; the pack goes and a cup comes in.
         await repository.SaveAsync(
-            PurchasedIngredient("Refined Sugar", categoryId, sugarId), [Unit(bagId, 900m, bag.Id), Unit(cupId, 200m)], newPrice: null, bomLines: null, Cancellation);
+            PurchasedIngredient("Refined Sugar", categoryId, sugarId), [Unit(bagId, 900m, bag.Id), Unit(cupId, 200m)], brandPrices: null, bomLines: null, Cancellation);
 
         var sugar = await repository.GetByIdAsync(sugarId, Cancellation);
         sugar!.Name.Should().Be("Refined Sugar");
@@ -154,11 +154,11 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         var categoryId = await SeedCategoryAsync();
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         var repository = CreateRepository();
-        var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [Unit(bagId, 25000m)], (Today, bagId, 1250m), bomLines: null, Cancellation);
+        var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [Unit(bagId, 25000m)], [(null, bagId, 1250m)], bomLines: null, Cancellation);
 
-        var act = () => repository.SaveAsync(PurchasedIngredient("Bread Flour", categoryId, flourId), [], newPrice: null, bomLines: null, Cancellation);
+        var act = () => repository.SaveAsync(PurchasedIngredient("Bread Flour", categoryId, flourId), [], brandPrices: null, bomLines: null, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'bag' is used by 1 price entry*");
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'bag' is used by 1 purchase price*");
         var flour = await repository.GetByIdAsync(flourId, Cancellation);
         flour!.Name.Should().Be("Flour", "the rename was part of the save that was rejected");
         flour.Units.Should().ContainSingle();
@@ -174,15 +174,15 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         var repository = CreateRepository();
 
         var threeUnits = () => repository.SaveAsync(
-            PurchasedIngredient("Flour", categoryId), [Unit(bagId, 25000m), Unit(packId, 1000m), Unit(cupId, 120m)], newPrice: null, bomLines: null, Cancellation);
+            PurchasedIngredient("Flour", categoryId), [Unit(bagId, 25000m), Unit(packId, 1000m), Unit(cupId, 120m)], brandPrices: null, bomLines: null, Cancellation);
         await threeUnits.Should().ThrowAsync<InvalidOperationException>().WithMessage("*at most 2*");
 
         // The rejected save left no "Flour" behind to clash with.
-        var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [Unit(bagId, 25000m), Unit(packId, 1000m)], newPrice: null, bomLines: null, Cancellation);
+        var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [Unit(bagId, 25000m), Unit(packId, 1000m)], brandPrices: null, bomLines: null, Cancellation);
 
         // Both saved units replaced, the bag by a new row: removals go first, so neither the limit of
         // two nor the one-row-per-unit check trips.
-        await repository.SaveAsync(PurchasedIngredient("Flour", categoryId, flourId), [Unit(bagId, 50000m), Unit(cupId, 120m)], newPrice: null, bomLines: null, Cancellation);
+        await repository.SaveAsync(PurchasedIngredient("Flour", categoryId, flourId), [Unit(bagId, 50000m), Unit(cupId, 120m)], brandPrices: null, bomLines: null, Cancellation);
 
         (await repository.GetByIdAsync(flourId, Cancellation))!.Units.Select(u => (u.UnitOfMeasureId, u.BaseUnitsPerUnit))
             .Should().Equal((bagId, 50000m), (cupId, 120m));
@@ -193,11 +193,11 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
     {
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
-        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], (Today, null, 0.09m), bomLines: null, Cancellation);
-        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId, 20m), [], newPrice: null, [(sugarId, 1000m)], Cancellation);
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], [(null, null, 0.09m)], bomLines: null, Cancellation);
+        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId, 20m), [], brandPrices: null, [(sugarId, 1000m)], Cancellation);
         var lineId = (await CreateBomRepository().GetForIngredientAsync(syrupId, Cancellation)).Single().Id;
 
-        await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId, 10m, syrupId), [], newPrice: null, bomLines: null, Cancellation);
+        await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId, 10m, syrupId), [], brandPrices: null, bomLines: null, Cancellation);
 
         (await CreateBomRepository().GetForIngredientAsync(syrupId, Cancellation)).Should().ContainSingle()
             .Which.Id.Should().Be(lineId, "the line wasn't replaced");

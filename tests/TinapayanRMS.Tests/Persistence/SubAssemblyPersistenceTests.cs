@@ -169,31 +169,58 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
     }
 
     [Fact]
-    public async Task A_recipe_takes_one_sub_assembly_in_each_role_its_own_and_linked_together_but_two_products_can_each_have_one()
+    public async Task A_recipe_can_have_several_sub_assemblies_in_one_role_its_own_and_linked_told_apart_by_name()
     {
         var doughRoleId = await AddRoleAsync("Dough");
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
         var flourId = await AddIngredientAsync("Flour");
+        var sugarId = await AddIngredientAsync("Sugar");
         var (_, sweetDoughId) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)]);
         var productId = await AddProductAsync("Pandesal");
 
-        var twoOwn = () => SaveRecipeAsync(productId, new RecipeDraft(
-            [Owned(0, doughRoleId, [(flourId, 100m)]), Owned(0, doughRoleId, [(flourId, 200m)])], []));
-        var ownAndLinked = () => SaveRecipeAsync(productId, new RecipeDraft(
-            [Owned(0, doughRoleId, [(flourId, 100m)])], [new LinkedUsageDraft(sweetDoughId, UsageAuthoredField.WeightPerPiece, 30m)]));
+        var twoUnnamed = () => SaveRecipeAsync(productId, new RecipeDraft(
+            [Owned(0, fillingRoleId, [(sugarId, 100m)]), Owned(0, fillingRoleId, [(sugarId, 200m)])], []));
+        var oneNameTwice = () => SaveRecipeAsync(productId, new RecipeDraft(
+            [Owned(0, fillingRoleId, [(sugarId, 100m)]) with { Name = "Ube" }, Owned(0, fillingRoleId, [(sugarId, 200m)]) with { Name = "ube" }], []));
 
-        await twoOwn.Should().ThrowAsync<InvalidOperationException>().WithMessage("This recipe has more than one sub-assembly in the Dough role*");
-        await ownAndLinked.Should().ThrowAsync<InvalidOperationException>().WithMessage("This recipe has more than one sub-assembly in the Dough role*");
+        await twoUnnamed.Should().ThrowAsync<InvalidOperationException>().WithMessage("This recipe has more than one Filling without a name*");
+        await oneNameTwice.Should().ThrowAsync<InvalidOperationException>().WithMessage("This recipe has two Filling sub-assemblies called Ube*");
 
+        // Its own Dough beside Ensaymada's, which goes by its owner; and an unnamed Filling beside one named Cheese.
         await SaveRecipeAsync(productId, new RecipeDraft(
-            [Owned(0, fillingRoleId, [(flourId, 100m)])], [new LinkedUsageDraft(sweetDoughId, UsageAuthoredField.WeightPerPiece, 30m)]));
-        await AddProductWithSubAssemblyAsync("Cream Loaf", doughRoleId, [(flourId, 100m)]);
+            [
+                Owned(0, doughRoleId, [(flourId, 100m)]),
+                Owned(0, fillingRoleId, [(sugarId, 100m)]),
+                Owned(0, fillingRoleId, [(sugarId, 200m)]) with { Name = " Cheese " },
+            ],
+            [new LinkedUsageDraft(sweetDoughId, UsageAuthoredField.WeightPerPiece, 30m)]));
+
         await using var dbContext = CreateDbContext();
-        (await dbContext.SubAssemblies.CountAsync(s => s.RoleId == doughRoleId, Cancellation)).Should().Be(2, "Ensaymada and Cream Loaf each have their own Dough");
+        (await dbContext.SubAssemblies.Where(s => s.OwnerProductId == productId && s.RoleId == fillingRoleId).Select(s => s.Name).ToListAsync(Cancellation))
+            .Should().BeEquivalentTo([null, "Cheese"], "a name is saved trimmed");
+        (await dbContext.ProductSubAssemblyUsages.CountAsync(u => u.ProductId == productId, Cancellation)).Should().Be(4);
     }
 
     [Fact]
-    public async Task Moving_a_sub_assembly_to_a_role_a_product_linking_it_already_has_is_refused()
+    public async Task Names_can_be_swapped_between_a_products_own_sub_assemblies_in_one_save()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var productId = await AddProductAsync("Ube Cheese Pandesal");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [Owned(0, fillingRoleId, [(sugarId, 100m)]) with { Name = "Ube" }, Owned(0, fillingRoleId, [(sugarId, 200m)]) with { Name = "Cheese" }], []));
+        await using var before = CreateDbContext();
+        var ids = await before.SubAssemblies.Where(s => s.OwnerProductId == productId).OrderBy(s => s.Id).Select(s => s.Id).ToListAsync(Cancellation);
+
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [Owned(ids[0], fillingRoleId, [(sugarId, 100m)]) with { Name = "Cheese" }, Owned(ids[1], fillingRoleId, [(sugarId, 200m)]) with { Name = "Ube" }], []));
+
+        (await GetSubAssemblyAsync(ids[0])).Name.Should().Be("Cheese");
+        (await GetSubAssemblyAsync(ids[1])).Name.Should().Be("Ube");
+    }
+
+    [Fact]
+    public async Task Moving_a_sub_assembly_to_a_role_where_a_product_linking_it_has_one_by_its_name_is_refused()
     {
         var doughRoleId = await AddRoleAsync("Dough");
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -202,13 +229,17 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var (bigId, doughId) = await AddProductWithSubAssemblyAsync("Ensaymada Big", doughRoleId, [(flourId, 1000m)]);
         var smallId = await AddProductAsync("Ensaymada Small");
         await SaveRecipeAsync(smallId, new RecipeDraft(
-            [Owned(0, fillingRoleId, [(sugarId, 100m)])], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m)]));
+            [Owned(0, fillingRoleId, [(sugarId, 100m)]) with { Name = "Ube" }], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m)]));
 
-        var act = () => SaveRecipeAsync(bigId, new RecipeDraft([Owned(doughId, fillingRoleId, [(flourId, 1000m)])], []));
+        var act = () => SaveRecipeAsync(bigId, new RecipeDraft([Owned(doughId, fillingRoleId, [(flourId, 1000m)]) with { Name = "Ube" }], []));
 
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Ensaymada Small links this sub-assembly and already has one in the Filling role*");
+            .WithMessage("Ensaymada Small, which links this sub-assembly, has two Filling sub-assemblies called Ube*");
         (await GetSubAssemblyAsync(doughId)).RoleId.Should().Be(doughRoleId);
+
+        // Without the name it goes by its owner there, "Filling: Ensaymada Big", beside Ensaymada Small's "Filling: Ube".
+        await SaveRecipeAsync(bigId, new RecipeDraft([Owned(doughId, fillingRoleId, [(flourId, 1000m)])], []));
+        (await GetSubAssemblyAsync(doughId)).RoleId.Should().Be(fillingRoleId);
     }
 
     [Fact]

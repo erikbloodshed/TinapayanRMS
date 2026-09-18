@@ -338,55 +338,98 @@ public class RawMaterialRulesTests
     }
 
     [Fact]
-    public void ApplyLatestPrice_divides_the_price_by_the_base_units_in_its_unit()
+    public void ApplyBrandPrices_divides_the_price_by_the_base_units_in_its_unit()
     {
         var ingredient = new RawMaterial { Source = RawMaterialSource.Purchased };
 
-        RawMaterialRules.ApplyLatestPrice(ingredient, latestPrice: 900m, baseUnitsPerUnit: 25000m); // ₱900 a 25 kg bag
+        RawMaterialRules.ApplyBrandPrices(ingredient, [(900m, 25000m)]); // ₱900 a 25 kg bag
 
         ingredient.CostPerBaseUnit.Should().Be(0.036m);
     }
 
     [Fact]
-    public void ApplyLatestPrice_treats_a_price_with_no_unit_as_per_base_unit()
+    public void ApplyBrandPrices_treats_a_price_with_no_unit_as_per_base_unit()
     {
         var packaging = new RawMaterial { Type = RawMaterialType.Packaging, BaseUnitId = 1 };
 
-        RawMaterialRules.ApplyLatestPrice(packaging, latestPrice: 0.3m, baseUnitsPerUnit: null);
+        RawMaterialRules.ApplyBrandPrices(packaging, [(0.3m, null)]);
 
         packaging.CostPerBaseUnit.Should().Be(0.3m);
     }
 
     [Fact]
-    public void ApplyLatestPrice_with_no_price_zeroes_the_cost()
+    public void ApplyBrandPrices_costs_at_the_dearest_brand_per_base_unit_and_says_which()
+    {
+        var flour = new RawMaterial { Source = RawMaterialSource.Purchased };
+
+        // ₱900 a 25 kg bag is ₱0.036/g; ₱40 a 1 kg pack is ₱0.04/g; ₱0.038 a gram sits between.
+        var dearest = RawMaterialRules.ApplyBrandPrices(flour, [(900m, 25000m), (40m, 1000m), (0.038m, null)]);
+
+        dearest.Should().Be(1);
+        flour.CostPerBaseUnit.Should().Be(0.04m);
+    }
+
+    [Fact]
+    public void FindDearestBrandPrice_takes_the_first_on_a_tie()
+    {
+        RawMaterialRules.FindDearestBrandPrice([(40m, 1000m), (0.04m, null)]).Should().Be(0);
+    }
+
+    [Fact]
+    public void ApplyBrandPrices_with_no_prices_zeroes_the_cost()
     {
         var ingredient = new RawMaterial { Source = RawMaterialSource.Purchased, CostPerBaseUnit = 0.036m, BufferedCostPerBaseUnit = 0.036m };
 
-        RawMaterialRules.ApplyLatestPrice(ingredient, latestPrice: null, baseUnitsPerUnit: null);
+        var dearest = RawMaterialRules.ApplyBrandPrices(ingredient, []);
 
+        dearest.Should().BeNull();
         ingredient.CostPerBaseUnit.Should().Be(0m);
         ingredient.BufferedCostPerBaseUnit.Should().Be(0m);
     }
 
     [Fact]
-    public void ApplyLatestPrice_puts_the_materials_buffer_on_top_of_the_buffered_cost()
+    public void ApplyBrandPrices_puts_the_materials_buffer_on_top_of_the_buffered_cost()
     {
         var flour = new RawMaterial { Source = RawMaterialSource.Purchased, CostBufferPercent = 5m };
 
-        RawMaterialRules.ApplyLatestPrice(flour, latestPrice: 1250m, baseUnitsPerUnit: 25000m); // ₱1,250 a 25 kg bag
+        RawMaterialRules.ApplyBrandPrices(flour, [(1250m, 25000m)]); // ₱1,250 a 25 kg bag
 
         flour.CostPerBaseUnit.Should().Be(0.05m);
         flour.BufferedCostPerBaseUnit.Should().Be(0.0525m);
     }
 
     [Fact]
-    public void ApplyLatestPrice_with_no_buffer_makes_the_buffered_cost_the_cost()
+    public void ApplyBrandPrices_with_no_buffer_makes_the_buffered_cost_the_cost()
     {
         var sugar = new RawMaterial { Source = RawMaterialSource.Purchased };
 
-        RawMaterialRules.ApplyLatestPrice(sugar, latestPrice: 900m, baseUnitsPerUnit: 25000m);
+        RawMaterialRules.ApplyBrandPrices(sugar, [(900m, 25000m)]);
 
         sugar.BufferedCostPerBaseUnit.Should().Be(sugar.CostPerBaseUnit);
+    }
+
+    [Fact]
+    public void EnsureDistinctBrandPrices_accepts_one_brand_in_two_units()
+    {
+        var act = () => RawMaterialRules.EnsureDistinctBrandPrices([("Gold Medal", 1), ("Gold Medal", 2), (null, 1)]);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureDistinctBrandPrices_rejects_a_brand_twice_in_one_unit_whatever_its_case_or_spacing()
+    {
+        var act = () => RawMaterialRules.EnsureDistinctBrandPrices([("Gold Medal", 1), (" gold medal ", 1)]);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("'Gold Medal' is priced twice*");
+    }
+
+    [Fact]
+    public void EnsureDistinctBrandPrices_rejects_two_unnamed_brands_in_one_unit()
+    {
+        var act = () => RawMaterialRules.EnsureDistinctBrandPrices([(null, null), ("  ", null)]);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("Two prices without a brand*");
     }
 
     [Theory]

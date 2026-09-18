@@ -65,9 +65,12 @@ public sealed class PackagingLineRow : ReactiveObject
         }
     }
 
-    private decimal _qtyPerUnit;
-    /// <summary>How much of the material one piece takes, in its base unit: 1 box, 30 cm of ribbon.</summary>
-    public decimal QtyPerUnit
+    private decimal? _qtyPerUnit;
+    /// <summary>
+    /// How much of the material one piece takes, in its base unit: 1 box, 30 cm of ribbon. Null until it's typed, so the
+    /// grid's cell is empty rather than 0.0000 (AllowNullValue).
+    /// </summary>
+    public decimal? QtyPerUnit
     {
         get => _qtyPerUnit;
         set
@@ -83,10 +86,10 @@ public sealed class PackagingLineRow : ReactiveObject
     /// <summary>What one base unit of the material costs, buffered: what products are costed with.</summary>
     public decimal UnitCost => PackagingMaterial?.BufferedCostPerBaseUnit ?? 0m;
 
-    public decimal CostPerUnit => ProductRules.CalculatePackagingLineCost(UnitCost, QtyPerUnit, baseUnitsPerEntryUnit: null);
+    public decimal CostPerUnit => ProductRules.CalculatePackagingLineCost(UnitCost, QtyPerUnit ?? 0m, baseUnitsPerEntryUnit: null);
 
     /// <summary>Nothing typed into it: the grid's add row left as it was, which isn't a line at all.</summary>
-    private bool IsBlank => PackagingMaterialId is null && QtyPerUnit == 0m;
+    private bool IsBlank => PackagingMaterialId is null && QtyPerUnit is null or 0m;
 
     /// <summary>
     /// Points each row at its material in <paramref name="materialsById"/> (the screen's current copies, so a
@@ -122,7 +125,7 @@ public sealed class PackagingLineRow : ReactiveObject
                 throw new InvalidOperationException($"Pick the packaging material for the {row.QtyPerUnit:#,0.####} per {unitNoun} line, or delete that line.");
             }
 
-            if (row.QtyPerUnit <= 0m)
+            if (row.QtyPerUnit is not > 0m)
             {
                 throw new InvalidOperationException($"Enter how much {material.Name} one {unitNoun} takes, or delete its line.");
             }
@@ -133,7 +136,7 @@ public sealed class PackagingLineRow : ReactiveObject
                     $"{material.Name} is on two of the same {unitNoun}'s packaging lines — put its quantity on one line and delete the other.");
             }
 
-            lines.Add((material, row.QtyPerUnit));
+            lines.Add((material, row.QtyPerUnit.Value));
         }
 
         return lines;

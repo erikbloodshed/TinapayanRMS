@@ -41,6 +41,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     public async Task<int> SaveAsync(
         Product product,
         RecipeDraft? recipe,
+        PackagingLinkDraft? packagingLink,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? packagingLines,
         IReadOnlyList<ProductPackDraft>? packs,
         CostingParameters? costing,
@@ -68,6 +69,12 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         if (recipe is not null)
         {
             await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, fields.Id, recipe, cancellationToken);
+        }
+
+        // Before the lines: SetLinesAsync refuses a linked product's, so an unlink has to land first.
+        if (packagingLink is not null)
+        {
+            await PackagingLinkRepository.SetAsync(dbContext, fields.Id, packagingLink, cancellationToken);
         }
 
         if (packagingLines is not null)

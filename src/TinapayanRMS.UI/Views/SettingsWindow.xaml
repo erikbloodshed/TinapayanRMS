@@ -38,16 +38,11 @@
                 BorderBrush="{StaticResource CardBorderBrush}"
                 BorderThickness="0,1,0,0"
                 Padding="16,10">
-            <DockPanel>
-                <syncfusion:ButtonAdv DockPanel.Dock="Right"
-                                      Label="Close"
-                                      IconTemplate="{StaticResource CancelIconTemplate}"
-                                      IsCancel="True"
-                                      Click="CloseButton_Click" />
-                <TextBlock Text="Each change is saved when you click Save on its tab."
-                           Style="{StaticResource CaptionStyle}"
-                           VerticalAlignment="Center" />
-            </DockPanel>
+            <syncfusion:ButtonAdv HorizontalAlignment="Right"
+                                  Label="Close"
+                                  IconTemplate="{StaticResource CancelIconTemplate}"
+                                  IsCancel="True"
+                                  Click="CloseButton_Click" />
         </Border>
     </Grid>
 </Window>

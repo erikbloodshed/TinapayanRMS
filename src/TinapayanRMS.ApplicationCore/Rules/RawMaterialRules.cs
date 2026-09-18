@@ -34,8 +34,8 @@ public static class RawMaterialRules
     }
 
     /// <summary>
-    /// A Purchased material has no weight loss percent; its CostPerBaseUnit comes from price history
-    /// (ApplyLatestPrice below). A Made ingredient needs a weight loss percent — its cost comes from
+    /// A Purchased material has no weight loss percent; its CostPerBaseUnit comes from its brand prices
+    /// (ApplyBrandPrices below). A Made ingredient needs a weight loss percent — its cost comes from
     /// a BOM instead (IngredientBomRules). A Linked ingredient needs the ingredient it's linked to and
     /// both shares — its cost is a share of that one's (LinkedCost). Only a linked one has link fields.
     /// Every kind can have alternative units (RawMaterialUnit); only a purchased one is ever priced in them.
@@ -191,18 +191,75 @@ public static class RawMaterialRules
     }
 
     /// <summary>
-    /// Recomputes CostPerBaseUnit from the latest price history entry: its price divided by the
-    /// base units in the unit it was priced in (<paramref name="baseUnitsPerUnit"/>, null for a price
-    /// per base unit), and BufferedCostPerBaseUnit from that with the material's buffer. No entry
-    /// (<paramref name="latestPrice"/> null) reverts the material to unpriced. Call after every
-    /// add/update/delete of a price entry, and after the latest entry's unit changes its multiplier.
+    /// Recomputes CostPerBaseUnit from the brand prices: the dearest of them per base unit, each price
+    /// divided by the base units in the unit it's for (null for a price per base unit), so the material
+    /// is costed at the most it's bought for. BufferedCostPerBaseUnit follows with the material's buffer.
+    /// No prices revert the material to unpriced. Call after the brand prices change, and after one of
+    /// their units changes its multiplier. Returns the index of the brand price the cost came from.
     /// </summary>
-    public static void ApplyLatestPrice(RawMaterial material, decimal? latestPrice, decimal? baseUnitsPerUnit)
+    public static int? ApplyBrandPrices(RawMaterial material, IReadOnlyList<(decimal Price, decimal? BaseUnitsPerUnit)> brandPrices)
     {
-        material.CostPerBaseUnit = latestPrice is { } price
-            ? UnitConversionRules.CostPerBaseUnit(price, baseUnitsPerUnit)
+        var dearest = FindDearestBrandPrice(brandPrices);
+        material.CostPerBaseUnit = dearest is { } index
+            ? UnitConversionRules.CostPerBaseUnit(brandPrices[index].Price, brandPrices[index].BaseUnitsPerUnit)
             : 0m;
         material.BufferedCostPerBaseUnit = BufferedCost(material.CostPerBaseUnit, material.CostBufferPercent);
+        return dearest;
+    }
+
+    /// <summary>
+    /// The index of the brand price that costs the most per base unit (the first, on a tie), or null for
+    /// none. ₱930 a 25 kg sack (₱0.0372/g) is dearer than ₱35 a kilo pack (₱0.035/g).
+    /// </summary>
+    public static int? FindDearestBrandPrice(IReadOnlyList<(decimal Price, decimal? BaseUnitsPerUnit)> brandPrices)
+    {
+        int? dearest = null;
+        var highest = 0m;
+        for (var i = 0; i < brandPrices.Count; i++)
+        {
+            var cost = UnitConversionRules.CostPerBaseUnit(brandPrices[i].Price, brandPrices[i].BaseUnitsPerUnit);
+            if (dearest is null || cost > highest)
+            {
+                dearest = i;
+                highest = cost;
+            }
+        }
+
+        return dearest;
+    }
+
+    /// <summary>A brand name as it's saved: trimmed, and null when there's none.</summary>
+    public static string? NormalizeBrand(string? brand) =>
+        string.IsNullOrWhiteSpace(brand) ? null : brand.Trim();
+
+    /// <summary>
+    /// A brand is priced once per unit: the same brand can be bought by the sack and by the kilo, but two
+    /// prices for the same brand in the same unit would leave it unclear which is current. Brands match
+    /// whatever their case, and an unnamed brand is a brand too. Units are compared as given (unit of
+    /// measure ids, or unit ids, null for the base unit).
+    /// </summary>
+    public static void EnsureDistinctBrandPrices(IEnumerable<(string? Brand, int? UnitKey)> brandPrices)
+    {
+        var duplicate = brandPrices
+            .GroupBy(p => (Brand: NormalizeBrand(p.Brand)?.ToUpperInvariant(), p.UnitKey))
+            .FirstOrDefault(g => g.Count() > 1);
+
+        if (duplicate is not null)
+        {
+            var brand = NormalizeBrand(duplicate.First().Brand);
+            throw new InvalidOperationException(brand is null
+                ? "Two prices without a brand are in the same unit. Name their brands, or remove one."
+                : $"'{brand}' is priced twice in the same unit. Remove one.");
+        }
+    }
+
+    /// <summary>A brand price is always positive.</summary>
+    public static void EnsureValidBrandPrice(decimal price)
+    {
+        if (price <= 0)
+        {
+            throw new InvalidOperationException("A brand's purchase price must be positive.");
+        }
     }
 
     /// <summary>A cost with a buffer on top: ₱0.05 with a 5% buffer is ₱0.0525.</summary>
@@ -259,4 +316,31 @@ public static class RawMaterialRules
                 "The base unit can't change once the material has alternative units, prices or packaging lines, which are all measured in it.");
         }
     }
+
+    /// <summary>
+    /// A material goes in a category of its own type: an ingredient in an ingredient category (Flour, Dairy), packaging
+    /// in a packaging one (Boxes, Labels).
+    /// </summary>
+    public static void EnsureCategoryMatchesType(RawMaterialType materialType, RawMaterialType categoryType, string categoryName)
+    {
+        if (materialType != categoryType)
+        {
+            throw new InvalidOperationException(
+                $"{categoryName} is a{(categoryType == RawMaterialType.Ingredient ? "n ingredient" : " packaging")} category. "
+                + $"Put this {(materialType == RawMaterialType.Ingredient ? "ingredient" : "packaging material")} in a category for {TypePlural(materialType)}.");
+        }
+    }
+
+    /// <summary>A category's type can change only while no material of its present type is in it, since each would be left in a category of the other type.</summary>
+    public static void EnsureCategoryTypeCanChange(string categoryName, int materialsInIt)
+    {
+        if (materialsInIt > 0)
+        {
+            throw new InvalidOperationException(
+                $"{categoryName} has {materialsInIt} material{(materialsInIt == 1 ? "" : "s")} in it, so its type can't change. "
+                + $"Move {(materialsInIt == 1 ? "it" : "them")} to another category first.");
+        }
+    }
+
+    private static string TypePlural(RawMaterialType type) => type == RawMaterialType.Ingredient ? "ingredients" : "packaging";
 }

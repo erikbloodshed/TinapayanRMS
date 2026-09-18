@@ -147,9 +147,6 @@
                                     <KeyBinding Key="Escape" Command="{Binding CancelDescriptionEditCommand}" />
                                 </syncfusion:SfTextBoxExt.InputBindings>
                             </syncfusion:SfTextBoxExt>
-                            <TextBlock Text="A short line about the product, e.g. soft bread with a creamy filling. Saved with Save."
-                                       Style="{StaticResource CaptionStyle}"
-                                       Margin="0,6,0,0" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                                 <syncfusion:ButtonAdv Label="Cancel" IconTemplate="{StaticResource CancelIconTemplate}" Command="{Binding CancelDescriptionEditCommand}" Margin="0,0,8,0" />
                                 <syncfusion:ButtonAdv Label="Done" IconTemplate="{StaticResource ApplyIconTemplate}" Command="{Binding CloseDescriptionEditorCommand}" />

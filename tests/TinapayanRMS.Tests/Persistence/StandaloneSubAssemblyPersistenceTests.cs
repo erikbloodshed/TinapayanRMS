@@ -85,7 +85,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
     }
 
     [Fact]
-    public async Task A_new_role_for_a_standalone_sub_assembly_is_refused_where_a_product_linking_it_already_has_one()
+    public async Task A_new_role_for_a_standalone_sub_assembly_is_refused_only_where_a_product_linking_it_has_one_by_its_name()
     {
         var glazeRoleId = await AddRoleAsync("Glaze");
         var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 2);
@@ -93,14 +93,21 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         var glazeId = await SaveStandaloneAsync("Glaze", glazeRoleId, [(sugarId, 100m)]);
         var productId = await AddProductAsync("Cream Loaf");
         await SaveRecipeAsync(productId, new RecipeDraft(
-            [new OwnedSubAssemblyDraft(0, toppingRoleId, [(sugarId, 50m)], UsageAuthoredField.WeightPerPiece, 10m)],
+            [new OwnedSubAssemblyDraft(0, toppingRoleId, [(sugarId, 50m)], UsageAuthoredField.WeightPerPiece, 10m, Name: "Glaze")],
             [new LinkedUsageDraft(glazeId, UsageAuthoredField.WeightPerPiece, 5m)]));
 
         var act = () => SaveStandaloneAsync("Glaze", toppingRoleId, [(sugarId, 100m)], glazeId);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Cream Loaf links this sub-assembly and already has one in the Topping role*");
+            .WithMessage("Cream Loaf, which links this sub-assembly, has two Topping sub-assemblies called Glaze*");
         (await GetSubAssemblyAsync(glazeId)).RoleId.Should().Be(glazeRoleId);
+
+        // With its own Topping going by nothing, Cream Loaf can tell them apart: "Topping" and "Topping: Glaze".
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [new OwnedSubAssemblyDraft(await OwnedSubAssemblyIdAsync(productId, toppingRoleId), toppingRoleId, [(sugarId, 50m)], UsageAuthoredField.WeightPerPiece, 10m)],
+            [new LinkedUsageDraft(glazeId, UsageAuthoredField.WeightPerPiece, 5m)]));
+        await SaveStandaloneAsync("Glaze", toppingRoleId, [(sugarId, 100m)], glazeId);
+        (await GetSubAssemblyAsync(glazeId)).RoleId.Should().Be(toppingRoleId);
     }
 
     [Fact]
@@ -301,8 +308,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
         var glazeId = await SaveStandaloneAsync("Glaze", roleId, [(sugarId, 1000m)]);
 
-        await new RawMaterialPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator()).AddAsync(
-            new RawMaterialPriceHistory { RawMaterialId = sugarId, Date = new DateOnly(2026, 9, 15), Price = 0.18m }, Cancellation);
+        await SetPriceAsync(sugarId, null, 0.18m);
 
         (await GetSubAssemblyAsync(glazeId)).TotalCost.Should().Be(180m);
     }

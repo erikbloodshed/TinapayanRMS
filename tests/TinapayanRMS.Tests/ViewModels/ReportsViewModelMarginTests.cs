@@ -24,7 +24,7 @@ public class ReportsViewModelMarginTests(DatabaseFixture fixture) : PersistenceT
         var packagingLineRepository = new PackagingLineRepository(factory);
 
         return new ReportsViewModel(
-            new RawMaterialPriceHistoryRepository(factory, CreateCostPropagator()),
+            new RawMaterialPriceHistoryRepository(factory),
             new RawMaterialRepository(factory, CreateCostPropagator()),
             new ProductRepository(factory),
             new ProductSubAssemblyUsageRepository(factory),

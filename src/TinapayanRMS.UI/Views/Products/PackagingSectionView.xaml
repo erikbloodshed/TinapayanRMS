@@ -4,9 +4,10 @@
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
     <!--
-        The recipe's packaging, the content of its Recipe Structure tab: its lines, typed straight into the table
-        as a sub-assembly's are. The add row at the bottom starts a line, Delete removes the selected one. Linked
-        packaging is the linked product's, so it only shows: AllowEditing is off and the add row goes with it.
+        The recipe's packaging, the content of its Recipe Structure tab, which Add Sub-Assembly adds in the Packaging
+        role: its lines, typed straight into the table as a sub-assembly's are. The add row at the bottom starts a line,
+        Delete removes the selected one. Linked packaging (another product's, or a packaging set) is kept where it's
+        from, so it only shows: AllowEditing is off and the add row goes with it.
     -->
     <StackPanel Margin="8">
         <!-- The name and what it's for, then the cost per piece -->
@@ -17,10 +18,6 @@
             </Grid.ColumnDefinitions>
 
             <Grid VerticalAlignment="Center">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -33,7 +30,6 @@
                         Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <TextBlock Text="{Binding PackagingLinkedToText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
                 </Border>
-                <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="Wrappers, ribbon and labels for one piece. A pack's own box goes on the Packs tab." Style="{StaticResource CaptionStyle}" />
             </Grid>
 
             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
@@ -48,6 +44,7 @@
 
         <!-- A line's quantity is how much of the material one piece takes, always in the material's base unit -->
         <syncfusion:SfDataGrid ItemsSource="{Binding LineEdits}"
+                               controls:NumericEditing.IsEnabled="True"
                                SelectedItem="{Binding SelectedLineEdit, Mode=TwoWay}"
                                GridLinesVisibility="Both"
                                CurrentCellBorderBrush="{StaticResource AccentBrush}"
@@ -91,7 +88,7 @@
                         </syncfusion:Columns>
                     </syncfusion:GridMultiColumnDropDownList.Columns>
                 </syncfusion:GridMultiColumnDropDownList>
-                <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="4" />
+                <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
                 <syncfusion:GridTextColumn MappingName="Unit" HeaderText="Unit" Width="64" AllowEditing="False" />
                 <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" AllowEditing="False" />
                 <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Piece" Width="104" NumberDecimalDigits="4" AllowEditing="False" />
@@ -103,13 +100,25 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBlock Text="Type the lines straight into the table. Delete removes the selected one." Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" />
             <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveLineCommand}" />
         </Grid>
 
-        <TextBlock Text="It's the linked product's packaging: change it there, or unlink it in Links &amp; Clone."
-                   Style="{StaticResource CaptionStyle}"
-                   Margin="0,8,0,0"
-                   Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        <!-- Linked packaging only shows here: Make a Copy makes its lines this product's own, and Save drops the link -->
+        <Grid Margin="0,8,0,0" Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Its lines are kept where it's linked from, and follow every change there. Make a Copy to change them here."
+                       Style="{StaticResource CaptionStyle}"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       Margin="0,0,12,0" />
+            <syncfusion:ButtonAdv Grid.Column="1"
+                                  Label="Make a Copy"
+                                  ToolTip="Make these lines this product's own, to change them here. It stops following where it's from."
+                                  IconTemplate="{StaticResource CopyIconTemplate}"
+                                  Command="{Binding CopyPackagingCommand}" />
+        </Grid>
     </StackPanel>
 </UserControl>

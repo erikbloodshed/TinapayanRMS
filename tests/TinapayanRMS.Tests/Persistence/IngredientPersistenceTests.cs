@@ -144,7 +144,6 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     {
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
-        var priceHistoryRepository = new RawMaterialPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator());
 
         await repository.AddAsync(new RawMaterial
         {
@@ -154,7 +153,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         }, Cancellation);
         var ingredient = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
         var kilogramUnitId = await AddKilogramUnitAsync(ingredient.Id);
-        await priceHistoryRepository.AddAsync(new RawMaterialPriceHistory { RawMaterialId = ingredient.Id, UnitId = kilogramUnitId, Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
+        await SetPriceAsync(ingredient.Id, kilogramUnitId, 90m);
 
         ingredient = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
         ingredient.Name = "Refined Sugar";
@@ -216,9 +215,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await repository.AddAsync(new RawMaterial { Name = "Flour", CategoryId = categoryId, Source = RawMaterialSource.Purchased }, Cancellation);
         var ingredient = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
         var kilogramUnitId = await AddKilogramUnitAsync(ingredient.Id);
-        await new RawMaterialPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator()).AddAsync(
-            new RawMaterialPriceHistory { RawMaterialId = ingredient.Id, UnitId = kilogramUnitId, Date = new DateOnly(2026, 1, 1), Price = 50m },
-            Cancellation);
+        await SetPriceAsync(ingredient.Id, kilogramUnitId, 50m);
 
         await repository.DeleteAsync(ingredient.Id, Cancellation);
 
@@ -268,12 +265,13 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
         var repository = CreateRepository();
         await repository.AddAsync(new RawMaterial { Name = "Butter", CategoryId = categoryId }, Cancellation);
+        var packagingCategoryId = await AddPackagingCategoryAsync();
 
         var act = () => repository.AddAsync(new RawMaterial
         {
             Type = RawMaterialType.Packaging,
             Name = "Butter",
-            CategoryId = categoryId,
+            CategoryId = packagingCategoryId,
             BaseUnitId = pieceId,
         }, Cancellation);
 

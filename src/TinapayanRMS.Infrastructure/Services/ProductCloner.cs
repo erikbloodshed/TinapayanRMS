@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -21,6 +22,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         var usages = await dbContext.ProductSubAssemblyUsages
             .AsNoTracking()
             .Include(u => u.SubAssembly)
+            .ThenInclude(s => s!.OwnerProduct)
             .Where(u => u.ProductId == sourceProductId)
             .OrderBy(u => u.Id)
             .ToListAsync(cancellationToken);
@@ -42,6 +44,13 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                 .ToListAsync(cancellationToken))
             .ToLookup(l => l.UsageId);
         var packagingLines = await PackagingLineRepository.ResolveEffectiveAsync(dbContext, sourceProductId, [], cancellationToken);
+
+        // A packaging set the source links directly stays linked, like a standalone sub-assembly: it's kept apart to
+        // be shared. Reached through another product's link, it's copied like the rest of that product's packaging.
+        var linkedSetId = await dbContext.PackagingLinks
+            .Where(l => l.ProductId == sourceProductId)
+            .Select(l => l.LinkedSubAssemblyId)
+            .FirstOrDefaultAsync(cancellationToken);
         var costing = await dbContext.CostingParameters.AsNoTracking().FirstOrDefaultAsync(c => c.ProductId == sourceProductId, cancellationToken);
 
         // Packs are never linked — resolving the packaging through a link only ever brings per-piece lines
@@ -62,8 +71,10 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         await ProductRepository.AddAsync(dbContext, newProduct, cancellationToken);
 
         // A standalone sub-assembly stays linked, at the same piece size: it's kept apart to be shared.
-        // Every other one becomes the clone's own, in the role it has: the source has one in each role, so
-        // the clone does too (SetRecipeAsync checks it).
+        // Every other one becomes the clone's own, in the role it has, with its name. In a role the source has more
+        // than one in, a linked one without a name of its own takes its owner's, which is what told it apart there,
+        // so the clone's sections stay apart too (SetRecipeAsync checks it).
+        var repeatedRoleIds = usages.GroupBy(u => u.SubAssembly!.RoleId).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
         var owned = new List<OwnedSubAssemblyDraft>();
         var linked = new List<LinkedUsageDraft>();
         foreach (var usage in usages)
@@ -90,12 +101,20 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                     .. addInsByUsage[usage.Id].Select(l => new RecipeLine(l.IngredientId, l.Grams)),
                 ],
                 usage.AuthoredField,
-                usage.AuthoredValue));
+                usage.AuthoredValue,
+                repeatedRoleIds.Contains(usage.SubAssembly.RoleId)
+                    ? SubAssemblyRules.SectionLabel(usage.SubAssembly, sourceProductId)
+                    : SubAssemblyRules.NormalizeName(usage.SubAssembly.Name)));
         }
 
         await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, newProduct.Id, new RecipeDraft(owned, linked), cancellationToken);
 
-        if (packagingLines.Count > 0)
+        if (linkedSetId is { } setId)
+        {
+            dbContext.PackagingLinks.Add(new PackagingLink { ProductId = newProduct.Id, LinkedSubAssemblyId = setId });
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        else if (packagingLines.Count > 0)
         {
             await PackagingLineRepository.SetLinesAsync(
                 dbContext,

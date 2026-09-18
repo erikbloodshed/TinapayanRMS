@@ -6,7 +6,7 @@
              xmlns:vm="clr-namespace:TinapayanRMS.UI.ViewModels">
     <!--
         What goes into one piece, in tabs (RecipeTabs): a sub-assembly's for each one in the recipe, in role
-        order, then New Sub-Assembly while Add Sub-Assembly's form is open, then Packaging, which is always there.
+        order, then New Sub-Assembly while Add Sub-Assembly's form is open, then Packaging while the product has any.
         Add Sub-Assembly and Delete Sub-Assembly sit in the header. Each tab's content is picked by its type from
         the templates below, and each takes the screen's DataContext back from this card: they all show one of
         the screen's forms, or its packaging.
@@ -34,16 +34,12 @@
     <StackPanel>
         <!-- The header, with the buttons that add a sub-assembly and delete the one whose tab is showing -->
         <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <TextBlock Text="Recipe Structure" Style="{StaticResource PanelHeaderStyle}" VerticalAlignment="Center" />
+            <TextBlock Text="Recipe Structure" Style="{StaticResource PanelHeaderStyle}" Margin="0,0,0,4" VerticalAlignment="Center" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,4">
                 <syncfusion:ButtonAdv Label="Add Sub-Assembly"
                                       ToolTip="Make a new sub-assembly, or link or copy an existing one, in a tab of its own"
@@ -55,11 +51,6 @@
                                       IconTemplate="{StaticResource DeleteIconTemplate}"
                                       Command="{Binding RemoveUsageCommand}" />
             </StackPanel>
-
-            <TextBlock Grid.Row="1"
-                       Grid.ColumnSpan="2"
-                       Text="What goes into one piece: each sub-assembly's ingredients, in grams a batch, then the packaging. A sub-assembly is made here, or linked or copied from another product or the Sub-Assemblies screen. Moving to another tab applies what you typed; Save saves it."
-                       Style="{StaticResource PanelCaptionStyle}" />
         </Grid>
 
         <!--
@@ -73,7 +64,15 @@
             RecipeTabs and inserted at the drop (TabLayoutPanel.MoveItem). That took the tabs out of role order,
             and out of step with UsageEdits, which MirrorUsageTabs keeps them in index for index.
         -->
+        <!-- A new product has no tabs: every section, packaging included, comes in through Add Sub-Assembly. -->
+        <TextBlock Text="Nothing in the recipe yet. Add Sub-Assembly adds a section — a new one, or one linked or copied — and its Packaging role adds the packaging."
+                   Style="{StaticResource CaptionStyle}"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0"
+                   Visibility="{Binding HasRecipeTabs, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+
         <syncfusion:TabControlExt ItemsSource="{Binding RecipeTabs}"
+                                  Visibility="{Binding HasRecipeTabs, Converter={StaticResource BooleanToVisibilityConverter}}"
                                   SelectedItem="{Binding SelectedRecipeTab, Mode=TwoWay}"
                                   AllowDragDrop="False"
                                   CloseButtonType="Hide"

@@ -10,16 +10,15 @@ public class SubAssembly
     public int Id { get; set; }
 
     /// <summary>
-    /// A standalone sub-assembly's name, unique among standalone ones: products pick it to link or copy by
-    /// it. Null for a product's own, which goes by its role: a product has one sub-assembly in each role, and
-    /// its recipe's tabs are called by them (since 2026-09-17; a name saved before then is cleared the next
-    /// time its product's recipe is saved, and nothing shows it).
+    /// A standalone sub-assembly's name, unique among standalone ones: products pick it to link or copy by it.
+    /// Optional for a product's own, which goes by its role, and unique within that product: it tells apart several
+    /// in one role, whose tabs read "Filling: Ube" and "Filling: Cheese" (SubAssemblyRules.EnsureSectionsDistinct).
     /// </summary>
     public string? Name { get; set; }
 
     /// <summary>
     /// Required. Decides which section of every recipe using it the sub-assembly shows in, and what that
-    /// section is called; a recipe has one sub-assembly in each role.
+    /// section is called, with its name beside it when the recipe has more than one in the role.
     /// </summary>
     public int RoleId { get; set; }
 

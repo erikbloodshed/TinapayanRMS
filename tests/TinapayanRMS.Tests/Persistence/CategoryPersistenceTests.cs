@@ -54,23 +54,61 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
     }
 
     [Fact]
-    public async Task One_category_can_hold_both_ingredients_and_packaging()
+    public async Task A_category_is_for_ingredients_unless_saved_for_packaging_and_its_type_round_trips()
     {
-        var category = await SeedCategoryAsync("Butter");
-        var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
+        var repository = CreateRepository();
+        await repository.AddAsync(new RawMaterialCategory { Name = "Flour" }, Cancellation);
+        await repository.AddAsync(new RawMaterialCategory { Name = "Boxes", Type = RawMaterialType.Packaging }, Cancellation);
 
+        (await repository.GetAllAsync(Cancellation)).Select(c => (c.Name, c.Type))
+            .Should().Equal(("Boxes", RawMaterialType.Packaging), ("Flour", RawMaterialType.Ingredient));
+
+        // Nothing is in it yet, so its type can still change.
+        var flour = (await repository.GetAllAsync(Cancellation)).Single(c => c.Name == "Flour");
+        await repository.UpdateAsync(new RawMaterialCategory { Id = flour.Id, Name = "Labels", Type = RawMaterialType.Packaging }, Cancellation);
+        (await repository.GetAllAsync(Cancellation)).Single(c => c.Id == flour.Id).Type.Should().Be(RawMaterialType.Packaging);
+    }
+
+    [Fact]
+    public async Task A_material_goes_only_in_a_category_of_its_own_type()
+    {
+        var flour = await SeedCategoryAsync("Flour");
+        var boxesId = await AddPackagingCategoryAsync("Boxes");
+        var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
+        var materials = new RawMaterialRepository(CreateDbContextFactory(), CreateCostPropagator());
+
+        var boxAsFlour = () => materials.AddAsync(
+            new RawMaterial { Name = "Cake Box", Type = RawMaterialType.Packaging, CategoryId = flour.Id, BaseUnitId = pieceId }, Cancellation);
+        var flourAsBox = () => materials.AddAsync(new RawMaterial { Name = "Bread Flour", CategoryId = boxesId }, Cancellation);
+
+        await boxAsFlour.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Flour is an ingredient category. Put this packaging material in a category for packaging.");
+        await flourAsBox.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Boxes is a packaging category. Put this ingredient in a category for ingredients.");
+
+        await materials.AddAsync(new RawMaterial { Name = "Cake Box", Type = RawMaterialType.Packaging, CategoryId = boxesId, BaseUnitId = pieceId }, Cancellation);
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.SingleAsync(Cancellation)).CategoryId.Should().Be(boxesId);
+    }
+
+    [Fact]
+    public async Task A_categorys_type_cant_change_while_a_material_is_in_it()
+    {
+        var flour = await SeedCategoryAsync("Flour");
         await using (var dbContext = CreateDbContext())
         {
-            dbContext.RawMaterials.Add(new RawMaterial { Name = "Unsalted Butter", Type = RawMaterialType.Ingredient, CategoryId = category.Id });
-            dbContext.RawMaterials.Add(new RawMaterial { Name = "Butter Tub", Type = RawMaterialType.Packaging, CategoryId = category.Id, BaseUnitId = pieceId });
+            dbContext.RawMaterials.Add(new RawMaterial { Name = "Bread Flour", CategoryId = flour.Id });
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
-        await using (var dbContext = CreateDbContext())
-        {
-            var types = await dbContext.RawMaterials.Where(m => m.CategoryId == category.Id).Select(m => m.Type).ToListAsync(Cancellation);
-            types.Should().BeEquivalentTo([RawMaterialType.Ingredient, RawMaterialType.Packaging]);
-        }
+        var retype = () => CreateRepository().UpdateAsync(new RawMaterialCategory { Id = flour.Id, Name = "Flour", Type = RawMaterialType.Packaging }, Cancellation);
+
+        await retype.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Flour has 1 material in it, so its type can't change. Move it to another category first.");
+
+        // A rename alone is still fine.
+        await CreateRepository().UpdateAsync(new RawMaterialCategory { Id = flour.Id, Name = "Flours" }, Cancellation);
+        (await CreateRepository().GetAllAsync(Cancellation)).Single().Should().BeEquivalentTo(new { Name = "Flours", Type = RawMaterialType.Ingredient });
     }
 
     private RawMaterialCategoryRepository CreateRepository() => new(CreateDbContextFactory());

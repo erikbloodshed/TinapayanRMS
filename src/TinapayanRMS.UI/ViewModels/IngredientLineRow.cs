@@ -71,9 +71,12 @@ public sealed class IngredientLineRow : ReactiveObject
     /// <summary>What a gram of this line's ingredient costs, buffered; 0 until one is picked.</summary>
     public decimal CostPerGram => Ingredient?.BufferedCostPerBaseUnit ?? 0m;
 
-    private decimal _grams;
-    /// <summary>The line's grams. Typing them makes them the figure that stays put, so any typed percentage is let go.</summary>
-    public decimal Grams
+    private decimal? _grams;
+    /// <summary>
+    /// The line's grams; null until they're typed, so the grid's cell is empty rather than 0.00 (AllowNullValue).
+    /// Typing them makes them the figure that stays put, so any typed percentage is let go.
+    /// </summary>
+    public decimal? Grams
     {
         get => _grams;
         set
@@ -84,7 +87,7 @@ public sealed class IngredientLineRow : ReactiveObject
     }
 
     /// <summary>Grams worked out rather than typed: from a typed percentage, which stays the figure that's kept.</summary>
-    private void SetGrams(decimal value)
+    private void SetGrams(decimal? value)
     {
         this.RaiseAndSetIfChanged(ref _grams, value, nameof(Grams));
         this.RaisePropertyChanged(nameof(Percent));
@@ -180,9 +183,13 @@ public sealed class IngredientLineRow : ReactiveObject
     /// </summary>
     public decimal? Percent
     {
-        get => BaseWeight <= 0
-            ? SubAssemblyRules.CalculateAbsolutePercent(Grams, BatchWeight)
-            : AuthoredBakersPercent ?? SubAssemblyRules.CalculateBakersPercent(Grams, BaseWeight);
+        get => AuthoredBakersPercent is { } authored && BaseWeight > 0
+            ? authored
+            : Grams is not { } grams
+                ? null
+                : BaseWeight <= 0
+                    ? SubAssemblyRules.CalculateAbsolutePercent(grams, BatchWeight)
+                    : SubAssemblyRules.CalculateBakersPercent(grams, BaseWeight);
         set
         {
             // The grid won't open the cell where it can't be typed (controls:GridCellEditing); this is the backstop. Checked
@@ -206,10 +213,10 @@ public sealed class IngredientLineRow : ReactiveObject
     }
 
     /// <summary>What this line adds to the batch's cost, at the ingredient's buffered cost per gram.</summary>
-    public decimal Cost => Grams * (Ingredient?.BufferedCostPerBaseUnit ?? 0m);
+    public decimal Cost => (Grams ?? 0m) * (Ingredient?.BufferedCostPerBaseUnit ?? 0m);
 
     /// <summary>Nothing typed into it: the grid's add row left as it was, which isn't a line at all.</summary>
-    private bool IsBlank => IngredientId is null && Grams == 0m;
+    private bool IsBlank => IngredientId is null && Grams is null or 0m;
 
     /// <summary>
     /// Points each row at its ingredient in <paramref name="ingredientsById"/> (the screen's current copies,
@@ -242,7 +249,7 @@ public sealed class IngredientLineRow : ReactiveObject
     public static decimal ApplyFormulaBase(IReadOnlyList<IngredientLineRow> rows, decimal batchWeight)
     {
         // A typed percentage is never on a base line, so reworking those lines' grams can't move the base itself.
-        var baseWeight = SubAssemblyRules.FormulaBaseWeight([.. rows.Select(r => (r.Grams, r.IsFormulaBase))]);
+        var baseWeight = SubAssemblyRules.FormulaBaseWeight([.. rows.Select(r => (r.Grams ?? 0m, r.IsFormulaBase))]);
         ApplyFormulaBase(rows, baseWeight, batchWeight);
         return baseWeight;
     }
@@ -269,7 +276,7 @@ public sealed class IngredientLineRow : ReactiveObject
 
     /// <summary>The batch the rows make: the grams of every row with its ingredient picked, as the screens' batch weight counts them.</summary>
     public static decimal BatchWeightOf(IEnumerable<IngredientLineRow> rows) =>
-        rows.Where(r => r.Ingredient is not null).Sum(r => r.Grams);
+        rows.Where(r => r.Ingredient is not null).Sum(r => r.Grams ?? 0m);
 
     /// <summary>The percentage column's header: "Baker's %" while there's a base, "Absolute %" while nothing is ticked.</summary>
     public static string PercentHeader(decimal baseWeight) => baseWeight > 0 ? "Baker's %" : "Absolute %";
@@ -289,7 +296,7 @@ public sealed class IngredientLineRow : ReactiveObject
                 throw new InvalidOperationException($"Pick the ingredient for the {row.Grams:#,0.##} g line of {madeInto}, or delete that line.");
             }
 
-            if (row.Grams <= 0m)
+            if (row.Grams is not > 0m)
             {
                 throw new InvalidOperationException($"Enter how many grams of {ingredient.Name} go into {madeInto}, or delete its line.");
             }
@@ -299,7 +306,7 @@ public sealed class IngredientLineRow : ReactiveObject
                 throw new InvalidOperationException($"{ingredient.Name} is on two lines of {madeInto}. Put its total on one line and delete the other.");
             }
 
-            lines.Add((ingredient, row.Grams, row.IsFormulaBase, row.AuthoredBakersPercent));
+            lines.Add((ingredient, row.Grams.Value, row.IsFormulaBase, row.AuthoredBakersPercent));
         }
 
         return lines;

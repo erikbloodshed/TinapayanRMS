@@ -49,9 +49,9 @@
                 <Border Grid.Row="1" Style="{StaticResource SectionDividerStyle}" />
 
                 <!--
-                    Every tab but Links & Clone is part of the one form Save writes, so a new product shows them
+                    Every tab but Clone is part of the one form Save writes, so a new product shows them
                     too. Fixed tabs, like Raw Materials': nothing to close or reopen. The strip sits along the
-                    bottom, and each tab scrolls on its own, so the strip stays put. Links & Clone only applies to a
+                    bottom, and each tab scrolls on its own, so the strip stays put. Clone only applies to a
                     saved product; while it's hidden the ViewModel moves the selection off it (SelectedDetailsTab).
                 -->
                 <syncfusion:TabControlExt Grid.Row="2"
@@ -110,21 +110,12 @@
                         </ScrollViewer>
                     </syncfusion:TabItemExt>
 
-                    <syncfusion:TabItemExt Header="Links &amp; Clone"
+                    <!-- Linking the packaging moved into the Recipe Structure's Add Sub-Assembly, so this tab only clones. -->
+                    <syncfusion:TabItemExt Header="Clone"
                                            CanClose="False"
                                            Visibility="{Binding ShowLinks, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="2*" />
-                                    <ColumnDefinition Width="25" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <p:PackagingLinkCard VerticalAlignment="Top" />
-                                <Border Grid.Column="1" Style="{StaticResource ColumnDividerStyle}" />
-                                <p:CloneCard Grid.Column="2" VerticalAlignment="Top" />
-                            </Grid>
+                            <p:CloneCard HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="420" />
                         </ScrollViewer>
                     </syncfusion:TabItemExt>
                 </syncfusion:TabControlExt>

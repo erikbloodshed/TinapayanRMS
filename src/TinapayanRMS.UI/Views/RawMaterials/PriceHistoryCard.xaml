@@ -26,6 +26,7 @@
                                    ColumnSizer="Star">
                 <syncfusion:SfDataGrid.Columns>
                     <syncfusion:GridDateTimeColumn MappingName="Date" HeaderText="Date" />
+                    <syncfusion:GridTextColumn MappingName="Brand" HeaderText="Brand" />
                     <syncfusion:GridTextColumn MappingName="UnitName" HeaderText="Unit" />
                     <controls:NumericColumn MappingName="Price" HeaderText="Price" NumberDecimalDigits="2" />
                     <controls:NumericColumn MappingName="CostPerBaseUnit" HeaderText="Cost / Base Unit" NumberDecimalDigits="4" />

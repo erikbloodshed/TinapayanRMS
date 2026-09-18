@@ -123,8 +123,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         var repository = CreateRepository();
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = ribbonId, UnitOfMeasureId = rollUnitOfMeasureId, BaseUnitsPerUnit = 1000m }, Cancellation);
         var roll = (await repository.GetForRawMaterialAsync(ribbonId, Cancellation)).Single();
-        await new RawMaterialPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator()).AddAsync(
-            new RawMaterialPriceHistory { RawMaterialId = ribbonId, UnitId = roll.Id, Date = new DateOnly(2026, 1, 1), Price = 45m }, Cancellation);
+        await SetPriceAsync(ribbonId, roll.Id, 45m);
         (await GetCostPerBaseUnitAsync(ribbonId)).Should().Be(0.045m);
 
         // The roll is really 900 cm.
@@ -171,12 +170,11 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         var repository = CreateRepository();
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = ribbonId, UnitOfMeasureId = rollUnitOfMeasureId, BaseUnitsPerUnit = 1000m }, Cancellation);
         var roll = (await repository.GetForRawMaterialAsync(ribbonId, Cancellation)).Single();
-        await new RawMaterialPriceHistoryRepository(CreateDbContextFactory(), CreateCostPropagator()).AddAsync(
-            new RawMaterialPriceHistory { RawMaterialId = ribbonId, UnitId = roll.Id, Date = new DateOnly(2026, 1, 1), Price = 45m }, Cancellation);
+        await SetPriceAsync(ribbonId, roll.Id, 45m);
 
         var act = () => repository.DeleteAsync(roll.Id, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'roll' is used by 1 price entry*");
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'roll' is used by 1 purchase price*");
     }
 
     [Fact]

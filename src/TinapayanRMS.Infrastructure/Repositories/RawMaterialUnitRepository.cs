@@ -85,8 +85,8 @@ public class RawMaterialUnitRepository(
 
     /// <summary>
     /// Changes the unit, multiplier or description of <paramref name="unit"/>, which must belong to its
-    /// RawMaterialId, and saves it. A new multiplier reprices the material when its latest price is in
-    /// this unit; recipe lines are in grams, so nothing else moves. Returns whether that changed an
+    /// RawMaterialId, and saves it. A new multiplier reprices the material when a brand is priced in
+    /// this unit (logging a new cost in price history); recipe lines are in grams, so nothing else moves. Returns whether that changed an
     /// ingredient's cost, for the caller to cascade once its transaction commits.
     /// </summary>
     internal static async Task<bool> UpdateAsync(TinapayanRMSDbContext dbContext, RawMaterialUnit unit, CancellationToken cancellationToken)
@@ -107,32 +107,24 @@ public class RawMaterialUnitRepository(
         existing.BaseUnitsPerUnit = unit.BaseUnitsPerUnit;
         existing.Description = unit.Description;
 
-        var costChanged = false;
-        if (multiplierChanged)
-        {
-            // The material's cost comes from its latest price, so a new multiplier only moves
-            // CostPerBaseUnit when that price is in this unit.
-            var latest = await dbContext.RawMaterialPriceHistories
-                .Where(h => h.RawMaterialId == existing.RawMaterialId)
-                .OrderByDescending(h => h.Date)
-                .ThenByDescending(h => h.Id)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (latest?.UnitId == existing.Id)
-            {
-                RawMaterialRules.ApplyLatestPrice(material, latest.Price, existing.BaseUnitsPerUnit);
-                costChanged = true;
-            }
-        }
-
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // The material's cost is its dearest brand price per base unit, which a new multiplier can move
+        // when a brand is priced in this unit. RepriceAsync reads the saved multiplier, so it runs after.
+        var costChanged = false;
+        if (multiplierChanged
+            && await dbContext.RawMaterialBrandPrices.AnyAsync(p => p.UnitId == existing.Id, cancellationToken))
+        {
+            costChanged = await RawMaterialBrandPriceRepository.RepriceAsync(dbContext, material, material.CostPerBaseUnit, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         // Packaging lines need nothing: their cost is worked out from the unit's multiplier each
         // time a product is read. An ingredient's new cost has to reach what's made from it.
         return costChanged && material.Type == RawMaterialType.Ingredient;
     }
 
-    /// <summary>Removes the unit and saves, unless a price entry or (for packaging) a packaging line still uses it.</summary>
+    /// <summary>Removes the unit and saves, unless a purchase price, a price history entry or (for packaging) a packaging line still uses it.</summary>
     internal static async Task DeleteAsync(TinapayanRMSDbContext dbContext, int id, CancellationToken cancellationToken)
     {
         var unit = await dbContext.RawMaterialUnits
@@ -140,6 +132,13 @@ public class RawMaterialUnitRepository(
             .Include(u => u.RawMaterial)
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken)
             ?? throw new InvalidOperationException($"Raw material unit {id} does not exist.");
+
+        var brandCount = await dbContext.RawMaterialBrandPrices.CountAsync(p => p.UnitId == id, cancellationToken);
+        if (brandCount > 0)
+        {
+            throw new InvalidOperationException(
+                $"'{unit.UnitOfMeasure!.Name}' is used by {brandCount} purchase {(brandCount == 1 ? "price" : "prices")}. Change those to another unit first.");
+        }
 
         var priceCount = await dbContext.RawMaterialPriceHistories.CountAsync(h => h.UnitId == id, cancellationToken);
         if (priceCount > 0)

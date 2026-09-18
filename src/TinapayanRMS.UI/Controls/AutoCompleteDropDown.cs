@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.UI.Xaml.Grid.Cells;
 
@@ -49,6 +50,7 @@ public static class AutoCompleteDropDown
 /// <item>A column with <c>SearchCondition="Contains"</c> picks a name that contains the typed text, not only one that
 /// starts with it (<see cref="ScreenAwareDropDownControl"/>).</item>
 /// <item>The pop-up is placed on the monitor the cell is on (<see cref="ScreenAwareDropDownControl"/>).</item>
+/// <item>Tab keeps the row picked in the open list, as Enter does; the grid moved on without it.</item>
 /// </list>
 /// </summary>
 public sealed class AutoCompleteDropDownRenderer : GridCellMultiColumnDropDownRenderer
@@ -71,6 +73,19 @@ public sealed class AutoCompleteDropDownRenderer : GridCellMultiColumnDropDownRe
         {
             uiElement.Text = DisplayText(column, DataGrid.View?.GetPropertyAccessProvider().GetValue(dataContext, column.MappingName));
         }
+    }
+
+    protected override bool ShouldGridTryToHandleKeyDown(KeyEventArgs e)
+    {
+        // The grid takes Tab in its PreviewKeyDown, before the control's own key handling ever sees it, and moves on to
+        // the next cell reading the value picked before the list was opened. The row picked in the list (with the arrow
+        // keys) was only committed by Enter. Tab now commits it too, as the control's own Tab would, then moves on.
+        if (e.Key == Key.Tab && HasCurrentCellState && IsInEditing && CurrentCellRendererElement is ScreenAwareDropDownControl editor)
+        {
+            editor.CommitListPick();
+        }
+
+        return base.ShouldGridTryToHandleKeyDown(e);
     }
 
     private static string DisplayText(GridMultiColumnDropDownList column, object? value)
@@ -139,6 +154,23 @@ public sealed class ScreenAwareDropDownControl : SfMultiColumnDropDownControl
         // Leaving the cell keeps the pick only when the box holds its whole name, which a contained text doesn't.
         // With Contains, the pick typing made is kept, as Tab keeps it.
         base.CommitValue(autoCommit || (SearchCondition == SearchCondition.Contains && SelectedItem is not null));
+    }
+
+    /// <summary>
+    /// Makes the row picked in the open list the control's pick and closes the list: what the control does itself on
+    /// Enter. Nothing while the list is closed or has no row picked, which is how text matching no name leaves it
+    /// (the columns' AllowNullInput clears the list's pick), so Tab never commits a name the text doesn't match.
+    /// </summary>
+    internal void CommitListPick()
+    {
+        if (!IsDropDownOpen || InternalGrid?.SelectedItem is not { } picked)
+        {
+            return;
+        }
+
+        SelectedItem = picked;
+        CommitValue(autoCommit: true);
+        IsDropDownOpen = false;
     }
 
     /// <summary>Whether any name in the list starts with the lower-cased typed text.</summary>

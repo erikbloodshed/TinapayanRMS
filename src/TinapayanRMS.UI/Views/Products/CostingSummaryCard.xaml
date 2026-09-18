@@ -21,8 +21,6 @@
 
     <StackPanel>
         <TextBlock Text="Costing Summary" Style="{StaticResource PanelHeaderStyle}" />
-        <TextBlock Text="Labor, overhead and administrative are percentages of the material cost. The markup goes on the base cost, then VAT on top. Changes are saved with Save."
-                   Style="{StaticResource PanelCaptionStyle}" />
 
         <!-- Every input is a percentage, and shows what it comes to in pesos: five equal columns with gaps between -->
         <Grid>

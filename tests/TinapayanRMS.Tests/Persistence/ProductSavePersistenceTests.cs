@@ -60,6 +60,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
             new RecipeDraft(
                 [new OwnedSubAssemblyDraft(0, doughRoleId, [(flourId, 1000m)], UsageAuthoredField.Yield, 40m)],
                 [new LinkedUsageDraft(linkedFillingId, UsageAuthoredField.WeightPerPiece, 10m)]),
+            null,
             [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)],
             null,
             new CostingParameters { LaborPercent = 6m, OverheadPercent = 5.5m, AdministrativePercent = 3.5m, MarginPercent = 30m, VatPercent = 12m },
@@ -98,6 +99,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         await CreateProductRepository().SaveAsync(
             new Product { Id = productId, Name = "Custard Ensaymada" },
             recipe: null,
+            packagingLink: null,
             packagingLines: null,
             packs: null, costing: null,
             Cancellation);
@@ -121,6 +123,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var act = () => CreateProductRepository().SaveAsync(
             new Product { Id = productId, Name = "Ube Ensaymada", Description = "Now with ube" },
             new RecipeDraft([new OwnedSubAssemblyDraft(custardId, fillingRoleId, [(ubeId, 200m)], UsageAuthoredField.WeightPerPiece, 15m)], []),
+            null,
             [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m), (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 4m)],
             null,
             new CostingParameters { LaborPercent = 5m },
@@ -150,6 +153,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var act = () => CreateProductRepository().SaveAsync(
             new Product { Name = "Custard Bun" },
             new RecipeDraft([new OwnedSubAssemblyDraft(0, fillingRoleId, [(sugarId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []),
+            null,
             [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m), (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 4m)],
             packs: null, costing: null,
             Cancellation);

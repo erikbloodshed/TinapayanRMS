@@ -4,8 +4,14 @@ namespace TinapayanRMS.ApplicationCore.Interfaces;
 
 public interface IPackagingLinkRepository
 {
-    /// <summary>The product's packaging link, with the product it's linked to, or null when it owns its packaging.</summary>
+    /// <summary>The product's packaging link, with the product or packaging set it's linked to, or null when it owns its packaging.</summary>
     Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Links productId's packaging to a standalone packaging set (a sub-assembly in the Packaging role), one set per
+    /// piece, replacing any existing link. Refused for any other sub-assembly.
+    /// </summary>
+    Task SetSubAssemblyLinkAsync(int productId, int subAssemblyId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Links productId's packaging to linkedProductId's, replacing any existing link. Its own lines (if

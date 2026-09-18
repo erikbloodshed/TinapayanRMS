@@ -83,8 +83,6 @@
                                FontWeight="SemiBold"
                                Foreground="{StaticResource HeadingForegroundBrush}"
                                TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="Manage the material's details, units of measure, and cost information."
-                               Style="{StaticResource CaptionStyle}" />
                 </StackPanel>
             </DockPanel>
 

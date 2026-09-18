@@ -18,6 +18,8 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<RawMaterialUnit> RawMaterialUnits => Set<RawMaterialUnit>();
 
+    public DbSet<RawMaterialBrandPrice> RawMaterialBrandPrices => Set<RawMaterialBrandPrice>();
+
     public DbSet<RawMaterialPriceHistory> RawMaterialPriceHistories => Set<RawMaterialPriceHistory>();
 
     public DbSet<IngredientBomLine> IngredientBomLines => Set<IngredientBomLine>();
@@ -27,6 +29,8 @@ public class TinapayanRMSDbContext : DbContext
     public DbSet<SubAssembly> SubAssemblies => Set<SubAssembly>();
 
     public DbSet<SubAssemblyLine> SubAssemblyLines => Set<SubAssemblyLine>();
+
+    public DbSet<SubAssemblyPackagingLine> SubAssemblyPackagingLines => Set<SubAssemblyPackagingLine>();
 
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
 

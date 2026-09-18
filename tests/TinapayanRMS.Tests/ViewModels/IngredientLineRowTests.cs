@@ -67,6 +67,22 @@ public class IngredientLineRowTests
     }
 
     [Fact]
+    public void A_new_row_leaves_its_grams_and_percentage_empty_until_typed()
+    {
+        var row = new IngredientLineRow(id => IngredientsById.GetValueOrDefault(id), baseWeight: 1000m) { IngredientId = Sugar.Id };
+
+        row.Grams.Should().BeNull("the grid shows an empty cell rather than 0.00 (AllowNullValue)");
+        row.Percent.Should().BeNull();
+        row.Cost.Should().Be(0m);
+
+        row.Grams = 200m;
+        row.Grams = null;
+
+        row.Grams.Should().BeNull("clearing the cell leaves it empty");
+        row.Percent.Should().BeNull();
+    }
+
+    [Fact]
     public void CompleteLines_leaves_out_a_blank_add_row()
     {
         var lines = IngredientLineRow.CompleteLines([new IngredientLineRow(Flour, 1000m), new IngredientLineRow()], "Bread Dough");
@@ -87,6 +103,16 @@ public class IngredientLineRowTests
     {
         var row = new IngredientLineRow { IngredientId = Sugar.Id };
         IngredientLineRow.Resolve([row], IngredientsById);
+
+        var act = () => IngredientLineRow.CompleteLines([row], "Bread Dough");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("Enter how many grams of Sugar go into Bread Dough, or delete its line.");
+    }
+
+    [Fact]
+    public void CompleteLines_refuses_grams_cleared_back_to_empty()
+    {
+        var row = new IngredientLineRow(Sugar, 100m) { Grams = null };
 
         var act = () => IngredientLineRow.CompleteLines([row], "Bread Dough");
 

@@ -6,14 +6,15 @@ using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// The Settings dialog's Categories tab: the one category list ingredients and packaging share.
-/// Picking a category loads it for renaming; New, or finishing a Save or Delete, clears the form, so
+/// The Settings dialog's Categories tab: the raw material categories, each for ingredients or for packaging.
+/// Picking a category loads it for renaming or retyping; New, or finishing a Save or Delete, clears the form, so
 /// the next Save always adds a category rather than renaming the last one touched.
 /// </summary>
 public sealed class CategoriesViewModel : ViewModelBase, IDisposable
@@ -40,6 +41,17 @@ public sealed class CategoriesViewModel : ViewModelBase, IDisposable
         get => _editingName;
         set => this.RaiseAndSetIfChanged(ref _editingName, value);
     }
+
+    private RawMaterialType _editingType;
+    /// <summary>Whether the category is for ingredients or packaging: a material only goes in a category of its own type.</summary>
+    public RawMaterialType EditingType
+    {
+        get => _editingType;
+        set => this.RaiseAndSetIfChanged(ref _editingType, value);
+    }
+
+    /// <summary>The Type picker's choices.</summary>
+    public IReadOnlyList<RawMaterialType> Types { get; } = Enum.GetValues<RawMaterialType>();
 
     private readonly ObservableAsPropertyHelper<string> _formTitle;
     /// <summary>"New Category", or "Edit Category" while one is picked, so it's clear what Save will do.</summary>
@@ -71,6 +83,7 @@ public sealed class CategoriesViewModel : ViewModelBase, IDisposable
             {
                 _editingId = category!.Id;
                 EditingName = category.Name;
+                EditingType = category.Type;
             });
 
         // Runs each time Settings opens and after this tab's own saves. It merges rather than
@@ -91,7 +104,7 @@ public sealed class CategoriesViewModel : ViewModelBase, IDisposable
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
-            var category = new RawMaterialCategory { Id = _editingId, Name = EditingName.Trim() };
+            var category = new RawMaterialCategory { Id = _editingId, Name = EditingName.Trim(), Type = EditingType };
 
             var validation = _categoryValidator.Validate(category);
             if (!validation.IsValid)
@@ -128,6 +141,7 @@ public sealed class CategoriesViewModel : ViewModelBase, IDisposable
         SelectedCategory = null;
         _editingId = 0;
         EditingName = string.Empty;
+        EditingType = RawMaterialType.Ingredient;
     }
 
     public void Dispose() => _categoryCache.Dispose();

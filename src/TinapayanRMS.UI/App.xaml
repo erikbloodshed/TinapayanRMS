@@ -170,21 +170,12 @@
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
 
-        <!-- A card's caption under its section header, with room before the card's first field. -->
-        <Style x:Key="CardCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionStyle}">
-            <Setter Property="Margin" Value="0,0,0,12" />
-        </Style>
-
         <!--
             The compact screen's sections (Products): unboxed sections inside one bordered region, each a
-            smaller header over its caption, set apart from the next by a divider line.
+            smaller header, set apart from the next by a divider line.
         -->
         <Style x:Key="PanelHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionHeaderStyle}">
             <Setter Property="FontSize" Value="15" />
-            <Setter Property="Margin" Value="0,0,0,2" />
-        </Style>
-
-        <Style x:Key="PanelCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionStyle}">
             <Setter Property="Margin" Value="0,0,0,8" />
         </Style>
 

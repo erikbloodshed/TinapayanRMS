@@ -237,7 +237,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task ProductCloner_CloneAsync_refuses_a_source_with_two_sub_assemblies_in_one_role_and_makes_nothing()
+    public async Task ProductCloner_CloneAsync_keeps_two_sub_assemblies_in_one_role_apart_by_the_names_they_went_by()
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour");
@@ -245,7 +245,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         var (sourceId, _) = await AddProductWithSubAssemblyAsync("Source", roleId, [(flourId, 1000m)]);
         await using (var dbContext = CreateDbContext())
         {
-            // The source both owns a Dough and links Pandesal's, as one saved before a recipe took one in each role could.
+            // The source both owns a Dough and links Pandesal's, which goes by its owner there: "Dough" and "Dough: Pandesal".
             dbContext.ProductSubAssemblyUsages.Add(new ProductSubAssemblyUsage
             {
                 ProductId = sourceId,
@@ -256,9 +256,11 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
-        var act = () => CreateProductCloner().CloneAsync(sourceId, "Clone Of Source", Cancellation);
+        var cloneId = await CreateProductCloner().CloneAsync(sourceId, "Clone Of Source", Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("This recipe has more than one sub-assembly in the Dough role*");
-        (await CreateProductRepository().GetAllAsync(Cancellation)).Select(p => p.Name).Should().BeEquivalentTo(["Pandesal", "Source"]);
+        await using var check = CreateDbContext();
+        (await check.SubAssemblies.Where(s => s.OwnerProductId == cloneId).Select(s => s.Name).ToListAsync(Cancellation))
+            .Should().BeEquivalentTo([null, "Pandesal"], "both are the clone's own now, and Pandesal's keeps what told it apart");
     }
+
 }

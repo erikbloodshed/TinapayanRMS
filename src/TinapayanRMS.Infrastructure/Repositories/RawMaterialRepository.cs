@@ -47,7 +47,7 @@ public class RawMaterialRepository(
     public async Task<int> SaveAsync(
         RawMaterial material,
         IReadOnlyList<RawMaterialUnit> units,
-        (DateOnly Date, int? UnitOfMeasureId, decimal Price)? newPrice,
+        IReadOnlyList<(string? Brand, int? UnitOfMeasureId, decimal Price)>? brandPrices,
         IReadOnlyList<(int ComponentIngredientId, decimal Grams)>? bomLines,
         CancellationToken cancellationToken)
     {
@@ -87,18 +87,36 @@ public class RawMaterialRepository(
             }
 
             id = fields.Id;
+
+            // The cost the brand prices are compared against, whatever the steps below do to it on the
+            // way, so a Save logs at most one price, and only when it leaves the cost changed.
+            var costBefore = await dbContext.RawMaterials.Where(m => m.Id == id).Select(m => m.CostPerBaseUnit).SingleAsync(cancellationToken);
+
+            // The old brand prices go before the units do, so a unit only they were in can be removed.
+            if (brandPrices is not null)
+            {
+                await RawMaterialBrandPriceRepository.RemoveAllAsync(dbContext, id, cancellationToken);
+            }
+
             costChanged |= await SaveUnitsAsync(dbContext, id, units, cancellationToken);
 
-            if (newPrice is { } price)
+            if (brandPrices is not null)
             {
-                var entry = new RawMaterialPriceHistory
+                var rows = new List<RawMaterialBrandPrice>();
+                foreach (var (brand, unitOfMeasureId, price) in brandPrices)
                 {
-                    RawMaterialId = id,
-                    Date = price.Date,
-                    UnitId = await FindUnitIdAsync(dbContext, id, price.UnitOfMeasureId, cancellationToken),
-                    Price = price.Price,
-                };
-                costChanged |= await RawMaterialPriceHistoryRepository.AddAsync(dbContext, entry, cancellationToken);
+                    rows.Add(new RawMaterialBrandPrice
+                    {
+                        Brand = brand,
+                        UnitId = await FindUnitIdAsync(dbContext, id, unitOfMeasureId, cancellationToken),
+                        Price = price,
+                    });
+                }
+
+                var saved = await dbContext.RawMaterials.FirstAsync(m => m.Id == id, cancellationToken);
+                await RawMaterialBrandPriceRepository.AddAllAsync(dbContext, saved, rows, cancellationToken);
+                costChanged |= await RawMaterialBrandPriceRepository.RepriceAsync(dbContext, saved, costBefore, cancellationToken);
+                await dbContext.SaveChangesAsync(cancellationToken);
             }
 
             if (bomLines is not null)
@@ -135,6 +153,7 @@ public class RawMaterialRepository(
         RawMaterialRules.EnsureFieldsMatchType(material);
         RawMaterialRules.EnsureFieldsMatchSource(material);
         RawMaterialRules.EnsureValidCostBuffer(material.CostBufferPercent);
+        await EnsureCategoryMatchesAsync(dbContext, material, cancellationToken);
         if (await EnsureValidLinkAsync(dbContext, material, cancellationToken) is { } inheritedBuffer)
         {
             material.CostBufferPercent = inheritedBuffer;
@@ -144,6 +163,19 @@ public class RawMaterialRepository(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return material.Source == RawMaterialSource.Linked;
+    }
+
+    /// <summary>A material goes in a category of its own type. A category that doesn't exist is left to the foreign key.</summary>
+    private static async Task EnsureCategoryMatchesAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
+    {
+        var category = await dbContext.RawMaterialCategories
+            .Where(c => c.Id == material.CategoryId)
+            .Select(c => new { c.Name, c.Type })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (category is not null)
+        {
+            RawMaterialRules.EnsureCategoryMatchesType(material.Type, category.Type, category.Name);
+        }
     }
 
     /// <summary>
@@ -162,6 +194,7 @@ public class RawMaterialRepository(
 
         RawMaterialRules.EnsureTypeUnchanged(existing.Type, material.Type);
         RawMaterialRules.EnsureSourceUnchanged(existing.Source, material.Source);
+        await EnsureCategoryMatchesAsync(dbContext, material, cancellationToken);
         var inheritedBuffer = await EnsureValidLinkAsync(dbContext, material, cancellationToken);
 
         // Only a packaging material can get here: an ingredient's is always null (EnsureFieldsMatchType).
@@ -169,8 +202,10 @@ public class RawMaterialRepository(
         {
             RawMaterialRules.EnsureBaseUnitCanChange(
                 hasUnits: await dbContext.RawMaterialUnits.AnyAsync(u => u.RawMaterialId == existing.Id, cancellationToken),
-                hasPrices: await dbContext.RawMaterialPriceHistories.AnyAsync(h => h.RawMaterialId == existing.Id, cancellationToken),
-                hasLines: await dbContext.PackagingLines.AnyAsync(l => l.PackagingMaterialId == existing.Id, cancellationToken));
+                hasPrices: await dbContext.RawMaterialBrandPrices.AnyAsync(p => p.RawMaterialId == existing.Id, cancellationToken)
+                    || await dbContext.RawMaterialPriceHistories.AnyAsync(h => h.RawMaterialId == existing.Id, cancellationToken),
+                hasLines: await dbContext.PackagingLines.AnyAsync(l => l.PackagingMaterialId == existing.Id, cancellationToken)
+                    || await dbContext.SubAssemblyPackagingLines.AnyAsync(l => l.PackagingMaterialId == existing.Id, cancellationToken));
         }
 
         // Field by field, not a blind Update(): CostPerBaseUnit and BufferedCostPerBaseUnit are owned

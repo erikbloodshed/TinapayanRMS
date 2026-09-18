@@ -1,0 +1,27 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using TinapayanRMS.Domain.Entities;
+
+namespace TinapayanRMS.Infrastructure.Configurations;
+
+public class SubAssemblyPackagingLineConfiguration : IEntityTypeConfiguration<SubAssemblyPackagingLine>
+{
+    public void Configure(EntityTypeBuilder<SubAssemblyPackagingLine> builder)
+    {
+        builder.ToTable(t => t.HasCheckConstraint("CK_SubAssemblyPackagingLines_QtyPerSet", "[QtyPerSet] > 0"));
+
+        // Deleting the set takes its own lines with it.
+        builder.HasOne(l => l.SubAssembly)
+            .WithMany()
+            .HasForeignKey(l => l.SubAssemblyId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Deleting a packaging material that's in use by a set is blocked instead.
+        builder.HasOne(l => l.PackagingMaterial)
+            .WithMany()
+            .HasForeignKey(l => l.PackagingMaterialId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(l => new { l.SubAssemblyId, l.PackagingMaterialId }).IsUnique();
+    }
+}

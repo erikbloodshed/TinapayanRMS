@@ -26,22 +26,24 @@ public interface IRawMaterialRepository
     /// <summary>
     /// Saves everything the Raw Materials screen edits in one transaction, so nothing is saved unless
     /// every part passes: the material itself (added when its Id is 0, otherwise updated as
-    /// UpdateAsync does), its alternative units, a new price and its BOM, each checked as their own
+    /// UpdateAsync does), its alternative units, its brand prices and its BOM, each checked as their own
     /// repositories check them. Returns the material's id.
     /// </summary>
     /// <param name="units">
     /// The material's complete set of alternative units: saved ones missing from it are removed,
     /// those with an Id are updated and those without are added. Only their fields are read.
     /// </param>
-    /// <param name="newPrice">
-    /// A price entry to add, or null for none. Its unit is named by unit of measure, since a unit added
-    /// in the same save has no id yet; a null unit means a price per base unit.
+    /// <param name="brandPrices">
+    /// A purchased material's complete set of brand prices, replacing the saved ones, or null to leave
+    /// them as they are. Each unit is named by unit of measure, since a unit added in the same save has
+    /// no id yet; a null unit means a price per base unit. The material is costed at the dearest per base
+    /// unit, and a new cost is logged in price history, dated today (RawMaterialBrandPriceRepository).
     /// </param>
     /// <param name="bomLines">A made ingredient's new BOM, in grams, replacing the old one, or null to leave the BOM as it is.</param>
     Task<int> SaveAsync(
         RawMaterial material,
         IReadOnlyList<RawMaterialUnit> units,
-        (DateOnly Date, int? UnitOfMeasureId, decimal Price)? newPrice,
+        IReadOnlyList<(string? Brand, int? UnitOfMeasureId, decimal Price)>? brandPrices,
         IReadOnlyList<(int ComponentIngredientId, decimal Grams)>? bomLines,
         CancellationToken cancellationToken);
 

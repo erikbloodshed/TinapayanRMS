@@ -8,13 +8,13 @@ public class SubAssemblyConfiguration : IEntityTypeConfiguration<SubAssembly>
 {
     public void Configure(EntityTypeBuilder<SubAssembly> builder)
     {
-        // Only a standalone sub-assembly has a name; a product's own goes by its role.
+        // A standalone sub-assembly always has a name; a product's own goes by its role, and has one only to tell it
+        // apart from others in that role.
         builder.Property(s => s.Name).HasMaxLength(100);
 
         // Standalone names are unique among themselves: rows with no owner are kept in the index, where SQL
-        // Server's unique index counts their NULL owners as equal. A product's own has no name, so it's left out
-        // (the filter), or its NULL names would clash too. A name one saved before 2026-09-17 still has stays
-        // unique within its product until that product's recipe is saved again and clears it.
+        // Server's unique index counts their NULL owners as equal. A product's own names are unique within their
+        // product; an unnamed one is left out (the filter), or its NULL names would clash too.
         builder.HasIndex(s => new { s.OwnerProductId, s.Name }).IsUnique().HasFilter("[Name] IS NOT NULL");
 
         // Restrict, not Cascade: this is also how "a role can't be deleted while any

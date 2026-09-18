@@ -38,6 +38,14 @@ public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        // Packaging sets live in it, and nothing else can stand in for it: renaming it is fine, deleting it isn't.
+        var isPackaging = await dbContext.SubAssemblyRoles.AnyAsync(r => r.Id == id && r.IsPackaging, cancellationToken);
+        if (isPackaging)
+        {
+            throw new InvalidOperationException("The Packaging role holds the packaging sets, so it can't be deleted. It can be renamed.");
+        }
+
         await dbContext.SubAssemblyRoles.Where(r => r.Id == id).ExecuteDeleteAsync(cancellationToken);
     }
 }

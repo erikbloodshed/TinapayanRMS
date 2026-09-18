@@ -13,8 +13,6 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
 {
     private RawMaterialUnitRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
 
-    private RawMaterialPriceHistoryRepository CreatePriceHistoryRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
-
     private async Task<int> SeedIngredientAsync(string name, RawMaterialSource source = RawMaterialSource.Purchased)
     {
         await using var dbContext = CreateDbContext();
@@ -130,7 +128,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = sugarId, UnitOfMeasureId = sackUnitOfMeasureId, BaseUnitsPerUnit = 1000m }, Cancellation);
         var sack = (await repository.GetForRawMaterialAsync(sugarId, Cancellation)).Single();
 
-        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = sugarId, UnitId = sack.Id, Date = new DateOnly(2026, 1, 1), Price = 90m }, Cancellation);
+        await SetPriceAsync(sugarId, sack.Id, 90m);
         await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation);
         var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Custard Bun", await AddRoleAsync("Filling"), [(sugarId, 500m)]);
 
@@ -158,7 +156,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         var repository = CreateRepository();
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = eggId, UnitOfMeasureId = pieceUnitOfMeasureId, BaseUnitsPerUnit = 50m }, Cancellation);
         var piece = (await repository.GetForRawMaterialAsync(eggId, Cancellation)).Single();
-        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = eggId, Date = new DateOnly(2026, 1, 1), Price = 0.2m }, Cancellation); // per gram
+        await SetPriceAsync(eggId, null, 0.2m); // per gram
 
         await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(custardId, [(eggId, 100m)], Cancellation);
         var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Egg Bun", await AddRoleAsync("Topping"), [(eggId, 150m)]);
@@ -205,7 +203,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         var units = await repository.GetForRawMaterialAsync(flourId, Cancellation);
         var bag = units.Single(u => u.UnitOfMeasureId == bagId);
         var pack = units.Single(u => u.UnitOfMeasureId == packId);
-        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = flourId, UnitId = bag.Id, Date = new DateOnly(2026, 1, 1), Price = 1250m }, Cancellation);
+        await SetPriceAsync(flourId, bag.Id, 1250m);
 
         pack.BaseUnitsPerUnit = 500m;
         await repository.UpdateAsync(pack, Cancellation);
@@ -260,11 +258,11 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         var repository = CreateRepository();
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = flourId, UnitOfMeasureId = bagId, BaseUnitsPerUnit = 25000m }, Cancellation);
         var bag = (await repository.GetForRawMaterialAsync(flourId, Cancellation)).Single();
-        await CreatePriceHistoryRepository().AddAsync(new RawMaterialPriceHistory { RawMaterialId = flourId, UnitId = bag.Id, Date = new DateOnly(2026, 1, 1), Price = 1250m }, Cancellation);
+        await SetPriceAsync(flourId, bag.Id, 1250m);
 
         var act = () => repository.DeleteAsync(bag.Id, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'bag' is used by 1 price entry*");
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'bag' is used by 1 purchase price*");
         (await repository.GetForRawMaterialAsync(flourId, Cancellation)).Should().ContainSingle();
     }
 

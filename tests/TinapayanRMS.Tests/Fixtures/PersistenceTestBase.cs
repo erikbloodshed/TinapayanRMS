@@ -3,6 +3,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure;
+using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Tests.Fixtures;
@@ -40,6 +41,15 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
     /// <summary>The ingredient cost cascade the raw material repositories hand ingredient cost changes to.</summary>
     protected IngredientCostPropagator CreateCostPropagator() =>
         new(CreateDbContextFactory(), new SubAssemblyCostPropagator(CreateDbContextFactory()));
+
+    protected RawMaterialBrandPriceRepository CreateBrandPriceRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
+
+    /// <summary>
+    /// Prices a purchased material at a single, unnamed brand (<paramref name="unitId"/> one of its own units, or null for
+    /// a price per base unit), replacing any it had, as the Purchase Cost Setup's Save does. The cost cascades.
+    /// </summary>
+    protected Task SetPriceAsync(int rawMaterialId, int? unitId, decimal price) =>
+        CreateBrandPriceRepository().SetAsync(rawMaterialId, [new RawMaterialBrandPrice { UnitId = unitId, Price = price }], Cancellation);
 
     /// <summary>
     /// UnitOfMeasure has no migration-seeded rows (Phase: units are fully user-managed,
@@ -111,14 +121,24 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
         return product.Id;
     }
 
-    /// <summary>A role for a test's sub-assemblies.</summary>
-    protected async Task<int> AddRoleAsync(string name, int sortOrder = 1)
+    /// <summary>A role for a test's sub-assemblies; <paramref name="isPackaging"/> makes it the role packaging sets go in.</summary>
+    protected async Task<int> AddRoleAsync(string name, int sortOrder = 1, bool isPackaging = false)
     {
         await using var dbContext = CreateDbContext();
-        var role = new SubAssemblyRole { Name = name, SortOrder = sortOrder };
+        var role = new SubAssemblyRole { Name = name, SortOrder = sortOrder, IsPackaging = isPackaging };
         dbContext.SubAssemblyRoles.Add(role);
         await dbContext.SaveChangesAsync(Cancellation);
         return role.Id;
+    }
+
+    /// <summary>A packaging category, which is all a packaging material can be filed under (RawMaterialRules.EnsureCategoryMatchesType).</summary>
+    protected async Task<int> AddPackagingCategoryAsync(string name = "Boxes")
+    {
+        await using var dbContext = CreateDbContext();
+        var category = new RawMaterialCategory { Name = name, Type = RawMaterialType.Packaging };
+        dbContext.RawMaterialCategories.Add(category);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return category.Id;
     }
 
     /// <summary>A purchased ingredient, in a shared "Ingredients" category, costing <paramref name="costPerGram"/> a gram with no buffer.</summary>
@@ -145,7 +165,7 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
     {
         var repository = new TinapayanRMS.Infrastructure.Repositories.ProductRepository(CreateDbContextFactory());
         var product = (await repository.GetByIdAsync(productId, Cancellation))!;
-        await repository.SaveAsync(product, recipe, packagingLines: null, packs: null, costing: null, Cancellation);
+        await repository.SaveAsync(product, recipe, packagingLink: null, packagingLines: null, packs: null, costing: null, Cancellation);
     }
 
     /// <summary>The id of <paramref name="productId"/>'s own sub-assembly in the role <paramref name="roleId"/>, which it has one of.</summary>

@@ -16,6 +16,7 @@ public class SubAssemblyRoleConfiguration : IEntityTypeConfiguration<SubAssembly
             new SubAssemblyRole { Id = 2, Name = "Filling", SortOrder = 2 },
             new SubAssemblyRole { Id = 3, Name = "Topping", SortOrder = 3 },
             new SubAssemblyRole { Id = 4, Name = "Inclusion", SortOrder = 4 },
-            new SubAssemblyRole { Id = 5, Name = "Finishing", SortOrder = 5 });
+            new SubAssemblyRole { Id = 5, Name = "Finishing", SortOrder = 5 },
+            new SubAssemblyRole { Id = 6, Name = "Packaging", SortOrder = 6, IsPackaging = true });
     }
 }

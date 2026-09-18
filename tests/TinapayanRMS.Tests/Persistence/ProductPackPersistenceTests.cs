@@ -243,10 +243,10 @@ public class ProductPackPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var product = new Product { Id = productId, Name = "Ensaymada" };
 
         await CreateProductRepository().SaveAsync(
-            product, null, null, [Pack("Pack of 12", 12, (boxId, 1m))], null, Cancellation);
+            product, null, null, null, [Pack("Pack of 12", 12, (boxId, 1m))], null, Cancellation);
         (await CreatePackRepository().GetForProductAsync(productId, Cancellation)).Should().ContainSingle();
 
-        await CreateProductRepository().SaveAsync(product, null, null, null, null, Cancellation);
+        await CreateProductRepository().SaveAsync(product, null, null, null, null, null, Cancellation);
 
         (await CreatePackRepository().GetForProductAsync(productId, Cancellation))
             .Should().ContainSingle("null packs means leave them as they are");

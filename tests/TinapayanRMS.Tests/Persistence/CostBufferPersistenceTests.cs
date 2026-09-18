@@ -15,8 +15,6 @@ namespace TinapayanRMS.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private static readonly DateOnly Today = new(2026, 9, 14);
-
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
 
     private async Task<int> SeedCategoryAsync()
@@ -62,7 +60,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
         var flourId = await CreateRepository().SaveAsync(
             PurchasedIngredient("Flour", categoryId, costBufferPercent: 5m),
-            [new RawMaterialUnit { UnitOfMeasureId = bagId, BaseUnitsPerUnit = 25000m }], (Today, bagId, 1250m), bomLines: null, Cancellation);
+            [new RawMaterialUnit { UnitOfMeasureId = bagId, BaseUnitsPerUnit = 25000m }], [(null, bagId, 1250m)], bomLines: null, Cancellation);
 
         var flour = await GetMaterialAsync(flourId);
         flour.CostPerBaseUnit.Should().Be(0.05m);
@@ -74,12 +72,12 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     {
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
-        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], (Today, null, 0.09m), bomLines: null, Cancellation);
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], [(null, null, 0.09m)], bomLines: null, Cancellation);
         var custardId = await SeedSubAssemblyAsync("Custard", sugarId, 1000m);
 
         (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(90m);
 
-        await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 10m, id: sugarId), [], newPrice: null, bomLines: null, Cancellation);
+        await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 10m, id: sugarId), [], brandPrices: null, bomLines: null, Cancellation);
 
         var sugar = await GetMaterialAsync(sugarId);
         sugar.CostPerBaseUnit.Should().Be(0.09m, "the buffer never changes the true cost");
@@ -92,8 +90,8 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     {
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
-        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 10m), [], (Today, null, 0.10m), bomLines: null, Cancellation);
-        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId), [], newPrice: null, [(sugarId, 1000m)], Cancellation);
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 10m), [], [(null, null, 0.10m)], bomLines: null, Cancellation);
+        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId), [], brandPrices: null, [(sugarId, 1000m)], Cancellation);
         var custardId = await SeedSubAssemblyAsync("Custard", syrupId, 1000m);
 
         var syrup = await GetMaterialAsync(syrupId);
@@ -101,7 +99,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         syrup.BufferedCostPerBaseUnit.Should().Be(0.11m, "the buffered rollup uses sugar's buffered cost");
         (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(110m);
 
-        await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId, costBufferPercent: 10m, id: syrupId), [], newPrice: null, bomLines: null, Cancellation);
+        await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId, costBufferPercent: 10m, id: syrupId), [], brandPrices: null, bomLines: null, Cancellation);
 
         syrup = await GetMaterialAsync(syrupId);
         syrup.CostPerBaseUnit.Should().Be(0.10m);
@@ -114,11 +112,11 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     {
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
-        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], (Today, null, 0.10m), bomLines: null, Cancellation);
-        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId), [], newPrice: null, [(sugarId, 1000m)], Cancellation);
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], [(null, null, 0.10m)], bomLines: null, Cancellation);
+        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId), [], brandPrices: null, [(sugarId, 1000m)], Cancellation);
         var custardId = await SeedSubAssemblyAsync("Custard", syrupId, 500m);
 
-        await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 20m, id: sugarId), [], newPrice: null, bomLines: null, Cancellation);
+        await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 20m, id: sugarId), [], brandPrices: null, bomLines: null, Cancellation);
 
         (await GetMaterialAsync(syrupId)).BufferedCostPerBaseUnit.Should().Be(0.12m);
         (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(60m, "500 g of syrup at the buffered ₱0.12");
@@ -129,9 +127,9 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     {
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
-        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], (Today, null, 0.09m), bomLines: null, Cancellation);
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], [(null, null, 0.09m)], bomLines: null, Cancellation);
 
-        await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 50m, id: sugarId), [], (Today, null, 0.10m), bomLines: null, Cancellation);
+        await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 50m, id: sugarId), [], [(null, null, 0.10m)], bomLines: null, Cancellation);
 
         var sugar = await GetMaterialAsync(sugarId);
         sugar.CostPerBaseUnit.Should().Be(0.10m);
@@ -144,12 +142,12 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         var categoryId = await SeedCategoryAsync();
         var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
         var repository = CreateRepository();
-        var box = new RawMaterial { Name = "Cake Box", Type = RawMaterialType.Packaging, CategoryId = categoryId, BaseUnitId = pieceId };
-        var boxId = await repository.SaveAsync(box, [], (Today, null, 30m), bomLines: null, Cancellation);
+        var box = new RawMaterial { Name = "Cake Box", Type = RawMaterialType.Packaging, CategoryId = await AddPackagingCategoryAsync(), BaseUnitId = pieceId };
+        var boxId = await repository.SaveAsync(box, [], [(null, null, 30m)], bomLines: null, Cancellation);
 
         box.Id = boxId;
         box.CostBufferPercent = 10m;
-        await repository.SaveAsync(box, [], newPrice: null, bomLines: null, Cancellation);
+        await repository.SaveAsync(box, [], brandPrices: null, bomLines: null, Cancellation);
 
         var saved = await GetMaterialAsync(boxId);
         saved.CostPerBaseUnit.Should().Be(30m);
@@ -165,7 +163,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     {
         var categoryId = await SeedCategoryAsync();
 
-        var act = () => CreateRepository().SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent), [], newPrice: null, bomLines: null, Cancellation);
+        var act = () => CreateRepository().SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent), [], brandPrices: null, bomLines: null, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Cost buffer*");
     }

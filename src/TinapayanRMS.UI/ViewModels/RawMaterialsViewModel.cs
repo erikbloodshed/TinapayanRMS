@@ -123,6 +123,8 @@ public sealed class RawMaterialPriceRow(RawMaterialPriceHistory entry, string ba
 
     public string UnitName => Entry.Unit?.UnitOfMeasure?.Name ?? baseUnitName;
 
+    public string Brand => Entry.Brand ?? string.Empty;
+
     public decimal Price => Entry.Price;
 
     public decimal CostPerBaseUnit => UnitConversionRules.CostPerBaseUnit(Entry.Price, Entry.Unit?.BaseUnitsPerUnit);
@@ -142,18 +144,19 @@ public sealed record UsageExampleResult(
 /// The Raw Materials screen: ingredients and packaging in one list. A material's type decides which
 /// parts of its details apply — an ingredient is measured in grams and can be made from a BOM, a
 /// packaging material has a base unit of its own and is always purchased. Its details, alternative
-/// units, purchase price and BOM are all edited in memory, and Save writes them together.
+/// units, brand prices and BOM are all edited in memory, and Save writes them together.
 /// </summary>
-public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
+public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPriceRowHost
 {
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
+    private readonly IRawMaterialBrandPriceRepository _brandPriceRepository;
     private readonly IIngredientBomLineRepository _bomLineRepository;
     private readonly IRawMaterialCategoryRepository _categoryRepository;
     private readonly IValidator<RawMaterialCategory> _categoryValidator;
     private readonly IValidator<RawMaterial> _rawMaterialValidator;
     private readonly IValidator<RawMaterialUnit> _unitValidator;
-    private readonly IValidator<RawMaterialPriceHistory> _priceHistoryValidator;
+    private readonly IValidator<RawMaterialBrandPrice> _brandPriceValidator;
     private readonly SourceCache<RawMaterial, int> _rawMaterialCache = new(m => m.Id);
     private readonly ReadOnlyObservableCollection<RawMaterial> _rawMaterials;
     private readonly ReadOnlyObservableCollection<RawMaterial> _visibleRawMaterials;
@@ -188,6 +191,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<IngredientLineRow> BomLineEdits { get; } = [];
 
+    /// <summary>The line the BOM table's add row edits: it prices itself as its component is picked, before it's committed.</summary>
+    public Func<IngredientLineRow> NewBomLine => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id));
+
     public ReadOnlyObservableCollection<RawMaterialCategory> Categories => _categories;
 
     /// <summary>
@@ -199,7 +205,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
 
     public static readonly RawMaterialCategory AddNewCategory = new() { Id = AddNewCategoryId, Name = "< Add New .. >" };
 
-    /// <summary>What the Category picker lists: the categories, with the "&lt; Add New .. &gt;" row above them.</summary>
+    /// <summary>What the Category picker lists: the categories of the material's type, with the "&lt; Add New .. &gt;" row above them.</summary>
     public ReadOnlyObservableCollection<RawMaterialCategory> CategoryOptions => _categoryOptions;
 
     /// <summary>Every unit of measure, for the base unit picker and the Alternative Units grid's unit cell.</summary>
@@ -208,7 +214,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
     /// <summary>The form's alternative units, saved or not. Their units are the form's own copies, edited in place.</summary>
     public ObservableCollection<RawMaterialUnitRow> UnitRows { get; } = [];
 
-    public ObservableCollection<RawMaterialUnitOption> PurchaseUnitOptions { get; } = [];
+    /// <summary>The Purchase Cost Setup grid's unit choices: the base unit, then every unit of measure it can be bought in.</summary>
+    public ObservableCollection<PurchaseUnitChoice> PurchaseUnitOptions { get; } = [];
 
     public ObservableCollection<RawMaterialUnitOption> ExampleUnitOptions { get; } = [];
 
@@ -404,8 +411,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
     /// <summary>A saved purchased material: a new one has no price history yet.</summary>
     public bool ShowPriceHistory => _showPriceHistory.Value;
 
-    /// <summary>The details tabs along the bottom: Cost Setup, Alternative Units, then Price History.</summary>
-    public const int PriceHistoryTab = 2;
+    /// <summary>The details tabs along the bottom: Cost Setup, Alternative Units, Usage Example, then Price History.</summary>
+    public const int PriceHistoryTab = 3;
 
     /// <summary>The details tab showing. Moves to Cost Setup when Price History is about to hide (ShowPriceHistory).</summary>
     private int _selectedDetailsTab;
@@ -470,77 +477,52 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
     /// <summary>Set while the screen itself replaces or changes the unit rows, so only the user's grid edits count as edits.</summary>
     private bool _syncingUnitRows;
 
-    // Purchase Cost Setup.
-    private RawMaterialUnitOption? _editingPurchaseUnit;
-    public RawMaterialUnitOption? EditingPurchaseUnit
+    // Purchase Cost Setup: a brand per row, typed straight into the grid; Remove acts on the row picked.
+    /// <summary>The form's brand prices, saved or not. The material is costed at the dearest per base unit.</summary>
+    public ObservableCollection<BrandPriceRow> BrandPriceRows { get; } = [];
+
+    private BrandPriceRow? _selectedBrandPriceRow;
+    public BrandPriceRow? SelectedBrandPriceRow
     {
-        get => _editingPurchaseUnit;
-        set => this.RaiseAndSetIfChanged(ref _editingPurchaseUnit, value);
+        get => _selectedBrandPriceRow;
+        set => this.RaiseAndSetIfChanged(ref _selectedBrandPriceRow, value);
     }
 
-    /// <summary>The price per EditingPurchaseUnit. Saving a different price or unit adds a price history entry dated today.</summary>
-    private decimal? _editingPrice;
-    public decimal? EditingPrice
+    /// <summary>The row the grid's add row edits (controls:GridAddNewRow.ItemFactory): one that follows the form's units and buffer.</summary>
+    public Func<BrandPriceRow> NewBrandPriceRow => () => new BrandPriceRow(this);
+
+    /// <summary>
+    /// The alternative units added by picking, on a brand row, a unit the material didn't have. Each goes again once no
+    /// row is in it, so trying units out leaves nothing behind.
+    /// </summary>
+    private readonly HashSet<RawMaterialUnit> _brandAddedUnits = [];
+
+    /// <summary>How many brand prices the material has saved, which fix a packaging material's base unit.</summary>
+    private int _savedBrandPriceCount;
+
+    private string _purchaseCostText = "—";
+    /// <summary>What the dearest brand comes to per base unit, recalculated as the grid is typed into, e.g. "₱0.0372".</summary>
+    public string PurchaseCostText
     {
-        get => _editingPrice;
-        set => this.RaiseAndSetIfChanged(ref _editingPrice, value);
+        get => _purchaseCostText;
+        private set => this.RaiseAndSetIfChanged(ref _purchaseCostText, value);
     }
 
-    /// <summary>
-    /// How many base units one EditingPurchaseUnit holds: its multiplier. Typing it sets the multiplier
-    /// of a unit that isn't saved yet; empty for one added here until it's typed.
-    /// </summary>
-    private decimal? _editingPurchaseQuantity;
-    public decimal? EditingPurchaseQuantity
-    {
-        get => _editingPurchaseQuantity;
-        set => this.RaiseAndSetIfChanged(ref _editingPurchaseQuantity, value);
-    }
-
-    private readonly ObservableAsPropertyHelper<bool> _isPurchaseQuantityReadOnly;
-    /// <summary>
-    /// Read-only for the base unit (always 1) and a saved alternative unit, whose multiplier changes
-    /// in the Alternative Units grid, since a change reprices the material.
-    /// </summary>
-    public bool IsPurchaseQuantityReadOnly => _isPurchaseQuantityReadOnly.Value;
-
-    /// <summary>
-    /// The alternative unit added by picking a new unit in the Purchase Cost Setup. It stays only while
-    /// it's the purchase unit, so picking another before Save takes it back out.
-    /// </summary>
-    private RawMaterialUnit? _purchaseAddedUnit;
-
-    /// <summary>
-    /// Set while the purchase unit choices are replaced or a unit is picked for the user, so neither the
-    /// picker clearing itself nor the quantity box following the pick counts as the user's own change.
-    /// </summary>
-    private bool _syncingPurchaseSetup;
-
-    /// <summary>
-    /// EditingPrice with EditingCostBufferPercent on top: ₱930 at 5% is ₱976.50. Typing it works out the
-    /// buffer percent instead, which is what's saved; a new price keeps the percent and moves this.
-    /// </summary>
-    private decimal? _editingBufferedPrice;
-    public decimal? EditingBufferedPrice
-    {
-        get => _editingBufferedPrice;
-        set => this.RaiseAndSetIfChanged(ref _editingBufferedPrice, value);
-    }
-
-    private readonly ObservableAsPropertyHelper<bool> _isBufferedPriceReadOnly;
-    /// <summary>Read-only until there's a price, since the buffer percent is worked out from it.</summary>
-    public bool IsBufferedPriceReadOnly => _isBufferedPriceReadOnly.Value;
-
-    /// <summary>Set while the buffer percent or the buffered price follows the other, so that isn't taken as the user's own edit.</summary>
-    private bool _syncingCostBuffer;
-
-    private readonly ObservableAsPropertyHelper<string> _purchaseCostText;
-    /// <summary>What EditingPrice comes to per base unit, recalculated as it's typed, e.g. "₱0.0372".</summary>
-    public string PurchaseCostText => _purchaseCostText.Value;
-
-    private readonly ObservableAsPropertyHelper<string> _purchaseBufferedCostText;
+    private string _purchaseBufferedCostText = string.Empty;
     /// <summary>PurchaseCostText with EditingCostBufferPercent on top, e.g. "Buffered (5%): ₱0.0391", or empty while unpriced.</summary>
-    public string PurchaseBufferedCostText => _purchaseBufferedCostText.Value;
+    public string PurchaseBufferedCostText
+    {
+        get => _purchaseBufferedCostText;
+        private set => this.RaiseAndSetIfChanged(ref _purchaseBufferedCostText, value);
+    }
+
+    private string _purchaseCostSourceText = string.Empty;
+    /// <summary>Which brand the cost comes from, when there's more than one, e.g. "From Gold Medal, the dearest of 2 brands."</summary>
+    public string PurchaseCostSourceText
+    {
+        get => _purchaseCostSourceText;
+        private set => this.RaiseAndSetIfChanged(ref _purchaseCostSourceText, value);
+    }
 
     // Usage Example.
     private RawMaterial? _exampleRawMaterial;
@@ -597,6 +579,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<RxVoid, RxVoid> DeleteUnitCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> CalculateExampleCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeletePriceCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> RemoveBrandPriceCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveBomLineCommand { get; }
 
     /// <summary>
@@ -610,24 +593,26 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
     public RawMaterialsViewModel(
         IRawMaterialRepository rawMaterialRepository,
         IRawMaterialPriceHistoryRepository priceHistoryRepository,
+        IRawMaterialBrandPriceRepository brandPriceRepository,
         IIngredientBomLineRepository bomLineRepository,
         IRawMaterialCategoryRepository categoryRepository,
         IValidator<RawMaterialCategory> categoryValidator,
         IValidator<RawMaterial> rawMaterialValidator,
         IValidator<RawMaterialUnit> unitValidator,
-        IValidator<RawMaterialPriceHistory> priceHistoryValidator,
+        IValidator<RawMaterialBrandPrice> brandPriceValidator,
         IUnitOfMeasureRepository unitOfMeasureRepository,
         ILogger logger)
         : base(logger)
     {
         _rawMaterialRepository = rawMaterialRepository;
         _priceHistoryRepository = priceHistoryRepository;
+        _brandPriceRepository = brandPriceRepository;
         _bomLineRepository = bomLineRepository;
         _categoryRepository = categoryRepository;
         _categoryValidator = categoryValidator;
         _rawMaterialValidator = rawMaterialValidator;
         _unitValidator = unitValidator;
-        _priceHistoryValidator = priceHistoryValidator;
+        _brandPriceValidator = brandPriceValidator;
 
         var byName = SortExpressionComparer<RawMaterial>.Ascending(m => m.Name);
 
@@ -674,7 +659,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
         // MergeFrom diffs against the categories it loaded — the row isn't one of them, so it would be dropped.
         _addNewCategoryOption.AddOrUpdate(AddNewCategory);
 
+        // The picker offers only the categories of the material's own type, which is all it can be saved in.
         _categoryCache.Connect()
+            .Filter(this.WhenAnyValue(x => x.EditingType).Select(type => (Func<RawMaterialCategory, bool>)(c => c.Type == type)))
             .Or(_addNewCategoryOption.Connect())
             .SortAndBind(out _categoryOptions, SortExpressionComparer<RawMaterialCategory>
                 .Ascending(c => c.Id == AddNewCategoryId ? 0 : 1)
@@ -698,6 +685,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
                 Id = AddNewCategoryId,
                 Name = text.Length == 0 ? "< Add New .. >" : $"< Add New \"{text}\" .. >",
             }));
+
+        // A new material's type changed under a category of the other type: that category is no longer one it can go in.
+        this.WhenAnyValue(x => x.EditingType)
+            .Where(type => EditingCategory is { } category && category.Type != type)
+            .Subscribe(_ => EditingCategory = null);
 
         _isEditingIngredient = this.WhenAnyValue(x => x.EditingType)
             .Select(type => type == RawMaterialType.Ingredient)
@@ -764,57 +756,19 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
             .Select(material => material is null ? "—" : $"₱{material.BufferedCostPerBaseUnit:N4}")
             .ToProperty(this, x => x.BufferedCostText, "—");
 
-        _purchaseCostText = this.WhenAnyValue(x => x.EditingPrice, x => x.EditingPurchaseQuantity, (price, quantity) =>
-                price is > 0 && quantity is > 0
-                    ? $"₱{UnitConversionRules.CostPerBaseUnit(price.Value, quantity):N4}"
-                    : "—")
-            .ToProperty(this, x => x.PurchaseCostText, "—");
+        // The summary follows the grid as it's typed into: the dearest brand, as Save will cost the material.
+        BrandPriceRows.ToObservableChangeSet()
+            .AutoRefresh(r => r.Price)
+            .AutoRefresh(r => r.Quantity)
+            .AutoRefresh(r => r.Brand)
+            .Subscribe(_ => UpdatePurchaseCostTexts());
 
-        _purchaseBufferedCostText = this.WhenAnyValue(x => x.EditingPrice, x => x.EditingPurchaseQuantity, x => x.EditingCostBufferPercent,
-                (price, quantity, buffer) =>
-                    price is > 0 && quantity is > 0
-                        ? $"Buffered ({buffer ?? 0m:0.##}%): ₱{RawMaterialRules.BufferedCost(UnitConversionRules.CostPerBaseUnit(price.Value, quantity), buffer ?? 0m):N4}"
-                        : string.Empty)
-            .ToProperty(this, x => x.PurchaseBufferedCostText, string.Empty);
-
-        _isPurchaseQuantityReadOnly = this.WhenAnyValue(x => x.EditingPurchaseUnit)
-            .Select(option => option?.Unit is not { Id: 0 })
-            .ToProperty(this, x => x.IsPurchaseQuantityReadOnly, true);
-
-        _isBufferedPriceReadOnly = this.WhenAnyValue(x => x.EditingPrice)
-            .Select(price => price is not > 0)
-            .ToProperty(this, x => x.IsBufferedPriceReadOnly, true);
-
-        // The buffer percent and the buffered price follow each other: typing either works out the
-        // other from the price. The percent is what's saved, so a new price keeps it and moves the
-        // buffered price. Loading a material sets the percent and price, so this runs then too.
-        this.WhenAnyValue(x => x.EditingPrice, x => x.EditingCostBufferPercent)
-            .Where(_ => !_syncingCostBuffer)
-            .Subscribe(values => SyncCostBuffer(() => EditingBufferedPrice = values.Item1 is { } price && price > 0
-                ? Math.Round(RawMaterialRules.BufferedCost(price, values.Item2 ?? 0m), 2)
-                : null));
-
-        this.WhenAnyValue(x => x.EditingBufferedPrice)
-            .Where(bufferedPrice => !_syncingCostBuffer && bufferedPrice is not null && EditingPrice is > 0)
-            .Subscribe(bufferedPrice => SyncCostBuffer(() =>
-                EditingCostBufferPercent = Math.Round(RawMaterialRules.CostBufferPercentOf(EditingPrice!.Value, bufferedPrice!.Value), 4)));
-
-        // Picking a unit the material doesn't have yet adds it as an alternative unit; picking any other
-        // takes back one added that way, so browsing the picker leaves nothing behind.
-        this.WhenAnyValue(x => x.EditingPurchaseUnit)
-            .Where(_ => !IsRefreshing && !_syncingPurchaseSetup)
-            .Subscribe(OnPurchaseUnitPicked);
-
-        // The quantity typed for a unit that isn't saved yet is its multiplier, which the Alternative
-        // Units grid and the overview show as it's typed.
-        this.WhenAnyValue(x => x.EditingPurchaseQuantity)
-            .Where(_ => !IsRefreshing && !_syncingPurchaseSetup)
-            .Subscribe(quantity =>
+        // Each brand's buffered price follows the buffer.
+        this.WhenAnyValue(x => x.EditingCostBufferPercent)
+            .Subscribe(_ =>
             {
-                if (EditingPurchaseUnit?.Unit is { Id: 0 } unit && UnitRows.FirstOrDefault(r => ReferenceEquals(r.Unit, unit)) is { } row)
-                {
-                    SyncUnitRows(() => row.BaseUnitsPerUnit = quantity ?? 0m);
-                }
+                RefreshBrandPriceRows();
+                UpdatePurchaseCostTexts();
             });
 
         // A packaging material is always purchased, and an ingredient's base unit is the gram, so
@@ -870,8 +824,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
             .Switch()
             .Subscribe();
 
-        // A unit typed into the Alternative Units grid, or its unit or multiplier changed there, is offered as a
-        // purchase unit straight away, and the add row goes once there are two.
+        this.WhenAnyValue(x => x.SelectedRawMaterial)
+            .Where(_ => !IsRefreshing)
+            .Select(material => Observable.FromAsync(() => LoadBrandPricesAsync(material)))
+            .Switch()
+            .Subscribe();
+
+        // A unit's multiplier changed in the Alternative Units grid reprices the brands bought in it straight away,
+        // and the add row goes once there are two units.
         UnitRows.ToObservableChangeSet()
             .AutoRefresh(r => r.UnitOfMeasureId)
             .AutoRefresh(r => r.BaseUnitsPerUnit)
@@ -937,7 +897,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
                     UpdateUnitRowsBaseUnit();
                 }
 
-                // Every time, so a unit of measure created in Settings shows as a new purchase unit.
+                // Every time, so a unit of measure created or renamed in Settings shows as a purchase unit.
                 RebuildPurchaseUnitOptions();
 
                 var previousExample = ExampleRawMaterial;
@@ -983,15 +943,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            // A new material's purchase unit starts empty, and a price means nothing without the unit it's for.
-            if (source == RawMaterialSource.Purchased && EditingPurchaseUnit is null && EditingPrice is not (null or 0m))
-            {
-                ErrorMessage = "Pick the purchase unit the price is for.";
-                return;
-            }
-
-            // The units are typed straight into the grid, so a half-filled or repeated one is caught here.
+            // The units and brand prices are typed straight into their grids, so a half-filled or repeated one is caught here.
             EnsureValidUnitRows();
+            var brandPrices = source == RawMaterialSource.Purchased ? CompleteBrandPrices() : null;
 
             // The picker already leaves the material being edited out of BomComponentOptions, so this can't be
             // picked through the UI. But a self-reference already in the database (only reachable by editing it
@@ -1004,26 +958,12 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            (DateOnly Date, int? UnitOfMeasureId, decimal Price)? newPrice = null;
-            if (source == RawMaterialSource.Purchased && HasNewPrice())
-            {
-                var entry = new RawMaterialPriceHistory { Price = EditingPrice ?? 0m };
-                var priceValidation = _priceHistoryValidator.Validate(entry);
-                if (!priceValidation.IsValid)
-                {
-                    ErrorMessage = string.Join(" ", priceValidation.Errors.Select(e => e.ErrorMessage));
-                    return;
-                }
-
-                newPrice = (DateOnly.FromDateTime(DateTime.Today), EditingPurchaseUnit!.Unit?.UnitOfMeasureId, entry.Price);
-            }
-
             var bomLines = source == RawMaterialSource.Made ? ChangedBomLines() : null;
 
-            var id = await _rawMaterialRepository.SaveAsync(material, [.. UnitRows.Select(r => r.Unit)], newPrice, bomLines, CancellationToken.None);
+            var id = await _rawMaterialRepository.SaveAsync(material, [.. UnitRows.Select(r => r.Unit)], brandPrices, bomLines, CancellationToken.None);
 
             // The list picks up any cost that cascaded to other materials; then the form reloads what
-            // was saved, so new units get their ids and the price history and BOM show the new rows.
+            // was saved, so new units get their ids and the brand prices, price history and BOM show the new rows.
             await LoadCommand.Execute();
             await ReloadSavedRawMaterialAsync(id);
             SuccessMessage = $"{EditingName} was saved.";
@@ -1048,7 +988,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
             {
                 await RunSafelyAsync(async () =>
                 {
-                    var category = new RawMaterialCategory { Name = name.Trim() };
+                    // For the material's own type, the only kind the picker offers it.
+                    var category = new RawMaterialCategory { Name = name.Trim(), Type = EditingType };
 
                     var validation = _categoryValidator.Validate(category);
                     if (!validation.IsValid)
@@ -1078,13 +1019,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
             () =>
             {
                 var removed = SelectedUnitRow!.Unit;
-                if (ReferenceEquals(removed, _purchaseAddedUnit))
-                {
-                    _purchaseAddedUnit = null;
-                }
-
+                _brandAddedUnits.Remove(removed);
                 ReplaceUnitRows([.. UnitRows.Select(r => r.Unit).Where(u => !ReferenceEquals(u, removed))], selectedUnit: null);
-                RebuildPurchaseUnitOptions();
+                RefreshBrandPriceRows();
+                UpdatePurchaseCostTexts();
             },
             hasSelectedUnitRow);
 
@@ -1107,16 +1045,23 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
                 (material, unit, quantity) => material is not null && unit is not null && quantity > 0));
 
         DeletePriceCommand = ReactiveCommand.CreateFromTask(
-            () => RunWithConfirmationAsync("Delete this price entry? This can't be undone.", async () =>
+            () => RunWithConfirmationAsync("Delete this price history entry? The material's cost stays as it is. This can't be undone.", async () =>
             {
                 await _priceHistoryRepository.DeleteAsync(SelectedPriceRow!.Entry.Id, CancellationToken.None);
 
-                // A merge picks up the material's new cost and keeps the form's unsaved edits, which
-                // selecting the refreshed material would reload away. Only the history itself reloads.
-                await LoadCommand.Execute();
+                // The history is only a log, so the cost stays and the form keeps its unsaved edits. Only the history reloads.
                 await LoadPriceHistoryAsync(SelectedRawMaterial);
             }),
             this.WhenAnyValue(x => x.SelectedPriceRow).Select(row => row is not null));
+
+        // Nothing to confirm: the brand only leaves the grid, and its price goes when the material is saved.
+        RemoveBrandPriceCommand = ReactiveCommand.Create(
+            () =>
+            {
+                BrandPriceRows.Remove(SelectedBrandPriceRow!);
+                DropUnusedAddedUnits(pickedRow: null);
+            },
+            this.WhenAnyValue(x => x.SelectedBrandPriceRow).Select(row => row is not null));
 
         RemoveBomLineCommand = ReactiveCommand.Create(
             () => { BomLineEdits.Remove(SelectedBomLineEdit!); },
@@ -1174,25 +1119,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
         return $"Also linked to {linkedTo.Name}: {parts}. With this one, {totals} (at most 100% each).";
     }
 
-    /// <summary>Sets the buffer percent or the buffered price from the other without that setting the first one back.</summary>
-    private void SyncCostBuffer(Action set)
-    {
-        _syncingCostBuffer = true;
-        try
-        {
-            set();
-        }
-        finally
-        {
-            _syncingCostBuffer = false;
-        }
-    }
-
     /// <summary>
     /// An empty form, for New and after Delete. It starts as a purchased ingredient, the usual kind, but
-    /// the category, purchase unit and the usage example's material start empty, so none is saved or
-    /// costed by accident. The numbers keep a value: the price and cost buffer are 0, and the usage
-    /// example's quantity stays.
+    /// the category, brand prices and the usage example's material start empty, so none is saved or
+    /// costed by accident. The numbers keep a value: the cost buffer is 0, and the usage example's
+    /// quantity stays.
     /// </summary>
     private void ClearForm()
     {
@@ -1233,6 +1164,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
     private void ResetDetails(RawMaterial? material)
     {
         SelectedPriceRow = null;
+        SelectedBrandPriceRow = null;
         SelectedBomLineEdit = null;
         LoadUnitRows(material);
         if (material is not null)
@@ -1242,7 +1174,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// A new material's details: no alternative units, price history or BOM lines. Selecting nothing
+    /// A new material's details: no alternative units, brand prices, price history or BOM lines. Selecting nothing
     /// clears them only when something was selected, and after an unsaved new material nothing was.
     /// </summary>
     private void ClearDetails()
@@ -1252,8 +1184,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
         LastUpdatedText = "—";
         BomLineEdits.Clear();
         _savedBomLines = [];
+        BrandPriceRows.Clear();
+        _savedBrandPriceCount = 0;
         UpdateCanChangeBaseUnit();
-        ResetPurchaseSetup();
     }
 
     /// <summary>The form's alternative units, from <paramref name="material"/>'s saved ones (none for a new material).</summary>
@@ -1271,13 +1204,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
             Description = u.Description,
         });
 
-        _purchaseAddedUnit = null;
+        _brandAddedUnits.Clear();
         ReplaceUnitRows([.. units], selectedUnit: null);
-        RebuildPurchaseUnitOptions();
+        RefreshBrandPriceRows();
         UpdateCanChangeBaseUnit();
     }
 
-    /// <summary>Shows the base unit on the form's alternative units, and rebuilds the purchase unit choices, keeping what's picked.</summary>
+    /// <summary>Shows the base unit on the form's alternative units and in the purchase unit choices.</summary>
     private void RebuildUnitViews()
     {
         UpdateUnitRowsBaseUnit();
@@ -1324,13 +1257,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
     private UnitOfMeasure? FindUnitOfMeasure(int id) => UnitsOfMeasure.FirstOrDefault(u => u.Id == id);
 
     /// <summary>
-    /// What an edit in the Alternative Units grid does: a row added there, or a row's unit or multiplier changed, shows in
-    /// the purchase unit choices straight away, and the add row goes once there are two units.
+    /// What an edit in the Alternative Units grid does: a brand bought in a unit whose multiplier changed there is repriced
+    /// straight away, and the add row goes once there are two units.
     /// </summary>
     private void OnUnitRowsEdited()
     {
         CanAddUnit = UnitRows.Count < UnitConversionRules.MaxAlternativeUnits;
-        RebuildPurchaseUnitOptions();
+        RefreshBrandPriceRows();
+        UpdatePurchaseCostTexts();
     }
 
     /// <summary>
@@ -1350,8 +1284,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
 
             if (unit.BaseUnitsPerUnit <= 0)
             {
-                // A unit added by picking it as the purchase unit gets its multiplier from Quantity per Purchase Unit.
-                var where = ReferenceEquals(unit, _purchaseAddedUnit) ? "Quantity per Purchase Unit" : "Alternative Units";
+                // A unit added by picking it on a brand row gets its multiplier from that row's quantity.
+                var where = _brandAddedUnits.Contains(unit) ? "Qty per Purchase Unit" : "Alternative Units";
                 throw new InvalidOperationException($"Enter how many {BaseUnitAbbreviation} are in one {unit.UnitOfMeasure?.Name ?? "unit"} ({where}).");
             }
 
@@ -1371,125 +1305,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// The Purchase Cost Setup's units: the base unit, then the form's alternative units, saved or not,
-    /// then, while there's room for another, the units of measure it doesn't have yet (marked new).
-    /// Keeps the unit picked while it's still there; otherwise picks as ResetPurchaseSetup does.
-    /// </summary>
-    private void RebuildPurchaseUnitOptions()
-    {
-        // Read first: the picker can clear its own selection when its items go.
-        var picked = EditingPurchaseUnit;
-
-        var form = new RawMaterial { Type = EditingType, BaseUnit = EditingBaseUnit, Units = [.. UnitRows.Select(r => r.Unit)] };
-        _syncingPurchaseSetup = true;
-        try
-        {
-            PurchaseUnitOptions.Clear();
-            PurchaseUnitOptions.AddRange(RawMaterialUnitOption.For(form));
-            PurchaseUnitOptions.AddRange(NewPurchaseUnitOptions(form));
-        }
-        finally
-        {
-            _syncingPurchaseSetup = false;
-        }
-
-        SetPurchaseUnit((picked is { IsNew: false } ? PurchaseUnitOptions.FirstOrDefault(o => !o.IsNew && ReferenceEquals(o.Unit, picked.Unit)) : null)
-            ?? DefaultPurchaseUnit());
-    }
-
-    /// <summary>
-    /// The units of measure the form doesn't have yet, which picking as the purchase unit adds. Only
-    /// while there's room for another alternative unit; the one already added here doesn't count, since
-    /// picking a new unit replaces it. The base unit is never offered: a packaging material's own, or a
-    /// unit of measure named like an ingredient's gram, which has no unit of measure row of its own.
-    /// </summary>
-    private List<RawMaterialUnitOption> NewPurchaseUnitOptions(RawMaterial form)
-    {
-        if (UnitRows.Count(r => !ReferenceEquals(r.Unit, _purchaseAddedUnit)) >= UnitConversionRules.MaxAlternativeUnits)
-        {
-            return [];
-        }
-
-        var baseUnitId = EditingType == RawMaterialType.Packaging ? EditingBaseUnit?.Id : null;
-        return
-        [
-            .. UnitsOfMeasure
-                .Where(u => u.Id != baseUnitId && UnitRows.All(r => r.Unit.UnitOfMeasureId != u.Id) && !IsNamedLikeTheBaseUnit(u))
-                .Select(u => new RawMaterialUnitOption(new RawMaterialUnit { UnitOfMeasureId = u.Id, UnitOfMeasure = u }, form, isNew: true)),
-        ];
-    }
-
-    private bool IsNamedLikeTheBaseUnit(UnitOfMeasure unit) =>
-        string.Equals(unit.Name, BaseUnitName, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(unit.Abbreviation, BaseUnitAbbreviation, StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// What picking a purchase unit does: a new one becomes an alternative unit, and any other takes back
-    /// one added that way. Neither replaces the picker's items: a ComboBoxAdv whose items are replaced
-    /// while it's still handling the pick falls back to its first item. So the picked option becomes
-    /// the added unit's own, and only its IsNew flag changes.
-    /// </summary>
-    private void OnPurchaseUnitPicked(RawMaterialUnitOption? picked)
-    {
-        // The picker clears itself while its items are replaced.
-        if (picked is null)
-        {
-            return;
-        }
-
-        if (!ReferenceEquals(picked.Unit, _purchaseAddedUnit))
-        {
-            DropPurchaseAddedUnit();
-        }
-
-        if (picked.IsNew)
-        {
-            picked.IsNew = false;
-            _purchaseAddedUnit = picked.Unit;
-            ReplaceUnitRows([.. UnitRows.Select(r => r.Unit), picked.Unit!], SelectedUnitRow?.Unit);
-        }
-
-        SetPurchaseUnit(picked);
-    }
-
-    /// <summary>
-    /// Takes the unit added through the Purchase Cost Setup back out of the rows, and makes its option
-    /// new again, in case it's picked again.
-    /// </summary>
-    private void DropPurchaseAddedUnit()
-    {
-        var added = _purchaseAddedUnit;
-        if (added is null)
-        {
-            return;
-        }
-
-        _purchaseAddedUnit = null;
-        ReplaceUnitRows([.. UnitRows.Select(r => r.Unit).Where(u => !ReferenceEquals(u, added))], SelectedUnitRow?.Unit);
-        if (PurchaseUnitOptions.FirstOrDefault(o => ReferenceEquals(o.Unit, added)) is { } option)
-        {
-            option.IsNew = true;
-        }
-    }
-
-    /// <summary>Picks a purchase unit for the user and shows its quantity: its multiplier, or empty for a unit added here that has none yet.</summary>
-    private void SetPurchaseUnit(RawMaterialUnitOption? option)
-    {
-        _syncingPurchaseSetup = true;
-        try
-        {
-            EditingPurchaseUnit = option;
-            EditingPurchaseQuantity = option is { BaseUnitsPerUnit: > 0 } ? option.BaseUnitsPerUnit : null;
-        }
-        finally
-        {
-            _syncingPurchaseSetup = false;
-        }
-    }
-
     private void UpdateCanChangeBaseUnit() =>
-        CanChangeBaseUnit = SelectedRawMaterial is null || (SelectedRawMaterial.Units.Count == 0 && PriceHistory.Count == 0);
+        CanChangeBaseUnit = SelectedRawMaterial is null
+            || (SelectedRawMaterial.Units.Count == 0 && _savedBrandPriceCount == 0 && PriceHistory.Count == 0);
 
     /// <summary>
     /// The usage example's unit choices for <paramref name="material"/>. Keeps the unit picked before
@@ -1506,58 +1324,183 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Puts the Purchase Cost Setup back to the latest price: its unit and amount, or the largest unit and
-    /// no price. A unit added by picking it here goes, since it's no longer the purchase unit.
+    /// The Purchase Cost Setup grid's unit choices: the base unit, then every unit of measure but one that is (or is named
+    /// like) the base unit. Left alone when nothing changed, so the grid's open unit cell keeps its list.
     /// </summary>
-    private void ResetPurchaseSetup()
+    private void RebuildPurchaseUnitOptions()
     {
-        if (_purchaseAddedUnit is not null)
+        var baseUnitId = EditingType == RawMaterialType.Packaging ? EditingBaseUnit?.Id : null;
+        List<PurchaseUnitChoice> choices =
+        [
+            new(PurchaseUnitChoice.BaseUnitKey, BaseUnitText.NameOf(EditingType, EditingBaseUnit), BaseUnitText.AbbreviationOf(EditingType, EditingBaseUnit)),
+            .. UnitsOfMeasure
+                .Where(u => u.Id != baseUnitId && !IsNamedLikeTheBaseUnit(u))
+                .Select(u => new PurchaseUnitChoice(u.Id, u.Name, u.Abbreviation)),
+        ];
+
+        if (!choices.SequenceEqual(PurchaseUnitOptions))
         {
-            DropPurchaseAddedUnit();
-            RebuildPurchaseUnitOptions();
+            PurchaseUnitOptions.Clear();
+            PurchaseUnitOptions.AddRange(choices);
+        }
+    }
+
+    private bool IsNamedLikeTheBaseUnit(UnitOfMeasure unit) =>
+        string.Equals(unit.Name, BaseUnitText.NameOf(EditingType, EditingBaseUnit), StringComparison.OrdinalIgnoreCase)
+        || string.Equals(unit.Abbreviation, BaseUnitText.AbbreviationOf(EditingType, EditingBaseUnit), StringComparison.OrdinalIgnoreCase);
+
+    RawMaterialUnit? IBrandPriceRowHost.FindUnit(int unitOfMeasureId) =>
+        UnitRows.FirstOrDefault(r => r.Unit.UnitOfMeasureId == unitOfMeasureId)?.Unit;
+
+    void IBrandPriceRowHost.SetMultiplier(int unitOfMeasureId, decimal baseUnitsPerUnit)
+    {
+        if (UnitRows.FirstOrDefault(r => r.Unit.UnitOfMeasureId == unitOfMeasureId) is { } row)
+        {
+            SyncUnitRows(() => row.BaseUnitsPerUnit = baseUnitsPerUnit);
+            RefreshBrandPriceRows();
+            UpdatePurchaseCostTexts();
+        }
+    }
+
+    decimal IBrandPriceRowHost.CostBufferPercent => EditingCostBufferPercent ?? 0m;
+
+    /// <summary>
+    /// What picking a unit on a brand row does: one the material doesn't have yet is added as an alternative unit, with its
+    /// multiplier typed as the row's quantity, while there's room for another; and one added that way that no row is in
+    /// any more goes. <paramref name="row"/> may still be the grid's add row, which isn't in BrandPriceRows yet.
+    /// </summary>
+    void IBrandPriceRowHost.OnUnitPicked(BrandPriceRow row)
+    {
+        DropUnusedAddedUnits(row);
+
+        if (row.UnitKey is not { } key || key == PurchaseUnitChoice.BaseUnitKey || ((IBrandPriceRowHost)this).FindUnit(key) is not null)
+        {
+            return;
         }
 
-        SetPurchaseUnit(DefaultPurchaseUnit());
-        EditingPrice = PriceHistory.FirstOrDefault()?.Entry.Price;
+        if (UnitRows.Count >= UnitConversionRules.MaxAlternativeUnits)
+        {
+            ErrorMessage = $"A material can have at most {UnitConversionRules.MaxAlternativeUnits} alternative units. "
+                + "Pick one it already has, or remove one in Alternative Units first.";
+            return;
+        }
+
+        var unit = new RawMaterialUnit { UnitOfMeasureId = key, UnitOfMeasure = FindUnitOfMeasure(key) };
+        _brandAddedUnits.Add(unit);
+        ReplaceUnitRows([.. UnitRows.Select(r => r.Unit), unit], SelectedUnitRow?.Unit);
+        RefreshBrandPriceRows();
     }
 
     /// <summary>
-    /// The latest price's unit, or for an unpriced material its largest unit, else the base unit. Never a
-    /// new unit, which picking would add as an alternative unit. None for a new material, whose purchase
-    /// unit starts empty, like its category (ClearForm).
+    /// Takes back out of the alternative units each one added by picking it on a brand row that no row, nor
+    /// <paramref name="pickedRow"/> (a row still being added), is in any more.
     /// </summary>
-    private RawMaterialUnitOption? DefaultPurchaseUnit()
+    private void DropUnusedAddedUnits(BrandPriceRow? pickedRow)
     {
-        if (SelectedRawMaterial is null)
+        var usedKeys = BrandPriceRows.Append(pickedRow).Select(r => r?.UnitKey).ToHashSet();
+        var unused = _brandAddedUnits.Where(u => !usedKeys.Contains(u.UnitOfMeasureId)).ToList();
+        if (unused.Count == 0)
         {
-            return null;
+            return;
         }
 
-        var latest = PriceHistory.FirstOrDefault()?.Entry;
-        var options = PurchaseUnitOptions.Where(o => !o.IsNew).ToList();
-        return (latest is not null
-                ? options.FirstOrDefault(o => o.UnitId == latest.UnitId)
-                : options.Skip(1).FirstOrDefault())
-            ?? options.FirstOrDefault();
+        foreach (var unit in unused)
+        {
+            _brandAddedUnits.Remove(unit);
+        }
+
+        ReplaceUnitRows([.. UnitRows.Select(r => r.Unit).Where(u => !unused.Contains(u))], SelectedUnitRow?.Unit);
+        RefreshBrandPriceRows();
+        UpdatePurchaseCostTexts();
+    }
+
+    /// <summary>Shows each brand row's quantity and buffered price as the units and buffer now are.</summary>
+    private void RefreshBrandPriceRows()
+    {
+        foreach (var row in BrandPriceRows)
+        {
+            row.Refresh();
+        }
+    }
+
+    /// <summary>The summary under the grid: the dearest brand per base unit, as Save will cost the material, with the buffer on top.</summary>
+    private void UpdatePurchaseCostTexts()
+    {
+        var priced = BrandPriceRows.Where(r => r.CostPerBaseUnit is not null).ToList();
+        if (RawMaterialRules.FindDearestBrandPrice([.. priced.Select(r => (r.Price!.Value, r.Quantity))]) is not { } dearest)
+        {
+            PurchaseCostText = "—";
+            PurchaseBufferedCostText = string.Empty;
+            PurchaseCostSourceText = string.Empty;
+            return;
+        }
+
+        var cost = priced[dearest].CostPerBaseUnit!.Value;
+        var buffer = EditingCostBufferPercent ?? 0m;
+        PurchaseCostText = $"₱{cost:N4}";
+        PurchaseBufferedCostText = $"Buffered ({buffer:0.##}%): ₱{RawMaterialRules.BufferedCost(cost, buffer):N4}";
+        PurchaseCostSourceText = priced.Count > 1
+            ? $"From {RawMaterialRules.NormalizeBrand(priced[dearest].Brand) ?? "the unnamed brand"}, the dearest of {priced.Count} brands."
+            : string.Empty;
     }
 
     /// <summary>
-    /// Whether Save adds a price entry: the Purchase Cost Setup's unit or amount differs from the latest
-    /// price, or an unpriced material has a price typed in. An unsaved unit's id is 0, which never
-    /// matches the latest price's unit. An empty field on a priced material also counts, and is then
-    /// rejected: a price goes by deleting its entry (PriceHistoryRules.IsNewPrice).
+    /// The brand rows as Save sends them. Each needs a unit and a price, and its quantity when the unit is new; a row
+    /// with nothing typed into it is left out. Throws InvalidOperationException for the first problem, which
+    /// RunSafelyAsync shows.
     /// </summary>
-    private bool HasNewPrice()
+    private List<(string? Brand, int? UnitOfMeasureId, decimal Price)> CompleteBrandPrices()
     {
-        if (EditingPurchaseUnit is null)
+        var prices = new List<(string? Brand, int? UnitOfMeasureId, decimal Price)>();
+        foreach (var row in BrandPriceRows)
         {
-            return false;
+            var brand = RawMaterialRules.NormalizeBrand(row.Brand);
+            if (brand is null && row.UnitKey is null && row.Price is null)
+            {
+                continue;
+            }
+
+            if (row.UnitKey is not { } key)
+            {
+                throw new InvalidOperationException(brand is null
+                    ? "Pick the purchase unit every price is for, or remove the empty row."
+                    : $"Pick the purchase unit '{brand}' is priced in.");
+            }
+
+            if (key != PurchaseUnitChoice.BaseUnitKey && ((IBrandPriceRowHost)this).FindUnit(key) is null)
+            {
+                throw new InvalidOperationException(
+                    $"{(brand is null ? "A price" : $"'{brand}'")} is in a unit this material doesn't have. Pick another, or add it in Alternative Units.");
+            }
+
+            var validation = _brandPriceValidator.Validate(new RawMaterialBrandPrice { Brand = brand, Price = row.Price ?? 0m });
+            if (!validation.IsValid)
+            {
+                throw new InvalidOperationException(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage)));
+            }
+
+            prices.Add((brand, key == PurchaseUnitChoice.BaseUnitKey ? null : key, row.Price!.Value));
         }
 
-        var latest = PriceHistory.FirstOrDefault()?.Entry;
-        return latest is null
-            ? PriceHistoryRules.IsNewPrice(null, EditingPrice)
-            : latest.UnitId != EditingPurchaseUnit.UnitId || PriceHistoryRules.IsNewPrice(latest.Price, EditingPrice);
+        RawMaterialRules.EnsureDistinctBrandPrices(prices.Select(p => (p.Brand, p.UnitOfMeasureId)));
+        return prices;
+    }
+
+    private async Task LoadBrandPricesAsync(RawMaterial? material)
+    {
+        BrandPriceRows.Clear();
+        _savedBrandPriceCount = 0;
+
+        if (material is { Source: RawMaterialSource.Purchased })
+        {
+            var brandPrices = await _brandPriceRepository.GetForRawMaterialAsync(material.Id, CancellationToken.None);
+            BrandPriceRows.AddRange(brandPrices.Select(p =>
+                new BrandPriceRow(this, p.Brand, p.Unit?.UnitOfMeasureId ?? PurchaseUnitChoice.BaseUnitKey, p.Price)));
+            _savedBrandPriceCount = brandPrices.Count;
+        }
+
+        UpdateCanChangeBaseUnit();
+        UpdatePurchaseCostTexts();
     }
 
     /// <summary>The BOM editor's lines when they differ from those last loaded, or null to leave the saved BOM as it is.</summary>
@@ -1603,7 +1546,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable
 
         LastUpdatedText = PriceHistory.FirstOrDefault()?.Date.ToString("MMM d, yyyy", CultureInfo.CurrentCulture) ?? "—";
         UpdateCanChangeBaseUnit();
-        ResetPurchaseSetup();
     }
 
     /// <summary>

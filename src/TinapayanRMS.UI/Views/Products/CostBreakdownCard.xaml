@@ -28,8 +28,6 @@
     <!-- One piece's selling price, from its materials up: each part per piece and as a share of the price. -->
     <StackPanel>
         <TextBlock Text="Recipe Cost Breakdown" Style="{StaticResource PanelHeaderStyle}" />
-        <TextBlock Text="What one piece's selling price is made of, from its materials to the price with VAT."
-                   Style="{StaticResource PanelCaptionStyle}" />
 
         <Grid>
             <Grid.ColumnDefinitions>

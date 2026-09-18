@@ -121,6 +121,51 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.Rows.Should().ContainSingle();
     }
 
+    [Fact]
+    public async Task In_the_packaging_role_the_form_saves_and_reloads_a_packaging_set()
+    {
+        await AddRoleAsync("Glaze");
+        await AddRoleAsync("Packaging", sortOrder: 2, isPackaging: true);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        int boxId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var box = new RawMaterial
+            {
+                Type = RawMaterialType.Packaging,
+                Name = "Gift Box",
+                Category = new RawMaterialCategory { Name = "Boxes" },
+                BaseUnitId = pieceId,
+                CostPerBaseUnit = 30m,
+                BufferedCostPerBaseUnit = 33m,
+            };
+            dbContext.RawMaterials.Add(box);
+            await dbContext.SaveChangesAsync(Cancellation);
+            boxId = box.Id;
+        }
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.IsPackaging.Should().BeFalse("a new form takes the first role, Glaze");
+
+        viewModel.EditingRole = viewModel.Roles.Single(r => r.IsPackaging);
+        viewModel.IsPackaging.Should().BeTrue();
+        viewModel.EditingName = "Gift Box Set";
+        viewModel.PackagingLines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 2m });
+        viewModel.SetCost.Should().Be(66m, "two boxes at their buffered ₱33");
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SuccessMessage.Should().Be("Gift Box Set was saved.");
+        await WaitUntilSettledAsync(() => viewModel.PackagingLines.Count == 1, () => $"packaging lines={viewModel.PackagingLines.Count}");
+        viewModel.IsPackaging.Should().BeTrue();
+        viewModel.Lines.Should().BeEmpty();
+        viewModel.PackagingLines.Single().Unit.Should().Be("pc");
+        viewModel.SetCost.Should().Be(66m);
+        viewModel.UsedByText.Should().Contain("Add Sub-Assembly");
+    }
+
     private SubAssembliesViewModel CreateViewModel()
     {
         ReactiveUIBootstrapper.EnsureInitialized();

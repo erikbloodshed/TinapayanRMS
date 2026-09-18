@@ -22,17 +22,12 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Categories" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-                <TextBlock Grid.Row="1"
-                           Text="One list for all raw materials. Ingredients and packaging can share a category."
-                           Style="{StaticResource CaptionStyle}"
-                           Margin="0,0,0,12" />
+                <TextBlock Grid.Row="0" Text="Categories" Style="{StaticResource SectionHeaderStyle}" />
 
-                <syncfusion:SfDataGrid Grid.Row="2"
+                <syncfusion:SfDataGrid Grid.Row="1"
                                        ItemsSource="{Binding Categories}"
                                        SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
                                        GridLinesVisibility="Both"
@@ -46,6 +41,7 @@
                                        ColumnSizer="Star">
                     <syncfusion:SfDataGrid.Columns>
                         <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
+                        <syncfusion:GridTextColumn MappingName="Type" HeaderText="Type" Width="120" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </Grid>
@@ -60,6 +56,13 @@
                 <syncfusion:SfTextBoxExt x:Name="NameTextBox"
                                          Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          Margin="0,0,0,12" />
+
+                <!-- Which materials it's for: a material only goes in a category of its own type -->
+                <TextBlock Text="Type" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:ComboBoxAdv ItemsSource="{Binding Types}"
+                                        SelectedItem="{Binding EditingType, Mode=TwoWay}"
+                                        ToolTip="Ingredient categories are offered to ingredients, packaging ones to packaging materials. It can't change while a material is in it."
+                                        Margin="0,0,0,12" />
 
                 <StackPanel Orientation="Horizontal">
                     <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />

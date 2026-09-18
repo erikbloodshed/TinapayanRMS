@@ -7,12 +7,16 @@ namespace TinapayanRMS.ApplicationCore.Interfaces;
 /// One of the product's own sub-assemblies as Save writes it: its role, which is what it's called, its gram
 /// lines, and the product's piece size for it (an owner always uses its own sub-assemblies). Id is 0 for a new one.
 /// </summary>
+/// <param name="Name">
+/// Optional: what tells it apart from others in its role, e.g. "Ube" beside "Cheese" (SubAssemblyRules.EnsureSectionsDistinct).
+/// </param>
 public sealed record OwnedSubAssemblyDraft(
     int Id,
     int RoleId,
     IReadOnlyList<RecipeLine> Lines,
     UsageAuthoredField AuthoredField,
-    decimal AuthoredValue);
+    decimal AuthoredValue,
+    string? Name = null);
 
 /// <summary>A sub-assembly the product links (another product's, or a standalone one), at the product's own piece size.</summary>
 public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField AuthoredField, decimal AuthoredValue)
@@ -31,6 +35,16 @@ public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField Auth
 /// longer lists.
 /// </summary>
 public sealed record RecipeDraft(IReadOnlyList<OwnedSubAssemblyDraft> Owned, IReadOnlyList<LinkedUsageDraft> Linked);
+
+/// <summary>
+/// What a product's per-piece packaging links, as Save writes it: another product's packaging, a standalone packaging
+/// set (one set per piece), or neither (<see cref="None"/>), when the product owns its packaging lines.
+/// </summary>
+public sealed record PackagingLinkDraft(int? LinkedProductId, int? LinkedSubAssemblyId)
+{
+    /// <summary>No link: the product's packaging is its own lines.</summary>
+    public static PackagingLinkDraft None { get; } = new(null, null);
+}
 
 public interface IProductRepository
 {
@@ -55,12 +69,18 @@ public interface IProductRepository
     /// The product's complete recipe of sub-assemblies, or null to leave it as it is. An owned
     /// sub-assembly it no longer lists is deleted, unless another product links it.
     /// </param>
+    /// <param name="packagingLink">
+    /// What the per-piece packaging links from now on, or null to leave the link as it is. Written before the lines, so
+    /// a product unlinked here can be given its own lines in the same save. Removing a link doesn't copy the lines it
+    /// showed: pass them as <paramref name="packagingLines"/>.
+    /// </param>
     /// <param name="packagingLines">The new per-piece packaging lines, as IPackagingLineRepository.SetLinesAsync takes them, or null to leave them as they are.</param>
     /// <param name="packs">The product's complete set of sellable packs with their own lines, or null to leave them as they are. A pack it no longer lists is deleted with its lines.</param>
     /// <param name="costing">The new costing parameters (only their cost and percentage fields are read), or null to leave them as they are.</param>
     Task<int> SaveAsync(
         Product product,
         RecipeDraft? recipe,
+        PackagingLinkDraft? packagingLink,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? packagingLines,
         IReadOnlyList<ProductPackDraft>? packs,
         CostingParameters? costing,

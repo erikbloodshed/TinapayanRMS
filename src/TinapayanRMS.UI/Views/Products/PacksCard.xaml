@@ -11,9 +11,6 @@
     -->
     <StackPanel Margin="8">
         <TextBlock Text="Packs" Style="{StaticResource PanelHeaderStyle}" />
-        <TextBlock Text="How this product is sold in multiples — a pack of 8, a pack of 12. A pack costs the pieces it holds plus its own box, and is priced with the same margin and VAT as one piece."
-                   Style="{StaticResource PanelCaptionStyle}"
-                   TextWrapping="Wrap" />
 
         <syncfusion:SfDataGrid ItemsSource="{Binding PackEdits}"
                                SelectedItem="{Binding SelectedPackEdit, Mode=TwoWay}"
@@ -28,7 +25,6 @@
                                SelectionMode="Single"
                                ColumnSizer="Star"
                                controls:GridEditCommit.OnFocusLeave="True"
-                               Margin="0,10,0,0"
                                Height="170">
             <syncfusion:SfDataGrid.Columns>
                 <syncfusion:GridTextColumn MappingName="Name" HeaderText="Pack" />
@@ -44,9 +40,6 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBlock Text="Add a pack, then name it and set how many pieces it holds."
-                       Style="{StaticResource CaptionStyle}"
-                       VerticalAlignment="Center" />
             <syncfusion:ButtonAdv Grid.Column="1" Label="Add Pack" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding AddPackCommand}" Margin="0,0,8,0" />
             <syncfusion:ButtonAdv Grid.Column="2" Label="Remove Pack" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemovePackCommand}" />
         </Grid>
@@ -58,11 +51,9 @@
             <TextBlock Style="{StaticResource PanelHeaderStyle}">
                 <Run Text="Packaging for one " /><Run Text="{Binding Name, Mode=OneWay}" />
             </TextBlock>
-            <TextBlock Text="The box, label and ribbon this pack takes — once a pack, however many pieces go in. Quantities are in each material's own base unit."
-                       Style="{StaticResource PanelCaptionStyle}"
-                       TextWrapping="Wrap" />
 
             <syncfusion:SfDataGrid ItemsSource="{Binding LineEdits}"
+                                   controls:NumericEditing.IsEnabled="True"
                                    SelectedItem="{Binding SelectedLineEdit, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"
@@ -80,7 +71,6 @@
                                    controls:GridAddNewRow.DropWhenUntouched="True"
                                    controls:AutoCompleteDropDown.IsEnabled="True"
                                    controls:GridAddNewRow.ItemFactory="{Binding NewLineEdit}"
-                                   Margin="0,10,0,0"
                                    Height="180">
                 <syncfusion:SfDataGrid.Columns>
                     <syncfusion:GridMultiColumnDropDownList MappingName="PackagingMaterialId"
@@ -106,7 +96,7 @@
                             </syncfusion:Columns>
                         </syncfusion:GridMultiColumnDropDownList.Columns>
                     </syncfusion:GridMultiColumnDropDownList>
-                    <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="4" />
+                    <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
                     <syncfusion:GridTextColumn MappingName="Unit" HeaderText="Unit" Width="64" AllowEditing="False" />
                     <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" AllowEditing="False" />
                     <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Pack" Width="104" NumberDecimalDigits="4" AllowEditing="False" />
@@ -118,7 +108,6 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="Type the lines straight into the table." Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" />
                 <syncfusion:ButtonAdv Grid.Column="1"
                                       Label="Remove Line"
                                       IconTemplate="{StaticResource RemoveIconTemplate}"

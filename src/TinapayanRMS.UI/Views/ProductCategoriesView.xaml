@@ -22,17 +22,12 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Product Categories" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,4" />
-                <TextBlock Grid.Row="1"
-                           Text="What the Products list groups products under. A product without one is listed as Uncategorized."
-                           Style="{StaticResource CaptionStyle}"
-                           Margin="0,0,0,12" />
+                <TextBlock Grid.Row="0" Text="Product Categories" Style="{StaticResource SectionHeaderStyle}" />
 
-                <syncfusion:SfDataGrid Grid.Row="2"
+                <syncfusion:SfDataGrid Grid.Row="1"
                                        ItemsSource="{Binding Categories}"
                                        SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
                                        GridLinesVisibility="Both"

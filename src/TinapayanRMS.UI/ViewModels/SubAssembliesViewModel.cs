@@ -73,6 +73,36 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
     /// <summary>The formula base as last worked out, for a line started in the add row.</summary>
     private decimal _formulaBase;
 
+    /// <summary>The packaging materials, for a packaging set's lines.</summary>
+    public ObservableCollection<RawMaterial> PackagingMaterials { get; } = [];
+
+    /// <summary>A packaging set's lines, typed straight into the table: how much of each material one set takes.</summary>
+    public ObservableCollection<PackagingLineRow> PackagingLines { get; } = [];
+
+    /// <summary>The line the packaging table's add row edits: it prices itself as its material is picked.</summary>
+    public Func<PackagingLineRow> NewPackagingLine => () => new PackagingLineRow(id => PackagingMaterials.FirstOrDefault(m => m.Id == id));
+
+    private PackagingLineRow? _selectedPackagingLine;
+    public PackagingLineRow? SelectedPackagingLine
+    {
+        get => _selectedPackagingLine;
+        set => this.RaiseAndSetIfChanged(ref _selectedPackagingLine, value);
+    }
+
+    private decimal _setCost;
+    /// <summary>What one packaging set costs, at its materials' buffered costs: a linking product's packaging per piece.</summary>
+    public decimal SetCost
+    {
+        get => _setCost;
+        private set => this.RaiseAndSetIfChanged(ref _setCost, value);
+    }
+
+    /// <summary>
+    /// The form is a packaging set: its role is the Packaging role, so it takes packaging materials per set instead of
+    /// ingredients in grams, and the screen shows the packaging table in place of the recipe's.
+    /// </summary>
+    public bool IsPackaging => EditingRole?.IsPackaging == true;
+
     private StandaloneSubAssemblyRow? _selectedRow;
     public StandaloneSubAssemblyRow? SelectedRow
     {
@@ -98,7 +128,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
     public SubAssemblyRole? EditingRole
     {
         get => _editingRole;
-        set => this.RaiseAndSetIfChanged(ref _editingRole, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _editingRole, value);
+            this.RaisePropertyChanged(nameof(IsPackaging));
+        }
     }
 
     private string _headerTitle = "New sub-assembly";
@@ -164,6 +198,8 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
 
     private const string NotUsedText = "No product uses it yet. Link or copy it from a product's recipe on the Products screen.";
 
+    private const string SetNotUsedText = "No product uses it yet. Link it from a product's Recipe Structure: Add Sub-Assembly, Link an existing one.";
+
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
@@ -205,6 +241,14 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
             .AutoRefresh(l => l.Cost)
             .Subscribe(_ => RecomputeTotals());
 
+        // A packaging set's lines price themselves as their material is picked, and the set's cost follows.
+        PackagingLines.ToObservableChangeSet()
+            .AutoRefresh(l => l.PackagingMaterialId)
+            .Subscribe(_ => PackagingLineRow.Resolve(PackagingLines, PackagingMaterials.ToDictionary(m => m.Id)));
+        PackagingLines.ToObservableChangeSet()
+            .AutoRefresh(l => l.CostPerUnit)
+            .Subscribe(_ => SetCost = PackagingLines.Sum(l => l.CostPerUnit));
+
         // The formula's base: what's ticked, and how much of it there is.
         Lines.ToObservableChangeSet()
             .AutoRefresh(l => l.IsFormulaBase)
@@ -229,13 +273,16 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
             {
                 Roles.MergeFrom(roles, r => r.Id);
                 Ingredients.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Ingredient).OrderBy(m => m.Name)], m => m.Id);
+                PackagingMaterials.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Packaging).OrderBy(m => m.Name)], m => m.Id);
                 _rowCache.MergeFrom(subAssemblies.Select(s => new StandaloneSubAssemblyRow(s, linkedBy.GetValueOrDefault(s.Id) ?? [])));
 
                 // A form opened before the roles were loaded (a new one, shown at start) takes the first role.
                 EditingRole = Roles.FirstOrDefault(r => r.Id == roleId) ?? (_editingId == 0 && roleId is null ? Roles.FirstOrDefault() : null);
 
                 IngredientLineRow.Resolve(Lines, Ingredients.ToDictionary(m => m.Id));
+                PackagingLineRow.Resolve(PackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
                 RecomputeTotals();
+                SetCost = PackagingLines.Sum(l => l.CostPerUnit);
 
                 SelectedRow = Rows.FirstOrDefault(r => r.Id == selectedId);
                 if (_editingId > 0)
@@ -257,17 +304,35 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            var lines = IngredientLineRow.CompleteLines(Lines, name);
-            if (lines.Count == 0)
+            int id;
+            if (IsPackaging)
             {
-                ErrorMessage = $"Add the ingredients that go into {name}, in grams.";
-                return;
-            }
+                var setLines = PackagingLineRow.CompleteLines(PackagingLines, "set");
+                if (setLines.Count == 0)
+                {
+                    ErrorMessage = $"Add the packaging materials that go into {name}, per set.";
+                    return;
+                }
 
-            var id = await _subAssemblyRepository.SaveStandaloneAsync(
-                new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id },
-                [.. lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
-                CancellationToken.None);
+                id = await _subAssemblyRepository.SaveStandalonePackagingAsync(
+                    new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id },
+                    [.. setLines.Select(l => (l.PackagingMaterial.Id, l.QtyPerUnit))],
+                    CancellationToken.None);
+            }
+            else
+            {
+                var lines = IngredientLineRow.CompleteLines(Lines, name);
+                if (lines.Count == 0)
+                {
+                    ErrorMessage = $"Add the ingredients that go into {name}, in grams.";
+                    return;
+                }
+
+                id = await _subAssemblyRepository.SaveStandaloneAsync(
+                    new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id },
+                    [.. lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
+                    CancellationToken.None);
+            }
 
             // The list picks up the new totals; then the form reloads what was saved.
             await LoadCommand.Execute();
@@ -286,9 +351,24 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
             }),
             this.WhenAnyValue(x => x.SelectedRow).Select(row => row is not null));
 
+        // The line selected in whichever table is showing.
         RemoveLineCommand = ReactiveCommand.Create(
-            () => { Lines.Remove(SelectedLine!); },
-            this.WhenAnyValue(x => x.SelectedLine).Select(line => line is not null));
+            () =>
+            {
+                if (IsPackaging)
+                {
+                    PackagingLines.Remove(SelectedPackagingLine!);
+                }
+                else
+                {
+                    Lines.Remove(SelectedLine!);
+                }
+            },
+            this.WhenAnyValue(
+                x => x.SelectedLine,
+                x => x.SelectedPackagingLine,
+                x => x.IsPackaging,
+                (line, packagingLine, isPackaging) => isPackaging ? packagingLine is not null : line is not null));
     }
 
     /// <summary>A fresh form for a new sub-assembly: nothing selected, no name or lines, the first role.</summary>
@@ -302,6 +382,8 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
         EditingRole = Roles.FirstOrDefault();
         SelectedLine = null;
         Lines.Clear();
+        SelectedPackagingLine = null;
+        PackagingLines.Clear();
         UsedByText = NotUsedText;
     }
 
@@ -317,14 +399,18 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        // A sub-assembly has one kind of line or the other, as its role says.
         var version = ++_formLoadVersion;
-        var saved = await _lineRepository.GetForSubAssembliesAsync([row.Id], CancellationToken.None);
+        var isSet = row.SubAssembly.Role?.IsPackaging == true;
+        IReadOnlyList<SubAssemblyLine> saved = isSet ? [] : await _lineRepository.GetForSubAssembliesAsync([row.Id], CancellationToken.None);
+        IReadOnlyList<SubAssemblyPackagingLine> savedSet = isSet ? await _subAssemblyRepository.GetPackagingLinesAsync(row.Id, CancellationToken.None) : [];
         if (version != _formLoadVersion)
         {
             return;
         }
 
         var ingredientsById = Ingredients.ToDictionary(m => m.Id);
+        var packagingById = PackagingMaterials.ToDictionary(m => m.Id);
         _editingId = row.Id;
         HeaderTitle = row.Name;
         EditingName = row.Name;
@@ -332,13 +418,16 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
         SelectedLine = null;
         Lines.Clear();
         Lines.AddRange(saved.Select(l => new IngredientLineRow(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)));
+        SelectedPackagingLine = null;
+        PackagingLines.Clear();
+        PackagingLines.AddRange(savedSet.Select(l => new PackagingLineRow(packagingById.GetValueOrDefault(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet)));
         ShowUsedBy(row.GetUsedBy());
     }
 
     private void ShowUsedBy(IReadOnlyList<string> productNames)
     {
         UsedByText = productNames.Count == 0
-            ? NotUsedText
+            ? IsPackaging ? SetNotUsedText : NotUsedText
             : $"Used by {string.Join(", ", productNames)}. They follow every change saved here, and it can't be deleted while they use it.";
     }
 
@@ -356,7 +445,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
 
     private void RecomputeTotals()
     {
-        BatchWeight = Lines.Where(l => l.Ingredient is not null).Sum(l => l.Grams);
+        BatchWeight = Lines.Where(l => l.Ingredient is not null).Sum(l => l.Grams ?? 0m);
         BatchCost = Lines.Sum(l => l.Cost);
         CostPerGram = BatchWeight > 0 ? BatchCost / BatchWeight : 0m;
     }
