@@ -44,6 +44,20 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         var packagingLines = await PackagingLineRepository.ResolveEffectiveAsync(dbContext, sourceProductId, [], cancellationToken);
         var costing = await dbContext.CostingParameters.AsNoTracking().FirstOrDefaultAsync(c => c.ProductId == sourceProductId, cancellationToken);
 
+        // Packs are never linked — resolving the packaging through a link only ever brings per-piece lines
+        // (PackagingLineRepository.ResolveEffectiveAsync) — so the clone copies the source's own packs outright.
+        var sourcePacks = await dbContext.ProductPacks
+            .AsNoTracking()
+            .Where(p => p.ProductId == sourceProductId)
+            .OrderBy(p => p.Id)
+            .ToListAsync(cancellationToken);
+        var sourcePackLines = (await dbContext.PackagingLines
+                .AsNoTracking()
+                .Where(l => l.ProductId == sourceProductId && l.PackId != null)
+                .OrderBy(l => l.Id)
+                .ToListAsync(cancellationToken))
+            .ToLookup(l => l.PackId!.Value);
+
         var newProduct = new Product { Name = newProductName, Description = source.Description, CategoryId = source.CategoryId };
         await ProductRepository.AddAsync(dbContext, newProduct, cancellationToken);
 
@@ -86,8 +100,24 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
             await PackagingLineRepository.SetLinesAsync(
                 dbContext,
                 newProduct.Id,
+                packId: null,
                 [.. packagingLines.Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
-                    l.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? l.QtyPerPiece : l.PiecesPerPackagingUnit))],
+                    l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))],
+                cancellationToken);
+        }
+
+        if (sourcePacks.Count > 0)
+        {
+            // Id 0 throughout: every pack is the clone's own new row, with its own copy of the lines.
+            await ProductPackRepository.SetPacksAsync(
+                dbContext,
+                newProduct.Id,
+                [.. sourcePacks.Select(p => new ProductPackDraft(
+                    0,
+                    p.Name,
+                    p.PiecesPerPack,
+                    [.. sourcePackLines[p.Id].Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
+                        l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))]))],
                 cancellationToken);
         }
 

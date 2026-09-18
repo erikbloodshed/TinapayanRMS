@@ -145,7 +145,7 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
     {
         var repository = new TinapayanRMS.Infrastructure.Repositories.ProductRepository(CreateDbContextFactory());
         var product = (await repository.GetByIdAsync(productId, Cancellation))!;
-        await repository.SaveAsync(product, recipe, packagingLines: null, costing: null, Cancellation);
+        await repository.SaveAsync(product, recipe, packagingLines: null, packs: null, costing: null, Cancellation);
     }
 
     /// <summary>The id of <paramref name="productId"/>'s own sub-assembly in the role <paramref name="roleId"/>, which it has one of.</summary>

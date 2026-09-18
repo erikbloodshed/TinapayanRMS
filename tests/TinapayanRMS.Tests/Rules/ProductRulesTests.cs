@@ -136,43 +136,128 @@ public class ProductRulesTests
     }
 
     [Fact]
-    public void EnsureValidPackagingLines_rejects_non_positive_qty_per_piece()
+    public void EnsureValidPackagingLines_rejects_a_non_positive_quantity()
     {
-        var act = () => ProductRules.EnsureValidPackagingLines([(PackagingMaterialId: 1, QtyPerPiece: 0m)]);
+        var act = () => ProductRules.EnsureValidPackagingLines([(PackId: null, PackagingMaterialId: 1, QtyPerUnit: 0m)]);
 
         act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void EnsureValidPackagingLines_rejects_the_same_material_twice()
+    public void EnsureValidPackagingLines_rejects_the_same_material_twice_per_piece()
     {
         var act = () => ProductRules.EnsureValidPackagingLines(
         [
-            (PackagingMaterialId: 1, QtyPerPiece: 5m),
-            (PackagingMaterialId: 1, QtyPerPiece: 3m),
+            (PackId: null, PackagingMaterialId: 1, QtyPerUnit: 5m),
+            (PackId: null, PackagingMaterialId: 1, QtyPerUnit: 3m),
         ]);
 
         act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void ReconcileReciprocal_derives_PiecesPerPackagingUnit_from_an_authored_QtyPerPiece()
+    public void EnsureValidPackagingLines_rejects_the_same_material_twice_on_one_pack()
     {
-        // A box: 6 pieces per box means 0.1667 (1/6) of the box per piece.
-        var (qtyPerPiece, piecesPerPackagingUnit) = ProductRules.ReconcileReciprocal(PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m);
+        var act = () => ProductRules.EnsureValidPackagingLines(
+        [
+            (PackId: (int?)7, PackagingMaterialId: 1, QtyPerUnit: 1m),
+            (PackId: (int?)7, PackagingMaterialId: 1, QtyPerUnit: 2m),
+        ]);
 
-        piecesPerPackagingUnit.Should().Be(6m);
-        qtyPerPiece.Should().Be(1m / 6m);
+        act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void ReconcileReciprocal_derives_QtyPerPiece_from_an_authored_PiecesPerPackagingUnit()
+    public void EnsureValidPackagingLines_allows_one_material_to_wrap_the_piece_and_a_pack()
+    {
+        // A cello sheet around each piece, and the same sheet shrink-wrapping the pack of 12 as a whole:
+        // two different jobs for one material, so neither is the other's duplicate.
+        var act = () => ProductRules.EnsureValidPackagingLines(
+        [
+            (PackId: null, PackagingMaterialId: 1, QtyPerUnit: 1m),
+            (PackId: (int?)7, PackagingMaterialId: 1, QtyPerUnit: 1m),
+        ]);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureValidPackagingLines_allows_two_packs_to_take_the_same_material()
+    {
+        var act = () => ProductRules.EnsureValidPackagingLines(
+        [
+            (PackId: (int?)7, PackagingMaterialId: 1, QtyPerUnit: 1m),
+            (PackId: (int?)8, PackagingMaterialId: 1, QtyPerUnit: 1m),
+        ]);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void ReconcileReciprocal_derives_QtyPerUnit_from_an_authored_UnitsPerPackagingUnit()
+    {
+        // A box: 6 pieces per box means 0.1667 (1/6) of the box per piece.
+        var (qtyPerUnit, unitsPerPackagingUnit) = ProductRules.ReconcileReciprocal(PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m);
+
+        unitsPerPackagingUnit.Should().Be(6m);
+        qtyPerUnit.Should().Be(1m / 6m);
+    }
+
+    [Fact]
+    public void ReconcileReciprocal_derives_UnitsPerPackagingUnit_from_an_authored_QtyPerUnit()
     {
         // A ribbon: 12cm per piece means 1/12 of a "packaging unit of ribbon" per piece.
-        var (qtyPerPiece, piecesPerPackagingUnit) = ProductRules.ReconcileReciprocal(PackagingLineAuthoredField.QtyPerPiece, 12m);
+        var (qtyPerUnit, unitsPerPackagingUnit) = ProductRules.ReconcileReciprocal(PackagingLineAuthoredField.QtyPerUnit, 12m);
 
-        qtyPerPiece.Should().Be(12m);
-        piecesPerPackagingUnit.Should().Be(1m / 12m);
+        qtyPerUnit.Should().Be(12m);
+        unitsPerPackagingUnit.Should().Be(1m / 12m);
+    }
+
+
+    [Fact]
+    public void EnsureValidPacks_accepts_a_product_with_no_packs()
+    {
+        // Most products are sold by the piece only.
+        var act = () => ProductRules.EnsureValidPacks([]);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureValidPacks_rejects_a_pack_with_no_name()
+    {
+        var act = () => ProductRules.EnsureValidPacks([(Name: "  ", PiecesPerPack: 12)]);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void EnsureValidPacks_rejects_a_pack_that_holds_no_pieces()
+    {
+        var act = () => ProductRules.EnsureValidPacks([(Name: "Pack of 0", PiecesPerPack: 0)]);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void EnsureValidPacks_rejects_two_packs_with_the_same_name_ignoring_case()
+    {
+        var act = () => ProductRules.EnsureValidPacks([(Name: "Pack of 12", PiecesPerPack: 12), (Name: "pack of 12", PiecesPerPack: 6)]);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void CalculatePackMaterialCost_adds_the_packs_own_box_to_the_pieces_it_holds()
+    {
+        // 8 pieces at P4.50 of materials each is P36, and the box they go in is P12 on top.
+        ProductRules.CalculatePackMaterialCost(4.50m, 8, [12m]).Should().Be(48m);
+    }
+
+    [Fact]
+    public void CalculatePackMaterialCost_of_a_pack_with_no_box_is_just_its_pieces()
+    {
+        ProductRules.CalculatePackMaterialCost(4.50m, 8, []).Should().Be(36m);
     }
 
     [Fact]
@@ -184,31 +269,31 @@ public class ProductRulesTests
     }
 
     [Fact]
-    public void CalculatePackagingLineCostPerPiece_matches_the_ribbon_worked_example()
+    public void CalculatePackagingLineCost_matches_the_ribbon_worked_example()
     {
         // A ribbon costs ₱0.045/cm (₱45 per 1000cm roll), used at 12.7cm per piece -> ₱0.5715.
-        var costPerPiece = ProductRules.CalculatePackagingLineCostPerPiece(
-            costPerBaseUnit: 0.045m, qtyPerPiece: 12.7m, baseUnitsPerEntryUnit: null);
+        var costPerPiece = ProductRules.CalculatePackagingLineCost(
+            costPerBaseUnit: 0.045m, qtyPerUnit: 12.7m, baseUnitsPerEntryUnit: null);
 
         costPerPiece.Should().Be(0.5715m);
     }
 
     [Fact]
-    public void CalculatePackagingLineCostPerPiece_converts_a_line_entered_in_an_alternative_unit()
+    public void CalculatePackagingLineCost_converts_a_line_entered_in_an_alternative_unit()
     {
         // The same ribbon entered in metres (100 cm each): 0.127 m per piece -> 12.7 cm -> ₱0.5715.
-        var costPerPiece = ProductRules.CalculatePackagingLineCostPerPiece(
-            costPerBaseUnit: 0.045m, qtyPerPiece: 0.127m, baseUnitsPerEntryUnit: 100m);
+        var costPerPiece = ProductRules.CalculatePackagingLineCost(
+            costPerBaseUnit: 0.045m, qtyPerUnit: 0.127m, baseUnitsPerEntryUnit: 100m);
 
         costPerPiece.Should().Be(0.5715m);
     }
 
     [Fact]
-    public void CalculatePackagingLineCostPerPiece_matches_the_box_worked_example()
+    public void CalculatePackagingLineCost_matches_the_box_worked_example()
     {
         // A box costs ₱0.30/piece (₱30 per 100-piece pack), used one per finished piece.
-        var costPerPiece = ProductRules.CalculatePackagingLineCostPerPiece(
-            costPerBaseUnit: 0.3m, qtyPerPiece: 1m, baseUnitsPerEntryUnit: null);
+        var costPerPiece = ProductRules.CalculatePackagingLineCost(
+            costPerBaseUnit: 0.3m, qtyPerUnit: 1m, baseUnitsPerEntryUnit: null);
 
         costPerPiece.Should().Be(0.3m);
     }

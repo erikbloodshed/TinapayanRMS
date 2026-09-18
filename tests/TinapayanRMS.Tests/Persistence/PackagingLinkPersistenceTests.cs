@@ -55,7 +55,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         var boxId = await SeedBoxAsync();
         var bigId = await AddProductAsync("Big");
         var smallId = await AddProductAsync("Small");
-        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)], Cancellation);
 
         await CreatePackagingLinkRepository().SetLinkAsync(smallId, bigId, Cancellation);
 
@@ -72,7 +72,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         var aId = await AddProductAsync("A");
         var bId = await AddProductAsync("B");
         var cId = await AddProductAsync("C");
-        await CreatePackagingLineRepository().SetLinesAsync(aId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(aId, [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)], Cancellation);
 
         var links = CreatePackagingLinkRepository();
         await links.SetLinkAsync(bId, aId, Cancellation); // b -> a
@@ -104,8 +104,8 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         var aId = await AddProductAsync("A");
         var bId = await AddProductAsync("B");
         var derivedId = await AddProductAsync("Derived");
-        await CreatePackagingLineRepository().SetLinesAsync(aId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
-        await CreatePackagingLineRepository().SetLinesAsync(bId, [(bagId, null, PackagingLineAuthoredField.QtyPerPiece, 1m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(aId, [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(bId, [(bagId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
 
         var links = CreatePackagingLinkRepository();
         await links.SetLinkAsync(derivedId, aId, Cancellation);
@@ -123,7 +123,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         var boxId = await SeedBoxAsync();
         var bigId = await AddProductAsync("Big");
         var smallId = await AddProductAsync("Small");
-        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)], Cancellation);
         var links = CreatePackagingLinkRepository();
         await links.SetLinkAsync(smallId, bigId, Cancellation);
 
@@ -131,7 +131,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
 
         (await links.GetForProductAsync(smallId, Cancellation)).Should().BeNull();
         (await CreatePackagingLineRepository().GetForProductAsync(smallId, Cancellation))
-            .Should().ContainSingle(l => l.PiecesPerPackagingUnit == 6m, "it owns a copy of what it showed a moment ago");
+            .Should().ContainSingle(l => l.UnitsPerPackagingUnit == 6m, "it owns a copy of what it showed a moment ago");
     }
 
     [Fact]
@@ -150,10 +150,10 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         var boxId = await SeedBoxAsync();
         var bigId = await AddProductAsync("Big");
         var smallId = await AddProductAsync("Small");
-        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(bigId, [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)], Cancellation);
         await CreatePackagingLinkRepository().SetLinkAsync(smallId, bigId, Cancellation);
 
-        var act = () => CreatePackagingLineRepository().SetLinesAsync(smallId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m)], Cancellation);
+        var act = () => CreatePackagingLineRepository().SetLinesAsync(smallId, [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 4m)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -203,7 +203,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         await SaveRecipeAsync(sourceId, new RecipeDraft(
             [new OwnedSubAssemblyDraft(0, fillingRoleId, [(ubeId, 100m)], UsageAuthoredField.Yield, 10m)],
             [new LinkedUsageDraft(linkedDoughId, UsageAuthoredField.WeightPerPiece, 40m)]));
-        await CreatePackagingLineRepository().SetLinesAsync(otherId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(otherId, [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)], Cancellation);
         await CreatePackagingLinkRepository().SetLinkAsync(sourceId, otherId, Cancellation);
         await CreateCostingParametersRepository().SetAsync(sourceId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1.25m, marginPercent: 40m, vatPercent: 12m, Cancellation);
 

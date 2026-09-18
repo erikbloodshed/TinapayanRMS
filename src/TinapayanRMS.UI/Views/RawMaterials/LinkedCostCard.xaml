@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:rm="clr-namespace:TinapayanRMS.UI.Views.RawMaterials"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
     <Border Style="{StaticResource CardStyle}">
         <StackPanel>
@@ -76,6 +77,8 @@
                        Style="{StaticResource CaptionStyle}"
                        TextWrapping="Wrap"
                        Margin="0,12,0,0" />
+
+            <rm:UsageExampleSection />
         </StackPanel>
     </Border>
 </UserControl>

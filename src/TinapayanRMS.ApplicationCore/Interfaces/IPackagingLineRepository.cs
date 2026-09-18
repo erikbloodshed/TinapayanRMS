@@ -17,7 +17,7 @@ public interface IPackagingLineRepository
 
     /// <summary>
     /// Replaces the product's whole packaging line set. AuthoredValue is whichever of
-    /// QtyPerPiece/PiecesPerPackagingUnit the user actually typed for that line (per
+    /// QtyPerUnit/UnitsPerPackagingUnit the user actually typed for that line (per
     /// AuthoredField) — the repository derives the other one (ProductRules.ReconcileReciprocal).
     /// Each line's quantities are in UnitId, one of that material's own units, or in its base unit
     /// when that's null. Every line must be a packaging material (RawMaterialRules.EnsureUsableAsPackaging).

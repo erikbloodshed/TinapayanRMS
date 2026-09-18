@@ -196,7 +196,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
             productId = product.Id;
         }
         await new PackagingLineRepository(CreateDbContextFactory()).SetLinesAsync(
-            productId, [(ribbonId, meter.Id, PackagingLineAuthoredField.QtyPerPiece, 0.5m)], Cancellation);
+            productId, [(ribbonId, meter.Id, PackagingLineAuthoredField.QtyPerUnit, 0.5m)], Cancellation);
 
         var act = () => repository.DeleteAsync(meter.Id, Cancellation);
 

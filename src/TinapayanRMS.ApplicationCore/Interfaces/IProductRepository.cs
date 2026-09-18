@@ -55,12 +55,14 @@ public interface IProductRepository
     /// The product's complete recipe of sub-assemblies, or null to leave it as it is. An owned
     /// sub-assembly it no longer lists is deleted, unless another product links it.
     /// </param>
-    /// <param name="packagingLines">The new packaging lines, as IPackagingLineRepository.SetLinesAsync takes them, or null to leave them as they are.</param>
+    /// <param name="packagingLines">The new per-piece packaging lines, as IPackagingLineRepository.SetLinesAsync takes them, or null to leave them as they are.</param>
+    /// <param name="packs">The product's complete set of sellable packs with their own lines, or null to leave them as they are. A pack it no longer lists is deleted with its lines.</param>
     /// <param name="costing">The new costing parameters (only their cost and percentage fields are read), or null to leave them as they are.</param>
     Task<int> SaveAsync(
         Product product,
         RecipeDraft? recipe,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? packagingLines,
+        IReadOnlyList<ProductPackDraft>? packs,
         CostingParameters? costing,
         CancellationToken cancellationToken);
 

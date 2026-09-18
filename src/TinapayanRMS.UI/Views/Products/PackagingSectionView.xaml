@@ -33,7 +33,7 @@
                         Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <TextBlock Text="{Binding PackagingLinkedToText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
                 </Border>
-                <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="Boxes, wrappers, ribbon and labels for one piece" Style="{StaticResource CaptionStyle}" />
+                <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="Wrappers, ribbon and labels for one piece. A pack's own box goes on the Packs tab." Style="{StaticResource CaptionStyle}" />
             </Grid>
 
             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
@@ -91,10 +91,10 @@
                         </syncfusion:Columns>
                     </syncfusion:GridMultiColumnDropDownList.Columns>
                 </syncfusion:GridMultiColumnDropDownList>
-                <controls:NumericColumn MappingName="QtyPerPiece" HeaderText="Qty" Width="96" NumberDecimalDigits="4" />
+                <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="4" />
                 <syncfusion:GridTextColumn MappingName="Unit" HeaderText="Unit" Width="64" AllowEditing="False" />
                 <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" AllowEditing="False" />
-                <controls:NumericColumn MappingName="CostPerPiece" HeaderText="Cost per Piece" Width="104" NumberDecimalDigits="4" AllowEditing="False" />
+                <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Piece" Width="104" NumberDecimalDigits="4" AllowEditing="False" />
             </syncfusion:SfDataGrid.Columns>
         </syncfusion:SfDataGrid>
 

@@ -73,11 +73,11 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (ribbonId, meterId, PackagingLineAuthoredField.QtyPerPiece, 0.127m),
+            (ribbonId, meterId, PackagingLineAuthoredField.QtyPerUnit, 0.127m),
         ], Cancellation);
 
         var line = (await CreatePackagingLineRepository().GetEffectiveForProductAsync(productId, Cancellation)).Should().ContainSingle().Subject;
-        line.QtyPerPiece.Should().Be(0.127m, "quantities are stored as entered, in the line's unit");
+        line.QtyPerUnit.Should().Be(0.127m, "quantities are stored as entered, in the line's unit");
         line.Unit!.UnitOfMeasure!.Abbreviation.Should().Be("m");
         line.PackagingMaterial!.Units.Should().ContainSingle("the Products editor needs the material's units");
     }
@@ -95,7 +95,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (ribbonId, twineMeterId, PackagingLineAuthoredField.QtyPerPiece, 0.127m),
+            (ribbonId, twineMeterId, PackagingLineAuthoredField.QtyPerUnit, 0.127m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -121,15 +121,15 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         // Authored as "6 pieces per box".
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m),
         ], Cancellation);
 
         var lines = await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation);
         var line = lines.Should().ContainSingle().Subject;
-        line.PiecesPerPackagingUnit.Should().Be(6m);
+        line.UnitsPerPackagingUnit.Should().Be(6m);
         // The repository computes the full-precision reciprocal (1/6 = 0.1666...), but the
         // decimal(18,4) column rounds it to 4 places on the round trip through SQL Server.
-        line.QtyPerPiece.Should().Be(0.1667m);
+        line.QtyPerUnit.Should().Be(0.1667m);
         // The line's quantities are in the material's standard unit, which the Products grid shows.
         line.PackagingMaterial!.BaseUnit!.Id.Should().Be(pieceId);
     }
@@ -144,8 +144,8 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
-            (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m),
+            (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m),
+            (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 4m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -160,7 +160,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         var productId = await SeedProductAsync("Ensaymada");
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m),
         ], Cancellation);
 
         await using var dbContext = CreateDbContext();
@@ -181,7 +181,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         await CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m),
         ], Cancellation);
         await CreateCostingParametersRepository().SetAsync(productId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, marginPercent: 40m, vatPercent: 12m, Cancellation);
 
@@ -310,7 +310,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(999_999,
         [
-            (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -332,7 +332,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (butterId, null, PackagingLineAuthoredField.QtyPerPiece, 1m),
+            (butterId, null, PackagingLineAuthoredField.QtyPerUnit, 1m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'Butter' is an ingredient*");
@@ -345,7 +345,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         var act = () => CreatePackagingLineRepository().SetLinesAsync(productId,
         [
-            (999_999, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m),
+            (999_999, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m),
         ], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();

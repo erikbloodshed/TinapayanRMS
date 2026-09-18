@@ -161,15 +161,15 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         // The row the add row edits shows the material's base unit and prices itself as soon as the material is picked.
         var boxLine = viewModel.NewLineEdit();
         boxLine.PackagingMaterialId = boxId;
-        boxLine.QtyPerPiece = 0.5m;
+        boxLine.QtyPerUnit = 0.5m;
         boxLine.Unit.Should().Be("pc");
         boxLine.UnitCost.Should().Be(12m);
-        boxLine.CostPerPiece.Should().Be(6m, "half a ₱12 box a piece");
+        boxLine.CostPerUnit.Should().Be(6m, "half a ₱12 box a piece");
         viewModel.LineEdits.Add(boxLine);
 
         var ribbonLine = viewModel.NewLineEdit();
         ribbonLine.PackagingMaterialId = ribbonId;
-        ribbonLine.QtyPerPiece = 30m;
+        ribbonLine.QtyPerUnit = 30m;
         ribbonLine.Unit.Should().Be("cm");
         viewModel.LineEdits.Add(ribbonLine);
         viewModel.Costs.Packaging.Should().Be(6.6m, "₱6 of box and 30 cm of ribbon at ₱0.02 a cm");
@@ -193,17 +193,17 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             lines.Should().AllSatisfy(l =>
             {
                 l.UnitId.Should().BeNull("a line is always in its material's base unit");
-                l.AuthoredField.Should().Be(PackagingLineAuthoredField.QtyPerPiece);
+                l.AuthoredField.Should().Be(PackagingLineAuthoredField.QtyPerUnit);
             });
             lines[0].PackagingMaterialId.Should().Be(boxId);
-            lines[0].QtyPerPiece.Should().Be(0.5m);
-            lines[1].QtyPerPiece.Should().Be(30m);
+            lines[0].QtyPerUnit.Should().Be(0.5m);
+            lines[1].QtyPerUnit.Should().Be(30m);
         }
 
         await WaitUntilSettledAsync(
             () => viewModel.SelectedProduct is not null && viewModel.LineEdits.Count == 2 && !viewModel.LineEdits.Contains(boxLine),
             () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.LineEdits.Count}");
-        viewModel.LineEdits.Single(l => l.PackagingMaterialId == ribbonId).QtyPerPiece.Should().Be(30m);
+        viewModel.LineEdits.Single(l => l.PackagingMaterialId == ribbonId).QtyPerUnit.Should().Be(30m);
         viewModel.Costs.Packaging.Should().Be(6.6m);
     }
 
@@ -227,7 +227,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             dbContext.PackagingLines.Add(new PackagingLine
             {
                 ProductId = productId, PackagingMaterialId = ribbon.Id, UnitId = roll.Id,
-                AuthoredField = PackagingLineAuthoredField.PiecesPerPackagingUnit, PiecesPerPackagingUnit = 50m, QtyPerPiece = 0.02m,
+                AuthoredField = PackagingLineAuthoredField.UnitsPerPackagingUnit, UnitsPerPackagingUnit = 50m, QtyPerUnit = 0.02m,
             });
             await dbContext.SaveChangesAsync(Cancellation);
         }
@@ -238,7 +238,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await WaitUntilSettledAsync(() => viewModel.LineEdits.Count == 1, () => $"lines={viewModel.LineEdits.Count}");
 
         var line = viewModel.LineEdits.Single();
-        line.QtyPerPiece.Should().Be(20m);
+        line.QtyPerUnit.Should().Be(20m);
         line.Unit.Should().Be("cm");
         viewModel.Costs.Packaging.Should().Be(0.4m);
     }
@@ -897,6 +897,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             new ProductRepository(factory),
             new ProductSubAssemblyUsageRepository(factory),
             packagingLineRepository,
+            new ProductPackRepository(factory),
             new CostingParametersRepository(factory),
             new PackagingLinkRepository(factory, packagingLineRepository),
             new ProductCloner(factory),

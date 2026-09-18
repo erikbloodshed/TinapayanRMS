@@ -60,7 +60,8 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
             new RecipeDraft(
                 [new OwnedSubAssemblyDraft(0, doughRoleId, [(flourId, 1000m)], UsageAuthoredField.Yield, 40m)],
                 [new LinkedUsageDraft(linkedFillingId, UsageAuthoredField.WeightPerPiece, 10m)]),
-            [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)],
+            [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)],
+            null,
             new CostingParameters { LaborPercent = 6m, OverheadPercent = 5.5m, AdministrativePercent = 3.5m, MarginPercent = 30m, VatPercent = 12m },
             Cancellation);
 
@@ -76,7 +77,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
             ("Dough", true, UsageAuthoredField.Yield, 40m),
             ("Filling", false, UsageAuthoredField.WeightPerPiece, 10m),
         });
-        (await CreatePackagingLineRepository().GetForProductAsync(id, Cancellation)).Should().ContainSingle(l => l.PiecesPerPackagingUnit == 6m);
+        (await CreatePackagingLineRepository().GetForProductAsync(id, Cancellation)).Should().ContainSingle(l => l.UnitsPerPackagingUnit == 6m);
 
         var costing = (await CreateCostingParametersRepository().GetForProductAsync(id, Cancellation))!;
         costing.LaborPercent.Should().Be(6m);
@@ -91,14 +92,14 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
         var boxId = await SeedBoxAsync();
         var (productId, custardId) = await AddProductWithSubAssemblyAsync("Ensaymada", fillingRoleId, [(sugarId, 100m)]);
-        await CreatePackagingLineRepository().SetLinesAsync(productId, [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m)], Cancellation);
+        await CreatePackagingLineRepository().SetLinesAsync(productId, [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)], Cancellation);
         await CreateCostingParametersRepository().SetAsync(productId, 5m, 3m, 1m, 40m, 12m, Cancellation);
 
         await CreateProductRepository().SaveAsync(
             new Product { Id = productId, Name = "Custard Ensaymada" },
             recipe: null,
             packagingLines: null,
-            costing: null,
+            packs: null, costing: null,
             Cancellation);
 
         (await CreateProductRepository().GetByIdAsync(productId, Cancellation))!.Name.Should().Be("Custard Ensaymada");
@@ -120,7 +121,8 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var act = () => CreateProductRepository().SaveAsync(
             new Product { Id = productId, Name = "Ube Ensaymada", Description = "Now with ube" },
             new RecipeDraft([new OwnedSubAssemblyDraft(custardId, fillingRoleId, [(ubeId, 200m)], UsageAuthoredField.WeightPerPiece, 15m)], []),
-            [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m), (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m)],
+            [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m), (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 4m)],
+            null,
             new CostingParameters { LaborPercent = 5m },
             Cancellation);
 
@@ -148,8 +150,8 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var act = () => CreateProductRepository().SaveAsync(
             new Product { Name = "Custard Bun" },
             new RecipeDraft([new OwnedSubAssemblyDraft(0, fillingRoleId, [(sugarId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []),
-            [(boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 6m), (boxId, null, PackagingLineAuthoredField.PiecesPerPackagingUnit, 4m)],
-            costing: null,
+            [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m), (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 4m)],
+            packs: null, costing: null,
             Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();

@@ -94,7 +94,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         var repository = CreateProductRepository();
 
         var id = await repository.SaveAsync(
-            new Product { Name = "Chocolate Cake", CategoryId = cakes.Id }, recipe: null, packagingLines: null, costing: null, Cancellation);
+            new Product { Name = "Chocolate Cake", CategoryId = cakes.Id }, recipe: null, packagingLines: null, packs: null, costing: null, Cancellation);
 
         var byId = await repository.GetByIdAsync(id, Cancellation);
         byId!.CategoryId.Should().Be(cakes.Id);
@@ -107,7 +107,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
     {
         var cakes = await SeedCategoryAsync("Cakes");
         var repository = CreateProductRepository();
-        var id = await repository.SaveAsync(new Product { Name = "Pandesal" }, recipe: null, packagingLines: null, costing: null, Cancellation);
+        var id = await repository.SaveAsync(new Product { Name = "Pandesal" }, recipe: null, packagingLines: null, packs: null, costing: null, Cancellation);
         (await repository.GetByIdAsync(id, Cancellation))!.Category.Should().BeNull();
 
         await repository.UpdateAsync(new Product { Id = id, Name = "Pandesal", CategoryId = cakes.Id }, Cancellation);
@@ -124,7 +124,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var productId = await CreateProductRepository().SaveAsync(
-            new Product { Name = "Pandesal", CategoryId = breads.Id }, recipe: null, packagingLines: null, costing: null, Cancellation);
+            new Product { Name = "Pandesal", CategoryId = breads.Id }, recipe: null, packagingLines: null, packs: null, costing: null, Cancellation);
 
         // As a recipe saved from the product as it was read (SaveRecipeAsync reads it with GetByIdAsync first).
         await SaveRecipeAsync(productId, new RecipeDraft([new OwnedSubAssemblyDraft(0, roleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m)], []));
@@ -137,7 +137,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
     {
         var cakes = await SeedCategoryAsync("Cakes");
         var id = await CreateProductRepository().SaveAsync(
-            new Product { Name = "Chocolate Cake", CategoryId = cakes.Id }, recipe: null, packagingLines: null, costing: null, Cancellation);
+            new Product { Name = "Chocolate Cake", CategoryId = cakes.Id }, recipe: null, packagingLines: null, packs: null, costing: null, Cancellation);
 
         await CreateRepository().DeleteAsync(cakes.Id, Cancellation);
 
@@ -152,7 +152,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
     {
         var cakes = await SeedCategoryAsync("Cakes");
         var sourceId = await CreateProductRepository().SaveAsync(
-            new Product { Name = "Chocolate Cake", CategoryId = cakes.Id }, recipe: null, packagingLines: null, costing: null, Cancellation);
+            new Product { Name = "Chocolate Cake", CategoryId = cakes.Id }, recipe: null, packagingLines: null, packs: null, costing: null, Cancellation);
 
         var cloneId = await new ProductCloner(CreateDbContextFactory()).CloneAsync(sourceId, "Chocolate Cake Mini", Cancellation);
 

@@ -40,8 +40,12 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             return await ResolveEffectiveAsync(dbContext, link.LinkedProductId, visitedProductIds, cancellationToken);
         }
 
+        // Per-piece lines only. A packaging link says "this product's packaging is that product's", and
+        // that holds for what one piece is wrapped in. A pack's lines can't come through it: they point at
+        // rows in ProductPacks belonging to the linked product, so the linking product would show lines for
+        // packs it doesn't sell and can't edit. A pack is always its own product's, link or no link.
         return await WithMaterialAndUnits(dbContext.PackagingLines)
-            .Where(l => l.ProductId == productId)
+            .Where(l => l.ProductId == productId && l.PackId == null)
             .ToListAsync(cancellationToken);
     }
 
@@ -49,7 +53,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
     /// A line's material with its base unit and alternative units (the Products editor's unit picker
     /// and cost need them), and the unit the line itself is entered in.
     /// </summary>
-    private static IQueryable<PackagingLine> WithMaterialAndUnits(IQueryable<PackagingLine> lines) =>
+    internal static IQueryable<PackagingLine> WithMaterialAndUnits(IQueryable<PackagingLine> lines) =>
         lines
             .AsNoTracking()
             .Include(l => l.PackagingMaterial)
@@ -66,17 +70,24 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await SetLinesAsync(dbContext, productId, lines, cancellationToken);
+        await SetLinesAsync(dbContext, productId, packId: null, lines, cancellationToken);
     }
 
-    /// <summary>Replaces the product's packaging lines on the caller's context and saves them, after every check SetLinesAsync makes.</summary>
+    /// <summary>
+    /// Replaces one group of the product's packaging lines on the caller's context and saves them, after
+    /// every check SetLinesAsync makes. <paramref name="packId"/> null is the per-piece group; a pack's id
+    /// is that pack's own group. Only that group is replaced — writing a pack's lines never touches the
+    /// per-piece ones, and vice versa.
+    /// </summary>
     internal static async Task SetLinesAsync(
         TinapayanRMSDbContext dbContext,
         int productId,
+        int? packId,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
         CancellationToken cancellationToken)
     {
-        ProductRules.EnsureValidPackagingLines([.. lines.Select(l => (l.PackagingMaterialId, l.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? l.AuthoredValue : 1m / l.AuthoredValue))]);
+        ProductRules.EnsureValidPackagingLines(
+            [.. lines.Select(l => (packId, l.PackagingMaterialId, l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.AuthoredValue : 1m / l.AuthoredValue))]);
 
         var productExists = await dbContext.Products.AnyAsync(p => p.Id == productId, cancellationToken);
         if (!productExists)
@@ -84,10 +95,23 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             throw new InvalidOperationException($"Product {productId} does not exist.");
         }
 
-        var isLinked = await dbContext.PackagingLinks.AnyAsync(l => l.ProductId == productId, cancellationToken);
-        if (isLinked)
+        if (packId is null)
         {
-            throw new InvalidOperationException("This product's packaging is linked to another product's — unlink it before editing its lines directly.");
+            // The link covers the per-piece packaging, which is all it resolves (ResolveEffectiveAsync).
+            // A linked product still owns its packs, so a pack's lines stay editable while it's linked.
+            var isLinked = await dbContext.PackagingLinks.AnyAsync(l => l.ProductId == productId, cancellationToken);
+            if (isLinked)
+            {
+                throw new InvalidOperationException("This product's packaging is linked to another product's — unlink it before editing its lines directly.");
+            }
+        }
+        else
+        {
+            var packBelongs = await dbContext.ProductPacks.AnyAsync(p => p.Id == packId && p.ProductId == productId, cancellationToken);
+            if (!packBelongs)
+            {
+                throw new InvalidOperationException($"Pack {packId} isn't one of this product's.");
+            }
         }
 
         var materialIds = lines.Select(l => l.PackagingMaterialId).ToList();
@@ -120,20 +144,23 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             }
         }
 
+        // This group only. A nullable parameter is part of EF's query-cache key, so `l.PackId == packId`
+        // generates `PackId IS NULL` for the per-piece group rather than a comparison that matches nothing.
         await dbContext.PackagingLines
-            .Where(l => l.ProductId == productId)
+            .Where(l => l.ProductId == productId && l.PackId == packId)
             .ExecuteDeleteAsync(cancellationToken);
 
         dbContext.PackagingLines.AddRange(lines.Select(l =>
         {
-            var (qtyPerPiece, piecesPerPackagingUnit) = ProductRules.ReconcileReciprocal(l.AuthoredField, l.AuthoredValue);
+            var (qtyPerUnit, unitsPerPackagingUnit) = ProductRules.ReconcileReciprocal(l.AuthoredField, l.AuthoredValue);
             return new PackagingLine
             {
                 ProductId = productId,
+                PackId = packId,
                 PackagingMaterialId = l.PackagingMaterialId,
                 UnitId = l.UnitId,
-                QtyPerPiece = qtyPerPiece,
-                PiecesPerPackagingUnit = piecesPerPackagingUnit,
+                QtyPerUnit = qtyPerUnit,
+                UnitsPerPackagingUnit = unitsPerPackagingUnit,
                 AuthoredField = l.AuthoredField,
             };
         }));

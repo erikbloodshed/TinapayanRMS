@@ -154,7 +154,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         var saved = await GetMaterialAsync(boxId);
         saved.CostPerBaseUnit.Should().Be(30m);
         saved.BufferedCostPerBaseUnit.Should().Be(33m);
-        ProductRules.CalculatePackagingLineCostPerPiece(saved.BufferedCostPerBaseUnit, qtyPerPiece: 0.5m, baseUnitsPerEntryUnit: null)
+        ProductRules.CalculatePackagingLineCost(saved.BufferedCostPerBaseUnit, qtyPerUnit: 0.5m, baseUnitsPerEntryUnit: null)
             .Should().Be(16.5m, "half a box per piece, at the buffered ₱33");
     }
 

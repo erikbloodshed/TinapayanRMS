@@ -53,18 +53,12 @@
                                   SelectedIndex="{Binding SelectedDetailsTab, Mode=TwoWay}">
             <!-- A material is purchased (a price), made (a BOM) or linked (a share of another's cost), so one of the first three cards shows -->
             <syncfusion:TabItemExt Header="Cost Setup" CanClose="False">
+                <!-- Full width, one card: each cost card ends with the material's own Usage Example (UsageExampleSection) -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="16" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
                         <rm:PurchaseCostSetupCard Visibility="{Binding ShowPurchaseSetup, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <rm:BillOfMaterialsCard Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <rm:LinkedCostCard Visibility="{Binding IsEditingLinked, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        <rm:UsageExampleCard Grid.Column="2" />
                     </Grid>
                 </ScrollViewer>
             </syncfusion:TabItemExt>

@@ -72,7 +72,7 @@ public class PackagingLinkRepository(
         await packagingLineRepository.SetLinesAsync(
             productId,
             [.. effectiveLines.Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
-                l.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? l.QtyPerPiece : l.PiecesPerPackagingUnit))],
+                l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))],
             cancellationToken);
     }
 }

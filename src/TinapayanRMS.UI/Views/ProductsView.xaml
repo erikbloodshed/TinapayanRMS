@@ -103,6 +103,13 @@
                         </ScrollViewer>
                     </syncfusion:TabItemExt>
 
+                    <!-- Packs sits after Costing: a pack's price is the piece price it's worked out from, times its pieces -->
+                    <syncfusion:TabItemExt Header="Packs" CanClose="False">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,12">
+                            <p:PacksCard />
+                        </ScrollViewer>
+                    </syncfusion:TabItemExt>
+
                     <syncfusion:TabItemExt Header="Links &amp; Clone"
                                            CanClose="False"
                                            Visibility="{Binding ShowLinks, Converter={StaticResource BooleanToVisibilityConverter}}">

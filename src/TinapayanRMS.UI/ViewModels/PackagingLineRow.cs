@@ -29,12 +29,12 @@ public sealed class PackagingLineRow : ReactiveObject
         _findMaterial = findMaterial;
     }
 
-    /// <param name="qtyPerPiece">How much of the material, in its base unit, one piece takes.</param>
-    public PackagingLineRow(RawMaterial packagingMaterial, decimal qtyPerPiece)
+    /// <param name="qtyPerUnit">How much of the material, in its base unit, one piece — or one pack — takes.</param>
+    public PackagingLineRow(RawMaterial packagingMaterial, decimal qtyPerUnit)
     {
         _packagingMaterialId = packagingMaterial.Id;
         _packagingMaterial = packagingMaterial;
-        _qtyPerPiece = qtyPerPiece;
+        _qtyPerUnit = qtyPerUnit;
     }
 
     private int? _packagingMaterialId;
@@ -61,19 +61,19 @@ public sealed class PackagingLineRow : ReactiveObject
             this.RaiseAndSetIfChanged(ref _packagingMaterial, value);
             this.RaisePropertyChanged(nameof(Unit));
             this.RaisePropertyChanged(nameof(UnitCost));
-            this.RaisePropertyChanged(nameof(CostPerPiece));
+            this.RaisePropertyChanged(nameof(CostPerUnit));
         }
     }
 
-    private decimal _qtyPerPiece;
+    private decimal _qtyPerUnit;
     /// <summary>How much of the material one piece takes, in its base unit: 1 box, 30 cm of ribbon.</summary>
-    public decimal QtyPerPiece
+    public decimal QtyPerUnit
     {
-        get => _qtyPerPiece;
+        get => _qtyPerUnit;
         set
         {
-            this.RaiseAndSetIfChanged(ref _qtyPerPiece, value);
-            this.RaisePropertyChanged(nameof(CostPerPiece));
+            this.RaiseAndSetIfChanged(ref _qtyPerUnit, value);
+            this.RaisePropertyChanged(nameof(CostPerUnit));
         }
     }
 
@@ -83,10 +83,10 @@ public sealed class PackagingLineRow : ReactiveObject
     /// <summary>What one base unit of the material costs, buffered: what products are costed with.</summary>
     public decimal UnitCost => PackagingMaterial?.BufferedCostPerBaseUnit ?? 0m;
 
-    public decimal CostPerPiece => ProductRules.CalculatePackagingLineCostPerPiece(UnitCost, QtyPerPiece, baseUnitsPerEntryUnit: null);
+    public decimal CostPerUnit => ProductRules.CalculatePackagingLineCost(UnitCost, QtyPerUnit, baseUnitsPerEntryUnit: null);
 
     /// <summary>Nothing typed into it: the grid's add row left as it was, which isn't a line at all.</summary>
-    private bool IsBlank => PackagingMaterialId is null && QtyPerPiece == 0m;
+    private bool IsBlank => PackagingMaterialId is null && QtyPerUnit == 0m;
 
     /// <summary>
     /// Points each row at its material in <paramref name="materialsById"/> (the screen's current copies, so a
@@ -110,28 +110,30 @@ public sealed class PackagingLineRow : ReactiveObject
     /// The rows as lines, leaving out blank ones. A row with only a material or only a quantity is refused, and so
     /// is a material on two rows, each with a message naming it.
     /// </summary>
-    public static IReadOnlyList<(RawMaterial PackagingMaterial, decimal QtyPerPiece)> CompleteLines(IEnumerable<PackagingLineRow> rows)
+    /// <param name="unitNoun">What one of these lines packs, for the messages: "piece", or a pack's name.</param>
+    public static IReadOnlyList<(RawMaterial PackagingMaterial, decimal QtyPerUnit)> CompleteLines(
+        IEnumerable<PackagingLineRow> rows, string unitNoun = "piece")
     {
-        List<(RawMaterial PackagingMaterial, decimal QtyPerPiece)> lines = [];
+        List<(RawMaterial PackagingMaterial, decimal QtyPerUnit)> lines = [];
         foreach (var row in rows.Where(r => !r.IsBlank))
         {
             if (row.PackagingMaterial is not { } material)
             {
-                throw new InvalidOperationException($"Pick the packaging material for the {row.QtyPerPiece:#,0.####} per piece line, or delete that line.");
+                throw new InvalidOperationException($"Pick the packaging material for the {row.QtyPerUnit:#,0.####} per {unitNoun} line, or delete that line.");
             }
 
-            if (row.QtyPerPiece <= 0m)
+            if (row.QtyPerUnit <= 0m)
             {
-                throw new InvalidOperationException($"Enter how much {material.Name} one piece takes, or delete its line.");
+                throw new InvalidOperationException($"Enter how much {material.Name} one {unitNoun} takes, or delete its line.");
             }
 
             if (lines.Any(l => l.PackagingMaterial.Id == material.Id))
             {
                 throw new InvalidOperationException(
-                    $"{material.Name} is on two packaging lines. A product can't use the same packaging material more than once — put its quantity on one line and delete the other.");
+                    $"{material.Name} is on two of the same {unitNoun}'s packaging lines — put its quantity on one line and delete the other.");
             }
 
-            lines.Add((material, row.QtyPerPiece));
+            lines.Add((material, row.QtyPerUnit));
         }
 
         return lines;

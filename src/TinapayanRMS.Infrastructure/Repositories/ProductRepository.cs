@@ -42,6 +42,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         Product product,
         RecipeDraft? recipe,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? packagingLines,
+        IReadOnlyList<ProductPackDraft>? packs,
         CostingParameters? costing,
         CancellationToken cancellationToken)
     {
@@ -71,7 +72,12 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 
         if (packagingLines is not null)
         {
-            await PackagingLineRepository.SetLinesAsync(dbContext, fields.Id, packagingLines, cancellationToken);
+            await PackagingLineRepository.SetLinesAsync(dbContext, fields.Id, packId: null, packagingLines, cancellationToken);
+        }
+
+        if (packs is not null)
+        {
+            await ProductPackRepository.SetPacksAsync(dbContext, fields.Id, packs, cancellationToken);
         }
 
         if (costing is not null)
@@ -112,6 +118,13 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
                 + $"{(packagingLinkedBy.Count == 1 ? "links" : "link")} this product's packaging. Unlink it there first.");
         }
 
+        // Products -> PackagingLines and Products -> ProductPacks both cascade, but a pack's own lines
+        // don't go with their pack: PackagingLine.PackId is Restrict, since cascading it too would be a
+        // second cascade path into PackagingLines (PackagingLineConfiguration). So the lines have to go
+        // first by hand, then the packs, and only then the product, whose remaining cascades take the
+        // usages, its own sub-assemblies and the costing parameters.
+        await dbContext.PackagingLines.Where(l => l.ProductId == id).ExecuteDeleteAsync(cancellationToken);
+        await dbContext.ProductPacks.Where(p => p.ProductId == id).ExecuteDeleteAsync(cancellationToken);
         await dbContext.Products.Where(p => p.Id == id).ExecuteDeleteAsync(cancellationToken);
     }
 

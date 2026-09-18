@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Globalization;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
@@ -255,16 +256,31 @@ public sealed record CostShareRow(string Name, decimal Amount, decimal Percent);
 public sealed record RecipeUsageExampleResult(string Title, decimal TotalCost, IReadOnlyList<CostShareRow> Breakdown);
 
 /// <summary>
+/// One sellable pack priced from the product's per-piece material cost and the pack's own packaging lines.
+/// </summary>
+public sealed record PackCostSummary(
+    string Name, int PiecesPerPack, decimal MaterialCost, decimal BaseCost, decimal PreVatPrice, decimal SellingPrice)
+{
+    public decimal Markup => PreVatPrice - BaseCost;
+
+    public decimal Vat => SellingPrice - PreVatPrice;
+
+    public decimal ProfitMarginPercent => CostingRules.CalculateProfitMarginPercent(BaseCost, PreVatPrice);
+}
+
+/// <summary>
 /// A product's cost per piece, from its materials to its selling price (cost-plus, CostingRules), with
-/// each part's share of the selling price. Worked out from the form, so unsaved edits show at once.
+/// each part's share of the selling price, and the same worked through for each of its sellable packs.
+/// Worked out from the form, so unsaved edits show at once.
 /// </summary>
 public sealed class ProductCostSummary
 {
-    public static ProductCostSummary Empty { get; } = new([], [], 0m, 0m, 0m, 0m, 0m);
+    public static ProductCostSummary Empty { get; } = new([], [], [], 0m, 0m, 0m, 0m, 0m);
 
     public ProductCostSummary(
         IReadOnlyList<decimal> usageCostsPerPiece,
         IReadOnlyList<decimal> packagingCostsPerPiece,
+        IReadOnlyList<(string Name, int PiecesPerPack, decimal LineCost)> packs,
         decimal laborPercent,
         decimal overheadPercent,
         decimal administrativePercent,
@@ -284,7 +300,23 @@ public sealed class ProductCostSummary
         VatPercent = vatPercent;
         (BaseCost, PreVatPrice, SellingPrice) = CostingRules.CalculateSellingPrice(
             Material, laborPercent, overheadPercent, administrativePercent, marginPercent, vatPercent);
+
+        // Each pack priced the same way, from its own material cost: the pieces it holds at the figure just
+        // worked out, plus its own box and label. Same percentages — a pack has none of its own.
+        Packs =
+        [
+            .. packs.Select(p =>
+            {
+                var packMaterial = ProductRules.CalculatePackMaterialCost(Material, p.PiecesPerPack, [p.LineCost]);
+                var (packBase, packPreVat, packPrice) = CostingRules.CalculateSellingPrice(
+                    packMaterial, laborPercent, overheadPercent, administrativePercent, marginPercent, vatPercent);
+                return new PackCostSummary(p.Name, p.PiecesPerPack, packMaterial, packBase, packPreVat, packPrice);
+            }),
+        ];
     }
+
+    /// <summary>The product's sellable packs, each costed and priced; empty for a product sold by the piece only.</summary>
+    public IReadOnlyList<PackCostSummary> Packs { get; }
 
     public decimal SubAssemblies { get; }
 
@@ -353,16 +385,18 @@ public sealed class ProductCostSummary
 /// </summary>
 public sealed class ProductsViewModel : ViewModelBase, IDisposable
 {
-    /// <summary>The details tabs along the bottom: Recipe, Costing, then Links &amp; Clone.</summary>
+    /// <summary>The details tabs along the bottom: Recipe, Costing, Packs, then Links &amp; Clone.</summary>
     public const int RecipeTab = 0;
 
-    public const int LinksTab = 2;
+    /// <summary>Recipe 0, Costing 1, Packs 2, then Links &amp; Clone.</summary>
+    public const int LinksTab = 3;
 
     private static readonly IReadOnlyDictionary<int, IReadOnlyList<string>> NoLinks = new Dictionary<int, IReadOnlyList<string>>();
 
     private readonly IProductRepository _productRepository;
     private readonly IProductSubAssemblyUsageRepository _usageRepository;
     private readonly IPackagingLineRepository _packagingLineRepository;
+    private readonly IProductPackRepository _productPackRepository;
     private readonly ICostingParametersRepository _costingParametersRepository;
     private readonly IPackagingLinkRepository _packagingLinkRepository;
     private readonly IProductCloner _productCloner;
@@ -468,7 +502,20 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     public ObservableCollection<PackagingLineRow> LineEdits { get; } = [];
 
     /// <summary>The line the packaging table's add row edits: it offers its material's units and prices itself before it's committed.</summary>
-    public Func<PackagingLineRow> NewLineEdit => () => new PackagingLineRow(id => PackagingMaterials.FirstOrDefault(m => m.Id == id));
+    public Func<PackagingLineRow> NewLineEdit => () => new PackagingLineRow(FindPackagingMaterial);
+
+    /// <summary>A packaging material as the screen last loaded it, for a row that prices itself.</summary>
+    private RawMaterial? FindPackagingMaterial(int id) => PackagingMaterials.FirstOrDefault(m => m.Id == id);
+
+    /// <summary>The product's sellable packs, typed straight into the Packs tab's table.</summary>
+    public ObservableCollection<ProductPackRow> PackEdits { get; } = [];
+
+    private ProductPackRow? _selectedPackEdit;
+    public ProductPackRow? SelectedPackEdit
+    {
+        get => _selectedPackEdit;
+        set => this.RaiseAndSetIfChanged(ref _selectedPackEdit, value);
+    }
 
     /// <summary>The products this one's packaging can be linked to: every other product.</summary>
     public ObservableCollection<Product> LinkTargetProductOptions { get; } = [];
@@ -963,6 +1010,10 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     // What the product had when it was loaded, so Save only sends the parts that changed.
     private RecipeDraft _savedRecipe = new([], []);
     private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> _savedLines = [];
+    private List<ProductPackDraft> _savedPacks = [];
+
+    /// <summary>Each pack row's subscription to its own lines; cleared whenever the rows are replaced.</summary>
+    private readonly CompositeDisposable _packSubscriptions = [];
     private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) _savedCosting;
 
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
@@ -994,6 +1045,9 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormAddInCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> AddPackCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> RemovePackCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> RemovePackLineCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> CalculateExampleCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> LinkPackagingCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> UnlinkPackagingCommand { get; }
@@ -1003,6 +1057,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         IProductRepository productRepository,
         IProductSubAssemblyUsageRepository usageRepository,
         IPackagingLineRepository packagingLineRepository,
+        IProductPackRepository productPackRepository,
         ICostingParametersRepository costingParametersRepository,
         IPackagingLinkRepository packagingLinkRepository,
         IProductCloner productCloner,
@@ -1020,6 +1075,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         _productRepository = productRepository;
         _usageRepository = usageRepository;
         _packagingLineRepository = packagingLineRepository;
+        _productPackRepository = productPackRepository;
         _costingParametersRepository = costingParametersRepository;
         _packagingLinkRepository = packagingLinkRepository;
         _productCloner = productCloner;
@@ -1165,7 +1221,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         // A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.
         LineEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
-            .AutoRefresh(l => l.CostPerPiece)
+            .AutoRefresh(l => l.CostPerUnit)
             .Subscribe(_ =>
             {
                 PackagingLineRow.Resolve(LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
@@ -1300,6 +1356,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                 product,
                 IsSameRecipe(recipe, _savedRecipe) ? null : recipe,
                 ChangedLines(),
+                ChangedPacks(),
                 CurrentCosting() == _savedCosting ? null : costing,
                 CancellationToken.None);
 
@@ -1474,6 +1531,34 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             () => { LineEdits.Remove(SelectedLineEdit!); },
             this.WhenAnyValue(x => x.SelectedLineEdit, x => x.IsPackagingLinked, (line, linked) => line is not null && !linked));
 
+        AddPackCommand = ReactiveCommand.Create(() =>
+        {
+            // A dozen is the commonest pack, so a new row starts there rather than empty and invalid.
+            var row = PackRowFor(new ProductPack { Name = $"Pack of {12}", PiecesPerPack = 12 });
+            PackEdits.Add(row);
+            SelectedPackEdit = row;
+            RecomputeRecipe();
+        });
+
+        RemovePackCommand = ReactiveCommand.Create(
+            () =>
+            {
+                PackEdits.Remove(SelectedPackEdit!);
+                SelectedPackEdit = null;
+                RecomputeRecipe();
+            },
+            this.WhenAnyValue(x => x.SelectedPackEdit).Select(pack => pack is not null));
+
+        RemovePackLineCommand = ReactiveCommand.Create(
+            () =>
+            {
+                var pack = SelectedPackEdit!;
+                pack.LineEdits.Remove(pack.SelectedLineEdit!);
+                pack.SelectedLineEdit = null;
+            },
+            this.WhenAnyValue(x => x.SelectedPackEdit, x => x.SelectedPackEdit!.SelectedLineEdit)
+                .Select(pair => pair.Item1 is not null && pair.Item2 is not null));
+
         CalculateExampleCommand = ReactiveCommand.Create(
             () =>
             {
@@ -1588,9 +1673,13 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         }
 
         LineEdits.Clear();
+        SelectedPackEdit = null;
+        _packSubscriptions.Clear();
+        PackEdits.Clear();
         SetPackagingLink(null);
         _savedRecipe = new RecipeDraft([], []);
         _savedLines = [];
+        _savedPacks = [];
         SetCosting(null);
         RefreshLinkableOptions();
         RecomputeRecipe();
@@ -1613,6 +1702,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         var packagingLink = await _packagingLinkRepository.GetForProductAsync(product.Id, cancellationToken);
         var usages = await _usageRepository.GetForProductAsync(product.Id, cancellationToken);
         var lines = await _packagingLineRepository.GetEffectiveForProductAsync(product.Id, cancellationToken);
+        var packs = await _productPackRepository.GetForProductAsync(product.Id, cancellationToken);
         var costing = await _costingParametersRepository.GetForProductAsync(product.Id, cancellationToken);
         var subAssemblyLines = await _subAssemblyLineRepository.GetForSubAssembliesAsync(
             [.. usages.Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
@@ -1627,6 +1717,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         SetPackagingLink(packagingLink);
         ReplaceUsages(usages, subAssemblyLines, addIns);
         ReplaceLines(lines);
+        ReplacePacks(packs);
         SetCosting(costing);
         RefreshLinkableOptions();
         RecomputeRecipe();
@@ -1712,12 +1803,58 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         {
             // The table's quantity is in the material's base unit. A line saved before it was (in an alternative unit,
             // or as pieces per unit) shows as that, at the same cost, and is saved that way once the packaging changes.
-            var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerPiece ? line.QtyPerPiece : line.PiecesPerPackagingUnit;
-            var qtyPerPiece = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerPiece;
-            LineEdits.Add(new PackagingLineRow(line.PackagingMaterial!, UnitConversionRules.ToBaseQuantity(qtyPerPiece, line.Unit?.BaseUnitsPerUnit)));
+            var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? line.QtyPerUnit : line.UnitsPerPackagingUnit;
+            var qtyPerUnit = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerUnit;
+            LineEdits.Add(new PackagingLineRow(line.PackagingMaterial!, UnitConversionRules.ToBaseQuantity(qtyPerUnit, line.Unit?.BaseUnitsPerUnit)));
         }
 
         _savedLines = CurrentLines();
+    }
+
+    private void ReplacePacks(IReadOnlyList<ProductPack> packs)
+    {
+        SelectedPackEdit = null;
+        _packSubscriptions.Clear();
+        PackEdits.Clear();
+        foreach (var pack in packs)
+        {
+            PackEdits.Add(PackRowFor(pack));
+        }
+
+        _savedPacks = CurrentPacks();
+    }
+
+    /// <summary>A pack as a row, with its own lines in the material's base unit, as ReplaceLines shows the per-piece ones.</summary>
+    private ProductPackRow PackRowFor(ProductPack pack)
+    {
+        var row = new ProductPackRow(pack, FindPackagingMaterial);
+        foreach (var line in pack.Lines)
+        {
+            var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? line.QtyPerUnit : line.UnitsPerPackagingUnit;
+            var qtyPerUnit = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerUnit;
+            row.LineEdits.Add(new PackagingLineRow(line.PackagingMaterial!, UnitConversionRules.ToBaseQuantity(qtyPerUnit, line.Unit?.BaseUnitsPerUnit)));
+        }
+
+        WatchPackLines(row);
+        return row;
+    }
+
+    /// <summary>A pack's cost follows its own lines, the same way the screen's cost follows LineEdits.</summary>
+    private void WatchPackLines(ProductPackRow row)
+    {
+        _packSubscriptions.Add(row.LineEdits
+            .ToObservableChangeSet()
+            .AutoRefresh(l => l.CostPerUnit)
+            .Subscribe(_ =>
+            {
+                if (IsRefreshing)
+                {
+                    return;
+                }
+
+                row.RaiseLineCostChanged();
+                RecomputeRecipe();
+            }));
     }
 
     private void SetCosting(CostingParameters? costing)
@@ -1735,7 +1872,16 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
     /// <summary>The packaging lines as Save writes them, in each material's base unit; a line half filled in is refused (PackagingLineRow.CompleteLines).</summary>
     private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> CurrentLines() =>
-        [.. PackagingLineRow.CompleteLines(LineEdits).Select(l => (l.PackagingMaterial.Id, (int?)null, PackagingLineAuthoredField.QtyPerPiece, l.QtyPerPiece))];
+        [.. PackagingLineRow.CompleteLines(LineEdits).Select(l => (l.PackagingMaterial.Id, (int?)null, PackagingLineAuthoredField.QtyPerUnit, l.QtyPerUnit))];
+
+    /// <summary>The packs as Save writes them, each with its own lines; a pack half filled in is refused as a line is.</summary>
+    private List<ProductPackDraft> CurrentPacks() =>
+        [.. PackEdits.Select(p => new ProductPackDraft(
+            p.Pack.Id,
+            p.Name,
+            p.PiecesPerPack,
+            [.. PackagingLineRow.CompleteLines(p.LineEdits, string.IsNullOrWhiteSpace(p.Name) ? "pack" : p.Name)
+                .Select(l => (l.PackagingMaterial.Id, (int?)null, PackagingLineAuthoredField.QtyPerUnit, l.QtyPerUnit))]))];
 
     /// <summary>The recipe as Save writes it: the product's own sub-assemblies with their lines, and the ones it links.</summary>
     private RecipeDraft CurrentRecipe() =>
@@ -1778,6 +1924,23 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
         var current = CurrentLines();
         return current.SequenceEqual(_savedLines) ? null : current;
+    }
+
+    /// <summary>
+    /// The packs when they differ from those last loaded, else null. Spelled out rather than left to record
+    /// equality, since a draft's Lines is a list and two equal lists aren't equal records.
+    /// </summary>
+    private List<ProductPackDraft>? ChangedPacks()
+    {
+        var current = CurrentPacks();
+        var same = current.Count == _savedPacks.Count
+            && current.Zip(_savedPacks).All(pair =>
+                pair.First.Id == pair.Second.Id
+                && pair.First.Name == pair.Second.Name
+                && pair.First.PiecesPerPack == pair.Second.PiecesPerPack
+                && pair.First.Lines.SequenceEqual(pair.Second.Lines));
+
+        return same ? null : current;
     }
 
     /// <summary>
@@ -2595,15 +2758,25 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>The cost summary, from the recipe and packaging as they are now and the costing fields.</summary>
-    private void RecomputeCosts() =>
+    private void RecomputeCosts()
+    {
         Costs = new ProductCostSummary(
             [.. UsageEdits.Select(u => u.CostPerPiece)],
-            [.. LineEdits.Select(l => l.CostPerPiece)],
+            [.. LineEdits.Select(l => l.CostPerUnit)],
+            [.. PackEdits.Select(p => (p.Name, p.PiecesPerPack, p.LineCost))],
             EditingLaborPercent,
             EditingOverheadPercent,
             EditingAdministrativePercent,
             EditingMarginPercent,
             EditingVatPercent);
+
+        // Back onto the rows, so the Packs table shows each pack's own cost and price beside it.
+        foreach (var (row, summary) in PackEdits.Zip(Costs.Packs))
+        {
+            row.MaterialCost = summary.MaterialCost;
+            row.SellingPrice = summary.SellingPrice;
+        }
+    }
 
     public void Dispose()
     {
