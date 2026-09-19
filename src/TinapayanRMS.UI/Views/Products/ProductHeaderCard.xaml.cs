@@ -6,7 +6,8 @@ namespace TinapayanRMS.UI.Views.Products;
 
 /// <summary>
 /// Products' summary header: the product's title and description (edited in a pop-up from the link under
-/// the title), New/Save/Delete, then its name, category, cost and price per piece, and when it was last saved.
+/// the title), New/Save/Delete, then its figures: material and base cost, current price and the markup it earns per
+/// piece, and when it was last saved. Nothing in it is typed into but the description (ProductDetailsCard has the rest).
 /// Inherits the Products screen's DataContext (ProductsViewModel).
 /// </summary>
 public partial class ProductHeaderCard : UserControl
@@ -15,9 +16,6 @@ public partial class ProductHeaderCard : UserControl
     {
         InitializeComponent();
     }
-
-    /// <summary>Puts the cursor in the name, so typing can start straight away.</summary>
-    public void FocusName() => NameTextBox.Focus();
 
     /// <summary>The description's pop-up opened: the cursor goes in its box, with the text selected, once the pop-up can take focus.</summary>
     private void OnDescriptionEditorOpened(object? sender, EventArgs e) =>

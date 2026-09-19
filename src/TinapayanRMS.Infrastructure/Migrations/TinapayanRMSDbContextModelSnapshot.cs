@@ -22,6 +22,39 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.CostingDefaults", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("AdministrativePercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("LaborPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("MarginPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("OverheadPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("VatPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CostingDefaults", t =>
+                        {
+                            t.HasCheckConstraint("CK_CostingDefaults_SingleRow", "[Id] = 1");
+                        });
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.CostingParameters", b =>
                 {
                     b.Property<int>("Id")

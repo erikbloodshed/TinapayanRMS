@@ -1,0 +1,78 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.CostingDefaultsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="500" d:DesignWidth="900">
+    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="16">
+        <!-- ErrorMessage and SuccessMessage as toasts, over the card: each puts itself in the Grid's bottom-right corner -->
+        <controls:ErrorToast />
+        <controls:SuccessToast />
+
+        <!-- The five percentages, as the Products screen's Costing tab labels them -->
+        <Border Style="{StaticResource CardStyle}" Width="420" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <StackPanel>
+                <TextBlock Text="Costing Defaults" Style="{StaticResource SectionHeaderStyle}" />
+                <TextBlock Style="{StaticResource CaptionStyle}"
+                           Margin="0,0,0,12"
+                           Text="What a new product's costing starts with. Each product keeps its own from its first Save: changing these doesn't change any saved product." />
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="Labor %" Style="{StaticResource FieldLabelStyle}" ToolTip="Of the material cost per piece" />
+                    <syncfusion:DoubleTextBox Grid.Row="1"
+                                              Margin="0,0,0,12"
+                                              MinValue="0"
+                                              Value="{Binding EditingLaborPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock Grid.Column="2" Text="Overhead %" Style="{StaticResource FieldLabelStyle}" ToolTip="Of the material cost per piece" />
+                    <syncfusion:DoubleTextBox Grid.Row="1"
+                                              Grid.Column="2"
+                                              Margin="0,0,0,12"
+                                              MinValue="0"
+                                              Value="{Binding EditingOverheadPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock Grid.Row="2" Text="Administrative %" Style="{StaticResource FieldLabelStyle}" ToolTip="Of the material cost per piece: office, permits, bookkeeping" />
+                    <syncfusion:DoubleTextBox Grid.Row="3"
+                                              Margin="0,0,0,12"
+                                              MinValue="0"
+                                              Value="{Binding EditingAdministrativePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="2" Text="Markup %" Style="{StaticResource FieldLabelStyle}" ToolTip="On the base cost: materials, labor, overhead and administrative" />
+                    <syncfusion:DoubleTextBox Grid.Row="3"
+                                              Grid.Column="2"
+                                              Margin="0,0,0,12"
+                                              MinValue="0"
+                                              Value="{Binding EditingMarginPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock Grid.Row="4" Text="VAT %" Style="{StaticResource FieldLabelStyle}" ToolTip="On top of the marked-up price" />
+                    <syncfusion:DoubleTextBox Grid.Row="5"
+                                              MinValue="0"
+                                              Value="{Binding EditingVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </Grid>
+
+                <syncfusion:ButtonAdv Label="Save"
+                                      HorizontalAlignment="Left"
+                                      Margin="0,16,0,0"
+                                      IconTemplate="{StaticResource SaveIconTemplate}"
+                                      Command="{Binding SaveCommand}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

@@ -7,7 +7,8 @@ namespace TinapayanRMS.UI.Views;
 
 /// <summary>
 /// The lookups every screen picks from, opened from the navigation drawer's Settings item: units of
-/// measure, raw material categories, product categories and sub-assembly roles, one tab each. Built afresh each time it
+/// measure, raw material categories, product categories, sub-assembly roles and the costing a new product starts
+/// with, one tab each. Built afresh each time it
 /// opens, over the same long-lived ViewModels, so a tab keeps its selection and unsaved edits between
 /// visits.
 /// </summary>
@@ -17,7 +18,8 @@ public partial class SettingsWindow : Window
         UnitsOfMeasureViewModel unitsOfMeasureViewModel,
         CategoriesViewModel categoriesViewModel,
         ProductCategoriesViewModel productCategoriesViewModel,
-        SubAssemblyRolesViewModel rolesViewModel)
+        SubAssemblyRolesViewModel rolesViewModel,
+        CostingDefaultsViewModel costingDefaultsViewModel)
     {
         InitializeComponent();
 
@@ -25,6 +27,7 @@ public partial class SettingsWindow : Window
         CategoriesTab.Content = new CategoriesView(categoriesViewModel);
         ProductCategoriesTab.Content = new ProductCategoriesView(productCategoriesViewModel);
         RolesTab.Content = new SubAssemblyRolesView(rolesViewModel);
+        CostingDefaultsTab.Content = new CostingDefaultsView(costingDefaultsViewModel);
 
         // The ViewModels outlive this window, so their delete confirmations are removed with it.
         var confirmDeletes = new CompositeDisposable(
@@ -41,6 +44,7 @@ public partial class SettingsWindow : Window
             categoriesViewModel.LoadCommand.Execute().Subscribe();
             productCategoriesViewModel.LoadCommand.Execute().Subscribe();
             rolesViewModel.LoadCommand.Execute().Subscribe();
+            costingDefaultsViewModel.LoadCommand.Execute().Subscribe();
         };
     }
 

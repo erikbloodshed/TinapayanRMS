@@ -412,8 +412,6 @@ public sealed class ProductCostSummary
 
     public decimal Vat => SellingPrice - PreVatPrice;
 
-    public decimal ProfitMarginPercent => CostingRules.CalculateProfitMarginPercent(BaseCost, PreVatPrice);
-
     /// <summary>What the shop charges for one piece now, with VAT, as entered on the form; null when not entered.</summary>
     public decimal? CurrentPrice { get; }
 
@@ -448,7 +446,7 @@ public sealed class ProductCostSummary
 
 /// <summary>
 /// The Products screen: a product's recipe (its own sub-assemblies and those it links, each at its own
-/// piece size, and its packaging), its costing, its packaging link and cloning. The name, description,
+/// piece size, and its packaging), its costing, its packaging link, and cloning it or making a variant of it. The name, description,
 /// recipe, packaging and costing are edited in memory, and Save writes them together
 /// (IProductRepository.SaveAsync).
 /// </summary>
@@ -467,6 +465,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     private readonly IPackagingLineRepository _packagingLineRepository;
     private readonly IProductPackRepository _productPackRepository;
     private readonly ICostingParametersRepository _costingParametersRepository;
+    private readonly ICostingDefaultsRepository _costingDefaultsRepository;
     private readonly IPackagingLinkRepository _packagingLinkRepository;
     private readonly IProductCloner _productCloner;
     private readonly ISubAssemblyRepository _subAssemblyRepository;
@@ -1135,6 +1134,9 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     private readonly CompositeDisposable _packSubscriptions = [];
     private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) _savedCosting;
 
+    // What a new product's costing starts with (Settings → Costing Defaults), as of the last LoadCommand.
+    private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) _costingDefaults;
+
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
@@ -1175,12 +1177,16 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<RxVoid, RxVoid> CopyPackagingCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> CloneCommand { get; }
 
+    /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductCloner.CreateVariantAsync).</summary>
+    public ReactiveCommand<RxVoid, RxVoid> CreateVariantCommand { get; }
+
     public ProductsViewModel(
         IProductRepository productRepository,
         IProductSubAssemblyUsageRepository usageRepository,
         IPackagingLineRepository packagingLineRepository,
         IProductPackRepository productPackRepository,
         ICostingParametersRepository costingParametersRepository,
+        ICostingDefaultsRepository costingDefaultsRepository,
         IPackagingLinkRepository packagingLinkRepository,
         IProductCloner productCloner,
         ISubAssemblyRepository subAssemblyRepository,
@@ -1199,6 +1205,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         _packagingLineRepository = packagingLineRepository;
         _productPackRepository = productPackRepository;
         _costingParametersRepository = costingParametersRepository;
+        _costingDefaultsRepository = costingDefaultsRepository;
         _packagingLinkRepository = packagingLinkRepository;
         _productCloner = productCloner;
         _subAssemblyRepository = subAssemblyRepository;
@@ -1405,6 +1412,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             var products = await _productRepository.GetAllAsync(CancellationToken.None);
             var linkable = await _subAssemblyRepository.GetLinkableAsync(CancellationToken.None);
             var packagingSets = (await _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None)).Where(s => s.Role?.IsPackaging == true).ToList();
+            var costingDefaults = await _costingDefaultsRepository.GetAsync(CancellationToken.None);
 
             // A linked section reads another product's sub-assembly, which can change there (its lines,
             // name or role), so those are fetched again; the product's own sections only need their
@@ -1445,6 +1453,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                 _productCache.MergeFrom(products);
                 _linkable = linkable;
                 _packagingSets = packagingSets;
+                RefreshCostingDefaults(costingDefaults);
 
                 SelectedProduct = Products.FirstOrDefault(p => p.Id == selectedId);
                 if (SelectedProduct is not null)
@@ -1761,16 +1770,21 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             this.WhenAnyValue(x => x.SelectedPackEdit, x => x.SelectedPackEdit!.SelectedLineEdit)
                 .Select(pair => pair.Item1 is not null && pair.Item2 is not null));
 
-        // A clone copies the product as saved: unsaved edits stay with this one.
-        CloneCommand = ReactiveCommand.CreateFromTask(
-            () => RunSafelyAsync(async () =>
-            {
-                var newId = await _productCloner.CloneAsync(SelectedProduct!.Id, EditingCloneName, CancellationToken.None);
-                await LoadCommand.Execute();
-                SelectedProduct = Products.FirstOrDefault(p => p.Id == newId);
-            }),
-            this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingCloneName, (product, name) => product is not null && !string.IsNullOrWhiteSpace(name)));
+        // A clone copies the product as saved, and a variant links it as saved: unsaved edits stay with this one.
+        var canMakeFromSelected = this.WhenAnyValue(
+            x => x.SelectedProduct, x => x.EditingCloneName, (product, name) => product is not null && !string.IsNullOrWhiteSpace(name));
+        CloneCommand = ReactiveCommand.CreateFromTask(() => MakeFromSelectedAsync(_productCloner.CloneAsync), canMakeFromSelected);
+        CreateVariantCommand = ReactiveCommand.CreateFromTask(() => MakeFromSelectedAsync(_productCloner.CreateVariantAsync), canMakeFromSelected);
     }
+
+    /// <summary>Makes a new product named EditingCloneName from the selected one as saved (a clone or a variant), then shows it.</summary>
+    private Task MakeFromSelectedAsync(Func<int, string, CancellationToken, Task<int>> make) =>
+        RunSafelyAsync(async () =>
+        {
+            var newId = await make(SelectedProduct!.Id, EditingCloneName, CancellationToken.None);
+            await LoadCommand.Execute();
+            SelectedProduct = Products.FirstOrDefault(p => p.Id == newId);
+        });
 
     /// <summary>The Last Updated figure: the day and the time; "—" for a product never saved since it was added.</summary>
     private void ShowUpdatedAt(DateTime? updatedAt) =>
@@ -1825,7 +1839,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         ClearDetails(keepRecipeTabs);
     }
 
-    /// <summary>A new product: no name, recipe, packaging, costing or links, and nothing selected.</summary>
+    /// <summary>A new product: no name, recipe, packaging or links, its costing at the defaults, and nothing selected.</summary>
     private void StartNewProduct()
     {
         SelectedProduct = null;
@@ -1842,6 +1856,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         CloseUsageForm();
         SelectedLineEdit = null;
         ClearDetails();
+        ApplyCostingDefaults();
     }
 
     /// <summary>
@@ -2194,6 +2209,27 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
     private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) CurrentCosting() =>
         (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent);
+
+    /// <summary>
+    /// A new product's costing starts at the defaults, while what Save compares against stays at none (SetCosting(null)),
+    /// so its first Save writes them as its own. Defaults of all zero write nothing, as before there were defaults.
+    /// </summary>
+    private void ApplyCostingDefaults() =>
+        (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent) = _costingDefaults;
+
+    /// <summary>
+    /// Takes up the defaults as LoadCommand read them. A new product still showing the ones it started with (the screen's
+    /// first load, or defaults changed in Settings since) takes the new ones; one whose costing was typed into keeps it.
+    /// </summary>
+    private void RefreshCostingDefaults(CostingDefaults defaults)
+    {
+        var untouchedNewProduct = _editingId == 0 && CurrentCosting() == _costingDefaults;
+        _costingDefaults = (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent);
+        if (untouchedNewProduct)
+        {
+            ApplyCostingDefaults();
+        }
+    }
 
     /// <summary>The packaging lines as Save writes them, in each material's base unit; a line half filled in is refused (PackagingLineRow.CompleteLines).</summary>
     private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> CurrentLines() =>

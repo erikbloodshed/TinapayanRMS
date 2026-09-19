@@ -9,7 +9,17 @@ namespace TinapayanRMS.Infrastructure.Services;
 
 public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductCloner
 {
-    public async Task<int> CloneAsync(int sourceProductId, string newProductName, CancellationToken cancellationToken)
+    public Task<int> CloneAsync(int sourceProductId, string newProductName, CancellationToken cancellationToken) =>
+        CreateFromAsync(sourceProductId, newProductName, asVariant: false, cancellationToken);
+
+    public Task<int> CreateVariantAsync(int sourceProductId, string newProductName, CancellationToken cancellationToken) =>
+        CreateFromAsync(sourceProductId, newProductName, asVariant: true, cancellationToken);
+
+    /// <summary>
+    /// A clone and a variant differ only in their recipe and per-piece packaging: a clone copies them, a variant links
+    /// them. The product row, packs and costing are copied alike.
+    /// </summary>
+    private async Task<int> CreateFromAsync(int sourceProductId, string newProductName, bool asVariant, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -47,10 +57,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
 
         // A packaging set the source links directly stays linked, like a standalone sub-assembly: it's kept apart to
         // be shared. Reached through another product's link, it's copied like the rest of that product's packaging.
-        var linkedSetId = await dbContext.PackagingLinks
-            .Where(l => l.ProductId == sourceProductId)
-            .Select(l => l.LinkedSubAssemblyId)
-            .FirstOrDefaultAsync(cancellationToken);
+        var sourceLink = await dbContext.PackagingLinks.AsNoTracking().FirstOrDefaultAsync(l => l.ProductId == sourceProductId, cancellationToken);
         var costing = await dbContext.CostingParameters.AsNoTracking().FirstOrDefaultAsync(c => c.ProductId == sourceProductId, cancellationToken);
 
         // Packs are never linked — resolving the packaging through a link only ever brings per-piece lines
@@ -76,6 +83,93 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         };
         await ProductRepository.AddAsync(dbContext, newProduct, cancellationToken);
 
+        var recipe = asVariant
+            ? VariantRecipe(usages, addInsByUsage)
+            : CloneRecipe(sourceProductId, usages, linesBySubAssembly, addInsByUsage);
+        await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, newProduct.Id, recipe, cancellationToken);
+
+        if (asVariant)
+        {
+            // The variant's packaging is the source's, followed through a link — a chain, when the source links a set
+            // or another product's — whenever the source has any: its own lines or a link.
+            if (sourceLink is not null || packagingLines.Count > 0)
+            {
+                await PackagingLinkRepository.SetAsync(dbContext, newProduct.Id, new PackagingLinkDraft(sourceProductId, null), cancellationToken);
+            }
+        }
+        else if (sourceLink?.LinkedSubAssemblyId is { } setId)
+        {
+            dbContext.PackagingLinks.Add(new PackagingLink { ProductId = newProduct.Id, LinkedSubAssemblyId = setId });
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        else if (packagingLines.Count > 0)
+        {
+            await PackagingLineRepository.SetLinesAsync(
+                dbContext,
+                newProduct.Id,
+                packId: null,
+                [.. packagingLines.Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
+                    l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))],
+                cancellationToken);
+        }
+
+        if (sourcePacks.Count > 0)
+        {
+            // Id 0 throughout: every pack is the new product's own new row, with its own copy of the lines.
+            await ProductPackRepository.SetPacksAsync(
+                dbContext,
+                newProduct.Id,
+                [.. sourcePacks.Select(p => new ProductPackDraft(
+                    0,
+                    p.Name,
+                    p.PiecesPerPack,
+                    [.. sourcePackLines[p.Id].Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
+                        l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))]))],
+                cancellationToken);
+        }
+
+        if (costing is not null)
+        {
+            await CostingParametersRepository.SetAsync(
+                dbContext,
+                new CostingParameters
+                {
+                    ProductId = newProduct.Id,
+                    LaborPercent = costing.LaborPercent,
+                    OverheadPercent = costing.OverheadPercent,
+                    AdministrativePercent = costing.AdministrativePercent,
+                    MarginPercent = costing.MarginPercent,
+                    VatPercent = costing.VatPercent,
+                },
+                cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return newProduct.Id;
+    }
+
+    /// <summary>
+    /// A variant links everything the source's recipe uses, at the source's piece sizes. Links don't chain, so one the
+    /// source links itself is linked where it's kept, and the source's add-ins on it become the variant's own; the
+    /// source's own sub-assemblies have none. Where a role repeats, one of the source's own without a name goes by the
+    /// source's name in the variant (SubAssemblyRules.SectionLabel), so the sections stay apart.
+    /// </summary>
+    private static RecipeDraft VariantRecipe(List<ProductSubAssemblyUsage> usages, ILookup<int, UsageAddInLine> addInsByUsage) =>
+        new(
+            [],
+            [
+                .. usages.Select(usage => new LinkedUsageDraft(usage.SubAssemblyId, usage.AuthoredField, usage.AuthoredValue)
+                {
+                    AddIns = [.. addInsByUsage[usage.Id].Select(l => (l.IngredientId, l.Grams))],
+                }),
+            ]);
+
+    private static RecipeDraft CloneRecipe(
+        int sourceProductId,
+        List<ProductSubAssemblyUsage> usages,
+        ILookup<int, SubAssemblyLine> linesBySubAssembly,
+        ILookup<int, UsageAddInLine> addInsByUsage)
+    {
         // A standalone sub-assembly stays linked, at the same piece size: it's kept apart to be shared.
         // Every other one becomes the clone's own, in the role it has, with its name. In a role the source has more
         // than one in, a linked one without a name of its own takes its owner's, which is what told it apart there,
@@ -113,56 +207,6 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                     : SubAssemblyRules.NormalizeName(usage.SubAssembly.Name)));
         }
 
-        await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, newProduct.Id, new RecipeDraft(owned, linked), cancellationToken);
-
-        if (linkedSetId is { } setId)
-        {
-            dbContext.PackagingLinks.Add(new PackagingLink { ProductId = newProduct.Id, LinkedSubAssemblyId = setId });
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        else if (packagingLines.Count > 0)
-        {
-            await PackagingLineRepository.SetLinesAsync(
-                dbContext,
-                newProduct.Id,
-                packId: null,
-                [.. packagingLines.Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
-                    l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))],
-                cancellationToken);
-        }
-
-        if (sourcePacks.Count > 0)
-        {
-            // Id 0 throughout: every pack is the clone's own new row, with its own copy of the lines.
-            await ProductPackRepository.SetPacksAsync(
-                dbContext,
-                newProduct.Id,
-                [.. sourcePacks.Select(p => new ProductPackDraft(
-                    0,
-                    p.Name,
-                    p.PiecesPerPack,
-                    [.. sourcePackLines[p.Id].Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
-                        l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))]))],
-                cancellationToken);
-        }
-
-        if (costing is not null)
-        {
-            await CostingParametersRepository.SetAsync(
-                dbContext,
-                new CostingParameters
-                {
-                    ProductId = newProduct.Id,
-                    LaborPercent = costing.LaborPercent,
-                    OverheadPercent = costing.OverheadPercent,
-                    AdministrativePercent = costing.AdministrativePercent,
-                    MarginPercent = costing.MarginPercent,
-                    VatPercent = costing.VatPercent,
-                },
-                cancellationToken);
-        }
-
-        await transaction.CommitAsync(cancellationToken);
-        return newProduct.Id;
+        return new RecipeDraft(owned, linked);
     }
 }

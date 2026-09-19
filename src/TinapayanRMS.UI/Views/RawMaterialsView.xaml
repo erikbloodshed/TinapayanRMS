@@ -15,7 +15,7 @@
         DataContext; when a card shows is decided here. The list is as wide as its columns (Auto),
         and the material's details take the rest.
     -->
-    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="16">
+    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="4">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />

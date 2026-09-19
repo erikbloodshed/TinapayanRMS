@@ -31,6 +31,7 @@
             <syncfusion:TabItemExt x:Name="CategoriesTab" Header="Material Categories" CanClose="False" />
             <syncfusion:TabItemExt x:Name="ProductCategoriesTab" Header="Product Categories" CanClose="False" />
             <syncfusion:TabItemExt x:Name="RolesTab" Header="Roles" CanClose="False" />
+            <syncfusion:TabItemExt x:Name="CostingDefaultsTab" Header="Costing Defaults" CanClose="False" />
         </syncfusion:TabControlExt>
 
         <Border Grid.Row="1"

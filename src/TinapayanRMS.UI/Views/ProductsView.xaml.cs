@@ -22,6 +22,6 @@ public partial class ProductsView : UserControl
         });
 
         // New clears the form; put the cursor in the name so typing can start straight away.
-        viewModel.NewCommand.Subscribe(_ => Header.FocusName());
+        viewModel.NewCommand.Subscribe(_ => Details.FocusName());
     }
 }

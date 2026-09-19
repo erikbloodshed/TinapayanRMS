@@ -1,0 +1,76 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.Products.ProductDetailsCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:viewModels="clr-namespace:TinapayanRMS.UI.ViewModels">
+    <UserControl.Resources>
+        <!--
+            The Category picker's rows: a line under its "< Add New .. >" row (ProductsViewModel.AddNewCategory), drawn as
+            Raw Materials' SummaryHeaderCard draws its own, and for the same reasons (a row's ContentTemplate, since the
+            picker needs DisplayMemberPath).
+        -->
+        <DataTemplate x:Key="AddNewCategoryTemplate">
+            <Border HorizontalAlignment="Stretch"
+                    BorderBrush="{StaticResource CardBorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="0,0,0,5"
+                    Margin="0,0,0,3">
+                <TextBlock Text="{Binding Name}" />
+            </Border>
+        </DataTemplate>
+        <Style x:Key="CategoryOptionStyle" TargetType="syncfusion:ComboBoxItemAdv" BasedOn="{StaticResource {x:Type syncfusion:ComboBoxItemAdv}}">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Id}" Value="{x:Static viewModels:ProductsViewModel.AddNewCategoryId}">
+                    <Setter Property="ContentTemplate" Value="{StaticResource AddNewCategoryTemplate}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <!--
+        What's typed in about the product itself, under the header's figures: its name, its category and the price the
+        shop charges now. Labels in the first row, fields in the second, as Raw Materials lays out its own. Save writes
+        them with the rest of the form.
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Text="Product Name" Style="{StaticResource FieldLabelStyle}" />
+        <syncfusion:SfTextBoxExt x:Name="NameTextBox"
+                                 Grid.Row="1"
+                                 Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Grid.Column="2" Text="Category" Style="{StaticResource FieldLabelStyle}" />
+        <syncfusion:ComboBoxAdv Grid.Row="1"
+                                Grid.Column="2"
+                                ItemsSource="{Binding CategoryOptions}"
+                                DisplayMemberPath="Name"
+                                ItemContainerStyle="{StaticResource CategoryOptionStyle}"
+                                SelectedItem="{Binding EditingCategory, Mode=TwoWay}"
+                                Text="{Binding CategorySearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                ToolTip="What the Products list groups it under. Pick a category, or &quot;&lt; Add New .. &gt;&quot; to name one now." />
+
+        <!-- Saved with the product. Empty rather than 0.00 until typed (UseNullOption). -->
+        <TextBlock Grid.Column="4" Text="Current Price" Style="{StaticResource FieldLabelStyle}" ToolTip="Per piece, with VAT: what the shop charges now" />
+        <syncfusion:CurrencyTextBox Grid.Row="1"
+                                    Grid.Column="4"
+                                    Value="{Binding EditingCurrentPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    UseNullOption="True"
+                                    NullValue="{x:Null}"
+                                    MinValue="0"
+                                    CurrencySymbol="₱"
+                                    CurrencyDecimalDigits="2"
+                                    ToolTip="Per piece, with VAT: what the shop charges now. The header's Markup % shows what it earns." />
+    </Grid>
+</UserControl>

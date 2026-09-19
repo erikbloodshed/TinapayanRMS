@@ -9,18 +9,9 @@
              mc:Ignorable="d"
              d:DesignHeight="800"
              d:DesignWidth="1400">
-    <UserControl.Resources>
-        <!-- The line between two sections side by side, standing in the gap column between them -->
-        <Style x:Key="ColumnDividerStyle" TargetType="Border">
-            <Setter Property="Width" Value="1" />
-            <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="Background" Value="{StaticResource CardBorderBrush}" />
-        </Style>
-    </UserControl.Resources>
-
     <!--
-        Two bordered regions: the product list, and the selected product's details (its header over its
-        tabs along the bottom). Inside the details the sections aren't boxed: headers and divider lines
+        Two bordered regions: the product list, and the selected product's details (its header of figures, the
+        fields typed in about it, then its tabs along the bottom). Inside the details the sections aren't boxed: headers and divider lines
         set them apart. Each section is a UserControl in Views/Products that inherits this screen's
         DataContext; when one shows is decided here.
     -->
@@ -41,12 +32,16 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <p:ProductHeaderCard x:Name="Header" />
+                <!-- The header only shows figures; what's typed in about the product sits under it -->
+                <p:ProductHeaderCard />
 
-                <Border Grid.Row="1" Style="{StaticResource SectionDividerStyle}" />
+                <p:ProductDetailsCard x:Name="Details" Grid.Row="1" Margin="0,12,0,0" />
+
+                <Border Grid.Row="2" Style="{StaticResource SectionDividerStyle}" />
 
                 <!--
                     Every tab but Clone is part of the one form Save writes, so a new product shows them
@@ -56,7 +51,7 @@
                     Between picking a product and its details arriving, the previous product's still show, and
                     the tabs ignore the mouse (AreDetailsReady): what's in them is no longer the form's.
                 -->
-                <syncfusion:TabControlExt Grid.Row="2"
+                <syncfusion:TabControlExt Grid.Row="3"
                                           IsHitTestVisible="{Binding AreDetailsReady}"
                                           TabStripPlacement="Bottom"
                                           CloseButtonType="Hide"
@@ -73,27 +68,10 @@
                         </ScrollViewer>
                     </syncfusion:TabItemExt>
 
-                    <!-- The inputs across the top, then the breakdown beside the profit, a line between each -->
+                    <!-- The costing parameters beside the recipe cost breakdown (CostingCard) -->
                     <syncfusion:TabItemExt Header="Costing" CanClose="False">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,12">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="3*" />
-                                    <ColumnDefinition Width="25" />
-                                    <ColumnDefinition Width="2*" />
-                                </Grid.ColumnDefinitions>
-
-                                <p:CostingSummaryCard Grid.ColumnSpan="3" />
-                                <Border Grid.Row="1" Grid.ColumnSpan="3" Style="{StaticResource SectionDividerStyle}" />
-                                <p:CostBreakdownCard Grid.Row="2" />
-                                <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource ColumnDividerStyle}" />
-                                <p:ProfitMarginCard Grid.Row="2" Grid.Column="2" VerticalAlignment="Top" />
-                            </Grid>
+                            <p:CostingCard />
                         </ScrollViewer>
                     </syncfusion:TabItemExt>
 
@@ -104,7 +82,7 @@
                         </ScrollViewer>
                     </syncfusion:TabItemExt>
 
-                    <!-- Linking the packaging moved into the Recipe Structure's Add Sub-Assembly, so this tab only clones. -->
+                    <!-- Linking the packaging moved into the Recipe Structure's Add Sub-Assembly, so this tab only clones: a copy, or a variant that links the recipe and packaging. -->
                     <syncfusion:TabItemExt Header="Clone"
                                            CanClose="False"
                                            Visibility="{Binding ShowLinks, Converter={StaticResource BooleanToVisibilityConverter}}">

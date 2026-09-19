@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.UI.Xaml.Grid.Cells;
 
@@ -51,6 +52,7 @@ public static class AutoCompleteDropDown
 /// starts with it (<see cref="ScreenAwareDropDownControl"/>).</item>
 /// <item>The pop-up is placed on the monitor the cell is on (<see cref="ScreenAwareDropDownControl"/>).</item>
 /// <item>Tab keeps the row picked in the open list, as Enter does; the grid moved on without it.</item>
+/// <item>The key that starts the edit is typed into the box; the base dropped it, so the first letter had to be typed twice.</item>
 /// </list>
 /// </summary>
 public sealed class AutoCompleteDropDownRenderer : GridCellMultiColumnDropDownRenderer
@@ -73,6 +75,36 @@ public sealed class AutoCompleteDropDownRenderer : GridCellMultiColumnDropDownRe
         {
             uiElement.Text = DisplayText(column, DataGrid.View?.GetPropertyAccessProvider().GetValue(dataContext, column.MappingName));
         }
+    }
+
+    protected override void OnEditElementLoaded(object sender, RoutedEventArgs e)
+    {
+        // A key typed on a cell not yet being edited starts the edit, and the grid keeps its character in
+        // PreviewInputText, since the editor doesn't exist yet to take it. The text box renderer writes it into the box
+        // once the editor loads; this one's base only focused the box and dropped it, so the first letter typed never
+        // showed and had to be typed again. It's typed into the box here, over the row's name as a text cell's
+        // character replaces its text, as typed text, once the control has finished loading: typed during Loaded, it
+        // showed but neither filtered nor picked. The list is opened first, as the control's own key-down opens it
+        // (AllowImmediatePopup) before the text arrives; the text then filters and picks as any key's does.
+        var typed = (string?)PreviewInputText;
+        base.OnEditElementLoaded(sender, e);
+
+        if (string.IsNullOrEmpty(typed) || sender is not ScreenAwareDropDownControl editor)
+        {
+            return;
+        }
+
+        editor.Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+        {
+            if (editor.TypingBox is not { IsKeyboardFocused: true } box)
+            {
+                return;
+            }
+
+            box.SelectAll();
+            editor.IsDropDownOpen = editor.AllowImmediatePopup;
+            TextCompositionManager.StartComposition(new TextComposition(InputManager.Current, box, typed));
+        });
     }
 
     protected override bool ShouldGridTryToHandleKeyDown(KeyEventArgs e)
@@ -119,8 +151,11 @@ public sealed class ScreenAwareDropDownControl : SfMultiColumnDropDownControl
     /// <summary>Whether a name in the list starts with the text being typed, once worked out for that text.</summary>
     private bool? _anyNameStartsWithText;
 
+    /// <summary>The text box its text is typed into, once its template has been applied.</summary>
+    internal TextBox? TypingBox => GetTemplateChild("PART_TextBox") as TextBox;
+
     /// <summary>Whether its template, with the text box its text is typed into, has been applied.</summary>
-    internal bool HasEditor => GetTemplateChild("PART_TextBox") is TextBox;
+    internal bool HasEditor => TypingBox is not null;
 
     protected override void ProcessOnEditorTextChanged(object sender, TextChangedEventArgs e)
     {

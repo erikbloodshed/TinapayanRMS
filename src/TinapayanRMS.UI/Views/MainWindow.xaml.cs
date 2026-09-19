@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private readonly CategoriesViewModel _categoriesViewModel;
     private readonly ProductCategoriesViewModel _productCategoriesViewModel;
     private readonly SubAssemblyRolesViewModel _rolesViewModel;
+    private readonly CostingDefaultsViewModel _costingDefaultsViewModel;
 
     public MainWindow(
         MainWindowViewModel viewModel,
@@ -29,7 +30,8 @@ public partial class MainWindow : Window
         UnitsOfMeasureViewModel unitsOfMeasureViewModel,
         CategoriesViewModel categoriesViewModel,
         ProductCategoriesViewModel productCategoriesViewModel,
-        SubAssemblyRolesViewModel rolesViewModel)
+        SubAssemblyRolesViewModel rolesViewModel,
+        CostingDefaultsViewModel costingDefaultsViewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
@@ -37,6 +39,7 @@ public partial class MainWindow : Window
         _categoriesViewModel = categoriesViewModel;
         _productCategoriesViewModel = productCategoriesViewModel;
         _rolesViewModel = rolesViewModel;
+        _costingDefaultsViewModel = costingDefaultsViewModel;
 
         RawMaterialsTab.Content = new RawMaterialsView(rawMaterialsViewModel);
         SubAssembliesTab.Content = new SubAssembliesView(subAssembliesViewModel);
@@ -80,7 +83,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Units of measure, categories and roles, edited in a dialog over the current screen. Once it
+    /// Units of measure, categories, roles and costing defaults, edited in a dialog over the current screen. Once it
     /// closes, the screen on show refreshes so its pickers include anything added or renamed; the other
     /// tabs pick the changes up when they're next shown, as they do for any change.
     /// </summary>
@@ -88,7 +91,8 @@ public partial class MainWindow : Window
     {
         NavigationDrawer.IsOpen = false;
 
-        var settings = new SettingsWindow(_unitsOfMeasureViewModel, _categoriesViewModel, _productCategoriesViewModel, _rolesViewModel) { Owner = this };
+        var settings = new SettingsWindow(
+            _unitsOfMeasureViewModel, _categoriesViewModel, _productCategoriesViewModel, _rolesViewModel, _costingDefaultsViewModel) { Owner = this };
         SfSkinManager.SetTheme(settings, SfSkinManager.GetTheme(this));
         settings.ShowDialog();
 

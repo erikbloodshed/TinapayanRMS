@@ -60,6 +60,7 @@ public static class CompositionRoot
                 services.AddSingleton<IPackagingLineRepository, PackagingLineRepository>();
         services.AddSingleton<IProductPackRepository, ProductPackRepository>();
                 services.AddSingleton<ICostingParametersRepository, CostingParametersRepository>();
+                services.AddSingleton<ICostingDefaultsRepository, CostingDefaultsRepository>();
                 services.AddSingleton<IPackagingLinkRepository, PackagingLinkRepository>();
                 services.AddSingleton<IProductCloner, ProductCloner>();
 
@@ -86,6 +87,7 @@ public static class CompositionRoot
                 services.AddSingleton<CategoriesViewModel>();
                 services.AddSingleton<ProductCategoriesViewModel>();
                 services.AddSingleton<SubAssemblyRolesViewModel>();
+                services.AddSingleton<CostingDefaultsViewModel>();
             });
     }
 }

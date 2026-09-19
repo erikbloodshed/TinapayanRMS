@@ -8,6 +8,19 @@
         <TextBlock Text="New Product Name" Style="{StaticResource FieldLabelStyle}" />
         <syncfusion:SfTextBoxExt Text="{Binding EditingCloneName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
 
-        <syncfusion:ButtonAdv Label="Clone" HorizontalAlignment="Left" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding CloneCommand}" />
+        <StackPanel Orientation="Horizontal">
+            <syncfusion:ButtonAdv Label="Clone" IconTemplate="{StaticResource CopyIconTemplate}" Command="{Binding CloneCommand}" />
+            <syncfusion:ButtonAdv Label="Create Variant"
+                                  Margin="8,0,0,0"
+                                  IconTemplate="{StaticResource LinkIconTemplate}"
+                                  Command="{Binding CreateVariantCommand}" />
+        </StackPanel>
+
+        <!-- Capped at the card's MinWidth, so it wraps rather than widening the card -->
+        <TextBlock Style="{StaticResource CaptionStyle}"
+                   MaxWidth="420"
+                   HorizontalAlignment="Left"
+                   Margin="0,8,0,0"
+                   Text="Clone copies the recipe and packaging: the new product's own from then on. Create Variant links them instead: the new product follows every change made here, at piece sizes of its own." />
     </StackPanel>
 </UserControl>

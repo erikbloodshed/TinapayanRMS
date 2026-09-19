@@ -985,6 +985,84 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.Categories.Should().ContainSingle("nothing was added");
     }
 
+    [Fact]
+    public async Task Create_Variant_makes_a_product_that_links_the_recipe_and_packaging_and_shows_it()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var (sourceId, doughId) = await AddProductWithSubAssemblyAsync("Ensaymada Big", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
+        await GivePackagingAsync(sourceId);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}");
+
+        viewModel.EditingCloneName = "Ensaymada Small";
+        await viewModel.CreateVariantCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SelectedProduct!.Name.Should().Be("Ensaymada Small");
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1 && viewModel.IsPackagingLinked,
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, packaging linked={viewModel.IsPackagingLinked}");
+        var usage = viewModel.UsageEdits.Single();
+        usage.IsLinked.Should().BeTrue();
+        usage.SubAssemblyId.Should().Be(doughId);
+    }
+
+    [Fact]
+    public async Task A_new_product_starts_with_the_costing_defaults_and_its_first_Save_keeps_them()
+    {
+        await new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(
+            new CostingDefaults { LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 40m, VatPercent = 12m },
+            Cancellation);
+        var viewModel = CreateViewModel();
+
+        await viewModel.LoadCommand.Execute();
+
+        (viewModel.EditingLaborPercent, viewModel.EditingOverheadPercent, viewModel.EditingAdministrativePercent, viewModel.EditingMarginPercent, viewModel.EditingVatPercent)
+            .Should().Be((25m, 10m, 5m, 40m, 12m), "the screen opens on a new product");
+
+        viewModel.EditingName = "Pandesal";
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        var costing = await dbContext.CostingParameters.SingleAsync(c => c.Product!.Name == "Pandesal", Cancellation);
+        (costing.LaborPercent, costing.MarginPercent, costing.VatPercent).Should().Be((25m, 40m, 12m));
+    }
+
+    [Fact]
+    public async Task Changed_defaults_reach_an_untouched_new_product_but_not_a_typed_one_or_a_saved_product()
+    {
+        var defaultsRepository = new CostingDefaultsRepository(CreateDbContextFactory());
+        var productId = await AddProductAsync("Cheese roll");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        // As Settings would, while the screen shows a new product: it takes them up on the next load.
+        await defaultsRepository.SetAsync(new CostingDefaults { LaborPercent = 20m, VatPercent = 12m }, Cancellation);
+        await viewModel.LoadCommand.Execute();
+        viewModel.EditingLaborPercent.Should().Be(20m);
+
+        // Typed into, it keeps what was typed.
+        viewModel.EditingLaborPercent = 7m;
+        await defaultsRepository.SetAsync(new CostingDefaults { LaborPercent = 30m, VatPercent = 12m }, Cancellation);
+        await viewModel.LoadCommand.Execute();
+        viewModel.EditingLaborPercent.Should().Be(7m);
+
+        // A saved product without costing of its own shows none: the defaults are only where a new product starts.
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
+        viewModel.EditingLaborPercent.Should().Be(0m);
+
+        // New starts from the latest defaults.
+        await viewModel.NewCommand.Execute();
+        (viewModel.EditingLaborPercent, viewModel.EditingVatPercent).Should().Be((30m, 12m));
+    }
+
     private async Task<int> AddProductCategoryAsync(string name)
     {
         await using var dbContext = CreateDbContext();
@@ -1034,6 +1112,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             packagingLineRepository,
             new ProductPackRepository(factory),
             new CostingParametersRepository(factory),
+            new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory, packagingLineRepository),
             new ProductCloner(factory),
             new SubAssemblyRepository(factory),

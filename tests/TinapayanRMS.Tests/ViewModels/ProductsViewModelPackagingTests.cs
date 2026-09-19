@@ -303,6 +303,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
             packagingLineRepository,
             new ProductPackRepository(factory),
             new CostingParametersRepository(factory),
+            new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory, packagingLineRepository),
             new ProductCloner(factory),
             new SubAssemblyRepository(factory),
