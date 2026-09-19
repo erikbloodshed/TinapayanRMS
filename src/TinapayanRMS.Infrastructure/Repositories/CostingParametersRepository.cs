@@ -2,18 +2,18 @@ using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class CostingParametersRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ICostingParametersRepository
 {
-    public async Task<CostingParameters?> GetForProductAsync(int productId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.CostingParameters
-            .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.ProductId == productId, cancellationToken);
-    }
+    // ProductId is unique, so there's at most one row.
+    public Task<CostingParameters?> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
+        dbContextFactory.QuerySingleOrDefaultAsync<CostingParameters>(
+            $"SELECT {Columns.Of<CostingParameters>("c")} FROM CostingParameters c WHERE c.ProductId = @productId",
+            new { productId },
+            cancellationToken);
 
     public async Task SetAsync(
         int productId, decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent, decimal vatPercent, CancellationToken cancellationToken)

@@ -1,19 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductCategoryRepository
 {
-    public async Task<IReadOnlyList<ProductCategory>> GetAllAsync(CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.ProductCategories
-            .AsNoTracking()
-            .OrderBy(c => c.Name)
-            .ToListAsync(cancellationToken);
-    }
+    public Task<IReadOnlyList<ProductCategory>> GetAllAsync(CancellationToken cancellationToken) =>
+        dbContextFactory.QueryAsync<ProductCategory>($"SELECT {Columns.Of<ProductCategory>("c")} FROM ProductCategories c ORDER BY c.Name", null, cancellationToken);
 
     public async Task AddAsync(ProductCategory category, CancellationToken cancellationToken)
     {

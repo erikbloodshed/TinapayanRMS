@@ -3,6 +3,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
@@ -12,20 +13,15 @@ public class ProductPackRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var packs = await dbContext.ProductPacks
-            .AsNoTracking()
-            .Where(p => p.ProductId == productId)
-            .OrderBy(p => p.PiecesPerPack)
-            .ThenBy(p => p.Name)
-            .ToListAsync(cancellationToken);
+        var packs = await dbContext.QueryAsync<ProductPack>(
+            $"SELECT {Columns.Of<ProductPack>("p")} FROM ProductPacks p WHERE p.ProductId = @productId ORDER BY p.PiecesPerPack, p.Name",
+            new { productId },
+            cancellationToken);
 
-        // Two queries and a stitch rather than an Include: the lines need PackagingLineRepository's own
-        // include chain (the material with its base and alternative units, and the line's entry unit), and
-        // restating it from this end would be a second copy to keep in step.
-        var lines = await PackagingLineRepository.WithMaterialAndUnits(dbContext.PackagingLines)
-            .Where(l => l.ProductId == productId && l.PackId != null)
-            .OrderBy(l => l.Id)
-            .ToListAsync(cancellationToken);
+        // Stitched on rather than joined: the lines come with their material and units the way every
+        // packaging line does (RawMaterialReads), and restating that from this end would be a second copy.
+        var lines = await RawMaterialReads.GetPackagingLinesAsync(
+            dbContext, "WHERE l.ProductId = @productId AND l.PackId IS NOT NULL", new { productId }, cancellationToken);
 
         var linesByPack = lines.ToLookup(l => l.PackId!.Value);
         foreach (var pack in packs)

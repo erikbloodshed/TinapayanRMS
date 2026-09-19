@@ -2,19 +2,16 @@ using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class RawMaterialCategoryRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialCategoryRepository
 {
-    public async Task<IReadOnlyList<RawMaterialCategory>> GetAllAsync(CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.RawMaterialCategories
-            .AsNoTracking()
-            .OrderBy(c => c.Name)
-            .ToListAsync(cancellationToken);
-    }
+    // Type is stored by name; Dapper parses it back into the enum.
+    public Task<IReadOnlyList<RawMaterialCategory>> GetAllAsync(CancellationToken cancellationToken) =>
+        dbContextFactory.QueryAsync<RawMaterialCategory>(
+            $"SELECT {Columns.Of<RawMaterialCategory>("c")} FROM RawMaterialCategories c ORDER BY c.Name", null, cancellationToken);
 
     public async Task AddAsync(RawMaterialCategory category, CancellationToken cancellationToken)
     {

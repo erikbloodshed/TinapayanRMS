@@ -2,19 +2,15 @@ using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IUnitOfMeasureRepository
 {
-    public async Task<IReadOnlyList<UnitOfMeasure>> GetAllAsync(CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.UnitsOfMeasure
-            .AsNoTracking()
-            .OrderBy(u => u.Name)
-            .ToListAsync(cancellationToken);
-    }
+    public Task<IReadOnlyList<UnitOfMeasure>> GetAllAsync(CancellationToken cancellationToken) =>
+        dbContextFactory.QueryAsync<UnitOfMeasure>(
+            $"SELECT {Columns.Of<UnitOfMeasure>("u")} FROM UnitsOfMeasure u ORDER BY u.Name", null, cancellationToken);
 
     public async Task AddAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken)
     {

@@ -1,30 +1,37 @@
+using Dapper;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductRepository
 {
-    public async Task<IReadOnlyList<Product>> GetAllAsync(CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.Products
-            .AsNoTracking()
-            .Include(p => p.Category)
-            .OrderBy(p => p.Name)
-            .ToListAsync(cancellationToken);
-    }
+    private static readonly string ProductWithCategorySql = $"""
+        SELECT {Columns.Of<Product>("p")}, {Columns.Of<ProductCategory>("c")}
+        FROM Products p
+        LEFT JOIN ProductCategories c ON c.Id = p.CategoryId
+        """;
 
-    public async Task<Product?> GetByIdAsync(int id, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.Products
-            .AsNoTracking()
-            .Include(p => p.Category)
-            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
-    }
+    public Task<IReadOnlyList<Product>> GetAllAsync(CancellationToken cancellationToken) =>
+        GetWithCategoryAsync("ORDER BY p.Name", null, cancellationToken);
+
+    public async Task<Product?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
+        (await GetWithCategoryAsync("WHERE p.Id = @id", new { id }, cancellationToken)).SingleOrDefault();
+
+    private Task<IReadOnlyList<Product>> GetWithCategoryAsync(string filterAndOrder, object? parameters, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync<IReadOnlyList<Product>>(
+            async dbContext => (await dbContext.Connection().QueryAsync<Product, ProductCategory?, Product>(
+                dbContext.Command($"{ProductWithCategorySql}\n{filterAndOrder}", parameters, cancellationToken),
+                (product, category) =>
+                {
+                    product.Category = category;
+                    return product;
+                },
+                splitOn: "Id")).AsList(),
+            cancellationToken);
 
     public async Task AddAsync(Product product, CancellationToken cancellationToken)
     {

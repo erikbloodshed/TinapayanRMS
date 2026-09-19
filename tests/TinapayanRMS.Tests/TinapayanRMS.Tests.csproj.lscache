@@ -96,6 +96,7 @@ Persistence/
  StandaloneSubAssemblyPersistenceTests.cs
  SubAssemblyPersistenceTests.cs
  UnitOfMeasurePersistenceTests.cs
+Queries/ColumnsTests.cs
 Rules/
  CostingRulesTests.cs
  IngredientBomRulesTests.cs
@@ -345,6 +346,7 @@ ViewModels/
  awesomeassertions/9.6.0/lib/net8.0/AwesomeAssertions.dll
  azure.core/1.50.0/lib/net8.0/Azure.Core.dll
  azure.identity/1.17.1/lib/net8.0/Azure.Identity.dll
+ dapper/2.1.86/lib/net10.0/Dapper.dll
  dynamicdata/9.4.33/lib/net10.0/DynamicData.dll
  fluentvalidation/12.1.1/lib/net8.0/FluentValidation.dll
  microsoft.applicationinsights/2.23.0/lib/netstandard2.0/Microsoft.ApplicationInsights.dll

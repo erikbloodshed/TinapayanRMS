@@ -1,37 +1,58 @@
+using Dapper;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductSubAssemblyUsageRepository
 {
-    public async Task<IReadOnlyList<ProductSubAssemblyUsage>> GetForProductAsync(int productId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.ProductSubAssemblyUsages
-            .AsNoTracking()
-            .Include(u => u.SubAssembly)
-            .ThenInclude(s => s!.Role)
-            .Include(u => u.SubAssembly)
-            .ThenInclude(s => s!.OwnerProduct)
-            .Where(u => u.ProductId == productId)
-            .ToListAsync(cancellationToken);
-    }
+    public Task<IReadOnlyList<ProductSubAssemblyUsage>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync<IReadOnlyList<ProductSubAssemblyUsage>>(
+            async dbContext => (await dbContext.Connection().QueryAsync<ProductSubAssemblyUsage, SubAssembly, SubAssemblyRole, Product?, ProductSubAssemblyUsage>(
+                dbContext.Command(
+                    $"""
+                    SELECT {Columns.Of<ProductSubAssemblyUsage>("u")}, {SubAssemblyReads.ColumnsWithRoleAndOwner}
+                    FROM ProductSubAssemblyUsages u
+                    JOIN SubAssemblies s ON s.Id = u.SubAssemblyId
+                    {SubAssemblyReads.RoleAndOwnerJoins}
+                    WHERE u.ProductId = @productId
+                    ORDER BY u.Id
+                    """,
+                    new { productId },
+                    cancellationToken),
+                (usage, subAssembly, role, owner) =>
+                {
+                    usage.SubAssembly = SubAssemblyReads.WithRoleAndOwner(subAssembly, role, owner);
+                    return usage;
+                },
+                splitOn: "Id,Id,Id")).AsList(),
+            cancellationToken);
 
-    public async Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductAsync(int productId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-
-        // The Ingredient comes with it: every add-in is priced from its BufferedCostPerBaseUnit on read.
-        return await dbContext.UsageAddInLines
-            .AsNoTracking()
-            .Include(l => l.Ingredient)
-            .Where(l => l.Usage!.ProductId == productId)
-            .OrderBy(l => l.Id)
-            .ToListAsync(cancellationToken);
-    }
+    // The Ingredient comes with it: every add-in is priced from its BufferedCostPerBaseUnit on read.
+    public Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductAsync(int productId, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync<IReadOnlyList<UsageAddInLine>>(
+            async dbContext => (await dbContext.Connection().QueryAsync<UsageAddInLine, RawMaterial, UsageAddInLine>(
+                dbContext.Command(
+                    $"""
+                    SELECT {Columns.Of<UsageAddInLine>("l")}, {Columns.Of<RawMaterial>("i")}
+                    FROM UsageAddInLines l
+                    JOIN ProductSubAssemblyUsages u ON u.Id = l.UsageId
+                    JOIN RawMaterials i ON i.Id = l.IngredientId
+                    WHERE u.ProductId = @productId
+                    ORDER BY l.Id
+                    """,
+                    new { productId },
+                    cancellationToken),
+                (line, ingredient) =>
+                {
+                    line.Ingredient = ingredient;
+                    return line;
+                },
+                splitOn: "Id")).AsList(),
+            cancellationToken);
 
     /// <summary>
     /// Replaces the product's recipe on the caller's context, which should hold a transaction: its usages,

@@ -3,18 +3,16 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IPackagingLineRepository
 {
-    public async Task<IReadOnlyList<PackagingLine>> GetForProductAsync(int productId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await WithMaterialAndUnits(dbContext.PackagingLines)
-            .Where(l => l.ProductId == productId)
-            .ToListAsync(cancellationToken);
-    }
+    public Task<IReadOnlyList<PackagingLine>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync(
+            dbContext => RawMaterialReads.GetPackagingLinesAsync(dbContext, "WHERE l.ProductId = @productId", new { productId }, cancellationToken),
+            cancellationToken);
 
     public async Task<IReadOnlyList<PackagingLine>> GetEffectiveForProductAsync(int productId, CancellationToken cancellationToken)
     {
@@ -26,6 +24,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
     /// Follows the packaging's link chain (if any) until an unlinked product or a packaging set is found, then
     /// returns that product's own lines, or the set's lines as this product's (<see cref="SetLinesAsPackagingLines"/>).
     /// visitedProductIds guards against a cycle slipping past SetLinkAsync's own check (e.g. a manual data edit).
+    /// Reads through Dapper, in <paramref name="dbContext"/>'s transaction if it has one (ProductCloner's does).
     /// </summary>
     internal static async Task<IReadOnlyList<PackagingLine>> ResolveEffectiveAsync(
         TinapayanRMSDbContext dbContext, int productId, HashSet<int> visitedProductIds, CancellationToken cancellationToken)
@@ -35,9 +34,8 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             throw new InvalidOperationException("Circular packaging link detected.");
         }
 
-        var link = await dbContext.PackagingLinks
-            .AsNoTracking()
-            .FirstOrDefaultAsync(l => l.ProductId == productId, cancellationToken);
+        var link = await dbContext.QuerySingleOrDefaultAsync<PackagingLink>(
+            $"SELECT {Columns.Of<PackagingLink>("l")} FROM PackagingLinks l WHERE l.ProductId = @productId", new { productId }, cancellationToken);
 
         if (link?.LinkedSubAssemblyId is { } setId)
         {
@@ -53,9 +51,8 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         // that holds for what one piece is wrapped in. A pack's lines can't come through it: they point at
         // rows in ProductPacks belonging to the linked product, so the linking product would show lines for
         // packs it doesn't sell and can't edit. A pack is always its own product's, link or no link.
-        return await WithMaterialAndUnits(dbContext.PackagingLines)
-            .Where(l => l.ProductId == productId && l.PackId == null)
-            .ToListAsync(cancellationToken);
+        return await RawMaterialReads.GetPackagingLinesAsync(
+            dbContext, "WHERE l.ProductId = @productId AND l.PackId IS NULL", new { productId }, cancellationToken);
     }
 
     /// <summary>
@@ -66,10 +63,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
     private static async Task<IReadOnlyList<PackagingLine>> SetLinesAsPackagingLines(
         TinapayanRMSDbContext dbContext, int productId, int setId, CancellationToken cancellationToken)
     {
-        var setLines = await SubAssemblyRepository.WithMaterialAndUnits(dbContext.SubAssemblyPackagingLines)
-            .Where(l => l.SubAssemblyId == setId)
-            .OrderBy(l => l.Id)
-            .ToListAsync(cancellationToken);
+        var setLines = await RawMaterialReads.GetSetLinesAsync(dbContext, setId, cancellationToken);
 
         return
         [
@@ -88,21 +82,6 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             }),
         ];
     }
-
-    /// <summary>
-    /// A line's material with its base unit and alternative units (the Products editor's unit picker
-    /// and cost need them), and the unit the line itself is entered in.
-    /// </summary>
-    internal static IQueryable<PackagingLine> WithMaterialAndUnits(IQueryable<PackagingLine> lines) =>
-        lines
-            .AsNoTracking()
-            .Include(l => l.PackagingMaterial)
-            .ThenInclude(m => m!.BaseUnit)
-            .Include(l => l.PackagingMaterial)
-            .ThenInclude(m => m!.Units.OrderByDescending(u => u.BaseUnitsPerUnit))
-            .ThenInclude(u => u.UnitOfMeasure)
-            .Include(l => l.Unit)
-            .ThenInclude(u => u!.UnitOfMeasure);
 
     public async Task SetLinesAsync(
         int productId,

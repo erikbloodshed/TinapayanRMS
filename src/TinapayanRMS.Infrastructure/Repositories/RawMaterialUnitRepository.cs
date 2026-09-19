@@ -3,6 +3,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Queries;
 using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
@@ -11,16 +12,8 @@ public class RawMaterialUnitRepository(
     IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,
     IngredientCostPropagator costPropagator) : IRawMaterialUnitRepository
 {
-    public async Task<IReadOnlyList<RawMaterialUnit>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.RawMaterialUnits
-            .AsNoTracking()
-            .Include(u => u.UnitOfMeasure)
-            .Where(u => u.RawMaterialId == rawMaterialId)
-            .OrderByDescending(u => u.BaseUnitsPerUnit)
-            .ToListAsync(cancellationToken);
-    }
+    public Task<IReadOnlyList<RawMaterialUnit>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync(dbContext => RawMaterialReads.GetUnitsAsync(dbContext, rawMaterialId, cancellationToken), cancellationToken);
 
     public async Task AddAsync(RawMaterialUnit unit, CancellationToken cancellationToken)
     {

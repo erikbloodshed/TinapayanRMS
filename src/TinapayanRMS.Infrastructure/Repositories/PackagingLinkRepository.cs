@@ -1,8 +1,10 @@
+using Dapper;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
@@ -10,15 +12,28 @@ public class PackagingLinkRepository(
     IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,
     IPackagingLineRepository packagingLineRepository) : IPackagingLinkRepository
 {
-    public async Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.PackagingLinks
-            .AsNoTracking()
-            .Include(l => l.LinkedProduct)
-            .Include(l => l.LinkedSubAssembly)
-            .FirstOrDefaultAsync(l => l.ProductId == productId, cancellationToken);
-    }
+    // ProductId is unique, so there's at most one link.
+    public Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync(
+            async dbContext => (await dbContext.Connection().QueryAsync<PackagingLink, Product?, SubAssembly?, PackagingLink>(
+                dbContext.Command(
+                    $"""
+                    SELECT {Columns.Of<PackagingLink>("l")}, {Columns.Of<Product>("p")}, {Columns.Of<SubAssembly>("s")}
+                    FROM PackagingLinks l
+                    LEFT JOIN Products p ON p.Id = l.LinkedProductId
+                    LEFT JOIN SubAssemblies s ON s.Id = l.LinkedSubAssemblyId
+                    WHERE l.ProductId = @productId
+                    """,
+                    new { productId },
+                    cancellationToken),
+                (link, linkedProduct, linkedSet) =>
+                {
+                    link.LinkedProduct = linkedProduct;
+                    link.LinkedSubAssembly = linkedSet;
+                    return link;
+                },
+                splitOn: "Id,Id")).SingleOrDefault(),
+            cancellationToken);
 
     public async Task SetSubAssemblyLinkAsync(int productId, int subAssemblyId, CancellationToken cancellationToken)
     {

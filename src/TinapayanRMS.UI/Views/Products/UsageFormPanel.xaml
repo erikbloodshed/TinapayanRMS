@@ -6,12 +6,39 @@
     <!--
         Add a sub-assembly to the recipe: a new one of the product's own, a link to an existing one
         (another product's, or a standalone one from the Sub-Assemblies screen), or a copy of one. Or change one already in it: an own one's role, name, lines and piece size, a
-        linked one's piece size and add-ins only. Apply only puts it in the recipe; Save saves it. It is the whole of its
-        Recipe Structure tab, so it has no box of its own, and for a section already in the recipe it carries
+        linked one's piece size and add-ins only. Apply only puts it in the recipe; Save saves it. It is all that shows under a
+        sub-assembly's Recipe Structure tab (one panel for every tab, RecipeStructureCard), so it has no box of its own, and for a section already in the recipe it carries
         that section's heading (EditingUsage) in place of the add form's title. A section is called by its role, and
         by its name too where the recipe has more than one in the role. Taking one out of the recipe is the card's Delete Sub-Assembly.
     -->
     <UserControl.Resources>
+        <!--
+            A value shown in a text box's frame, beside boxes that can be typed into: the Windows11Light theme's
+            SfTextBoxExt (24px tall, corners of 4, a light border with a darker bottom edge, the text inset 6px, and its
+            text colour, which the TextBlock inside takes from ValueBoxForegroundBrush over the app's muted default).
+            The border brush is the theme's own trick: a 2px gradient, flipped to the bottom, darkens the last pixel.
+        -->
+        <SolidColorBrush x:Key="ValueBoxForegroundBrush" Color="#1B1B1B" />
+        <Style x:Key="ValueBoxStyle" TargetType="Border">
+            <Setter Property="Height" Value="24" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,0" />
+            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="BorderBrush">
+                <Setter.Value>
+                    <LinearGradientBrush MappingMode="Absolute" StartPoint="0,0" EndPoint="0,2">
+                        <LinearGradientBrush.RelativeTransform>
+                            <ScaleTransform ScaleY="-1" CenterY="0.49" />
+                        </LinearGradientBrush.RelativeTransform>
+                        <GradientStop Offset="0.5" Color="#8E8E8E" />
+                        <GradientStop Offset="1.0" Color="#F1F1F1" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!--
             The percentage column's header, "Baker's %" or "Absolute %" (UsageFormPercentHeader). A template binding the view's own
             DataContext, not HeaderText="{Binding}": a bound HeaderText reaches the header cell only through the grid's
@@ -429,12 +456,18 @@
                 </Grid.ColumnDefinitions>
 
                 <TextBlock Grid.Column="0" Text="Total Weight (g)" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:SfTextBoxExt Grid.Row="1"
-                                         Grid.Column="0"
-                                         IsReadOnly="True"
-                                         Focusable="False"
-                                         Text="{Binding UsageFormTotalWeightText, Mode=OneWay}"
-                                         ToolTip="The batch: the sum of its lines, and of this product's add-ins to them." />
+                <!--
+                    Drawn as a box but a TextBlock, not a read-only text box: WPF hooks every TextBox up to Windows'
+                    text services, whatever its focus or IsReadOnly, and each change of its text then waits on them
+                    (about 115 ms a product picked, measured; far more on some machines). ValueBoxStyle copies the
+                    theme's text box.
+                -->
+                <Border Grid.Row="1"
+                        Grid.Column="0"
+                        Style="{StaticResource ValueBoxStyle}"
+                        ToolTip="The batch: the sum of its lines, and of this product's add-ins to them.">
+                    <TextBlock Text="{Binding UsageFormTotalWeightText}" Foreground="{StaticResource ValueBoxForegroundBrush}" VerticalAlignment="Center" />
+                </Border>
 
                 <TextBlock Grid.Column="2" Text="Yield (pcs)" Style="{StaticResource FieldLabelStyle}" />
                 <syncfusion:DoubleTextBox Grid.Row="1"

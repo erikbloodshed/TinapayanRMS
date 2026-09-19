@@ -53,28 +53,42 @@
                     too. Fixed tabs, like Raw Materials': nothing to close or reopen. The strip sits along the
                     bottom, and each tab scrolls on its own, so the strip stays put. Clone only applies to a
                     saved product; while it's hidden the ViewModel moves the selection off it (SelectedDetailsTab).
+                    Between picking a product and its details arriving, the previous product's still show, and
+                    the tabs ignore the mouse (AreDetailsReady): what's in them is no longer the form's.
                 -->
                 <syncfusion:TabControlExt Grid.Row="2"
+                                          IsHitTestVisible="{Binding AreDetailsReady}"
                                           TabStripPlacement="Bottom"
                                           CloseButtonType="Hide"
                                           ShowTabItemContextMenu="False"
                                           ShowTabListContextMenu="False"
                                           SelectedIndex="{Binding SelectedDetailsTab, Mode=TwoWay}">
                     <!--
-                        The recipe gets two thirds: its tables need about 580 px, and the doughnut beside it about
-                        310 px. Narrower than 960 px (a window under about 1,350 px wide) the side column moves under
-                        it at full width instead. A click doesn't scroll the tab (FocusScrolling): the sub-assembly
-                        form's lines table often starts near the bottom of the window.
+                        The recipe, the tab's full width: the cost and unit conversion overviews have a tab of their
+                        own, Overview, next, and the Recipe Usage Example that sat beside it is gone (2026-09-19, at
+                        the user's request). A click doesn't scroll the tab (FocusScrolling): the sub-assembly form's
+                        lines table often starts near the bottom of the window.
                     -->
                     <syncfusion:TabItemExt Header="Recipe" CanClose="False">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,12">
+                            <p:RecipeStructureCard controls:FocusScrolling.SkipOnClick="True" />
+                        </ScrollViewer>
+                    </syncfusion:TabItemExt>
+
+                    <!--
+                        What the recipe comes to: its cost split by section (the doughnut) beside each sub-assembly's
+                        batch and pieces, stacked below 960 px like the Recipe tab's columns. A tab of their own
+                        (2026-09-19, at the user's request) rather than beside the recipe: redrawn on every product
+                        picked, they slowed the Recipe tab, and a tab that isn't showing isn't laid out or drawn.
+                    -->
+                    <syncfusion:TabItemExt Header="Overview" CanClose="False">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,12">
                             <controls:ResponsiveColumnsPanel Breakpoint="960"
-                                                             LeadingWeight="2"
+                                                             LeadingWeight="1"
                                                              TrailingWeight="1"
-                                                             Spacing="24"
-                                                             controls:FocusScrolling.SkipOnClick="True">
-                                <p:RecipeStructureCard />
-                                <p:RecipeSidePanel />
+                                                             Spacing="24">
+                                <p:CostOverviewCard />
+                                <p:PieceConversionCard />
                             </controls:ResponsiveColumnsPanel>
                         </ScrollViewer>
                     </syncfusion:TabItemExt>

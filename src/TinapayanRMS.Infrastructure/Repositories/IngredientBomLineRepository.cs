@@ -1,8 +1,10 @@
+using Dapper;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Queries;
 using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
@@ -11,15 +13,26 @@ public class IngredientBomLineRepository(
     IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,
     IngredientCostPropagator costPropagator) : IIngredientBomLineRepository
 {
-    public async Task<IReadOnlyList<IngredientBomLine>> GetForIngredientAsync(int ingredientId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.IngredientBomLines
-            .AsNoTracking()
-            .Include(l => l.ComponentIngredient)
-            .Where(l => l.IngredientId == ingredientId)
-            .ToListAsync(cancellationToken);
-    }
+    public Task<IReadOnlyList<IngredientBomLine>> GetForIngredientAsync(int ingredientId, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync<IReadOnlyList<IngredientBomLine>>(
+            async dbContext => (await dbContext.Connection().QueryAsync<IngredientBomLine, RawMaterial, IngredientBomLine>(
+                dbContext.Command(
+                    $"""
+                    SELECT {Columns.Of<IngredientBomLine>("l")}, {Columns.Of<RawMaterial>("c")}
+                    FROM IngredientBomLines l
+                    JOIN RawMaterials c ON c.Id = l.ComponentIngredientId
+                    WHERE l.IngredientId = @ingredientId
+                    ORDER BY l.Id
+                    """,
+                    new { ingredientId },
+                    cancellationToken),
+                (line, component) =>
+                {
+                    line.ComponentIngredient = component;
+                    return line;
+                },
+                splitOn: "Id")).AsList(),
+            cancellationToken);
 
     public async Task SetLinesAsync(
         int ingredientId, IReadOnlyList<(int ComponentIngredientId, decimal Grams)> lines, CancellationToken cancellationToken)

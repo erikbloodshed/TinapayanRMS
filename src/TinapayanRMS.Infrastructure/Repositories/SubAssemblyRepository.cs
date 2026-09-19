@@ -2,11 +2,24 @@ using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ISubAssemblyRepository
 {
+    /// <summary>
+    /// A product's name for each recipe usage of a sub-assembly by a product other than its owner, for the
+    /// sub-assemblies <c>s</c> the appended condition selects.
+    /// </summary>
+    private const string RecipeLinksSql = """
+        SELECT u.SubAssemblyId, p.Name AS ProductName
+        FROM ProductSubAssemblyUsages u
+        JOIN SubAssemblies s ON s.Id = u.SubAssemblyId
+        JOIN Products p ON p.Id = u.ProductId
+        WHERE (s.OwnerProductId IS NULL OR u.ProductId <> s.OwnerProductId) AND
+        """;
+
     public async Task<IReadOnlyList<SubAssembly>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken)
     {
         if (ids.Count == 0)
@@ -14,65 +27,50 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             return [];
         }
 
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.SubAssemblies
-            .AsNoTracking()
-            .Include(s => s.Role)
-            .Include(s => s.OwnerProduct)
-            .Where(s => ids.Contains(s.Id))
-            .ToListAsync(cancellationToken);
+        return await dbContextFactory.ReadAsync(
+            dbContext => SubAssemblyReads.GetWithRoleAndOwnerAsync(
+                dbContext, $"WHERE s.Id IN ({DapperReads.IdsTable})\nORDER BY s.Id", new { ids = DapperReads.IdList(ids) }, cancellationToken),
+            cancellationToken);
     }
 
-    public async Task<IReadOnlyList<SubAssembly>> GetLinkableAsync(CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.SubAssemblies
-            .AsNoTracking()
-            .Include(s => s.Role)
-            .Include(s => s.OwnerProduct)
-            .Where(s => s.TotalWeight > 0 && !s.Role!.IsPackaging)
-            .OrderBy(s => s.OwnerProductId != null)
-            .ThenBy(s => s.Name)
-            .ThenBy(s => s.OwnerProduct!.Name)
-            .ThenBy(s => s.Role!.SortOrder)
-            .ToListAsync(cancellationToken);
-    }
+    public Task<IReadOnlyList<SubAssembly>> GetLinkableAsync(CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync(
+            dbContext => SubAssemblyReads.GetWithRoleAndOwnerAsync(
+                dbContext,
+                """
+                WHERE s.TotalWeight > 0 AND r.IsPackaging = 0
+                ORDER BY CASE WHEN s.OwnerProductId IS NULL THEN 0 ELSE 1 END, s.Name, o.Name, r.SortOrder
+                """,
+                null,
+                cancellationToken),
+            cancellationToken);
 
-    public async Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetLinkedByAsync(int ownerProductId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await GetLinkedByAsync(dbContext, u => u.SubAssembly!.OwnerProductId == ownerProductId, cancellationToken);
-    }
+    public async Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetLinkedByAsync(int ownerProductId, CancellationToken cancellationToken) =>
+        ToLinkedBy(await dbContextFactory.QueryAsync<LinkRow>(
+            $"{RecipeLinksSql} s.OwnerProductId = @ownerProductId", new { ownerProductId }, cancellationToken));
 
-    public async Task<IReadOnlyList<SubAssembly>> GetStandaloneAsync(CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.SubAssemblies
-            .AsNoTracking()
-            .Include(s => s.Role)
-            .Where(s => s.OwnerProductId == null)
-            .OrderBy(s => s.Name)
-            .ToListAsync(cancellationToken);
-    }
+    public Task<IReadOnlyList<SubAssembly>> GetStandaloneAsync(CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync(
+            dbContext => SubAssemblyReads.GetWithRoleAndOwnerAsync(dbContext, "WHERE s.OwnerProductId IS NULL\nORDER BY s.Name", null, cancellationToken),
+            cancellationToken);
 
-    public async Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetStandaloneLinkedByAsync(CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var recipeLinks = await GetLinkedByAsync(dbContext, u => u.SubAssembly!.OwnerProductId == null, cancellationToken);
-        var setLinks = await GetPackagingLinkedByAsync(dbContext, cancellationToken);
+    /// <summary>The recipes linking a standalone sub-assembly, and the products whose packaging links a set, in one query.</summary>
+    public async Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetStandaloneLinkedByAsync(CancellationToken cancellationToken) =>
+        // A sub-assembly is either a recipe or a set, so no id is in both halves.
+        ToLinkedBy(await dbContextFactory.QueryAsync<LinkRow>(
+            $"""
+            {RecipeLinksSql} s.OwnerProductId IS NULL
+            UNION ALL
+            SELECT l.LinkedSubAssemblyId AS SubAssemblyId, p.Name AS ProductName
+            FROM PackagingLinks l
+            JOIN Products p ON p.Id = l.ProductId
+            WHERE l.LinkedSubAssemblyId IS NOT NULL
+            """,
+            null,
+            cancellationToken));
 
-        // A sub-assembly is either a recipe or a set, so no id is in both.
-        return recipeLinks.Concat(setLinks).ToDictionary(p => p.Key, p => p.Value);
-    }
-
-    public async Task<IReadOnlyList<SubAssemblyPackagingLine>> GetPackagingLinesAsync(int subAssemblyId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await WithMaterialAndUnits(dbContext.SubAssemblyPackagingLines)
-            .Where(l => l.SubAssemblyId == subAssemblyId)
-            .OrderBy(l => l.Id)
-            .ToListAsync(cancellationToken);
-    }
+    public Task<IReadOnlyList<SubAssemblyPackagingLine>> GetPackagingLinesAsync(int subAssemblyId, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync(dbContext => RawMaterialReads.GetSetLinesAsync(dbContext, subAssemblyId, cancellationToken), cancellationToken);
 
     public async Task<int> SaveStandaloneAsync(SubAssembly subAssembly, IReadOnlyList<RecipeLine> lines, CancellationToken cancellationToken)
     {
@@ -206,11 +204,14 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         // Every product using a standalone sub-assembly links it: a recipe through a usage, a set through its
         // packaging link.
         await EnsureNoneLinkedElsewhereAsync(dbContext, u => u.SubAssemblyId == id, cancellationToken);
-        var setLinkedBy = await GetPackagingLinkedByAsync(dbContext, cancellationToken);
-        if (setLinkedBy.TryGetValue(id, out var productNames))
+        var setLinkedBy = await dbContext.PackagingLinks
+            .Where(l => l.LinkedSubAssemblyId == id)
+            .Select(l => l.Product!.Name)
+            .ToListAsync(cancellationToken);
+        if (setLinkedBy.Count > 0)
         {
             var name = await dbContext.SubAssemblies.Where(s => s.Id == id).Select(s => s.Name).FirstAsync(cancellationToken);
-            SubAssemblyRules.EnsureNotLinkedElsewhere(name ?? string.Empty, productNames);
+            SubAssemblyRules.EnsureNotLinkedElsewhere(name ?? string.Empty, [.. setLinkedBy.Order(StringComparer.CurrentCultureIgnoreCase)]);
         }
 
         // Its lines go with it (Cascade).
@@ -229,42 +230,19 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         var links = await dbContext.ProductSubAssemblyUsages
             .Where(subAssemblyFilter)
             .Where(u => u.ProductId != u.SubAssembly!.OwnerProductId)
-            .Select(u => new { u.SubAssemblyId, ProductName = u.Product!.Name })
+            .Select(u => new LinkRow(u.SubAssemblyId, u.Product!.Name))
             .ToListAsync(cancellationToken);
 
-        return links
-            .GroupBy(l => l.SubAssemblyId)
-            .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)[.. g.Select(l => l.ProductName).Order(StringComparer.CurrentCultureIgnoreCase)]);
+        return ToLinkedBy(links);
     }
 
-    /// <summary>For each packaging set a product's packaging links, the names of those products. One query.</summary>
-    private static async Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetPackagingLinkedByAsync(
-        TinapayanRMSDbContext dbContext, CancellationToken cancellationToken)
-    {
-        var links = await dbContext.PackagingLinks
-            .Where(l => l.LinkedSubAssemblyId != null)
-            .Select(l => new { SubAssemblyId = l.LinkedSubAssemblyId!.Value, ProductName = l.Product!.Name })
-            .ToListAsync(cancellationToken);
+    private sealed record LinkRow(int SubAssemblyId, string ProductName);
 
-        return links
+    /// <summary>Each sub-assembly's linking products' names, alphabetically.</summary>
+    private static Dictionary<int, IReadOnlyList<string>> ToLinkedBy(IEnumerable<LinkRow> links) =>
+        links
             .GroupBy(l => l.SubAssemblyId)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)[.. g.Select(l => l.ProductName).Order(StringComparer.CurrentCultureIgnoreCase)]);
-    }
-
-    /// <summary>
-    /// A set's lines with each material's category, base unit and alternative units, as the packaging grids and a
-    /// linking product's packaging (PackagingLineRepository) need them.
-    /// </summary>
-    internal static IQueryable<SubAssemblyPackagingLine> WithMaterialAndUnits(IQueryable<SubAssemblyPackagingLine> lines) =>
-        lines
-            .AsNoTracking()
-            .Include(l => l.PackagingMaterial)
-            .ThenInclude(m => m!.BaseUnit)
-            .Include(l => l.PackagingMaterial)
-            .ThenInclude(m => m!.Units.OrderByDescending(u => u.BaseUnitsPerUnit))
-            .ThenInclude(u => u.UnitOfMeasure)
-            .Include(l => l.PackagingMaterial)
-            .ThenInclude(m => m!.Category);
 
     /// <summary>
     /// Refuses to go on while another product links a sub-assembly matching

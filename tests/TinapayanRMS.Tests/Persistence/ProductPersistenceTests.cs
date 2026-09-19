@@ -83,6 +83,32 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     }
 
     [Fact]
+    public async Task GetForProductAsync_reads_each_line_with_its_materials_details_and_its_own_unit()
+    {
+        var ribbonsId = await SeedPackagingCategoryAsync("Ribbons");
+        var boxesId = await SeedPackagingCategoryAsync("Boxes");
+        var centimeterId = await SeedUnitOfMeasureAsync("centimeter", "cm");
+        var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
+        var ribbonId = await SeedPackagingMaterialAsync("Satin Ribbon", ribbonsId, centimeterId, purchaseUnitQty: 1000m, currentCost: 45m);
+        var meterId = await AddPackagingMaterialUnitAsync(ribbonId, await SeedUnitOfMeasureAsync("meter", "m"), baseUnitsPerUnit: 100m);
+        await AddPackagingMaterialUnitAsync(ribbonId, await SeedUnitOfMeasureAsync("roll", "roll"), baseUnitsPerUnit: 1000m);
+        var boxId = await SeedPackagingMaterialAsync("Gift Box", boxesId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
+        var productId = await SeedProductAsync("Gift Box Set");
+        await CreatePackagingLineRepository().SetLinesAsync(productId,
+        [
+            (ribbonId, meterId, PackagingLineAuthoredField.QtyPerUnit, 0.3m),
+            (boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m),
+        ], Cancellation);
+
+        var lines = await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation);
+
+        lines.Select(l => (l.PackagingMaterial!.Name, l.PackagingMaterial.Category!.Name, l.PackagingMaterial.BaseUnit!.Abbreviation, l.Unit?.UnitOfMeasure!.Abbreviation))
+            .Should().Equal(("Satin Ribbon", "Ribbons", "cm", "m"), ("Gift Box", "Boxes", "pc", null));
+        lines[0].PackagingMaterial!.Units.Select(u => u.UnitOfMeasure!.Abbreviation).Should().Equal(["roll", "m"], "largest first");
+        lines[1].PackagingMaterial!.Units.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task SetLinesAsync_rejects_a_unit_that_belongs_to_another_material()
     {
         var categoryId = await SeedPackagingCategoryAsync("Ribbons");

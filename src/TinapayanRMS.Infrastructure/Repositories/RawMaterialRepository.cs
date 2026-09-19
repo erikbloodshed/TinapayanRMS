@@ -3,6 +3,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Queries;
 using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
@@ -11,20 +12,14 @@ public class RawMaterialRepository(
     IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,
     IngredientCostPropagator costPropagator) : IRawMaterialRepository
 {
-    public async Task<IReadOnlyList<RawMaterial>> GetAllAsync(CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await WithDetails(dbContext.RawMaterials)
-            .OrderBy(m => m.Name)
-            .ToListAsync(cancellationToken);
-    }
+    public Task<IReadOnlyList<RawMaterial>> GetAllAsync(CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync(
+            dbContext => RawMaterialReads.GetWithDetailsAsync(dbContext, "ORDER BY m.Name", null, cancellationToken), cancellationToken);
 
-    public async Task<RawMaterial?> GetByIdAsync(int id, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await WithDetails(dbContext.RawMaterials)
-            .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
-    }
+    public async Task<RawMaterial?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
+        (await dbContextFactory.ReadAsync(
+            dbContext => RawMaterialReads.GetWithDetailsAsync(dbContext, "WHERE m.Id = @id", new { id }, cancellationToken), cancellationToken))
+        .SingleOrDefault();
 
     public async Task AddAsync(RawMaterial material, CancellationToken cancellationToken)
     {
@@ -345,13 +340,4 @@ public class RawMaterialRepository(
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException("A price's unit must be one of that material's own units.");
     }
-
-    /// <summary>A material with what the screens show of it: its category, base unit, and alternative units (largest first).</summary>
-    private static IQueryable<RawMaterial> WithDetails(IQueryable<RawMaterial> materials) =>
-        materials
-            .AsNoTracking()
-            .Include(m => m.Category)
-            .Include(m => m.BaseUnit)
-            .Include(m => m.Units.OrderByDescending(u => u.BaseUnitsPerUnit))
-            .ThenInclude(u => u.UnitOfMeasure);
 }

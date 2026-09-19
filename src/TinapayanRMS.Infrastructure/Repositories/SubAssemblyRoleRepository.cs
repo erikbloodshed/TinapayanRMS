@@ -1,19 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ISubAssemblyRoleRepository
 {
-    public async Task<IReadOnlyList<SubAssemblyRole>> GetAllAsync(CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.SubAssemblyRoles
-            .AsNoTracking()
-            .OrderBy(r => r.SortOrder)
-            .ToListAsync(cancellationToken);
-    }
+    public Task<IReadOnlyList<SubAssemblyRole>> GetAllAsync(CancellationToken cancellationToken) =>
+        dbContextFactory.QueryAsync<SubAssemblyRole>(
+            $"SELECT {Columns.Of<SubAssemblyRole>("r")} FROM SubAssemblyRoles r ORDER BY r.SortOrder", null, cancellationToken);
 
     public async Task AddAsync(SubAssemblyRole role, CancellationToken cancellationToken)
     {

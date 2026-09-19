@@ -1,8 +1,10 @@
+using Dapper;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Queries;
 using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
@@ -11,17 +13,29 @@ public class RawMaterialBrandPriceRepository(
     IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,
     IngredientCostPropagator costPropagator) : IRawMaterialBrandPriceRepository
 {
-    public async Task<IReadOnlyList<RawMaterialBrandPrice>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.RawMaterialBrandPrices
-            .AsNoTracking()
-            .Include(p => p.Unit)
-            .ThenInclude(u => u!.UnitOfMeasure)
-            .Where(p => p.RawMaterialId == rawMaterialId)
-            .OrderBy(p => p.Id)
-            .ToListAsync(cancellationToken);
-    }
+    /// <summary>In the order they were added, each with its unit (if any) and that unit's unit of measure.</summary>
+    public Task<IReadOnlyList<RawMaterialBrandPrice>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync<IReadOnlyList<RawMaterialBrandPrice>>(
+            async dbContext => (await dbContext.Connection().QueryAsync<RawMaterialBrandPrice, RawMaterialUnit?, UnitOfMeasure?, RawMaterialBrandPrice>(
+                dbContext.Command(
+                    $"""
+                    SELECT {Columns.Of<RawMaterialBrandPrice>("p")}, {Columns.Of<RawMaterialUnit>("u")}, {Columns.Of<UnitOfMeasure>("m")}
+                    FROM RawMaterialBrandPrices p
+                    LEFT JOIN RawMaterialUnits u ON u.Id = p.UnitId
+                    LEFT JOIN UnitsOfMeasure m ON m.Id = u.UnitOfMeasureId
+                    WHERE p.RawMaterialId = @rawMaterialId
+                    ORDER BY p.Id
+                    """,
+                    new { rawMaterialId },
+                    cancellationToken),
+                (brandPrice, unit, unitOfMeasure) =>
+                {
+                    brandPrice.Unit = unit;
+                    unit?.UnitOfMeasure = unitOfMeasure;
+                    return brandPrice;
+                },
+                splitOn: "Id,Id")).AsList(),
+            cancellationToken);
 
     public async Task SetAsync(int rawMaterialId, IReadOnlyList<RawMaterialBrandPrice> brandPrices, CancellationToken cancellationToken)
     {

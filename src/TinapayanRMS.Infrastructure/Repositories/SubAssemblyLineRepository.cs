@@ -1,7 +1,9 @@
+using Dapper;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
@@ -14,13 +16,25 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
             return [];
         }
 
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.SubAssemblyLines
-            .AsNoTracking()
-            .Include(l => l.Ingredient)
-            .Where(l => subAssemblyIds.Contains(l.SubAssemblyId))
-            .OrderBy(l => l.Id)
-            .ToListAsync(cancellationToken);
+        return await dbContextFactory.ReadAsync<IReadOnlyList<SubAssemblyLine>>(
+            async dbContext => (await dbContext.Connection().QueryAsync<SubAssemblyLine, RawMaterial, SubAssemblyLine>(
+                dbContext.Command(
+                    $"""
+                    SELECT {Columns.Of<SubAssemblyLine>("l")}, {Columns.Of<RawMaterial>("i")}
+                    FROM SubAssemblyLines l
+                    JOIN RawMaterials i ON i.Id = l.IngredientId
+                    WHERE l.SubAssemblyId IN ({DapperReads.IdsTable})
+                    ORDER BY l.Id
+                    """,
+                    new { ids = DapperReads.IdList(subAssemblyIds) },
+                    cancellationToken),
+                (line, ingredient) =>
+                {
+                    line.Ingredient = ingredient;
+                    return line;
+                },
+                splitOn: "Id")).AsList(),
+            cancellationToken);
     }
 
     /// <summary>

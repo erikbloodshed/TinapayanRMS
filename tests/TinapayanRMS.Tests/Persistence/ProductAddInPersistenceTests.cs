@@ -21,16 +21,8 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
     private static LinkedUsageDraft Linked(int subAssemblyId, decimal weightPerPiece, params (int IngredientId, decimal Grams)[] addIns) =>
         new(subAssemblyId, UsageAuthoredField.WeightPerPiece, weightPerPiece) { AddIns = addIns };
 
-    private async Task<IReadOnlyList<UsageAddInLine>> AddInsAsync(int productId)
-    {
-        await using var dbContext = CreateDbContext();
-        return await dbContext.UsageAddInLines
-            .AsNoTracking()
-            .Include(l => l.Ingredient)
-            .Where(l => l.Usage!.ProductId == productId)
-            .OrderBy(l => l.Id)
-            .ToListAsync(Cancellation);
-    }
+    private Task<IReadOnlyList<UsageAddInLine>> AddInsAsync(int productId) =>
+        CreateUsageRepository().GetAddInsForProductAsync(productId, Cancellation);
 
     /// <summary>Cream Loaf owns Sweet Dough; Cream Loaf Mini links it. Returns both products and the dough.</summary>
     private async Task<(int OwnerId, int LinkerId, int DoughId, int FlourId)> SeedLinkedDoughAsync()
@@ -56,6 +48,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         addIn.UsageId.Should().Be(await UsageIdAsync(linkerId, doughId));
         addIn.IngredientId.Should().Be(ubeId);
         addIn.Grams.Should().Be(20m);
+        (addIn.Ingredient!.Name, addIn.Ingredient.BufferedCostPerBaseUnit).Should().Be(("Ube Flavour", 0.8m), "an add-in is costed from its ingredient on read");
     }
 
     [Fact]

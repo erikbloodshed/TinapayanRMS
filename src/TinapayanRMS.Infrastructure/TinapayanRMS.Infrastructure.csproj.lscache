@@ -140,6 +140,11 @@ obj/Release/net10.0/
  .NETCoreApp,Version=v10.0.AssemblyAttributes.cs
  TinapayanRMS.Infrastructure.AssemblyInfo.cs
  TinapayanRMS.Infrastructure.GlobalUsings.g.cs
+Queries/
+ Columns.cs
+ DapperReads.cs
+ RawMaterialReads.cs
+ SubAssemblyReads.cs
 Repositories/
  CostingParametersRepository.cs
  IngredientBomLineRepository.cs
@@ -342,6 +347,7 @@ TinapayanRMSDbContextFactory.cs
 <NUGET>/
  azure.core/1.50.0/lib/net8.0/Azure.Core.dll
  azure.identity/1.17.1/lib/net8.0/Azure.Identity.dll
+ dapper/2.1.86/lib/net10.0/Dapper.dll
  fluentvalidation/12.1.1/lib/net8.0/FluentValidation.dll
  microsoft.bcl.asyncinterfaces/8.0.0/lib/netstandard2.1/Microsoft.Bcl.AsyncInterfaces.dll
  microsoft.data.sqlclient/6.1.6/ref/net9.0/Microsoft.Data.SqlClient.dll

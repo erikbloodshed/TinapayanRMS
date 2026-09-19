@@ -67,6 +67,49 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task Picking_another_product_keeps_the_previous_details_until_its_own_arrive_and_Save_waits_for_them()
+    {
+        var roleId = await AddRoleAsync("Filling");
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.24m);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.5m);
+        var (_, ubeFillingId) = await AddProductWithSubAssemblyAsync("Ube pandesal", roleId, [(ubeId, 100m)]);
+        var (cheeseRollId, cheeseFillingId) = await AddProductWithSubAssemblyAsync("Cheese roll", roleId, [(cheeseId, 100m)]);
+        DateTime? cheeseRollUpdatedAt;
+        await using (var dbContext = CreateDbContext())
+        {
+            cheeseRollUpdatedAt = (await dbContext.Products.SingleAsync(p => p.Id == cheeseRollId, Cancellation)).UpdatedAt;
+        }
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Name == "Ube pandesal");
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.SingleOrDefault()?.SubAssemblyId == ubeFillingId,
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}");
+
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == cheeseRollId);
+
+        // Its details are still on their way (read off the UI thread): the ube pandesal's show until they
+        // arrive, not an empty recipe, and a Save now would write that recipe under the cheese roll's name.
+        viewModel.AreDetailsReady.Should().BeFalse();
+        viewModel.EditingName.Should().Be("Cheese roll");
+        viewModel.UsageEdits.Should().ContainSingle().Which.SubAssemblyId.Should().Be(ubeFillingId);
+        viewModel.HasRecipeTabs.Should().BeTrue();
+        await viewModel.SaveCommand.Execute();
+
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.SingleOrDefault()?.SubAssemblyId == cheeseFillingId,
+            () => $"ready={viewModel.AreDetailsReady}, usages={string.Join(",", viewModel.UsageEdits.Select(u => u.SubAssemblyId))}");
+        viewModel.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>().Which.Usage.SubAssemblyId.Should().Be(cheeseFillingId);
+        await using (var dbContext = CreateDbContext())
+        {
+            (await dbContext.Products.SingleAsync(p => p.Id == cheeseRollId, Cancellation)).UpdatedAt.Should().Be(cheeseRollUpdatedAt, "the Save did nothing");
+            (await dbContext.ProductSubAssemblyUsages.Where(u => u.ProductId == cheeseRollId).Select(u => u.SubAssemblyId).ToListAsync(Cancellation))
+                .Should().Equal(cheeseFillingId);
+        }
+    }
+
+    [Fact]
     public async Task One_Save_writes_a_new_product_with_a_sub_assembly_made_in_it()
     {
         var roleId = await AddRoleAsync("Filling");

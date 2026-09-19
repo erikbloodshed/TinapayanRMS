@@ -65,6 +65,35 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
     }
 
     [Fact]
+    public async Task The_form_shows_under_a_sub_assemblys_tab_or_New_Sub_Assemblys_and_the_packaging_under_its_own()
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        await AddRoleAsync("Packaging", sortOrder: 6, isPackaging: true);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var boxId = await AddPackagingAsync("Gift Box", 30m);
+        await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m);
+        var viewModel = await CreateLoadedViewModelAsync();
+        (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((false, false), "no product is picked, so there are no tabs");
+
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.SelectedRecipeTab is SubAssemblyRecipeTab, () => $"tab={viewModel.SelectedRecipeTab?.Header}");
+        (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((true, false));
+
+        await viewModel.AddUsageCommand.Execute();
+        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.AddSubAssemblyTab);
+        (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((true, false));
+
+        viewModel.EditingUsageRole = viewModel.FormRoleOptions.Single(r => r.IsPackaging);
+        viewModel.FormPackagingLines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
+        await viewModel.ApplyUsageCommand.Execute();
+        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
+        (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((false, true));
+
+        viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single();
+        (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((true, false));
+    }
+
+    [Fact]
     public async Task Linking_a_packaging_set_shows_its_lines_read_only_and_Save_writes_the_link()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);

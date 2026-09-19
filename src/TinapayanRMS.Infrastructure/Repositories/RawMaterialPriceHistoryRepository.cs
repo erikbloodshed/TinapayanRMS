@@ -1,6 +1,8 @@
+using Dapper;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
@@ -10,18 +12,29 @@ namespace TinapayanRMS.Infrastructure.Repositories;
 /// </summary>
 public class RawMaterialPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialPriceHistoryRepository
 {
-    public async Task<IReadOnlyList<RawMaterialPriceHistory>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.RawMaterialPriceHistories
-            .AsNoTracking()
-            .Include(h => h.Unit)
-            .ThenInclude(u => u!.UnitOfMeasure)
-            .Where(h => h.RawMaterialId == rawMaterialId)
-            .OrderByDescending(h => h.Date)
-            .ThenByDescending(h => h.Id)
-            .ToListAsync(cancellationToken);
-    }
+    /// <summary>Newest first, each with its unit (if any) and that unit's unit of measure.</summary>
+    public Task<IReadOnlyList<RawMaterialPriceHistory>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync<IReadOnlyList<RawMaterialPriceHistory>>(
+            async dbContext => (await dbContext.Connection().QueryAsync<RawMaterialPriceHistory, RawMaterialUnit?, UnitOfMeasure?, RawMaterialPriceHistory>(
+                dbContext.Command(
+                    $"""
+                    SELECT {Columns.Of<RawMaterialPriceHistory>("h")}, {Columns.Of<RawMaterialUnit>("u")}, {Columns.Of<UnitOfMeasure>("m")}
+                    FROM RawMaterialPriceHistories h
+                    LEFT JOIN RawMaterialUnits u ON u.Id = h.UnitId
+                    LEFT JOIN UnitsOfMeasure m ON m.Id = u.UnitOfMeasureId
+                    WHERE h.RawMaterialId = @rawMaterialId
+                    ORDER BY h.Date DESC, h.Id DESC
+                    """,
+                    new { rawMaterialId },
+                    cancellationToken),
+                (entry, unit, unitOfMeasure) =>
+                {
+                    entry.Unit = unit;
+                    unit?.UnitOfMeasure = unitOfMeasure;
+                    return entry;
+                },
+                splitOn: "Id,Id")).AsList(),
+            cancellationToken);
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
     {

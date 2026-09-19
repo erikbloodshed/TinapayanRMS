@@ -110,7 +110,8 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         set.TotalCost.Should().Be(0m);
         var lines = await CreateRepository().GetPackagingLinesAsync(id, Cancellation);
         lines.Select(l => (l.PackagingMaterialId, l.QtyPerSet)).Should().Equal((boxId, 1m), (ribbonId, 30m));
-        lines.Should().OnlyContain(l => l.PackagingMaterial!.BaseUnit != null);
+        lines.Select(l => (l.PackagingMaterial!.Name, l.PackagingMaterial.Category!.Name, l.PackagingMaterial.BaseUnit!.Abbreviation))
+            .Should().Equal(("Gift Box", "Boxes", "pc"), ("Ribbon", "Boxes", "cm"));
     }
 
     [Fact]

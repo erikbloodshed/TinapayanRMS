@@ -2,35 +2,17 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
-             xmlns:local="clr-namespace:TinapayanRMS.UI.Views.Products"
-             xmlns:vm="clr-namespace:TinapayanRMS.UI.ViewModels">
+             xmlns:local="clr-namespace:TinapayanRMS.UI.Views.Products">
     <!--
         What goes into one piece, in tabs (RecipeTabs): a sub-assembly's for each one in the recipe, in role
         order, then New Sub-Assembly while Add Sub-Assembly's form is open, then Packaging while the product has any.
-        Add Sub-Assembly and Delete Sub-Assembly sit in the header. Each tab's content is picked by its type from
-        the templates below, and each takes the screen's DataContext back from this card: they all show one of
-        the screen's forms, or its packaging.
+        Add Sub-Assembly and Delete Sub-Assembly sit in the header.
+        The tabs only pick what shows under them; they have no content of their own. Every sub-assembly's tab and
+        New Sub-Assembly's show the screen's one form, so there's one UsageFormPanel, and one PackagingSectionView,
+        built once and shown or hidden by the tab showing (IsUsageFormShowing, IsPackagingShowing). As each tab's
+        own content, the form was built again every time its tab showed: on every product picked, since each
+        product brings new tabs, which took about 80 ms (the form and its grids), measured.
     -->
-    <UserControl.Resources>
-        <!-- A sub-assembly's tab is the form that edits it: its lines for the product's own, read-only for a link -->
-        <DataTemplate DataType="{x:Type vm:SubAssemblyRecipeTab}">
-            <Border Padding="8">
-                <local:UsageFormPanel DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=local:RecipeStructureCard}}" />
-            </Border>
-        </DataTemplate>
-
-        <DataTemplate DataType="{x:Type vm:AddSubAssemblyRecipeTab}">
-            <Border Padding="8">
-                <local:UsageFormPanel DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=local:RecipeStructureCard}}"
-                                      Visibility="{Binding IsUsageFormOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
-            </Border>
-        </DataTemplate>
-
-        <DataTemplate DataType="{x:Type vm:PackagingRecipeTab}">
-            <local:PackagingSectionView DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=local:RecipeStructureCard}}" />
-        </DataTemplate>
-    </UserControl.Resources>
-
     <StackPanel>
         <!-- The header, with the buttons that add a sub-assembly and delete the one whose tab is showing -->
         <Grid>
@@ -63,6 +45,8 @@
             AllowDragDrop on unless it's set False (its coercion), and a tab dropped on another is removed from
             RecipeTabs and inserted at the drop (TabLayoutPanel.MoveItem). That took the tabs out of role order,
             and out of step with UsageEdits, which MirrorUsageTabs keeps them in index for index.
+            An empty ContentTemplate, so a tab shows nothing of its own (not its type's name), and no border, so the
+            empty content area draws nothing: the frame below stands in for it.
         -->
         <!-- A new product has no tabs: every section, packaging included, comes in through Add Sub-Assembly. -->
         <TextBlock Text="Nothing in the recipe yet. Add Sub-Assembly adds a section — a new one, or one linked or copied — and its Packaging role adds the packaging."
@@ -71,9 +55,11 @@
                    Margin="0,8,0,0"
                    Visibility="{Binding HasRecipeTabs, Converter={StaticResource EmptyStateVisibilityConverter}}" />
 
-        <syncfusion:TabControlExt ItemsSource="{Binding RecipeTabs}"
+        <syncfusion:TabControlExt x:Name="RecipeTabControl"
+                                  ItemsSource="{Binding RecipeTabs}"
                                   Visibility="{Binding HasRecipeTabs, Converter={StaticResource BooleanToVisibilityConverter}}"
                                   SelectedItem="{Binding SelectedRecipeTab, Mode=TwoWay}"
+                                  BorderThickness="0"
                                   AllowDragDrop="False"
                                   CloseButtonType="Hide"
                                   CloseMode="Delete"
@@ -89,6 +75,35 @@
                     </StackPanel>
                 </DataTemplate>
             </syncfusion:TabControlExt.ItemTemplate>
+            <syncfusion:TabControlExt.ContentTemplate>
+                <DataTemplate />
+            </syncfusion:TabControlExt.ContentTemplate>
         </syncfusion:TabControlExt>
+
+        <!--
+            What the tab showing shows, in the tab control's content frame (its theme brush, and the width it drew).
+            The frame is a Border of its own behind the content, not around it: it sits below text of fractional
+            height, so it's snapped to whole pixels as the theme's frame is (or its bottom line blurs across two
+            rows), and a snapped Border shifts whatever it holds by the fraction too, redrawing the form's edges.
+        -->
+        <Grid UseLayoutRounding="True" Visibility="{Binding HasRecipeTabs, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Border SnapsToDevicePixels="True"
+                    BorderBrush="{Binding BorderBrush, ElementName=RecipeTabControl}"
+                    Background="{Binding Background, ElementName=RecipeTabControl}"
+                    BorderThickness="1,0,1,1" />
+
+            <Grid Margin="1,0,1,1">
+                <!--
+                    A sub-assembly's tab is the form that edits it: its lines for the product's own, read-only for a link.
+                    Inset as it was as the tab's content: 8, and the tab control's own 2 at the sides and bottom, less 2 at the top.
+                -->
+                <Border Padding="10,6,10,10" Visibility="{Binding IsUsageFormShowing, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <local:UsageFormPanel />
+                </Border>
+
+                <!-- The packaging, inset as the tab control inset it as a tab's content -->
+                <local:PackagingSectionView Margin="2,-2,2,2" Visibility="{Binding IsPackagingShowing, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            </Grid>
+        </Grid>
     </StackPanel>
 </UserControl>

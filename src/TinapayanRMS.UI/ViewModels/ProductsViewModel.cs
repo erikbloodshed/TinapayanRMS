@@ -317,9 +317,6 @@ public sealed class LinkableSubAssemblyOption
 /// <summary>One slice of the material cost per piece: a sub-assembly, or all of the packaging. Percent is its share of the material cost.</summary>
 public sealed record CostShareRow(string Name, decimal Amount, decimal Percent);
 
-/// <summary>What the Recipe Usage Example worked out: the material cost of a number of pieces, by slice.</summary>
-public sealed record RecipeUsageExampleResult(string Title, decimal TotalCost, IReadOnlyList<CostShareRow> Breakdown);
-
 /// <summary>
 /// One sellable pack priced from the product's per-piece material cost and the pack's own packaging lines.
 /// </summary>
@@ -450,11 +447,11 @@ public sealed class ProductCostSummary
 /// </summary>
 public sealed class ProductsViewModel : ViewModelBase, IDisposable
 {
-    /// <summary>The details tabs along the bottom: Recipe, Costing, Packs, then Clone.</summary>
+    /// <summary>The details tabs along the bottom: Recipe, Overview, Costing, Packs, then Clone.</summary>
     public const int RecipeTab = 0;
 
-    /// <summary>Recipe 0, Costing 1, Packs 2, then Clone.</summary>
-    public const int LinksTab = 3;
+    /// <summary>Recipe 0, Overview 1, Costing 2, Packs 3, then Clone.</summary>
+    public const int LinksTab = 4;
 
     private static readonly IReadOnlyDictionary<int, IReadOnlyList<string>> NoLinks = new Dictionary<int, IReadOnlyList<string>>();
 
@@ -538,6 +535,17 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         get => _selectedRecipeTab;
         set => this.RaiseAndSetIfChanged(ref _selectedRecipeTab, value);
     }
+
+    private readonly ObservableAsPropertyHelper<bool> _isUsageFormShowing;
+    /// <summary>
+    /// The sub-assembly form shows under the Recipe Structure's tabs: on a sub-assembly's tab, and on New
+    /// Sub-Assembly's while its form is open. There's one form for them all (RecipeStructureCard).
+    /// </summary>
+    public bool IsUsageFormShowing => _isUsageFormShowing.Value;
+
+    private readonly ObservableAsPropertyHelper<bool> _isPackagingShowing;
+    /// <summary>The packaging shows under the Recipe Structure's tabs: on the Packaging tab.</summary>
+    public bool IsPackagingShowing => _isPackagingShowing.Value;
 
     /// <summary>The last tab other than New Sub-Assembly that showed, for cancelling an add.</summary>
     private RecipeTab? _lastRecipeContentTab;
@@ -676,6 +684,19 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
     /// <summary>The product whose recipe, packaging, costing and links the form holds, or null for a new product.</summary>
     private int? _detailProductId;
+
+    private bool _areDetailsReady = true;
+    /// <summary>
+    /// The details showing are the picked product's. False from picking another product until its details
+    /// arrive (ResetDetails to LoadProductDetailAsync): the previous product's stay showing meanwhile, so no
+    /// empty product is drawn between the two, but they're no longer the ones the form is about, so nothing
+    /// may act on them (the details tabs ignore the mouse, and Save does nothing).
+    /// </summary>
+    public bool AreDetailsReady
+    {
+        get => _areDetailsReady;
+        private set => this.RaiseAndSetIfChanged(ref _areDetailsReady, value);
+    }
 
     private string _editingName = string.Empty;
     public string EditingName
@@ -1095,21 +1116,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         set => this.RaiseAndSetIfChanged(ref _editingVatPercent, value);
     }
 
-    // Recipe Usage Example.
-    private decimal _exampleQuantity = 1m;
-    public decimal ExampleQuantity
-    {
-        get => _exampleQuantity;
-        set => this.RaiseAndSetIfChanged(ref _exampleQuantity, value);
-    }
-
-    private RecipeUsageExampleResult? _exampleResult;
-    public RecipeUsageExampleResult? ExampleResult
-    {
-        get => _exampleResult;
-        private set => this.RaiseAndSetIfChanged(ref _exampleResult, value);
-    }
-
     private string _editingCloneName = string.Empty;
     public string EditingCloneName
     {
@@ -1164,7 +1170,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<RxVoid, RxVoid> AddPackCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemovePackCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemovePackLineCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> CalculateExampleCommand { get; }
 
     /// <summary>The add form's Remove Line under its packaging table.</summary>
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormPackagingLineCommand { get; }
@@ -1278,6 +1283,16 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             .Select(product => product is not null)
             .ToProperty(this, x => x.ShowLinks);
 
+        _isUsageFormShowing = this.WhenAnyValue(
+                x => x.SelectedRecipeTab,
+                x => x.IsUsageFormOpen,
+                (tab, isFormOpen) => tab is SubAssemblyRecipeTab || (tab is AddSubAssemblyRecipeTab && isFormOpen))
+            .ToProperty(this, x => x.IsUsageFormShowing);
+
+        _isPackagingShowing = this.WhenAnyValue(x => x.SelectedRecipeTab)
+            .Select(tab => tab is PackagingRecipeTab)
+            .ToProperty(this, x => x.IsPackagingShowing);
+
         // Every selection-driven subscription skips while LoadCommand merges in fresh data, which only
         // re-points a selection at its refreshed copy; the form, recipe and unsaved edits stay as-is.
         this.WhenAnyValue(x => x.SelectedProduct)
@@ -1376,10 +1391,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                 x => x.EditingLaborPercent, x => x.EditingOverheadPercent, x => x.EditingAdministrativePercent, x => x.EditingMarginPercent, x => x.EditingVatPercent)
             .Subscribe(_ => RecomputeCosts());
 
-        // A worked-out example belongs to the quantity it was worked out for.
-        this.WhenAnyValue(x => x.ExampleQuantity)
-            .Subscribe(_ => ExampleResult = null);
-
         // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
         // rather than replaces, so the screen keeps its selection, pickers and unsaved edits while
         // picking up what changed elsewhere: a repriced ingredient, or a linked sub-assembly its owner
@@ -1469,6 +1480,13 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
+            // The picked product's details haven't replaced the previous one's yet: saving now would write that
+            // recipe under this product's name. The moment passes in a fraction of a second.
+            if (!AreDetailsReady)
+            {
+                return;
+            }
+
             // A form left open is part of what's being saved, unless it's an add form nothing was entered in, which
             // has nothing to save. Its sub-assembly's tab shows, as Apply would show it, so an add made this way
             // stays the tab showing through the reload.
@@ -1740,17 +1758,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             this.WhenAnyValue(x => x.SelectedPackEdit, x => x.SelectedPackEdit!.SelectedLineEdit)
                 .Select(pair => pair.Item1 is not null && pair.Item2 is not null));
 
-        CalculateExampleCommand = ReactiveCommand.Create(
-            () =>
-            {
-                var pieces = ExampleQuantity;
-                ExampleResult = new RecipeUsageExampleResult(
-                    $"Cost for {pieces:#,0.##} pc of {HeaderTitle}",
-                    Costs.Material * pieces,
-                    [.. CostShares.Select(share => share with { Amount = share.Amount * pieces })]);
-            },
-            this.WhenAnyValue(x => x.ExampleQuantity).Select(quantity => quantity > 0));
-
         // A clone copies the product as saved: unsaved edits stay with this one.
         CloneCommand = ReactiveCommand.CreateFromTask(
             () => RunSafelyAsync(async () =>
@@ -1778,19 +1785,37 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// What follows a new selection: nothing picked or open. Another product's recipe is cleared while
-    /// its own loads; the same product picked again (a fresh copy after Save) keeps showing until then.
+    /// What follows a new selection: nothing picked or open. Another product's details wait for its own to
+    /// arrive and go with them (AreDetailsReady); the same product picked again (a fresh copy after Save) keeps
+    /// showing until its reload, and none picked clears them.
     /// </summary>
     private void ResetDetails(Product? product)
     {
+        // Another product's details replace these when they arrive, in the same pass (ClearDetailsForAnother).
+        // Cleared here, the screen drew an empty product in between: a flicker, with the recipe's frame
+        // collapsing and growing back.
+        if (product is not null && product.Id != _detailProductId)
+        {
+            AreDetailsReady = false;
+            return;
+        }
+
+        AreDetailsReady = true;
         CloseUsageForm();
         SelectedLineEdit = null;
-        ExampleResult = null;
 
         if (product?.Id != _detailProductId)
         {
             ClearDetails();
         }
+    }
+
+    /// <summary>What ResetDetails leaves for the picked product's details to replace: the previous product's.</summary>
+    private void ClearDetailsForAnother()
+    {
+        CloseUsageForm();
+        SelectedLineEdit = null;
+        ClearDetails();
     }
 
     /// <summary>A new product: no name, recipe, packaging, costing or links, and nothing selected.</summary>
@@ -1857,31 +1882,69 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var packagingLink = await _packagingLinkRepository.GetForProductAsync(product.Id, cancellationToken);
-        var usages = await _usageRepository.GetForProductAsync(product.Id, cancellationToken);
-        var lines = await _packagingLineRepository.GetEffectiveForProductAsync(product.Id, cancellationToken);
-        var packs = await _productPackRepository.GetForProductAsync(product.Id, cancellationToken);
-        var costing = await _costingParametersRepository.GetForProductAsync(product.Id, cancellationToken);
-        var subAssemblyLines = await _subAssemblyLineRepository.GetForSubAssembliesAsync(
-            [.. usages.Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
-        var addIns = await _usageRepository.GetAddInsForProductAsync(product.Id, cancellationToken);
-        var linkedBy = await _subAssemblyRepository.GetLinkedByAsync(product.Id, cancellationToken);
+        // Read on the thread pool, so the UI thread comes back once, when all of it has arrived, instead of
+        // after each read to start the next. The reads touch no ViewModel state; everything below them does.
+        ProductDetail detail;
+        try
+        {
+            detail = await Task.Run(() => ReadProductDetailAsync(product.Id, cancellationToken), cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested && product.Id != _detailProductId)
+        {
+            // Nothing of the picked product's came: the previous product's mustn't stay showing under its name.
+            ClearDetailsForAnother();
+            AreDetailsReady = true;
+            throw;
+        }
 
         // Only the product picked last is shown; a newer pick cancels this load.
         cancellationToken.ThrowIfCancellationRequested();
 
+        // Out with the previous product's details and in with these, in one pass, so nothing is drawn between them.
+        if (product.Id != _detailProductId)
+        {
+            ClearDetailsForAnother();
+        }
+
+        AreDetailsReady = true;
         _detailProductId = product.Id;
-        _linkedBy = linkedBy;
+        _linkedBy = detail.LinkedBy;
 
         // The packaging first, so the recipe's tabs, rebuilt next, can reselect the Packaging tab if it showed.
-        SetPackagingLink(packagingLink);
-        ReplaceLines(lines);
-        SetHasPackaging(packagingLink is not null || lines.Count > 0);
-        ReplaceUsages(usages, subAssemblyLines, addIns);
-        ReplacePacks(packs);
-        SetCosting(costing);
+        SetPackagingLink(detail.PackagingLink);
+        ReplaceLines(detail.Lines);
+        SetHasPackaging(detail.PackagingLink is not null || detail.Lines.Count > 0);
+        ReplaceUsages(detail.Usages, detail.SubAssemblyLines, detail.AddIns);
+        ReplacePacks(detail.Packs);
+        SetCosting(detail.Costing);
         RefreshLinkableOptions();
         RecomputeRecipe();
+    }
+
+    /// <summary>Everything a product's detail shows, as LoadProductDetailAsync reads it.</summary>
+    private sealed record ProductDetail(
+        PackagingLink? PackagingLink,
+        IReadOnlyList<ProductSubAssemblyUsage> Usages,
+        IReadOnlyList<PackagingLine> Lines,
+        IReadOnlyList<ProductPack> Packs,
+        CostingParameters? Costing,
+        IReadOnlyList<SubAssemblyLine> SubAssemblyLines,
+        IReadOnlyList<UsageAddInLine> AddIns,
+        IReadOnlyDictionary<int, IReadOnlyList<string>> LinkedBy);
+
+    /// <summary>Only the repositories: this runs off the UI thread.</summary>
+    private async Task<ProductDetail> ReadProductDetailAsync(int productId, CancellationToken cancellationToken)
+    {
+        var packagingLink = await _packagingLinkRepository.GetForProductAsync(productId, cancellationToken);
+        var usages = await _usageRepository.GetForProductAsync(productId, cancellationToken);
+        var lines = await _packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken);
+        var packs = await _productPackRepository.GetForProductAsync(productId, cancellationToken);
+        var costing = await _costingParametersRepository.GetForProductAsync(productId, cancellationToken);
+        var subAssemblyLines = await _subAssemblyLineRepository.GetForSubAssembliesAsync(
+            [.. usages.Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
+        var addIns = await _usageRepository.GetAddInsForProductAsync(productId, cancellationToken);
+        var linkedBy = await _subAssemblyRepository.GetLinkedByAsync(productId, cancellationToken);
+        return new ProductDetail(packagingLink, usages, lines, packs, costing, subAssemblyLines, addIns, linkedBy);
     }
 
     /// <summary>The saved packaging link, or none: what the Packaging tab shows, and what Save compares against.</summary>
@@ -3072,7 +3135,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
         HasUsages = UsageEdits.Count > 0;
         HasMaterialCost = material > 0;
-        ExampleResult = null;
     }
 
     /// <summary>The cost summary, from the recipe and packaging as they are now and the costing fields.</summary>
