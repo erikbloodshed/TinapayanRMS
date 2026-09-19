@@ -39,6 +39,12 @@ public class RawMaterialConfiguration : IEntityTypeConfiguration<RawMaterial>
             .HasForeignKey(m => m.LinkedToId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // The costs per base unit keep 20 decimals rather than the usual 4, so a buffered cost typed per bag (₱1,297.37 for
+        // 25 kg is ₱0.0518948 a gram) comes back as typed, and screens round only for show. 28 digits in all is as many as
+        // a .NET decimal holds, so any stored value reads back without overflowing.
+        builder.Property(m => m.CostPerBaseUnit).HasPrecision(28, 20);
+        builder.Property(m => m.BufferedCostPerBaseUnit).HasPrecision(28, 20);
+
         // Backstops for RawMaterialRules.EnsureFieldsMatchType, EnsureFieldsMatchSource and
         // EnsureValidCostBuffer, which the repository checks first with a friendlier message: an
         // ingredient's base unit is the gram (no row), a packaging material has one of its own, only an

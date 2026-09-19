@@ -156,6 +156,73 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
             .Should().Be(16.5m, "half a box per piece, at the buffered ₱33");
     }
 
+    [Fact]
+    public async Task A_new_price_leaves_a_priced_materials_buffered_cost_and_its_sub_assemblies_where_they_were()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = CreateRepository();
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 10m), [], [(null, null, 0.09m)], bomLines: null, Cancellation);
+        var custardId = await SeedSubAssemblyAsync("Custard", sugarId, 1000m);
+
+        (await GetMaterialAsync(sugarId)).BufferedCostPerBaseUnit.Should().Be(0.099m, "worked out from the first price");
+
+        await SetPriceAsync(sugarId, null, 0.12m);
+
+        var sugar = await GetMaterialAsync(sugarId);
+        sugar.CostPerBaseUnit.Should().Be(0.12m);
+        sugar.BufferedCostPerBaseUnit.Should().Be(0.099m, "a fixed amount, which prices don't move, even above it");
+        (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(99m);
+
+        await RecalculateBufferAsync(sugarId);
+
+        (await GetMaterialAsync(sugarId)).BufferedCostPerBaseUnit.Should().Be(0.132m, "₱0.12 with the 10% on top");
+        (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(132m);
+    }
+
+    [Fact]
+    public async Task A_typed_buffered_cost_is_saved_as_it_is_and_cascades()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = CreateRepository();
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 10m), [], [(null, null, 0.09m)], bomLines: null, Cancellation);
+        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId), [], brandPrices: null, [(sugarId, 1000m)], Cancellation);
+        var custardId = await SeedSubAssemblyAsync("Custard", syrupId, 500m);
+
+        var sugar = PurchasedIngredient("Sugar", categoryId, costBufferPercent: 10m, id: sugarId);
+        sugar.BufferedCostPerBaseUnit = 0.0518948m; // ₱1,297.37 typed for a 25 kg bag
+        await repository.SaveAsync(sugar, [], [(null, null, 0.09m)], bomLines: null, Cancellation);
+
+        (await GetMaterialAsync(sugarId)).BufferedCostPerBaseUnit.Should().Be(0.0518948m, "typed, not ₱0.09 with 10% on top, and not rounded to 4 decimals");
+        (await GetMaterialAsync(syrupId)).BufferedCostPerBaseUnit.Should().Be(0.0518948m);
+        (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(25.9474m);
+    }
+
+    [Fact]
+    public async Task Removing_every_price_leaves_the_material_unpriced_and_its_next_price_works_the_buffer_out_again()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = CreateRepository();
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 10m), [], [(null, null, 0.09m)], bomLines: null, Cancellation);
+
+        await CreateBrandPriceRepository().SetAsync(sugarId, [], Cancellation);
+        (await GetMaterialAsync(sugarId)).BufferedCostPerBaseUnit.Should().Be(0m);
+
+        await SetPriceAsync(sugarId, null, 0.2m);
+        (await GetMaterialAsync(sugarId)).BufferedCostPerBaseUnit.Should().Be(0.22m);
+    }
+
+    [Fact]
+    public async Task A_negative_buffered_cost_is_rejected()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var sugar = PurchasedIngredient("Sugar", categoryId);
+        sugar.BufferedCostPerBaseUnit = -0.01m;
+
+        var act = () => CreateRepository().SaveAsync(sugar, [], brandPrices: null, bomLines: null, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Buffered cost can't be negative.");
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(101)]

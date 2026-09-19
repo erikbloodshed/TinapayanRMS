@@ -6,10 +6,11 @@
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              mc:Ignorable="d"
              d:DesignHeight="650" d:DesignWidth="1400">
-    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="16">
+    <!-- Cards are 4px apart and 4px from the page's edge, as on Raw Materials -->
+    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="4">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="4" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 

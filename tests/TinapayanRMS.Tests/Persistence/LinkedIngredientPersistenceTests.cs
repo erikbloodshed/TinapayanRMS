@@ -160,6 +160,26 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
     }
 
     [Fact]
+    public async Task A_part_takes_its_share_of_the_eggs_fixed_buffered_cost_not_of_a_new_price()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var eggId = await SaveEggAsync(categoryId, costBufferPercent: 10m);
+        var yolkId = await SaveAsync(Linked("Egg Yolk", categoryId, eggId, weightShare: 30m, costShare: 70m));
+
+        // The egg goes up to ₱0.12/g; its buffered cost stays at ₱0.099/g until it's recalculated.
+        await SetPriceAsync(eggId, null, 0.12m);
+        var yolk = await GetMaterialAsync(yolkId);
+        yolk.CostPerBaseUnit.Should().Be(0.28m, "70% of the egg's new ₱0.12, over 30% of its weight");
+        yolk.BufferedCostPerBaseUnit.Should().Be(0.231m, "the same share of the egg's unchanged ₱0.099");
+
+        // A buffered cost typed on the egg reaches the yolk as the same share of it.
+        var egg = Purchased("Egg", categoryId, costBufferPercent: 10m, id: eggId);
+        egg.BufferedCostPerBaseUnit = 0.15m;
+        await CreateRepository().SaveAsync(egg, await UnitsOfAsync(eggId), brandPrices: null, bomLines: null, Cancellation);
+        (await GetMaterialAsync(yolkId)).BufferedCostPerBaseUnit.Should().Be(0.35m, "₱0.15 × 70 / 30");
+    }
+
+    [Fact]
     public async Task The_buffer_is_inherited_on_AddAsync_down_a_chain_of_links_and_from_a_new_link()
     {
         var categoryId = await SeedCategoryAsync();

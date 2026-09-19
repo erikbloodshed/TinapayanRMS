@@ -27,12 +27,13 @@
     <!--
         Standalone sub-assemblies, which no product owns: the list beside the one being edited. Products
         link them (and follow every change saved here) or copy them, from their recipe. The list is as
-        wide as its columns (Auto), and the form takes the rest.
+        wide as its columns (Auto), and the form takes the rest. Cards are 4px apart and 4px from the page's
+        edge, as on Raw Materials.
     -->
-    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="16">
+    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="4">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="4" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -62,8 +63,9 @@
                                        SelectionMode="Single"
                                        NavigationMode="Row">
                     <syncfusion:SfDataGrid.Columns>
-                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="200" />
-                        <syncfusion:GridTextColumn MappingName="RoleName" HeaderText="Role" Width="110" />
+                        <!-- The Raw Materials list's widths, so the three lists are the same width -->
+                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="220" />
+                        <syncfusion:GridTextColumn MappingName="RoleName" HeaderText="Role" Width="185" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </Grid>

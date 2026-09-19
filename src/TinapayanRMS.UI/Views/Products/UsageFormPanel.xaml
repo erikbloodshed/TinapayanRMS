@@ -66,42 +66,36 @@
                    Margin="0,0,0,8"
                    Visibility="{Binding IsAddingUsage, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-        <!-- The section's role, which is what it's called, its badges, and what a piece of it costs as the form stands. -->
-        <Grid Margin="0,0,0,10" Visibility="{Binding IsAddingUsage, Converter={StaticResource EmptyStateVisibilityConverter}}">
+        <!--
+            The section's badges, and what a piece of it costs at the far right. No title: its tab already names it by
+            its role. A packaging section's cost stays under its own table, and so does the add form's, which has no
+            badge row.
+        -->
+        <Grid Visibility="{Binding IsAddingUsage, Converter={StaticResource EmptyStateVisibilityConverter}}">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-
-            <TextBlock Text="{Binding EditingUsage.SectionName}"
-                       FontSize="15"
-                       FontWeight="SemiBold"
-                       Foreground="{StaticResource HeadingForegroundBrush}"
-                       TextTrimming="CharacterEllipsis"
-                       VerticalAlignment="Center" />
-            <Border Grid.Column="1"
-                    Style="{StaticResource LinkedBadgeStyle}"
-                    ToolTip="Its lines come from where it's kept, and follow its changes."
-                    Visibility="{Binding EditingUsage.IsLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock Text="{Binding EditingUsage.LinkedFromText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
-            </Border>
-            <Border Grid.Column="2"
-                    HorizontalAlignment="Left"
-                    Style="{StaticResource LinkedBadgeStyle}"
-                    ToolTip="Changing its lines changes theirs too."
-                    Visibility="{Binding EditingUsage.IsShared, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock Text="{Binding EditingUsage.SharedText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" TextTrimming="CharacterEllipsis" />
-            </Border>
-
-            <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="12,0,0,0">
-                <TextBlock Text="Cost per piece" Style="{StaticResource CaptionStyle}" HorizontalAlignment="Right" />
-                <TextBlock Text="{Binding UsageFormCostPerPieceText}"
-                           FontSize="16"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource HeadingForegroundBrush}"
-                           HorizontalAlignment="Right" />
+            <TextBlock Grid.Column="1"
+                       Style="{StaticResource CaptionStyle}"
+                       VerticalAlignment="Center"
+                       Margin="12,0,0,10"
+                       Visibility="{Binding IsFormPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}">
+                <Run Text="Cost per piece · " /><Run Text="{Binding UsageFormCostPerPieceText, Mode=OneWay}" />
+            </TextBlock>
+            <StackPanel Orientation="Horizontal">
+                <Border Style="{StaticResource LinkedBadgeStyle}"
+                        Margin="0,0,8,10"
+                        ToolTip="Its lines come from where it's kept, and follow its changes."
+                        Visibility="{Binding EditingUsage.IsLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding EditingUsage.LinkedFromText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
+                </Border>
+                <Border Style="{StaticResource LinkedBadgeStyle}"
+                        Margin="0,0,8,10"
+                        ToolTip="Changing its lines changes theirs too."
+                        Visibility="{Binding EditingUsage.IsShared, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding EditingUsage.SharedText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" TextTrimming="CharacterEllipsis" />
+                </Border>
             </StackPanel>
         </Grid>
 
@@ -236,7 +230,17 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
+                <!-- What a piece of it costs, on the same row as Remove Line -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                    <TextBlock Text="Cost per piece" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBlock Text="{Binding UsageFormCostPerPieceText}"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource HeadingForegroundBrush}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
                 <TextBlock Text="How much of each material one piece takes, in its unit. It's the product's packaging: Apply puts it on the Packaging tab."
                            Style="{StaticResource CaptionStyle}"
                            VerticalAlignment="Center"
@@ -249,7 +253,7 @@
                            TextWrapping="Wrap"
                            Margin="0,0,12,0"
                            Visibility="{Binding IsFormEditingPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
-                <syncfusion:ButtonAdv Grid.Column="1"
+                <syncfusion:ButtonAdv Grid.Column="2"
                                       Label="Remove Line"
                                       IconTemplate="{StaticResource RemoveIconTemplate}"
                                       Command="{Binding RemoveFormPackagingLineCommand}"
@@ -265,11 +269,6 @@
                 only show: AllowEditing is off and the add row goes with it (AddNewRowPositionConverter).
             -->
             <StackPanel Visibility="{Binding IsFormShowingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <!-- Named only when it's a linked recipe, which add-ins go on top of; a product's own lines are just "the lines". -->
-                <TextBlock Text="Linked Recipe"
-                           Style="{StaticResource PanelHeaderStyle}"
-                           Visibility="{Binding IsFormOfferingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}" />
-
                 <syncfusion:SfDataGrid ItemsSource="{Binding FormLines}"
                                        controls:NumericEditing.IsEnabled="True"
                                        controls:GridAddNewRow.HideCheckBoxes="True"
@@ -335,27 +334,39 @@
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
 
-                <Grid Margin="0,8,0,8" Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <!-- The formula caption on the left; Remove Line only for the product's own lines; the cost per piece only while adding (the badge row has it otherwise) -->
+                <Grid Margin="0,8,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveFormLineCommand}" />
+                    <!-- What the percentages are read against, and the figure a batch is scaled by. -->
+                    <TextBlock Text="{Binding UsageFormBaseCaption}"
+                               Style="{StaticResource CaptionStyle}"
+                               VerticalAlignment="Center"
+                               TextWrapping="Wrap"
+                               Margin="0,0,12,0" />
+                    <TextBlock Grid.Column="1"
+                               Style="{StaticResource CaptionStyle}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,12,0"
+                               Visibility="{Binding IsAddingUsage, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Run Text="Cost per piece · " /><Run Text="{Binding UsageFormCostPerPieceText, Mode=OneWay}" />
+                    </TextBlock>
+                    <syncfusion:ButtonAdv Grid.Column="2"
+                                          Label="Remove Line"
+                                          IconTemplate="{StaticResource RemoveIconTemplate}"
+                                          Command="{Binding RemoveFormLineCommand}"
+                                          Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </Grid>
 
-                <!-- What the percentages are read against, and the figure a batch is scaled by. -->
-                <TextBlock Text="{Binding UsageFormBaseCaption}" Style="{StaticResource CaptionStyle}" Margin="0,8,0,0" TextWrapping="Wrap" />
-
-                <!-- Whose a linked one's lines are, and Show Add-Ins, which opens the table of this product's own extras under them -->
+                <!-- A linked one's Show Add-Ins, which opens the table of this product's own extras under its lines -->
                 <Grid Margin="0,8,0,8" Visibility="{Binding IsFormEditingLines, Converter={StaticResource EmptyStateVisibilityConverter}}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Its lines are its owner's: change them where it's kept, or make this product a copy of it. Anything extra just for this product goes in its add-ins."
-                               Style="{StaticResource CaptionStyle}"
-                               VerticalAlignment="Center"
-                               Margin="0,0,12,0" />
                     <syncfusion:ButtonAdv Grid.Column="1"
                                           VerticalAlignment="Center"
                                           Label="{Binding FormAddInsToggleText}"
@@ -373,8 +384,6 @@
                 Add-Ins opens it; it's open to start with only when there are add-ins (IsFormAddInsExpanded).
             -->
             <StackPanel Margin="0,6,0,0" Visibility="{Binding IsFormShowingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock Text="This Product's Add-Ins" Style="{StaticResource PanelHeaderStyle}" />
-
                 <syncfusion:SfDataGrid ItemsSource="{Binding FormAddIns}"
                                        controls:NumericEditing.IsEnabled="True"
                                        controls:GridCellEditing.IsEnabled="True"

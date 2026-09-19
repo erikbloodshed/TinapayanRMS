@@ -189,7 +189,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.PriceHistory.Single().Brand.Should().Be("Gold Medal");
         var brand = viewModel.BrandPriceRows.Single();
         (brand.Brand, brand.UnitKey, brand.Price).Should().Be(("Gold Medal", bagId, 1250m), "the form reloads what was saved");
-        viewModel.CurrentCostText.Should().Be("₱0.0500");
+        viewModel.HeaderCostUnitText.Should().Be("bag", "the header's costs are in the Per unit, the dearest brand's");
+        viewModel.CurrentCostText.Should().Be("₱1,250.00");
         viewModel.CanChangeTypeAndSource.Should().BeFalse();
     }
 
@@ -264,7 +265,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var reloaded = viewModel.BrandPriceRows.Single();
         (reloaded.UnitKey, reloaded.Quantity).Should().Be((sackId, 25000m));
         reloaded.CanTypeQuantity.Should().BeFalse("a saved unit's multiplier is corrected in Alternative Units");
-        viewModel.CurrentCostText.Should().Be("₱0.0600");
+        viewModel.CurrentCostText.Should().Be("₱1,500.00", "a 25 kg sack's worth, the Per unit");
     }
 
 
@@ -533,6 +534,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial is not null && viewModel.BomLineEdits.Count == 1,
             () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.BomLineEdits.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
+        viewModel.HeaderCostUnitText.Should().Be("g", "a made ingredient has no Purchase Cost Setup, so its header stays per gram");
+        viewModel.CurrentCostText.Should().MatchRegex(@"^₱\d+\.\d{4}$");
         var lineId = await BomLineIdAsync();
 
         viewModel.EditingName = "Syrup";
@@ -687,7 +690,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
-    public async Task A_cost_buffer_is_saved_with_the_material_and_shown_beside_the_true_cost()
+    public async Task A_cost_buffer_is_saved_with_the_material_as_a_fixed_buffered_cost_that_prices_dont_move()
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedCategoryAsync("Dry goods");
@@ -696,14 +699,18 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingCostBufferPercent.Should().Be(0m, "a new material starts with no buffer");
+        viewModel.EditingBufferedCost.Should().BeNull();
         viewModel.EditingName = "Flour";
         PickCategory(viewModel);
         await AddUnitAsync(viewModel, bagId, 25000m);
         var brand = AddBrandPrice(viewModel, null, "bag", 1250m);
-        viewModel.EditingCostBufferPercent = 5m;
+        viewModel.TypedCostBufferPercent = 5m;
+        viewModel.EditingBufferedCost.Should().Be(0.0525m, "typing the percent puts it on top of the dearest brand");
         viewModel.PurchaseCostText.Should().Be("₱0.0500");
-        viewModel.PurchaseBufferedCostText.Should().Be("Buffered (5%): ₱0.0525", "it follows the buffer as it's typed");
-        brand.BufferedPrice.Should().Be(1312.5m, "the brand's Cost Buffer column follows it too");
+        viewModel.BufferedCostUnit!.Key.Should().Be(PurchaseUnitChoice.BaseUnitKey, "a new material starts on its base unit");
+        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
+        viewModel.PurchaseBufferedCostText.Should().Contain("₱1,312.50/bag");
+        brand.BufferPercent.Should().Be(5m, "the brand's Buffer % column is the buffered cost over its price");
 
         await viewModel.SaveCommand.Execute();
 
@@ -712,34 +719,117 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SelectedRawMaterial!.CostBufferPercent.Should().Be(5m);
         viewModel.EditingCostBufferPercent.Should().Be(5m, "the form reloads what was saved");
+        viewModel.EditingBufferedCost.Should().Be(0.0525m);
+        viewModel.BufferedCostUnit!.Name.Should().Be("bag", "a saved material starts on its dearest brand's unit");
+        viewModel.EditingBufferedCostInUnit.Should().Be(1312.5m);
+        viewModel.HeaderCostUnitText.Should().Be("bag");
+        viewModel.CurrentCostText.Should().Be("₱1,250.00");
+        viewModel.BufferedCostText.Should().Be("₱1,312.50");
+
+        // The header follows the Per unit: per gram, to 4 decimals.
+        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions[0];
+        viewModel.HeaderCostUnitText.Should().Be("g");
         viewModel.CurrentCostText.Should().Be("₱0.0500");
         viewModel.BufferedCostText.Should().Be("₱0.0525");
+        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
+        viewModel.BufferedCostWarningText.Should().BeEmpty();
+
+        // The bag goes up to ₱1,500 (₱0.06/g): the buffered cost stays, and the screen says the buffer's gone.
+        viewModel.BrandPriceRows.Single().Price = 1500m;
+        viewModel.EditingBufferedCost.Should().Be(0.0525m);
+        viewModel.EditingCostBufferPercent.Should().Be(5m, "a new price moves neither");
+        viewModel.BrandPriceRows.Single().BufferPercent.Should().Be(-12.5m, "₱1,312.50 is 12.5% under ₱1,500");
+        viewModel.BufferedCostWarningText.Should().NotBeEmpty();
+
+        // Typing the percent works the buffered cost out from the new dearest price.
+        viewModel.TypedCostBufferPercent = 10m;
+        viewModel.EditingBufferedCost.Should().Be(0.066m, "₱0.06 with 10% on top");
+        viewModel.EditingBufferedCostInUnit.Should().Be(1650m);
+        viewModel.BufferedCostWarningText.Should().BeEmpty();
+        viewModel.BrandPriceRows.Single().BufferPercent.Should().Be(10m);
+
+        // Typing the buffered cost works the percent out: ₱1,800 over ₱1,500 is 20%.
+        viewModel.EditingBufferedCostInUnit = 1800m;
+        viewModel.EditingBufferedCost.Should().Be(0.072m);
+        viewModel.EditingCostBufferPercent.Should().Be(20m);
+        viewModel.TypedCostBufferPercent.Should().Be(20m, "the box shows it");
+
+        // Recalculate puts the percent back on top of the dearest brand after a price change.
+        viewModel.BrandPriceRows.Single().Price = 1600m;
+        await viewModel.RecalculateBufferCommand.Execute();
+        viewModel.EditingBufferedCostInUnit.Should().Be(1920m, "₱1,600 with 20% on top");
+
+        await viewModel.SaveCommand.Execute();
+        await WaitUntilSettledAsync(() => viewModel.BufferedCostText == "₱1,920.00",
+            () => $"buffered={viewModel.BufferedCostText}, error={viewModel.ErrorMessage ?? "none"}");
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingCostBufferPercent.Should().Be(0m);
+        viewModel.EditingBufferedCost.Should().BeNull();
     }
 
+    [Fact]
+    public async Task The_buffered_cost_is_typed_in_the_picked_unit_kept_per_base_unit_unrounded_and_shown_to_the_centavo()
+    {
+        var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        await AddUnitAsync(viewModel, bagId, 25000m);
+        viewModel.BufferedCostUnitOptions.Select(o => o.Name).Should().Equal("gram", "bag");
+
+        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
+        viewModel.EditingBufferedCostInUnit = 1297.37m;
+        viewModel.EditingBufferedCost.Should().Be(0.0518948m, "₱1,297.37 over 25,000 g, not rounded");
+        viewModel.EditingBufferedCostInUnit.Should().Be(1297.37m);
+
+        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions[0];
+        viewModel.EditingBufferedCostInUnit.Should().Be(0.05m, "shown to the centavo");
+        viewModel.EditingBufferedCost.Should().Be(0.0518948m, "which only rounds what's shown");
+
+        // Removing the bag takes the picker back to the base unit.
+        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
+        viewModel.SelectedUnitRow = viewModel.UnitRows.Single();
+        await viewModel.DeleteUnitCommand.Execute();
+        viewModel.BufferedCostUnitOptions.Select(o => o.Name).Should().Equal("gram");
+        viewModel.BufferedCostUnit!.Key.Should().Be(PurchaseUnitChoice.BaseUnitKey);
+    }
 
     [Fact]
-    public async Task Each_brands_cost_buffer_follows_its_price_and_the_buffer_percent()
+    public async Task Each_brands_buffer_percent_is_the_buffered_cost_over_its_own_price()
     {
         await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
         await viewModel.NewCommand.Execute();
-        var brand = viewModel.NewBrandPriceRow();
-        brand.BufferedPrice.Should().BeNull("there's no price to put a buffer on");
+        var dearer = viewModel.NewBrandPriceRow();
+        dearer.BufferPercent.Should().BeNull("there's no price to work a buffer out from");
 
-        brand.Price = 930m;
-        brand.BufferedPrice.Should().Be(930m, "no buffer yet");
+        dearer.UnitKey = PurchaseUnitChoice.BaseUnitKey;
+        dearer.Price = 1m;
+        viewModel.BrandPriceRows.Add(dearer);
+        dearer.BufferPercent.Should().Be(0m, "no buffer yet");
 
-        viewModel.BrandPriceRows.Add(brand);
-        viewModel.EditingCostBufferPercent = 5m;
-        brand.BufferedPrice.Should().Be(976.5m);
+        viewModel.TypedCostBufferPercent = 5m;
+        viewModel.EditingBufferedCost.Should().Be(1.05m);
+        dearer.BufferPercent.Should().Be(5m);
 
-        brand.Price = 1000m;
-        brand.BufferedPrice.Should().Be(1050m);
+        // A cheaper brand is further under the same buffered cost: ₱1.05 over ₱0.84 is 25%.
+        var cheaper = AddBrandPrice(viewModel, "Cheap", "gram", 0.84m);
+        cheaper.BufferPercent.Should().Be(25m);
+
+        // Typing the buffered cost works the percent out against the dearest brand, and every row follows.
+        viewModel.EditingBufferedCostInUnit = 1.2m;
+        viewModel.EditingCostBufferPercent.Should().Be(20m);
+        dearer.BufferPercent.Should().Be(20m);
+        cheaper.BufferPercent.Should().BeApproximately(42.857m, 0.001m, "₱1.20 over ₱0.84");
+
+        dearer.Price = 1.5m;
+        viewModel.EditingBufferedCost.Should().Be(1.2m, "a new price doesn't move it");
+        dearer.BufferPercent.Should().Be(-20m);
     }
 
     [Fact]
@@ -762,7 +852,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             () => $"brands={viewModel.BrandPriceRows.Count}");
         viewModel.EditingCostBufferPercent.Should().Be(5m);
         var brand = viewModel.BrandPriceRows.Single();
-        (brand.UnitKey, brand.Price, brand.BufferedPrice).Should().Be((PurchaseUnitChoice.BaseUnitKey, 930m, 976.5m));
+        (brand.UnitKey, brand.Price, brand.BufferPercent).Should().Be((PurchaseUnitChoice.BaseUnitKey, 930m, 5m));
         viewModel.PurchaseCostText.Should().Be("₱930.0000");
     }
 

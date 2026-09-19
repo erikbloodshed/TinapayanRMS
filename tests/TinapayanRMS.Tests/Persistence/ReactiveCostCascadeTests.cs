@@ -96,7 +96,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(90m);
 
         // Sugar's price doubles — no direct edit to the sub-assembly.
-        await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m);
+        await SetPriceAndRecalculateBufferAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m);
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(180m);
     }
@@ -117,7 +117,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(45m);
 
         // Sugar's price doubles: syrup becomes 0.18/g, which should ripple into Custard too.
-        await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m);
+        await SetPriceAndRecalculateBufferAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m);
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(90m); // 500g @ 0.18/g
     }
@@ -159,7 +159,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var custardId = await SeedSubAssemblyAsync("Custard", roleId, sugarId, 500m);
         var caramelId = await SeedSubAssemblyAsync("Caramel Sauce", roleId, sugarId, 200m);
 
-        await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m); // 0.18/g
+        await SetPriceAndRecalculateBufferAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m); // 0.18/g
 
         (await GetSubAssemblyAsync(custardId)).TotalCost.Should().Be(90m); // 500 * 0.18
         (await GetSubAssemblyAsync(caramelId)).TotalCost.Should().Be(36m); // 200 * 0.18
@@ -180,7 +180,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(58m); // 800*0.05 + 200*0.09
 
         // Only flour's price changes; sugar's line cost must still use its own current cost.
-        await SetPriceAsync(flourId, await KilogramUnitIdAsync(flourId), 100m); // 0.10/g
+        await SetPriceAndRecalculateBufferAsync(flourId, await KilogramUnitIdAsync(flourId), 100m); // 0.10/g
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(98m); // 800*0.10 + 200*0.09
     }
@@ -210,7 +210,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
 
         ReadUsageCostPerPiece().Should().Be(0.9m); // 9 * 10 / 100
 
-        await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m);
+        await SetPriceAndRecalculateBufferAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m);
 
         ReadUsageCostPerPiece().Should().Be(1.8m); // sugar doubled -> usage cost doubled, with zero product-level code involved
     }
@@ -253,7 +253,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         // A 1,020 g / ₱66 effective batch at 30 g a piece.
         ReadUsageCostPerPiece().Should().Be(66m * 30m / 1020m);
 
-        await SetPriceAsync(ubeId, await KilogramUnitIdAsync(ubeId), 1600m);
+        await SetPriceAndRecalculateBufferAsync(ubeId, await KilogramUnitIdAsync(ubeId), 1600m);
 
         // ₱82 now: the ube doubled to ₱32, with no add-in-level propagation code anywhere.
         ReadUsageCostPerPiece().Should().Be(82m * 30m / 1020m);

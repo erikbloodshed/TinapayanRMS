@@ -308,7 +308,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
         var glazeId = await SaveStandaloneAsync("Glaze", roleId, [(sugarId, 1000m)]);
 
-        await SetPriceAsync(sugarId, null, 0.18m);
+        await SetPriceAndRecalculateBufferAsync(sugarId, null, 0.18m);
 
         (await GetSubAssemblyAsync(glazeId)).TotalCost.Should().Be(180m);
     }

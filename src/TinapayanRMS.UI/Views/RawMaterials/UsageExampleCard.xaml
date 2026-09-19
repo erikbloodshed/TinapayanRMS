@@ -12,7 +12,8 @@
         Always the material being edited (ExampleRawMaterial follows the selection), priced at its saved cost
         per base unit, so an edit on Cost Setup (a price, a BOM line, a share) shows here once saved.
     -->
-    <Border Style="{StaticResource CardStyle}">
+    <!-- No frame of its own: it sits straight in its tab, whose card has the border and rounded corners -->
+    <Border Padding="12">
         <StackPanel>
             <TextBlock Text="Usage Example" Style="{StaticResource SectionHeaderStyle}" />
 

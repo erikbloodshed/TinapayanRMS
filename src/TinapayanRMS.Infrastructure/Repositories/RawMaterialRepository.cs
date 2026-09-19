@@ -70,6 +70,7 @@ public class RawMaterialRepository(
                 CostSharePercent = material.CostSharePercent,
                 BaseUnitId = material.BaseUnitId,
                 CostBufferPercent = material.CostBufferPercent,
+                BufferedCostPerBaseUnit = material.BufferedCostPerBaseUnit,
             };
 
             if (fields.Id == 0)
@@ -109,6 +110,13 @@ public class RawMaterialRepository(
                 }
 
                 var saved = await dbContext.RawMaterials.FirstAsync(m => m.Id == id, cancellationToken);
+
+                // No buffered cost sent: it's worked out from the new prices, not the old ones UpdateAsync had.
+                if (fields.Source == RawMaterialSource.Purchased && material.BufferedCostPerBaseUnit == 0m)
+                {
+                    saved.BufferedCostPerBaseUnit = 0m;
+                }
+
                 await RawMaterialBrandPriceRepository.AddAllAsync(dbContext, saved, rows, cancellationToken);
                 costChanged |= await RawMaterialBrandPriceRepository.RepriceAsync(dbContext, saved, costBefore, cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
@@ -140,18 +148,25 @@ public class RawMaterialRepository(
     /// <summary>
     /// Adds <paramref name="material"/> and saves it, rejecting fields that don't fit its type or source, or a
     /// link that doesn't fit. A linked ingredient takes the buffer of the one it's linked to, whatever it was
-    /// given. Returns whether the caller must cascade its cost: a linked ingredient's is worked out from the
-    /// one it's linked to.
+    /// given. A new material has no cost yet, so its buffered cost only stands if one was typed for a purchased
+    /// material; otherwise its first brand price or the cascade works it out. Returns whether the caller must
+    /// cascade its cost: a linked ingredient's is worked out from the one it's linked to.
     /// </summary>
     internal static async Task<bool> AddAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
     {
         RawMaterialRules.EnsureFieldsMatchType(material);
         RawMaterialRules.EnsureFieldsMatchSource(material);
         RawMaterialRules.EnsureValidCostBuffer(material.CostBufferPercent);
+        RawMaterialRules.EnsureValidBufferedCost(material.BufferedCostPerBaseUnit);
         await EnsureCategoryMatchesAsync(dbContext, material, cancellationToken);
         if (await EnsureValidLinkAsync(dbContext, material, cancellationToken) is { } inheritedBuffer)
         {
             material.CostBufferPercent = inheritedBuffer;
+        }
+
+        if (material.Source != RawMaterialSource.Purchased)
+        {
+            material.BufferedCostPerBaseUnit = 0m;
         }
 
         dbContext.RawMaterials.Add(material);
@@ -176,13 +191,14 @@ public class RawMaterialRepository(
     /// <summary>
     /// Copies the form's fields onto the stored material and saves it. Returns whether the caller must
     /// cascade its cost: a made ingredient's weight loss percent, a linked ingredient's link or shares,
-    /// or an ingredient's buffer may have just changed.
+    /// or an ingredient's buffer or fixed buffered cost may have just changed.
     /// </summary>
     internal static async Task<bool> UpdateAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
     {
         RawMaterialRules.EnsureFieldsMatchType(material);
         RawMaterialRules.EnsureFieldsMatchSource(material);
         RawMaterialRules.EnsureValidCostBuffer(material.CostBufferPercent);
+        RawMaterialRules.EnsureValidBufferedCost(material.BufferedCostPerBaseUnit);
 
         var existing = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == material.Id, cancellationToken)
             ?? throw new InvalidOperationException($"Raw material {material.Id} does not exist.");
@@ -213,14 +229,21 @@ public class RawMaterialRepository(
         existing.CostSharePercent = material.CostSharePercent;
         existing.BaseUnitId = material.BaseUnitId;
 
-        // A purchased material's buffered cost follows its buffer here; a made one's is a BOM rollup,
-        // which the cascade redoes. A linked one's buffer is the linked-to ingredient's, not the form's.
+        // A purchased material's buffered cost is the fixed amount the form sends, which the buffer percent
+        // doesn't move (the screen's Recalculate works it out from the percent). A made one's is a BOM rollup
+        // with its own buffer on top, which the cascade redoes. A linked one's buffer is the linked-to
+        // ingredient's, not the form's.
         var costBufferPercent = inheritedBuffer ?? material.CostBufferPercent;
         var bufferChanged = existing.CostBufferPercent != costBufferPercent;
         existing.CostBufferPercent = costBufferPercent;
-        if (bufferChanged && existing.Source == RawMaterialSource.Purchased)
+        // None sent (0) is worked out afresh from the cost and the percent, as for a first price.
+        if (existing.Source == RawMaterialSource.Purchased)
         {
-            existing.BufferedCostPerBaseUnit = RawMaterialRules.BufferedCost(existing.CostPerBaseUnit, existing.CostBufferPercent);
+            var bufferedCost = material.BufferedCostPerBaseUnit > 0
+                ? material.BufferedCostPerBaseUnit
+                : RawMaterialRules.BufferedCost(existing.CostPerBaseUnit, existing.CostBufferPercent);
+            bufferChanged = existing.BufferedCostPerBaseUnit != bufferedCost;
+            existing.BufferedCostPerBaseUnit = bufferedCost;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

@@ -4,7 +4,8 @@
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
     <!-- The grid fills the card, which fills its tab -->
-    <Border Style="{StaticResource CardStyle}">
+    <!-- No frame of its own: it sits straight in its tab, whose card has the border and rounded corners -->
+    <Border Padding="12">
         <DockPanel>
             <TextBlock DockPanel.Dock="Top" Text="Price History" Style="{StaticResource SectionHeaderStyle}" />
             <syncfusion:ButtonAdv DockPanel.Dock="Bottom"

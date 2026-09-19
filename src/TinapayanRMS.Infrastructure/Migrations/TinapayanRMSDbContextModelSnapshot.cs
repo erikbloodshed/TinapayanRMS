@@ -333,8 +333,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("BufferedCostPerBaseUnit")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(28, 20)
+                        .HasColumnType("decimal(28,20)");
 
                     b.Property<int>("CategoryId")
                         .HasColumnType("int");
@@ -344,8 +344,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasColumnType("decimal(18,4)");
 
                     b.Property<decimal>("CostPerBaseUnit")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(28, 20)
+                        .HasColumnType("decimal(28,20)");
 
                     b.Property<decimal?>("CostSharePercent")
                         .HasPrecision(18, 4)

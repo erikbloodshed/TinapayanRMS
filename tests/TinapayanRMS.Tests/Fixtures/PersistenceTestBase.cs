@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure;
@@ -50,6 +51,25 @@ public abstract class PersistenceTestBase(DatabaseFixture fixture) : IAsyncLifet
     /// </summary>
     protected Task SetPriceAsync(int rawMaterialId, int? unitId, decimal price) =>
         CreateBrandPriceRepository().SetAsync(rawMaterialId, [new RawMaterialBrandPrice { UnitId = unitId, Price = price }], Cancellation);
+
+    /// <summary>
+    /// SetPriceAsync, then the screen's Recalculate and Save: a price change alone leaves a priced material's fixed
+    /// buffered cost where it was, so this is how a new price reaches what recipes are costed with.
+    /// </summary>
+    protected async Task SetPriceAndRecalculateBufferAsync(int rawMaterialId, int? unitId, decimal price)
+    {
+        await SetPriceAsync(rawMaterialId, unitId, price);
+        await RecalculateBufferAsync(rawMaterialId);
+    }
+
+    /// <summary>Sets a purchased material's fixed buffered cost to its cost with its buffer percent on top, and saves it. It cascades.</summary>
+    protected async Task RecalculateBufferAsync(int rawMaterialId)
+    {
+        var repository = new RawMaterialRepository(CreateDbContextFactory(), CreateCostPropagator());
+        var material = (await repository.GetByIdAsync(rawMaterialId, Cancellation))!;
+        material.BufferedCostPerBaseUnit = RawMaterialRules.BufferedCost(material.CostPerBaseUnit, material.CostBufferPercent);
+        await repository.UpdateAsync(material, Cancellation);
+    }
 
     /// <summary>
     /// UnitOfMeasure has no migration-seeded rows (Phase: units are fully user-managed,

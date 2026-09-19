@@ -15,10 +15,12 @@
         set them apart. Each section is a UserControl in Views/Products that inherits this screen's
         DataContext; when one shows is decided here.
     -->
-    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="12">
+    <!-- Cards are 4px apart and 4px from the page's edge, as on Raw Materials -->
+    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="4">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="340" />
-            <ColumnDefinition Width="12" />
+            <!-- Auto: the list card is as wide as its columns, as on Raw Materials -->
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="4" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -27,22 +29,32 @@
 
         <p:ProductListCard Grid.Column="0" />
 
-        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="12">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
+        <!--
+            As on Raw Materials: the header card, then the tabs in a card of their own, 4px apart. The tab control
+            draws no frame (BorderThickness 0), so the card around it is the only border, and each tab's content
+            sits straight in it, kept off the edge by its ScrollViewer's padding.
+        -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-                <!-- The header only shows figures; what's typed in about the product sits under it -->
-                <p:ProductHeaderCard />
+            <Border Style="{StaticResource CardStyle}" Padding="12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <p:ProductDetailsCard x:Name="Details" Grid.Row="1" Margin="0,12,0,0" />
+                    <!-- The header only shows figures; what's typed in about the product sits under it -->
+                    <p:ProductHeaderCard />
 
-                <Border Grid.Row="2" Style="{StaticResource SectionDividerStyle}" />
+                    <p:ProductDetailsCard x:Name="Details" Grid.Row="1" Margin="0,12,0,0" />
+                </Grid>
+            </Border>
 
+            <Border Grid.Row="1" Margin="0,4,0,0" Style="{StaticResource CardStyle}" Padding="4">
                 <!--
                     Every tab but Clone is part of the one form Save writes, so a new product shows them
                     too. Fixed tabs, like Raw Materials': nothing to close or reopen. The strip sits along the
@@ -51,7 +63,7 @@
                     Between picking a product and its details arriving, the previous product's still show, and
                     the tabs ignore the mouse (AreDetailsReady): what's in them is no longer the form's.
                 -->
-                <syncfusion:TabControlExt Grid.Row="3"
+                <syncfusion:TabControlExt BorderThickness="0"
                                           IsHitTestVisible="{Binding AreDetailsReady}"
                                           TabStripPlacement="Bottom"
                                           CloseButtonType="Hide"
@@ -63,21 +75,21 @@
                         sub-assembly form's lines table often starts near the bottom of the window.
                     -->
                     <syncfusion:TabItemExt Header="Recipe" CanClose="False">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,12">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,14,12">
                             <p:RecipeStructureCard controls:FocusScrolling.SkipOnClick="True" />
                         </ScrollViewer>
                     </syncfusion:TabItemExt>
 
                     <!-- The costing parameters beside the recipe cost breakdown (CostingCard) -->
                     <syncfusion:TabItemExt Header="Costing" CanClose="False">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,12">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,14,12">
                             <p:CostingCard />
                         </ScrollViewer>
                     </syncfusion:TabItemExt>
 
                     <!-- Packs sits after Costing: a pack's price is the piece price it's worked out from, times its pieces -->
                     <syncfusion:TabItemExt Header="Packs" CanClose="False">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,12">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,14,12">
                             <p:PacksCard />
                         </ScrollViewer>
                     </syncfusion:TabItemExt>
@@ -86,12 +98,12 @@
                     <syncfusion:TabItemExt Header="Clone"
                                            CanClose="False"
                                            Visibility="{Binding ShowLinks, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,12">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,14,12">
                             <p:CloneCard HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="420" />
                         </ScrollViewer>
                     </syncfusion:TabItemExt>
                 </syncfusion:TabControlExt>
-            </Grid>
-        </Border>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

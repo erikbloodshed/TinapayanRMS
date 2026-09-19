@@ -369,6 +369,30 @@ public class RawMaterialRulesTests
         flour.CostPerBaseUnit.Should().Be(0.04m);
     }
 
+    [Theory]
+    [InlineData(0.08)]
+    [InlineData(0.02)]
+    public void ApplyBrandPrices_leaves_a_buffered_cost_it_already_has_whatever_the_new_price(decimal price)
+    {
+        var flour = new RawMaterial { Source = RawMaterialSource.Purchased, CostBufferPercent = 5m, CostPerBaseUnit = 0.05m, BufferedCostPerBaseUnit = 0.0525m };
+
+        RawMaterialRules.ApplyBrandPrices(flour, [(price, null)]);
+
+        flour.CostPerBaseUnit.Should().Be(price);
+        flour.BufferedCostPerBaseUnit.Should().Be(0.0525m, "a fixed amount, changed only by typing it or recalculating it");
+    }
+
+    [Fact]
+    public void EnsureValidBufferedCost_rejects_a_negative_amount_only()
+    {
+        RawMaterialRules.EnsureValidBufferedCost(0m);
+        RawMaterialRules.EnsureValidBufferedCost(0.05m);
+
+        var act = () => RawMaterialRules.EnsureValidBufferedCost(-0.01m);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("Buffered cost can't be negative.");
+    }
+
     [Fact]
     public void FindDearestBrandPrice_takes_the_first_on_a_tie()
     {

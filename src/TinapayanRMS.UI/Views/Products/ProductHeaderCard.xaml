@@ -11,6 +11,11 @@
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
+        <Style x:Key="FigureSeparatorStyle" TargetType="Border">
+            <Setter Property="Width" Value="1" />
+            <Setter Property="Margin" Value="16,0" />
+            <Setter Property="Background" Value="{StaticResource CardBorderBrush}" />
+        </Style>
         <Style x:Key="FigureAmountStyle" TargetType="TextBlock" BasedOn="{StaticResource FigureValueStyle}">
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
@@ -163,15 +168,21 @@
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="24" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="24" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="24" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="24" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="1.3*" />
             </Grid.ColumnDefinitions>
+
+            <!-- A thin line between each figure and the next, as the Raw Materials header has -->
+            <Border Grid.Column="1" Grid.RowSpan="2" Style="{StaticResource FigureSeparatorStyle}" />
+            <Border Grid.Column="3" Grid.RowSpan="2" Style="{StaticResource FigureSeparatorStyle}" />
+            <Border Grid.Column="5" Grid.RowSpan="2" Style="{StaticResource FigureSeparatorStyle}" />
+            <Border Grid.Column="7" Grid.RowSpan="2" Style="{StaticResource FigureSeparatorStyle}" />
 
             <TextBlock Text="Material Cost" Style="{StaticResource FigureLabelStyle}" ToolTip="Per piece: its sub-assemblies' share and its packaging" />
             <TextBlock Grid.Row="1" Text="{Binding Costs.Material, StringFormat='₱{0:N4}'}" Style="{StaticResource FigureAmountStyle}" />
@@ -203,7 +214,7 @@
                        Grid.Column="8"
                        Text="{Binding LastUpdatedText}"
                        ToolTip="{Binding LastUpdatedText}"
-                       Style="{StaticResource FigureValueStyle}" />
+                       Style="{StaticResource FigureAmountStyle}" />
         </Grid>
     </Grid>
 </UserControl>

@@ -35,6 +35,7 @@ public class RawMaterialValidator : AbstractValidator<RawMaterial>
         When(m => m.Source == RawMaterialSource.Purchased, () =>
         {
             RuleFor(m => m.WeightLossPercent).Null().WithMessage("A purchased material has no weight loss percent.");
+            RuleFor(m => m.BufferedCostPerBaseUnit).GreaterThanOrEqualTo(0m).WithMessage("Buffered cost can't be negative.");
         });
 
         When(m => m.Source != RawMaterialSource.Linked, () =>

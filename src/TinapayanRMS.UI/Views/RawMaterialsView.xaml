@@ -13,7 +13,7 @@
         The list beside the selected material: its summary header, then its cards in tabs along
         the bottom. Each card is a UserControl in Views/RawMaterials that inherits this screen's
         DataContext; when a card shows is decided here. The list is as wide as its columns (Auto),
-        and the material's details take the rest.
+        and the material's details take the rest. Cards are 4px apart, as the page is from the window's edge.
     -->
     <Grid Background="{StaticResource PageBackgroundBrush}" Margin="4">
         <Grid.RowDefinitions>
@@ -22,7 +22,7 @@
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="4" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -35,7 +35,7 @@
 
         <rm:MaterialListCard Grid.RowSpan="2" Grid.Column="0" />
 
-        <rm:SummaryHeaderCard x:Name="SummaryHeader" Grid.Column="2" Margin="0,0,0,16" />
+        <rm:SummaryHeaderCard x:Name="SummaryHeader" Grid.Column="2" Margin="0,0,0,4" />
 
         <!--
             Every tab is part of the one form Save writes, so a new material shows them too.
@@ -46,52 +46,55 @@
             Between picking a material and its details arriving, the previous material's still
             show, and the tabs ignore the mouse (AreDetailsReady): what's in them isn't the form's.
         -->
-        <syncfusion:TabControlExt Grid.Row="1"
-                                  Grid.Column="2"
-                                  IsHitTestVisible="{Binding AreDetailsReady}"
-                                  TabStripPlacement="Bottom"
-                                  CloseButtonType="Hide"
-                                  ShowTabItemContextMenu="False"
-                                  ShowTabListContextMenu="False"
-                                  SelectedIndex="{Binding SelectedDetailsTab, Mode=TwoWay}">
-            <!-- A material is purchased (a price), made (a BOM) or linked (a share of another's cost), so one of the first three cards shows -->
-            <syncfusion:TabItemExt Header="Cost Setup" CanClose="False">
-                <!-- Full width, one card -->
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <Grid>
-                        <rm:PurchaseCostSetupCard Visibility="{Binding ShowPurchaseSetup, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        <rm:BillOfMaterialsCard Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        <rm:LinkedCostCard Visibility="{Binding IsEditingLinked, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    </Grid>
-                </ScrollViewer>
-            </syncfusion:TabItemExt>
+        <!-- In a card of its own, as on Products, so the tabs get the rounded corners the theme's square frame doesn't have -->
+        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource CardStyle}" Padding="4">
+            <!-- No frame of its own: the card around it is the frame -->
+            <syncfusion:TabControlExt IsHitTestVisible="{Binding AreDetailsReady}"
+                                      BorderThickness="0"
+                                      TabStripPlacement="Bottom"
+                                      CloseButtonType="Hide"
+                                      ShowTabItemContextMenu="False"
+                                      ShowTabListContextMenu="False"
+                                      SelectedIndex="{Binding SelectedDetailsTab, Mode=TwoWay}">
+                <!-- A material is purchased (a price), made (a BOM) or linked (a share of another's cost), so one of the first three cards shows -->
+                <syncfusion:TabItemExt Header="Cost Setup" CanClose="False">
+                    <!-- Full width, one card -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <Grid>
+                            <rm:PurchaseCostSetupCard Visibility="{Binding ShowPurchaseSetup, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <rm:BillOfMaterialsCard Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <rm:LinkedCostCard Visibility="{Binding IsEditingLinked, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </Grid>
+                    </ScrollViewer>
+                </syncfusion:TabItemExt>
 
-            <syncfusion:TabItemExt Header="Alternative Units" CanClose="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="2*" />
-                            <ColumnDefinition Width="16" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
+                <syncfusion:TabItemExt Header="Alternative Units" CanClose="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="4" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
 
-                        <rm:AlternativeUnitsCard />
-                        <rm:UnitConversionCard Grid.Column="2" />
-                    </Grid>
-                </ScrollViewer>
-            </syncfusion:TabItemExt>
+                            <rm:AlternativeUnitsCard />
+                            <rm:UnitConversionCard Grid.Column="2" />
+                        </Grid>
+                    </ScrollViewer>
+                </syncfusion:TabItemExt>
 
-            <syncfusion:TabItemExt Header="Usage Example" CanClose="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <rm:UsageExampleCard />
-                </ScrollViewer>
-            </syncfusion:TabItemExt>
+                <syncfusion:TabItemExt Header="Usage Example" CanClose="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <rm:UsageExampleCard />
+                    </ScrollViewer>
+                </syncfusion:TabItemExt>
 
-            <syncfusion:TabItemExt Header="Price History"
-                                   CanClose="False"
-                                   Visibility="{Binding ShowPriceHistory, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <rm:PriceHistoryCard />
-            </syncfusion:TabItemExt>
-        </syncfusion:TabControlExt>
+                <syncfusion:TabItemExt Header="Price History"
+                                       CanClose="False"
+                                       Visibility="{Binding ShowPriceHistory, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <rm:PriceHistoryCard />
+                </syncfusion:TabItemExt>
+            </syncfusion:TabControlExt>
+        </Border>
     </Grid>
 </UserControl>

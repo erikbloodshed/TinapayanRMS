@@ -98,8 +98,6 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.4*" />
-                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -109,23 +107,15 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource TileLabelStyle}" />
-                    <syncfusion:SfTextBoxExt x:Name="NameTextBox"
-                                             Grid.Row="1"
-                                             Grid.Column="0"
-                                             Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             LostFocus="NameTextBox_LostFocus" />
-
                     <!-- An ingredient is always in grams; packaging picks its own base unit -->
-                    <Border Grid.Column="1" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
-                    <TextBlock Grid.Column="2" Text="Base Unit" Style="{StaticResource TileLabelStyle}" />
+                    <TextBlock Grid.Column="0" Text="Base Unit" Style="{StaticResource TileLabelStyle}" />
                     <TextBlock Grid.Row="1"
-                               Grid.Column="2"
+                               Grid.Column="0"
                                Text="gram (g)"
                                Style="{StaticResource TileValueStyle}"
                                Visibility="{Binding IsEditingIngredient, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <syncfusion:ComboBoxAdv Grid.Row="1"
-                                            Grid.Column="2"
+                                            Grid.Column="0"
                                             ItemsSource="{Binding UnitsOfMeasure}"
                                             DisplayMemberPath="Name"
                                             SelectedItem="{Binding EditingBaseUnit, Mode=TwoWay}"
@@ -133,38 +123,45 @@
                                             ToolTip="Fixed once the material has alternative units, prices or packaging lines."
                                             Visibility="{Binding IsEditingPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                    <Border Grid.Column="3" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
-                    <TextBlock Grid.Column="4" Text="Current Cost per Base Unit" Style="{StaticResource TileLabelStyle}" />
+                    <Border Grid.Column="1" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
+                    <!-- The saved costs, in the unit picked as Per in the Purchase Cost Setup -->
+                    <TextBlock Grid.Column="2" Style="{StaticResource TileLabelStyle}">
+                        <Run Text="Current Cost per" /> <Run Text="{Binding HeaderCostUnitText, Mode=OneWay}" />
+                    </TextBlock>
                     <TextBlock Grid.Row="1"
-                               Grid.Column="4"
+                               Grid.Column="2"
                                Style="{StaticResource TileValueStyle}"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Text="{Binding CurrentCostText}" />
 
                     <!-- The cost with the buffer on top: what recipes and products are costed with -->
-                    <Border Grid.Column="5" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
-                    <TextBlock Grid.Column="6" Text="Buffered Cost" Style="{StaticResource TileLabelStyle}" />
+                    <Border Grid.Column="3" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
+                    <TextBlock Grid.Column="4" Style="{StaticResource TileLabelStyle}">
+                        <Run Text="Buffered Cost per" /> <Run Text="{Binding HeaderCostUnitText, Mode=OneWay}" />
+                    </TextBlock>
                     <TextBlock Grid.Row="1"
-                               Grid.Column="6"
+                               Grid.Column="4"
                                Style="{StaticResource TileValueStyle}"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Text="{Binding BufferedCostText}" />
 
-                    <Border Grid.Column="7" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
-                    <TextBlock Grid.Column="8" Text="Last Updated" Style="{StaticResource TileLabelStyle}" />
-                    <TextBlock Grid.Row="1" Grid.Column="8" Text="{Binding LastUpdatedText}" Style="{StaticResource TileValueStyle}" />
+                    <Border Grid.Column="5" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
+                    <TextBlock Grid.Column="6" Text="Last Updated" Style="{StaticResource TileLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="6" Text="{Binding LastUpdatedText}" Style="{StaticResource TileValueStyle}" />
                 </Grid>
             </Border>
 
-            <!-- Labels in the first row, fields in the second. Packaging is always purchased; only an ingredient can be made. -->
+            <!-- Labels in the first row, fields in the second: Name first. Packaging is always purchased; only an ingredient can be made. -->
             <Grid Margin="0,12,0,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.5*" />
+                    <ColumnDefinition Width="16" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="16" />
                     <ColumnDefinition Width="*" />
@@ -174,17 +171,24 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" Text="Type" Style="{StaticResource FieldLabelStyle}" />
+                <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:SfTextBoxExt x:Name="NameTextBox"
+                                         Grid.Row="1"
+                                         Grid.Column="0"
+                                         Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         LostFocus="NameTextBox_LostFocus" />
+
+                <TextBlock Grid.Column="2" Text="Type" Style="{StaticResource FieldLabelStyle}" />
                 <syncfusion:ComboBoxAdv Grid.Row="1"
-                                        Grid.Column="0"
+                                        Grid.Column="2"
                                         ItemsSource="{Binding Types}"
                                         SelectedItem="{Binding EditingType, Mode=TwoWay}"
                                         IsEnabled="{Binding CanChangeTypeAndSource}"
                                         ToolTip="Ingredients go in recipes; packaging goes on a product's packaging lines. Fixed once saved." />
 
-                <TextBlock Grid.Column="2" Text="Category" Style="{StaticResource FieldLabelStyle}" />
+                <TextBlock Grid.Column="4" Text="Category" Style="{StaticResource FieldLabelStyle}" />
                 <syncfusion:ComboBoxAdv Grid.Row="1"
-                                        Grid.Column="2"
+                                        Grid.Column="4"
                                         ItemsSource="{Binding CategoryOptions}"
                                         DisplayMemberPath="Name"
                                         ItemContainerStyle="{StaticResource CategoryOptionStyle}"
@@ -192,23 +196,23 @@
                                         Text="{Binding CategorySearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                         ToolTip="Pick a category, or &quot;&lt; Add New .. &gt;&quot; to name one now." />
 
-                <TextBlock Grid.Column="4"
+                <TextBlock Grid.Column="6"
                            Text="Source"
                            Style="{StaticResource FieldLabelStyle}"
                            Visibility="{Binding IsEditingIngredient, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <syncfusion:ComboBoxAdv Grid.Row="1"
-                                        Grid.Column="4"
+                                        Grid.Column="6"
                                         ItemsSource="{Binding Sources}"
                                         SelectedItem="{Binding EditingSource, Mode=TwoWay}"
                                         IsEnabled="{Binding CanChangeTypeAndSource}"
                                         Visibility="{Binding IsEditingIngredient, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                <TextBlock Grid.Column="6"
+                <TextBlock Grid.Column="8"
                            Text="Weight Loss %"
                            Style="{StaticResource FieldLabelStyle}"
                            Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <syncfusion:DoubleTextBox Grid.Row="1"
-                                          Grid.Column="6"
+                                          Grid.Column="8"
                                           Value="{Binding EditingWeightLossPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </Grid>

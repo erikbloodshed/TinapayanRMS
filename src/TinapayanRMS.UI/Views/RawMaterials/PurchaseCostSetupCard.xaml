@@ -3,27 +3,78 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
-    <Border Style="{StaticResource CardStyle}">
+    <!-- No frame of its own: it sits straight in its tab, whose card has the border and rounded corners -->
+    <Border Padding="12">
         <StackPanel>
             <TextBlock Text="Purchase Cost Setup" Style="{StaticResource SectionHeaderStyle}" />
 
-            <!-- One buffer for the whole material: every brand's Cost Buffer column follows it -->
+            <!--
+                One fixed buffered cost for the whole material, which brand prices don't move: typed, or recalculated from the
+                dearest brand with the buffer % on top. The two follow each other as they're typed: the % gives the dearest brand
+                with it on top, and the Buffered Cost gives what it is over the dearest brand. Every brand's Buffer % column says
+                how far it is over that brand's price. It's kept per base unit; the box shows it in the unit picked beside it,
+                to the centavo, and what's typed isn't rounded.
+            -->
             <Grid Margin="0,0,0,12">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="6" />
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <TextBlock Grid.Column="0" Text="Cost Buffer %" Style="{StaticResource FieldLabelStyle}" />
                 <syncfusion:DoubleTextBox Grid.Row="1"
                                           Grid.Column="0"
-                                          Value="{Binding EditingCostBufferPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                          ToolTip="A cushion on top of the cost for price swings, waste and yield variation. Recipes and products are costed with the buffered cost." />
+                                          Value="{Binding TypedCostBufferPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          ToolTip="The cushion on top of the dearest brand, for price swings, waste and yield variation. Typing it works out the Buffered Cost; typing the Buffered Cost works it out." />
+                <TextBlock Grid.Column="2" Text="Buffered Cost (₱)" Style="{StaticResource FieldLabelStyle}" />
+                <!-- Updated when focus leaves, since the value it shows back is rounded to the centavo -->
+                <syncfusion:DoubleTextBox Grid.Row="1"
+                                          Grid.Column="2"
+                                          Value="{Binding EditingBufferedCostInUnit, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                          NumberDecimalDigits="-1"
+                                          MinimumNumberDecimalDigits="2"
+                                          MaximumNumberDecimalDigits="10"
+                                          MinValue="0"
+                                          UseNullOption="True"
+                                          ToolTip="A fixed amount recipes and products are costed with. New brand prices don't move it; Recalculate does." />
+                <TextBlock Grid.Column="4" Text="Per" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:ComboBoxAdv Grid.Row="1"
+                                        Grid.Column="4"
+                                        ItemsSource="{Binding BufferedCostUnitOptions}"
+                                        DisplayMemberPath="Name"
+                                        SelectedItem="{Binding BufferedCostUnit, Mode=TwoWay}"
+                                        ToolTip="The unit the buffered cost is shown and typed in. It's kept per base unit either way." />
+                <syncfusion:ButtonAdv Grid.Row="0"
+                                      Grid.RowSpan="2"
+                                      Grid.Column="6"
+                                      VerticalAlignment="Bottom"
+                                      Label="Recalculate"
+                                      IconTemplate="{StaticResource CalculateIconTemplate}"
+                                      Command="{Binding RecalculateBufferCommand}"
+                                      ToolTip="Sets the buffered cost to the dearest brand with the Cost Buffer % on top." />
+                <TextBlock Grid.Row="2"
+                           Grid.ColumnSpan="7"
+                           Margin="0,6,0,0"
+                           Text="{Binding PurchaseBufferedCostText}"
+                           Foreground="{StaticResource MutedForegroundBrush}"
+                           TextWrapping="Wrap" />
+                <TextBlock Grid.Row="3"
+                           Grid.ColumnSpan="7"
+                           Margin="0,4,0,0"
+                           Text="{Binding BufferedCostWarningText}"
+                           Foreground="{StaticResource WarningForegroundBrush}"
+                           TextWrapping="Wrap" />
             </Grid>
 
             <!--
@@ -83,7 +134,8 @@
                                             AllowNullValue="True"
                                             controls:GridCellEditing.AllowWhen="CanTypeQuantity" />
                     <controls:NumericColumn MappingName="Price" HeaderText="Purchase Price (₱)" NumberDecimalDigits="2" AllowNullValue="True" />
-                    <controls:NumericColumn MappingName="BufferedPrice" HeaderText="Cost Buffer (₱)" NumberDecimalDigits="2" AllowNullValue="True" AllowEditing="False" />
+                    <!-- How far the buffered cost is over this brand's price -->
+                    <controls:NumericColumn MappingName="BufferPercent" HeaderText="Buffer %" NumberDecimalDigits="2" AllowNullValue="True" AllowEditing="False" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
 

@@ -131,10 +131,12 @@ public class RawMaterialBrandPriceRepository(
             .Select(p => new { p.Brand, p.UnitId, p.Price, BaseUnitsPerUnit = p.Unit == null ? (decimal?)null : p.Unit.BaseUnitsPerUnit })
             .ToListAsync(cancellationToken);
 
+        // The buffered cost only moves here on a first pricing, or back to 0 with the last price gone.
+        var bufferedBefore = material.BufferedCostPerBaseUnit;
         var dearest = RawMaterialRules.ApplyBrandPrices(material, [.. brandPrices.Select(p => (p.Price, p.BaseUnitsPerUnit))]);
         if (material.CostPerBaseUnit == costBefore)
         {
-            return false;
+            return material.BufferedCostPerBaseUnit != bufferedBefore && material.Type == RawMaterialType.Ingredient;
         }
 
         // Nothing to log when the last price went: the material is simply unpriced again.

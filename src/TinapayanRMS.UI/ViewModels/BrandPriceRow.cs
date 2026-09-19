@@ -78,7 +78,7 @@ public sealed class BrandPriceRow : ReactiveObject
         set
         {
             this.RaiseAndSetIfChanged(ref _price, value);
-            this.RaisePropertyChanged(nameof(BufferedPrice));
+            this.RaisePropertyChanged(nameof(BufferPercent));
         }
     }
 
@@ -109,21 +109,30 @@ public sealed class BrandPriceRow : ReactiveObject
     public bool CanTypeQuantity =>
         UnitKey is { } key && key != PurchaseUnitChoice.BaseUnitKey && _host?.FindUnit(key) is { Id: 0 };
 
-    /// <summary>The price with the material's buffer on top, to the centavo: ₱930 with a 5% buffer is ₱976.50.</summary>
-    public decimal? BufferedPrice =>
-        Price is { } price ? Math.Round(RawMaterialRules.BufferedCost(price, _host?.CostBufferPercent ?? 0m), 2) : null;
+    /// <summary>
+    /// How far the material's buffered cost is over this brand's price, in percent: the buffered cost for one of the row's
+    /// unit, less the price, over the price. ₱976.50 a sack over ₱930 is 5%; a cheaper brand's is higher. Empty until the
+    /// material has a buffered cost (or a price for Save to work one out from), and until the row has a price and a quantity.
+    /// </summary>
+    public decimal? BufferPercent =>
+        _host?.BufferedCostPerBaseUnit is { } buffered && Quantity is > 0 && Price is > 0
+            ? RawMaterialRules.CostBufferPercentOf(Price.Value, buffered * Quantity.Value)
+            : null;
 
     /// <summary>What the price comes to per base unit, once there's a price and a quantity.</summary>
     public decimal? CostPerBaseUnit =>
         Price is > 0 && Quantity is > 0 ? UnitConversionRules.CostPerBaseUnit(Price.Value, Quantity) : null;
 
-    /// <summary>Shows the screen's current units and buffer: after a unit's multiplier changes, or the buffer.</summary>
+    /// <summary>Shows the screen's current units and buffered cost: after a unit's multiplier changes, or the buffered cost.</summary>
     public void Refresh()
     {
         this.RaisePropertyChanged(nameof(Quantity));
         this.RaisePropertyChanged(nameof(CanTypeQuantity));
-        this.RaisePropertyChanged(nameof(BufferedPrice));
+        this.RaisePropertyChanged(nameof(BufferPercent));
     }
+
+    /// <summary>Shows the screen's current buffered cost, which moves with the prices while Save is still to work it out.</summary>
+    public void RefreshBufferPercent() => this.RaisePropertyChanged(nameof(BufferPercent));
 }
 
 /// <summary>What a <see cref="BrandPriceRow"/> needs from the screen it's on.</summary>
@@ -135,8 +144,11 @@ public interface IBrandPriceRowHost
     /// <summary>Sets a not-yet-saved alternative unit's multiplier, typed as the row's quantity.</summary>
     void SetMultiplier(int unitOfMeasureId, decimal baseUnitsPerUnit);
 
-    /// <summary>The form's cost buffer.</summary>
-    decimal CostBufferPercent { get; }
+    /// <summary>
+    /// The form's fixed buffered cost per base unit, or while it has none, what Save will work out from the dearest
+    /// brand and the buffer percent; null while there's neither.
+    /// </summary>
+    decimal? BufferedCostPerBaseUnit { get; }
 
     /// <summary>A unit was picked on the row: one the material doesn't have yet is added as an alternative unit.</summary>
     void OnUnitPicked(BrandPriceRow row);

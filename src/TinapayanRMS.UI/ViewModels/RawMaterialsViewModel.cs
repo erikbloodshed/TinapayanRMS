@@ -368,6 +368,94 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         set => this.RaiseAndSetIfChanged(ref _editingCostBufferPercent, value);
     }
 
+    /// <summary>
+    /// The Cost Buffer % box. Typing it works the buffered cost out afresh: the dearest brand, as the grid now is, with
+    /// the percent on top (nothing to work out from while no brand is priced). Loading a material sets
+    /// EditingCostBufferPercent itself, so the saved buffered cost stays as it was.
+    /// </summary>
+    public decimal? TypedCostBufferPercent
+    {
+        get => EditingCostBufferPercent;
+        set
+        {
+            EditingCostBufferPercent = value;
+            if (DearestLiveCost() is { } dearest)
+            {
+                EditingBufferedCost = RawMaterialRules.BufferedCost(dearest, value ?? 0m);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Purchased only: the fixed buffered cost per base unit, which brand prices don't move. Typed, worked out from the
+    /// dearest brand when the percent is typed, or by Recalculate; a cleared box saves as 0, which Save then works out
+    /// afresh from the prices (as for a material's first price).
+    /// </summary>
+    private decimal? _editingBufferedCost;
+    public decimal? EditingBufferedCost
+    {
+        get => _editingBufferedCost;
+        set => this.RaiseAndSetIfChanged(ref _editingBufferedCost, value);
+    }
+
+    /// <summary>
+    /// The units the buffered cost can be shown and typed in: the base unit, then the form's alternative units that have
+    /// a multiplier. Left alone when nothing changed, so the picker keeps its selection.
+    /// </summary>
+    public ObservableCollection<PurchaseUnitChoice> BufferedCostUnitOptions { get; } = [];
+
+    private PurchaseUnitChoice? _bufferedCostUnit;
+    /// <summary>
+    /// The unit the Buffered Cost box is in, for show only: the buffered cost is kept per base unit. It starts on the
+    /// dearest brand's unit, and falls back to the base unit when its unit goes.
+    /// </summary>
+    public PurchaseUnitChoice? BufferedCostUnit
+    {
+        get => _bufferedCostUnit;
+        set
+        {
+            // While the choices are replaced, the picker writes back an empty pick; the rebuild sets the pick itself.
+            if (_rebuildingBufferedCostUnits)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _bufferedCostUnit, value);
+            UpdatePurchaseCostTexts();
+        }
+    }
+
+    /// <summary>
+    /// Set while RebuildBufferedCostUnitOptions replaces the choices. Clearing them makes the picker write back an empty
+    /// pick, whose texts update would rebuild the choices again, halfway through, until the stack overflowed.
+    /// </summary>
+    private bool _rebuildingBufferedCostUnits;
+
+    /// <summary>
+    /// EditingBufferedCost in BufferedCostUnit, rounded to the centavo for show: ₱0.0518948/g is ₱1,297.37 a 25 kg bag.
+    /// What's typed is divided back to the base unit at full precision, so it isn't rounded, and the Cost Buffer % becomes
+    /// what it is over the dearest brand, to the 4 decimals the percent keeps: ₱1,300 a bag over ₱1,250 is 4%.
+    /// </summary>
+    public decimal? EditingBufferedCostInUnit
+    {
+        get => EditingBufferedCost is { } cost ? Math.Round(cost * BufferedCostUnitSize(), 2) : null;
+        set
+        {
+            EditingBufferedCost = value is { } typed ? typed / BufferedCostUnitSize() : null;
+            if (EditingBufferedCost is { } buffered && DearestLiveCost() is { } dearest)
+            {
+                EditingCostBufferPercent = Math.Round(RawMaterialRules.CostBufferPercentOf(dearest, buffered), 4);
+            }
+        }
+    }
+
+    /// <summary>How many base units BufferedCostUnit holds: 1 for the base unit.</summary>
+    private decimal BufferedCostUnitSize() =>
+        BufferedCostUnit is { Key: not PurchaseUnitChoice.BaseUnitKey } unit
+        && UnitRows.FirstOrDefault(r => r.Unit.UnitOfMeasureId == unit.Key)?.Unit is { BaseUnitsPerUnit: > 0 } row
+            ? row.BaseUnitsPerUnit
+            : 1m;
+
     /// <summary>Packaging only; an ingredient's base unit is always the gram.</summary>
     private UnitOfMeasure? _editingBaseUnit;
     public UnitOfMeasure? EditingBaseUnit
@@ -451,13 +539,32 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
     private readonly ObservableAsPropertyHelper<string> _baseUnitAbbreviation;
     public string BaseUnitAbbreviation => _baseUnitAbbreviation.Value;
 
-    private readonly ObservableAsPropertyHelper<string> _currentCostText;
-    /// <summary>E.g. "₱0.0372", or "—" for a material not saved yet.</summary>
-    public string CurrentCostText => _currentCostText.Value;
+    private string _currentCostText = "—";
+    /// <summary>
+    /// The saved cost in the Purchase Cost Setup's Per unit (BufferedCostUnit): "₱0.0372" a gram, to 4 decimals, or
+    /// "₱930.00" a bag, to 2; "—" for a material not saved yet.
+    /// </summary>
+    public string CurrentCostText
+    {
+        get => _currentCostText;
+        private set => this.RaiseAndSetIfChanged(ref _currentCostText, value);
+    }
 
-    private readonly ObservableAsPropertyHelper<string> _bufferedCostText;
-    /// <summary>The saved cost with the buffer on top, e.g. "₱0.0391", or "—" for a material not saved yet.</summary>
-    public string BufferedCostText => _bufferedCostText.Value;
+    private string _bufferedCostText = "—";
+    /// <summary>The saved buffered cost, as CurrentCostText: "₱0.0391" a gram, "₱976.50" a bag, or "—" for a material not saved yet.</summary>
+    public string BufferedCostText
+    {
+        get => _bufferedCostText;
+        private set => this.RaiseAndSetIfChanged(ref _bufferedCostText, value);
+    }
+
+    private string _headerCostUnitText = "g";
+    /// <summary>The unit the header's costs are in, for their labels: the Per unit's abbreviation, e.g. "g" or "bag".</summary>
+    public string HeaderCostUnitText
+    {
+        get => _headerCostUnitText;
+        private set => this.RaiseAndSetIfChanged(ref _headerCostUnitText, value);
+    }
 
     /// <summary>The latest price's date, or "—" for an unpriced or made material.</summary>
     private string _lastUpdatedText = "—";
@@ -524,11 +631,27 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
     }
 
     private string _purchaseBufferedCostText = string.Empty;
-    /// <summary>PurchaseCostText with EditingCostBufferPercent on top, e.g. "Buffered (5%): ₱0.0391", or empty while unpriced.</summary>
+    /// <summary>What EditingBufferedCost comes to over the dearest brand, e.g. "₱0.0391/g is 5.11% over the dearest brand's ₱0.0372/g.", or empty while unpriced.</summary>
     public string PurchaseBufferedCostText
     {
         get => _purchaseBufferedCostText;
         private set => this.RaiseAndSetIfChanged(ref _purchaseBufferedCostText, value);
+    }
+
+    private string _bufferedCostWarningText = string.Empty;
+    /// <summary>Set while the dearest brand costs more per base unit than EditingBufferedCost, so the buffer has been eaten up; empty otherwise.</summary>
+    public string BufferedCostWarningText
+    {
+        get => _bufferedCostWarningText;
+        private set => this.RaiseAndSetIfChanged(ref _bufferedCostWarningText, value);
+    }
+
+    private decimal? _dearestPurchaseCost;
+    /// <summary>The dearest brand per base unit as the grid is typed into, which Recalculate puts the buffer on; null while unpriced.</summary>
+    public decimal? DearestPurchaseCost
+    {
+        get => _dearestPurchaseCost;
+        private set => this.RaiseAndSetIfChanged(ref _dearestPurchaseCost, value);
     }
 
     private string _purchaseCostSourceText = string.Empty;
@@ -595,6 +718,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
     public ReactiveCommand<RxVoid, RxVoid> CalculateExampleCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeletePriceCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveBrandPriceCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> RecalculateBufferCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveBomLineCommand { get; }
 
     /// <summary>
@@ -763,13 +887,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
                 (type, baseUnit) => BaseUnitText.AbbreviationOf(type, baseUnit))
             .ToProperty(this, x => x.BaseUnitAbbreviation, "g");
 
-        _currentCostText = this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Select(material => material is null ? "—" : $"₱{material.CostPerBaseUnit:N4}")
-            .ToProperty(this, x => x.CurrentCostText, "—");
-
-        _bufferedCostText = this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Select(material => material is null ? "—" : $"₱{material.BufferedCostPerBaseUnit:N4}")
-            .ToProperty(this, x => x.BufferedCostText, "—");
+        // The header's saved costs; a new Per unit, or a unit's multiplier, updates them through UpdatePurchaseCostTexts.
+        this.WhenAnyValue(x => x.SelectedRawMaterial)
+            .Subscribe(_ => UpdateHeaderCostTexts());
 
         // The summary follows the grid as it's typed into: the dearest brand, as Save will cost the material.
         BrandPriceRows.ToObservableChangeSet()
@@ -778,10 +898,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
             .AutoRefresh(r => r.Brand)
             .Subscribe(_ => UpdatePurchaseCostTexts());
 
-        // Each brand's buffered price follows the buffer.
-        this.WhenAnyValue(x => x.EditingCostBufferPercent)
+        // Each brand's buffered price follows the fixed buffered cost. The percent doesn't move it: it only feeds Recalculate.
+        this.WhenAnyValue(x => x.EditingBufferedCost, x => x.EditingCostBufferPercent)
             .Subscribe(_ =>
             {
+                this.RaisePropertyChanged(nameof(TypedCostBufferPercent));
                 RefreshBrandPriceRows();
                 UpdatePurchaseCostTexts();
             });
@@ -946,6 +1067,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
                 CostBufferPercent = source == RawMaterialSource.Linked
                     ? EditingLinkedTo?.CostBufferPercent ?? 0m
                     : EditingCostBufferPercent ?? 0m,
+                // Only a purchased material's is the form's; a made or linked one's is worked out by the cascade.
+                BufferedCostPerBaseUnit = source == RawMaterialSource.Purchased ? EditingBufferedCost ?? 0m : 0m,
             };
 
             var validation = _rawMaterialValidator.Validate(material);
@@ -1050,7 +1173,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
                     BaseUnitText.AbbreviationOf(material),
                     material.CostPerBaseUnit,
                     baseQuantity * material.CostPerBaseUnit,
-                    material.CostBufferPercent,
+                    // What the fixed buffered cost comes to over the cost, which drifts from the percent as prices move.
+                    material.CostPerBaseUnit > 0
+                        ? Math.Round(RawMaterialRules.CostBufferPercentOf(material.CostPerBaseUnit, material.BufferedCostPerBaseUnit), 2)
+                        : material.CostBufferPercent,
                     baseQuantity * material.BufferedCostPerBaseUnit);
             },
             this.WhenAnyValue(x => x.ExampleRawMaterial, x => x.ExampleUnit, x => x.ExampleQuantity,
@@ -1077,16 +1203,20 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
             },
             this.WhenAnyValue(x => x.SelectedBrandPriceRow).Select(row => row is not null));
 
+        // Re-initialises the fixed buffered cost from the dearest brand, as typed, with the buffer percent on top. Save keeps it.
+        RecalculateBufferCommand = ReactiveCommand.Create(
+            () => { EditingBufferedCost = RawMaterialRules.BufferedCost(DearestPurchaseCost!.Value, EditingCostBufferPercent ?? 0m); },
+            this.WhenAnyValue(x => x.DearestPurchaseCost).Select(cost => cost is not null));
+
         RemoveBomLineCommand = ReactiveCommand.Create(
             () => { BomLineEdits.Remove(SelectedBomLineEdit!); },
             this.WhenAnyValue(x => x.SelectedBomLineEdit).Select(line => line is not null));
     }
 
     /// <summary>
-    /// "Egg costs ₱0.0900/g before its 10% buffer. At 70% of its weight for 30% of its cost, this costs ₱0.0386/g, buffered ₱0.0424/g."
-    /// Worked out with the same rules the cascade saves with, from the linked-to ingredient's stored true cost
-    /// and buffer: the cost share is of the unbuffered cost, and the linked-to ingredient's buffer percent,
-    /// which the part inherits, goes on top.
+    /// "Egg costs ₱0.0900/g, buffered ₱0.0990/g. At 70% of its weight for 30% of its cost, this costs ₱0.0386/g, buffered ₱0.0424/g."
+    /// Worked out with the same rule the cascade saves with, from the linked-to ingredient's stored costs: the
+    /// same share of its true cost and of its (fixed) buffered cost.
     /// </summary>
     private static string LinkedCostPreview(RawMaterial? linkedTo, decimal? weightShare, decimal? costShare)
     {
@@ -1095,14 +1225,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
             return "Pick the ingredient this one is a part of.";
         }
 
-        var linkedToText = $"{linkedTo.Name} costs ₱{linkedTo.CostPerBaseUnit:N4}/g before its {linkedTo.CostBufferPercent:0.##}% buffer.";
+        var linkedToText = $"{linkedTo.Name} costs ₱{linkedTo.CostPerBaseUnit:N4}/g, buffered ₱{linkedTo.BufferedCostPerBaseUnit:N4}/g.";
         if (weightShare is not (> 0 and <= 100) || costShare is not (> 0 and <= 100))
         {
             return $"{linkedToText} Enter this part's share of its weight and of its cost.";
         }
 
         var cost = RawMaterialRules.LinkedCost(linkedTo.CostPerBaseUnit, weightShare.Value, costShare.Value);
-        var buffered = RawMaterialRules.BufferedCost(cost, linkedTo.CostBufferPercent);
+        var buffered = RawMaterialRules.LinkedCost(linkedTo.BufferedCostPerBaseUnit, weightShare.Value, costShare.Value);
         return $"{linkedToText} At {weightShare:0.##}% of its weight for {costShare:0.##}% of its cost, this costs ₱{cost:N4}/g, buffered ₱{buffered:N4}/g.";
     }
 
@@ -1153,6 +1283,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         EditingWeightSharePercent = null;
         EditingCostSharePercent = null;
         EditingCostBufferPercent = 0m;
+        EditingBufferedCost = null;
         EditingBaseUnit = null;
         ExampleRawMaterial = null;
         ClearDetails();
@@ -1171,6 +1302,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         EditingWeightSharePercent = material.WeightSharePercent;
         EditingCostSharePercent = material.CostSharePercent;
         EditingCostBufferPercent = material.CostBufferPercent;
+        EditingBufferedCost = material.BufferedCostPerBaseUnit;
         EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId);
     }
 
@@ -1270,7 +1402,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         _savedBrandPriceCount = detail.BrandPrices.Count;
 
         UpdateCanChangeBaseUnit();
-        UpdatePurchaseCostTexts();
+        RebuildBufferedCostUnitOptions();
+        BufferedCostUnit = DearestBrandUnit();
         _detailMaterialId = material?.Id;
         AreDetailsReady = true;
     }
@@ -1457,7 +1590,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         }
     }
 
-    decimal IBrandPriceRowHost.CostBufferPercent => EditingCostBufferPercent ?? 0m;
+    decimal? IBrandPriceRowHost.BufferedCostPerBaseUnit =>
+        EditingBufferedCost is > 0 ? EditingBufferedCost
+        : DearestLiveCost() is { } cost ? RawMaterialRules.BufferedCost(cost, EditingCostBufferPercent ?? 0m)
+        : null;
 
     /// <summary>
     /// What picking a unit on a brand row does: one the material doesn't have yet is added as an alternative unit, with its
@@ -1518,22 +1654,120 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         }
     }
 
-    /// <summary>The summary under the grid: the dearest brand per base unit, as Save will cost the material, with the buffer on top.</summary>
+    /// <summary>
+    /// The header's saved costs in the Per unit: to 4 decimals on the base unit, whose costs are fractions of a centavo,
+    /// and to the centavo on any other.
+    /// </summary>
+    private void UpdateHeaderCostTexts()
+    {
+        var onBaseUnit = BufferedCostUnit is null or { Key: PurchaseUnitChoice.BaseUnitKey };
+        var size = BufferedCostUnitSize();
+        string Format(decimal costPerBaseUnit) => onBaseUnit ? $"₱{costPerBaseUnit:N4}" : $"₱{costPerBaseUnit * size:N2}";
+
+        HeaderCostUnitText = BufferedCostUnit?.Abbreviation ?? BaseUnitAbbreviation;
+        CurrentCostText = SelectedRawMaterial is { } material ? Format(material.CostPerBaseUnit) : "—";
+        BufferedCostText = SelectedRawMaterial is { } saved ? Format(saved.BufferedCostPerBaseUnit) : "—";
+    }
+
+    /// <summary>
+    /// The Buffered Cost unit picker's choices: the base unit, then each alternative unit with a multiplier. A picked unit
+    /// that's gone is swapped for the base unit; one that's still there is kept, as the new list's own copy.
+    /// </summary>
+    private void RebuildBufferedCostUnitOptions()
+    {
+        List<PurchaseUnitChoice> choices =
+        [
+            new(PurchaseUnitChoice.BaseUnitKey, BaseUnitName, BaseUnitAbbreviation),
+            .. UnitRows
+                .Where(r => r.Unit is { UnitOfMeasureId: > 0, BaseUnitsPerUnit: > 0 } && FindUnitOfMeasure(r.Unit.UnitOfMeasureId) is not null)
+                .Select(r => FindUnitOfMeasure(r.Unit.UnitOfMeasureId)!)
+                .Select(u => new PurchaseUnitChoice(u.Id, u.Name, u.Abbreviation)),
+        ];
+
+        if (choices.SequenceEqual(BufferedCostUnitOptions))
+        {
+            return;
+        }
+
+        var picked = BufferedCostUnit;
+        _rebuildingBufferedCostUnits = true;
+        try
+        {
+            BufferedCostUnitOptions.Clear();
+            BufferedCostUnitOptions.AddRange(choices);
+            _bufferedCostUnit = choices.FirstOrDefault(c => c.Key == picked?.Key) ?? choices[0];
+            this.RaisePropertyChanged(nameof(BufferedCostUnit));
+        }
+        finally
+        {
+            _rebuildingBufferedCostUnits = false;
+        }
+    }
+
+    /// <summary>The unit of the dearest brand as the grid now is, among the picker's choices; the base unit while unpriced.</summary>
+    private PurchaseUnitChoice DearestBrandUnit()
+    {
+        var priced = BrandPriceRows.Where(r => r.CostPerBaseUnit is not null).ToList();
+        var key = RawMaterialRules.FindDearestBrandPrice([.. priced.Select(r => (r.Price!.Value, r.Quantity))]) is { } dearest
+            ? priced[dearest].UnitKey
+            : null;
+        return BufferedCostUnitOptions.FirstOrDefault(c => c.Key == key) ?? BufferedCostUnitOptions[0];
+    }
+
+    /// <summary>The dearest brand per base unit as the grid now is, which is what Save costs the material at; null while unpriced.</summary>
+    private decimal? DearestLiveCost()
+    {
+        var priced = BrandPriceRows.Where(r => r.CostPerBaseUnit is not null).ToList();
+        return RawMaterialRules.FindDearestBrandPrice([.. priced.Select(r => (r.Price!.Value, r.Quantity))]) is { } dearest
+            ? priced[dearest].CostPerBaseUnit
+            : null;
+    }
+
+    /// <summary>
+    /// The summary of the grid: the dearest brand per base unit, as Save will cost the material, and what the fixed
+    /// buffered cost comes to over it.
+    /// </summary>
     private void UpdatePurchaseCostTexts()
     {
+        foreach (var row in BrandPriceRows)
+        {
+            row.RefreshBufferPercent();
+        }
+
+        RebuildBufferedCostUnitOptions();
+        this.RaisePropertyChanged(nameof(EditingBufferedCostInUnit));
+        UpdateHeaderCostTexts();
+
         var priced = BrandPriceRows.Where(r => r.CostPerBaseUnit is not null).ToList();
         if (RawMaterialRules.FindDearestBrandPrice([.. priced.Select(r => (r.Price!.Value, r.Quantity))]) is not { } dearest)
         {
+            DearestPurchaseCost = null;
             PurchaseCostText = "—";
             PurchaseBufferedCostText = string.Empty;
+            BufferedCostWarningText = string.Empty;
             PurchaseCostSourceText = string.Empty;
             return;
         }
 
         var cost = priced[dearest].CostPerBaseUnit!.Value;
-        var buffer = EditingCostBufferPercent ?? 0m;
+        var unit = BufferedCostUnit?.Abbreviation ?? BaseUnitAbbreviation;
+        var size = BufferedCostUnitSize();
+        DearestPurchaseCost = cost;
         PurchaseCostText = $"₱{cost:N4}";
-        PurchaseBufferedCostText = $"Buffered ({buffer:0.##}%): ₱{RawMaterialRules.BufferedCost(cost, buffer):N4}";
+        if (EditingBufferedCost is > 0 and var buffered)
+        {
+            var over = RawMaterialRules.CostBufferPercentOf(cost, buffered);
+            PurchaseBufferedCostText = $"₱{buffered * size:N2}/{unit} is {over:0.##}% over the dearest brand's ₱{cost * size:N2}/{unit}.";
+            BufferedCostWarningText = buffered < cost
+                ? "The dearest brand now costs more than the buffered cost. Recalculate to put the buffer back on top."
+                : string.Empty;
+        }
+        else
+        {
+            PurchaseBufferedCostText = $"Save works it out as ₱{RawMaterialRules.BufferedCost(cost, EditingCostBufferPercent ?? 0m) * size:N2}/{unit}, the dearest brand with the buffer on top.";
+            BufferedCostWarningText = string.Empty;
+        }
+
         PurchaseCostSourceText = priced.Count > 1
             ? $"From {RawMaterialRules.NormalizeBrand(priced[dearest].Brand) ?? "the unnamed brand"}, the dearest of {priced.Count} brands."
             : string.Empty;

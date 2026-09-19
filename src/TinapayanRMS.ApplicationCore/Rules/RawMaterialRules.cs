@@ -102,9 +102,9 @@ public static class RawMaterialRules
     /// <summary>
     /// A linked part's cost per base unit: the linked-to ingredient's, times the share of its cost the part
     /// carries, over the share of its weight the part is. An egg at ₱0.09 a gram gives egg white (70% of the
-    /// weight, 30% of the cost) ₱0.0386 a gram and egg yolk (30%, 70%) ₱0.21. The share is always of the
-    /// linked-to ingredient's true (unbuffered) cost; the part inherits the linked-to ingredient's buffer
-    /// percent, and its buffered cost is BufferedCost of the result with that percent.
+    /// weight, 30% of the cost) ₱0.0386 a gram and egg yolk (30%, 70%) ₱0.21. The part's true cost is the
+    /// share of the linked-to ingredient's true cost, and its buffered cost the same share of the linked-to
+    /// ingredient's (fixed) buffered cost.
     /// </summary>
     public static decimal LinkedCost(decimal linkedToCost, decimal weightSharePercent, decimal costSharePercent) =>
         linkedToCost * costSharePercent / weightSharePercent;
@@ -193,9 +193,12 @@ public static class RawMaterialRules
     /// <summary>
     /// Recomputes CostPerBaseUnit from the brand prices: the dearest of them per base unit, each price
     /// divided by the base units in the unit it's for (null for a price per base unit), so the material
-    /// is costed at the most it's bought for. BufferedCostPerBaseUnit follows with the material's buffer.
-    /// No prices revert the material to unpriced. Call after the brand prices change, and after one of
-    /// their units changes its multiplier. Returns the index of the brand price the cost came from.
+    /// is costed at the most it's bought for. BufferedCostPerBaseUnit is a fixed amount the prices don't
+    /// move: it's only worked out here (the cost with the material's buffer on top) the first time the
+    /// material is priced, while it's still 0, and it goes back to 0 when no prices are left. After that
+    /// it changes only when it's typed or recalculated on the screen. Call after the brand prices change,
+    /// and after one of their units changes its multiplier. Returns the index of the brand price the cost
+    /// came from.
     /// </summary>
     public static int? ApplyBrandPrices(RawMaterial material, IReadOnlyList<(decimal Price, decimal? BaseUnitsPerUnit)> brandPrices)
     {
@@ -203,7 +206,15 @@ public static class RawMaterialRules
         material.CostPerBaseUnit = dearest is { } index
             ? UnitConversionRules.CostPerBaseUnit(brandPrices[index].Price, brandPrices[index].BaseUnitsPerUnit)
             : 0m;
-        material.BufferedCostPerBaseUnit = BufferedCost(material.CostPerBaseUnit, material.CostBufferPercent);
+        if (dearest is null)
+        {
+            material.BufferedCostPerBaseUnit = 0m;
+        }
+        else if (material.BufferedCostPerBaseUnit == 0m)
+        {
+            material.BufferedCostPerBaseUnit = BufferedCost(material.CostPerBaseUnit, material.CostBufferPercent);
+        }
+
         return dearest;
     }
 
@@ -279,6 +290,15 @@ public static class RawMaterialRules
         if (bufferPercent is < 0 or > 100)
         {
             throw new InvalidOperationException("Cost buffer must be at least 0 and at most 100 percent.");
+        }
+    }
+
+    /// <summary>A purchased material's fixed buffered cost can't be negative. It may be below the cost, once prices have risen past it.</summary>
+    public static void EnsureValidBufferedCost(decimal bufferedCost)
+    {
+        if (bufferedCost < 0)
+        {
+            throw new InvalidOperationException("Buffered cost can't be negative.");
         }
     }
 

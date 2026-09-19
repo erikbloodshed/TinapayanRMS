@@ -137,6 +137,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         // The sack actually holds 900 g, not 1,000 g.
         sack.BaseUnitsPerUnit = 900m;
         await repository.UpdateAsync(sack, Cancellation);
+        await RecalculateBufferAsync(sugarId); // the buffered cost recipes use is fixed until it's recalculated
 
         (await GetCostPerGramAsync(sugarId)).Should().Be(0.1m); // 90 / 900 g
         (await GetCostPerGramAsync(syrupId)).Should().Be(0.1m, "the made ingredient using sugar is recomputed");

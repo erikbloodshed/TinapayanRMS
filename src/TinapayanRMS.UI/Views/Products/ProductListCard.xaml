@@ -4,7 +4,7 @@
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
     <!-- The screen's first region: its title, the search box, then the list filling the rest, padded with empty rows. -->
-    <Border Style="{StaticResource CardStyle}" Padding="12">
+    <Border Style="{StaticResource CardStyle}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -30,11 +30,11 @@
                                    AutoGenerateColumns="False"
                                    AllowEditing="False"
                                    SelectionMode="Single"
-                                   NavigationMode="Row"
-                                   ColumnSizer="Star">
+                                   NavigationMode="Row">
                 <syncfusion:SfDataGrid.Columns>
-                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
-                    <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="110" />
+                    <!-- The Raw Materials list's widths, so the three lists are the same width -->
+                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="220" />
+                    <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="185" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
         </Grid>

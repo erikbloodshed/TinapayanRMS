@@ -3,7 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
-    <Border Style="{StaticResource CardStyle}">
+    <!-- No frame of its own: it sits straight in its tab, whose card has the border and rounded corners -->
+    <Border Padding="12">
         <StackPanel>
             <TextBlock Text="Linked Cost" Style="{StaticResource SectionHeaderStyle}" />
 
@@ -62,7 +63,7 @@
                                           NullValue="{x:Null}"
                                           IsReadOnly="True"
                                           controls:ReadOnlyText.IsGreyed="True"
-                                          ToolTip="Inherited from the linked ingredient: its buffer percent goes on top of this part's cost. The cost share is of that ingredient's cost before its buffer. Change the buffer there." />
+                                          ToolTip="Inherited from the linked ingredient, for show: this part takes the same share of that ingredient's buffered cost as of its cost. Change the buffer there." />
             </Grid>
 
             <!-- Follows the link and both shares as they're typed -->

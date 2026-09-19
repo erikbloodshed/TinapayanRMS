@@ -39,12 +39,11 @@
                 </syncfusion:SfDataGrid.SortColumnDescriptions>
                 <syncfusion:SfDataGrid.Columns>
                     <!--
-                        Fixed widths, measured in the grid's font (Segoe UI, 12 px): Name fits 30 characters and
-                        Category 25, even in capitals. The list's column in RawMaterialsView is Auto, so the card is
-                        as wide as these columns and never cuts one off. The costs are in the header's tiles.
+                        Fixed widths. The list's column in RawMaterialsView is Auto, so the card is as wide as these
+                        columns and never cuts one off. The costs are in the header's tiles.
                     -->
-                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="220" />
-                    <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="185" />
+                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="215" />
+                    <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="165" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
         </DockPanel>

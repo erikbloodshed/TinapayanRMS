@@ -10,37 +10,16 @@
         from, so it only shows: AllowEditing is off and the add row goes with it.
     -->
     <StackPanel Margin="8">
-        <!-- The name and what it's for, then the cost per piece -->
-        <Grid Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <Grid VerticalAlignment="Center">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <TextBlock Text="Packaging" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource HeadingForegroundBrush}" />
-                <Border Grid.Column="1"
-                        HorizontalAlignment="Left"
-                        Style="{StaticResource LinkedBadgeStyle}"
-                        Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <TextBlock Text="{Binding PackagingLinkedToText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
-                </Border>
-            </Grid>
-
-            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                <TextBlock Text="Cost per piece" Style="{StaticResource CaptionStyle}" HorizontalAlignment="Right" />
-                <TextBlock Text="{Binding Costs.Packaging, StringFormat='₱{0:N4}'}"
-                           FontSize="16"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource HeadingForegroundBrush}"
-                           HorizontalAlignment="Right" />
-            </StackPanel>
-        </Grid>
+        <!--
+            No title: its tab already says Packaging. A badge when it's linked; the cost per piece sits on the Remove Line
+            row, under its table.
+        -->
+        <Border HorizontalAlignment="Left"
+                Style="{StaticResource LinkedBadgeStyle}"
+                Margin="0,0,0,10"
+                Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <TextBlock Text="{Binding PackagingLinkedToText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
+        </Border>
 
         <!-- A line's quantity is how much of the material one piece takes, always in the material's base unit -->
         <syncfusion:SfDataGrid ItemsSource="{Binding LineEdits}"
@@ -95,12 +74,27 @@
             </syncfusion:SfDataGrid.Columns>
         </syncfusion:SfDataGrid>
 
-        <Grid Margin="0,8,0,0" Visibility="{Binding IsPackagingEditable, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <!-- Remove Line only while its lines are this product's own; the cost per piece either way -->
+        <Grid Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveLineCommand}" />
+            <!-- What a piece of it costs, on the same row as Remove Line -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                <TextBlock Text="Cost per piece" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBlock Text="{Binding Costs.Packaging, StringFormat='₱{0:N4}'}"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource HeadingForegroundBrush}"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+            <syncfusion:ButtonAdv Grid.Column="2"
+                                  Label="Remove Line"
+                                  IconTemplate="{StaticResource RemoveIconTemplate}"
+                                  Command="{Binding RemoveLineCommand}"
+                                  Visibility="{Binding IsPackagingEditable, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
 
         <!-- Linked packaging only shows here: Make a Copy makes its lines this product's own, and Save drops the link -->
