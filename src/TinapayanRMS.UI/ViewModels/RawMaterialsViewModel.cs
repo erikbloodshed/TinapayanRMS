@@ -249,6 +249,21 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         set => this.RaiseAndSetIfChanged(ref _selectedRawMaterial, value);
     }
 
+    /// <summary>The material whose price history, brand prices and BOM the grids hold; null for none (a new material).</summary>
+    private int? _detailMaterialId;
+
+    private bool _areDetailsReady = true;
+    /// <summary>
+    /// False from picking another material until its details (price history, brand prices, BOM) arrive, while the previous
+    /// material's still show: the details tabs ignore the mouse, and Save waits, since it would write the previous
+    /// material's brand prices or BOM under this one.
+    /// </summary>
+    public bool AreDetailsReady
+    {
+        get => _areDetailsReady;
+        private set => this.RaiseAndSetIfChanged(ref _areDetailsReady, value);
+    }
+
     private int _editingId;
 
     private string _editingName = string.Empty;
@@ -812,21 +827,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
             .Where(_ => !IsRefreshing)
             .Subscribe(ResetDetails);
 
+        // A newer selection cancels an older one still loading (Switch disposes it, which cancels its token), so a quick
+        // second pick never gets the first one's details added to its own.
         this.WhenAnyValue(x => x.SelectedRawMaterial)
             .Where(_ => !IsRefreshing)
-            .Select(material => Observable.FromAsync(() => LoadPriceHistoryAsync(material)))
-            .Switch()
-            .Subscribe();
-
-        this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Where(_ => !IsRefreshing)
-            .Select(material => Observable.FromAsync(() => LoadBomLinesAsync(material)))
-            .Switch()
-            .Subscribe();
-
-        this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Where(_ => !IsRefreshing)
-            .Select(material => Observable.FromAsync(() => LoadBrandPricesAsync(material)))
+            .Select(material => Observable.FromAsync(cancellationToken => LoadDetailsAsync(material, cancellationToken)))
             .Switch()
             .Subscribe();
 
@@ -914,6 +919,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
+            // The picked material's details haven't replaced the previous one's yet: saving now would write that material's
+            // brand prices or BOM under this one. The moment passes in a fraction of a second.
+            if (!AreDetailsReady)
+            {
+                return;
+            }
+
             var type = EditingType;
             var source = type == RawMaterialType.Packaging ? RawMaterialSource.Purchased : EditingSource;
             var material = new RawMaterial
@@ -1050,7 +1062,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
                 await _priceHistoryRepository.DeleteAsync(SelectedPriceRow!.Entry.Id, CancellationToken.None);
 
                 // The history is only a log, so the cost stays and the form keeps its unsaved edits. Only the history reloads.
-                await LoadPriceHistoryAsync(SelectedRawMaterial);
+                var material = SelectedRawMaterial!;
+                ReplacePriceHistory(material, await _priceHistoryRepository.GetForRawMaterialAsync(material.Id, CancellationToken.None));
+                UpdateCanChangeBaseUnit();
             }),
             this.WhenAnyValue(x => x.SelectedPriceRow).Select(row => row is not null));
 
@@ -1160,9 +1174,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId);
     }
 
-    /// <summary>What follows a new selection: its alternative units, and nothing picked or open.</summary>
+    /// <summary>
+    /// What follows a new selection: its alternative units, and nothing picked or open. Another material's price history,
+    /// brand prices and BOM replace the ones showing when they arrive, in the same pass (LoadDetailsAsync): cleared here,
+    /// the grids drew empty in between. Until then they aren't this material's (AreDetailsReady).
+    /// </summary>
     private void ResetDetails(RawMaterial? material)
     {
+        AreDetailsReady = material is null || material.Id == _detailMaterialId;
         SelectedPriceRow = null;
         SelectedBrandPriceRow = null;
         SelectedBomLineEdit = null;
@@ -1180,13 +1199,89 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
     private void ClearDetails()
     {
         ResetDetails(null);
-        PriceHistory.Clear();
-        LastUpdatedText = "—";
+        ShowDetails(null, RawMaterialDetail.None);
+    }
+
+    /// <summary>
+    /// What a pick shows beyond the list's copy of the material (its price history, brand prices and BOM), read on the thread
+    /// pool in one go, so the UI thread comes back once rather than after each read. Only the material picked last is shown:
+    /// a newer pick cancels this load, so its details can't join the newer one's.
+    /// </summary>
+    private async Task LoadDetailsAsync(RawMaterial? material, CancellationToken cancellationToken)
+    {
+        if (material is null)
+        {
+            ShowDetails(null, RawMaterialDetail.None);
+            return;
+        }
+
+        RawMaterialDetail detail;
+        try
+        {
+            detail = await Task.Run(() => ReadDetailAsync(material, cancellationToken), cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested && material.Id != _detailMaterialId)
+        {
+            // Nothing of the picked material's came: the previous material's mustn't stay showing under its name.
+            ShowDetails(null, RawMaterialDetail.None);
+            throw;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        ShowDetails(material, detail);
+    }
+
+    /// <summary>A material's price history, brand prices and BOM lines, as LoadDetailsAsync reads them.</summary>
+    private sealed record RawMaterialDetail(
+        IReadOnlyList<RawMaterialPriceHistory> PriceHistory,
+        IReadOnlyList<RawMaterialBrandPrice> BrandPrices,
+        IReadOnlyList<IngredientBomLine> BomLines)
+    {
+        public static readonly RawMaterialDetail None = new([], [], []);
+    }
+
+    /// <summary>Only the repositories: this runs off the UI thread. A purchased material has prices, a made one a BOM, and a linked one neither.</summary>
+    private async Task<RawMaterialDetail> ReadDetailAsync(RawMaterial material, CancellationToken cancellationToken) =>
+        material.Source switch
+        {
+            RawMaterialSource.Purchased => new RawMaterialDetail(
+                await _priceHistoryRepository.GetForRawMaterialAsync(material.Id, cancellationToken),
+                await _brandPriceRepository.GetForRawMaterialAsync(material.Id, cancellationToken),
+                []),
+            RawMaterialSource.Made => new RawMaterialDetail([], [], await _bomLineRepository.GetForIngredientAsync(material.Id, cancellationToken)),
+            _ => RawMaterialDetail.None,
+        };
+
+    /// <summary>
+    /// Puts <paramref name="material"/>'s details in place of whatever the grids held, in one pass, so nothing is drawn in
+    /// between, along with what Save compares the BOM against. None for no material.
+    /// </summary>
+    private void ShowDetails(RawMaterial? material, RawMaterialDetail detail)
+    {
+        ReplacePriceHistory(material, detail.PriceHistory);
+
         BomLineEdits.Clear();
-        _savedBomLines = [];
+        BomLineEdits.AddRange(detail.BomLines.Select(l => new IngredientLineRow(l.ComponentIngredient!, l.Grams)));
+        _savedBomLines = CurrentBomLines();
+
         BrandPriceRows.Clear();
-        _savedBrandPriceCount = 0;
+        BrandPriceRows.AddRange(detail.BrandPrices.Select(p =>
+            new BrandPriceRow(this, p.Brand, p.Unit?.UnitOfMeasureId ?? PurchaseUnitChoice.BaseUnitKey, p.Price)));
+        _savedBrandPriceCount = detail.BrandPrices.Count;
+
         UpdateCanChangeBaseUnit();
+        UpdatePurchaseCostTexts();
+        _detailMaterialId = material?.Id;
+        AreDetailsReady = true;
+    }
+
+    /// <summary>The Price History grid, newest first, and the header's Last Updated from its latest entry.</summary>
+    private void ReplacePriceHistory(RawMaterial? material, IReadOnlyList<RawMaterialPriceHistory> entries)
+    {
+        var baseUnitName = material is null ? string.Empty : BaseUnitText.NameOf(material);
+        PriceHistory.Clear();
+        PriceHistory.AddRange(entries.Select(e => new RawMaterialPriceRow(e, baseUnitName)));
+        LastUpdatedText = PriceHistory.FirstOrDefault()?.Date.ToString("MMM d, yyyy", CultureInfo.CurrentCulture) ?? "—";
     }
 
     /// <summary>The form's alternative units, from <paramref name="material"/>'s saved ones (none for a new material).</summary>
@@ -1486,23 +1581,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         return prices;
     }
 
-    private async Task LoadBrandPricesAsync(RawMaterial? material)
-    {
-        BrandPriceRows.Clear();
-        _savedBrandPriceCount = 0;
-
-        if (material is { Source: RawMaterialSource.Purchased })
-        {
-            var brandPrices = await _brandPriceRepository.GetForRawMaterialAsync(material.Id, CancellationToken.None);
-            BrandPriceRows.AddRange(brandPrices.Select(p =>
-                new BrandPriceRow(this, p.Brand, p.Unit?.UnitOfMeasureId ?? PurchaseUnitChoice.BaseUnitKey, p.Price)));
-            _savedBrandPriceCount = brandPrices.Count;
-        }
-
-        UpdateCanChangeBaseUnit();
-        UpdatePurchaseCostTexts();
-    }
-
     /// <summary>The BOM editor's lines when they differ from those last loaded, or null to leave the saved BOM as it is.</summary>
     private List<(int ComponentIngredientId, decimal Grams)>? ChangedBomLines()
     {
@@ -1514,43 +1592,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
     private List<(int ComponentIngredientId, decimal Grams)> CurrentBomLines() =>
         [.. IngredientLineRow.CompleteLines(BomLineEdits, EditingName.Trim()).Select(l => (l.Ingredient.Id, l.Grams))];
 
-    private async Task LoadBomLinesAsync(RawMaterial? material)
-    {
-        BomLineEdits.Clear();
-        _savedBomLines = [];
-
-        if (material is not { Source: RawMaterialSource.Made })
-        {
-            return;
-        }
-
-        var lines = await _bomLineRepository.GetForIngredientAsync(material.Id, CancellationToken.None);
-        foreach (var line in lines)
-        {
-            BomLineEdits.Add(new IngredientLineRow(line.ComponentIngredient!, line.Grams));
-        }
-
-        _savedBomLines = CurrentBomLines();
-    }
-
-    private async Task LoadPriceHistoryAsync(RawMaterial? material)
-    {
-        PriceHistory.Clear();
-
-        if (material is { Source: RawMaterialSource.Purchased })
-        {
-            var entries = await _priceHistoryRepository.GetForRawMaterialAsync(material.Id, CancellationToken.None);
-            var baseUnitName = BaseUnitText.NameOf(material);
-            PriceHistory.AddRange(entries.Select(e => new RawMaterialPriceRow(e, baseUnitName)));
-        }
-
-        LastUpdatedText = PriceHistory.FirstOrDefault()?.Date.ToString("MMM d, yyyy", CultureInfo.CurrentCulture) ?? "—";
-        UpdateCanChangeBaseUnit();
-    }
-
     /// <summary>
     /// Re-fetches the material just saved and pushes it into the grid's cache and the selection. A fresh
-    /// copy is always a new selection, so the form and its details reload from what was saved.
+    /// copy is always a new selection, so the form and its details reload from what was saved. A new material,
+    /// saved for the first time, is still the one whose details show, not another material: they stay until the
+    /// reload replaces them, as an existing one's do.
     /// </summary>
     private async Task ReloadSavedRawMaterialAsync(int id)
     {
@@ -1558,6 +1604,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         if (saved is not null)
         {
             _rawMaterialCache.AddOrUpdate(saved);
+            _detailMaterialId = id;
             SelectedRawMaterial = saved;
         }
     }

@@ -1810,12 +1810,15 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>What ResetDetails leaves for the picked product's details to replace: the previous product's.</summary>
-    private void ClearDetailsForAnother()
+    /// <summary>
+    /// What ResetDetails leaves for the picked product's details to replace: the previous product's. Its recipe's tabs
+    /// stay for the picked recipe's sections to take over (ReplaceUsages), unless nothing is coming to replace them.
+    /// </summary>
+    private void ClearDetailsForAnother(bool keepRecipeTabs)
     {
         CloseUsageForm();
         SelectedLineEdit = null;
-        ClearDetails();
+        ClearDetails(keepRecipeTabs);
     }
 
     /// <summary>A new product: no name, recipe, packaging, costing or links, and nothing selected.</summary>
@@ -1836,8 +1839,12 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         ClearDetails();
     }
 
-    /// <summary>Empties the recipe, packaging, costing and links, and what Save compares them against.</summary>
-    private void ClearDetails()
+    /// <summary>
+    /// Empties the recipe, packaging, costing and links, and what Save compares them against. With
+    /// <paramref name="keepRecipeTabs"/>, the recipe's sections and the Packaging tab stay for another product's to
+    /// replace in the same pass: the tab strip then keeps its tabs rather than building a new one for each.
+    /// </summary>
+    private void ClearDetails(bool keepRecipeTabs = false)
     {
         var previousTab = SelectedRecipeTab;
         _detailProductId = null;
@@ -1846,7 +1853,11 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         _arrangingRecipeTabs = true;
         try
         {
-            UsageEdits.Clear();
+            if (!keepRecipeTabs)
+            {
+                UsageEdits.Clear();
+            }
+
             RecipeTabs.Remove(AddSubAssemblyTab);
         }
         finally
@@ -1855,7 +1866,10 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         }
 
         LineEdits.Clear();
-        SetHasPackaging(false);
+        if (!keepRecipeTabs)
+        {
+            SetHasPackaging(false);
+        }
         SelectedPackEdit = null;
         _packSubscriptions.Clear();
         PackEdits.Clear();
@@ -1892,7 +1906,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         catch (Exception) when (!cancellationToken.IsCancellationRequested && product.Id != _detailProductId)
         {
             // Nothing of the picked product's came: the previous product's mustn't stay showing under its name.
-            ClearDetailsForAnother();
+            ClearDetailsForAnother(keepRecipeTabs: false);
             AreDetailsReady = true;
             throw;
         }
@@ -1900,10 +1914,11 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         // Only the product picked last is shown; a newer pick cancels this load.
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Out with the previous product's details and in with these, in one pass, so nothing is drawn between them.
+        // Out with the previous product's details and in with these, in one pass, so nothing is drawn between them. Its
+        // recipe's tabs stay, for this recipe's sections to take over.
         if (product.Id != _detailProductId)
         {
-            ClearDetailsForAnother();
+            ClearDetailsForAnother(keepRecipeTabs: true);
         }
 
         AreDetailsReady = true;
@@ -2023,19 +2038,40 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         // linking the same one have different sets.
         var addInsByUsage = addIns.ToLookup(a => a.UsageId);
         var ingredientsById = Ingredients.ToDictionary(m => m.Id);
-        // Another product's recipe opens on its first tab; the same product's, reloaded, keeps the tab it showed.
+        List<ProductUsageEdit> sections =
+        [
+            .. usages
+                .Select(u => ToUsageEdit(u, linesBySubAssembly[u.SubAssemblyId], addInsByUsage[u.Id], ingredientsById))
+                .Order(ProductUsageEdit.RecipeOrder),
+        ];
+
+        // Another product's recipe opens on its first tab; the same product's, reloaded, keeps the tab it showed. Its
+        // section is read now, before the tabs take on the new sections.
         var previousTab = _isRecipeClearedForAnother ? null : SelectedRecipeTab;
+        var previousUsage = (previousTab as SubAssemblyRecipeTab)?.Usage;
         _isRecipeClearedForAnother = false;
 
+        // Section for section, in place: each tab stays and shows its new section (MirrorUsageTabs), so the tab strip keeps
+        // the tabs it has and only adds or takes away the difference, rather than building a new TabItemExt, template and
+        // all, for every section of every product picked.
         _arrangingRecipeTabs = true;
         try
         {
-            UsageEdits.Clear();
-            foreach (var usage in usages
-                .Select(u => ToUsageEdit(u, linesBySubAssembly[u.SubAssemblyId], addInsByUsage[u.Id], ingredientsById))
-                .Order(ProductUsageEdit.RecipeOrder))
+            for (var i = 0; i < sections.Count; i++)
             {
-                UsageEdits.Add(usage);
+                if (i < UsageEdits.Count)
+                {
+                    UsageEdits[i] = sections[i];
+                }
+                else
+                {
+                    UsageEdits.Add(sections[i]);
+                }
+            }
+
+            while (UsageEdits.Count > sections.Count)
+            {
+                UsageEdits.RemoveAt(UsageEdits.Count - 1);
             }
         }
         finally
@@ -2044,7 +2080,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         }
 
         _savedRecipe = CurrentRecipe();
-        ReselectRecipeTab(previousTab, (previousTab as SubAssemblyRecipeTab)?.Usage);
+        ReselectRecipeTab(previousTab, previousUsage);
     }
 
     private ProductUsageEdit ToUsageEdit(

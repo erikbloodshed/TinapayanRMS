@@ -1248,6 +1248,61 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task Picking_another_product_keeps_the_recipe_tabs_and_opens_the_form_on_its_first_section()
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
+        var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 3);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.24m);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var ubeBreadId = await AddProductAsync("Ube Bread");
+        await SaveRecipeAsync(ubeBreadId, new RecipeDraft(
+            [
+                new OwnedSubAssemblyDraft(0, doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m),
+                new OwnedSubAssemblyDraft(0, fillingRoleId, [(ubeId, 300m)], UsageAuthoredField.WeightPerPiece, 15m),
+            ],
+            []));
+        var cheeseBreadId = await AddProductAsync("Cheese Bread");
+        await SaveRecipeAsync(cheeseBreadId, new RecipeDraft(
+            [
+                new OwnedSubAssemblyDraft(0, doughRoleId, [(flourId, 800m)], UsageAuthoredField.WeightPerPiece, 40m),
+                new OwnedSubAssemblyDraft(0, fillingRoleId, [(cheeseId, 200m)], UsageAuthoredField.WeightPerPiece, 10m),
+                new OwnedSubAssemblyDraft(0, toppingRoleId, [(cheeseId, 50m)], UsageAuthoredField.WeightPerPiece, 2m),
+            ],
+            []));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == ubeBreadId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 2, () => $"usage rows={viewModel.UsageEdits.Count}");
+        viewModel.SelectedRecipeTab = viewModel.RecipeTabs[1];
+        List<RecipeTab> ubeBreadTabs = [.. viewModel.RecipeTabs];
+
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == cheeseBreadId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 3, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        // The strip keeps its tabs, which show the cheese bread's sections; only its Topping gets a tab of its own.
+        viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling", "Topping");
+        viewModel.RecipeTabs[0].Should().BeSameAs(ubeBreadTabs[0]);
+        viewModel.RecipeTabs[1].Should().BeSameAs(ubeBreadTabs[1]);
+
+        // Another product's recipe opens on its first tab, the form on its own section, not the one the tab showed before.
+        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.RecipeTabs[0]);
+        viewModel.EditingUsage.Should().BeSameAs(viewModel.UsageEdits[0]);
+        viewModel.FormLines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal([("Flour", 800m)]);
+        viewModel.EditingUsageWeightPerPiece.Should().Be(40m);
+
+        // Back to the ube bread: the Topping's tab goes, and the first two show its sections again.
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == ubeBreadId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 2, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        viewModel.RecipeTabs.Should().Equal(ubeBreadTabs);
+        viewModel.FormLines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal([("Flour", 1000m)]);
+        viewModel.EditingUsageWeightPerPiece.Should().Be(50m);
+    }
+
+    [Fact]
     public async Task An_add_in_already_in_the_linked_recipe_is_refused_on_the_spot()
     {
         var (linkerId, _, _, flourId) = await SeedLinkableDoughAsync();

@@ -43,9 +43,12 @@
             along the bottom (TabStripPlacement), and each tab scrolls on its own, so the
             strip stays put. Price History only applies to a saved purchased material; while
             it's hidden the ViewModel moves the selection off it (SelectedDetailsTab).
+            Between picking a material and its details arriving, the previous material's still
+            show, and the tabs ignore the mouse (AreDetailsReady): what's in them isn't the form's.
         -->
         <syncfusion:TabControlExt Grid.Row="1"
                                   Grid.Column="2"
+                                  IsHitTestVisible="{Binding AreDetailsReady}"
                                   TabStripPlacement="Bottom"
                                   CloseButtonType="Hide"
                                   ShowTabItemContextMenu="False"

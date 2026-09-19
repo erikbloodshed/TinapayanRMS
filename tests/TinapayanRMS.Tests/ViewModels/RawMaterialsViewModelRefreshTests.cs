@@ -31,7 +31,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         viewModel.EditingName = "Flour (unsaved rename)";
         viewModel.CanAddUnit.Should().BeTrue("one alternative unit is below the limit of two");
         var selected = viewModel.SelectedRawMaterial;
@@ -58,7 +58,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         viewModel.EditingName = "Flour (unsaved rename)";
 
         await RenameAbbreviationAsync(bagId, "bg");
@@ -73,6 +73,70 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
 
     [Fact]
+    public async Task A_second_pick_before_the_first_ones_details_arrive_shows_only_its_own()
+    {
+        var flourId = await SeedPurchasedIngredientAsync("Flour");
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar");
+        await CreateBrandPriceRepository().SetAsync(
+            flourId,
+            [new RawMaterialBrandPrice { Brand = "Gold Medal", Price = 0.05m }, new RawMaterialBrandPrice { Brand = "Wellington", Price = 0.04m }],
+            Cancellation);
+        await SetPriceAsync(sugarId, null, 0.09m);
+        await SeedMadeIngredientAsync("Butter Icing", (flourId, 100m), (sugarId, 50m));
+        await SeedMadeIngredientAsync("Syrup", (sugarId, 100m));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        // Sugar picked before Flour's details can arrive, as a quick second click or an arrow key held down in the list does.
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == flourId);
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == sugarId);
+
+        await WaitUntilSettledAsync(() => viewModel.BrandPriceRows.Count > 0 && viewModel.PriceHistory.Count > 0,
+            () => $"brands={viewModel.BrandPriceRows.Count}, prices={viewModel.PriceHistory.Count}");
+        viewModel.BrandPriceRows.Select(r => (r.Brand, r.Price)).Should().Equal([(null, 0.09m)], "Flour's brands never join Sugar's");
+        viewModel.PriceHistory.Should().ContainSingle().Which.Entry.RawMaterialId.Should().Be(sugarId);
+
+        // The same for a made ingredient's bill of materials.
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Name == "Butter Icing");
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Name == "Syrup");
+
+        await WaitUntilSettledAsync(() => viewModel.BomLineEdits.Count > 0, () => $"lines={viewModel.BomLineEdits.Count}");
+        viewModel.BomLineEdits.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal([("Sugar", 100m)], "Butter Icing's lines never join Syrup's");
+    }
+
+    [Fact]
+    public async Task Picking_another_material_keeps_the_previous_details_until_its_own_arrive_and_Save_waits_for_them()
+    {
+        var flourId = await SeedPurchasedIngredientAsync("Flour");
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar");
+        await CreateBrandPriceRepository().SetAsync(
+            flourId,
+            [new RawMaterialBrandPrice { Brand = "Gold Medal", Price = 0.05m }, new RawMaterialBrandPrice { Brand = "Wellington", Price = 0.04m }],
+            Cancellation);
+        await SetPriceAsync(sugarId, null, 0.09m);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single(m => m.Id == flourId));
+
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == sugarId);
+
+        // Its details are still on their way (read off the UI thread): Flour's show until they arrive, not an empty grid,
+        // and a Save now would write Flour's brand prices under Sugar.
+        viewModel.AreDetailsReady.Should().BeFalse();
+        viewModel.EditingName.Should().Be("Sugar");
+        viewModel.BrandPriceRows.Select(r => r.Brand).Should().Equal("Gold Medal", "Wellington");
+        await viewModel.SaveCommand.Execute();
+
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, brands={viewModel.BrandPriceRows.Count}");
+        viewModel.BrandPriceRows.Single().Price.Should().Be(0.09m);
+        viewModel.SuccessMessage.Should().BeNull("nothing was saved");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterialBrandPrices.Where(p => p.RawMaterialId == sugarId).Select(p => p.Price).ToListAsync(Cancellation))
+            .Should().Equal([0.09m], "the Save did nothing");
+    }
+
+    [Fact]
     public async Task Unsaved_units_survive_a_reload_and_show_a_unit_renamed_on_another_tab()
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
@@ -80,7 +144,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         await AddUnitAsync(viewModel, bagId, 25000m);
         var brand = AddBrandPrice(viewModel, "Gold Medal", "bag", 1250m);
 
@@ -236,7 +300,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         var bag = AddBrandPrice(viewModel, "Gold Medal", "bag", 1250m);
         bag.CanTypeQuantity.Should().BeFalse("the bag unit is saved");
         bag.Quantity.Should().Be(25000m);
@@ -283,7 +347,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         viewModel.ShowPriceHistory.Should().BeTrue();
         viewModel.SelectedDetailsTab = RawMaterialsViewModel.PriceHistoryTab;
 
@@ -347,7 +411,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         // Selecting Flour and leaving its name untouched isn't a conflict with itself.
-        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Name == "Flour");
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single(m => m.Name == "Flour"));
         viewModel.CheckNameAvailability();
         viewModel.ErrorMessage.Should().BeNull();
 
@@ -372,7 +436,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         viewModel.CanAddUnit.Should().BeFalse("the ingredient already has the two alternative units allowed");
 
         AddBrandPrice(viewModel, null, "pack", 60m);
@@ -397,7 +461,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         AddBrandPrice(viewModel, "Gold Medal", "bag", 900m); // ₱0.036/g
         AddBrandPrice(viewModel, "Wellington", "pack", 40m); // ₱0.04/g
         viewModel.PurchaseCostText.Should().Be("₱0.0400");
@@ -795,7 +859,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         AddBrandPrice(viewModel, null, "bag", 1250m);
         viewModel.ExampleRawMaterial.Should().NotBeNull("selecting a material puts it in the usage example");
         viewModel.EditingCostBufferPercent = 5m;
@@ -865,7 +929,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
         await viewModel.LoadCommand.Execute();
 
-        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         AddBrandPrice(viewModel, null, "bag", 1250m);
 
         await viewModel.DeleteCommand.Execute();
@@ -1073,7 +1137,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         viewModel.UnitRows.Single().BaseUnitsPerUnit = 20000m;
         await viewModel.SaveCommand.Execute();
 
@@ -1159,6 +1223,26 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         return ingredient.Id;
     }
 
+    /// <summary>A made ingredient with a bill of materials: grams of each component.</summary>
+    private async Task<int> SeedMadeIngredientAsync(string name, params (int ComponentId, decimal Grams)[] lines)
+    {
+        await using var dbContext = CreateDbContext();
+        var ingredient = new RawMaterial
+        {
+            Name = name,
+            Type = RawMaterialType.Ingredient,
+            Category = new RawMaterialCategory { Name = $"{name} goods" },
+            Source = RawMaterialSource.Made,
+            WeightLossPercent = 0m,
+        };
+        dbContext.RawMaterials.Add(ingredient);
+        await dbContext.SaveChangesAsync(Cancellation);
+
+        dbContext.IngredientBomLines.AddRange(lines.Select(l => new IngredientBomLine { IngredientId = ingredient.Id, ComponentIngredientId = l.ComponentId, Grams = l.Grams }));
+        await dbContext.SaveChangesAsync(Cancellation);
+        return ingredient.Id;
+    }
+
     /// <summary>Renames a unit of measure's abbreviation the way the Settings dialog would, behind the screen's back.</summary>
     private async Task RenameAbbreviationAsync(int unitOfMeasureId, string abbreviation)
     {
@@ -1172,6 +1256,16 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     {
         await using var dbContext = CreateDbContext();
         return await dbContext.IngredientBomLines.Select(l => l.Id).SingleAsync(Cancellation);
+    }
+
+    /// <summary>
+    /// Picks <paramref name="material"/> as a click in the list does, and waits for its details (price history, brand
+    /// prices, BOM), which are read off the UI thread: until they arrive the previous material's show, and Save waits.
+    /// </summary>
+    private static async Task SelectAsync(RawMaterialsViewModel viewModel, RawMaterial material)
+    {
+        viewModel.SelectedRawMaterial = material;
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => $"{material.Name}'s details never arrived");
     }
 
     /// <summary>
