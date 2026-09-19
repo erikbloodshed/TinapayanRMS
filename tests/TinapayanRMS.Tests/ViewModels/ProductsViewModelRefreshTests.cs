@@ -63,7 +63,6 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.Costs.Material.Should().Be(3.6m);
         var (expectedBaseCost, _, _) = CostingRules.CalculateSellingPrice(3.6m, 5m, 0m, 0m, 0m, 0m);
         viewModel.Costs.BaseCost.Should().Be(expectedBaseCost);
-        viewModel.CostShares.Should().ContainSingle().Which.Amount.Should().Be(3.6m);
     }
 
     [Fact]
@@ -568,13 +567,12 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageEdits.Should().ContainSingle();
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.AddSubAssemblyTab, "the form has to be put right first");
 
-        // Named, it goes in, and the second Dough's tab reads by its name; so does the Cost Overview's slice.
+        // Named, it goes in, and the second Dough's tab reads by its name.
         viewModel.EditingUsageName = "Ube";
         await viewModel.ApplyUsageCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Select(t => t.Header).Should().Equal("Dough", "Dough: Ube");
-        viewModel.CostShares.Select(c => c.Name).Take(2).Should().Equal("Dough", "Dough: Ube");
 
         // Saved and loaded again, both are there, by the same names.
         await viewModel.SaveCommand.Execute();
@@ -880,6 +878,46 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.ErrorMessage.Should().BeNull("a category is optional");
         await using var dbContext = CreateDbContext();
         (await dbContext.Products.SingleAsync(Cancellation)).CategoryId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task The_current_price_shows_the_markup_it_earns_as_it_is_typed_and_Save_keeps_it()
+    {
+        var roleId = await AddRoleAsync("Filling");
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.25m);
+        await AddProductWithSubAssemblyAsync("Ube pandesal", roleId, [(ubeId, 100m)], weightPerPiece: 10m);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+        viewModel.EditingLaborPercent = 100m;
+        viewModel.EditingVatPercent = 12m;
+        viewModel.Costs.BaseCost.Should().Be(5m, "₱2.50 of filling and as much again in labor");
+        viewModel.Costs.CurrentMarkupPercent.Should().BeNull("no current price is entered");
+
+        viewModel.EditingCurrentPrice = 7m;
+        viewModel.Costs.CurrentMarkupPercent.Should().Be(25m, "₱7 with 12% VAT is ₱6.25 before it: ₱1.25 on ₱5 of cost");
+        viewModel.Costs.IsCurrentPriceBelowCost.Should().BeFalse();
+
+        viewModel.EditingCurrentPrice = 5m;
+        viewModel.Costs.IsCurrentPriceBelowCost.Should().BeTrue("₱5 with VAT is under ₱5 before it");
+
+        viewModel.EditingCurrentPrice = 7m;
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using (var dbContext = CreateDbContext())
+        {
+            (await dbContext.Products.SingleAsync(Cancellation)).CurrentPrice.Should().Be(7m);
+        }
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingCurrentPrice.Should().BeNull("a new product has no current price");
+        viewModel.Costs.CurrentMarkupPercent.Should().BeNull();
+
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        viewModel.EditingCurrentPrice.Should().Be(7m);
     }
 
     [Fact]

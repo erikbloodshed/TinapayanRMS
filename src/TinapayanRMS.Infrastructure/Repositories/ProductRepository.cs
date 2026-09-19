@@ -63,7 +63,14 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 
         // A copy of the form's fields: the caller's entity is never attached, and never given an id by
         // a save that then rolls back.
-        var fields = new Product { Id = product.Id, Name = product.Name, Description = product.Description, CategoryId = product.CategoryId };
+        var fields = new Product
+        {
+            Id = product.Id,
+            Name = product.Name,
+            Description = product.Description,
+            CategoryId = product.CategoryId,
+            CurrentPrice = product.CurrentPrice,
+        };
         if (fields.Id == 0)
         {
             await AddAsync(dbContext, fields, cancellationToken);
@@ -150,7 +157,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>Copies the name, description and category onto the stored product, stamps it as saved now, and saves it.</summary>
+    /// <summary>Copies the name, description, category and current price onto the stored product, stamps it as saved now, and saves it.</summary>
     internal static async Task UpdateAsync(TinapayanRMSDbContext dbContext, Product product, CancellationToken cancellationToken)
     {
         var existing = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == product.Id, cancellationToken)
@@ -159,6 +166,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         existing.Name = product.Name;
         existing.Description = product.Description;
         existing.CategoryId = product.CategoryId;
+        existing.CurrentPrice = product.CurrentPrice;
         existing.UpdatedAt = DateTime.Now;
 
         await dbContext.SaveChangesAsync(cancellationToken);

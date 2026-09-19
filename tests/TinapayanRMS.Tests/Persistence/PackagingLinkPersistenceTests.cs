@@ -197,6 +197,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         {
             var source = await dbContext.Products.SingleAsync(p => p.Id == sourceId, Cancellation);
             source.Description = "Soft bread with ube filling";
+            source.CurrentPrice = 35m;
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
@@ -211,6 +212,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
 
         var clone = (await CreateProductRepository().GetByIdAsync(cloneId, Cancellation))!;
         clone.Description.Should().Be("Soft bread with ube filling");
+        clone.CurrentPrice.Should().Be(35m);
         clone.UpdatedAt.Should().BeCloseTo(DateTime.Now, TimeSpan.FromMinutes(1), "a clone is saved when it's made");
 
         var usages = await CreateUsageRepository().GetForProductAsync(cloneId, Cancellation);

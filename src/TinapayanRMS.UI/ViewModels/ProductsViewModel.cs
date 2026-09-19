@@ -132,12 +132,11 @@ public sealed class ProductUsageEdit : ReactiveObject
             this.RaiseAndSetIfChanged(ref _isRoleRepeated, value);
             this.RaisePropertyChanged(nameof(SectionName));
             this.RaisePropertyChanged(nameof(DisplayName));
-            this.RaisePropertyChanged(nameof(UnitName));
         }
     }
 
     /// <summary>
-    /// What the section is called: its tab, its heading, and its slice of the cost overviews. Its role, e.g. "Filling",
+    /// What the section is called: its tab and its heading. Its role, e.g. "Filling",
     /// and with its name when the recipe has more than one in the role: "Filling: Ube" beside "Filling: Cheese".
     /// </summary>
     public string SectionName => IsRoleRepeated && Label is { } label ? $"{RoleName}: {label}" : RoleName;
@@ -212,12 +211,6 @@ public sealed class ProductUsageEdit : ReactiveObject
 
     /// <summary>E.g. "60 g per piece".</summary>
     public string WeightText => $"{WeightPerPiece:#,0.##} g per piece";
-
-    /// <summary>For the Unit Conversion Overview (Controls/UnitConversionOverview): one batch of the sub-assembly...</summary>
-    public string UnitName => $"{SectionName} batch";
-
-    /// <summary>...and the pieces it makes.</summary>
-    public string BaseEquivalentText => $"{Yield:#,0.##} pc";
 
     /// <summary>The same section with other lines (repriced ingredients, or the owner's edits), add-ins or role.</summary>
     public ProductUsageEdit With(
@@ -314,9 +307,6 @@ public sealed class LinkableSubAssemblyOption
     };
 }
 
-/// <summary>One slice of the material cost per piece: a sub-assembly, or all of the packaging. Percent is its share of the material cost.</summary>
-public sealed record CostShareRow(string Name, decimal Amount, decimal Percent);
-
 /// <summary>
 /// One sellable pack priced from the product's per-piece material cost and the pack's own packaging lines.
 /// </summary>
@@ -337,7 +327,7 @@ public sealed record PackCostSummary(
 /// </summary>
 public sealed class ProductCostSummary
 {
-    public static ProductCostSummary Empty { get; } = new([], [], [], 0m, 0m, 0m, 0m, 0m);
+    public static ProductCostSummary Empty { get; } = new([], [], [], 0m, 0m, 0m, 0m, 0m, null);
 
     public ProductCostSummary(
         IReadOnlyList<decimal> usageCostsPerPiece,
@@ -347,7 +337,8 @@ public sealed class ProductCostSummary
         decimal overheadPercent,
         decimal administrativePercent,
         decimal marginPercent,
-        decimal vatPercent)
+        decimal vatPercent,
+        decimal? currentPrice)
     {
         SubAssemblies = usageCostsPerPiece.Sum();
         Packaging = packagingCostsPerPiece.Sum();
@@ -362,6 +353,10 @@ public sealed class ProductCostSummary
         VatPercent = vatPercent;
         (BaseCost, PreVatPrice, SellingPrice) = CostingRules.CalculateSellingPrice(
             Material, laborPercent, overheadPercent, administrativePercent, marginPercent, vatPercent);
+        CurrentPrice = currentPrice;
+        CurrentMarkupPercent = currentPrice is { } price
+            ? CostingRules.CalculateMarkupPercentFromPrice(BaseCost, price, vatPercent)
+            : null;
 
         // Each pack priced the same way, from its own material cost: the pieces it holds at the figure just
         // worked out, plus its own box and label. Same percentages — a pack has none of its own.
@@ -419,6 +414,18 @@ public sealed class ProductCostSummary
 
     public decimal ProfitMarginPercent => CostingRules.CalculateProfitMarginPercent(BaseCost, PreVatPrice);
 
+    /// <summary>What the shop charges for one piece now, with VAT, as entered on the form; null when not entered.</summary>
+    public decimal? CurrentPrice { get; }
+
+    /// <summary>
+    /// The markup CurrentPrice actually earns on the base cost, VAT taken out (as MarginPercent is on
+    /// SellingPrice); null when no current price is entered.
+    /// </summary>
+    public decimal? CurrentMarkupPercent { get; }
+
+    /// <summary>The current price doesn't cover the base cost: a negative markup, which the header shows in red.</summary>
+    public bool IsCurrentPriceBelowCost => CurrentMarkupPercent < 0;
+
     public decimal SubAssembliesShare => CostingRules.PercentOf(SubAssemblies, SellingPrice);
 
     public decimal PackagingShare => CostingRules.PercentOf(Packaging, SellingPrice);
@@ -447,11 +454,11 @@ public sealed class ProductCostSummary
 /// </summary>
 public sealed class ProductsViewModel : ViewModelBase, IDisposable
 {
-    /// <summary>The details tabs along the bottom: Recipe, Overview, Costing, Packs, then Clone.</summary>
+    /// <summary>The details tabs along the bottom: Recipe, Costing, Packs, then Clone.</summary>
     public const int RecipeTab = 0;
 
-    /// <summary>Recipe 0, Overview 1, Costing 2, Packs 3, then Clone.</summary>
-    public const int LinksTab = 4;
+    /// <summary>Recipe 0, Costing 1, Packs 2, then Clone.</summary>
+    public const int LinksTab = 3;
 
     private static readonly IReadOnlyDictionary<int, IReadOnlyList<string>> NoLinks = new Dictionary<int, IReadOnlyList<string>>();
 
@@ -637,9 +644,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     /// <summary>The form's packaging table can be typed into: a new or copied packaging, not a link.</summary>
     public bool IsFormEditingPackaging => IsFormPackaging && EditingUsageMode.Mode != UsageFormMode.Link;
 
-    /// <summary>Each sub-assembly's, and the packaging's, share of the material cost per piece: the Recipe Cost Overview.</summary>
-    public ObservableCollection<CostShareRow> CostShares { get; } = [];
-
     public IReadOnlyList<UsageFormModeOption> UsageFormModes { get; } = UsageFormModeOption.All;
 
     /// <summary>
@@ -710,6 +714,14 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     {
         get => _editingDescription;
         set => this.RaiseAndSetIfChanged(ref _editingDescription, value);
+    }
+
+    private decimal? _editingCurrentPrice;
+    /// <summary>What the shop charges for one piece now, with VAT (Product.CurrentPrice); null when not entered.</summary>
+    public decimal? EditingCurrentPrice
+    {
+        get => _editingCurrentPrice;
+        set => this.RaiseAndSetIfChanged(ref _editingCurrentPrice, value);
     }
 
     private string _categorySearchText = string.Empty;
@@ -810,13 +822,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _packagingLinkedToText, value);
     }
 
-    private bool _hasUsages;
-    public bool HasUsages
-    {
-        get => _hasUsages;
-        private set => this.RaiseAndSetIfChanged(ref _hasUsages, value);
-    }
-
     private bool _hasPackaging;
     /// <summary>
     /// The product has packaging, its own lines or a link, so the Recipe Structure has its Packaging tab. A new product
@@ -826,14 +831,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     {
         get => _hasPackaging;
         private set => this.RaiseAndSetIfChanged(ref _hasPackaging, value);
-    }
-
-    private bool _hasMaterialCost;
-    /// <summary>Whether there's any material cost to share out: the Recipe Cost Overview's chart shows only then.</summary>
-    public bool HasMaterialCost
-    {
-        get => _hasMaterialCost;
-        private set => this.RaiseAndSetIfChanged(ref _hasMaterialCost, value);
     }
 
     private ProductCostSummary _costs = ProductCostSummary.Empty;
@@ -1384,11 +1381,16 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             .Subscribe(_ =>
             {
                 PackagingLineRow.Resolve(LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
-                RecomputeRecipe();
+                RecomputeCosts();
             });
 
         this.WhenAnyValue(
-                x => x.EditingLaborPercent, x => x.EditingOverheadPercent, x => x.EditingAdministrativePercent, x => x.EditingMarginPercent, x => x.EditingVatPercent)
+                x => x.EditingLaborPercent,
+                x => x.EditingOverheadPercent,
+                x => x.EditingAdministrativePercent,
+                x => x.EditingMarginPercent,
+                x => x.EditingVatPercent,
+                x => x.EditingCurrentPrice)
             .Subscribe(_ => RecomputeCosts());
 
         // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
@@ -1472,7 +1474,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                 PackagingLineRow.Resolve(FormPackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
 
                 RecomputeUsageForm();
-                RecomputeRecipe();
+                RecomputeCosts();
             });
         });
 
@@ -1501,6 +1503,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                 Name = EditingName,
                 Description = string.IsNullOrWhiteSpace(EditingDescription) ? null : EditingDescription.Trim(),
                 CategoryId = EditingCategory?.Id,
+                CurrentPrice = EditingCurrentPrice,
             };
 
             var validation = _productValidator.Validate(product);
@@ -1670,7 +1673,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
                 UsageEdits.Remove(usage);
                 RefreshLinkableOptions();
-                RecomputeRecipe();
+                RecomputeCosts();
                 return Task.CompletedTask;
             }),
             this.WhenAnyValue(x => x.SelectedRecipeTab).Select(tab => tab is SubAssemblyRecipeTab or PackagingRecipeTab));
@@ -1736,7 +1739,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             var row = PackRowFor(new ProductPack { Name = $"Pack of {12}", PiecesPerPack = 12 });
             PackEdits.Add(row);
             SelectedPackEdit = row;
-            RecomputeRecipe();
+            RecomputeCosts();
         });
 
         RemovePackCommand = ReactiveCommand.Create(
@@ -1744,7 +1747,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             {
                 PackEdits.Remove(SelectedPackEdit!);
                 SelectedPackEdit = null;
-                RecomputeRecipe();
+                RecomputeCosts();
             },
             this.WhenAnyValue(x => x.SelectedPackEdit).Select(pack => pack is not null));
 
@@ -1780,6 +1783,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         EditingName = product.Name;
         EditingDescription = product.Description ?? string.Empty;
         EditingCategory = Categories.FirstOrDefault(c => c.Id == product.CategoryId);
+        EditingCurrentPrice = product.CurrentPrice;
         ShowUpdatedAt(product.UpdatedAt);
         EditingCloneName = $"{product.Name} Copy";
     }
@@ -1829,6 +1833,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         EditingName = string.Empty;
         EditingDescription = string.Empty;
         EditingCategory = null;
+        EditingCurrentPrice = null;
         IsDescriptionEditorOpen = false;
         ShowUpdatedAt(null);
         EditingCloneName = string.Empty;
@@ -1879,7 +1884,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         _savedPacks = [];
         SetCosting(null);
         RefreshLinkableOptions();
-        RecomputeRecipe();
+        RecomputeCosts();
 
         // A picked product's sub-assemblies are on their way, and pick the tab when they arrive.
         _isRecipeClearedForAnother = SelectedProduct is not null;
@@ -1933,7 +1938,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         ReplacePacks(detail.Packs);
         SetCosting(detail.Costing);
         RefreshLinkableOptions();
-        RecomputeRecipe();
+        RecomputeCosts();
     }
 
     /// <summary>Everything a product's detail shows, as LoadProductDetailAsync reads it.</summary>
@@ -2025,7 +2030,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         ShowPackagingLink(null);
         SetHasPackaging(false);
         RefreshLinkableOptions();
-        RecomputeRecipe();
+        RecomputeCosts();
     }
 
     /// <summary>The saved usages as sections, in recipe order; they're also what Save compares the recipe against.</summary>
@@ -2173,7 +2178,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                 }
 
                 row.RaiseLineCostChanged();
-                RecomputeRecipe();
+                RecomputeCosts();
             }));
     }
 
@@ -2392,7 +2397,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         SetHasPackaging(true);
         CloseUsageForm();
         RefreshLinkableOptions();
-        RecomputeRecipe();
+        RecomputeCosts();
         return PackagingTab;
     }
 
@@ -2482,7 +2487,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
         CloseUsageForm();
         RefreshLinkableOptions();
-        RecomputeRecipe();
+        RecomputeCosts();
         return usage;
     }
 
@@ -2789,7 +2794,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
         ReplaceInRecipeOrder(old, replacement);
         RefreshLinkableOptions();
-        RecomputeRecipe();
+        RecomputeCosts();
 
         // Its tab is its form, so the form opens again on what took its place.
         if (wasEditing)
@@ -3156,23 +3161,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             ? new SubAssemblyLineEdit(fresh, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)
             : l)];
 
-    /// <summary>After the recipe or packaging changed: each part's share of the material cost, and everything priced from them.</summary>
-    private void RecomputeRecipe()
-    {
-        RecomputeCosts();
-
-        var material = Costs.Material;
-        CostShares.Clear();
-        CostShares.AddRange(UsageEdits.Select(u => new CostShareRow(u.SectionName, u.CostPerPiece, CostingRules.PercentOf(u.CostPerPiece, material))));
-        if (LineEdits.Count > 0)
-        {
-            CostShares.Add(new CostShareRow("Packaging", Costs.Packaging, CostingRules.PercentOf(Costs.Packaging, material)));
-        }
-
-        HasUsages = UsageEdits.Count > 0;
-        HasMaterialCost = material > 0;
-    }
-
     /// <summary>The cost summary, from the recipe and packaging as they are now and the costing fields.</summary>
     private void RecomputeCosts()
     {
@@ -3184,7 +3172,8 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             EditingOverheadPercent,
             EditingAdministrativePercent,
             EditingMarginPercent,
-            EditingVatPercent);
+            EditingVatPercent,
+            EditingCurrentPrice);
 
         // Back onto the rows, so the Packs table shows each pack's own cost and price beside it.
         foreach (var (row, summary) in PackEdits.Zip(Costs.Packs))

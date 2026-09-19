@@ -49,6 +49,16 @@ public static class CostingRules
     public static decimal CalculateProfitMarginPercent(decimal baseCost, decimal preVatPrice) =>
         PercentOf(preVatPrice - baseCost, preVatPrice);
 
+    /// <summary>
+    /// The markup a price with VAT actually earns, as a percentage of the base cost: VAT taken out first, as
+    /// CalculateSellingPrice adds it last. The price CalculateSellingPrice works out gives back its margin.
+    /// </summary>
+    public static decimal CalculateMarkupPercentFromPrice(decimal baseCost, decimal sellingPrice, decimal vatPercent)
+    {
+        var preVatPrice = sellingPrice / (1 + vatPercent / 100m);
+        return PercentOf(preVatPrice - baseCost, baseCost);
+    }
+
     /// <summary><paramref name="part"/> as a percentage of <paramref name="whole"/>, or 0 when there's nothing to share.</summary>
     public static decimal PercentOf(decimal part, decimal whole) =>
         whole == 0 ? 0 : part / whole * 100m;

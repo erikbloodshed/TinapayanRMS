@@ -129,6 +129,33 @@ public class CostingRulesTests
     }
 
     [Fact]
+    public void CalculateMarkupPercentFromPrice_takes_VAT_out_then_gives_the_markup_on_the_base_cost()
+    {
+        // ₱145.60 with 12% VAT is ₱130 before VAT: ₱30 on ₱100 of cost.
+        CostingRules.CalculateMarkupPercentFromPrice(baseCost: 100m, sellingPrice: 145.60m, vatPercent: 12m).Should().Be(30m);
+    }
+
+    [Fact]
+    public void CalculateMarkupPercentFromPrice_gives_back_the_margin_of_the_price_CalculateSellingPrice_works_out()
+    {
+        var (baseCost, _, sellingPrice) = CostingRules.CalculateSellingPrice(4.50m, 25m, 15m, 10m, 30m, 12m);
+
+        CostingRules.CalculateMarkupPercentFromPrice(baseCost, sellingPrice, vatPercent: 12m).Should().BeApproximately(30m, 0.0000001m);
+    }
+
+    [Fact]
+    public void CalculateMarkupPercentFromPrice_is_negative_for_a_price_under_the_cost()
+    {
+        CostingRules.CalculateMarkupPercentFromPrice(baseCost: 100m, sellingPrice: 89.60m, vatPercent: 12m).Should().Be(-20m);
+    }
+
+    [Fact]
+    public void CalculateMarkupPercentFromPrice_is_zero_with_no_base_cost()
+    {
+        CostingRules.CalculateMarkupPercentFromPrice(baseCost: 0m, sellingPrice: 10m, vatPercent: 12m).Should().Be(0m);
+    }
+
+    [Fact]
     public void PercentOf_gives_the_parts_share_of_the_whole()
     {
         CostingRules.PercentOf(part: 6m, whole: 59.45m).Should().BeApproximately(10.0925m, 0.0001m);

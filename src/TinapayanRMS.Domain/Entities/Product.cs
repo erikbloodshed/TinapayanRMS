@@ -15,6 +15,12 @@ public class Product
     public ProductCategory? Category { get; set; }
 
     /// <summary>
+    /// What the shop charges for one piece now, with VAT, as entered: set beside the computed selling price to
+    /// see the markup it actually earns. Optional: null when not entered.
+    /// </summary>
+    public decimal? CurrentPrice { get; set; }
+
+    /// <summary>
     /// When the product was last saved, in local time: set each time it's added or updated, and for a
     /// clone when it's made. Null for a product not saved since this was added.
     /// </summary>

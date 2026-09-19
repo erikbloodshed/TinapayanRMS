@@ -53,7 +53,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var creamId = await AddIngredientAsync("Cream", costPerGram: 0.2m);
         var (_, linkedFillingId) = await AddProductWithSubAssemblyAsync("Cream Loaf", fillingRoleId, [(creamId, 500m)]);
         var boxId = await SeedBoxAsync();
-        var product = new Product { Name = "Cream Loaf Mini", Description = "A small cream loaf" };
+        var product = new Product { Name = "Cream Loaf Mini", Description = "A small cream loaf", CurrentPrice = 25.50m };
 
         var id = await CreateProductRepository().SaveAsync(
             product,
@@ -70,6 +70,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var saved = (await CreateProductRepository().GetByIdAsync(id, Cancellation))!;
         saved.Name.Should().Be("Cream Loaf Mini");
         saved.Description.Should().Be("A small cream loaf");
+        saved.CurrentPrice.Should().Be(25.50m);
         saved.UpdatedAt.Should().BeCloseTo(DateTime.Now, TimeSpan.FromMinutes(1));
 
         var usages = await CreateUsageRepository().GetForProductAsync(id, Cancellation);

@@ -67,7 +67,13 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                 .ToListAsync(cancellationToken))
             .ToLookup(l => l.PackId!.Value);
 
-        var newProduct = new Product { Name = newProductName, Description = source.Description, CategoryId = source.CategoryId };
+        var newProduct = new Product
+        {
+            Name = newProductName,
+            Description = source.Description,
+            CategoryId = source.CategoryId,
+            CurrentPrice = source.CurrentPrice,
+        };
         await ProductRepository.AddAsync(dbContext, newProduct, cancellationToken);
 
         // A standalone sub-assembly stays linked, at the same piece size: it's kept apart to be shared.

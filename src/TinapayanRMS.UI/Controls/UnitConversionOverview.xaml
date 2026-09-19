@@ -4,7 +4,6 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             xmlns:local="clr-namespace:TinapayanRMS.UI.Controls"
              x:Name="Root"
              d:DesignHeight="260" d:DesignWidth="360">
     <UserControl.Resources>
@@ -42,48 +41,6 @@
             </StackPanel>
         </DataTemplate>
 
-        <!--
-            ShowAsRows: a row per unit, its box pointing right at what it comes to. The boxes share one
-            width (SharedSizeGroup), so the arrows line up; a long name wraps inside its box.
-        -->
-        <DataTemplate x:Key="RowTemplate">
-            <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" SharedSizeGroup="UnitBox" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <Border Background="{StaticResource CardBackgroundBrush}"
-                        BorderBrush="{StaticResource AccentBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Padding="12,8">
-                    <TextBlock HorizontalAlignment="Center"
-                               TextAlignment="Center"
-                               TextWrapping="Wrap"
-                               MaxWidth="170"
-                               FontSize="15"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource HeadingForegroundBrush}">
-                        <Run Text="1" />
-                        <Run Text="{Binding UnitName, Mode=OneWay}" />
-                    </TextBlock>
-                </Border>
-                <TextBlock Grid.Column="1"
-                           Margin="10,0"
-                           VerticalAlignment="Center"
-                           Style="{StaticResource IconGlyphStyle}"
-                           FontSize="16"
-                           Foreground="{StaticResource AccentBrush}"
-                           Text="&#xE72A;" />
-                <TextBlock Grid.Column="2"
-                           VerticalAlignment="Center"
-                           FontSize="14"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource HeadingForegroundBrush}"
-                           Text="{Binding BaseEquivalentText}" />
-            </Grid>
-        </DataTemplate>
     </UserControl.Resources>
 
     <StackPanel>
@@ -96,40 +53,19 @@
         </TextBlock>
 
         <StackPanel Visibility="{Binding HasItems, ElementName=Root, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <!--
-                One box per alternative unit, each pointing down into the base unit; or, with ShowAsRows,
-                a row per unit pointing right at what it comes to (the base unit box then isn't drawn).
-            -->
-            <ItemsControl ItemsSource="{Binding ItemsSource, ElementName=Root}" HorizontalAlignment="Center" Grid.IsSharedSizeScope="True">
-                <ItemsControl.Style>
-                    <Style TargetType="ItemsControl">
-                        <Setter Property="ItemTemplate" Value="{StaticResource PointingDownTemplate}" />
-                        <Setter Property="ItemsPanel">
-                            <Setter.Value>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel HorizontalAlignment="Center" />
-                                </ItemsPanelTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding ShowAsRows, RelativeSource={RelativeSource AncestorType=local:UnitConversionOverview}}" Value="True">
-                                <Setter Property="ItemTemplate" Value="{StaticResource RowTemplate}" />
-                                <Setter Property="ItemsPanel">
-                                    <Setter.Value>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel />
-                                        </ItemsPanelTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ItemsControl.Style>
+            <!-- One box per alternative unit, each pointing down into the base unit -->
+            <ItemsControl ItemsSource="{Binding ItemsSource, ElementName=Root}"
+                          ItemTemplate="{StaticResource PointingDownTemplate}"
+                          HorizontalAlignment="Center">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel HorizontalAlignment="Center" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
             </ItemsControl>
 
             <!-- The base unit everything converts to -->
             <Border HorizontalAlignment="Center"
-                    Visibility="{Binding ShowAsRows, ElementName=Root, Converter={StaticResource EmptyStateVisibilityConverter}}"
                     Margin="0,4,0,0"
                     MinWidth="120"
                     Background="{StaticResource CardBackgroundBrush}"

@@ -15,6 +15,14 @@
         <Style x:Key="FigureAmountStyle" TargetType="TextBlock" BasedOn="{StaticResource FigureValueStyle}">
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+        <!-- The markup the current price earns: red when the price doesn't cover the base cost -->
+        <Style x:Key="CurrentMarkupStyle" TargetType="TextBlock" BasedOn="{StaticResource FigureAmountStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Costs.IsCurrentPriceBelowCost}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource ErrorForegroundBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
 
         <!--
             The Category picker's rows: a line under its "< Add New .. >" row (ProductsViewModel.AddNewCategory), drawn as
@@ -67,7 +75,8 @@
     <!--
         The product's title under its initial, with its description as a link under the title (the link opens
         a pop-up to edit it), and New/Save/Delete; then a row of figures: the name, the category, the base unit, the
-        material cost and selling price per piece, and when it was last saved.
+        material cost and selling price per piece, the price the shop charges now (entered) with the markup it earns,
+        and when it was last saved.
     -->
     <Grid>
         <Grid.RowDefinitions>
@@ -184,6 +193,10 @@
                 <ColumnDefinition Width="24" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="24" />
+                <ColumnDefinition Width="1.1*" />
+                <ColumnDefinition Width="24" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="24" />
                 <ColumnDefinition Width="1.3*" />
             </Grid.ColumnDefinitions>
 
@@ -215,9 +228,30 @@
                        Style="{StaticResource FigureAmountStyle}"
                        Foreground="{StaticResource AccentBrush}" />
 
-            <TextBlock Grid.Column="10" Text="Last Updated" Style="{StaticResource FigureLabelStyle}" />
+            <!-- Entered, and saved with the product. Empty rather than 0.00 until typed (UseNullOption). -->
+            <TextBlock Grid.Column="10" Text="Current Price" Style="{StaticResource FigureLabelStyle}" ToolTip="Per piece, with VAT: what the shop charges now" />
+            <syncfusion:CurrencyTextBox Grid.Row="1"
+                                        Grid.Column="10"
+                                        Value="{Binding EditingCurrentPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        UseNullOption="True"
+                                        NullValue="{x:Null}"
+                                        MinValue="0"
+                                        CurrencySymbol="₱"
+                                        CurrencyDecimalDigits="2"
+                                        ToolTip="Per piece, with VAT: what the shop charges now. Markup % shows what it earns." />
+
+            <TextBlock Grid.Column="12"
+                       Text="Markup %"
+                       Style="{StaticResource FigureLabelStyle}"
+                       ToolTip="What the current price earns on the base cost, VAT taken out: the costing's Markup % at that price" />
             <TextBlock Grid.Row="1"
-                       Grid.Column="10"
+                       Grid.Column="12"
+                       Text="{Binding Costs.CurrentMarkupPercent, StringFormat='{}{0:N2}%', TargetNullValue='—'}"
+                       Style="{StaticResource CurrentMarkupStyle}" />
+
+            <TextBlock Grid.Column="14" Text="Last Updated" Style="{StaticResource FigureLabelStyle}" />
+            <TextBlock Grid.Row="1"
+                       Grid.Column="14"
                        Text="{Binding LastUpdatedText}"
                        ToolTip="{Binding LastUpdatedText}"
                        Style="{StaticResource FigureValueStyle}" />

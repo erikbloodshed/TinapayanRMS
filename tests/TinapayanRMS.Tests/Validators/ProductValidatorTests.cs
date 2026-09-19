@@ -35,4 +35,21 @@ public class ProductValidatorTests
 
         _validator.Validate(product).IsValid.Should().BeFalse();
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0.0)]
+    [InlineData(25.5)]
+    public void Accepts_no_current_price_or_one_of_zero_or_more(double? currentPrice)
+    {
+        var product = new Product { Name = "Ensaymada", CurrentPrice = (decimal?)currentPrice };
+
+        _validator.Validate(product).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Rejects_a_negative_current_price()
+    {
+        _validator.Validate(new Product { Name = "Ensaymada", CurrentPrice = -0.01m }).IsValid.Should().BeFalse();
+    }
 }

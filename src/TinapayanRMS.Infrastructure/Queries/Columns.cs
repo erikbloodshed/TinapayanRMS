@@ -27,7 +27,7 @@ internal static class Columns
         [typeof(SubAssemblyLine)] = ["Id", "SubAssemblyId", "IngredientId", "Grams", "IsFormulaBase", "AuthoredBakersPercent"],
         [typeof(SubAssemblyPackagingLine)] = ["Id", "SubAssemblyId", "PackagingMaterialId", "QtyPerSet"],
         [typeof(ProductCategory)] = ["Id", "Name"],
-        [typeof(Product)] = ["Id", "Name", "Description", "CategoryId", "UpdatedAt"],
+        [typeof(Product)] = ["Id", "Name", "Description", "CategoryId", "UpdatedAt", "CurrentPrice"],
         [typeof(ProductPack)] = ["Id", "ProductId", "Name", "PiecesPerPack"],
         [typeof(ProductSubAssemblyUsage)] = ["Id", "ProductId", "SubAssemblyId", "AuthoredField", "AuthoredValue"],
         [typeof(UsageAddInLine)] = ["Id", "UsageId", "IngredientId", "Grams"],

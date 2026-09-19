@@ -14,5 +14,9 @@ public class ProductValidator : AbstractValidator<Product>
         RuleFor(p => p.Description)
             .MaximumLength(MaxDescriptionLength)
             .WithMessage($"The description can be at most {MaxDescriptionLength} characters.");
+        RuleFor(p => p.CurrentPrice)
+            .GreaterThanOrEqualTo(0m)
+            .When(p => p.CurrentPrice is not null)
+            .WithMessage("The current price can't be negative.");
     }
 }

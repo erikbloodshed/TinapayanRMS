@@ -314,6 +314,22 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     }
 
     [Fact]
+    public async Task ProductRepository_stores_the_current_price_and_clears_it()
+    {
+        var repository = CreateProductRepository();
+        var product = new Product { Name = "Cream Loaf", CurrentPrice = 28.75m };
+
+        await repository.AddAsync(product, Cancellation);
+        (await repository.GetByIdAsync(product.Id, Cancellation))!.CurrentPrice.Should().Be(28.75m);
+
+        await repository.UpdateAsync(new Product { Id = product.Id, Name = "Cream Loaf", CurrentPrice = 30m }, Cancellation);
+        (await repository.GetByIdAsync(product.Id, Cancellation))!.CurrentPrice.Should().Be(30m);
+
+        await repository.UpdateAsync(new Product { Id = product.Id, Name = "Cream Loaf", CurrentPrice = null }, Cancellation);
+        (await repository.GetByIdAsync(product.Id, Cancellation))!.CurrentPrice.Should().BeNull();
+    }
+
+    [Fact]
     public async Task ProductRepository_GetByIdAsync_returns_null_for_a_nonexistent_product()
     {
         (await CreateProductRepository().GetByIdAsync(999_999, Cancellation)).Should().BeNull();
