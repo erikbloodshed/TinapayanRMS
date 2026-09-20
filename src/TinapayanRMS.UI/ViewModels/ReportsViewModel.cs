@@ -155,11 +155,13 @@ public class ReportsViewModel : ReactiveObject
                     l.PackagingMaterial!.BufferedCostPerBaseUnit, l.QtyPerUnit, l.Unit?.BaseUnitsPerUnit))
                 .ToList();
 
-            var materialCostPerPiece = ProductRules.CalculateMaterialCostPerPiece(usageCosts, packagingCosts);
+            // Per sellable unit, as the Products screen prices it: the pieces that unit holds at the recipe's
+            // cost per piece, plus the packaging that wraps the whole unit.
+            var materialCost = ProductRules.CalculateMaterialCost(usageCosts, product.QuantityRequired, packagingCosts);
 
             var costingParameters = await _costingParametersRepository.GetForProductAsync(product.Id, CancellationToken.None);
             var (baseCost, _, sellingPrice) = CostingRules.CalculateSellingPrice(
-                materialCostPerPiece,
+                materialCost,
                 costingParameters?.LaborPercent ?? 0m,
                 costingParameters?.OverheadPercent ?? 0m,
                 costingParameters?.AdministrativePercent ?? 0m,

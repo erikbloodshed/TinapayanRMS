@@ -40,7 +40,8 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.FormPackagingLines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
         viewModel.UsageFormPreviewText.Should().Be("₱30.0000 a piece");
 
-        await viewModel.ApplyUsageCommand.Execute();
+        // The form has no Apply of its own: Save puts it in the recipe and shows its tab, as leaving the tab would.
+        await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
@@ -49,11 +50,10 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.IsPackagingLinked.Should().BeFalse();
         viewModel.Costs.Packaging.Should().Be(30m);
 
-        // One packaging to a product: the role isn't offered again.
+        // One packaging to a product: the role isn't offered again. Nothing is typed into this form, so Save drops it.
         await viewModel.AddUsageCommand.Execute();
         viewModel.FormRoleOptions.Select(r => r.Name).Should().Equal("Dough");
         viewModel.LinkableSubAssemblies.Should().NotContain(o => o.IsPackaging);
-        await viewModel.CancelUsageCommand.Execute();
 
         await viewModel.SaveCommand.Execute();
 
@@ -85,7 +85,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
 
         viewModel.EditingUsageRole = viewModel.FormRoleOptions.Single(r => r.IsPackaging);
         viewModel.FormPackagingLines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
-        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
         (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((false, true));
 
@@ -115,7 +115,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.IsFormPackaging.Should().BeTrue();
         viewModel.IsFormEditingPackaging.Should().BeFalse("a link's lines are kept where it's from");
 
-        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
@@ -124,9 +124,6 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.PackagingLinkedToText.Should().Be("Linked to Gift Box Set (Sub-Assemblies)");
         viewModel.Costs.Packaging.Should().Be(31.5m, "one set per piece: a ₱30 box and 30 cm of ribbon at ₱0.05");
 
-        await viewModel.SaveCommand.Execute();
-
-        viewModel.ErrorMessage.Should().BeNull();
         await using (var dbContext = CreateDbContext())
         {
             var link = await dbContext.PackagingLinks.SingleAsync(Cancellation);
@@ -158,7 +155,6 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.IsFormEditingPackaging.Should().BeTrue();
         viewModel.FormPackagingLines.Single().QtyPerUnit = 3m;
 
-        await viewModel.ApplyUsageCommand.Execute();
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -256,8 +252,8 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal(
             ["Gift Box Set — Sub-Assemblies (Packaging)", "Packaging — Cream Loaf"],
             "a product never links its own packaging");
-        await viewModel.CancelUsageCommand.Execute();
 
+        // Picking another product closes the form with nothing applied, which is what abandons this add now.
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == ownId);
         await WaitUntilSettledAsync(() => viewModel.HasPackaging, () => $"has packaging={viewModel.HasPackaging}");
         await viewModel.AddUsageCommand.Execute();
@@ -301,7 +297,6 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
             new ProductRepository(factory),
             new ProductSubAssemblyUsageRepository(factory),
             packagingLineRepository,
-            new ProductPackRepository(factory),
             new CostingParametersRepository(factory),
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory, packagingLineRepository),

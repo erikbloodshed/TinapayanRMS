@@ -138,56 +138,32 @@ public class ProductRulesTests
     [Fact]
     public void EnsureValidPackagingLines_rejects_a_non_positive_quantity()
     {
-        var act = () => ProductRules.EnsureValidPackagingLines([(PackId: null, PackagingMaterialId: 1, QtyPerUnit: 0m)]);
+        var act = () => ProductRules.EnsureValidPackagingLines([(PackagingMaterialId: 1, QtyPerUnit: 0m)]);
 
         act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void EnsureValidPackagingLines_rejects_the_same_material_twice_per_piece()
+    public void EnsureValidPackagingLines_rejects_the_same_material_twice()
     {
+        // One line per material: a material a unit takes twice over belongs on a single line, at the
+        // combined quantity. There's no second place for it to be since packs went.
         var act = () => ProductRules.EnsureValidPackagingLines(
         [
-            (PackId: null, PackagingMaterialId: 1, QtyPerUnit: 5m),
-            (PackId: null, PackagingMaterialId: 1, QtyPerUnit: 3m),
+            (PackagingMaterialId: 1, QtyPerUnit: 5m),
+            (PackagingMaterialId: 1, QtyPerUnit: 3m),
         ]);
 
         act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void EnsureValidPackagingLines_rejects_the_same_material_twice_on_one_pack()
+    public void EnsureValidPackagingLines_accepts_different_materials()
     {
         var act = () => ProductRules.EnsureValidPackagingLines(
         [
-            (PackId: (int?)7, PackagingMaterialId: 1, QtyPerUnit: 1m),
-            (PackId: (int?)7, PackagingMaterialId: 1, QtyPerUnit: 2m),
-        ]);
-
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void EnsureValidPackagingLines_allows_one_material_to_wrap_the_piece_and_a_pack()
-    {
-        // A cello sheet around each piece, and the same sheet shrink-wrapping the pack of 12 as a whole:
-        // two different jobs for one material, so neither is the other's duplicate.
-        var act = () => ProductRules.EnsureValidPackagingLines(
-        [
-            (PackId: null, PackagingMaterialId: 1, QtyPerUnit: 1m),
-            (PackId: (int?)7, PackagingMaterialId: 1, QtyPerUnit: 1m),
-        ]);
-
-        act.Should().NotThrow();
-    }
-
-    [Fact]
-    public void EnsureValidPackagingLines_allows_two_packs_to_take_the_same_material()
-    {
-        var act = () => ProductRules.EnsureValidPackagingLines(
-        [
-            (PackId: (int?)7, PackagingMaterialId: 1, QtyPerUnit: 1m),
-            (PackId: (int?)8, PackagingMaterialId: 1, QtyPerUnit: 1m),
+            (PackagingMaterialId: 1, QtyPerUnit: 1m),
+            (PackagingMaterialId: 2, QtyPerUnit: 8m),
         ]);
 
         act.Should().NotThrow();
@@ -213,52 +189,6 @@ public class ProductRulesTests
         unitsPerPackagingUnit.Should().Be(1m / 12m);
     }
 
-
-    [Fact]
-    public void EnsureValidPacks_accepts_a_product_with_no_packs()
-    {
-        // Most products are sold by the piece only.
-        var act = () => ProductRules.EnsureValidPacks([]);
-
-        act.Should().NotThrow();
-    }
-
-    [Fact]
-    public void EnsureValidPacks_rejects_a_pack_with_no_name()
-    {
-        var act = () => ProductRules.EnsureValidPacks([(Name: "  ", PiecesPerPack: 12)]);
-
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void EnsureValidPacks_rejects_a_pack_that_holds_no_pieces()
-    {
-        var act = () => ProductRules.EnsureValidPacks([(Name: "Pack of 0", PiecesPerPack: 0)]);
-
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void EnsureValidPacks_rejects_two_packs_with_the_same_name_ignoring_case()
-    {
-        var act = () => ProductRules.EnsureValidPacks([(Name: "Pack of 12", PiecesPerPack: 12), (Name: "pack of 12", PiecesPerPack: 6)]);
-
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void CalculatePackMaterialCost_adds_the_packs_own_box_to_the_pieces_it_holds()
-    {
-        // 8 pieces at P4.50 of materials each is P36, and the box they go in is P12 on top.
-        ProductRules.CalculatePackMaterialCost(4.50m, 8, [12m]).Should().Be(48m);
-    }
-
-    [Fact]
-    public void CalculatePackMaterialCost_of_a_pack_with_no_box_is_just_its_pieces()
-    {
-        ProductRules.CalculatePackMaterialCost(4.50m, 8, []).Should().Be(36m);
-    }
 
     [Fact]
     public void ReconcileReciprocal_rejects_an_undefined_authored_field()
@@ -299,9 +229,23 @@ public class ProductRulesTests
     }
 
     [Fact]
-    public void CalculateMaterialCostPerPiece_sums_usage_and_packaging_costs()
+    public void CalculateMaterialCost_sums_usage_and_packaging_costs_for_a_product_sold_by_the_piece()
     {
-        ProductRules.CalculateMaterialCostPerPiece([2.4m, 1.1m], [0.5715m, 0.3m]).Should().Be(4.3715m);
+        ProductRules.CalculateMaterialCost([2.4m, 1.1m], 1, [0.5715m, 0.3m]).Should().Be(4.3715m);
+    }
+
+    [Fact]
+    public void CalculateMaterialCost_multiplies_only_the_recipe_by_the_quantity_required()
+    {
+        // A Box of 8: 8 pieces at ₱4.50 of recipe each is ₱36, and the box they go in is ₱12 on top —
+        // once, not eight times, because a packaging line is already for one whole sellable unit.
+        ProductRules.CalculateMaterialCost([4.50m], 8, [12m]).Should().Be(48m);
+    }
+
+    [Fact]
+    public void CalculateMaterialCost_of_a_unit_with_no_packaging_is_just_its_pieces()
+    {
+        ProductRules.CalculateMaterialCost([4.50m], 8, []).Should().Be(36m);
     }
 
     [Fact]

@@ -41,6 +41,7 @@
                 <!-- Updated when focus leaves, since the value it shows back is rounded to the centavo -->
                 <syncfusion:DoubleTextBox Grid.Row="1"
                                           Grid.Column="2"
+                                          controls:FieldUndoStep.Recorder="{Binding}"
                                           Value="{Binding EditingBufferedCostInUnit, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                                           NumberDecimalDigits="-1"
                                           MinimumNumberDecimalDigits="2"
@@ -53,6 +54,7 @@
                                         Grid.Column="4"
                                         ItemsSource="{Binding BufferedCostUnitOptions}"
                                         DisplayMemberPath="Name"
+                                        controls:FieldUndoStep.Recorder="{Binding}"
                                         SelectedItem="{Binding BufferedCostUnit, Mode=TwoWay}"
                                         ToolTip="The unit the buffered cost is shown and typed in. It's kept per base unit either way." />
                 <syncfusion:ButtonAdv Grid.Row="0"
@@ -84,6 +86,7 @@
                 saved unit's multiplier is corrected in the Alternative Units table.
             -->
             <syncfusion:SfDataGrid ItemsSource="{Binding BrandPriceRows}"
+                                   controls:GridUndoSteps.Recorder="{Binding}"
                                    controls:NumericEditing.IsEnabled="True"
                                    SelectedItem="{Binding SelectedBrandPriceRow, Mode=TwoWay}"
                                    GridLinesVisibility="Both"

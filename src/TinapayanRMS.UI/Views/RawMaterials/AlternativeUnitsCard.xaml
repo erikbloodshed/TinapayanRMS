@@ -15,6 +15,7 @@
                 comes from the screen (NewUnitRow), so it names its unit as soon as one is picked.
             -->
             <syncfusion:SfDataGrid ItemsSource="{Binding UnitRows}"
+                                   controls:GridUndoSteps.Recorder="{Binding}"
                                    SelectedItem="{Binding SelectedUnitRow, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"

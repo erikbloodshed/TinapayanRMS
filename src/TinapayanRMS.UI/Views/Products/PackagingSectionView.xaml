@@ -11,18 +11,35 @@
     -->
     <StackPanel Margin="8">
         <!--
-            No title: its tab already says Packaging. A badge when it's linked; the cost per piece sits on the Remove Line
-            row, under its table.
+            No title: its tab already says Packaging. A badge when it's linked, and what a piece of it costs at the far
+            right of the same row, as the recipe's other sub-assemblies have them (UsageFormPanel's badge row).
         -->
-        <Border HorizontalAlignment="Left"
-                Style="{StaticResource LinkedBadgeStyle}"
-                Margin="0,0,0,10"
-                Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <TextBlock Text="{Binding PackagingLinkedToText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
-        </Border>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Border HorizontalAlignment="Left"
+                    Style="{StaticResource LinkedBadgeStyle}"
+                    Margin="0,0,0,10"
+                    Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="{Binding PackagingLinkedToText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
+            </Border>
+            <TextBlock Grid.Column="1"
+                       Style="{StaticResource CaptionStyle}"
+                       VerticalAlignment="Center"
+                       Margin="12,0,0,10">
+                <Run Text="{Binding CostUnitCaption, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Costs.Packaging, StringFormat='₱{0:N4}', Mode=OneWay}" />
+            </TextBlock>
+        </Grid>
 
-        <!-- A line's quantity is how much of the material one piece takes, always in the material's base unit -->
+        <!--
+            A line's quantity is how much of the material one whole sellable unit takes — a piece, unless the product's
+            Quantity Required says otherwise — always in the material's base unit. Quantities are typed, so changing
+            Quantity Required doesn't rescale them; the caption above says what a unit is.
+        -->
         <syncfusion:SfDataGrid ItemsSource="{Binding LineEdits}"
+                               controls:GridUndoSteps.Recorder="{Binding}"
                                controls:NumericEditing.IsEnabled="True"
                                SelectedItem="{Binding SelectedLineEdit, Mode=TwoWay}"
                                GridLinesVisibility="Both"
@@ -70,27 +87,17 @@
                 <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
                 <syncfusion:GridTextColumn MappingName="Unit" HeaderText="Unit" Width="64" AllowEditing="False" />
                 <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" AllowEditing="False" />
-                <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Piece" Width="104" NumberDecimalDigits="4" AllowEditing="False" />
+                <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Unit" Width="104" NumberDecimalDigits="4" AllowEditing="False" />
             </syncfusion:SfDataGrid.Columns>
         </syncfusion:SfDataGrid>
 
-        <!-- Remove Line only while its lines are this product's own; the cost per piece either way -->
+        <!-- Remove Line only while its lines are this product's own; the cost per unit is up in the badge row -->
         <Grid Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <!-- What a piece of it costs, on the same row as Remove Line -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                <TextBlock Text="Cost per piece" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <TextBlock Text="{Binding Costs.Packaging, StringFormat='₱{0:N4}'}"
-                           FontSize="16"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource HeadingForegroundBrush}"
-                           VerticalAlignment="Center" />
-            </StackPanel>
-            <syncfusion:ButtonAdv Grid.Column="2"
+            <syncfusion:ButtonAdv Grid.Column="1"
                                   Label="Remove Line"
                                   IconTemplate="{StaticResource RemoveIconTemplate}"
                                   Command="{Binding RemoveLineCommand}"

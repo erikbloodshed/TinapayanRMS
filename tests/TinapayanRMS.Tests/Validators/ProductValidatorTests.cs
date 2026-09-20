@@ -21,6 +21,24 @@ public class ProductValidatorTests
     }
 
     [Fact]
+    public void A_new_product_holds_one_piece()
+    {
+        new Product { Name = "Ensaymada" }.QuantityRequired.Should().Be(1);
+    }
+
+    [Fact]
+    public void Accepts_a_quantity_required_of_more_than_one_piece()
+    {
+        _validator.Validate(new Product { Name = "Ensaymada Box of 8", QuantityRequired = 8 }).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Rejects_a_quantity_required_below_one()
+    {
+        _validator.Validate(new Product { Name = "Ensaymada", QuantityRequired = 0 }).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
     public void Accepts_a_description_at_the_limit()
     {
         var product = new Product { Name = "Ensaymada", Description = new string('a', ProductValidator.MaxDescriptionLength) };

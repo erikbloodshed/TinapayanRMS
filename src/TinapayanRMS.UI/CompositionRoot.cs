@@ -58,7 +58,6 @@ public static class CompositionRoot
                 services.AddSingleton<IProductRepository, ProductRepository>();
                 services.AddSingleton<IProductSubAssemblyUsageRepository, ProductSubAssemblyUsageRepository>();
                 services.AddSingleton<IPackagingLineRepository, PackagingLineRepository>();
-        services.AddSingleton<IProductPackRepository, ProductPackRepository>();
                 services.AddSingleton<ICostingParametersRepository, CostingParametersRepository>();
                 services.AddSingleton<ICostingDefaultsRepository, CostingDefaultsRepository>();
                 services.AddSingleton<IPackagingLinkRepository, PackagingLinkRepository>();
@@ -74,7 +73,6 @@ public static class CompositionRoot
                 services.AddSingleton<IValidator<SubAssembly>, SubAssemblyValidator>();
                 services.AddSingleton<IValidator<Product>, ProductValidator>();
                 services.AddSingleton<IValidator<CostingParameters>, CostingParametersValidator>();
-        services.AddSingleton<IValidator<ProductPack>, ProductPackValidator>();
                 services.AddSingleton<IValidator<RawMaterialBrandPrice>, RawMaterialBrandPriceValidator>();
 
                 services.AddSingleton<MainWindowViewModel>();

@@ -27,12 +27,11 @@ internal static class Columns
         [typeof(SubAssemblyLine)] = ["Id", "SubAssemblyId", "IngredientId", "Grams", "IsFormulaBase", "AuthoredBakersPercent"],
         [typeof(SubAssemblyPackagingLine)] = ["Id", "SubAssemblyId", "PackagingMaterialId", "QtyPerSet"],
         [typeof(ProductCategory)] = ["Id", "Name"],
-        [typeof(Product)] = ["Id", "Name", "Description", "CategoryId", "UpdatedAt", "CurrentPrice"],
-        [typeof(ProductPack)] = ["Id", "ProductId", "Name", "PiecesPerPack"],
+        [typeof(Product)] = ["Id", "Name", "Description", "CategoryId", "QuantityRequired", "UpdatedAt", "CurrentPrice"],
         [typeof(ProductSubAssemblyUsage)] = ["Id", "ProductId", "SubAssemblyId", "AuthoredField", "AuthoredValue"],
         [typeof(UsageAddInLine)] = ["Id", "UsageId", "IngredientId", "Grams"],
         [typeof(PackagingLine)] =
-            ["Id", "ProductId", "PackId", "PackagingMaterialId", "UnitId", "QtyPerUnit", "UnitsPerPackagingUnit", "AuthoredField"],
+            ["Id", "ProductId", "PackagingMaterialId", "UnitId", "QtyPerUnit", "UnitsPerPackagingUnit", "AuthoredField"],
         [typeof(CostingParameters)] =
             ["Id", "ProductId", "LaborPercent", "OverheadPercent", "AdministrativePercent", "MarginPercent", "VatPercent"],
         [typeof(CostingDefaults)] = ["Id", "LaborPercent", "OverheadPercent", "AdministrativePercent", "MarginPercent", "VatPercent"],

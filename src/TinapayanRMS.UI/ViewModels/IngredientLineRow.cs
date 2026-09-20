@@ -41,6 +41,32 @@ public sealed class IngredientLineRow : ReactiveObject
         _authoredBakersPercent = isFormulaBase ? null : authoredBakersPercent;
     }
 
+    /// <summary>
+    /// A row put back exactly as it stood, which is what an undo needs (ProductsViewModel's history). The
+    /// public setters can't do it: typing grams or ticking the base lets a typed percentage go, and
+    /// <see cref="Percent"/> refuses to take one while there's no base to read it against — a state a row is
+    /// allowed to be in, and the one case where restoring through the setters would lose the figure silently.
+    /// The row is left half filled in if that's how it stood, ingredient and all, which the other constructors
+    /// can't express either. <see cref="BaseWeight"/> and <see cref="BatchWeight"/> aren't taken: the caller's
+    /// single <see cref="ApplyFormulaBase(IEnumerable{IngredientLineRow}, decimal, decimal)"/> pass sets both.
+    /// </summary>
+    public static IngredientLineRow Restore(
+        Func<int, RawMaterial?> findIngredient,
+        decimal baseWeight,
+        int? ingredientId,
+        decimal? grams,
+        bool isFormulaBase,
+        decimal? authoredBakersPercent)
+    {
+        var row = new IngredientLineRow(findIngredient, baseWeight);
+        row._ingredientId = ingredientId;
+        row._ingredient = ingredientId is { } id ? findIngredient(id) : null;
+        row._grams = grams;
+        row._isFormulaBase = isFormulaBase;
+        row._authoredBakersPercent = authoredBakersPercent;
+        return row;
+    }
+
     private int? _ingredientId;
     public int? IngredientId
     {

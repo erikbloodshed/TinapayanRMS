@@ -168,18 +168,18 @@ public class CostingRulesTests
     }
 
     [Fact]
-    public void A_pack_with_no_box_of_its_own_prices_at_exactly_its_piece_count_times_the_piece_price()
+    public void A_unit_of_eight_with_no_packaging_of_its_own_prices_at_exactly_eight_times_the_piece_price()
     {
         // Labor, overhead and administrative are percentages of the material cost, and margin and VAT are
-        // multiplicative, so pricing is linear in the material cost. That's what makes a pack's price come
-        // out of the same CalculateSellingPrice as a piece's, with no pack-specific percentages: a pack's
-        // own box is the whole of the difference from a plain multiple.
+        // multiplicative, so pricing is linear in the material cost. That's what lets Quantity Required be a
+        // plain multiplier on the recipe, with no percentages of its own: a boxed product's own packaging is
+        // the whole of the difference from a plain multiple of the single.
         var piece = CostingRules.CalculateSellingPrice(4.50m, 25m, 15m, 10m, 30m, 12m);
-        var packMaterial = ProductRules.CalculatePackMaterialCost(4.50m, 8, []);
+        var boxOfEightMaterial = ProductRules.CalculateMaterialCost([4.50m], 8, []);
 
-        var pack = CostingRules.CalculateSellingPrice(packMaterial, 25m, 15m, 10m, 30m, 12m);
+        var boxOfEight = CostingRules.CalculateSellingPrice(boxOfEightMaterial, 25m, 15m, 10m, 30m, 12m);
 
-        pack.SellingPrice.Should().Be(piece.SellingPrice * 8m);
-        pack.BaseCost.Should().Be(piece.BaseCost * 8m);
+        boxOfEight.SellingPrice.Should().Be(piece.SellingPrice * 8m);
+        boxOfEight.BaseCost.Should().Be(piece.BaseCost * 8m);
     }
 }

@@ -43,7 +43,7 @@ public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyL
 /// follow every change saved here) or copy them, from their recipe on the Products screen. One Save writes
 /// the name, the role and the lines together.
 /// </summary>
-public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
+public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDisposable
 {
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _lineRepository;
@@ -206,6 +206,16 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
 
+    /// <summary>
+    /// The form's undo and redo stacks, the same shape as Products'. One step is one finished change — a cell
+    /// committed, a line added or removed, a field typed and left. Cleared whenever the form stops being the one
+    /// it recorded: another sub-assembly picked, a new one started, or a Save.
+    /// </summary>
+    public UndoHistory<SubAssemblyFormSnapshot> History { get; }
+
+    public ReactiveCommand<RxVoid, RxVoid> UndoCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> RedoCommand { get; }
+
     public SubAssembliesViewModel(
         ISubAssemblyRepository subAssemblyRepository,
         ISubAssemblyLineRepository lineRepository,
@@ -219,6 +229,14 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
         _lineRepository = lineRepository;
         _subAssemblyValidator = subAssemblyValidator;
 
+        // Before any subscription below: WhenAnyValue fires straight away with the value it finds, and the one on
+        // SelectedRow reaches ClearForm, which clears the history.
+        History = new UndoHistory<SubAssemblyFormSnapshot>(
+            CaptureSnapshot, (before, after) => before.ShowsSameAs(after), () => !IsBusyApplying);
+
+        UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, History.WhenAnyValue(h => h.CanUndo));
+        RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, History.WhenAnyValue(h => h.CanRedo));
+
         _rowCache.Connect()
             .SortAndBind(out _rows, SortExpressionComparer<StandaloneSubAssemblyRow>.Ascending(r => r.Name))
             .Subscribe();
@@ -226,7 +244,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
         // Picking a sub-assembly loads it into the form; a refresh only re-points the selection at its
         // refreshed copy, so it leaves the form and its unsaved edits alone.
         this.WhenAnyValue(x => x.SelectedRow)
-            .Where(_ => !IsRefreshing)
+            .Where(_ => !IsBusyApplying)
             .Select(row => Observable.FromAsync(() => LoadIntoFormAsync(row)))
             .Switch()
             .Subscribe();
@@ -234,26 +252,66 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
         // An ingredient picked in the table is pointed at the screen's copy of it, which prices the line.
         Lines.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
-            .Subscribe(_ => IngredientLineRow.Resolve(Lines, Ingredients.ToDictionary(m => m.Id)));
+            .Subscribe(_ =>
+            {
+                if (IsRestoring)
+                {
+                    return;
+                }
+
+                IngredientLineRow.Resolve(Lines, Ingredients.ToDictionary(m => m.Id));
+            });
 
         // Cost follows both an ingredient picked and grams typed.
         Lines.ToObservableChangeSet()
             .AutoRefresh(l => l.Cost)
-            .Subscribe(_ => RecomputeTotals());
+            .Subscribe(_ =>
+            {
+                if (IsRestoring)
+                {
+                    return;
+                }
+
+                RecomputeTotals();
+            });
 
         // A packaging set's lines price themselves as their material is picked, and the set's cost follows.
         PackagingLines.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
-            .Subscribe(_ => PackagingLineRow.Resolve(PackagingLines, PackagingMaterials.ToDictionary(m => m.Id)));
+            .Subscribe(_ =>
+            {
+                if (IsRestoring)
+                {
+                    return;
+                }
+
+                PackagingLineRow.Resolve(PackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
+            });
         PackagingLines.ToObservableChangeSet()
             .AutoRefresh(l => l.CostPerUnit)
-            .Subscribe(_ => SetCost = PackagingLines.Sum(l => l.CostPerUnit));
+            .Subscribe(_ =>
+            {
+                if (IsRestoring)
+                {
+                    return;
+                }
+
+                SetCost = PackagingLines.Sum(l => l.CostPerUnit);
+            });
 
         // The formula's base: what's ticked, and how much of it there is.
         Lines.ToObservableChangeSet()
             .AutoRefresh(l => l.IsFormulaBase)
             .AutoRefresh(l => l.Grams)
-            .Subscribe(_ => RecomputeFormulaBase());
+            .Subscribe(_ =>
+            {
+                if (IsRestoring)
+                {
+                    return;
+                }
+
+                RecomputeFormulaBase();
+            });
 
         // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
         // rather than replaces, so the screen keeps its selection and unsaved lines while picking up
@@ -353,7 +411,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
 
         // The line selected in whichever table is showing.
         RemoveLineCommand = ReactiveCommand.Create(
-            () =>
+            () => AsUndoStep(() =>
             {
                 if (IsPackaging)
                 {
@@ -363,7 +421,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
                 {
                     Lines.Remove(SelectedLine!);
                 }
-            },
+            }),
             this.WhenAnyValue(
                 x => x.SelectedLine,
                 x => x.SelectedPackagingLine,
@@ -371,9 +429,116 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
                 (line, packagingLine, isPackaging) => isPackaging ? packagingLine is not null : line is not null));
     }
 
+    void IUndoRecorder.BeginUndoStep() => History.Begin();
+
+    void IUndoRecorder.EndUndoStep() => History.End();
+
+    /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>
+    private void AsUndoStep(Action change)
+    {
+        History.Begin();
+        try
+        {
+            change();
+        }
+        finally
+        {
+            History.End();
+        }
+    }
+
+    /// <summary>Settles whatever step is open, then puts the form back one step.</summary>
+    public bool TryUndo()
+    {
+        History.End();
+        if (!History.TryUndo(out var restore))
+        {
+            return false;
+        }
+
+        RestoreSnapshot(restore);
+        return true;
+    }
+
+    /// <summary>Steps forward again into what the last undo stepped off.</summary>
+    public bool TryRedo()
+    {
+        History.End();
+        if (!History.TryRedo(out var restore))
+        {
+            return false;
+        }
+
+        RestoreSnapshot(restore);
+        return true;
+    }
+
+    private SubAssemblyFormSnapshot CaptureSnapshot() => new()
+    {
+        EditingId = _editingId,
+        Name = EditingName,
+        RoleId = EditingRole?.Id,
+        Lines = [.. Lines.Select(l => new IngredientLineState(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
+        PackagingLines = [.. PackagingLines.Select(l => new PackagingLineState(l.PackagingMaterialId, l.QtyPerUnit))],
+        FormulaBase = _formulaBase,
+    };
+
+    /// <summary>
+    /// Puts the form back as <paramref name="snapshot"/> had it. The lines are rebuilt rather than written into —
+    /// IngredientLineRow's setters drop a typed percentage — and the one recompute runs at the end, outside the
+    /// guard, so the totals and the formula base are worked out once from the form that was put back.
+    /// </summary>
+    private void RestoreSnapshot(SubAssemblyFormSnapshot snapshot)
+    {
+        ErrorMessage = null;
+
+        // A load still on its way would otherwise land on top of what's being put back.
+        _formLoadVersion++;
+
+        ApplyRestore(() =>
+        {
+            SelectedLine = null;
+            SelectedPackagingLine = null;
+
+            _editingId = snapshot.EditingId;
+            EditingName = snapshot.Name;
+            EditingRole = snapshot.RoleId is { } roleId ? Roles.FirstOrDefault(r => r.Id == roleId) : null;
+
+            _formulaBase = snapshot.FormulaBase;
+            Lines.Clear();
+            foreach (var line in snapshot.Lines)
+            {
+                Lines.Add(IngredientLineRow.Restore(
+                    id => Ingredients.FirstOrDefault(m => m.Id == id),
+                    snapshot.FormulaBase,
+                    line.IngredientId,
+                    line.Grams,
+                    line.IsFormulaBase,
+                    line.AuthoredBakersPercent));
+            }
+
+            PackagingLines.Clear();
+            foreach (var line in snapshot.PackagingLines)
+            {
+                PackagingLines.Add(new PackagingLineRow(id => PackagingMaterials.FirstOrDefault(m => m.Id == id))
+                {
+                    PackagingMaterialId = line.PackagingMaterialId,
+                    QtyPerUnit = line.QtyPerUnit,
+                });
+            }
+        });
+
+        IngredientLineRow.Resolve(Lines, Ingredients.ToDictionary(m => m.Id));
+        PackagingLineRow.Resolve(PackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
+        RecomputeFormulaBase();
+        RecomputeTotals();
+        SetCost = PackagingLines.Sum(l => l.CostPerUnit);
+    }
+
     /// <summary>A fresh form for a new sub-assembly: nothing selected, no name or lines, the first role.</summary>
     private void ClearForm()
     {
+        History.Clear();
         _formLoadVersion++;
         ApplyRefresh(() => SelectedRow = null);
         _editingId = 0;
@@ -409,6 +574,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        History.Clear();
         var ingredientsById = Ingredients.ToDictionary(m => m.Id);
         var packagingById = PackagingMaterials.ToDictionary(m => m.Id);
         _editingId = row.Id;

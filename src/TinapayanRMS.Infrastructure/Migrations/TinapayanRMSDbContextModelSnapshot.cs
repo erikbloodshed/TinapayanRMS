@@ -133,9 +133,6 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Property<int>("AuthoredField")
                         .HasColumnType("int");
 
-                    b.Property<int?>("PackId")
-                        .HasColumnType("int");
-
                     b.Property<int>("PackagingMaterialId")
                         .HasColumnType("int");
 
@@ -155,13 +152,11 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PackId");
-
                     b.HasIndex("PackagingMaterialId");
 
                     b.HasIndex("UnitId");
 
-                    b.HasIndex("ProductId", "PackId", "PackagingMaterialId")
+                    b.HasIndex("ProductId", "PackagingMaterialId")
                         .IsUnique();
 
                     b.ToTable("PackagingLines");
@@ -223,6 +218,11 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int>("QuantityRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -233,7 +233,10 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Products");
+                    b.ToTable("Products", t =>
+                        {
+                            t.HasCheckConstraint("CK_Products_QuantityRequired", "[QuantityRequired] > 0");
+                        });
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductCategory", b =>
@@ -255,36 +258,6 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ProductCategories");
-                });
-
-            modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductPack", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("nvarchar(60)");
-
-                    b.Property<int>("PiecesPerPack")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId", "Name")
-                        .IsUnique();
-
-                    b.ToTable("ProductPacks", t =>
-                        {
-                            t.HasCheckConstraint("CK_ProductPacks_PiecesPerPack", "[PiecesPerPack] > 0");
-                        });
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", b =>
@@ -791,11 +764,6 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.PackagingLine", b =>
                 {
-                    b.HasOne("TinapayanRMS.Domain.Entities.ProductPack", "Pack")
-                        .WithMany("Lines")
-                        .HasForeignKey("PackId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("TinapayanRMS.Domain.Entities.RawMaterial", "PackagingMaterial")
                         .WithMany()
                         .HasForeignKey("PackagingMaterialId")
@@ -812,8 +780,6 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("UnitId")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Pack");
 
                     b.Navigation("PackagingMaterial");
 
@@ -855,17 +821,6 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Category");
-                });
-
-            modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductPack", b =>
-                {
-                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", b =>
@@ -1040,11 +995,6 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("Ingredient");
 
                     b.Navigation("Usage");
-                });
-
-            modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductPack", b =>
-                {
-                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterial", b =>

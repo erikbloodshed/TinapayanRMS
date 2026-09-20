@@ -32,6 +32,7 @@
                                         ItemsSource="{Binding LinkTargets}"
                                         DisplayMemberPath="Name"
                                         IsTextSearchEnabled="True"
+                                        controls:FieldUndoStep.Recorder="{Binding}"
                                         SelectedItem="{Binding EditingLinkedTo, Mode=TwoWay}"
                                         ToolTip="The ingredient this one is a part of. Any ingredient but this one: purchased, made or linked." />
 
@@ -39,6 +40,7 @@
                 <!-- Empty rather than 0.00 until typed, as Quantity per Purchase Unit is (UseNullOption) -->
                 <syncfusion:DoubleTextBox Grid.Row="4"
                                           Grid.Column="0"
+                                          controls:FieldUndoStep.Recorder="{Binding}"
                                           Value="{Binding EditingWeightSharePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           UseNullOption="True"
                                           NullValue="{x:Null}"
@@ -48,6 +50,7 @@
                 <TextBlock Grid.Row="3" Grid.Column="2" Text="Cost Share %" Style="{StaticResource FieldLabelStyle}" />
                 <syncfusion:DoubleTextBox Grid.Row="4"
                                           Grid.Column="2"
+                                          controls:FieldUndoStep.Recorder="{Binding}"
                                           Value="{Binding EditingCostSharePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           UseNullOption="True"
                                           NullValue="{x:Null}"

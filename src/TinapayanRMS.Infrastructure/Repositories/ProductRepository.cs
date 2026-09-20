@@ -50,7 +50,6 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         RecipeDraft? recipe,
         PackagingLinkDraft? packagingLink,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? packagingLines,
-        IReadOnlyList<ProductPackDraft>? packs,
         CostingParameters? costing,
         CancellationToken cancellationToken)
     {
@@ -69,6 +68,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             Name = product.Name,
             Description = product.Description,
             CategoryId = product.CategoryId,
+            QuantityRequired = product.QuantityRequired,
             CurrentPrice = product.CurrentPrice,
         };
         if (fields.Id == 0)
@@ -93,12 +93,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 
         if (packagingLines is not null)
         {
-            await PackagingLineRepository.SetLinesAsync(dbContext, fields.Id, packId: null, packagingLines, cancellationToken);
-        }
-
-        if (packs is not null)
-        {
-            await ProductPackRepository.SetPacksAsync(dbContext, fields.Id, packs, cancellationToken);
+            await PackagingLineRepository.SetLinesAsync(dbContext, fields.Id, packagingLines, cancellationToken);
         }
 
         if (costing is not null)
@@ -139,13 +134,8 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
                 + $"{(packagingLinkedBy.Count == 1 ? "links" : "link")} this product's packaging. Unlink it there first.");
         }
 
-        // Products -> PackagingLines and Products -> ProductPacks both cascade, but a pack's own lines
-        // don't go with their pack: PackagingLine.PackId is Restrict, since cascading it too would be a
-        // second cascade path into PackagingLines (PackagingLineConfiguration). So the lines have to go
-        // first by hand, then the packs, and only then the product, whose remaining cascades take the
-        // usages, its own sub-assemblies and the costing parameters.
-        await dbContext.PackagingLines.Where(l => l.ProductId == id).ExecuteDeleteAsync(cancellationToken);
-        await dbContext.ProductPacks.Where(p => p.ProductId == id).ExecuteDeleteAsync(cancellationToken);
+        // The product's remaining cascades take its packaging lines, its usages, its own sub-assemblies
+        // and its costing parameters with it.
         await dbContext.Products.Where(p => p.Id == id).ExecuteDeleteAsync(cancellationToken);
     }
 
@@ -157,7 +147,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>Copies the name, description, category and current price onto the stored product, stamps it as saved now, and saves it.</summary>
+    /// <summary>Copies the name, description, category, quantity required and current price onto the stored product, stamps it as saved now, and saves it.</summary>
     internal static async Task UpdateAsync(TinapayanRMSDbContext dbContext, Product product, CancellationToken cancellationToken)
     {
         var existing = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == product.Id, cancellationToken)
@@ -166,6 +156,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         existing.Name = product.Name;
         existing.Description = product.Description;
         existing.CategoryId = product.CategoryId;
+        existing.QuantityRequired = product.QuantityRequired;
         existing.CurrentPrice = product.CurrentPrice;
         existing.UpdatedAt = DateTime.Now;
 

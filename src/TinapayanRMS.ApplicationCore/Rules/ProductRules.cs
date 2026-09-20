@@ -107,51 +107,22 @@ public static class ProductRules
         lineGrams * ingredientCostPerGram * weightPerPiece / subAssemblyTotalWeight;
 
     /// <summary>
-    /// A product's packaging lines, the per-piece ones and every pack's own together. Unlike
-    /// EnsureValidUsages and the ingredient/sub-assembly line rules, an empty list is deliberately
-    /// allowed here — a product may legitimately have no packaging lines entered yet, whereas a
-    /// sub-assembly with no ingredient lines or a product with no sub-assembly usage isn't a real
-    /// recipe.
-    /// <para>
-    /// One material can pack the piece and a pack both — a wrapper inside a box — and two different
-    /// packs each take their own box, so "not twice" is checked within each place (the per-piece set,
-    /// and each pack's set) rather than across the product.
-    /// </para>
+    /// A product's packaging lines. Unlike EnsureValidUsages and the ingredient/sub-assembly line rules,
+    /// an empty list is deliberately allowed here — a product may legitimately have no packaging lines
+    /// entered yet, whereas a sub-assembly with no ingredient lines or a product with no sub-assembly
+    /// usage isn't a real recipe.
     /// </summary>
-    public static void EnsureValidPackagingLines(IReadOnlyList<(int? PackId, int PackagingMaterialId, decimal QtyPerUnit)> lines)
+    public static void EnsureValidPackagingLines(IReadOnlyList<(int PackagingMaterialId, decimal QtyPerUnit)> lines)
     {
         if (lines.Any(l => l.QtyPerUnit <= 0))
         {
             throw new InvalidOperationException("A packaging line's quantity must be positive.");
         }
 
-        if (lines.GroupBy(l => (l.PackId, l.PackagingMaterialId)).Any(g => g.Count() > 1))
+        if (lines.GroupBy(l => l.PackagingMaterialId).Any(g => g.Count() > 1))
         {
             throw new InvalidOperationException(
-                "A product can't use the same packaging material more than once in one place — combine it into a single line instead.");
-        }
-    }
-
-    /// <summary>
-    /// A product's packs. An empty set is valid — most products are sold by the piece only — but a
-    /// pack holds a positive number of pieces, and no two packs share a name.
-    /// </summary>
-    public static void EnsureValidPacks(IReadOnlyList<(string Name, int PiecesPerPack)> packs)
-    {
-        if (packs.Any(p => string.IsNullOrWhiteSpace(p.Name)))
-        {
-            throw new InvalidOperationException("A pack needs a name, like \"Pack of 8\".");
-        }
-
-        if (packs.Any(p => p.PiecesPerPack <= 0))
-        {
-            throw new InvalidOperationException("A pack has to hold at least one piece.");
-        }
-
-        var duplicate = packs.GroupBy(p => p.Name.Trim(), StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
-        if (duplicate is not null)
-        {
-            throw new InvalidOperationException($"This product has two packs called {duplicate.First().Name}. Give each one its own name.");
+                "A product can't use the same packaging material more than once — combine it into a single line instead.");
         }
     }
 
@@ -166,23 +137,20 @@ public static class ProductRules
         };
 
     /// <summary>
-    /// Cost of one packaging line per thing it packs — a finished piece, or a pack: QtyPerUnit, in the
-    /// line's unit, converted to the material's base units (<paramref name="baseUnitsPerEntryUnit"/>,
-    /// null when the line is in the base unit), at the material's cost per base unit.
+    /// Cost of one packaging line per sellable unit of the product: QtyPerUnit, in the line's unit,
+    /// converted to the material's base units (<paramref name="baseUnitsPerEntryUnit"/>, null when the
+    /// line is in the base unit), at the material's cost per base unit.
     /// </summary>
     public static decimal CalculatePackagingLineCost(decimal costPerBaseUnit, decimal qtyPerUnit, decimal? baseUnitsPerEntryUnit) =>
         costPerBaseUnit * UnitConversionRules.ToBaseQuantity(qtyPerUnit, baseUnitsPerEntryUnit);
 
     /// <summary>
-    /// A pack's material cost: its pieces' share of the product's cost per piece, plus the packaging
-    /// that's the pack's own — the box, the label, the ribbon. Each piece's own wrapper is already
-    /// counted in <paramref name="materialCostPerPiece"/>, so it isn't added again here.
+    /// A product's total material cost, per sellable unit: the pieces that unit holds
+    /// (<paramref name="quantityRequired"/>) at every sub-assembly usage's cost-per-piece, plus the
+    /// packaging that wraps the whole unit. The recipe is authored per piece whatever the quantity is,
+    /// so only the usages are multiplied; the packaging lines are already for one whole unit.
     /// </summary>
-    public static decimal CalculatePackMaterialCost(
-        decimal materialCostPerPiece, int piecesPerPack, IReadOnlyList<decimal> packPackagingCosts) =>
-        materialCostPerPiece * piecesPerPack + packPackagingCosts.Sum();
-
-    /// <summary>A product's total material cost per piece: every sub-assembly usage's cost-per-piece, plus every packaging line's cost-per-piece.</summary>
-    public static decimal CalculateMaterialCostPerPiece(IReadOnlyList<decimal> usageCostsPerPiece, IReadOnlyList<decimal> packagingCostsPerPiece) =>
-        usageCostsPerPiece.Sum() + packagingCostsPerPiece.Sum();
+    public static decimal CalculateMaterialCost(
+        IReadOnlyList<decimal> usageCostsPerPiece, int quantityRequired, IReadOnlyList<decimal> packagingCosts) =>
+        usageCostsPerPiece.Sum() * quantityRequired + packagingCosts.Sum();
 }

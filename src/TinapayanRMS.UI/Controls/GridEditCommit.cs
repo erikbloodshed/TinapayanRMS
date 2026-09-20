@@ -1,7 +1,5 @@
 using System.Windows;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Media;
 using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.UI.Xaml.Grid.Helpers;
 
@@ -40,7 +38,7 @@ public static class GridEditCommit
     {
         // A cell's dropdown opens in a popup, outside the grid's visual tree, but focus there is still in the grid.
         var focused = Keyboard.FocusedElement;
-        if ((bool)e.NewValue || sender is not SfDataGrid grid || IsWithin(grid, focused as DependencyObject))
+        if ((bool)e.NewValue || sender is not SfDataGrid grid || VisualTreeWalk.IsWithin(grid, focused as DependencyObject))
         {
             return;
         }
@@ -52,29 +50,6 @@ public static class GridEditCommit
         {
             Keyboard.Focus(focused);
         }
-    }
-
-    /// <summary>Whether <paramref name="element"/> is inside <paramref name="grid"/>, following a popup up to the element it belongs to.</summary>
-    private static bool IsWithin(SfDataGrid grid, DependencyObject? element)
-    {
-        for (var current = element; current is not null; current = VisualTreeHelper.GetParent(current) ?? LogicalTreeHelper.GetParent(current))
-        {
-            if (ReferenceEquals(current, grid))
-            {
-                return true;
-            }
-
-            if (current is Popup { PlacementTarget: { } target })
-            {
-                current = target;
-                if (ReferenceEquals(current, grid))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     /// <summary>

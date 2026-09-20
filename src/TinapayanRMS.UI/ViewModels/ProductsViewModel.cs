@@ -308,31 +308,19 @@ public sealed class LinkableSubAssemblyOption
 }
 
 /// <summary>
-/// One sellable pack priced from the product's per-piece material cost and the pack's own packaging lines.
-/// </summary>
-public sealed record PackCostSummary(
-    string Name, int PiecesPerPack, decimal MaterialCost, decimal BaseCost, decimal PreVatPrice, decimal SellingPrice)
-{
-    public decimal Markup => PreVatPrice - BaseCost;
-
-    public decimal Vat => SellingPrice - PreVatPrice;
-
-    public decimal ProfitMarginPercent => CostingRules.CalculateProfitMarginPercent(BaseCost, PreVatPrice);
-}
-
-/// <summary>
-/// A product's cost per piece, from its materials to its selling price (cost-plus, CostingRules), with
-/// each part's share of the selling price, and the same worked through for each of its sellable packs.
+/// A product's cost for one sellable unit, from its materials to its selling price (cost-plus,
+/// CostingRules), with each part's share of the selling price. The recipe is authored per piece, so the
+/// usages are multiplied by <c>quantityRequired</c>; the packaging lines already wrap one whole unit.
 /// Worked out from the form, so unsaved edits show at once.
 /// </summary>
 public sealed class ProductCostSummary
 {
-    public static ProductCostSummary Empty { get; } = new([], [], [], 0m, 0m, 0m, 0m, 0m, null);
+    public static ProductCostSummary Empty { get; } = new([], 1, [], 0m, 0m, 0m, 0m, 0m, null);
 
     public ProductCostSummary(
         IReadOnlyList<decimal> usageCostsPerPiece,
-        IReadOnlyList<decimal> packagingCostsPerPiece,
-        IReadOnlyList<(string Name, int PiecesPerPack, decimal LineCost)> packs,
+        int quantityRequired,
+        IReadOnlyList<decimal> packagingCosts,
         decimal laborPercent,
         decimal overheadPercent,
         decimal administrativePercent,
@@ -340,9 +328,10 @@ public sealed class ProductCostSummary
         decimal vatPercent,
         decimal? currentPrice)
     {
-        SubAssemblies = usageCostsPerPiece.Sum();
-        Packaging = packagingCostsPerPiece.Sum();
-        Material = ProductRules.CalculateMaterialCostPerPiece(usageCostsPerPiece, packagingCostsPerPiece);
+        QuantityRequired = quantityRequired;
+        SubAssemblies = usageCostsPerPiece.Sum() * quantityRequired;
+        Packaging = packagingCosts.Sum();
+        Material = ProductRules.CalculateMaterialCost(usageCostsPerPiece, quantityRequired, packagingCosts);
         LaborPercent = laborPercent;
         OverheadPercent = overheadPercent;
         AdministrativePercent = administrativePercent;
@@ -357,23 +346,10 @@ public sealed class ProductCostSummary
         CurrentMarkupPercent = currentPrice is { } price
             ? CostingRules.CalculateMarkupPercentFromPrice(BaseCost, price, vatPercent)
             : null;
-
-        // Each pack priced the same way, from its own material cost: the pieces it holds at the figure just
-        // worked out, plus its own box and label. Same percentages — a pack has none of its own.
-        Packs =
-        [
-            .. packs.Select(p =>
-            {
-                var packMaterial = ProductRules.CalculatePackMaterialCost(Material, p.PiecesPerPack, [p.LineCost]);
-                var (packBase, packPreVat, packPrice) = CostingRules.CalculateSellingPrice(
-                    packMaterial, laborPercent, overheadPercent, administrativePercent, marginPercent, vatPercent);
-                return new PackCostSummary(p.Name, p.PiecesPerPack, packMaterial, packBase, packPreVat, packPrice);
-            }),
-        ];
     }
 
-    /// <summary>The product's sellable packs, each costed and priced; empty for a product sold by the piece only.</summary>
-    public IReadOnlyList<PackCostSummary> Packs { get; }
+    /// <summary>How many finished pieces this unit holds: 1 for a product sold by the piece.</summary>
+    public int QuantityRequired { get; }
 
     public decimal SubAssemblies { get; }
 
@@ -387,13 +363,13 @@ public sealed class ProductCostSummary
 
     public decimal AdministrativePercent { get; }
 
-    /// <summary>The labor cost per piece, in pesos: LaborPercent of the material cost.</summary>
+    /// <summary>The labor cost per sellable unit, in pesos: LaborPercent of the material cost.</summary>
     public decimal Labor { get; }
 
-    /// <summary>The overhead cost per piece, in pesos: OverheadPercent of the material cost.</summary>
+    /// <summary>The overhead cost per sellable unit, in pesos: OverheadPercent of the material cost.</summary>
     public decimal Overhead { get; }
 
-    /// <summary>The administrative cost per piece, in pesos: AdministrativePercent of the material cost.</summary>
+    /// <summary>The administrative cost per sellable unit, in pesos: AdministrativePercent of the material cost.</summary>
     public decimal Administrative { get; }
 
     /// <summary>The subtotal the markup goes on: materials, labor, overhead and administrative.</summary>
@@ -407,12 +383,12 @@ public sealed class ProductCostSummary
 
     public decimal SellingPrice { get; }
 
-    /// <summary>The markup: the profit on one piece, since VAT is collected for the government.</summary>
+    /// <summary>The markup: the profit on one sellable unit, since VAT is collected for the government.</summary>
     public decimal Markup => PreVatPrice - BaseCost;
 
     public decimal Vat => SellingPrice - PreVatPrice;
 
-    /// <summary>What the shop charges for one piece now, with VAT, as entered on the form; null when not entered.</summary>
+    /// <summary>What the shop charges for one sellable unit now, with VAT, as entered on the form; null when not entered.</summary>
     public decimal? CurrentPrice { get; }
 
     /// <summary>
@@ -450,20 +426,19 @@ public sealed class ProductCostSummary
 /// recipe, packaging and costing are edited in memory, and Save writes them together
 /// (IProductRepository.SaveAsync).
 /// </summary>
-public sealed class ProductsViewModel : ViewModelBase, IDisposable
+public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
 {
-    /// <summary>The details tabs along the bottom: Recipe, Costing, Packs, then Clone.</summary>
+    /// <summary>The details tabs along the bottom: Recipe, Costing, then Clone.</summary>
     public const int RecipeTab = 0;
 
-    /// <summary>Recipe 0, Costing 1, Packs 2, then Clone.</summary>
-    public const int LinksTab = 3;
+    /// <summary>Recipe 0, Costing 1, then Clone.</summary>
+    public const int LinksTab = 2;
 
     private static readonly IReadOnlyDictionary<int, IReadOnlyList<string>> NoLinks = new Dictionary<int, IReadOnlyList<string>>();
 
     private readonly IProductRepository _productRepository;
     private readonly IProductSubAssemblyUsageRepository _usageRepository;
     private readonly IPackagingLineRepository _packagingLineRepository;
-    private readonly IProductPackRepository _productPackRepository;
     private readonly ICostingParametersRepository _costingParametersRepository;
     private readonly ICostingDefaultsRepository _costingDefaultsRepository;
     private readonly IPackagingLinkRepository _packagingLinkRepository;
@@ -590,16 +565,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     /// <summary>A packaging material as the screen last loaded it, for a row that prices itself.</summary>
     private RawMaterial? FindPackagingMaterial(int id) => PackagingMaterials.FirstOrDefault(m => m.Id == id);
 
-    /// <summary>The product's sellable packs, typed straight into the Packs tab's table.</summary>
-    public ObservableCollection<ProductPackRow> PackEdits { get; } = [];
-
-    private ProductPackRow? _selectedPackEdit;
-    public ProductPackRow? SelectedPackEdit
-    {
-        get => _selectedPackEdit;
-        set => this.RaiseAndSetIfChanged(ref _selectedPackEdit, value);
-    }
-
     /// <summary>The standalone packaging sets (sub-assemblies in the Packaging role), by name, as last loaded, for the form's picker.</summary>
     private IReadOnlyList<SubAssembly> _packagingSets = [];
 
@@ -715,8 +680,23 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         set => this.RaiseAndSetIfChanged(ref _editingDescription, value);
     }
 
+    private int _editingQuantityRequired = 1;
+    /// <summary>
+    /// How many finished pieces make one sellable unit (Product.QuantityRequired): 1 for a product sold by the
+    /// piece, 8 for a "Box of 8". The recipe stays per piece; every cost and price on this screen is for one
+    /// whole unit, so this multiplies the sub-assemblies' share of it.
+    /// </summary>
+    public int EditingQuantityRequired
+    {
+        get => _editingQuantityRequired;
+        set => this.RaiseAndSetIfChanged(ref _editingQuantityRequired, value);
+    }
+
+    /// <summary>What the figures on this screen are for: "Per piece", or "Per unit of 8 pieces".</summary>
+    public string CostUnitCaption => EditingQuantityRequired <= 1 ? "Per piece" : $"Per unit of {EditingQuantityRequired} pieces";
+
     private decimal? _editingCurrentPrice;
-    /// <summary>What the shop charges for one piece now, with VAT (Product.CurrentPrice); null when not entered.</summary>
+    /// <summary>What the shop charges for one sellable unit now, with VAT (Product.CurrentPrice); null when not entered.</summary>
     public decimal? EditingCurrentPrice
     {
         get => _editingCurrentPrice;
@@ -1128,10 +1108,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     // What the product had when it was loaded, so Save only sends the parts that changed.
     private RecipeDraft _savedRecipe = new([], []);
     private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> _savedLines = [];
-    private List<ProductPackDraft> _savedPacks = [];
-
-    /// <summary>Each pack row's subscription to its own lines; cleared whenever the rows are replaced.</summary>
-    private readonly CompositeDisposable _packSubscriptions = [];
     private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) _savedCosting;
 
     // What a new product's costing starts with (Settings → Costing Defaults), as of the last LoadCommand.
@@ -1140,6 +1116,25 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
+
+    /// <summary>
+    /// Revert: reads the product back as it was last saved, throwing away everything staged since — the details, the
+    /// recipe's sections and their lines, the packaging, the packs and the costing. The sub-assembly form has no
+    /// discard of its own, so this is what abandons a section being added or edited, along with the rest.
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> RevertCommand { get; }
+
+    /// <summary>
+    /// The form's undo and redo stacks. One step is one finished change — a cell edit committed, a row added or
+    /// taken out, a sub-assembly applied, a field typed and left — never a keystroke. It holds what the screen
+    /// shows, not what Save writes: undoing never touches the baselines Save compares against, so a change undone
+    /// and one never made come to the same thing. Cleared whenever the form stops being the one it recorded:
+    /// another product picked, a new one started, a Save, or a Revert.
+    /// </summary>
+    public UndoHistory<ProductFormSnapshot> History { get; }
+
+    public ReactiveCommand<RxVoid, RxVoid> UndoCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> RedoCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> EditDescriptionCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> CloseDescriptionEditorCommand { get; }
@@ -1157,8 +1152,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Delete Sub-Assembly: takes the sub-assembly whose tab is showing out of the recipe.</summary>
     public ReactiveCommand<RxVoid, RxVoid> RemoveUsageCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> ApplyUsageCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> CancelUsageCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormLineCommand { get; }
 
     /// <summary>Show Add-Ins / Hide Add-Ins, under a linked recipe.</summary>
@@ -1166,9 +1159,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormAddInCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> AddPackCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> RemovePackCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> RemovePackLineCommand { get; }
 
     /// <summary>The add form's Remove Line under its packaging table.</summary>
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormPackagingLineCommand { get; }
@@ -1184,7 +1174,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         IProductRepository productRepository,
         IProductSubAssemblyUsageRepository usageRepository,
         IPackagingLineRepository packagingLineRepository,
-        IProductPackRepository productPackRepository,
         ICostingParametersRepository costingParametersRepository,
         ICostingDefaultsRepository costingDefaultsRepository,
         IPackagingLinkRepository packagingLinkRepository,
@@ -1203,7 +1192,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         _productRepository = productRepository;
         _usageRepository = usageRepository;
         _packagingLineRepository = packagingLineRepository;
-        _productPackRepository = productPackRepository;
         _costingParametersRepository = costingParametersRepository;
         _costingDefaultsRepository = costingDefaultsRepository;
         _packagingLinkRepository = packagingLinkRepository;
@@ -1300,16 +1288,16 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         // Every selection-driven subscription skips while LoadCommand merges in fresh data, which only
         // re-points a selection at its refreshed copy; the form, recipe and unsaved edits stay as-is.
         this.WhenAnyValue(x => x.SelectedProduct)
-            .Where(product => product is not null && !IsRefreshing)
+            .Where(product => product is not null && !IsBusyApplying)
             .Subscribe(product => LoadIntoForm(product!));
 
         this.WhenAnyValue(x => x.SelectedProduct)
-            .Where(_ => !IsRefreshing)
+            .Where(_ => !IsBusyApplying)
             .Subscribe(ResetDetails);
 
         // A newer selection cancels an older one still loading (Switch disposes it, which cancels its token).
         this.WhenAnyValue(x => x.SelectedProduct)
-            .Where(_ => !IsRefreshing)
+            .Where(_ => !IsBusyApplying)
             .Select(product => Observable.FromAsync(cancellationToken => LoadProductDetailAsync(product, cancellationToken)))
             .Switch()
             .Subscribe();
@@ -1320,7 +1308,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         // The sub-assembly form: where its sub-assembly comes from, then the one it links or copies.
         this.WhenAnyValue(x => x.EditingUsageMode)
             .Skip(1)
-            .Where(_ => !IsRefreshing && IsUsageFormOpen && IsAddingUsage)
+            .Where(_ => !IsBusyApplying && IsUsageFormOpen && IsAddingUsage)
             .Subscribe(_ => StartUsageFormMode());
 
         // A line picked, typed or deleted in the form's table: it's priced, and the batch and preview follow.
@@ -1330,6 +1318,11 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             .AutoRefresh(l => l.IsFormulaBase)
             .Subscribe(_ =>
             {
+                if (IsRestoring)
+                {
+                    return;
+                }
+
                 IngredientLineRow.Resolve(FormLines, Ingredients.ToDictionary(m => m.Id));
                 FormLinesChanged();
             });
@@ -1340,6 +1333,11 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             .AutoRefresh(l => l.Grams)
             .Subscribe(_ =>
             {
+                if (IsRestoring)
+                {
+                    return;
+                }
+
                 IngredientLineRow.Resolve(FormAddIns, Ingredients.ToDictionary(m => m.Id));
                 FormLinesChanged();
             });
@@ -1350,6 +1348,11 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             .AutoRefresh(l => l.CostPerUnit)
             .Subscribe(_ =>
             {
+                if (IsRestoring)
+                {
+                    return;
+                }
+
                 PackagingLineRow.Resolve(FormPackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
                 RecomputeUsageForm();
             });
@@ -1358,6 +1361,11 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         this.WhenAnyValue(x => x.IsAddingUsage, x => x.EditingUsageMode, x => x.EditingUsageRole, x => x.EditingUsageSource)
             .Subscribe(_ =>
             {
+                if (IsRestoring)
+                {
+                    return;
+                }
+
                 this.RaisePropertyChanged(nameof(IsFormPackaging));
                 this.RaisePropertyChanged(nameof(IsFormEditingPackaging));
                 RecomputeUsageForm();
@@ -1365,7 +1373,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
         this.WhenAnyValue(x => x.EditingUsageSource)
             .Skip(1)
-            .Where(_ => !IsRefreshing && IsUsageFormOpen && IsAddingUsage)
+            .Where(_ => !IsBusyApplying && IsUsageFormOpen && IsAddingUsage)
             .Select(source => Observable.FromAsync(cancellationToken => LoadUsageSourceAsync(source, cancellationToken)))
             .Switch()
             .Subscribe();
@@ -1373,12 +1381,12 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         // Typing one figure of the piece size works out the other, and makes it the one that's kept.
         this.WhenAnyValue(x => x.EditingUsageWeightPerPiece)
             .Skip(1)
-            .Where(_ => !_syncingPieceSize && !IsRefreshing)
+            .Where(_ => !_syncingPieceSize && !IsBusyApplying)
             .Subscribe(_ => PieceSizeTyped(UsageAuthoredField.WeightPerPiece));
 
         this.WhenAnyValue(x => x.EditingUsageYield)
             .Skip(1)
-            .Where(_ => !_syncingPieceSize && !IsRefreshing)
+            .Where(_ => !_syncingPieceSize && !IsBusyApplying)
             .Subscribe(_ => PieceSizeTyped(UsageAuthoredField.Yield));
 
         // A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.
@@ -1387,6 +1395,11 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             .AutoRefresh(l => l.CostPerUnit)
             .Subscribe(_ =>
             {
+                if (IsRestoring)
+                {
+                    return;
+                }
+
                 PackagingLineRow.Resolve(LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
                 RecomputeCosts();
             });
@@ -1397,8 +1410,24 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                 x => x.EditingAdministrativePercent,
                 x => x.EditingMarginPercent,
                 x => x.EditingVatPercent,
-                x => x.EditingCurrentPrice)
+                x => x.EditingCurrentPrice,
+                x => x.EditingQuantityRequired)
+            .Where(_ => !IsRestoring)
             .Subscribe(_ => RecomputeCosts());
+
+        // The caption on every figure names what it's for, so it follows the quantity.
+        this.WhenAnyValue(x => x.EditingQuantityRequired)
+            .Subscribe(_ => this.RaisePropertyChanged(nameof(CostUnitCaption)));
+
+        // Nothing is recorded until a product's details have arrived, or while the screen is being written to
+        // wholesale: a load merging in fresh data and a restore putting a form back are neither of them edits.
+        History = new UndoHistory<ProductFormSnapshot>(
+            CaptureSnapshot,
+            (before, after) => before.ShowsSameAs(after),
+            () => AreDetailsReady && !IsBusyApplying);
+
+        UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, History.WhenAnyValue(h => h.CanUndo));
+        RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, History.WhenAnyValue(h => h.CanRedo));
 
         // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
         // rather than replaces, so the screen keeps its selection, pickers and unsaved edits while
@@ -1512,6 +1541,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                 Name = EditingName,
                 Description = string.IsNullOrWhiteSpace(EditingDescription) ? null : EditingDescription.Trim(),
                 CategoryId = EditingCategory?.Id,
+                QuantityRequired = EditingQuantityRequired,
                 CurrentPrice = EditingCurrentPrice,
             };
 
@@ -1544,9 +1574,12 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                 IsSameRecipe(recipe, _savedRecipe) ? null : recipe,
                 ChangedPackagingLink(),
                 ChangedLines(),
-                ChangedPacks(),
                 CurrentCosting() == _savedCosting ? null : costing,
                 CancellationToken.None);
+
+            // What's saved is the new starting point: stepping back past it would show changes already written.
+            // Save's own reload keeps the product selected, so ClearDetails doesn't run and wouldn't clear this.
+            History.Clear();
 
             // The list picks up the new name; then the form reloads what was saved, which is what the
             // next Save compares against.
@@ -1603,6 +1636,28 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             this.RaisePropertyChanged(nameof(EditingCategory));
         });
 
+        // Revert reads the picked product's detail again, which replaces the recipe, packaging, packs and costing
+        // wholesale, so anything staged but unsaved goes: a section added or edited in the form included, since the
+        // form has no discard of its own. A new product was never saved, so it goes back to being a blank one.
+        RevertCommand = ReactiveCommand.CreateFromTask(() => RunWithConfirmationAsync(
+            "Undo every change made since this product was last saved?",
+            async () =>
+            {
+                if (SelectedProduct is not { } product)
+                {
+                    StartNewProduct();
+                    History.Clear();
+                    return;
+                }
+
+                History.Clear();
+                CloseUsageForm();
+                SelectedLineEdit = null;
+                LoadIntoForm(product);
+                await LoadProductDetailAsync(product, CancellationToken.None);
+                SuccessMessage = $"{product.Name} was put back as it was last saved.";
+            }));
+
         DeleteCommand = ReactiveCommand.CreateFromTask(
             () => RunWithConfirmationAsync(
                 $"Delete '{SelectedProduct!.Name}'? Its own sub-assemblies are deleted with it. This can't be undone.",
@@ -1626,12 +1681,15 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                     return;
                 }
 
-                if (!RecipeTabs.Contains(AddSubAssemblyTab))
+                AsUndoStep(() =>
                 {
-                    RecipeTabs.Insert(UsageEdits.Count, AddSubAssemblyTab);
-                }
+                    if (!RecipeTabs.Contains(AddSubAssemblyTab))
+                    {
+                        RecipeTabs.Insert(UsageEdits.Count, AddSubAssemblyTab);
+                    }
 
-                SelectRecipeTab(AddSubAssemblyTab);
+                    SelectRecipeTab(AddSubAssemblyTab);
+                });
             },
             this.WhenAnyValue(x => x.SelectedRecipeTab).Select(tab => tab is not AddSubAssemblyRecipeTab));
 
@@ -1639,7 +1697,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         EditUsageCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => SelectRecipeTab(TabFor(usage)));
 
         // A linked sub-assembly becomes the product's own copy, in the same role and at the same piece size; saved with Save.
-        MakeCopyCommand = ReactiveCommand.Create<ProductUsageEdit>(usage =>
+        MakeCopyCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => AsUndoStep(() =>
         {
             // Its add-ins become plain lines of the copy: the batch it was showing is the batch it keeps.
             // Never a duplicate ingredient, since an add-in can't be one the recipe already has.
@@ -1648,7 +1706,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                 0, usage.Role, [.. usage.Lines, .. usage.AddIns], usage.AuthoredField, usage.AuthoredValue,
                 ownerName: null, standaloneName: null, linkedBy: [], name: usage.IsRoleRepeated ? usage.Label : usage.Name);
             ReplaceUsage(usage, copy);
-        });
+        }));
 
         // Delete Sub-Assembly takes out the one whose tab is showing. Nothing to confirm: it only leaves the recipe,
         // and goes when the product is saved (Save deletes the product's own; a linked one stays with its owner).
@@ -1659,7 +1717,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             {
                 if (SelectedRecipeTab is PackagingRecipeTab)
                 {
-                    RemovePackaging();
+                    AsUndoStep(RemovePackaging);
                     return Task.CompletedTask;
                 }
 
@@ -1669,106 +1727,54 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
                     SubAssemblyRules.EnsureNotLinkedElsewhere($"{SelectedProduct?.Name ?? HeaderTitle}'s {usage.SectionName}", usage.LinkedBy);
                 }
 
-                // Whatever was typed into its form goes with it, rather than being applied on the way out.
-                if (ReferenceEquals(usage, EditingUsage))
+                AsUndoStep(() =>
                 {
-                    CloseUsageForm();
-                }
+                    // Whatever was typed into its form goes with it, rather than being applied on the way out.
+                    if (ReferenceEquals(usage, EditingUsage))
+                    {
+                        CloseUsageForm();
+                    }
 
-                // Its neighbour's tab shows instead: the next sub-assembly's, else the one before, else Packaging.
-                var index = UsageEdits.IndexOf(usage);
-                var neighbour = index + 1 < UsageEdits.Count ? UsageEdits[index + 1] : index > 0 ? UsageEdits[index - 1] : null;
-                SelectRecipeTab(neighbour is null ? PackagingTabIfShown : TabFor(neighbour));
+                    // Its neighbour's tab shows instead: the next sub-assembly's, else the one before, else Packaging.
+                    var index = UsageEdits.IndexOf(usage);
+                    var neighbour = index + 1 < UsageEdits.Count ? UsageEdits[index + 1] : index > 0 ? UsageEdits[index - 1] : null;
+                    SelectRecipeTab(neighbour is null ? PackagingTabIfShown : TabFor(neighbour));
 
-                UsageEdits.Remove(usage);
-                RefreshLinkableOptions();
-                RecomputeCosts();
+                    UsageEdits.Remove(usage);
+                    RefreshLinkableOptions();
+                    RecomputeCosts();
+                });
+
                 return Task.CompletedTask;
             }),
             this.WhenAnyValue(x => x.SelectedRecipeTab).Select(tab => tab is SubAssemblyRecipeTab or PackagingRecipeTab));
 
-        // Apply puts the form's sub-assembly in the recipe, then shows its tab, where its form stays open; or the form's
-        // packaging, then shows the Packaging tab.
-        ApplyUsageCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() =>
-        {
-            SelectRecipeTab(ApplyForm());
-            return Task.CompletedTask;
-        }));
-
-        CancelUsageCommand = ReactiveCommand.Create(() =>
-        {
-            // A section's tab has nothing else to show, so Cancel puts back what was last applied to it.
-            if (EditingUsage is { } editing)
-            {
-                OpenUsageForm(editing);
-                return;
-            }
-
-            CloseUsageForm();
-
-            // Cancelling an add goes back to the tab that showed before it, and New Sub-Assembly's tab goes.
-            if (SelectedRecipeTab is AddSubAssemblyRecipeTab)
-            {
-                SelectRecipeTab(_lastRecipeContentTab is { } last && RecipeTabs.Contains(last)
-                    ? last
-                    : RecipeTabs.OfType<SubAssemblyRecipeTab>().FirstOrDefault() ?? PackagingTabIfShown);
-            }
-        });
-
         RemoveFormLineCommand = ReactiveCommand.Create(
-            () => { FormLines.Remove(SelectedFormLine!); },
+            () => AsUndoStep(() => FormLines.Remove(SelectedFormLine!)),
             this.WhenAnyValue(x => x.SelectedFormLine).Select(line => line is not null));
 
         ToggleFormAddInsCommand = ReactiveCommand.Create(() => { IsFormAddInsExpanded = !IsFormAddInsExpanded; });
 
         RemoveFormPackagingLineCommand = ReactiveCommand.Create(
-            () => { FormPackagingLines.Remove(SelectedFormPackagingLine!); },
+            () => AsUndoStep(() => FormPackagingLines.Remove(SelectedFormPackagingLine!)),
             this.WhenAnyValue(x => x.SelectedFormPackagingLine).Select(line => line is not null));
 
         // The linked packaging's lines, as they show, become the product's own; Save drops the link and writes them.
         CopyPackagingCommand = ReactiveCommand.Create(
-            () =>
+            () => AsUndoStep(() =>
             {
                 ShowPackagingLink(null);
                 RefreshLinkableOptions();
-            },
+            }),
             this.WhenAnyValue(x => x.IsPackagingLinked));
 
         RemoveFormAddInCommand = ReactiveCommand.Create(
-            () => { FormAddIns.Remove(SelectedFormAddIn!); },
+            () => AsUndoStep(() => FormAddIns.Remove(SelectedFormAddIn!)),
             this.WhenAnyValue(x => x.SelectedFormAddIn).Select(line => line is not null));
 
         RemoveLineCommand = ReactiveCommand.Create(
-            () => { LineEdits.Remove(SelectedLineEdit!); },
+            () => AsUndoStep(() => LineEdits.Remove(SelectedLineEdit!)),
             this.WhenAnyValue(x => x.SelectedLineEdit, x => x.IsPackagingLinked, (line, linked) => line is not null && !linked));
-
-        AddPackCommand = ReactiveCommand.Create(() =>
-        {
-            // A dozen is the commonest pack, so a new row starts there rather than empty and invalid.
-            var row = PackRowFor(new ProductPack { Name = $"Pack of {12}", PiecesPerPack = 12 });
-            PackEdits.Add(row);
-            SelectedPackEdit = row;
-            RecomputeCosts();
-        });
-
-        RemovePackCommand = ReactiveCommand.Create(
-            () =>
-            {
-                PackEdits.Remove(SelectedPackEdit!);
-                SelectedPackEdit = null;
-                RecomputeCosts();
-            },
-            this.WhenAnyValue(x => x.SelectedPackEdit).Select(pack => pack is not null));
-
-        RemovePackLineCommand = ReactiveCommand.Create(
-            () =>
-            {
-                var pack = SelectedPackEdit!;
-                pack.LineEdits.Remove(pack.SelectedLineEdit!);
-                pack.SelectedLineEdit = null;
-            },
-            this.WhenAnyValue(x => x.SelectedPackEdit, x => x.SelectedPackEdit!.SelectedLineEdit)
-                .Select(pair => pair.Item1 is not null && pair.Item2 is not null));
 
         // A clone copies the product as saved, and a variant links it as saved: unsaved edits stay with this one.
         var canMakeFromSelected = this.WhenAnyValue(
@@ -1797,6 +1803,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         EditingName = product.Name;
         EditingDescription = product.Description ?? string.Empty;
         EditingCategory = Categories.FirstOrDefault(c => c.Id == product.CategoryId);
+        EditingQuantityRequired = product.QuantityRequired;
         EditingCurrentPrice = product.CurrentPrice;
         ShowUpdatedAt(product.UpdatedAt);
         EditingCloneName = $"{product.Name} Copy";
@@ -1847,6 +1854,7 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         EditingName = string.Empty;
         EditingDescription = string.Empty;
         EditingCategory = null;
+        EditingQuantityRequired = 1;
         EditingCurrentPrice = null;
         IsDescriptionEditorOpen = false;
         ShowUpdatedAt(null);
@@ -1866,6 +1874,9 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void ClearDetails(bool keepRecipeTabs = false)
     {
+        // The history is this product's form; another product's steps would put back a recipe that isn't its.
+        History.Clear();
+
         var previousTab = SelectedRecipeTab;
         _detailProductId = null;
         _linkedBy = NoLinks;
@@ -1890,13 +1901,9 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         {
             SetHasPackaging(false);
         }
-        SelectedPackEdit = null;
-        _packSubscriptions.Clear();
-        PackEdits.Clear();
         SetPackagingLink(null);
         _savedRecipe = new RecipeDraft([], []);
         _savedLines = [];
-        _savedPacks = [];
         SetCosting(null);
         RefreshLinkableOptions();
         RecomputeCosts();
@@ -1950,7 +1957,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         ReplaceLines(detail.Lines);
         SetHasPackaging(detail.PackagingLink is not null || detail.Lines.Count > 0);
         ReplaceUsages(detail.Usages, detail.SubAssemblyLines, detail.AddIns);
-        ReplacePacks(detail.Packs);
         SetCosting(detail.Costing);
         RefreshLinkableOptions();
         RecomputeCosts();
@@ -1961,7 +1967,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         PackagingLink? PackagingLink,
         IReadOnlyList<ProductSubAssemblyUsage> Usages,
         IReadOnlyList<PackagingLine> Lines,
-        IReadOnlyList<ProductPack> Packs,
         CostingParameters? Costing,
         IReadOnlyList<SubAssemblyLine> SubAssemblyLines,
         IReadOnlyList<UsageAddInLine> AddIns,
@@ -1973,13 +1978,12 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         var packagingLink = await _packagingLinkRepository.GetForProductAsync(productId, cancellationToken);
         var usages = await _usageRepository.GetForProductAsync(productId, cancellationToken);
         var lines = await _packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken);
-        var packs = await _productPackRepository.GetForProductAsync(productId, cancellationToken);
         var costing = await _costingParametersRepository.GetForProductAsync(productId, cancellationToken);
         var subAssemblyLines = await _subAssemblyLineRepository.GetForSubAssembliesAsync(
             [.. usages.Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
         var addIns = await _usageRepository.GetAddInsForProductAsync(productId, cancellationToken);
         var linkedBy = await _subAssemblyRepository.GetLinkedByAsync(productId, cancellationToken);
-        return new ProductDetail(packagingLink, usages, lines, packs, costing, subAssemblyLines, addIns, linkedBy);
+        return new ProductDetail(packagingLink, usages, lines, costing, subAssemblyLines, addIns, linkedBy);
     }
 
     /// <summary>The saved packaging link, or none: what the Packaging tab shows, and what Save compares against.</summary>
@@ -2071,28 +2075,10 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         var previousUsage = (previousTab as SubAssemblyRecipeTab)?.Usage;
         _isRecipeClearedForAnother = false;
 
-        // Section for section, in place: each tab stays and shows its new section (MirrorUsageTabs), so the tab strip keeps
-        // the tabs it has and only adds or takes away the difference, rather than building a new TabItemExt, template and
-        // all, for every section of every product picked.
         _arrangingRecipeTabs = true;
         try
         {
-            for (var i = 0; i < sections.Count; i++)
-            {
-                if (i < UsageEdits.Count)
-                {
-                    UsageEdits[i] = sections[i];
-                }
-                else
-                {
-                    UsageEdits.Add(sections[i]);
-                }
-            }
-
-            while (UsageEdits.Count > sections.Count)
-            {
-                UsageEdits.RemoveAt(UsageEdits.Count - 1);
-            }
+            ReplaceUsageItems(sections);
         }
         finally
         {
@@ -2101,6 +2087,287 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
 
         _savedRecipe = CurrentRecipe();
         ReselectRecipeTab(previousTab, previousUsage);
+    }
+
+    void IUndoRecorder.BeginUndoStep() => History.Begin();
+
+    void IUndoRecorder.EndUndoStep() => History.End();
+
+    /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>
+    private void AsUndoStep(Action change)
+    {
+        History.Begin();
+        try
+        {
+            change();
+        }
+        finally
+        {
+            History.End();
+        }
+    }
+
+    /// <summary>Settles whatever step is open, then puts the form back one step. False when there was nothing to undo.</summary>
+    public bool TryUndo()
+    {
+        History.End();
+        if (!History.TryUndo(out var restore))
+        {
+            return false;
+        }
+
+        RestoreSnapshot(restore);
+        return true;
+    }
+
+    /// <summary>Steps forward again into what the last undo stepped off. False when there was nothing to redo.</summary>
+    public bool TryRedo()
+    {
+        History.End();
+        if (!History.TryRedo(out var restore))
+        {
+            return false;
+        }
+
+        RestoreSnapshot(restore);
+        return true;
+    }
+
+    /// <summary>The form as it stands: everything an undo step puts back. See ProductFormSnapshot for what's left out.</summary>
+    private ProductFormSnapshot CaptureSnapshot() => new()
+    {
+        EditingId = _editingId,
+        Name = EditingName,
+        Description = EditingDescription,
+        CurrentPrice = EditingCurrentPrice,
+        QuantityRequired = EditingQuantityRequired,
+        CategoryId = EditingCategory?.Id,
+        CloneName = EditingCloneName,
+        Costing = (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent),
+        Usages = [.. UsageEdits],
+        SelectedTab = CaptureTabChoice(),
+        HasAddSubAssemblyTab = RecipeTabs.Contains(AddSubAssemblyTab),
+        HasPackaging = HasPackaging,
+        PackagingLink = _packagingLinkTarget,
+        Lines = [.. LineEdits.Select(CaptureLine)],
+        IsUsageFormOpen = IsUsageFormOpen,
+        IsAddingUsage = IsAddingUsage,
+        UsageFormTitle = UsageFormTitle,
+        UsageMode = EditingUsageMode,
+        IsFormEditingLines = IsFormEditingLines,
+        IsFormPickingSource = IsFormPickingSource,
+        IsFormAddInsExpanded = IsFormAddInsExpanded,
+        EditingUsageIndex = EditingUsage is { } editing && UsageEdits.IndexOf(editing) is var i and >= 0 ? i : null,
+        UsageRoleId = EditingUsageRole?.Id,
+        UsageName = EditingUsageName,
+        UsageSourceKey = EditingUsageSource?.Key,
+        FormLines = [.. FormLines.Select(CaptureIngredientLine)],
+        FormAddIns = [.. FormAddIns.Select(CaptureIngredientLine)],
+        FormPackagingLines = [.. FormPackagingLines.Select(CaptureLine)],
+        FormFormulaBase = _formFormulaBase,
+        UsageAuthoredField = _usageAuthoredField,
+        UsageWeightPerPiece = EditingUsageWeightPerPiece,
+        UsageYield = EditingUsageYield,
+    };
+
+    private static IngredientLineState CaptureIngredientLine(IngredientLineRow row) =>
+        new(row.IngredientId, row.Grams, row.IsFormulaBase, row.AuthoredBakersPercent);
+
+    private static PackagingLineState CaptureLine(PackagingLineRow row) => new(row.PackagingMaterialId, row.QtyPerUnit);
+
+    private RecipeTabChoice CaptureTabChoice() => SelectedRecipeTab switch
+    {
+        SubAssemblyRecipeTab tab => new RecipeTabChoice(RecipeTabKind.Usage, RecipeTabs.OfType<SubAssemblyRecipeTab>().ToList().IndexOf(tab)),
+        AddSubAssemblyRecipeTab => new RecipeTabChoice(RecipeTabKind.AddSubAssembly, -1),
+        PackagingRecipeTab => new RecipeTabChoice(RecipeTabKind.Packaging, -1),
+        _ => new RecipeTabChoice(RecipeTabKind.None, -1),
+    };
+
+    /// <summary>
+    /// Puts the whole form back as <paramref name="snapshot"/> had it. Order matters throughout, and is explained
+    /// step by step below; the one recompute runs at the end, outside IsRestoring, so the figures are worked out
+    /// once from the restored form rather than over and over from a half-restored one.
+    /// </summary>
+    private void RestoreSnapshot(ProductFormSnapshot snapshot)
+    {
+        // A message about a form that no longer exists would outlive what it was about.
+        ErrorMessage = null;
+
+        ApplyRestore(() =>
+        {
+            // 1. The form goes first. EditingUsage has to be null before the sections are replaced: the tab mirror
+            //    refills FormLines from a section that replaces the one being edited, which would undo this restore.
+            CloseUsageForm();
+            SelectedFormLine = null;
+            SelectedFormAddIn = null;
+            SelectedFormPackagingLine = null;
+            SelectedLineEdit = null;
+
+            // 2. The product's own fields. The category goes back by id, into the field: assigning the property
+            //    runs the picker's "< Add New .. >" sentinel, which opens a prompt.
+            _editingId = snapshot.EditingId;
+            EditingName = snapshot.Name;
+            EditingDescription = snapshot.Description;
+            EditingCurrentPrice = snapshot.CurrentPrice;
+            EditingQuantityRequired = snapshot.QuantityRequired;
+            EditingCloneName = snapshot.CloneName;
+            _editingCategory = snapshot.CategoryId is { } categoryId ? Categories.FirstOrDefault(c => c.Id == categoryId) : null;
+            this.RaisePropertyChanged(nameof(EditingCategory));
+
+            // 3. Costing.
+            (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent) =
+                snapshot.Costing;
+
+            // 4. Packaging. _savedPackagingLinkKey is deliberately left alone: it's what Save compares against.
+            ShowPackagingLink(snapshot.PackagingLink);
+            LineEdits.Clear();
+            foreach (var line in snapshot.Lines)
+            {
+                LineEdits.Add(RestoreLine(line));
+            }
+
+            SetHasPackaging(snapshot.HasPackaging);
+
+            // 5. The sections and their tabs, under _arrangingRecipeTabs so RecipeTabShown short-circuits: without
+            //    it, moving the tab back would apply the form the tab is being moved off, which is the very change
+            //    being undone.
+            _arrangingRecipeTabs = true;
+            try
+            {
+                ReplaceUsageItems(snapshot.Usages);
+
+                if (snapshot.HasAddSubAssemblyTab)
+                {
+                    if (!RecipeTabs.Contains(AddSubAssemblyTab))
+                    {
+                        RecipeTabs.Insert(UsageEdits.Count, AddSubAssemblyTab);
+                    }
+                }
+                else
+                {
+                    RecipeTabs.Remove(AddSubAssemblyTab);
+                }
+
+                SelectedRecipeTab = snapshot.SelectedTab switch
+                {
+                    { Kind: RecipeTabKind.Usage, UsageIndex: var index } =>
+                        RecipeTabs.OfType<SubAssemblyRecipeTab>().ElementAtOrDefault(index),
+                    { Kind: RecipeTabKind.AddSubAssembly } => RecipeTabs.Contains(AddSubAssemblyTab) ? AddSubAssemblyTab : null,
+                    { Kind: RecipeTabKind.Packaging } => PackagingTabIfShown,
+                    _ => null,
+                };
+            }
+            finally
+            {
+                _arrangingRecipeTabs = false;
+            }
+
+            // RecipeTabShown never ran, and it's the only other thing that writes these. Left stale, the next real
+            // change of tab would think it was leaving a tab that's gone, and apply the wrong form on the way out.
+            _shownRecipeTab = SelectedRecipeTab;
+            if (SelectedRecipeTab is not null and not AddSubAssemblyRecipeTab)
+            {
+                _lastRecipeContentTab = SelectedRecipeTab;
+            }
+
+            // 6. The form itself, last. The option lists are rebuilt before the pickers are put back, as a load does,
+            //    and RefreshLinkableOptions runs inside the guard: outside it, the source it can null would start a
+            //    load that clears the very lines being restored.
+            IsAddingUsage = snapshot.IsAddingUsage;
+            UsageFormTitle = snapshot.UsageFormTitle;
+            _editingUsageMode = snapshot.UsageMode;
+            this.RaisePropertyChanged(nameof(EditingUsageMode));
+            IsFormEditingLines = snapshot.IsFormEditingLines;
+            IsFormPickingSource = snapshot.IsFormPickingSource;
+            IsFormAddInsExpanded = snapshot.IsFormAddInsExpanded;
+
+            RefreshLinkableOptions();
+            RefreshFormRoleOptions();
+
+            _editingUsageRole = snapshot.UsageRoleId is { } roleId ? FormRoleOptions.FirstOrDefault(r => r.Id == roleId) : null;
+            this.RaisePropertyChanged(nameof(EditingUsageRole));
+            _editingUsageSource = snapshot.UsageSourceKey is { } sourceKey
+                ? LinkableSubAssemblies.FirstOrDefault(o => o.Key == sourceKey)
+                : null;
+            this.RaisePropertyChanged(nameof(EditingUsageSource));
+            _editingUsageName = snapshot.UsageName;
+            this.RaisePropertyChanged(nameof(EditingUsageName));
+
+            _formFormulaBase = snapshot.FormFormulaBase;
+            RestoreIngredientLines(FormLines, snapshot.FormLines, snapshot.FormFormulaBase);
+            RestoreIngredientLines(FormAddIns, snapshot.FormAddIns, snapshot.FormFormulaBase);
+            FormPackagingLines.Clear();
+            foreach (var line in snapshot.FormPackagingLines)
+            {
+                FormPackagingLines.Add(RestoreLine(line));
+            }
+
+            _usageAuthoredField = snapshot.UsageAuthoredField;
+            _editingUsageWeightPerPiece = snapshot.UsageWeightPerPiece;
+            this.RaisePropertyChanged(nameof(EditingUsageWeightPerPiece));
+            _editingUsageYield = snapshot.UsageYield;
+            this.RaisePropertyChanged(nameof(EditingUsageYield));
+
+            EditingUsage = snapshot.EditingUsageIndex is { } usageIndex && usageIndex < UsageEdits.Count
+                ? UsageEdits[usageIndex]
+                : null;
+            IsUsageFormOpen = snapshot.IsUsageFormOpen;
+        });
+
+        // 8. One pass over the restored form, outside the guard. FormLinesChanged is the screen's own "the lines
+        //    changed, bring everything into line" entry point: it raises what the form's tables show, works the
+        //    derived piece-size figure out again, and runs the single ApplyFormulaBase pass that gives every row
+        //    back its BaseWeight and BatchWeight.
+        this.RaisePropertyChanged(nameof(IsFormPackaging));
+        this.RaisePropertyChanged(nameof(IsFormEditingPackaging));
+        FormLinesChanged();
+        RecomputeCosts();
+    }
+
+    private void RestoreIngredientLines(
+        ObservableCollection<IngredientLineRow> rows, IReadOnlyList<IngredientLineState> states, decimal baseWeight)
+    {
+        rows.Clear();
+        foreach (var state in states)
+        {
+            rows.Add(IngredientLineRow.Restore(
+                id => Ingredients.FirstOrDefault(m => m.Id == id),
+                baseWeight,
+                state.IngredientId,
+                state.Grams,
+                state.IsFormulaBase,
+                state.AuthoredBakersPercent));
+        }
+    }
+
+    private PackagingLineRow RestoreLine(PackagingLineState state) =>
+        new(FindPackagingMaterial) { PackagingMaterialId = state.PackagingMaterialId, QtyPerUnit = state.QtyPerUnit };
+
+    /// <summary>
+    /// Makes UsageEdits hold <paramref name="sections"/>, section for section and in place: each tab stays and shows its
+    /// new section (MirrorUsageTabs), so the tab strip keeps the tabs it has and only adds or takes away the difference,
+    /// rather than building a new TabItemExt, template and all, for every section of every product picked. Never Clear(),
+    /// which the mirror reads as every tab going. Call it with _arrangingRecipeTabs set, so the strip's own pick as a tab
+    /// goes is ignored. It leaves _savedRecipe alone, which is why an undo can use it and ReplaceUsages can't be reused.
+    /// </summary>
+    private void ReplaceUsageItems(IReadOnlyList<ProductUsageEdit> sections)
+    {
+        for (var i = 0; i < sections.Count; i++)
+        {
+            if (i < UsageEdits.Count)
+            {
+                UsageEdits[i] = sections[i];
+            }
+            else
+            {
+                UsageEdits.Add(sections[i]);
+            }
+        }
+
+        while (UsageEdits.Count > sections.Count)
+        {
+            UsageEdits.RemoveAt(UsageEdits.Count - 1);
+        }
     }
 
     private ProductUsageEdit ToUsageEdit(
@@ -2151,52 +2418,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         return new PackagingLineRow(line.PackagingMaterial!, UnitConversionRules.ToBaseQuantity(qtyPerUnit, line.Unit?.BaseUnitsPerUnit));
     }
 
-    private void ReplacePacks(IReadOnlyList<ProductPack> packs)
-    {
-        SelectedPackEdit = null;
-        _packSubscriptions.Clear();
-        PackEdits.Clear();
-        foreach (var pack in packs)
-        {
-            PackEdits.Add(PackRowFor(pack));
-        }
-
-        _savedPacks = CurrentPacks();
-    }
-
-    /// <summary>A pack as a row, with its own lines in the material's base unit, as ReplaceLines shows the per-piece ones.</summary>
-    private ProductPackRow PackRowFor(ProductPack pack)
-    {
-        var row = new ProductPackRow(pack, FindPackagingMaterial);
-        foreach (var line in pack.Lines)
-        {
-            var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? line.QtyPerUnit : line.UnitsPerPackagingUnit;
-            var qtyPerUnit = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerUnit;
-            row.LineEdits.Add(new PackagingLineRow(line.PackagingMaterial!, UnitConversionRules.ToBaseQuantity(qtyPerUnit, line.Unit?.BaseUnitsPerUnit)));
-        }
-
-        WatchPackLines(row);
-        return row;
-    }
-
-    /// <summary>A pack's cost follows its own lines, the same way the screen's cost follows LineEdits.</summary>
-    private void WatchPackLines(ProductPackRow row)
-    {
-        _packSubscriptions.Add(row.LineEdits
-            .ToObservableChangeSet()
-            .AutoRefresh(l => l.CostPerUnit)
-            .Subscribe(_ =>
-            {
-                if (IsRefreshing)
-                {
-                    return;
-                }
-
-                row.RaiseLineCostChanged();
-                RecomputeCosts();
-            }));
-    }
-
     private void SetCosting(CostingParameters? costing)
     {
         EditingLaborPercent = costing?.LaborPercent ?? 0m;
@@ -2234,15 +2455,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     /// <summary>The packaging lines as Save writes them, in each material's base unit; a line half filled in is refused (PackagingLineRow.CompleteLines).</summary>
     private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> CurrentLines() =>
         [.. PackagingLineRow.CompleteLines(LineEdits).Select(l => (l.PackagingMaterial.Id, (int?)null, PackagingLineAuthoredField.QtyPerUnit, l.QtyPerUnit))];
-
-    /// <summary>The packs as Save writes them, each with its own lines; a pack half filled in is refused as a line is.</summary>
-    private List<ProductPackDraft> CurrentPacks() =>
-        [.. PackEdits.Select(p => new ProductPackDraft(
-            p.Pack.Id,
-            p.Name,
-            p.PiecesPerPack,
-            [.. PackagingLineRow.CompleteLines(p.LineEdits, string.IsNullOrWhiteSpace(p.Name) ? "pack" : p.Name)
-                .Select(l => (l.PackagingMaterial.Id, (int?)null, PackagingLineAuthoredField.QtyPerUnit, l.QtyPerUnit))]))];
 
     /// <summary>The recipe as Save writes it: the product's own sub-assemblies with their lines, and the ones it links.</summary>
     private RecipeDraft CurrentRecipe() =>
@@ -2295,23 +2507,6 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         _packagingLinkTarget?.Key == _savedPackagingLinkKey
             ? null
             : _packagingLinkTarget is { } target ? new PackagingLinkDraft(target.ProductId, target.SubAssemblyId) : PackagingLinkDraft.None;
-
-    /// <summary>
-    /// The packs when they differ from those last loaded, else null. Spelled out rather than left to record
-    /// equality, since a draft's Lines is a list and two equal lists aren't equal records.
-    /// </summary>
-    private List<ProductPackDraft>? ChangedPacks()
-    {
-        var current = CurrentPacks();
-        var same = current.Count == _savedPacks.Count
-            && current.Zip(_savedPacks).All(pair =>
-                pair.First.Id == pair.Second.Id
-                && pair.First.Name == pair.Second.Name
-                && pair.First.PiecesPerPack == pair.Second.PiecesPerPack
-                && pair.First.Lines.SequenceEqual(pair.Second.Lines));
-
-        return same ? null : current;
-    }
 
     /// <summary>
     /// Loads the saved product again and selects the fresh copy, so the form shows (and compares against) what was
@@ -2545,6 +2740,10 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
             return true;
         }
 
+        // Applying a section is one undo step, wherever it's applied from: a tab left, or a Save. A refused one
+        // changes only the message and whether the add-ins table is open, neither of which counts as a change, so
+        // the step settles into nothing of its own accord.
+        History.Begin();
         try
         {
             ErrorMessage = null;
@@ -2555,6 +2754,10 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
         {
             ErrorMessage = ex.Message;
             return false;
+        }
+        finally
+        {
+            History.End();
         }
     }
 
@@ -3202,21 +3405,14 @@ public sealed class ProductsViewModel : ViewModelBase, IDisposable
     {
         Costs = new ProductCostSummary(
             [.. UsageEdits.Select(u => u.CostPerPiece)],
+            EditingQuantityRequired,
             [.. LineEdits.Select(l => l.CostPerUnit)],
-            [.. PackEdits.Select(p => (p.Name, p.PiecesPerPack, p.LineCost))],
             EditingLaborPercent,
             EditingOverheadPercent,
             EditingAdministrativePercent,
             EditingMarginPercent,
             EditingVatPercent,
             EditingCurrentPrice);
-
-        // Back onto the rows, so the Packs table shows each pack's own cost and price beside it.
-        foreach (var (row, summary) in PackEdits.Zip(Costs.Packs))
-        {
-            row.MaterialCost = summary.MaterialCost;
-            row.SellingPrice = summary.SellingPrice;
-        }
     }
 
     public void Dispose()

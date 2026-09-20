@@ -155,9 +155,8 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
     }
 
     [Fact]
-    public async Task Copies_the_packs_costing_and_details()
+    public async Task Copies_the_quantity_required_costing_and_details()
     {
-        var boxId = await AddPackagingAsync("Pack Box", 12m);
         var sourceId = await AddProductAsync("Ensaymada Big");
         int categoryId;
         await using (var dbContext = CreateDbContext())
@@ -167,16 +166,12 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
             var source = await dbContext.Products.SingleAsync(p => p.Id == sourceId, Cancellation);
             source.Category = category;
             source.Description = "Buttery and soft";
+            source.QuantityRequired = 8;
             source.CurrentPrice = 35m;
             await dbContext.SaveChangesAsync(Cancellation);
             categoryId = category.Id;
         }
 
-        var packRepository = new ProductPackRepository(CreateDbContextFactory());
-        await packRepository.SetPacksAsync(
-            sourceId,
-            [new ProductPackDraft(0, "Pack of 6", 6, [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)])],
-            Cancellation);
         var costingRepository = new CostingParametersRepository(CreateDbContextFactory());
         await costingRepository.SetAsync(sourceId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, marginPercent: 40m, vatPercent: 12m, Cancellation);
 
@@ -186,12 +181,8 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         variant.Name.Should().Be("Ensaymada Small");
         variant.CategoryId.Should().Be(categoryId);
         variant.Description.Should().Be("Buttery and soft");
+        variant.QuantityRequired.Should().Be(8, "a variant sells the same way its source does until it's changed");
         variant.CurrentPrice.Should().Be(35m);
-
-        var pack = (await packRepository.GetForProductAsync(variantId, Cancellation)).Should().ContainSingle().Subject;
-        pack.Name.Should().Be("Pack of 6");
-        pack.Lines.Should().ContainSingle().Which.PackagingMaterialId.Should().Be(boxId);
-        pack.Id.Should().NotBe((await packRepository.GetForProductAsync(sourceId, Cancellation)).Single().Id, "packs are never linked");
 
         var costing = (await costingRepository.GetForProductAsync(variantId, Cancellation))!;
         costing.MarginPercent.Should().Be(40m);

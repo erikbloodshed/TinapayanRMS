@@ -64,8 +64,8 @@
                                        NavigationMode="Row">
                     <syncfusion:SfDataGrid.Columns>
                         <!-- The Raw Materials list's widths, so the three lists are the same width -->
-                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="220" />
-                        <syncfusion:GridTextColumn MappingName="RoleName" HeaderText="Role" Width="185" />
+                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="210" />
+                        <syncfusion:GridTextColumn MappingName="RoleName" HeaderText="Role" Width="160" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </Grid>
@@ -96,6 +96,16 @@
                                                   Command="{Binding SaveCommand}"
                                                   ToolTip="Saves the name, role and lines together."
                                                   Margin="0,0,8,0" />
+                            <syncfusion:ButtonAdv Label="Undo"
+                                                  IconTemplate="{StaticResource UndoIconTemplate}"
+                                                  Command="{Binding UndoCommand}"
+                                                  ToolTip="Takes back the last change: a quantity typed, a line added or removed. Ctrl+Z."
+                                                  Margin="0,0,8,0" />
+                            <syncfusion:ButtonAdv Label="Redo"
+                                                  IconTemplate="{StaticResource RedoIconTemplate}"
+                                                  Command="{Binding RedoCommand}"
+                                                  ToolTip="Puts back the change the last Undo took. Ctrl+Y."
+                                                  Margin="0,0,8,0" />
                             <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
                         </StackPanel>
                     </Grid>
@@ -123,6 +133,7 @@
                         <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" />
                         <syncfusion:SfTextBoxExt Grid.Row="1"
                                                  Grid.Column="0"
+                                                 controls:FieldUndoStep.Recorder="{Binding}"
                                                  Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Column="2" Text="Role" Style="{StaticResource FieldLabelStyle}" />
@@ -130,6 +141,7 @@
                                                 Grid.Column="2"
                                                 ItemsSource="{Binding Roles}"
                                                 DisplayMemberPath="Name"
+                                                controls:FieldUndoStep.Recorder="{Binding}"
                                                 SelectedItem="{Binding EditingRole, Mode=TwoWay}" />
 
                         <!-- A recipe's batch totals; a packaging set has its set cost in their place -->
@@ -182,9 +194,10 @@
 
                     <!--
                         A packaging set's lines: how much of each material one set takes, in its base unit. The same
-                        columns as a product's Packaging tab, which a product linking the set shows them in, one set per piece.
+                        columns as a product's Packaging tab, which a product linking the set shows them in, one set per sellable unit.
                     -->
                     <syncfusion:SfDataGrid ItemsSource="{Binding PackagingLines}"
+                                           controls:GridUndoSteps.Recorder="{Binding}"
                                            controls:NumericEditing.IsEnabled="True"
                                            Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}"
                                            SelectedItem="{Binding SelectedPackagingLine, Mode=TwoWay}"
@@ -239,6 +252,7 @@
 
                     <!-- Typed straight into: the add row at the bottom starts a line, Delete removes the selected one -->
                     <syncfusion:SfDataGrid ItemsSource="{Binding Lines}"
+                                           controls:GridUndoSteps.Recorder="{Binding}"
                                            controls:NumericEditing.IsEnabled="True"
                                            Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}"
                                            controls:GridAddNewRow.HideCheckBoxes="True"
@@ -314,7 +328,7 @@
                             <TextBlock Text="{Binding FormulaBaseCaption}"
                                        Style="{StaticResource CaptionStyle}"
                                        Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
-                            <TextBlock Text="A product whose packaging links this set takes one set per piece."
+                            <TextBlock Text="A product whose packaging links this set takes one whole set per sellable unit."
                                        Style="{StaticResource CaptionStyle}"
                                        Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>

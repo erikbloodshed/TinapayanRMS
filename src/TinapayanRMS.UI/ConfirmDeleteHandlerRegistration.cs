@@ -20,7 +20,9 @@ public static class ConfirmDeleteHandlerRegistration
     public static IDisposable RegisterNativeMessageBoxHandler(this ViewModelBase viewModel) =>
         viewModel.ConfirmDelete.RegisterHandler(interaction =>
         {
-            var result = MessageBox.Show(interaction.Input, "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            // "Confirm" rather than "Confirm Delete": the same interaction asks about anything that can't be undone,
+            // Products' Revert among them, and the message itself says which.
+            var result = MessageBox.Show(interaction.Input, "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             interaction.SetOutput(result == MessageBoxResult.Yes);
         });
 }

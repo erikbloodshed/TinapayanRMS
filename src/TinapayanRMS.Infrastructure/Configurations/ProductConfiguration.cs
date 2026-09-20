@@ -14,6 +14,14 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(p => p.Description).HasMaxLength(ProductValidator.MaxDescriptionLength);
 
+        // One piece unless the product says otherwise. The database default matters as much as the CLR one:
+        // without it the column is added to existing rows as 0, and the check constraint below would then
+        // refuse to apply. HasSentinel moves the "leave it to the database" value off 0, which is what EF
+        // would take it to be: a product explicitly saved as 0 pieces has to reach the check constraint and
+        // be refused, on an insert as on an update, rather than being quietly stored as 1.
+        builder.Property(p => p.QuantityRequired).HasDefaultValue(1).HasSentinel(-1);
+        builder.ToTable(t => t.HasCheckConstraint("CK_Products_QuantityRequired", "[QuantityRequired] > 0"));
+
         // A category is optional, so deleting one leaves its products uncategorized rather than being refused.
         builder.HasOne(p => p.Category)
             .WithMany()

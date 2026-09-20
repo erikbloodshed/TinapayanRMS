@@ -146,7 +146,7 @@ public sealed record UsageExampleResult(
 /// packaging material has a base unit of its own and is always purchased. Its details, alternative
 /// units, brand prices and BOM are all edited in memory, and Save writes them together.
 /// </summary>
-public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPriceRowHost
+public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposable, IBrandPriceRowHost
 {
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
@@ -722,6 +722,16 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
     public ReactiveCommand<RxVoid, RxVoid> RemoveBomLineCommand { get; }
 
     /// <summary>
+    /// The form's undo and redo stacks, the same shape as Products'. One step is one finished change. The price
+    /// history is left out: its Delete writes to the database on the spot, so there is nothing unsaved to put back.
+    /// Cleared whenever the form stops being the one it recorded: another material picked, a new one, or a Save.
+    /// </summary>
+    public UndoHistory<RawMaterialFormSnapshot> History { get; }
+
+    public ReactiveCommand<RxVoid, RxVoid> UndoCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> RedoCommand { get; }
+
+    /// <summary>
     /// Input: the label to put over the box, and the value it starts with — what was already typed into the
     /// Category picker, so confirming a category from "&lt; Add New "X" .. &gt;" doesn't mean typing X again.
     /// Output: the name typed for the new category, or null if it was cancelled. The View registers a handler
@@ -887,6 +897,15 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
                 (type, baseUnit) => BaseUnitText.AbbreviationOf(type, baseUnit))
             .ToProperty(this, x => x.BaseUnitAbbreviation, "g");
 
+        // Nothing is recorded until a material's details have arrived, or while the screen is being written to
+        // wholesale: the brand prices and the BOM land a moment after the pick (AreDetailsReady), and a step taken
+        // before they do would put the empty grids back over them.
+        History = new UndoHistory<RawMaterialFormSnapshot>(
+            CaptureSnapshot, (before, after) => before.ShowsSameAs(after), () => AreDetailsReady && !IsBusyApplying);
+
+        UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, History.WhenAnyValue(h => h.CanUndo));
+        RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, History.WhenAnyValue(h => h.CanRedo));
+
         // The header's saved costs; a new Per unit, or a unit's multiplier, updates them through UpdatePurchaseCostTexts.
         this.WhenAnyValue(x => x.SelectedRawMaterial)
             .Subscribe(_ => UpdateHeaderCostTexts());
@@ -896,10 +915,12 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
             .AutoRefresh(r => r.Price)
             .AutoRefresh(r => r.Quantity)
             .AutoRefresh(r => r.Brand)
+            .Where(_ => !IsRestoring)
             .Subscribe(_ => UpdatePurchaseCostTexts());
 
         // Each brand's buffered price follows the fixed buffered cost. The percent doesn't move it: it only feeds Recalculate.
         this.WhenAnyValue(x => x.EditingBufferedCost, x => x.EditingCostBufferPercent)
+            .Where(_ => !IsRestoring)
             .Subscribe(_ =>
             {
                 this.RaisePropertyChanged(nameof(TypedCostBufferPercent));
@@ -910,7 +931,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         // A packaging material is always purchased, and an ingredient's base unit is the gram, so
         // switching a new material's type clears whatever the other type had filled in.
         this.WhenAnyValue(x => x.EditingType)
-            .Where(_ => !IsRefreshing)
+            .Where(_ => !IsBusyApplying)
             .Subscribe(type =>
             {
                 if (type == RawMaterialType.Packaging)
@@ -929,29 +950,29 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
 
         // A made ingredient starts with no weight loss: 0%, which is what the empty box shows anyway.
         this.WhenAnyValue(x => x.EditingSource)
-            .Where(source => source == RawMaterialSource.Made && !IsRefreshing)
+            .Where(source => source == RawMaterialSource.Made && !IsBusyApplying)
             .Subscribe(_ => EditingWeightLossPercent ??= 0m);
 
         // The alternative units and the purchase unit choices name the base unit, which a new
         // material can still change.
         this.WhenAnyValue(x => x.EditingType, x => x.EditingBaseUnit)
-            .Where(_ => !IsRefreshing)
+            .Where(_ => !IsBusyApplying)
             .Subscribe(_ => RebuildUnitViews());
 
         // Every selection-driven subscription skips while LoadCommand merges in fresh data, which
         // only re-points a selection at its refreshed copy; the form and details must stay as-is.
         this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Where(material => material is not null && !IsRefreshing)
+            .Where(material => material is not null && !IsBusyApplying)
             .Subscribe(material => LoadIntoForm(material!));
 
         this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Where(_ => !IsRefreshing)
+            .Where(_ => !IsBusyApplying)
             .Subscribe(ResetDetails);
 
         // A newer selection cancels an older one still loading (Switch disposes it, which cancels its token), so a quick
         // second pick never gets the first one's details added to its own.
         this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Where(_ => !IsRefreshing)
+            .Where(_ => !IsBusyApplying)
             .Select(material => Observable.FromAsync(cancellationToken => LoadDetailsAsync(material, cancellationToken)))
             .Switch()
             .Subscribe();
@@ -961,12 +982,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         UnitRows.ToObservableChangeSet()
             .AutoRefresh(r => r.UnitOfMeasureId)
             .AutoRefresh(r => r.BaseUnitsPerUnit)
-            .Where(_ => !_syncingUnitRows && !IsRefreshing)
+            .Where(_ => !_syncingUnitRows && !IsBusyApplying)
             .Subscribe(_ => OnUnitRowsEdited());
 
         // A component picked in the BOM table is pointed at the screen's copy of it, for its name.
         BomLineEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
+            .Where(_ => !IsRestoring)
             .Subscribe(_ => IngredientLineRow.Resolve(BomLineEdits, Ingredients.ToDictionary(m => m.Id)));
 
         this.WhenAnyValue(x => x.ExampleRawMaterial)
@@ -1151,14 +1173,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
 
         // Nothing to confirm: the unit only leaves the list, and is deleted when the material is saved.
         DeleteUnitCommand = ReactiveCommand.Create(
-            () =>
+            () => AsUndoStep(() =>
             {
                 var removed = SelectedUnitRow!.Unit;
                 _brandAddedUnits.Remove(removed);
                 ReplaceUnitRows([.. UnitRows.Select(r => r.Unit).Where(u => !ReferenceEquals(u, removed))], selectedUnit: null);
                 RefreshBrandPriceRows();
                 UpdatePurchaseCostTexts();
-            },
+            }),
             hasSelectedUnitRow);
 
         CalculateExampleCommand = ReactiveCommand.Create(
@@ -1196,20 +1218,20 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
 
         // Nothing to confirm: the brand only leaves the grid, and its price goes when the material is saved.
         RemoveBrandPriceCommand = ReactiveCommand.Create(
-            () =>
+            () => AsUndoStep(() =>
             {
                 BrandPriceRows.Remove(SelectedBrandPriceRow!);
                 DropUnusedAddedUnits(pickedRow: null);
-            },
+            }),
             this.WhenAnyValue(x => x.SelectedBrandPriceRow).Select(row => row is not null));
 
         // Re-initialises the fixed buffered cost from the dearest brand, as typed, with the buffer percent on top. Save keeps it.
         RecalculateBufferCommand = ReactiveCommand.Create(
-            () => { EditingBufferedCost = RawMaterialRules.BufferedCost(DearestPurchaseCost!.Value, EditingCostBufferPercent ?? 0m); },
+            () => AsUndoStep(() => EditingBufferedCost = RawMaterialRules.BufferedCost(DearestPurchaseCost!.Value, EditingCostBufferPercent ?? 0m)),
             this.WhenAnyValue(x => x.DearestPurchaseCost).Select(cost => cost is not null));
 
         RemoveBomLineCommand = ReactiveCommand.Create(
-            () => { BomLineEdits.Remove(SelectedBomLineEdit!); },
+            () => AsUndoStep(() => BomLineEdits.Remove(SelectedBomLineEdit!)),
             this.WhenAnyValue(x => x.SelectedBomLineEdit).Select(line => line is not null));
     }
 
@@ -1263,6 +1285,158 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
         return $"Also linked to {linkedTo.Name}: {parts}. With this one, {totals} (at most 100% each).";
     }
 
+    void IUndoRecorder.BeginUndoStep() => History.Begin();
+
+    void IUndoRecorder.EndUndoStep() => History.End();
+
+    /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>
+    private void AsUndoStep(Action change)
+    {
+        History.Begin();
+        try
+        {
+            change();
+        }
+        finally
+        {
+            History.End();
+        }
+    }
+
+    /// <summary>Settles whatever step is open, then puts the form back one step.</summary>
+    public bool TryUndo()
+    {
+        History.End();
+        if (!History.TryUndo(out var restore))
+        {
+            return false;
+        }
+
+        RestoreSnapshot(restore);
+        return true;
+    }
+
+    /// <summary>Steps forward again into what the last undo stepped off.</summary>
+    public bool TryRedo()
+    {
+        History.End();
+        if (!History.TryRedo(out var restore))
+        {
+            return false;
+        }
+
+        RestoreSnapshot(restore);
+        return true;
+    }
+
+    private RawMaterialFormSnapshot CaptureSnapshot() => new()
+    {
+        EditingId = _editingId,
+        Name = EditingName,
+        Type = EditingType,
+        CategoryId = EditingCategory?.Id,
+        Source = EditingSource,
+        CanChangeTypeAndSource = CanChangeTypeAndSource,
+        BaseUnitId = EditingBaseUnit?.Id,
+        WeightLossPercent = EditingWeightLossPercent,
+        LinkedToId = EditingLinkedTo?.Id,
+        WeightSharePercent = EditingWeightSharePercent,
+        CostSharePercent = EditingCostSharePercent,
+        CostBufferPercent = EditingCostBufferPercent,
+        BufferedCost = EditingBufferedCost,
+        BufferedCostUnitKey = BufferedCostUnit?.Key,
+        UnitRows =
+        [
+            .. UnitRows.Select(r => new UnitRowState(
+                r.Unit.Id, r.Unit.RawMaterialId, r.UnitOfMeasureId, r.BaseUnitsPerUnit, r.BaseUnitAbbreviation)),
+        ],
+        BrandPrices = [.. BrandPriceRows.Select(r => new BrandPriceState(r.Brand, r.UnitKey, r.Price))],
+        BomLines = [.. BomLineEdits.Select(l => new IngredientLineState(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
+    };
+
+    /// <summary>
+    /// Puts the form back as <paramref name="snapshot"/> had it. The rows are rebuilt rather than written into: an
+    /// IngredientLineRow's setters drop a typed percentage, and a unit row writes straight through to the stored
+    /// RawMaterialUnit that Save hands the repository, so each unit comes back as a fresh entity carrying its own
+    /// Id - one that lost it would be saved as a new unit and the stored one deleted. The one recompute runs at the
+    /// end, outside the guard, so the costs and captions are worked out once from the form that was put back.
+    /// </summary>
+    private void RestoreSnapshot(RawMaterialFormSnapshot snapshot)
+    {
+        ErrorMessage = null;
+
+        ApplyRestore(() =>
+        {
+            SelectedUnitRow = null;
+            SelectedBrandPriceRow = null;
+            SelectedBomLineEdit = null;
+
+            _editingId = snapshot.EditingId;
+            CanChangeTypeAndSource = snapshot.CanChangeTypeAndSource;
+            EditingName = snapshot.Name;
+            EditingType = snapshot.Type;
+            EditingCategory = snapshot.CategoryId is { } categoryId ? Categories.FirstOrDefault(c => c.Id == categoryId) : null;
+            EditingSource = snapshot.Source;
+            EditingBaseUnit = snapshot.BaseUnitId is { } baseUnitId ? UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId) : null;
+            EditingWeightLossPercent = snapshot.WeightLossPercent;
+            EditingLinkedTo = snapshot.LinkedToId is { } linkedToId ? Ingredients.FirstOrDefault(m => m.Id == linkedToId) : null;
+            EditingWeightSharePercent = snapshot.WeightSharePercent;
+            EditingCostSharePercent = snapshot.CostSharePercent;
+            EditingCostBufferPercent = snapshot.CostBufferPercent;
+            EditingBufferedCost = snapshot.BufferedCost;
+
+            // The alternative units, as fresh entities carrying their ids.
+            SyncUnitRows(() =>
+            {
+                UnitRows.Clear();
+                foreach (var unit in snapshot.UnitRows)
+                {
+                    UnitRows.Add(new RawMaterialUnitRow(
+                        new RawMaterialUnit
+                        {
+                            Id = unit.Id,
+                            RawMaterialId = unit.RawMaterialId,
+                            UnitOfMeasureId = unit.UnitOfMeasureId ?? 0,
+                            UnitOfMeasure = unit.UnitOfMeasureId is { } id ? FindUnitOfMeasure(id) : null,
+                            BaseUnitsPerUnit = unit.BaseUnitsPerUnit,
+                        },
+                        unit.BaseUnitAbbreviation,
+                        FindUnitOfMeasure));
+                }
+            });
+            CanAddUnit = UnitRows.Count < UnitConversionRules.MaxAlternativeUnits;
+
+            BrandPriceRows.Clear();
+            foreach (var price in snapshot.BrandPrices)
+            {
+                BrandPriceRows.Add(new BrandPriceRow(this) { Brand = price.Brand, UnitKey = price.UnitKey, Price = price.Price });
+            }
+
+            BomLineEdits.Clear();
+            foreach (var line in snapshot.BomLines)
+            {
+                BomLineEdits.Add(IngredientLineRow.Restore(
+                    id => Ingredients.FirstOrDefault(m => m.Id == id),
+                    baseWeight: 0m,
+                    line.IngredientId,
+                    line.Grams,
+                    line.IsFormulaBase,
+                    line.AuthoredBakersPercent));
+            }
+        });
+
+        // The Per picker's choices are rebuilt from the units above, so the one that was picked is found again here
+        // rather than in the guard: RebuildUnitViews replaces the list BufferedCostUnit is chosen from.
+        RebuildUnitViews();
+        BufferedCostUnit = snapshot.BufferedCostUnitKey is { } unitKey
+            ? BufferedCostUnitOptions.FirstOrDefault(o => o.Key == unitKey)
+            : null;
+
+        IngredientLineRow.Resolve(BomLineEdits, Ingredients.ToDictionary(m => m.Id));
+        RefreshBrandPriceRows();
+        UpdatePurchaseCostTexts();
+    }
+
     /// <summary>
     /// An empty form, for New and after Delete. It starts as a purchased ingredient, the usual kind, but
     /// the category, brand prices and the usage example's material start empty, so none is saved or
@@ -1271,6 +1445,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
     /// </summary>
     private void ClearForm()
     {
+        History.Clear();
         _editingId = 0;
         SelectedRawMaterial = null;
         CanChangeTypeAndSource = true;
@@ -1291,6 +1466,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IDisposable, IBrandPr
 
     private void LoadIntoForm(RawMaterial material)
     {
+        History.Clear();
         _editingId = material.Id;
         CanChangeTypeAndSource = false;
         EditingName = material.Name;

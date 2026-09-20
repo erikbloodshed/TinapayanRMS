@@ -58,11 +58,11 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var repository = new ProductRepository(CreateDbContextFactory());
 
         var id = await repository.SaveAsync(
-            new Product { Name = "Small" }, recipe: null, new PackagingLinkDraft(null, setId), packagingLines: null, packs: null, costing: null, Cancellation);
+            new Product { Name = "Small" }, recipe: null, new PackagingLinkDraft(null, setId), packagingLines: null, costing: null, Cancellation);
         (await CreatePackagingLinkRepository().GetForProductAsync(id, Cancellation))!.LinkedSubAssemblyId.Should().Be(setId, "a new product can link on its first save");
 
         await repository.SaveAsync(
-            new Product { Id = id, Name = "Small" }, recipe: null, new PackagingLinkDraft(bigId, null), packagingLines: null, packs: null, costing: null, Cancellation);
+            new Product { Id = id, Name = "Small" }, recipe: null, new PackagingLinkDraft(bigId, null), packagingLines: null, costing: null, Cancellation);
         (await CreatePackagingLinkRepository().GetForProductAsync(id, Cancellation))!.LinkedProductId.Should().Be(bigId);
 
         await repository.SaveAsync(
@@ -70,7 +70,6 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
             recipe: null,
             PackagingLinkDraft.None,
             [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 2m)],
-            packs: null,
             costing: null,
             Cancellation);
         (await CreatePackagingLinkRepository().GetForProductAsync(id, Cancellation)).Should().BeNull();
@@ -86,7 +85,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         await CreatePackagingLinkRepository().SetLinkAsync(bId, aId, Cancellation);
 
         var act = () => new ProductRepository(CreateDbContextFactory()).SaveAsync(
-            new Product { Id = aId, Name = "A renamed" }, recipe: null, new PackagingLinkDraft(bId, null), packagingLines: null, packs: null, costing: null, Cancellation);
+            new Product { Id = aId, Name = "A renamed" }, recipe: null, new PackagingLinkDraft(bId, null), packagingLines: null, costing: null, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*circular*");
         await using var dbContext = CreateDbContext();
@@ -192,7 +191,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         lines.Select(l => (l.PackagingMaterialId, l.QtyPerUnit, l.AuthoredField)).Should().Equal(
             (boxId, 1m, PackagingLineAuthoredField.QtyPerUnit),
             (ribbonId, 30m, PackagingLineAuthoredField.QtyPerUnit));
-        lines.Should().OnlyContain(l => l.ProductId == productId && l.PackId == null && l.UnitId == null && l.PackagingMaterial != null);
+        lines.Should().OnlyContain(l => l.ProductId == productId && l.UnitId == null && l.PackagingMaterial != null);
         var link = await CreatePackagingLinkRepository().GetForProductAsync(productId, Cancellation);
         link!.LinkedSubAssembly!.Name.Should().Be("Gift Box Set");
         link.LinkedProductId.Should().BeNull();

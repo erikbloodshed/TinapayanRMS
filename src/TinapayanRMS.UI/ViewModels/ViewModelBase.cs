@@ -58,6 +58,34 @@ public abstract class ViewModelBase : ReactiveObject
         }
     }
 
+    /// <summary>
+    /// True while a screen puts a whole form back, which is what an undo or a redo does. Subscriptions
+    /// that would otherwise recompute from half-restored state, or apply the form a tab is being moved
+    /// off, skip while it's set. It's kept apart from IsRefreshing because that one also means "this
+    /// data came from a load, so merge it rather than replace it", which a restore doesn't.
+    /// </summary>
+    protected bool IsRestoring { get; private set; }
+
+    /// <summary>Runs <paramref name="restore"/>, a whole form being put back, with IsRestoring set.</summary>
+    protected void ApplyRestore(Action restore)
+    {
+        IsRestoring = true;
+        try
+        {
+            restore();
+        }
+        finally
+        {
+            IsRestoring = false;
+        }
+    }
+
+    /// <summary>
+    /// The screen is being written to wholesale — a load merging in fresh data, or an undo putting a
+    /// form back. Either way the change isn't the user's, so nothing should react to it as an edit.
+    /// </summary>
+    protected bool IsBusyApplying => IsRefreshing || IsRestoring;
+
     /// <summary>Input: a confirmation message to show the user. Output: true if they confirmed. The View registers a handler that shows a native MessageBox.</summary>
     public Interaction<string, bool> ConfirmDelete { get; } = new();
 

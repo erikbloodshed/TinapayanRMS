@@ -57,13 +57,15 @@
             <Border Grid.Row="1" Margin="0,4,0,0" Style="{StaticResource CardStyle}" Padding="4">
                 <!--
                     Every tab but Clone is part of the one form Save writes, so a new product shows them
-                    too. Fixed tabs, like Raw Materials': nothing to close or reopen. The strip sits along the
+                    too. Fixed tabs, like Raw Materials': nothing to close or reopen, and nothing to drag into
+                    another order (AllowDragDrop, which TabControlExt defaults to true). The strip sits along the
                     bottom, and each tab scrolls on its own, so the strip stays put. Clone only applies to a
                     saved product; while it's hidden the ViewModel moves the selection off it (SelectedDetailsTab).
                     Between picking a product and its details arriving, the previous product's still show, and
                     the tabs ignore the mouse (AreDetailsReady): what's in them is no longer the form's.
                 -->
                 <syncfusion:TabControlExt BorderThickness="0"
+                                          AllowDragDrop="False"
                                           IsHitTestVisible="{Binding AreDetailsReady}"
                                           TabStripPlacement="Bottom"
                                           CloseButtonType="Hide"
@@ -84,13 +86,6 @@
                     <syncfusion:TabItemExt Header="Costing" CanClose="False">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,14,12">
                             <p:CostingCard />
-                        </ScrollViewer>
-                    </syncfusion:TabItemExt>
-
-                    <!-- Packs sits after Costing: a pack's price is the piece price it's worked out from, times its pieces -->
-                    <syncfusion:TabItemExt Header="Packs" CanClose="False">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,14,12">
-                            <p:PacksCard />
                         </ScrollViewer>
                     </syncfusion:TabItemExt>
 

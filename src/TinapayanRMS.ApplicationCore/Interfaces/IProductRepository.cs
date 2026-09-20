@@ -37,8 +37,8 @@ public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField Auth
 public sealed record RecipeDraft(IReadOnlyList<OwnedSubAssemblyDraft> Owned, IReadOnlyList<LinkedUsageDraft> Linked);
 
 /// <summary>
-/// What a product's per-piece packaging links, as Save writes it: another product's packaging, a standalone packaging
-/// set (one set per piece), or neither (<see cref="None"/>), when the product owns its packaging lines.
+/// What a product's packaging links, as Save writes it: another product's packaging, a standalone packaging
+/// set (one set per sellable unit), or neither (<see cref="None"/>), when the product owns its packaging lines.
 /// </summary>
 public sealed record PackagingLinkDraft(int? LinkedProductId, int? LinkedSubAssemblyId)
 {
@@ -55,7 +55,7 @@ public interface IProductRepository
     /// <summary>Adds the product and stamps its UpdatedAt.</summary>
     Task AddAsync(Product product, CancellationToken cancellationToken);
 
-    /// <summary>Changes the name, description and category, and stamps UpdatedAt.</summary>
+    /// <summary>Changes the name, description, category, quantity required and current price, and stamps UpdatedAt.</summary>
     Task UpdateAsync(Product product, CancellationToken cancellationToken);
 
     /// <summary>
@@ -64,25 +64,23 @@ public interface IProductRepository
     /// its recipe, its packaging lines and its costing parameters, each checked as their own repositories
     /// check them. Returns the product's id.
     /// </summary>
-    /// <param name="product">Only its Id, Name, Description and CategoryId are read; it's never given an id.</param>
+    /// <param name="product">Only its Id, Name, Description, CategoryId, QuantityRequired and CurrentPrice are read; it's never given an id.</param>
     /// <param name="recipe">
     /// The product's complete recipe of sub-assemblies, or null to leave it as it is. An owned
     /// sub-assembly it no longer lists is deleted, unless another product links it.
     /// </param>
     /// <param name="packagingLink">
-    /// What the per-piece packaging links from now on, or null to leave the link as it is. Written before the lines, so
+    /// What the packaging links from now on, or null to leave the link as it is. Written before the lines, so
     /// a product unlinked here can be given its own lines in the same save. Removing a link doesn't copy the lines it
     /// showed: pass them as <paramref name="packagingLines"/>.
     /// </param>
-    /// <param name="packagingLines">The new per-piece packaging lines, as IPackagingLineRepository.SetLinesAsync takes them, or null to leave them as they are.</param>
-    /// <param name="packs">The product's complete set of sellable packs with their own lines, or null to leave them as they are. A pack it no longer lists is deleted with its lines.</param>
+    /// <param name="packagingLines">The new packaging lines, as IPackagingLineRepository.SetLinesAsync takes them, or null to leave them as they are.</param>
     /// <param name="costing">The new costing parameters (only their cost and percentage fields are read), or null to leave them as they are.</param>
     Task<int> SaveAsync(
         Product product,
         RecipeDraft? recipe,
         PackagingLinkDraft? packagingLink,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? packagingLines,
-        IReadOnlyList<ProductPackDraft>? packs,
         CostingParameters? costing,
         CancellationToken cancellationToken);
 

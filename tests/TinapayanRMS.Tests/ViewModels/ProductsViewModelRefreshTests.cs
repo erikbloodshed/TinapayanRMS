@@ -126,21 +126,21 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageFormTotalWeightText.Should().Be("100 g");
         viewModel.EditingUsageWeightPerPiece = 10m;
         viewModel.EditingUsageYield.Should().Be(10m, "typing the weight per piece works out the yield");
-        await viewModel.ApplyUsageCommand.Execute();
         viewModel.EditingLaborPercent = 50m;
         viewModel.EditingAdministrativePercent = 12.5m;
 
+        // The sub-assembly's form is left open: the one Save puts it in the recipe, shows its tab, and writes the lot.
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
         var usage = viewModel.UsageEdits.Should().ContainSingle().Subject;
-        viewModel.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>("Apply shows the new sub-assembly's tab").Which.Usage.Should().BeSameAs(usage);
+        viewModel.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>("Save shows the new sub-assembly's tab").Which.Usage.Should().BeSameAs(usage);
         usage.IsOwned.Should().BeTrue();
         usage.CostPerPiece.Should().Be(2.4m);
         viewModel.Costs.Labor.Should().Be(1.2m, "labor is 50% of the ₱2.40 material cost");
         viewModel.Costs.Administrative.Should().Be(0.3m, "administrative is 12.5% of the ₱2.40 material cost");
         viewModel.Costs.BaseCost.Should().Be(3.9m, "₱2.40 of filling, ₱1.20 labor and ₱0.30 administrative");
 
-        await viewModel.SaveCommand.Execute();
-
-        viewModel.ErrorMessage.Should().BeNull();
         int productId;
         await using (var dbContext = CreateDbContext())
         {
@@ -307,7 +307,6 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingUsageYield.Should().Be(30m);
         viewModel.EditingUsageWeightPerPiece.Should().Be(50m, "1,500 g over the 30 pieces typed");
 
-        await viewModel.ApplyUsageCommand.Execute();
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -342,7 +341,6 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.IsFormShowingLines.Should().BeTrue("the sub-assembly picked to link shows the lines it brings, read-only");
         viewModel.FormLines.Single().Grams.Should().Be(1000m);
         viewModel.EditingUsageWeightPerPiece = 30m;
-        await viewModel.ApplyUsageCommand.Execute();
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
 
@@ -487,7 +485,6 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingUsageRole = viewModel.Roles.Single(r => r.Id == fillingRoleId);
         viewModel.FormLines.Add(new IngredientLineRow { IngredientId = ubeId, Grams = 100m });
         viewModel.EditingUsageWeightPerPiece = 10m;
-        await viewModel.ApplyUsageCommand.Execute();
 
         await viewModel.AddUsageCommand.Execute();
         viewModel.FormRoleOptions.Select(r => r.Name).Should().Equal(["Dough", "Filling"], "a recipe can have more than one in a role");
@@ -495,7 +492,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingUsageRole = viewModel.Roles.Single(r => r.Id == doughRoleId);
         viewModel.FormLines.Add(new IngredientLineRow { IngredientId = flourId, Grams = 1000m });
         viewModel.EditingUsageWeightPerPiece = 50m;
-        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
 
         // Dough sorts before Filling regardless of which was typed in first, and it's the tab showing.
         viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling");
@@ -503,7 +500,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task Changing_a_sub_assemblys_role_on_Apply_moves_its_tab_to_where_the_new_role_sorts()
+    public async Task Changing_a_sub_assemblys_role_on_Save_moves_its_tab_to_where_the_new_role_sorts()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -528,7 +525,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.EditUsageCommand.Execute(doughTab.Usage);
         viewModel.FormRoleOptions.Select(r => r.Name).Should().Equal(["Dough", "Filling", "Topping"], "every role, the recipe's others too");
         viewModel.EditingUsageRole = viewModel.Roles.Single(r => r.Id == toppingRoleId);
-        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Filling", "Topping");
@@ -561,7 +558,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingUsageRole = viewModel.Roles.Single(r => r.Id == doughRoleId);
         viewModel.FormLines.Add(new IngredientLineRow { IngredientId = ubeId, Grams = 500m });
         viewModel.EditingUsageWeightPerPiece = 20m;
-        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().StartWith("This recipe has more than one Dough without a name");
         viewModel.UsageEdits.Should().ContainSingle();
@@ -569,7 +566,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         // Named, it goes in, and the second Dough's tab reads by its name.
         viewModel.EditingUsageName = "Ube";
-        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Select(t => t.Header).Should().Equal("Dough", "Dough: Ube");
@@ -615,6 +612,51 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         // The reload shows the saved product's tabs — none — and the New Sub-Assembly tab, with nothing in it, goes.
         viewModel.RecipeTabs.Should().BeEmpty();
         viewModel.SelectedRecipeTab.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Revert_reads_the_product_back_as_it_was_saved_and_drops_a_sub_assembly_being_added()
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        await AddRoleAsync("Filling", sortOrder: 2);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.24m);
+        var productId = await AddProductAsync("Ube Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [new OwnedSubAssemblyDraft(0, doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m)], []));
+        var viewModel = CreateViewModel();
+        viewModel.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        // Rename it, retype the Dough's batch, then start a Filling that is left sitting in the form.
+        viewModel.EditingName = "Ube Roll Mini";
+        await viewModel.EditUsageCommand.Execute(viewModel.UsageEdits.Single());
+        viewModel.FormLines.Single().Grams = 1500m;
+        await viewModel.AddUsageCommand.Execute();
+        viewModel.EditingUsageRole!.Name.Should().Be("Filling");
+        viewModel.FormLines.Add(new IngredientLineRow { IngredientId = ubeId, Grams = 100m });
+        viewModel.EditingUsageWeightPerPiece = 10m;
+        viewModel.UsageEdits.Should().ContainSingle("the Dough went in when its tab was left; the Filling is still in the form");
+
+        await viewModel.RevertCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}");
+        viewModel.EditingName.Should().Be("Ube Roll", "the typed name goes back to the saved one");
+        viewModel.IsAddingUsage.Should().BeFalse("the Filling being added went with the rest");
+        viewModel.EditingUsage!.RoleName.Should().Be("Dough", "the reloaded Dough's tab shows, with its own form");
+        viewModel.UsageEdits.Should().ContainSingle().Which.RoleName.Should().Be("Dough");
+        viewModel.UsageEdits.Single().TotalWeight.Should().Be(1000m, "the retyped batch goes back to the saved 1,000 g");
+        viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Select(t => t.Header).Should().Equal("Dough");
+
+        // Revert only reads: nothing of the typing reached the database.
+        await using var dbContext = CreateDbContext();
+        (await dbContext.Products.SingleAsync(Cancellation)).Name.Should().Be("Ube Roll");
+        (await dbContext.ProductSubAssemblyUsages.CountAsync(Cancellation)).Should().Be(1);
     }
 
     [Fact]
@@ -665,28 +707,30 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Filling", "Topping", "Packaging");
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
 
-        // Applied with Apply: the Dough is the first tab, since Dough is the first role, and it's the tab showing.
+        // Applied on the way out of its tab: the Dough is the first tab, since Dough is the first role.
         await viewModel.AddUsageCommand.Execute();
         viewModel.EditingUsageRole!.Name.Should().Be("Dough", "the only role the recipe doesn't have yet");
         viewModel.FormLines.Add(new IngredientLineRow { IngredientId = flourId, Grams = 800m });
         viewModel.EditingUsageWeightPerPiece = 40m;
-        await viewModel.ApplyUsageCommand.Execute();
+        viewModel.SelectedRecipeTab = viewModel.PackagingTab;
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling", "Topping", "Packaging");
-        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.RecipeTabs[0]);
+
+        // Its own tab opens its form again.
+        viewModel.SelectedRecipeTab = viewModel.RecipeTabs[0];
         viewModel.EditingUsage!.RoleName.Should().Be("Dough");
 
-        // Opened from a sub-assembly's tab and cancelled: back on that tab, and the New Sub-Assembly tab goes.
+        // Opened from a sub-assembly's tab and left with nothing typed in: the form closes and the New Sub-Assembly tab goes.
         await viewModel.AddUsageCommand.Execute();
         viewModel.EditingUsageRole!.Name.Should().Be("Dough", "the recipe has one in every role, so the first is picked");
-        await viewModel.CancelUsageCommand.Execute();
+        viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First();
         viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling", "Topping", "Packaging");
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.RecipeTabs[0]);
     }
 
     [Fact]
-    public async Task Editing_a_sub_assembly_opens_the_form_in_its_tab_which_stays_through_a_refresh_and_Apply()
+    public async Task Editing_a_sub_assembly_opens_the_form_in_its_tab_which_stays_through_a_refresh_and_Save()
     {
         var roleId = await AddRoleAsync("Filling");
         var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.24m);
@@ -714,15 +758,20 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         tab.Usage.CostPerPiece.Should().Be(3.6m);
         viewModel.EditingUsage.Should().BeSameAs(tab.Usage, "the form follows the repriced copy that took its place");
 
-        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.UsageEdits.Should().ContainSingle("Apply replaces the refreshed copy instead of adding a second").Which.TotalWeight.Should().Be(150m);
-        viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Should().ContainSingle().Which.Should().BeSameAs(tab);
-        viewModel.SelectedRecipeTab.Should().BeSameAs(tab);
-        viewModel.EditingUsage.Should().BeSameAs(tab.Usage, "the tab has nothing else to show, so its form stays open on what was applied");
-        tab.Usage.CostPerPiece.Should().Be(3.6m, "10 g a piece of a 150 g, ₱54 batch");
-        tab.Header.Should().Be("Filling");
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}");
+
+        // Save reloads the product, so its tab and usage are fresh objects; there is still just the one of each.
+        viewModel.UsageEdits.Should().ContainSingle("Save replaces the refreshed copy instead of adding a second").Which.TotalWeight.Should().Be(150m);
+        var savedTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Should().ContainSingle().Subject;
+        viewModel.SelectedRecipeTab.Should().BeSameAs(savedTab);
+        viewModel.EditingUsage.Should().BeSameAs(savedTab.Usage, "the tab has nothing else to show, so its form is open on it");
+        savedTab.Usage.CostPerPiece.Should().Be(3.6m, "10 g a piece of a 150 g, ₱54 batch");
+        savedTab.Header.Should().Be("Filling");
     }
 
     [Fact]
@@ -744,12 +793,13 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedProduct = viewModel.Products.Single();
         await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 2, () => $"usage rows={viewModel.UsageEdits.Count}");
 
-        // From Packaging, Add Sub-Assembly then Cancel: back on Packaging, with the form closed and the add's tab gone.
+        // From Packaging, Add Sub-Assembly then back to Packaging: nothing was typed in, so the form closes
+        // with nothing applied and the add's tab goes.
         viewModel.SelectedRecipeTab = viewModel.PackagingTab;
         await viewModel.AddUsageCommand.Execute();
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.AddSubAssemblyTab);
         viewModel.IsUsageFormOpen.Should().BeTrue();
-        await viewModel.CancelUsageCommand.Execute();
+        viewModel.SelectedRecipeTab = viewModel.PackagingTab;
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
         viewModel.IsUsageFormOpen.Should().BeFalse();
         viewModel.RecipeTabs.Should().NotContain(viewModel.AddSubAssemblyTab);
@@ -792,7 +842,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingUsageSource = viewModel.LinkableSubAssemblies.Single(o => !o.IsPackaging);
         await WaitUntilSettledAsync(() => viewModel.UsageFormTotalWeightText == "100 g", () => $"batch={viewModel.UsageFormTotalWeightText}");
         viewModel.EditingUsageWeightPerPiece = 5m;
-        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
 
         var usage = viewModel.UsageEdits.Should().ContainSingle().Subject;
         usage.IsLinked.Should().BeTrue();
@@ -1110,7 +1160,6 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             new ProductRepository(factory),
             new ProductSubAssemblyUsageRepository(factory),
             packagingLineRepository,
-            new ProductPackRepository(factory),
             new CostingParametersRepository(factory),
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory, packagingLineRepository),
@@ -1193,11 +1242,12 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.ErrorMessage.Should().StartWith("This recipe has more than one Filling without a name");
         viewModel.EditingUsage.Should().BeSameAs(dough.Usage);
 
-        // Cancel puts back what was last applied, and the tab can be left again.
-        await viewModel.CancelUsageCommand.Execute();
+        // The form has no discard of its own: it's put right where it stands, and then the tab can be left.
+        viewModel.EditingUsageRole = viewModel.Roles.Single(r => r.Id == doughRoleId);
         viewModel.EditingUsageRole!.Name.Should().Be("Dough");
         viewModel.SelectedRecipeTab = filling;
         viewModel.SelectedRecipeTab.Should().BeSameAs(filling);
+        viewModel.ErrorMessage.Should().BeNull();
     }
 
     [Fact]
@@ -1243,7 +1293,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await WaitUntilSettledAsync(() => viewModel.FormLines.Count == 1, () => $"form lines={viewModel.FormLines.Count}");
         viewModel.FormAddIns.Add(new IngredientLineRow(viewModel.Ingredients.Single(m => m.Id == ubeId), addInGrams));
         viewModel.EditingUsageWeightPerPiece = weightPerPiece;
-        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
     }
 
     [Fact]
@@ -1308,17 +1358,20 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageFormTotalWeightText.Should().Be("1,020 g");
 
         viewModel.EditingUsageWeightPerPiece = 30m;
-        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
 
-        // Its tab opens with them showing, since it has some.
+        // Its tab opens with them showing, since it has some. Save reloads the product, so the form reopens on the
+        // reloaded copy rather than the one typed into.
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.EditingUsage!.AddIns.Should().ContainSingle();
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.EditingUsage?.AddIns.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, add-ins={viewModel.EditingUsage?.AddIns.Count}");
         viewModel.IsFormShowingAddIns.Should().BeTrue();
 
         // Shut, then an add-in the linked recipe already has: refused, with the table opened on it.
         await viewModel.ToggleFormAddInsCommand.Execute();
         viewModel.FormAddIns.Add(new IngredientLineRow(viewModel.Ingredients.Single(m => m.Id == flourId), 50m));
-        await viewModel.ApplyUsageCommand.Execute();
+        await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().Contain("Flour");
         viewModel.IsFormShowingAddIns.Should().BeTrue("the line the message is about has to be in sight to be put right");

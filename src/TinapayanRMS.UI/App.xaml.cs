@@ -14,6 +14,7 @@ using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.Windows.Controls.Input;
 using Syncfusion.Windows.Shared;
 using Syncfusion.Windows.Tools.Controls;
+using TinapayanRMS.UI.Controls;
 using TinapayanRMS.UI.Views;
 
 namespace TinapayanRMS.UI;
@@ -75,6 +76,10 @@ public partial class App : Application
 
         EventManager.RegisterClassHandler(
             typeof(AddNewRowControl), FrameworkElement.LoadedEvent, new RoutedEventHandler(HideAddNewRowText));
+
+        // Ctrl+Z and Ctrl+Y for the screen the cursor is on. It goes here, on every window, because Syncfusion's
+        // number boxes take both keys for their own per-character undo and mark them handled on the way down.
+        UndoShortcuts.Register();
     }
 
     /// <summary>

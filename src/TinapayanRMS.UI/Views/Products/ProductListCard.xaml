@@ -33,8 +33,8 @@
                                    NavigationMode="Row">
                 <syncfusion:SfDataGrid.Columns>
                     <!-- The Raw Materials list's widths, so the three lists are the same width -->
-                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="220" />
-                    <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="185" />
+                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="210" />
+                    <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="160" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
         </Grid>

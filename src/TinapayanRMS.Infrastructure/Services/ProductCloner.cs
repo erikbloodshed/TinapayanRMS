@@ -16,8 +16,8 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         CreateFromAsync(sourceProductId, newProductName, asVariant: true, cancellationToken);
 
     /// <summary>
-    /// A clone and a variant differ only in their recipe and per-piece packaging: a clone copies them, a variant links
-    /// them. The product row, packs and costing are copied alike.
+    /// A clone and a variant differ only in their recipe and packaging: a clone copies them, a variant links
+    /// them. The product row — its quantity required among the rest — and its costing are copied alike.
     /// </summary>
     private async Task<int> CreateFromAsync(int sourceProductId, string newProductName, bool asVariant, CancellationToken cancellationToken)
     {
@@ -60,25 +60,12 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         var sourceLink = await dbContext.PackagingLinks.AsNoTracking().FirstOrDefaultAsync(l => l.ProductId == sourceProductId, cancellationToken);
         var costing = await dbContext.CostingParameters.AsNoTracking().FirstOrDefaultAsync(c => c.ProductId == sourceProductId, cancellationToken);
 
-        // Packs are never linked — resolving the packaging through a link only ever brings per-piece lines
-        // (PackagingLineRepository.ResolveEffectiveAsync) — so the clone copies the source's own packs outright.
-        var sourcePacks = await dbContext.ProductPacks
-            .AsNoTracking()
-            .Where(p => p.ProductId == sourceProductId)
-            .OrderBy(p => p.Id)
-            .ToListAsync(cancellationToken);
-        var sourcePackLines = (await dbContext.PackagingLines
-                .AsNoTracking()
-                .Where(l => l.ProductId == sourceProductId && l.PackId != null)
-                .OrderBy(l => l.Id)
-                .ToListAsync(cancellationToken))
-            .ToLookup(l => l.PackId!.Value);
-
         var newProduct = new Product
         {
             Name = newProductName,
             Description = source.Description,
             CategoryId = source.CategoryId,
+            QuantityRequired = source.QuantityRequired,
             CurrentPrice = source.CurrentPrice,
         };
         await ProductRepository.AddAsync(dbContext, newProduct, cancellationToken);
@@ -107,24 +94,8 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
             await PackagingLineRepository.SetLinesAsync(
                 dbContext,
                 newProduct.Id,
-                packId: null,
                 [.. packagingLines.Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
                     l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))],
-                cancellationToken);
-        }
-
-        if (sourcePacks.Count > 0)
-        {
-            // Id 0 throughout: every pack is the new product's own new row, with its own copy of the lines.
-            await ProductPackRepository.SetPacksAsync(
-                dbContext,
-                newProduct.Id,
-                [.. sourcePacks.Select(p => new ProductPackDraft(
-                    0,
-                    p.Name,
-                    p.PiecesPerPack,
-                    [.. sourcePackLines[p.Id].Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
-                        l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))]))],
                 cancellationToken);
         }
 

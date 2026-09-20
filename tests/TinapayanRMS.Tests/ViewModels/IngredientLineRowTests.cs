@@ -237,4 +237,76 @@ public class IngredientLineRowTests
         IngredientLineRow.ApplyFormulaBase(rows);
         water.Grams.Should().Be(1300m, "its 65% waited for a base to come back");
     }
+
+    [Fact]
+    public void Restore_puts_back_a_typed_percentage_that_is_waiting_for_a_base()
+    {
+        // The state the public setters can't express: a percentage was typed, then the base was unticked, so
+        // BaseWeight is 0 and the Percent setter refuses to take one. An undo restoring through the setters
+        // would drop the 65% silently, and only ticking the base again would show it had gone.
+        var row = IngredientLineRow.Restore(
+            id => IngredientsById.GetValueOrDefault(id), baseWeight: 0m,
+            ingredientId: Sugar.Id, grams: 650m, isFormulaBase: false, authoredBakersPercent: 65m);
+
+        row.AuthoredBakersPercent.Should().Be(65m);
+        row.CanTypeBakersPercent.Should().BeFalse("there's no base to read a percentage against");
+        row.Grams.Should().Be(650m);
+
+        // With a base back, the percentage it was holding is what works out its grams again.
+        var flour = new IngredientLineRow(Flour, 2000m, isFormulaBase: true);
+        IngredientLineRow.ApplyFormulaBase([flour, row]);
+        row.Grams.Should().Be(1300m, "its 65% waited for a base to come back");
+    }
+
+    [Fact]
+    public void Restore_keeps_a_row_that_is_only_half_filled_in()
+    {
+        // An ingredient picked and no grams typed yet is a legitimate row (CompleteLines exists for it), and
+        // it can't go through the constructor that takes a RawMaterial and a decimal.
+        var row = IngredientLineRow.Restore(
+            id => IngredientsById.GetValueOrDefault(id), baseWeight: 0m,
+            ingredientId: Flour.Id, grams: null, isFormulaBase: false, authoredBakersPercent: null);
+
+        row.IngredientId.Should().Be(Flour.Id);
+        row.Ingredient.Should().BeSameAs(Flour, "it resolves its ingredient as it's rebuilt");
+        row.Grams.Should().BeNull();
+        row.Cost.Should().Be(0m);
+    }
+
+    [Fact]
+    public void Restore_keeps_a_row_with_no_ingredient_at_all()
+    {
+        var row = IngredientLineRow.Restore(
+            id => IngredientsById.GetValueOrDefault(id), baseWeight: 0m,
+            ingredientId: null, grams: 120m, isFormulaBase: false, authoredBakersPercent: null);
+
+        row.IngredientId.Should().BeNull();
+        row.Ingredient.Should().BeNull();
+        row.Grams.Should().Be(120m);
+    }
+
+    [Fact]
+    public void Restore_keeps_the_base_tick_without_losing_the_grams()
+    {
+        var row = IngredientLineRow.Restore(
+            id => IngredientsById.GetValueOrDefault(id), baseWeight: 1000m,
+            ingredientId: Flour.Id, grams: 1000m, isFormulaBase: true, authoredBakersPercent: null);
+
+        row.IsFormulaBase.Should().BeTrue();
+        row.Grams.Should().Be(1000m);
+        row.CanTypeBakersPercent.Should().BeFalse("a base line is 100% by definition");
+    }
+
+    [Fact]
+    public void A_restored_row_prices_itself_when_its_ingredient_is_picked_again()
+    {
+        var row = IngredientLineRow.Restore(
+            id => IngredientsById.GetValueOrDefault(id), baseWeight: 0m,
+            ingredientId: null, grams: 100m, isFormulaBase: false, authoredBakersPercent: null);
+
+        row.IngredientId = Flour.Id;
+
+        row.Ingredient.Should().BeSameAs(Flour);
+        row.Cost.Should().Be(100m * Flour.BufferedCostPerBaseUnit);
+    }
 }

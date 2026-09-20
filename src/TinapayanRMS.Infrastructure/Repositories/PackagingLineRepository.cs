@@ -47,18 +47,15 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             return await ResolveEffectiveAsync(dbContext, linkedProductId, visitedProductIds, cancellationToken);
         }
 
-        // Per-piece lines only. A packaging link says "this product's packaging is that product's", and
-        // that holds for what one piece is wrapped in. A pack's lines can't come through it: they point at
-        // rows in ProductPacks belonging to the linked product, so the linking product would show lines for
-        // packs it doesn't sell and can't edit. A pack is always its own product's, link or no link.
         return await RawMaterialReads.GetPackagingLinesAsync(
-            dbContext, "WHERE l.ProductId = @productId AND l.PackId IS NULL", new { productId }, cancellationToken);
+            dbContext, "WHERE l.ProductId = @productId", new { productId }, cancellationToken);
     }
 
     /// <summary>
-    /// A packaging set's lines as <paramref name="productId"/>'s per-piece packaging lines, never saved: one set per
-    /// piece, so a set's quantity is a piece's, in the material's base unit, typed as the quantity. Everything that
-    /// reads a product's packaging (the Products screen, Reports, unlinking's copy, a clone) takes them as they are.
+    /// A packaging set's lines as <paramref name="productId"/>'s own packaging lines, never saved: one set per
+    /// sellable unit, so a set's quantity is that unit's, in the material's base unit, typed as the quantity.
+    /// Everything that reads a product's packaging (the Products screen, Reports, unlinking's copy, a clone)
+    /// takes them as they are.
     /// </summary>
     private static async Task<IReadOnlyList<PackagingLine>> SetLinesAsPackagingLines(
         TinapayanRMSDbContext dbContext, int productId, int setId, CancellationToken cancellationToken)
@@ -89,24 +86,21 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await SetLinesAsync(dbContext, productId, packId: null, lines, cancellationToken);
+        await SetLinesAsync(dbContext, productId, lines, cancellationToken);
     }
 
     /// <summary>
-    /// Replaces one group of the product's packaging lines on the caller's context and saves them, after
-    /// every check SetLinesAsync makes. <paramref name="packId"/> null is the per-piece group; a pack's id
-    /// is that pack's own group. Only that group is replaced — writing a pack's lines never touches the
-    /// per-piece ones, and vice versa.
+    /// Replaces the product's packaging lines on the caller's context and saves them, after every check
+    /// SetLinesAsync makes.
     /// </summary>
     internal static async Task SetLinesAsync(
         TinapayanRMSDbContext dbContext,
         int productId,
-        int? packId,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
         CancellationToken cancellationToken)
     {
         ProductRules.EnsureValidPackagingLines(
-            [.. lines.Select(l => (packId, l.PackagingMaterialId, l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.AuthoredValue : 1m / l.AuthoredValue))]);
+            [.. lines.Select(l => (l.PackagingMaterialId, l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.AuthoredValue : 1m / l.AuthoredValue))]);
 
         var productExists = await dbContext.Products.AnyAsync(p => p.Id == productId, cancellationToken);
         if (!productExists)
@@ -114,23 +108,10 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             throw new InvalidOperationException($"Product {productId} does not exist.");
         }
 
-        if (packId is null)
+        var isLinked = await dbContext.PackagingLinks.AnyAsync(l => l.ProductId == productId, cancellationToken);
+        if (isLinked)
         {
-            // The link covers the per-piece packaging, which is all it resolves (ResolveEffectiveAsync).
-            // A linked product still owns its packs, so a pack's lines stay editable while it's linked.
-            var isLinked = await dbContext.PackagingLinks.AnyAsync(l => l.ProductId == productId, cancellationToken);
-            if (isLinked)
-            {
-                throw new InvalidOperationException("This product's packaging is linked to another product's — unlink it before editing its lines directly.");
-            }
-        }
-        else
-        {
-            var packBelongs = await dbContext.ProductPacks.AnyAsync(p => p.Id == packId && p.ProductId == productId, cancellationToken);
-            if (!packBelongs)
-            {
-                throw new InvalidOperationException($"Pack {packId} isn't one of this product's.");
-            }
+            throw new InvalidOperationException("This product's packaging is linked to another product's — unlink it before editing its lines directly.");
         }
 
         var materialIds = lines.Select(l => l.PackagingMaterialId).ToList();
@@ -163,10 +144,8 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             }
         }
 
-        // This group only. A nullable parameter is part of EF's query-cache key, so `l.PackId == packId`
-        // generates `PackId IS NULL` for the per-piece group rather than a comparison that matches nothing.
         await dbContext.PackagingLines
-            .Where(l => l.ProductId == productId && l.PackId == packId)
+            .Where(l => l.ProductId == productId)
             .ExecuteDeleteAsync(cancellationToken);
 
         dbContext.PackagingLines.AddRange(lines.Select(l =>
@@ -175,7 +154,6 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             return new PackagingLine
             {
                 ProductId = productId,
-                PackId = packId,
                 PackagingMaterialId = l.PackagingMaterialId,
                 UnitId = l.UnitId,
                 QtyPerUnit = qtyPerUnit,

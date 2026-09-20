@@ -31,6 +31,14 @@
             <TextBlock Text="&#xE74E;" Style="{StaticResource IconGlyphStyle}" />
         </DataTemplate>
 
+        <DataTemplate x:Key="UndoIconTemplate">
+            <TextBlock Text="&#xE10E;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="RedoIconTemplate">
+            <TextBlock Text="&#xE10D;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
         <DataTemplate x:Key="ApplyIconTemplate">
             <TextBlock Text="&#xE73E;" Style="{StaticResource IconGlyphStyle}" />
         </DataTemplate>

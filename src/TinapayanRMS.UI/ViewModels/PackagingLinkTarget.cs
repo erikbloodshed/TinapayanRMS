@@ -2,7 +2,7 @@ namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// What a product's per-piece packaging links: another product's packaging, or a standalone packaging set from the
-/// Sub-Assemblies screen, one set per piece. Exactly one of the two ids is set.
+/// Sub-Assemblies screen, one set per sellable unit. Exactly one of the two ids is set.
 /// </summary>
 public sealed record PackagingLinkTarget(int? ProductId, int? SubAssemblyId, string Name)
 {

@@ -15,8 +15,15 @@ public class Product
     public ProductCategory? Category { get; set; }
 
     /// <summary>
-    /// What the shop charges for one piece now, with VAT, as entered: set beside the computed selling price to
-    /// see the markup it actually earns. Optional: null when not entered.
+    /// How many finished pieces make one sellable unit: 1 for a product sold by the piece, 8 for a "Box of 8".
+    /// The recipe is authored per piece whatever this is; the costing multiplies by it, and the packaging lines
+    /// are for one whole sellable unit. Always at least 1 (CK_Products_QuantityRequired).
+    /// </summary>
+    public int QuantityRequired { get; set; } = 1;
+
+    /// <summary>
+    /// What the shop charges for one sellable unit now, with VAT, as entered: set beside the computed selling
+    /// price to see the markup it actually earns. Optional: null when not entered.
     /// </summary>
     public decimal? CurrentPrice { get; set; }
 
