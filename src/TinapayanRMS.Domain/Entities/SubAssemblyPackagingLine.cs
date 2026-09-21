@@ -17,6 +17,11 @@ public class SubAssemblyPackagingLine
 
     public RawMaterial? PackagingMaterial { get; set; }
 
-    /// <summary>How much of the material one set takes, in the material's base unit: 1 box, 30 cm of ribbon.</summary>
+    /// <summary>The unit this line's quantity is entered in: one of the material's own units, or null for its base unit.</summary>
+    public int? UnitId { get; set; }
+
+    public RawMaterialUnit? Unit { get; set; }
+
+    /// <summary>How much of the material one set takes, in the line's unit: 1 box, 30 cm of ribbon, 1 roll.</summary>
     public decimal QtyPerSet { get; set; }
 }

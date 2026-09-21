@@ -1,4 +1,4 @@
-using AwesomeAssertions;
+﻿using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -10,7 +10,8 @@ namespace TinapayanRMS.Tests.Persistence;
 
 /// <summary>
 /// A material's cost buffer: its buffered cost (BufferedCostPerBaseUnit) sits beside its true cost,
-/// stacks up the BOM tree, and is what sub-assemblies and packaging lines are costed with.
+/// rolls up the BOM tree (counted once, never stacked), and is what sub-assemblies and packaging lines
+/// are costed with.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
@@ -37,8 +38,8 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     private static RawMaterial PurchasedIngredient(string name, int categoryId, decimal costBufferPercent = 0m, int id = 0) =>
         new() { Id = id, Name = name, Type = RawMaterialType.Ingredient, CategoryId = categoryId, Source = RawMaterialSource.Purchased, CostBufferPercent = costBufferPercent };
 
-    private static RawMaterial MadeIngredient(string name, int categoryId, decimal costBufferPercent = 0m, int id = 0) =>
-        new() { Id = id, Name = name, Type = RawMaterialType.Ingredient, CategoryId = categoryId, Source = RawMaterialSource.Made, WeightLossPercent = 0m, CostBufferPercent = costBufferPercent };
+    private static RawMaterial MadeIngredient(string name, int categoryId, decimal costBufferPercent = 0m, int id = 0, decimal weightLossPercent = 0m) =>
+        new() { Id = id, Name = name, Type = RawMaterialType.Ingredient, CategoryId = categoryId, Source = RawMaterialSource.Made, WeightLossPercent = weightLossPercent, CostBufferPercent = costBufferPercent };
 
     private async Task<RawMaterial> GetMaterialAsync(int id)
     {
@@ -86,7 +87,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     }
 
     [Fact]
-    public async Task A_made_ingredient_stacks_its_own_buffer_on_its_components_buffered_costs()
+    public async Task A_made_ingredient_ignores_a_buffer_of_its_own_and_only_rolls_up_its_components()
     {
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
@@ -99,12 +100,58 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         syrup.BufferedCostPerBaseUnit.Should().Be(0.11m, "the buffered rollup uses sugar's buffered cost");
         (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(110m);
 
+        // A buffer sent for the made ingredient itself is never applied: sugar's is already in the rollup.
         await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId, costBufferPercent: 10m, id: syrupId), [], brandPrices: null, bomLines: null, Cancellation);
 
         syrup = await GetMaterialAsync(syrupId);
         syrup.CostPerBaseUnit.Should().Be(0.10m);
-        syrup.BufferedCostPerBaseUnit.Should().Be(0.121m, "syrup's 10% on top of sugar's buffered ₱0.11");
-        (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(121m);
+        syrup.BufferedCostPerBaseUnit.Should().Be(0.11m, "sugar's buffered ₱0.11, with nothing of syrup's own on top");
+        syrup.CostBufferPercent.Should().Be(0m, "a made ingredient is stored with no buffer of its own");
+        (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(110m);
+    }
+
+    [Fact]
+    public async Task A_made_ingredients_weight_loss_still_divides_its_rollup_while_its_own_buffer_never_multiplies_it()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = CreateRepository();
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 10m), [], [(null, null, 0.10m)], bomLines: null, Cancellation);
+        var syrupId = await repository.SaveAsync(
+            MadeIngredient("Simple Syrup", categoryId, costBufferPercent: 10m, weightLossPercent: 10m),
+            [],
+            brandPrices: null,
+            [(sugarId, 1000m)],
+            Cancellation);
+
+        var syrup = await GetMaterialAsync(syrupId);
+        syrup.CostPerBaseUnit.Should().BeApproximately(0.111111m, 0.000001m, "₱100 over the 900 g it yields");
+        syrup.BufferedCostPerBaseUnit.Should().BeApproximately(0.122222m, 0.000001m, "sugar's buffered ₱110 over the same 900 g");
+        syrup.CostBufferPercent.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task A_made_ingredient_recomputed_by_the_cascade_loses_a_stale_buffer_of_its_own()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = CreateRepository();
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 10m), [], [(null, null, 0.10m)], bomLines: null, Cancellation);
+        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId), [], brandPrices: null, [(sugarId, 1000m)], Cancellation);
+
+        // A percent left on the row from before the rule changed, which no screen can reach.
+        await using (var dbContext = CreateDbContext())
+        {
+            var stale = await dbContext.RawMaterials.SingleAsync(m => m.Id == syrupId, Cancellation);
+            stale.CostBufferPercent = 25m;
+            stale.BufferedCostPerBaseUnit = 0.1375m;
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        // Its component is repriced: the cascade, not a save of the made row, is what recomputes it.
+        await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent: 10m, id: sugarId), [], [(null, null, 0.20m)], bomLines: null, Cancellation);
+
+        var syrup = await GetMaterialAsync(syrupId);
+        syrup.BufferedCostPerBaseUnit.Should().Be(0.22m, "sugar's buffered ₱0.22, with no 25% on top");
+        syrup.CostBufferPercent.Should().Be(0m, "the cascade normalises it away");
     }
 
     [Fact]

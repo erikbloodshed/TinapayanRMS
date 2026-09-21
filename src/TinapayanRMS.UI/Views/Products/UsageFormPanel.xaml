@@ -1,11 +1,13 @@
-<UserControl x:Class="TinapayanRMS.UI.Views.Products.UsageFormPanel"
+﻿<UserControl x:Class="TinapayanRMS.UI.Views.Products.UsageFormPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
     <!--
         Add a sub-assembly to the recipe: a new one of the product's own, a link to an existing one
-        (another product's, or a standalone one from the Sub-Assemblies screen), or a copy of one. Or change one already in it: an own one's role, name, lines and piece size, a
+        (another product's, or a standalone one from the Sub-Assemblies screen), or a copy of one — which of the three
+        it is was picked on Add Sub-Assembly's drop-down before the form opened, and the title says which (UsageFormTitle).
+        Or change one already in it: an own one's role, name, lines and piece size, a
         linked one's piece size and add-ins only. Apply only puts it in the recipe; Save saves it. It is all that shows under a
         sub-assembly's Recipe Structure tab (one panel for every tab, RecipeStructureCard), so it has no box of its own, and for a section already in the recipe it carries
         that section's heading (EditingUsage) in place of the add form's title. A section is called by its role, and
@@ -99,40 +101,21 @@
             </StackPanel>
         </Grid>
 
-        <!-- Where it comes from, while adding. Labels in the first row, fields in the second. -->
-        <Grid Margin="0,0,0,8" Visibility="{Binding IsAddingUsage, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="2*" />
-            </Grid.ColumnDefinitions>
-
-            <TextBlock Grid.Column="0" Text="Sub-Assembly" Style="{StaticResource FieldLabelStyle}" />
-            <syncfusion:ComboBoxAdv Grid.Row="1"
-                                    Grid.Column="0"
-                                    IsEditable="False"
-                                    ItemsSource="{Binding UsageFormModes}"
-                                    DisplayMemberPath="Name"
-                                    controls:FieldUndoStep.Recorder="{Binding}"
-                                    SelectedItem="{Binding EditingUsageMode, Mode=TwoWay}" />
-
-            <TextBlock Grid.Column="2"
-                       Text="Existing Sub-Assembly or Packaging"
-                       Style="{StaticResource FieldLabelStyle}"
-                       Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
-            <syncfusion:ComboBoxAdv Grid.Row="1"
-                                    Grid.Column="2"
-                                    ItemsSource="{Binding LinkableSubAssemblies}"
+        <!--
+            Which existing sub-assembly is linked or copied. Nothing here asks *how* any more: Add Sub-Assembly's
+            drop-down picks that before the form opens (RecipeStructureCard), and the title above says which way it is.
+            So the row shows only while there's a source to pick (IsFormPickingSource, not IsAddingUsage) — a new
+            sub-assembly has no row at all rather than an empty one — and the picker takes the whole width, which its
+            longest entries ("Chocolate Glaze — Sub-Assemblies (Glaze)") need.
+        -->
+        <StackPanel Margin="0,0,0,8" Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <TextBlock Text="Existing Sub-Assembly or Packaging" Style="{StaticResource FieldLabelStyle}" />
+            <syncfusion:ComboBoxAdv ItemsSource="{Binding LinkableSubAssemblies}"
                                     DisplayMemberPath="DisplayName"
                                     controls:FieldUndoStep.Recorder="{Binding}"
                                     SelectedItem="{Binding EditingUsageSource, Mode=TwoWay}"
-                                    ToolTip="Another product's, or a standalone one from the Sub-Assemblies screen; or packaging: a packaging set, or another product's. A link follows every change made to it where it's kept; a copy is this product's own from then on."
-                                    Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
-        </Grid>
+                                    ToolTip="Another product's, or a standalone one from the Sub-Assemblies screen; or packaging: a packaging set, or another product's. A link follows every change made to it where it's kept; a copy is this product's own from then on." />
+        </StackPanel>
 
         <!--
             The product's own sub-assembly's role, which is what it's called, and its optional name, which tells it apart
@@ -237,7 +220,19 @@
                         </syncfusion:GridMultiColumnDropDownList.Columns>
                     </syncfusion:GridMultiColumnDropDownList>
                     <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
-                    <syncfusion:GridTextColumn MappingName="Unit" HeaderText="Unit" Width="64" AllowEditing="False" />
+                    <!--
+                        The unit the Qty is typed in: the material's base unit, or one of its alternative units. Each row has its
+                        own material, so its list comes from the row (PackagingUnitSelector). Editable, so the unit can be typed
+                        as well as picked. What the quantity comes to in base units is never shown — the conversion is behind
+                        the scenes, in Unit Cost (what one of the picked unit costs) and in the line's own total.
+                    -->
+                    <syncfusion:GridComboBoxColumn MappingName="UnitKey"
+                                                   HeaderText="Unit"
+                                                   Width="72"
+                                                   ItemsSourceSelector="{StaticResource PackagingUnitSelector}"
+                                                   DisplayMemberPath="Abbreviation"
+                                                   SelectedValuePath="Key"
+                                                   IsEditable="True" />
                     <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" AllowEditing="False" />
                     <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Piece" Width="104" NumberDecimalDigits="4" AllowEditing="False" />
                 </syncfusion:SfDataGrid.Columns>
@@ -300,7 +295,6 @@
                                            controls:NumericEditing.IsEnabled="True"
                                            controls:GridAddNewRow.HideCheckBoxes="True"
                                            controls:GridCellEditing.IsEnabled="True"
-                                           controls:GridCellEmphasis.IsEnabled="True"
                                            SelectedItem="{Binding SelectedFormLine, Mode=TwoWay}"
                                            GridLinesVisibility="Both"
                                            CurrentCellBorderBrush="{StaticResource AccentBrush}"
@@ -350,8 +344,7 @@
                                                     Width="96"
                                                     NumberDecimalDigits="1"
                                                     AllowNullValue="True"
-                                                    controls:GridCellEditing.AllowWhen="CanTypeBakersPercent"
-                                                    controls:GridCellEmphasis.When="IsPercentTyped" />
+                                                    controls:GridCellEditing.AllowWhen="CanTypeBakersPercent" />
                             <!-- The ingredient's buffered cost per gram, as the picker's own column shows it: the rate this line's Cost comes from. -->
                             <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost per Gram" Width="96" NumberDecimalDigits="4" AllowEditing="False" />
                             <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="96" NumberDecimalDigits="2" AllowEditing="False" />

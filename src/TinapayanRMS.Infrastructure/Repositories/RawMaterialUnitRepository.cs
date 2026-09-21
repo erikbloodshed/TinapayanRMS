@@ -149,6 +149,13 @@ public class RawMaterialUnitRepository(
                 throw new InvalidOperationException(
                     $"'{unit.UnitOfMeasure!.Name}' is used by {lineCount} packaging {(lineCount == 1 ? "line" : "lines")}. Change those to another unit first.");
             }
+
+            var setCount = await dbContext.SubAssemblyPackagingLines.CountAsync(l => l.UnitId == id, cancellationToken);
+            if (setCount > 0)
+            {
+                throw new InvalidOperationException(
+                    $"'{unit.UnitOfMeasure!.Name}' is used by {setCount} packaging set {(setCount == 1 ? "line" : "lines")}. Change those to another unit first.");
+            }
         }
 
         dbContext.RawMaterialUnits.Remove(unit);

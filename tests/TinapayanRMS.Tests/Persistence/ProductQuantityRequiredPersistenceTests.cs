@@ -119,7 +119,7 @@ public class ProductQuantityRequiredPersistenceTests(DatabaseFixture fixture) : 
         var (singleId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)]);
         var setId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
             new SubAssembly { Name = "Ensaymada Box of 8 Packaging", RoleId = packagingRoleId },
-            [(bagId, 8m), (boxId, 1m)],
+            [(bagId, null, 8m), (boxId, null, 1m)],
             Cancellation);
 
         var variantId = await CreateCloner().CreateVariantAsync(singleId, "Ensaymada Box of 8", Cancellation);

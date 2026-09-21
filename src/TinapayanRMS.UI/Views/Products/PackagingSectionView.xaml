@@ -85,7 +85,19 @@
                     </syncfusion:GridMultiColumnDropDownList.Columns>
                 </syncfusion:GridMultiColumnDropDownList>
                 <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
-                <syncfusion:GridTextColumn MappingName="Unit" HeaderText="Unit" Width="64" AllowEditing="False" />
+                <!--
+                    The unit the Qty is typed in: the material's base unit, or one of its alternative units. Each row has its
+                    own material, so its list comes from the row (PackagingUnitSelector). Editable, so the unit can be typed
+                    as well as picked. What the quantity comes to in base units is never shown — the conversion is behind
+                    the scenes, in Unit Cost (what one of the picked unit costs) and in the line's own total.
+                -->
+                <syncfusion:GridComboBoxColumn MappingName="UnitKey"
+                                               HeaderText="Unit"
+                                               Width="72"
+                                               ItemsSourceSelector="{StaticResource PackagingUnitSelector}"
+                                               DisplayMemberPath="Abbreviation"
+                                               SelectedValuePath="Key"
+                                               IsEditable="True" />
                 <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" AllowEditing="False" />
                 <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Unit" Width="104" NumberDecimalDigits="4" AllowEditing="False" />
             </syncfusion:SfDataGrid.Columns>

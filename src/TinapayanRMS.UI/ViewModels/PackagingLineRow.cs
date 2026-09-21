@@ -5,9 +5,25 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// One row of the Recipe Structure's Packaging table, which is typed into directly. The grid's material cell sets
-/// <see cref="PackagingMaterialId"/>; the screen points <see cref="PackagingMaterial"/> at that material
-/// (<see cref="Resolve"/>), which prices the row. The quantity is always in the material's own base unit.
+/// A unit a packaging line's quantity can be entered in: the material's base unit (<see cref="Key"/> 0), or one of
+/// its alternative units by <see cref="RawMaterialUnit"/> id. The same shape as the Purchase Cost Setup grid's
+/// <see cref="PurchaseUnitChoice"/>, and for the same reason: the grid's cell binds a scalar key, not an object.
+/// <see cref="UnitCost"/> is what one of this unit costs, buffered — the popup's own first column, so picking a
+/// unit previews what it costs before it's committed.
+/// </summary>
+public sealed record PackagingUnitChoice(int Key, string Abbreviation, decimal BaseUnitsPerUnit, decimal UnitCost)
+{
+    /// <summary>The base unit's key: it has no <see cref="RawMaterialUnit"/> row of its own, so a line in it stores no unit.</summary>
+    public const int BaseUnitKey = 0;
+}
+
+/// <summary>
+/// One row of the Recipe Structure's Packaging table and of a packaging set's Lines table, both typed into directly.
+/// The grid's material cell sets <see cref="PackagingMaterialId"/>; the screen points <see cref="PackagingMaterial"/>
+/// at that material (<see cref="Resolve"/>), which prices the row and fills <see cref="UnitOptions"/>. The quantity is
+/// in <see cref="UnitKey"/>'s unit — the material's base unit, or one of its alternative units — and
+/// <see cref="BaseQty"/> is what that comes to in base units — never shown, but what the line's total cost is
+/// worked out from; <see cref="UnitCost"/> is what one of the *picked* unit costs, which follows <see cref="UnitKey"/>.
 /// A row can be half filled in: <see cref="CompleteLines"/> checks them all before they're saved.
 /// </summary>
 public sealed class PackagingLineRow : ReactiveObject
@@ -29,12 +45,15 @@ public sealed class PackagingLineRow : ReactiveObject
         _findMaterial = findMaterial;
     }
 
-    /// <param name="qtyPerUnit">How much of the material, in its base unit, one piece — or one pack — takes.</param>
-    public PackagingLineRow(RawMaterial packagingMaterial, decimal qtyPerUnit)
+    /// <param name="qtyPerUnit">How much of the material, in <paramref name="unitId"/>'s unit, one piece — or one set — takes.</param>
+    /// <param name="unitId">One of the material's alternative units, or null for its base unit.</param>
+    public PackagingLineRow(RawMaterial packagingMaterial, decimal qtyPerUnit, int? unitId = null)
     {
         _packagingMaterialId = packagingMaterial.Id;
         _packagingMaterial = packagingMaterial;
         _qtyPerUnit = qtyPerUnit;
+        _unitOptions = OptionsFor(packagingMaterial);
+        _unitKey = KeptKey(unitId ?? PackagingUnitChoice.BaseUnitKey, _unitOptions);
     }
 
     private int? _packagingMaterialId;
@@ -59,16 +78,65 @@ public sealed class PackagingLineRow : ReactiveObject
         private set
         {
             this.RaiseAndSetIfChanged(ref _packagingMaterial, value);
-            this.RaisePropertyChanged(nameof(Unit));
+            UnitOptions = OptionsFor(value);
+            this.RaisePropertyChanged(nameof(UnitCost));
+            this.RaisePropertyChanged(nameof(BaseUnitAbbreviation));
+            this.RaisePropertyChanged(nameof(BaseQty));
+            this.RaisePropertyChanged(nameof(CostPerUnit));
+        }
+    }
+
+    private IReadOnlyList<PackagingUnitChoice> _unitOptions = [];
+    /// <summary>
+    /// The units this row's quantity can be entered in: the material's base unit first, then its alternative units
+    /// (at most two, <see cref="UnitConversionRules.MaxAlternativeUnits"/>). The grid's unit cell reads them per row
+    /// through <c>PackagingUnitSelector</c>, since each row has its own material.
+    /// </summary>
+    public IReadOnlyList<PackagingUnitChoice> UnitOptions
+    {
+        get => _unitOptions;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _unitOptions, value);
+
+            // A unit the new material doesn't have falls back to its base unit, so the row is never in a unit
+            // that isn't the material's — which the repository would refuse at Save.
+            UnitKey = KeptKey(_unitKey, value);
+        }
+    }
+
+    private int _unitKey = PackagingUnitChoice.BaseUnitKey;
+    /// <summary>
+    /// The unit the quantity is typed in (a <see cref="PackagingUnitChoice.Key"/>); the base unit until one is picked.
+    /// A unit this row's material doesn't have falls back to the base unit — the grid's cell can only offer the
+    /// material's own, but a restored undo step or a snapshot carries a key that may no longer fit, and the
+    /// repository would refuse it at Save.
+    /// </summary>
+    public int UnitKey
+    {
+        get => _unitKey;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _unitKey, KeptKey(value, _unitOptions));
+            this.RaisePropertyChanged(nameof(BaseQty));
             this.RaisePropertyChanged(nameof(UnitCost));
             this.RaisePropertyChanged(nameof(CostPerUnit));
         }
     }
 
+    /// <summary>The unit as a line stores it: null for the base unit, which has no row of its own.</summary>
+    public int? UnitId => _unitKey == PackagingUnitChoice.BaseUnitKey ? null : _unitKey;
+
+    /// <summary>Base units in one of the row's unit, or null when it's already the base unit.</summary>
+    private decimal? BaseUnitsPerEntryUnit =>
+        _unitKey == PackagingUnitChoice.BaseUnitKey
+            ? null
+            : _unitOptions.FirstOrDefault(o => o.Key == _unitKey)?.BaseUnitsPerUnit;
+
     private decimal? _qtyPerUnit;
     /// <summary>
-    /// How much of the material one piece takes, in its base unit: 1 box, 30 cm of ribbon. Null until it's typed, so the
-    /// grid's cell is empty rather than 0.0000 (AllowNullValue).
+    /// How much of the material one piece — or one set — takes, in the row's unit: 1 box, 30 cm of ribbon, 1 roll.
+    /// Null until it's typed, so the grid's cell is empty rather than 0.0000 (AllowNullValue).
     /// </summary>
     public decimal? QtyPerUnit
     {
@@ -76,20 +144,53 @@ public sealed class PackagingLineRow : ReactiveObject
         set
         {
             this.RaiseAndSetIfChanged(ref _qtyPerUnit, value);
+            this.RaisePropertyChanged(nameof(BaseQty));
             this.RaisePropertyChanged(nameof(CostPerUnit));
         }
     }
 
-    /// <summary>The material's base unit, which the quantity is in; blank until a material is picked.</summary>
-    public string Unit => PackagingMaterial is { } material ? BaseUnitText.AbbreviationOf(material) : string.Empty;
+    /// <summary>The material's own base unit, which its cost is per; blank until a material is picked.</summary>
+    public string BaseUnitAbbreviation => PackagingMaterial is { } material ? BaseUnitText.AbbreviationOf(material) : string.Empty;
 
-    /// <summary>What one base unit of the material costs, buffered: what products are costed with.</summary>
-    public decimal UnitCost => PackagingMaterial?.BufferedCostPerBaseUnit ?? 0m;
+    /// <summary>What the typed quantity comes to in the material's base unit: 1 roll of a 1,000 cm roll is 1,000.</summary>
+    public decimal? BaseQty =>
+        QtyPerUnit is { } qty ? UnitConversionRules.ToBaseQuantity(qty, BaseUnitsPerEntryUnit) : null;
 
-    public decimal CostPerUnit => ProductRules.CalculatePackagingLineCost(UnitCost, QtyPerUnit ?? 0m, baseUnitsPerEntryUnit: null);
+    /// <summary>What one base unit of the material costs, buffered: the true rate everything below is costed from.</summary>
+    private decimal CostPerBaseUnit => PackagingMaterial?.BufferedCostPerBaseUnit ?? 0m;
+
+    /// <summary>
+    /// What one of the row's currently selected unit costs, buffered — what the grid's Unit Cost column shows, and
+    /// the same figure each <see cref="UnitOptions"/> choice previews in the picker's popup before it's picked.
+    /// ₱0.05 for the base unit (a cm of ribbon), ₱50.00 once a 1,000 cm roll is picked.
+    /// </summary>
+    public decimal UnitCost => _unitOptions.FirstOrDefault(o => o.Key == _unitKey)?.UnitCost ?? 0m;
+
+    /// <summary>
+    /// The line's total cost: <see cref="CostPerBaseUnit"/> — never <see cref="UnitCost"/>, which is already scaled
+    /// to the picked unit and would double-convert if it fed this too — times the quantity in base units.
+    /// </summary>
+    public decimal CostPerUnit => ProductRules.CalculatePackagingLineCost(CostPerBaseUnit, QtyPerUnit ?? 0m, BaseUnitsPerEntryUnit);
 
     /// <summary>Nothing typed into it: the grid's add row left as it was, which isn't a line at all.</summary>
     private bool IsBlank => PackagingMaterialId is null && QtyPerUnit is null or 0m;
+
+    /// <summary>The material's base unit first, then its alternative units; empty until a material is picked.</summary>
+    private static IReadOnlyList<PackagingUnitChoice> OptionsFor(RawMaterial? material) =>
+        material is null
+            ? []
+            :
+            [
+                new(PackagingUnitChoice.BaseUnitKey, BaseUnitText.AbbreviationOf(material), 1m, material.BufferedCostPerBaseUnit),
+                .. material.Units
+                    .Where(u => u.UnitOfMeasure is not null)
+                    .Select(u => new PackagingUnitChoice(
+                        u.Id, u.UnitOfMeasure!.Abbreviation, u.BaseUnitsPerUnit, material.BufferedCostPerBaseUnit * u.BaseUnitsPerUnit)),
+            ];
+
+    /// <summary><paramref name="key"/> when <paramref name="options"/> still offers it, else the base unit.</summary>
+    private static int KeptKey(int key, IReadOnlyList<PackagingUnitChoice> options) =>
+        options.Any(o => o.Key == key) ? key : PackagingUnitChoice.BaseUnitKey;
 
     /// <summary>
     /// Points each row at its material in <paramref name="materialsById"/> (the screen's current copies, so a
@@ -104,7 +205,10 @@ public sealed class PackagingLineRow : ReactiveObject
                 : null;
             if (!ReferenceEquals(resolved, row.PackagingMaterial))
             {
+                // The unit survives a re-resolve to the same material: its alternative units come back with it.
+                var key = row._unitKey;
                 row.PackagingMaterial = resolved;
+                row.UnitKey = KeptKey(key, row.UnitOptions);
             }
         }
     }
@@ -113,11 +217,11 @@ public sealed class PackagingLineRow : ReactiveObject
     /// The rows as lines, leaving out blank ones. A row with only a material or only a quantity is refused, and so
     /// is a material on two rows, each with a message naming it.
     /// </summary>
-    /// <param name="unitNoun">What one of these lines packs, for the messages: "piece", or a pack's name.</param>
-    public static IReadOnlyList<(RawMaterial PackagingMaterial, decimal QtyPerUnit)> CompleteLines(
+    /// <param name="unitNoun">What one of these lines packs, for the messages: "piece", or "set".</param>
+    public static IReadOnlyList<(RawMaterial PackagingMaterial, int? UnitId, decimal QtyPerUnit)> CompleteLines(
         IEnumerable<PackagingLineRow> rows, string unitNoun = "piece")
     {
-        List<(RawMaterial PackagingMaterial, decimal QtyPerUnit)> lines = [];
+        List<(RawMaterial PackagingMaterial, int? UnitId, decimal QtyPerUnit)> lines = [];
         foreach (var row in rows.Where(r => !r.IsBlank))
         {
             if (row.PackagingMaterial is not { } material)
@@ -136,7 +240,7 @@ public sealed class PackagingLineRow : ReactiveObject
                     $"{material.Name} is on two of the same {unitNoun}'s packaging lines — put its quantity on one line and delete the other.");
             }
 
-            lines.Add((material, row.QtyPerUnit.Value));
+            lines.Add((material, row.UnitId, row.QtyPerUnit.Value));
         }
 
         return lines;

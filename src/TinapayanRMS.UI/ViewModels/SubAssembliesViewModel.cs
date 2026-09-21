@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
@@ -50,6 +50,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     private readonly IValidator<SubAssembly> _subAssemblyValidator;
     private readonly SourceCache<StandaloneSubAssemblyRow, int> _rowCache = new(r => r.Id);
     private readonly ReadOnlyObservableCollection<StandaloneSubAssemblyRow> _rows;
+    private readonly ReadOnlyObservableCollection<StandaloneSubAssemblyRow> _visibleRows;
 
     /// <summary>The sub-assembly the form shows: 0 for a new one.</summary>
     private int _editingId;
@@ -57,7 +58,18 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// <summary>Counts form loads, so a load overtaken by a newer one drops its lines instead of adding them too.</summary>
     private int _formLoadVersion;
 
+    /// <summary>Every standalone sub-assembly, whatever the list is filtered to.</summary>
     public ReadOnlyObservableCollection<StandaloneSubAssemblyRow> Rows => _rows;
+
+    /// <summary>The sub-assemblies the list shows: those whose name matches SearchText.</summary>
+    public ReadOnlyObservableCollection<StandaloneSubAssemblyRow> VisibleRows => _visibleRows;
+
+    private string _searchText = string.Empty;
+    public string SearchText
+    {
+        get => _searchText;
+        set => this.RaiseAndSetIfChanged(ref _searchText, value);
+    }
 
     public ObservableCollection<SubAssemblyRole> Roles { get; } = [];
 
@@ -237,8 +249,21 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, History.WhenAnyValue(h => h.CanUndo));
         RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, History.WhenAnyValue(h => h.CanRedo));
 
+        var byName = SortExpressionComparer<StandaloneSubAssemblyRow>.Ascending(r => r.Name);
+
         _rowCache.Connect()
-            .SortAndBind(out _rows, SortExpressionComparer<StandaloneSubAssemblyRow>.Ascending(r => r.Name))
+            .SortAndBind(out _rows, byName)
+            .Subscribe();
+
+        // The list's own filter, as Raw Materials and Products filter theirs: by name, ignoring case.
+        var nameFilter = this.WhenAnyValue(x => x.SearchText)
+            .Select(text => text.Trim())
+            .DistinctUntilChanged()
+            .Select(text => (Func<StandaloneSubAssemblyRow, bool>)(r => text.Length == 0 || r.Name.Contains(text, StringComparison.CurrentCultureIgnoreCase)));
+
+        _rowCache.Connect()
+            .Filter(nameFilter)
+            .SortAndBind(out _visibleRows, byName)
             .Subscribe();
 
         // Picking a sub-assembly loads it into the form; a refresh only re-points the selection at its
@@ -374,7 +399,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
                 id = await _subAssemblyRepository.SaveStandalonePackagingAsync(
                     new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id },
-                    [.. setLines.Select(l => (l.PackagingMaterial.Id, l.QtyPerUnit))],
+                    [.. setLines.Select(l => (l.PackagingMaterial.Id, l.UnitId, l.QtyPerUnit))],
                     CancellationToken.None);
             }
             else
@@ -479,7 +504,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         Name = EditingName,
         RoleId = EditingRole?.Id,
         Lines = [.. Lines.Select(l => new IngredientLineState(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
-        PackagingLines = [.. PackagingLines.Select(l => new PackagingLineState(l.PackagingMaterialId, l.QtyPerUnit))],
+        PackagingLines = [.. PackagingLines.Select(l => new PackagingLineState(l.PackagingMaterialId, l.UnitId, l.QtyPerUnit))],
         FormulaBase = _formulaBase,
     };
 
@@ -520,9 +545,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             PackagingLines.Clear();
             foreach (var line in snapshot.PackagingLines)
             {
+                // The material goes on first: it brings the units the row can be in, so the unit sticks.
                 PackagingLines.Add(new PackagingLineRow(id => PackagingMaterials.FirstOrDefault(m => m.Id == id))
                 {
                     PackagingMaterialId = line.PackagingMaterialId,
+                    UnitKey = line.UnitId ?? PackagingUnitChoice.BaseUnitKey,
                     QtyPerUnit = line.QtyPerUnit,
                 });
             }
@@ -586,7 +613,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         Lines.AddRange(saved.Select(l => new IngredientLineRow(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)));
         SelectedPackagingLine = null;
         PackagingLines.Clear();
-        PackagingLines.AddRange(savedSet.Select(l => new PackagingLineRow(packagingById.GetValueOrDefault(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet)));
+        PackagingLines.AddRange(savedSet.Select(l => new PackagingLineRow(packagingById.GetValueOrDefault(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId)));
         ShowUsedBy(row.GetUsedBy());
     }
 

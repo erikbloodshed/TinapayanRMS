@@ -45,11 +45,12 @@ public interface ISubAssemblyRepository
 
     /// <summary>
     /// Adds (Id 0) or updates a standalone packaging set — a sub-assembly in the Packaging role — and replaces its
-    /// lines (packaging materials, per set, in their base unit), in one transaction; every product whose packaging
-    /// links it follows. A saved recipe can't become a set. Returns its id.
+    /// lines (packaging materials, per set, each in <c>UnitId</c>, one of that material's own units, or in its base
+    /// unit when that's null), in one transaction; every product whose packaging links it follows. A saved recipe
+    /// can't become a set. Returns its id.
     /// </summary>
     Task<int> SaveStandalonePackagingAsync(
-        SubAssembly subAssembly, IReadOnlyList<(int PackagingMaterialId, decimal QtyPerSet)> lines, CancellationToken cancellationToken);
+        SubAssembly subAssembly, IReadOnlyList<(int PackagingMaterialId, int? UnitId, decimal QtyPerSet)> lines, CancellationToken cancellationToken);
 
     /// <summary>Deletes a standalone sub-assembly and its lines; refused while a product links it.</summary>
     Task DeleteStandaloneAsync(int id, CancellationToken cancellationToken);

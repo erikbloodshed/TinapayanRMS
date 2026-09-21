@@ -1,17 +1,26 @@
-<UserControl x:Class="TinapayanRMS.UI.Views.RawMaterials.SummaryHeaderCard"
+﻿<UserControl x:Class="TinapayanRMS.UI.Views.RawMaterials.SummaryHeaderCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
              xmlns:viewModels="clr-namespace:TinapayanRMS.UI.ViewModels">
     <UserControl.Resources>
-        <!-- A value tile: a muted label over a larger value. -->
-        <Style x:Key="TileLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource FieldLabelStyle}">
-            <Setter Property="Margin" Value="0,0,0,6" />
-        </Style>
+        <!-- A value tile: a muted label over its value, sized as the Products header's figures are. -->
+        <Style x:Key="TileLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource FieldLabelStyle}" />
+        <!--
+            24 is the height the Base Unit picker (ComboBoxAdv) is pinned to below, which stands in the first
+            tile for a packaging material. Every value takes that height, so the row measures the same whether
+            the tile holds text or the picker, and the header doesn't jump between an ingredient and packaging.
+            A TextBlock draws its text at the top of its box rather than centring it, so the padding puts the
+            14pt line (18.62 high) in the middle of the 24: (24 - 18.62) / 2.
+        -->
         <Style x:Key="TileValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Padding" Value="0,2.69,0,0" />
             <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
         <!--
@@ -51,7 +60,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource CardStyle}">
+    <Border Style="{StaticResource CardStyle}" Padding="12" MinHeight="{StaticResource HeaderCardHeight}">
         <StackPanel>
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
@@ -74,96 +83,129 @@
                     <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
                 </StackPanel>
 
-                <Border DockPanel.Dock="Left"
-                        Width="52"
-                        Height="52"
-                        Margin="0,0,14,0"
-                        CornerRadius="10"
-                        Background="{StaticResource AccentSoftBrush}">
-                    <TextBlock Text="{Binding HeaderInitial}"
-                               FontSize="24"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource AccentBrush}"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center" />
-                </Border>
-
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="{Binding HeaderTitle}"
-                               FontSize="24"
+                               FontSize="20"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource HeadingForegroundBrush}"
                                TextTrimming="CharacterEllipsis" />
                 </StackPanel>
             </DockPanel>
 
-            <!-- The tiles: labels in the first row, values in the second, with separators spanning both -->
-            <Border Margin="0,16,0,0"
-                    Padding="16,12"
-                    BorderBrush="{StaticResource CardBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+            <!--
+                The tiles: labels in the first row, values in the second, with separators spanning both. A plain row
+                rather than a bordered box (2026-09-21, at the user's request that this header be as compact as the
+                Products one, whose figures row this now matches in every measurement).
+            -->
+            <Grid Margin="0,12,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <!--
+                    Every tile takes an equal share. The two made-only ones (columns 6 and 8) share too while
+                    they're shown and take no width at all while they aren't (BooleanToStarWidthConverter): a
+                    plain star column would hold its share open around a collapsed tile, and an Auto one would
+                    size to its own text instead of matching the rest. The separators are Auto throughout, so a
+                    hidden one measures to nothing.
+                -->
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="{Binding IsEditingMade, Converter={StaticResource BooleanToStarWidthConverter}}" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="{Binding IsEditingMade, Converter={StaticResource BooleanToStarWidthConverter}}" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-                    <!-- An ingredient is always in grams; packaging picks its own base unit -->
-                    <TextBlock Grid.Column="0" Text="Base Unit" Style="{StaticResource TileLabelStyle}" />
-                    <TextBlock Grid.Row="1"
-                               Grid.Column="0"
-                               Text="gram (g)"
-                               Style="{StaticResource TileValueStyle}"
-                               Visibility="{Binding IsEditingIngredient, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <syncfusion:ComboBoxAdv Grid.Row="1"
-                                            Grid.Column="0"
-                                            ItemsSource="{Binding UnitsOfMeasure}"
-                                            DisplayMemberPath="Name"
-                                            controls:FieldUndoStep.Recorder="{Binding}"
-                                            SelectedItem="{Binding EditingBaseUnit, Mode=TwoWay}"
-                                            IsEnabled="{Binding CanChangeBaseUnit}"
-                                            ToolTip="Fixed once the material has alternative units, prices or packaging lines."
-                                            Visibility="{Binding IsEditingPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <!-- An ingredient is always in grams; packaging picks its own base unit -->
+                <TextBlock Grid.Column="0" Text="Base Unit" Style="{StaticResource TileLabelStyle}" />
+                <TextBlock Grid.Row="1"
+                           Grid.Column="0"
+                           Text="gram (g)"
+                           Style="{StaticResource TileValueStyle}"
+                           Visibility="{Binding IsEditingIngredient, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <!-- 24, not the theme's 31: the picker stood taller than the text boxes under it. -->
+                <syncfusion:ComboBoxAdv Grid.Row="1"
+                                        Grid.Column="0"
+                                        Height="24"
+                                        ItemsSource="{Binding UnitsOfMeasure}"
+                                        DisplayMemberPath="Name"
+                                        controls:FieldUndoStep.Recorder="{Binding}"
+                                        SelectedItem="{Binding EditingBaseUnit, Mode=TwoWay}"
+                                        IsEnabled="{Binding CanChangeBaseUnit}"
+                                        ToolTip="Fixed once the material has alternative units, prices or packaging lines."
+                                        Visibility="{Binding IsEditingPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                    <Border Grid.Column="1" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
-                    <!-- The saved costs, in the unit picked as Per in the Purchase Cost Setup -->
-                    <TextBlock Grid.Column="2" Style="{StaticResource TileLabelStyle}">
-                        <Run Text="Current Cost per" /> <Run Text="{Binding HeaderCostUnitText, Mode=OneWay}" />
-                    </TextBlock>
-                    <TextBlock Grid.Row="1"
-                               Grid.Column="2"
-                               Style="{StaticResource TileValueStyle}"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Text="{Binding CurrentCostText}" />
+                <Border Grid.Column="1" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
+                <!-- The saved costs, in the unit picked as Per in the Purchase Cost Setup -->
+                <TextBlock Grid.Column="2" Style="{StaticResource TileLabelStyle}">
+                    <Run Text="Current Cost per" /> <Run Text="{Binding HeaderCostUnitText, Mode=OneWay}" />
+                </TextBlock>
+                <TextBlock Grid.Row="1"
+                           Grid.Column="2"
+                           Style="{StaticResource TileValueStyle}"
+                           Text="{Binding CurrentCostText}" />
 
-                    <!-- The cost with the buffer on top: what recipes and products are costed with -->
-                    <Border Grid.Column="3" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
-                    <TextBlock Grid.Column="4" Style="{StaticResource TileLabelStyle}">
-                        <Run Text="Buffered Cost per" /> <Run Text="{Binding HeaderCostUnitText, Mode=OneWay}" />
-                    </TextBlock>
-                    <TextBlock Grid.Row="1"
-                               Grid.Column="4"
-                               Style="{StaticResource TileValueStyle}"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Text="{Binding BufferedCostText}" />
+                <!--
+                    The cost with the buffer on top: what recipes and products are costed with. A made
+                    ingredient's follows the BOM being typed into (Total Cost ÷ Total Weight, the two tiles
+                    beside it); every other material's is what was last saved.
+                -->
+                <Border Grid.Column="3" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
+                <TextBlock Grid.Column="4" Style="{StaticResource TileLabelStyle}">
+                    <Run Text="Buffered Cost per" /> <Run Text="{Binding HeaderCostUnitText, Mode=OneWay}" />
+                </TextBlock>
+                <TextBlock Grid.Row="1"
+                           Grid.Column="4"
+                           Style="{StaticResource TileValueStyle}"
+                           Text="{Binding BufferedCostText}" />
 
-                    <Border Grid.Column="5" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
-                    <TextBlock Grid.Column="6" Text="Last Updated" Style="{StaticResource TileLabelStyle}" />
-                    <TextBlock Grid.Row="1" Grid.Column="6" Text="{Binding LastUpdatedText}" Style="{StaticResource TileValueStyle}" />
+                <!-- Made only: the two figures the buffered cost is worked out from, as the BOM stands -->
+                <Border Grid.Column="5"
+                        Grid.RowSpan="2"
+                        Style="{StaticResource TileSeparatorStyle}"
+                        Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock Grid.Column="6"
+                           Text="Total Weight"
+                           Style="{StaticResource TileLabelStyle}"
+                           Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock Grid.Row="1"
+                           Grid.Column="6"
+                           Text="{Binding BomTotalWeight, StringFormat='{}{0:#,0.##} g'}"
+                           Style="{StaticResource TileValueStyle}"
+                           ToolTip="What the batch yields as the BOM stands: its grams less the weight loss."
+                           Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                <Border Grid.Column="7"
+                        Grid.RowSpan="2"
+                        Style="{StaticResource TileSeparatorStyle}"
+                        Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock Grid.Column="8"
+                           Text="Total Cost"
+                           Style="{StaticResource TileLabelStyle}"
+                           Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock Grid.Row="1"
+                           Grid.Column="8"
+                           Text="{Binding BomTotalCost, StringFormat='₱{0:N2}'}"
+                           Style="{StaticResource TileValueStyle}"
+                           ToolTip="What the BOM costs at its components' buffered costs, as it stands — the grid's Cost column. Over the Total Weight, it's the Buffered Cost per gram."
+                           Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                <!-- The day its cost last moved, whatever moved it -->
+                <Border Grid.Column="9" Grid.RowSpan="2" Style="{StaticResource TileSeparatorStyle}" />
+                <TextBlock Grid.Column="10" Text="Last Updated" Style="{StaticResource TileLabelStyle}" />
+                <TextBlock Grid.Row="1"
+                           Grid.Column="10"
+                           Text="{Binding LastUpdatedText}"
+                           Style="{StaticResource TileValueStyle}"
+                           ToolTip="When this material's cost last changed: a new price, a buffer edit, a recipe change, or the cascade reaching it from a component." />
                 </Grid>
-            </Border>
 
             <!-- Labels in the first row, fields in the second: Name first. Packaging is always purchased; only an ingredient can be made. -->
             <Grid Margin="0,12,0,0">
@@ -180,7 +222,8 @@
                     <ColumnDefinition Width="16" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="*" />
+                    <!-- Weight Loss %, made only: Auto, so the other fields take its width for any other material -->
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" />
@@ -229,8 +272,12 @@
                            Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <syncfusion:DoubleTextBox Grid.Row="1"
                                           Grid.Column="8"
+                                          MinWidth="120"
+                                          MinValue="0"
+                                          MaxValue="99.99"
                                           controls:FieldUndoStep.Recorder="{Binding}"
                                           Value="{Binding EditingWeightLossPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          ToolTip="How much of the batch's weight is lost while making it: the cost is spread over what's left. A new made ingredient starts at 3%."
                                           Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </Grid>
         </StackPanel>

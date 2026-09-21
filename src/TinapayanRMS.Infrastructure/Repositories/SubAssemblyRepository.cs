@@ -89,7 +89,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     }
 
     public async Task<int> SaveStandalonePackagingAsync(
-        SubAssembly subAssembly, IReadOnlyList<(int PackagingMaterialId, decimal QtyPerSet)> lines, CancellationToken cancellationToken)
+        SubAssembly subAssembly, IReadOnlyList<(int PackagingMaterialId, int? UnitId, decimal QtyPerSet)> lines, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -109,6 +109,20 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             RawMaterialRules.EnsureUsableAsPackaging(material.Type, material.Name);
         }
 
+        // A line's unit is one of its own material's alternative units; an empty one means that material's base unit.
+        var unitIds = lines.Where(l => l.UnitId is not null).Select(l => l.UnitId!.Value).Distinct().ToList();
+        var materialIdByUnitId = await dbContext.RawMaterialUnits
+            .Where(u => unitIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.RawMaterialId, cancellationToken);
+        foreach (var line in lines)
+        {
+            if (line.UnitId is { } unitId
+                && (!materialIdByUnitId.TryGetValue(unitId, out var unitMaterialId) || unitMaterialId != line.PackagingMaterialId))
+            {
+                throw new InvalidOperationException("A packaging set line's unit must be one of that material's own units.");
+            }
+        }
+
         // Saved here so a new one has its id for its lines. A set is costed on read, so its stored totals stay 0.
         await dbContext.SaveChangesAsync(cancellationToken);
         await dbContext.SubAssemblyPackagingLines.Where(l => l.SubAssemblyId == stored.Id).ExecuteDeleteAsync(cancellationToken);
@@ -116,6 +130,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         {
             SubAssemblyId = stored.Id,
             PackagingMaterialId = l.PackagingMaterialId,
+            UnitId = l.UnitId,
             QtyPerSet = l.QtyPerSet,
         }));
         await dbContext.SaveChangesAsync(cancellationToken);

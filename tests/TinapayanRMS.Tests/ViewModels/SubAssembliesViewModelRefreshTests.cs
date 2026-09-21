@@ -161,7 +161,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         await WaitUntilSettledAsync(() => viewModel.PackagingLines.Count == 1, () => $"packaging lines={viewModel.PackagingLines.Count}");
         viewModel.IsPackaging.Should().BeTrue();
         viewModel.Lines.Should().BeEmpty();
-        viewModel.PackagingLines.Single().Unit.Should().Be("pc");
+        viewModel.PackagingLines.Single().BaseUnitAbbreviation.Should().Be("pc");
         viewModel.SetCost.Should().Be(66m);
         viewModel.UsedByText.Should().Contain("Add Sub-Assembly");
     }

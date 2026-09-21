@@ -70,8 +70,11 @@ public class IngredientCostPropagator(IDbContextFactory<TinapayanRMSDbContext> d
                     continue;
                 }
 
-                // Two rollups over the same lines: the true cost from the components' true costs, and the
-                // buffered cost from their buffered costs with this ingredient's own buffer on top.
+                // Two rollups over the same lines: the true cost from the components' true costs, and the buffered
+                // cost from their buffered costs — with no buffer of its own on top (2026-09-21, at the user's
+                // request), since every component's own buffer is already inside the figures being rolled up. The
+                // weight loss still divides both. Its stored percent is normalised to 0 so nothing reads it as
+                // meaningful: a made ingredient has no buffer box on the screen.
                 var lines = linesByIngredientId[id].ToList();
                 var weightLossPercent = ingredient.WeightLossPercent ?? 0m;
 
@@ -83,7 +86,8 @@ public class IngredientCostPropagator(IDbContextFactory<TinapayanRMSDbContext> d
                     weightLossPercent);
 
                 ingredient.CostPerBaseUnit = costPerGram;
-                ingredient.BufferedCostPerBaseUnit = RawMaterialRules.BufferedCost(componentsBufferedCostPerGram, ingredient.CostBufferPercent);
+                ingredient.BufferedCostPerBaseUnit = componentsBufferedCostPerGram;
+                ingredient.CostBufferPercent = 0m;
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -173,6 +173,40 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.BrandPriceRows.Should().ContainSingle("the brand prices that arrived are still showing");
     }
 
+    [Fact]
+    public async Task Undoing_a_bom_edit_puts_the_headers_totals_back()
+    {
+        var (viewModel, _) = await OpenMadeIngredientAsync();
+        viewModel.BomTotalWeight.Should().Be(970m, "1,000 g less the 3% weight loss");
+        viewModel.BomTotalCost.Should().Be(110m, "1,000 g of sugar at its buffered ₱0.11");
+
+        Edit(viewModel, () => viewModel.BomLineEdits.Single().Grams = 500m);
+        viewModel.BomTotalWeight.Should().Be(485m);
+        viewModel.BomTotalCost.Should().Be(55m);
+
+        viewModel.TryUndo().Should().BeTrue();
+        viewModel.BomTotalWeight.Should().Be(970m, "the restore works the totals out again");
+        viewModel.BomTotalCost.Should().Be(110m);
+
+        viewModel.TryRedo().Should().BeTrue();
+        viewModel.BomTotalWeight.Should().Be(485m);
+        viewModel.BomTotalCost.Should().Be(55m);
+    }
+
+    [Fact]
+    public async Task Undoing_a_weight_loss_edit_puts_the_headers_yield_back()
+    {
+        var (viewModel, _) = await OpenMadeIngredientAsync();
+
+        Edit(viewModel, () => viewModel.EditingWeightLossPercent = 20m);
+        viewModel.BomTotalWeight.Should().Be(800m);
+        viewModel.BomTotalCost.Should().Be(110m, "the weight loss doesn't move the cost");
+
+        viewModel.TryUndo().Should().BeTrue();
+        viewModel.EditingWeightLossPercent.Should().Be(3m);
+        viewModel.BomTotalWeight.Should().Be(970m);
+    }
+
     /// <summary>One finished change, as the Controls/ behaviours bracket a gesture in the app.</summary>
     private static void Edit(RawMaterialsViewModel viewModel, Action change)
     {
@@ -210,6 +244,50 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         await WaitUntilSettledAsync(
             () => viewModel.AreDetailsReady && viewModel.UnitRows.Count == 1,
             () => $"ready={viewModel.AreDetailsReady}, units={viewModel.UnitRows.Count}");
+
+        viewModel.History.CanUndo.Should().BeFalse("the load itself isn't a change");
+        return (viewModel, materialId);
+    }
+
+    /// <summary>A saved made ingredient (3% weight loss) of 1,000 g of sugar at a buffered ₱0.11/g, open in the form.</summary>
+    private async Task<(RawMaterialsViewModel ViewModel, int MaterialId)> OpenMadeIngredientAsync()
+    {
+        int materialId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var category = new RawMaterialCategory { Name = "Syrup goods" };
+            dbContext.RawMaterialCategories.Add(category);
+            var sugar = new RawMaterial
+            {
+                Name = "Sugar",
+                Type = RawMaterialType.Ingredient,
+                Category = category,
+                Source = RawMaterialSource.Purchased,
+                CostPerBaseUnit = 0.10m,
+                BufferedCostPerBaseUnit = 0.11m,
+            };
+            var syrup = new RawMaterial
+            {
+                Name = "Simple Syrup",
+                Type = RawMaterialType.Ingredient,
+                Category = category,
+                Source = RawMaterialSource.Made,
+                WeightLossPercent = 3m,
+            };
+            dbContext.RawMaterials.AddRange(sugar, syrup);
+            await dbContext.SaveChangesAsync(Cancellation);
+
+            dbContext.IngredientBomLines.Add(new IngredientBomLine { IngredientId = syrup.Id, ComponentIngredientId = sugar.Id, Grams = 1000m });
+            await dbContext.SaveChangesAsync(Cancellation);
+            materialId = syrup.Id;
+        }
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == materialId);
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.BomLineEdits.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, lines={viewModel.BomLineEdits.Count}");
 
         viewModel.History.CanUndo.Should().BeFalse("the load itself isn't a change");
         return (viewModel, materialId);

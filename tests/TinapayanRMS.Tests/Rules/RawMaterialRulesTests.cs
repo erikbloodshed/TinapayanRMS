@@ -1,4 +1,4 @@
-using AwesomeAssertions;
+﻿using AwesomeAssertions;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
@@ -464,6 +464,21 @@ public class RawMaterialRulesTests
     public void BufferedCost_adds_the_buffer_percent_to_the_cost(decimal cost, decimal bufferPercent, decimal expected)
     {
         RawMaterialRules.BufferedCost(cost, bufferPercent).Should().Be(expected);
+    }
+
+    [Fact]
+    public void StoredCostBufferPercent_is_always_0_for_a_made_ingredient()
+    {
+        // Its components' buffers are already in its BOM rollup, and it has no buffer box on the screen, so a
+        // percent sent for it (a stale one loaded from the row) is normalised away rather than rejected.
+        RawMaterialRules.StoredCostBufferPercent(RawMaterialSource.Made, inheritedBuffer: null, sent: 84.4147m).Should().Be(0m);
+    }
+
+    [Fact]
+    public void StoredCostBufferPercent_takes_the_linked_to_ingredients_for_a_linked_one_and_what_was_sent_otherwise()
+    {
+        RawMaterialRules.StoredCostBufferPercent(RawMaterialSource.Linked, inheritedBuffer: 10m, sent: 5m).Should().Be(10m);
+        RawMaterialRules.StoredCostBufferPercent(RawMaterialSource.Purchased, inheritedBuffer: null, sent: 5m).Should().Be(5m);
     }
 
     [Theory]

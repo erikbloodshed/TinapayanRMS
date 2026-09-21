@@ -22,6 +22,13 @@ public class SubAssemblyPackagingLineConfiguration : IEntityTypeConfiguration<Su
             .HasForeignKey(l => l.PackagingMaterialId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // The unit the quantity is entered in, when it isn't the material's base unit. A unit a set line uses
+        // can't be deleted (RawMaterialUnitRepository.DeleteAsync says which sets are on it).
+        builder.HasOne(l => l.Unit)
+            .WithMany()
+            .HasForeignKey(l => l.UnitId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(l => new { l.SubAssemblyId, l.PackagingMaterialId }).IsUnique();
     }
 }

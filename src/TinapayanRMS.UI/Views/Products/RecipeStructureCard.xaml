@@ -1,19 +1,29 @@
-<UserControl x:Class="TinapayanRMS.UI.Views.Products.RecipeStructureCard"
+﻿<UserControl x:Class="TinapayanRMS.UI.Views.Products.RecipeStructureCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
+             xmlns:viewModels="clr-namespace:TinapayanRMS.UI.ViewModels"
              xmlns:local="clr-namespace:TinapayanRMS.UI.Views.Products">
     <!--
         What goes into one piece, in tabs (RecipeTabs): a sub-assembly's for each one in the recipe, in role
         order, then New Sub-Assembly while Add Sub-Assembly's form is open, then Packaging while the product has any.
-        Add Sub-Assembly and Delete Sub-Assembly sit in the header.
+        Add Sub-Assembly and Delete Sub-Assembly sit in the header, Add Sub-Assembly as a drop-down of the three
+        ways in: a new sub-assembly, or an existing one linked or copied (UsageFormMode).
         The tabs only pick what shows under them; they have no content of their own. Every sub-assembly's tab and
         New Sub-Assembly's show the screen's one form, so there's one UsageFormPanel, and one PackagingSectionView,
         built once and shown or hidden by the tab showing (IsUsageFormShowing, IsPackagingShowing). As each tab's
         own content, the form was built again every time its tab showed: on every product picked, since each
         product brings new tabs, which took about 80 ms (the form and its grids), measured.
     -->
-    <StackPanel>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
         <!-- The header, with the buttons that add a sub-assembly and delete the one whose tab is showing -->
         <Grid>
             <Grid.ColumnDefinitions>
@@ -23,11 +33,60 @@
 
             <TextBlock Text="Recipe Structure" Style="{StaticResource PanelHeaderStyle}" Margin="0,0,0,4" VerticalAlignment="Center" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,4">
-                <syncfusion:ButtonAdv Label="Add Sub-Assembly"
-                                      ToolTip="Make a new sub-assembly, or link or copy an existing one, in a tab of its own"
-                                      IconTemplate="{StaticResource AddIconTemplate}"
-                                      Command="{Binding AddUsageCommand}"
-                                      Margin="0,0,8,0" />
+                <!--
+                    The three ways in, on the button itself (DropDownButtonAdv, Syncfusion.Shared.WPF, the same
+                    namespace as ButtonAdv): the way is picked in the click that opens the tab, so the form no longer
+                    asks for it. Each item carries its UsageFormMode to AddUsageCommand.
+                    A DropDownButtonAdv's Content *is* its drop-down, and it doesn't close when something inside is
+                    clicked (its own OnMouseLeftButtonUp only closes for a click on the button, and a ButtonAdv inside
+                    handles the click first), so each item closes it in AddSubAssemblyItem_Click.
+                    ButtonAdv items rather than the ListBox in Syncfusion's own demos: a plain ListBox keeps the OS
+                    default look here, since SfSkinManager.ApplyThemeAsDefaultStyle is deliberately off (App.xaml.cs),
+                    and its blue selection would fight the app's amber accent.
+                    Each item is flattened with Background="Transparent" and BorderThickness="0" so it reads as a
+                    menu row rather than a raised button: the theme's own MouseOver still supplies the highlight.
+                    Properties only, never a Style, so the ButtonAdv template stays intact (App.xaml's design tokens).
+                -->
+                <syncfusion:DropDownButtonAdv x:Name="AddSubAssemblyButton"
+                                              Label="Add Sub-Assembly"
+                                              ToolTip="Make a new sub-assembly, or link or copy an existing one, in a tab of its own"
+                                              IconTemplate="{StaticResource AddIconTemplate}"
+                                              Margin="0,0,8,0">
+                    <StackPanel MinWidth="190" Margin="2">
+                        <syncfusion:ButtonAdv Label="New sub-assembly"
+                                              ToolTip="A sub-assembly of this product's own: type its lines in here."
+                                              IconTemplate="{StaticResource AddIconTemplate}"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Left"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Command="{Binding AddUsageCommand}"
+                                              CommandParameter="{x:Static viewModels:UsageFormMode.New}"
+                                              Click="AddSubAssemblyItem_Click" />
+                        <syncfusion:ButtonAdv Label="Link an existing one"
+                                              ToolTip="Another product's, a standalone one from the Sub-Assemblies screen, or packaging. Its lines stay where they're kept, and it follows every change made to them."
+                                              IconTemplate="{StaticResource LinkIconTemplate}"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Left"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Margin="0,2,0,0"
+                                              Command="{Binding AddUsageCommand}"
+                                              CommandParameter="{x:Static viewModels:UsageFormMode.Link}"
+                                              Click="AddSubAssemblyItem_Click" />
+                        <syncfusion:ButtonAdv Label="Copy an existing one"
+                                              ToolTip="Starts from an existing one's lines and role, and is this product's own from then on."
+                                              IconTemplate="{StaticResource CopyIconTemplate}"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Left"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Margin="0,2,0,0"
+                                              Command="{Binding AddUsageCommand}"
+                                              CommandParameter="{x:Static viewModels:UsageFormMode.Copy}"
+                                              Click="AddSubAssemblyItem_Click" />
+                    </StackPanel>
+                </syncfusion:DropDownButtonAdv>
                 <syncfusion:ButtonAdv Label="Delete Sub-Assembly"
                                       ToolTip="Take the sub-assembly showing out of the recipe. Save deletes the product's own; a linked one stays where it's from."
                                       IconTemplate="{StaticResource DeleteIconTemplate}"
@@ -49,13 +108,15 @@
             empty content area draws nothing: the frame below stands in for it.
         -->
         <!-- A new product has no tabs: every section, packaging included, comes in through Add Sub-Assembly. -->
-        <TextBlock Text="Nothing in the recipe yet. Add Sub-Assembly adds a section — a new one, or one linked or copied — and its Packaging role adds the packaging."
+        <TextBlock Grid.Row="1"
+                   Text="Nothing in the recipe yet. Add Sub-Assembly adds a section — a new one, or one linked or copied — and its Packaging role adds the packaging."
                    Style="{StaticResource CaptionStyle}"
                    TextWrapping="Wrap"
                    Margin="0,8,0,0"
                    Visibility="{Binding HasRecipeTabs, Converter={StaticResource EmptyStateVisibilityConverter}}" />
 
         <syncfusion:TabControlExt x:Name="RecipeTabControl"
+                                  Grid.Row="2"
                                   ItemsSource="{Binding RecipeTabs}"
                                   Visibility="{Binding HasRecipeTabs, Converter={StaticResource BooleanToVisibilityConverter}}"
                                   SelectedItem="{Binding SelectedRecipeTab, Mode=TwoWay}"
@@ -85,25 +146,34 @@
             The frame is a Border of its own behind the content, not around it: it sits below text of fractional
             height, so it's snapped to whole pixels as the theme's frame is (or its bottom line blurs across two
             rows), and a snapped Border shifts whatever it holds by the fraction too, redrawing the form's edges.
+
+            **The scrolling is in here, not around the whole card**, so the header and the tab strip stay put and
+            only the form under them moves: the frame takes the row that's left over (Height="*"), and its content
+            scrolls inside it. The Recipe tab in ProductsView holds this card in a plain Border for that reason —
+            a ScrollViewer around the card would scroll the tabs off the top, which is what it used to do.
+            FocusScrolling.SkipOnClick moved in with the ScrollViewer and goes on what's inside it, so the request
+            to bring a clicked control into view stops before reaching it.
         -->
-        <Grid UseLayoutRounding="True" Visibility="{Binding HasRecipeTabs, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <Grid Grid.Row="3" UseLayoutRounding="True" Visibility="{Binding HasRecipeTabs, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Border SnapsToDevicePixels="True"
                     BorderBrush="{Binding BorderBrush, ElementName=RecipeTabControl}"
                     Background="{Binding Background, ElementName=RecipeTabControl}"
                     BorderThickness="1,0,1,1" />
 
-            <Grid Margin="1,0,1,1">
-                <!--
-                    A sub-assembly's tab is the form that edits it: its lines for the product's own, read-only for a link.
-                    Inset as it was as the tab's content: 8, and the tab control's own 2 at the sides and bottom, less 2 at the top.
-                -->
-                <Border Padding="10,6,10,10" Visibility="{Binding IsUsageFormShowing, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <local:UsageFormPanel />
-                </Border>
+            <ScrollViewer Margin="1,0,1,1" VerticalScrollBarVisibility="Auto">
+                <Grid controls:FocusScrolling.SkipOnClick="True">
+                    <!--
+                        A sub-assembly's tab is the form that edits it: its lines for the product's own, read-only for a link.
+                        Inset as it was as the tab's content: 8, and the tab control's own 2 at the sides and bottom, less 2 at the top.
+                    -->
+                    <Border Padding="10,6,10,10" Visibility="{Binding IsUsageFormShowing, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <local:UsageFormPanel />
+                    </Border>
 
-                <!-- The packaging, inset as the tab control inset it as a tab's content -->
-                <local:PackagingSectionView Margin="2,-2,2,2" Visibility="{Binding IsPackagingShowing, Converter={StaticResource BooleanToVisibilityConverter}}" />
-            </Grid>
+                    <!-- The packaging, inset as the tab control inset it as a tab's content -->
+                    <local:PackagingSectionView Margin="2,-2,2,2" Visibility="{Binding IsPackagingShowing, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                </Grid>
+            </ScrollViewer>
         </Grid>
-    </StackPanel>
+    </Grid>
 </UserControl>

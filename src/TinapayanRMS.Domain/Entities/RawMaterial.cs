@@ -1,4 +1,4 @@
-using TinapayanRMS.Domain.Enums;
+﻿using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.Domain.Entities;
 
@@ -62,7 +62,8 @@ public class RawMaterial
     /// <summary>
     /// A cushion on top of the cost for price swings, waste and yield variation, at least 0 and at
     /// most 100. Defaults to 0, which makes the buffered cost the same as the true cost. A Linked ingredient
-    /// inherits it from the ingredient it's linked to, and the cascade keeps it in step.
+    /// inherits it from the ingredient it's linked to, and the cascade keeps it in step. A Made ingredient is
+    /// always 0: its components are already buffered, so it adds none of its own.
     /// </summary>
     public decimal CostBufferPercent { get; set; }
 
@@ -70,9 +71,24 @@ public class RawMaterial
     /// The cost of one base unit with the buffer on top: what recipes, sub-assemblies, packaging lines
     /// and products are costed with, while <see cref="CostPerBaseUnit"/> stays the true cost. Stored
     /// alongside it: for Purchased it's CostPerBaseUnit plus the buffer, for Made the BOM rollup of the
-    /// components' buffered costs plus its own buffer, so buffers stack up the BOM tree.
+    /// components' buffered costs and nothing more, so a buffer is counted once however deep the tree.
     /// </summary>
     public decimal BufferedCostPerBaseUnit { get; set; }
+
+    /// <summary>
+    /// When the material was last saved, in local time: set each time it's added or updated from a form, as
+    /// Product.UpdatedAt is. A cost change on its own doesn't move it — that's <see cref="CostUpdatedAt"/>.
+    /// Null for a material not saved since this was added.
+    /// </summary>
+    public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// When <see cref="CostPerBaseUnit"/> or <see cref="BufferedCostPerBaseUnit"/> last changed, in local time.
+    /// Stamped by the DbContext from what actually changed, so every path counts: a new brand price, a buffer or
+    /// buffered-cost edit, a BOM or weight-loss edit, a unit multiplier correction, and the cascade reaching it
+    /// from a component. Null for a material whose cost hasn't moved since this was added.
+    /// </summary>
+    public DateTime? CostUpdatedAt { get; set; }
 
     /// <summary>The units it's bought or used in besides its base unit.</summary>
     public List<RawMaterialUnit> Units { get; set; } = [];

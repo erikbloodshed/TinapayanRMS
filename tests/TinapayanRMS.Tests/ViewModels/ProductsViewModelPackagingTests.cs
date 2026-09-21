@@ -100,15 +100,14 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var boxId = await AddPackagingAsync("Gift Box", 30m);
         var ribbonId = await AddPackagingAsync("Ribbon", 0.05m, "cm");
         var setId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
-            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, 1m), (ribbonId, 30m)], Cancellation);
+            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 1m), (ribbonId, null, 30m)], Cancellation);
         var productId = await AddProductAsync("Ensaymada");
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single();
         await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == productId, () => $"selected={viewModel.SelectedProduct?.Id}");
         viewModel.RecipeTabs.Should().BeEmpty();
 
-        await viewModel.AddUsageCommand.Execute();
-        viewModel.EditingUsageMode = UsageFormModeOption.All.Single(o => o.Mode == UsageFormMode.Link);
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
         viewModel.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal("Gift Box Set — Sub-Assemblies (Packaging)");
         viewModel.EditingUsageSource = viewModel.LinkableSubAssemblies.Single();
         await WaitUntilSettledAsync(() => viewModel.FormPackagingLines.Count == 2, () => $"lines={viewModel.FormPackagingLines.Count}");
@@ -147,8 +146,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.EditingName = "Cream Loaf Mini";
 
-        await viewModel.AddUsageCommand.Execute();
-        viewModel.EditingUsageMode = UsageFormModeOption.All.Single(o => o.Mode == UsageFormMode.Copy);
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
         viewModel.EditingUsageSource = viewModel.LinkableSubAssemblies.Single(o => o.DisplayName == "Packaging — Cream Loaf");
         await WaitUntilSettledAsync(() => viewModel.FormPackagingLines.Count == 1, () => $"lines={viewModel.FormPackagingLines.Count}");
         viewModel.EditingUsageRole!.IsPackaging.Should().BeTrue("a copy of packaging takes the Packaging role");
@@ -171,7 +169,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
         var setId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
-            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, 1m)], Cancellation);
+            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
         var productId = await AddProductAsync("Ensaymada");
         await CreatePackagingLinkRepository().SetSubAssemblyLinkAsync(productId, setId, Cancellation);
         var viewModel = await CreateLoadedViewModelAsync();
@@ -202,7 +200,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
         var setId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
-            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, 1m)], Cancellation);
+            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
         var ownId = await AddProductAsync("Cream Loaf");
         await new PackagingLineRepository(CreateDbContextFactory())
             .SetLinesAsync(ownId, [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
@@ -238,7 +236,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
         await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
-            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, 1m)], Cancellation);
+            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
         var ownId = await AddProductAsync("Cream Loaf");
         await new PackagingLineRepository(CreateDbContextFactory())
             .SetLinesAsync(ownId, [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
@@ -247,8 +245,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Name == "Ensaymada");
         await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Name == "Ensaymada", () => $"selected={viewModel.SelectedProduct?.Name}");
-        await viewModel.AddUsageCommand.Execute();
-        viewModel.EditingUsageMode = UsageFormModeOption.All.Single(o => o.Mode == UsageFormMode.Link);
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
         viewModel.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal(
             ["Gift Box Set — Sub-Assemblies (Packaging)", "Packaging — Cream Loaf"],
             "a product never links its own packaging");
@@ -256,8 +253,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         // Picking another product closes the form with nothing applied, which is what abandons this add now.
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == ownId);
         await WaitUntilSettledAsync(() => viewModel.HasPackaging, () => $"has packaging={viewModel.HasPackaging}");
-        await viewModel.AddUsageCommand.Execute();
-        viewModel.EditingUsageMode = UsageFormModeOption.All.Single(o => o.Mode == UsageFormMode.Link);
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
         viewModel.LinkableSubAssemblies.Should().NotContain(o => o.IsPackaging);
         viewModel.FormRoleOptions.Should().NotContain(r => r.IsPackaging);
     }

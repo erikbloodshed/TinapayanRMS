@@ -16,26 +16,34 @@ public static class CostingRules
     }
 
     /// <summary>
-    /// A cost entered as a percentage of the material cost (labor, overhead, administrative), in pesos per piece:
-    /// 25% labor on ₱20 of materials is ₱5.
+    /// A cost entered as a percentage of the sub-assembly (ingredient) cost — labor, overhead,
+    /// administrative — in pesos per piece: 25% labor on ₱20 of sub-assemblies is ₱5. Packaging is
+    /// deliberately left out of the base: what these three pay for is making the recipe, not wrapping it.
     /// </summary>
-    public static decimal CalculateCostFromMaterialPercent(decimal materialCostPerPiece, decimal percent) =>
-        materialCostPerPiece * percent / 100m;
+    public static decimal CalculateCostFromSubAssemblyPercent(decimal subAssemblyCostPerPiece, decimal percent) =>
+        subAssemblyCostPerPiece * percent / 100m;
 
     /// <summary>
     /// Cost-plus pricing: margin is a markup on cost (BaseCost × (1 + Margin%)), and VAT is
     /// added on top of that pre-VAT price (× (1 + VAT%)) as a separate step — never combined
     /// into one formula, so each input maps to exactly one step a shop owner can check by hand.
-    /// The base cost is the materials plus the labor, overhead and administrative costs, each of
-    /// those a percentage of the materials (CalculateCostFromMaterialPercent).
+    /// The base cost is the materials — the sub-assemblies plus the packaging — plus the labor, overhead
+    /// and administrative costs, each of those a percentage of the sub-assemblies alone
+    /// (CalculateCostFromSubAssemblyPercent).
     /// </summary>
     public static (decimal BaseCost, decimal PreVatPrice, decimal SellingPrice) CalculateSellingPrice(
-        decimal materialCostPerPiece, decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent, decimal vatPercent)
+        decimal subAssemblyCostPerPiece,
+        decimal packagingCostPerPiece,
+        decimal laborPercent,
+        decimal overheadPercent,
+        decimal administrativePercent,
+        decimal marginPercent,
+        decimal vatPercent)
     {
-        var laborCost = CalculateCostFromMaterialPercent(materialCostPerPiece, laborPercent);
-        var overheadCost = CalculateCostFromMaterialPercent(materialCostPerPiece, overheadPercent);
-        var administrativeCost = CalculateCostFromMaterialPercent(materialCostPerPiece, administrativePercent);
-        var baseCost = materialCostPerPiece + laborCost + overheadCost + administrativeCost;
+        var laborCost = CalculateCostFromSubAssemblyPercent(subAssemblyCostPerPiece, laborPercent);
+        var overheadCost = CalculateCostFromSubAssemblyPercent(subAssemblyCostPerPiece, overheadPercent);
+        var administrativeCost = CalculateCostFromSubAssemblyPercent(subAssemblyCostPerPiece, administrativePercent);
+        var baseCost = subAssemblyCostPerPiece + packagingCostPerPiece + laborCost + overheadCost + administrativeCost;
         var preVatPrice = baseCost * (1 + marginPercent / 100m);
         var sellingPrice = preVatPrice * (1 + vatPercent / 100m);
         return (baseCost, preVatPrice, sellingPrice);

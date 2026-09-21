@@ -53,7 +53,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
 
     /// <summary>
     /// A packaging set's lines as <paramref name="productId"/>'s own packaging lines, never saved: one set per
-    /// sellable unit, so a set's quantity is that unit's, in the material's base unit, typed as the quantity.
+    /// sellable unit, so a set's quantity is that unit's, in the unit the set line was entered in, typed as the quantity.
     /// Everything that reads a product's packaging (the Products screen, Reports, unlinking's copy, a clone)
     /// takes them as they are.
     /// </summary>
@@ -72,6 +72,8 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
                     ProductId = productId,
                     PackagingMaterialId = l.PackagingMaterialId,
                     PackagingMaterial = l.PackagingMaterial,
+                    UnitId = l.UnitId,
+                    Unit = l.Unit,
                     QtyPerUnit = qtyPerUnit,
                     UnitsPerPackagingUnit = unitsPerPackagingUnit,
                     AuthoredField = PackagingLineAuthoredField.QtyPerUnit,

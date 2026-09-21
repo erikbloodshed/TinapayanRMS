@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -23,8 +24,30 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
 
     private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory(), CreatePackagingLineRepository());
 
+    /// <summary>A set whose lines are all in their materials' base units, which most of these tests are.</summary>
     private Task<int> SaveSetAsync(string name, int roleId, IReadOnlyList<(int PackagingMaterialId, decimal QtyPerSet)> lines, int id = 0) =>
+        SaveSetInUnitsAsync(name, roleId, [.. lines.Select(l => (l.PackagingMaterialId, (int?)null, l.QtyPerSet))], id);
+
+    /// <summary>A set whose lines name the unit they're entered in: null for the material's base unit.</summary>
+    private Task<int> SaveSetInUnitsAsync(string name, int roleId, IReadOnlyList<(int PackagingMaterialId, int? UnitId, decimal QtyPerSet)> lines, int id = 0) =>
         CreateRepository().SaveStandalonePackagingAsync(new SubAssembly { Id = id, Name = name, RoleId = roleId }, lines, Cancellation);
+
+    /// <summary>An alternative unit on a packaging material: one <paramref name="unit"/> is <paramref name="baseUnitsPerUnit"/> base units.</summary>
+    private async Task<int> AddAlternativeUnitAsync(int materialId, string unit, decimal baseUnitsPerUnit)
+    {
+        var unitOfMeasureId = await GetOrCreateUnitOfMeasureAsync(unit, unit);
+
+        await using var dbContext = CreateDbContext();
+        var alternative = new RawMaterialUnit
+        {
+            RawMaterialId = materialId,
+            UnitOfMeasureId = unitOfMeasureId,
+            BaseUnitsPerUnit = baseUnitsPerUnit,
+        };
+        dbContext.RawMaterialUnits.Add(alternative);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return alternative.Id;
+    }
 
     /// <summary>A packaging material with <paramref name="baseUnit"/> as its base unit, costing <paramref name="cost"/> a base unit.</summary>
     private async Task<int> AddPackagingAsync(string name, decimal cost, string baseUnit = "pc")
@@ -365,5 +388,58 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var act = () => repository.UpdateAsync(ribbon, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task A_set_line_keeps_the_alternative_unit_it_was_entered_in_and_is_costed_through_it()
+    {
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var ribbonId = await AddPackagingAsync("Ribbon", 0.05m, "cm");
+        var rollId = await AddAlternativeUnitAsync(ribbonId, "roll", 1000m);
+
+        var setId = await SaveSetInUnitsAsync("Gift Box Set", packagingRoleId, [(ribbonId, rollId, 1m)]);
+
+        var line = (await CreateRepository().GetPackagingLinesAsync(setId, Cancellation)).Should().ContainSingle().Subject;
+        line.QtyPerSet.Should().Be(1m, "one roll is what was typed, not the 1,000 cm it comes to");
+        line.UnitId.Should().Be(rollId);
+        line.Unit!.BaseUnitsPerUnit.Should().Be(1000m, "the read brings the unit back, so the line can be costed and shown");
+        line.Unit.UnitOfMeasure!.Abbreviation.Should().Be("roll");
+
+        var productId = await AddProductAsync("Gift Ensaymada");
+        await CreatePackagingLinkRepository().SetSubAssemblyLinkAsync(productId, setId, Cancellation);
+
+        var resolved = (await CreatePackagingLineRepository().GetEffectiveForProductAsync(productId, Cancellation))
+            .Should().ContainSingle().Subject;
+        resolved.UnitId.Should().Be(rollId, "a product linking the set reads the line in the unit the set holds it in");
+        ProductRules.CalculatePackagingLineCost(
+            resolved.PackagingMaterial!.BufferedCostPerBaseUnit, resolved.QtyPerUnit, resolved.Unit?.BaseUnitsPerUnit)
+            .Should().Be(50m, "1 roll is 1,000 cm at ₱0.05");
+    }
+
+    [Fact]
+    public async Task A_set_line_cant_be_entered_in_another_materials_unit()
+    {
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var ribbonId = await AddPackagingAsync("Ribbon", 0.05m, "cm");
+        var boxId = await AddPackagingAsync("Gift Box", 30m);
+        var rollId = await AddAlternativeUnitAsync(ribbonId, "roll", 1000m);
+
+        var act = () => SaveSetInUnitsAsync("Gift Box Set", packagingRoleId, [(boxId, rollId, 1m)]);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*must be one of that material's own units*");
+    }
+
+    [Fact]
+    public async Task A_unit_a_set_line_is_entered_in_cant_be_deleted()
+    {
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var ribbonId = await AddPackagingAsync("Ribbon", 0.05m, "cm");
+        var rollId = await AddAlternativeUnitAsync(ribbonId, "roll", 1000m);
+        await SaveSetInUnitsAsync("Gift Box Set", packagingRoleId, [(ribbonId, rollId, 1m)]);
+
+        var act = () => new RawMaterialUnitRepository(CreateDbContextFactory(), CreateCostPropagator())
+            .DeleteAsync(rollId, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*packaging set line*");
     }
 }

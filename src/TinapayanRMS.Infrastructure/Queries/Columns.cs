@@ -1,4 +1,4 @@
-using TinapayanRMS.Domain.Entities;
+﻿using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Queries;
 
@@ -17,6 +17,7 @@ internal static class Columns
         [
             "Id", "Name", "Type", "CategoryId", "Source", "WeightLossPercent", "LinkedToId", "WeightSharePercent",
             "CostSharePercent", "BaseUnitId", "CostPerBaseUnit", "CostBufferPercent", "BufferedCostPerBaseUnit",
+            "UpdatedAt", "CostUpdatedAt",
         ],
         [typeof(RawMaterialUnit)] = ["Id", "RawMaterialId", "UnitOfMeasureId", "BaseUnitsPerUnit", "Description"],
         [typeof(RawMaterialBrandPrice)] = ["Id", "RawMaterialId", "Brand", "UnitId", "Price"],
@@ -25,7 +26,7 @@ internal static class Columns
         [typeof(SubAssemblyRole)] = ["Id", "Name", "SortOrder", "IsPackaging"],
         [typeof(SubAssembly)] = ["Id", "Name", "RoleId", "OwnerProductId", "TotalWeight", "TotalCost"],
         [typeof(SubAssemblyLine)] = ["Id", "SubAssemblyId", "IngredientId", "Grams", "IsFormulaBase", "AuthoredBakersPercent"],
-        [typeof(SubAssemblyPackagingLine)] = ["Id", "SubAssemblyId", "PackagingMaterialId", "QtyPerSet"],
+        [typeof(SubAssemblyPackagingLine)] = ["Id", "SubAssemblyId", "PackagingMaterialId", "UnitId", "QtyPerSet"],
         [typeof(ProductCategory)] = ["Id", "Name"],
         [typeof(Product)] = ["Id", "Name", "Description", "CategoryId", "QuantityRequired", "UpdatedAt", "CurrentPrice"],
         [typeof(ProductSubAssemblyUsage)] = ["Id", "ProductId", "SubAssemblyId", "AuthoredField", "AuthoredValue"],

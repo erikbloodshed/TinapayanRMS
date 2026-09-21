@@ -307,16 +307,28 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         await empty.Should().ThrowAsync<InvalidOperationException>().WithMessage("*at least one line*");
     }
 
+    /// <summary>
+    /// A section goes in before how much of it a piece takes is known (2026-09-20), so the rule and the table's
+    /// check constraint both take 0; a negative piece size is still refused.
+    /// </summary>
     [Fact]
-    public async Task A_non_positive_piece_size_is_rejected()
+    public async Task A_section_saves_with_no_piece_size_yet_and_a_negative_one_is_rejected()
     {
         var roleId = await AddRoleAsync("Filling");
         var sugarId = await AddIngredientAsync("Sugar");
         var productId = await AddProductAsync("Ensaymada");
 
-        var act = () => SaveRecipeAsync(productId, new RecipeDraft([Owned(0, roleId, [(sugarId, 100m)], weightPerPiece: 0m)], []));
+        await SaveRecipeAsync(productId, new RecipeDraft([Owned(0, roleId, [(sugarId, 100m)], weightPerPiece: 0m)], []));
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*must be positive*");
+        await using (var dbContext = CreateDbContext())
+        {
+            var usage = await dbContext.ProductSubAssemblyUsages.SingleAsync(u => u.ProductId == productId, Cancellation);
+            usage.AuthoredValue.Should().Be(0m, "the section is in the recipe, waiting to be sized");
+        }
+
+        var negative = () => SaveRecipeAsync(productId, new RecipeDraft([Owned(0, roleId, [(sugarId, 100m)], weightPerPiece: -1m)], []));
+
+        await negative.Should().ThrowAsync<InvalidOperationException>().WithMessage("*can't be negative*");
     }
 
     [Fact]

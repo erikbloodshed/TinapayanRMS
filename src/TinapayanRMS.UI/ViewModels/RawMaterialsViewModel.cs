@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reactive.Linq;
 using DynamicData;
@@ -370,8 +370,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
     /// <summary>
     /// The Cost Buffer % box. Typing it works the buffered cost out afresh: the dearest brand, as the grid now is, with
-    /// the percent on top (nothing to work out from while no brand is priced). Loading a material sets
-    /// EditingCostBufferPercent itself, so the saved buffered cost stays as it was.
+    /// the percent on top (nothing to work out from while no brand is priced). The other way round, the % follows the
+    /// fixed amount over the dearest brand as prices are typed (UpdatePurchaseCostTexts).
     /// </summary>
     public decimal? TypedCostBufferPercent
     {
@@ -387,9 +387,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     /// <summary>
-    /// Purchased only: the fixed buffered cost per base unit, which brand prices don't move. Typed, worked out from the
-    /// dearest brand when the percent is typed, or by Recalculate; a cleared box saves as 0, which Save then works out
-    /// afresh from the prices (as for a material's first price).
+    /// Purchased only: the fixed buffered cost per base unit, which brand prices don't move (the Cost Buffer % follows
+    /// them instead). Typed, or worked out from the dearest brand when the percent is typed; a cleared box saves as 0,
+    /// which Save then works out afresh from the prices (as for a material's first price).
     /// </summary>
     private decimal? _editingBufferedCost;
     public decimal? EditingBufferedCost
@@ -441,11 +441,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         get => EditingBufferedCost is { } cost ? Math.Round(cost * BufferedCostUnitSize(), 2) : null;
         set
         {
+            // UpdatePurchaseCostTexts, which the change below reaches, works the % out from the new amount.
             EditingBufferedCost = value is { } typed ? typed / BufferedCostUnitSize() : null;
-            if (EditingBufferedCost is { } buffered && DearestLiveCost() is { } dearest)
-            {
-                EditingCostBufferPercent = Math.Round(RawMaterialRules.CostBufferPercentOf(dearest, buffered), 4);
-            }
         }
     }
 
@@ -529,9 +526,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>The summary header's big title: the material's name, or "New raw material".</summary>
     public string HeaderTitle => _headerTitle.Value;
 
-    private readonly ObservableAsPropertyHelper<string> _headerInitial;
-    public string HeaderInitial => _headerInitial.Value;
-
     private readonly ObservableAsPropertyHelper<string> _baseUnitName;
     /// <summary>The form's base unit name: "gram" for an ingredient, e.g. "centimeter" for ribbon.</summary>
     public string BaseUnitName => _baseUnitName.Value;
@@ -566,12 +560,36 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         private set => this.RaiseAndSetIfChanged(ref _headerCostUnitText, value);
     }
 
-    /// <summary>The latest price's date, or "—" for an unpriced or made material.</summary>
+    /// <summary>The day the material's cost last changed, or "—" for one whose cost has never moved.</summary>
     private string _lastUpdatedText = "—";
     public string LastUpdatedText
     {
         get => _lastUpdatedText;
         private set => this.RaiseAndSetIfChanged(ref _lastUpdatedText, value);
+    }
+
+
+    private decimal _bomTotalWeight;
+    /// <summary>
+    /// Made only: the batch's yield as the form has it, Σ BOM grams less the weight loss, so it follows the grid and
+    /// the Weight Loss % box as they're typed into. 0 while the BOM is empty.
+    /// </summary>
+    public decimal BomTotalWeight
+    {
+        get => _bomTotalWeight;
+        private set => this.RaiseAndSetIfChanged(ref _bomTotalWeight, value);
+    }
+
+    private decimal _bomTotalCost;
+    /// <summary>
+    /// Made only: what the form's BOM costs at its components' buffered costs — the sum of the grid's Cost column.
+    /// BomTotalCost ÷ BomTotalWeight is the buffered cost per gram Save stores, since a made ingredient adds no
+    /// buffer of its own, which is why the header shows the two beside Buffered Cost per g.
+    /// </summary>
+    public decimal BomTotalCost
+    {
+        get => _bomTotalCost;
+        private set => this.RaiseAndSetIfChanged(ref _bomTotalCost, value);
     }
 
     // Alternative Units: typed straight into the grid; Remove acts on the row picked.
@@ -647,7 +665,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     private decimal? _dearestPurchaseCost;
-    /// <summary>The dearest brand per base unit as the grid is typed into, which Recalculate puts the buffer on; null while unpriced.</summary>
+    /// <summary>The dearest brand per base unit as the grid is typed into, which the buffer percent goes on top of; null while unpriced.</summary>
     public decimal? DearestPurchaseCost
     {
         get => _dearestPurchaseCost;
@@ -718,7 +736,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public ReactiveCommand<RxVoid, RxVoid> CalculateExampleCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeletePriceCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveBrandPriceCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> RecalculateBufferCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveBomLineCommand { get; }
 
     /// <summary>
@@ -885,10 +902,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 material is null && string.IsNullOrWhiteSpace(name) ? "New raw material" : name)
             .ToProperty(this, x => x.HeaderTitle, "New raw material");
 
-        _headerInitial = this.WhenAnyValue(x => x.HeaderTitle)
-            .Select(title => string.IsNullOrWhiteSpace(title) ? "?" : title.Trim()[..1].ToUpperInvariant())
-            .ToProperty(this, x => x.HeaderInitial, "N");
-
         _baseUnitName = this.WhenAnyValue(x => x.EditingType, x => x.EditingBaseUnit,
                 (type, baseUnit) => BaseUnitText.NameOf(type, baseUnit))
             .ToProperty(this, x => x.BaseUnitName, "gram");
@@ -918,7 +931,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             .Where(_ => !IsRestoring)
             .Subscribe(_ => UpdatePurchaseCostTexts());
 
-        // Each brand's buffered price follows the fixed buffered cost. The percent doesn't move it: it only feeds Recalculate.
+        // Each brand's buffered price follows the fixed buffered cost. Only typing the percent moves the amount (TypedCostBufferPercent).
         this.WhenAnyValue(x => x.EditingBufferedCost, x => x.EditingCostBufferPercent)
             .Where(_ => !IsRestoring)
             .Subscribe(_ =>
@@ -948,10 +961,17 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 }
             });
 
-        // A made ingredient starts with no weight loss: 0%, which is what the empty box shows anyway.
+        // A made ingredient starts at 3% weight loss (2026-09-21, at the user's request: a small shrink is the
+        // normal case in the shop), and the box stays freely editable — typing 0 is a legitimate custom value.
+        // Only when the box is empty, so a saved material keeps what it was saved with.
         this.WhenAnyValue(x => x.EditingSource)
             .Where(source => source == RawMaterialSource.Made && !IsBusyApplying)
-            .Subscribe(_ => EditingWeightLossPercent ??= 0m);
+            .Subscribe(_ => EditingWeightLossPercent ??= 3m);
+
+        // The made-ingredient tiles follow the Weight Loss % box, which moves the yield the cost is spread over.
+        this.WhenAnyValue(x => x.EditingWeightLossPercent)
+            .Where(_ => !IsBusyApplying)
+            .Subscribe(_ => RecomputeBomTotals());
 
         // The alternative units and the purchase unit choices name the base unit, which a new
         // material can still change.
@@ -991,6 +1011,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             .Where(_ => !IsRestoring)
             .Subscribe(_ => IngredientLineRow.Resolve(BomLineEdits, Ingredients.ToDictionary(m => m.Id)));
 
+        // The header's Total Weight and Total Cost follow the BOM as it's typed into: Cost covers both a component
+        // picked and grams typed, as the sub-assembly form's batch totals do.
+        BomLineEdits.ToObservableChangeSet()
+            .AutoRefresh(l => l.Cost)
+            .Where(_ => !IsRestoring)
+            .Subscribe(_ => RecomputeBomTotals());
+
         this.WhenAnyValue(x => x.ExampleRawMaterial)
             .Where(_ => !IsRefreshing)
             .Subscribe(material => ReplaceExampleUnitOptions(material, kept: null));
@@ -1029,6 +1056,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId);
 
                 IngredientLineRow.Resolve(BomLineEdits, Ingredients.ToDictionary(m => m.Id));
+
+                // Resolve points each row at the refreshed component, so this is what carries a component repriced
+                // elsewhere into the header's totals: the change set above is suppressed while a refresh applies.
+                RecomputeBomTotals();
 
                 SelectedRawMaterial = RawMaterials.FirstOrDefault(m => m.Id == selectedId);
 
@@ -1224,11 +1255,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 DropUnusedAddedUnits(pickedRow: null);
             }),
             this.WhenAnyValue(x => x.SelectedBrandPriceRow).Select(row => row is not null));
-
-        // Re-initialises the fixed buffered cost from the dearest brand, as typed, with the buffer percent on top. Save keeps it.
-        RecalculateBufferCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => EditingBufferedCost = RawMaterialRules.BufferedCost(DearestPurchaseCost!.Value, EditingCostBufferPercent ?? 0m)),
-            this.WhenAnyValue(x => x.DearestPurchaseCost).Select(cost => cost is not null));
 
         RemoveBomLineCommand = ReactiveCommand.Create(
             () => AsUndoStep(() => BomLineEdits.Remove(SelectedBomLineEdit!)),
@@ -1435,6 +1461,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         IngredientLineRow.Resolve(BomLineEdits, Ingredients.ToDictionary(m => m.Id));
         RefreshBrandPriceRows();
         UpdatePurchaseCostTexts();
+        // Once, from the restored form: the change set and the Weight Loss % subscription are both suppressed while
+        // a restore applies, so without this the tiles would keep the figures from before the undo.
+        RecomputeBomTotals();
     }
 
     /// <summary>
@@ -1567,6 +1596,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private void ShowDetails(RawMaterial? material, RawMaterialDetail detail)
     {
         ReplacePriceHistory(material, detail.PriceHistory);
+        ShowUpdatedAt(material);
 
         BomLineEdits.Clear();
         BomLineEdits.AddRange(detail.BomLines.Select(l => new IngredientLineRow(l.ComponentIngredient!, l.Grams)));
@@ -1582,16 +1612,26 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         BufferedCostUnit = DearestBrandUnit();
         _detailMaterialId = material?.Id;
         AreDetailsReady = true;
+        RecomputeBomTotals();
     }
 
-    /// <summary>The Price History grid, newest first, and the header's Last Updated from its latest entry.</summary>
+    /// <summary>The Price History grid, newest first.</summary>
     private void ReplacePriceHistory(RawMaterial? material, IReadOnlyList<RawMaterialPriceHistory> entries)
     {
         var baseUnitName = material is null ? string.Empty : BaseUnitText.NameOf(material);
         PriceHistory.Clear();
         PriceHistory.AddRange(entries.Select(e => new RawMaterialPriceRow(e, baseUnitName)));
-        LastUpdatedText = PriceHistory.FirstOrDefault()?.Date.ToString("MMM d, yyyy", CultureInfo.CurrentCulture) ?? "—";
     }
+
+    /// <summary>
+    /// The Last Updated tile: the day the material's cost last changed, and nothing else (2026-09-21, at the
+    /// user's request, replacing a two-line tile that showed the save date over the cost date). Until CostUpdatedAt
+    /// was stored the tile read the newest price history entry's date, which a made or linked ingredient never
+    /// has, so it showed "—" for them however recently their cost had moved. The material also carries UpdatedAt,
+    /// the day the form last saved it; nothing shows it.
+    /// </summary>
+    private void ShowUpdatedAt(RawMaterial? material) =>
+        LastUpdatedText = material?.CostUpdatedAt?.ToString("MMM d, yyyy", CultureInfo.CurrentCulture) ?? "—";
 
     /// <summary>The form's alternative units, from <paramref name="material"/>'s saved ones (none for a new material).</summary>
     private void LoadUnitRows(RawMaterial? material)
@@ -1842,7 +1882,38 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         HeaderCostUnitText = BufferedCostUnit?.Abbreviation ?? BaseUnitAbbreviation;
         CurrentCostText = SelectedRawMaterial is { } material ? Format(material.CostPerBaseUnit) : "—";
-        BufferedCostText = SelectedRawMaterial is { } saved ? Format(saved.BufferedCostPerBaseUnit) : "—";
+
+        // A made ingredient's buffered cost follows the form's BOM instead of the saved row (2026-09-21, at the
+        // user's request), so the Total Cost and Total Weight tiles beside it always divide out to it as the grid
+        // is typed into; Save then stores the same figure. Every other material shows what was last saved.
+        BufferedCostText = IsEditingMade
+            ? Format(BomTotalWeight > 0 ? BomTotalCost / BomTotalWeight : 0m)
+            : SelectedRawMaterial is { } saved ? Format(saved.BufferedCostPerBaseUnit) : "—";
+    }
+
+    /// <summary>
+    /// The made-ingredient tiles, worked out from the FORM's BOM rows and Weight Loss % box: the yield comes from
+    /// IngredientBomRules.CalculateCost, the same formula IngredientCostPropagator saves with, so the tiles and the
+    /// stored cost can't drift apart, and the cost is the sum of the rows' own Cost — the grid's Cost column, at the
+    /// components' buffered costs. A row with no component picked counts for neither. Left alone until the details
+    /// are this material's (AreDetailsReady), since a pick loads the form before the grids.
+    /// </summary>
+    private void RecomputeBomTotals()
+    {
+        if (!AreDetailsReady)
+        {
+            return;
+        }
+
+        var (outputGrams, _) = IngredientBomRules.CalculateCost(
+            [.. BomLineEdits
+                .Where(l => l.Ingredient is not null)
+                .Select(l => (Grams: l.Grams ?? 0m, ComponentCostPerGram: l.Ingredient!.BufferedCostPerBaseUnit))],
+            EditingWeightLossPercent ?? 0m);
+
+        BomTotalWeight = outputGrams;
+        BomTotalCost = BomLineEdits.Sum(l => l.Cost);
+        UpdateHeaderCostTexts();
     }
 
     /// <summary>
@@ -1933,9 +2004,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         if (EditingBufferedCost is > 0 and var buffered)
         {
             var over = RawMaterialRules.CostBufferPercentOf(cost, buffered);
+            // The % box is what the fixed amount now comes to over the dearest brand, so a price change moves the % while
+            // the amount stays put (2026-09-21, at the user's request). Held to the 0-100 the box, the validator and the
+            // check constraint allow, so a buffer that's gone (or more than double) pins it; the line below and the
+            // warning say where it really stands. Typing the % still works the other way, through TypedCostBufferPercent.
+            EditingCostBufferPercent = Math.Clamp(Math.Round(over, 4), 0m, 100m);
             PurchaseBufferedCostText = $"₱{buffered * size:N2}/{unit} is {over:0.##}% over the dearest brand's ₱{cost * size:N2}/{unit}.";
             BufferedCostWarningText = buffered < cost
-                ? "The dearest brand now costs more than the buffered cost. Recalculate to put the buffer back on top."
+                ? "The dearest brand now costs more than the buffered cost. Type the Cost Buffer % again to put the buffer back on top."
                 : string.Empty;
         }
         else

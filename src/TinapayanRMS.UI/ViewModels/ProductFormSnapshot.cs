@@ -21,8 +21,8 @@ public readonly record struct RecipeTabChoice(RecipeTabKind Kind, int UsageIndex
 /// </summary>
 public readonly record struct IngredientLineState(int? IngredientId, decimal? Grams, bool IsFormulaBase, decimal? AuthoredBakersPercent);
 
-/// <summary>One packaging line, by material id for the same reason.</summary>
-public readonly record struct PackagingLineState(int? PackagingMaterialId, decimal? QtyPerUnit);
+/// <summary>One packaging line, by material id for the same reason, and by unit id for the unit it's entered in.</summary>
+public readonly record struct PackagingLineState(int? PackagingMaterialId, int? UnitId, decimal? QtyPerUnit);
 
 /// <summary>
 /// The Products screen's editable state at one instant: everything one undo step puts back, and nothing else.
@@ -67,7 +67,7 @@ public sealed record ProductFormSnapshot
     public required bool IsUsageFormOpen { get; init; }
     public required bool IsAddingUsage { get; init; }
     public required string UsageFormTitle { get; init; }
-    public required UsageFormModeOption UsageMode { get; init; }
+    public required UsageFormMode UsageMode { get; init; }
     public required bool IsFormEditingLines { get; init; }
     public required bool IsFormPickingSource { get; init; }
 

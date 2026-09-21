@@ -83,28 +83,34 @@ internal static class RawMaterialReads
         return lines;
     }
 
-    /// <summary>A packaging set's lines, in the order they were added, each with its material's details.</summary>
+    /// <summary>
+    /// A packaging set's lines, in the order they were added: each with its material's details, and the unit
+    /// the line is entered in.
+    /// </summary>
     public static async Task<IReadOnlyList<SubAssemblyPackagingLine>> GetSetLinesAsync(
         TinapayanRMSDbContext dbContext, int subAssemblyId, CancellationToken cancellationToken)
     {
-        var lines = (await dbContext.Connection().QueryAsync<SubAssemblyPackagingLine, RawMaterial, RawMaterialCategory, UnitOfMeasure?, SubAssemblyPackagingLine>(
+        var lines = (await dbContext.Connection().QueryAsync<SubAssemblyPackagingLine, RawMaterial, RawMaterialCategory, UnitOfMeasure?, RawMaterialUnit?, UnitOfMeasure?, SubAssemblyPackagingLine>(
             dbContext.Command(
                 $"""
-                SELECT {Columns.Of<SubAssemblyPackagingLine>("l")}, {MaterialColumns}
+                SELECT {Columns.Of<SubAssemblyPackagingLine>("l")}, {MaterialColumns}, {Columns.Of<RawMaterialUnit>("lu")}, {Columns.Of<UnitOfMeasure>("lum")}
                 FROM SubAssemblyPackagingLines l
                 JOIN RawMaterials m ON m.Id = l.PackagingMaterialId
                 {MaterialJoins}
+                LEFT JOIN RawMaterialUnits lu ON lu.Id = l.UnitId
+                LEFT JOIN UnitsOfMeasure lum ON lum.Id = lu.UnitOfMeasureId
                 WHERE l.SubAssemblyId = @subAssemblyId
                 ORDER BY l.Id
                 """,
                 new { subAssemblyId },
                 cancellationToken),
-            (line, material, category, baseUnit) =>
+            (line, material, category, baseUnit, unit, unitOfMeasure) =>
             {
                 line.PackagingMaterial = WithDetails(material, category, baseUnit);
+                line.Unit = unit is null ? null : WithUnitOfMeasure(unit, unitOfMeasure!);
                 return line;
             },
-            splitOn: "Id,Id,Id")).AsList();
+            splitOn: "Id,Id,Id,Id,Id")).AsList();
 
         await AttachUnitsAsync(dbContext, [.. lines.Select(l => l.PackagingMaterial!)], cancellationToken);
         return lines;

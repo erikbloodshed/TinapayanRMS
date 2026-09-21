@@ -132,7 +132,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box");
         var setId = await new SubAssemblyRepository(CreateDbContextFactory())
-            .SaveStandalonePackagingAsync(new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, 1m)], Cancellation);
+            .SaveStandalonePackagingAsync(new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
         var sourceId = await AddProductAsync("Big");
         await CreatePackagingLinkRepository().SetSubAssemblyLinkAsync(sourceId, setId, Cancellation);
 

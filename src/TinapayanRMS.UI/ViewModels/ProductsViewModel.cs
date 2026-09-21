@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Globalization;
 using System.Reactive.Disposables;
@@ -242,7 +242,11 @@ public sealed class ProductUsageEdit : ReactiveObject
         && AddIns.Zip(other.AddIns).All(pair => pair.First.Grams == pair.Second.Grams && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient));
 }
 
-/// <summary>Where the Add Sub-Assembly form's sub-assembly comes from.</summary>
+/// <summary>
+/// Where the sub-assembly being added comes from, picked on Add Sub-Assembly's drop-down
+/// (RecipeStructureCard) and carried by AddUsageCommand. New is the default, which is what a
+/// parameterless Execute() passes.
+/// </summary>
 public enum UsageFormMode
 {
     /// <summary>A new sub-assembly of the product's own.</summary>
@@ -253,16 +257,6 @@ public enum UsageFormMode
 
     /// <summary>A copy of an existing sub-assembly (another product's, or a standalone one), the product's own from then on.</summary>
     Copy,
-}
-
-public sealed record UsageFormModeOption(string Name, UsageFormMode Mode)
-{
-    public static IReadOnlyList<UsageFormModeOption> All { get; } =
-    [
-        new("New sub-assembly", UsageFormMode.New),
-        new("Link an existing one", UsageFormMode.Link),
-        new("Copy an existing one", UsageFormMode.Copy),
-    ];
 }
 
 /// <summary>
@@ -335,13 +329,13 @@ public sealed class ProductCostSummary
         LaborPercent = laborPercent;
         OverheadPercent = overheadPercent;
         AdministrativePercent = administrativePercent;
-        Labor = CostingRules.CalculateCostFromMaterialPercent(Material, laborPercent);
-        Overhead = CostingRules.CalculateCostFromMaterialPercent(Material, overheadPercent);
-        Administrative = CostingRules.CalculateCostFromMaterialPercent(Material, administrativePercent);
+        Labor = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, laborPercent);
+        Overhead = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, overheadPercent);
+        Administrative = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, administrativePercent);
         MarginPercent = marginPercent;
         VatPercent = vatPercent;
         (BaseCost, PreVatPrice, SellingPrice) = CostingRules.CalculateSellingPrice(
-            Material, laborPercent, overheadPercent, administrativePercent, marginPercent, vatPercent);
+            SubAssemblies, Packaging, laborPercent, overheadPercent, administrativePercent, marginPercent, vatPercent);
         CurrentPrice = currentPrice;
         CurrentMarkupPercent = currentPrice is { } price
             ? CostingRules.CalculateMarkupPercentFromPrice(BaseCost, price, vatPercent)
@@ -363,13 +357,13 @@ public sealed class ProductCostSummary
 
     public decimal AdministrativePercent { get; }
 
-    /// <summary>The labor cost per sellable unit, in pesos: LaborPercent of the material cost.</summary>
+    /// <summary>The labor cost per sellable unit, in pesos: LaborPercent of the sub-assembly cost.</summary>
     public decimal Labor { get; }
 
-    /// <summary>The overhead cost per sellable unit, in pesos: OverheadPercent of the material cost.</summary>
+    /// <summary>The overhead cost per sellable unit, in pesos: OverheadPercent of the sub-assembly cost.</summary>
     public decimal Overhead { get; }
 
-    /// <summary>The administrative cost per sellable unit, in pesos: AdministrativePercent of the material cost.</summary>
+    /// <summary>The administrative cost per sellable unit, in pesos: AdministrativePercent of the sub-assembly cost.</summary>
     public decimal Administrative { get; }
 
     /// <summary>The subtotal the markup goes on: materials, labor, overhead and administrative.</summary>
@@ -598,7 +592,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// or a packaging source for a link or a copy. It then shows the packaging table in place of the ingredients, add-ins
     /// and piece size, and Apply fills the Packaging tab.
     /// </summary>
-    public bool IsFormPackaging => IsAddingUsage && EditingUsageMode.Mode switch
+    public bool IsFormPackaging => IsAddingUsage && EditingUsageMode switch
     {
         UsageFormMode.Link => EditingUsageSource?.IsPackaging == true,
         UsageFormMode.Copy => EditingUsageSource is { } source ? source.IsPackaging : EditingUsageRole?.IsPackaging == true,
@@ -606,9 +600,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     };
 
     /// <summary>The form's packaging table can be typed into: a new or copied packaging, not a link.</summary>
-    public bool IsFormEditingPackaging => IsFormPackaging && EditingUsageMode.Mode != UsageFormMode.Link;
-
-    public IReadOnlyList<UsageFormModeOption> UsageFormModes { get; } = UsageFormModeOption.All;
+    public bool IsFormEditingPackaging => IsFormPackaging && EditingUsageMode != UsageFormMode.Link;
 
     /// <summary>
     /// Other products' sub-assemblies the form can link or copy. Linking leaves out the ones the recipe
@@ -737,10 +729,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// <summary>The header's title, and the usage example's: the product's name, or "New product".</summary>
     public string HeaderTitle => _headerTitle.Value;
 
-    private readonly ObservableAsPropertyHelper<string> _headerInitial;
-    /// <summary>The header tile's letter: the title's first.</summary>
-    public string HeaderInitial => _headerInitial.Value;
-
     private readonly ObservableAsPropertyHelper<string> _descriptionLinkText;
     /// <summary>The link under the header's title: the description, or "Add description" while there's none.</summary>
     public string DescriptionLinkText => _descriptionLinkText.Value;
@@ -850,7 +838,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _isUsageFormOpen, value);
     }
 
-    private string _usageFormTitle = "Add Sub-Assembly";
+    private string _usageFormTitle = "New sub-assembly";
     public string UsageFormTitle
     {
         get => _usageFormTitle;
@@ -865,8 +853,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _isAddingUsage, value);
     }
 
-    private UsageFormModeOption _editingUsageMode = UsageFormModeOption.All[0];
-    public UsageFormModeOption EditingUsageMode
+    private UsageFormMode _editingUsageMode;
+    /// <summary>Which way the add form takes its sub-assembly: what Add Sub-Assembly's drop-down picked.</summary>
+    public UsageFormMode EditingUsageMode
     {
         get => _editingUsageMode;
         set => this.RaiseAndSetIfChanged(ref _editingUsageMode, value);
@@ -1146,7 +1135,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// Output: the name typed for the new category, or null if it was cancelled. The View shows a TextPromptWindow.
     /// </summary>
     public Interaction<(string Label, string InitialValue), string?> PromptForNewCategory { get; } = new();
-    public ReactiveCommand<RxVoid, RxVoid> AddUsageCommand { get; }
+
+    /// <summary>Adds a sub-assembly the way the parameter says: Add Sub-Assembly's drop-down carries one item per way.</summary>
+    public ReactiveCommand<UsageFormMode, RxVoid> AddUsageCommand { get; }
     public ReactiveCommand<ProductUsageEdit, RxVoid> EditUsageCommand { get; }
     public ReactiveCommand<ProductUsageEdit, RxVoid> MakeCopyCommand { get; }
 
@@ -1255,10 +1246,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         _headerTitle = this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingName, (product, name) =>
                 product is null && string.IsNullOrWhiteSpace(name) ? "New product" : name)
             .ToProperty(this, x => x.HeaderTitle, "New product");
-
-        _headerInitial = this.WhenAnyValue(x => x.HeaderTitle)
-            .Select(title => string.IsNullOrWhiteSpace(title) ? "?" : title.Trim()[..1].ToUpperInvariant())
-            .ToProperty(this, x => x.HeaderInitial, "N");
 
         _descriptionLinkText = this.WhenAnyValue(x => x.EditingDescription)
             .Select(description => string.IsNullOrWhiteSpace(description) ? "Add description" : description.Trim())
@@ -1673,9 +1660,24 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         // add form in it, which also adds the packaging (the Packaging role, or a packaging source to link or copy). The form
         // showing is applied first, as leaving its tab would apply it; one a rule refuses keeps its tab, with the
         // message, and nothing opens. The tab goes again once another shows (RecipeTabShown).
-        AddUsageCommand = ReactiveCommand.Create(
-            () =>
+        //
+        // Its parameter is the way in, one per item on the drop-down. The tab is shown first and the mode set after:
+        // showing it starts the form in New (RecipeTabShown), and the mode landing on it starts the form again for a
+        // Link or a Copy (the EditingUsageMode subscription), so one path serves all three, in one undo step.
+        //
+        // The button stays live on the add tab, since the drop-down is the only place the way in can be changed now
+        // that the form has no picker of its own. An item picked over an add form nothing was entered in only changes
+        // its way, keeping the tab; over one already typed into it does what a second Add Sub-Assembly always did —
+        // applies what's there and starts another, in the way picked.
+        AddUsageCommand = ReactiveCommand.Create<UsageFormMode>(
+            mode =>
             {
+                if (SelectedRecipeTab is AddSubAssemblyRecipeTab && IsUsageFormUntouched())
+                {
+                    AsUndoStep(() => EditingUsageMode = mode);
+                    return;
+                }
+
                 if (!CommitUsageFormOnLeave())
                 {
                     return;
@@ -1689,9 +1691,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
                     }
 
                     SelectRecipeTab(AddSubAssemblyTab);
+                    EditingUsageMode = mode;
                 });
-            },
-            this.WhenAnyValue(x => x.SelectedRecipeTab).Select(tab => tab is not AddSubAssemblyRecipeTab));
+            });
 
         // A sub-assembly's tab is its form, so editing one is just showing its tab (RecipeTabShown opens the form).
         EditUsageCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => SelectRecipeTab(TabFor(usage)));
@@ -2173,7 +2175,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     private static IngredientLineState CaptureIngredientLine(IngredientLineRow row) =>
         new(row.IngredientId, row.Grams, row.IsFormulaBase, row.AuthoredBakersPercent);
 
-    private static PackagingLineState CaptureLine(PackagingLineRow row) => new(row.PackagingMaterialId, row.QtyPerUnit);
+    private static PackagingLineState CaptureLine(PackagingLineRow row) => new(row.PackagingMaterialId, row.UnitId, row.QtyPerUnit);
 
     private RecipeTabChoice CaptureTabChoice() => SelectedRecipeTab switch
     {
@@ -2340,8 +2342,15 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         }
     }
 
+    // The material goes on first: it brings the units the row can be in, and a key it doesn't offer falls back
+    // to the base unit, which would drop a restored unit set the other way round.
     private PackagingLineRow RestoreLine(PackagingLineState state) =>
-        new(FindPackagingMaterial) { PackagingMaterialId = state.PackagingMaterialId, QtyPerUnit = state.QtyPerUnit };
+        new(FindPackagingMaterial)
+        {
+            PackagingMaterialId = state.PackagingMaterialId,
+            UnitKey = state.UnitId ?? PackagingUnitChoice.BaseUnitKey,
+            QtyPerUnit = state.QtyPerUnit,
+        };
 
     /// <summary>
     /// Makes UsageEdits hold <paramref name="sections"/>, section for section and in place: each tab stays and shows its
@@ -2407,15 +2416,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     }
 
     /// <summary>
-    /// A packaging line as a table row, its quantity in the material's base unit. A line saved before it was (in an
-    /// alternative unit, or as pieces per unit) shows as that, at the same cost, and is saved that way once the
-    /// packaging changes.
+    /// A packaging line as a table row, its quantity in the unit it was entered in. A line saved as pieces per unit
+    /// shows as the quantity it comes to, at the same cost, and is saved that way once the packaging changes.
     /// </summary>
     private static PackagingLineRow ToPackagingRow(PackagingLine line)
     {
         var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? line.QtyPerUnit : line.UnitsPerPackagingUnit;
         var qtyPerUnit = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerUnit;
-        return new PackagingLineRow(line.PackagingMaterial!, UnitConversionRules.ToBaseQuantity(qtyPerUnit, line.Unit?.BaseUnitsPerUnit));
+        return new PackagingLineRow(line.PackagingMaterial!, qtyPerUnit, line.UnitId);
     }
 
     private void SetCosting(CostingParameters? costing)
@@ -2452,9 +2460,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         }
     }
 
-    /// <summary>The packaging lines as Save writes them, in each material's base unit; a line half filled in is refused (PackagingLineRow.CompleteLines).</summary>
+    /// <summary>The packaging lines as Save writes them, each in the unit it was typed in; a line half filled in is refused (PackagingLineRow.CompleteLines).</summary>
     private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> CurrentLines() =>
-        [.. PackagingLineRow.CompleteLines(LineEdits).Select(l => (l.PackagingMaterial.Id, (int?)null, PackagingLineAuthoredField.QtyPerUnit, l.QtyPerUnit))];
+        [.. PackagingLineRow.CompleteLines(LineEdits).Select(l => (l.PackagingMaterial.Id, l.UnitId, PackagingLineAuthoredField.QtyPerUnit, l.QtyPerUnit))];
 
     /// <summary>The recipe as Save writes it: the product's own sub-assemblies with their lines, and the ones it links.</summary>
     private RecipeDraft CurrentRecipe() =>
@@ -2527,9 +2535,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// <summary>The add form, fresh for its mode: a new sub-assembly's name, role and lines, or the pick of another product's.</summary>
     private void StartUsageFormMode()
     {
-        var mode = EditingUsageMode.Mode;
+        var mode = EditingUsageMode;
         IsFormEditingLines = mode != UsageFormMode.Link;
         IsFormPickingSource = mode != UsageFormMode.New;
+
+        // The title is the one thing on the form that says which way in was picked, now that the picker that used to
+        // say it is on Add Sub-Assembly's drop-down instead. Set here, not in StartAddingUsage, so it follows another
+        // item picked while the form is open.
+        UsageFormTitle = mode switch
+        {
+            UsageFormMode.Link => "Link an existing sub-assembly",
+            UsageFormMode.Copy => "Copy an existing sub-assembly",
+            _ => "New sub-assembly",
+        };
         FormLines.Clear();
         FormAddIns.Clear();
         FormPackagingLines.Clear();
@@ -2560,7 +2578,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         {
             packagingRows = packaging.SubAssemblyId is { } setId
                 ? [.. (await _subAssemblyRepository.GetPackagingLinesAsync(setId, cancellationToken))
-                    .Select(l => new PackagingLineRow(FindPackagingMaterial(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet))]
+                    .Select(l => new PackagingLineRow(FindPackagingMaterial(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId))]
                 : [.. (await _packagingLineRepository.GetEffectiveForProductAsync(packaging.ProductId!.Value, cancellationToken)).Select(ToPackagingRow)];
         }
         else if (source?.SubAssembly is { } subAssembly)
@@ -2584,7 +2602,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         FormPackagingLines.AddRange(packagingRows);
 
         // A copy takes its source's role and name; packaging, the Packaging role.
-        if (EditingUsageMode.Mode == UsageFormMode.Copy && source is not null)
+        if (EditingUsageMode == UsageFormMode.Copy && source is not null)
         {
             EditingUsageRole = source.IsPackaging
                 ? FormRoleOptions.FirstOrDefault(r => r.IsPackaging) ?? EditingUsageRole
@@ -2608,7 +2626,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// </summary>
     private PackagingRecipeTab ApplyPackagingForm()
     {
-        var linking = EditingUsageMode.Mode == UsageFormMode.Link;
+        var linking = EditingUsageMode == UsageFormMode.Link;
         var target = EditingUsageSource?.PackagingTarget;
         if (linking && target is null)
         {
@@ -2644,7 +2662,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
 
         if (EditingUsage is { IsLinked: true } linked)
         {
-            EnsurePieceSizeEntered(authoredValue, linked.DisplayName);
             usage = linked.WithPieceSizeAndAddIns(_usageAuthoredField, authoredValue, CompleteAddIns(linked.DisplayName, linked.Lines));
         }
         else if (IsFormEditingLines)
@@ -2658,8 +2675,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
                 throw new InvalidOperationException($"Add the ingredients that go into the {role.Name}, in grams.");
             }
 
-            EnsurePieceSizeEntered(authoredValue, role.Name);
-
             usage = new ProductUsageEdit(
                 EditingUsage?.SubAssemblyId ?? 0, role, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], _usageAuthoredField, authoredValue, ownerName: null, standaloneName: null, EditingUsage?.LinkedBy ?? [], name: EditingUsageName);
         }
@@ -2668,7 +2683,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             var source = EditingUsageSource?.SubAssembly
                 ?? throw new InvalidOperationException("Pick the sub-assembly to link, or cancel the form.");
             var sourceName = SubAssemblyRules.DisplayName(source);
-            EnsurePieceSizeEntered(authoredValue, sourceName);
 
             // The table's read-only lines are the ones LoadUsageSourceAsync loaded for this very pick; a pick
             // whose lines are still on their way has none yet, and linking it would make a batch of nothing.
@@ -2817,14 +2831,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         }
     }
 
-    private static void EnsurePieceSizeEntered(decimal authoredValue, string name)
-    {
-        if (authoredValue <= 0)
-        {
-            throw new InvalidOperationException($"Enter how many grams of {name} go into one piece, or how many pieces a batch makes.");
-        }
-    }
-
     private void CloseUsageForm()
     {
         IsUsageFormOpen = false;
@@ -2855,13 +2861,15 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         IsUsageFormOpen = true;
     }
 
-    /// <summary>A fresh form to add a sub-assembly, in place of any the form had open.</summary>
+    /// <summary>
+    /// A fresh form to add a sub-assembly, in place of any the form had open. It starts in New, and AddUsageCommand
+    /// sets the way its drop-down item asked for straight after, which starts the form again in it.
+    /// </summary>
     private void StartAddingUsage()
     {
         EditingUsage = null;
-        UsageFormTitle = "Add Sub-Assembly";
         IsAddingUsage = true;
-        EditingUsageMode = UsageFormModeOption.All[0];
+        EditingUsageMode = UsageFormMode.New;
         IsUsageFormOpen = true;
         StartUsageFormMode();
     }
@@ -2980,8 +2988,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         var (weightPerPiece, _) = ProductRules.ResolvePieceSize(_usageAuthoredField, authoredValue, totalWeight);
 
         UsageFormTotalWeightText = $"{totalWeight:#,0.##} g";
+        // Neither figure is needed to put the section in (ProductRules.EnsureValidUsages), so with none typed the
+        // caption says what that costs: nothing per piece, until one is.
         UsageFormPieceSizeCaption = authoredValue <= 0
-            ? "Type the weight per piece or the yield; the other is worked out."
+            ? "Type the weight per piece or the yield; the other is worked out. Until then this section costs nothing per piece."
             : _usageAuthoredField == UsageAuthoredField.WeightPerPiece
                 ? $"Weight per piece stays at {authoredValue:#,0.##} g if the batch changes."
                 : $"The yield stays at {authoredValue:#,0.##} pieces if the batch changes.";
@@ -3259,7 +3269,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// </summary>
     private void RefreshLinkableOptions()
     {
-        var linking = EditingUsageMode.Mode == UsageFormMode.Link;
+        var linking = EditingUsageMode == UsageFormMode.Link;
         var usedIds = UsageEdits.Select(u => u.SubAssemblyId).ToHashSet();
 
         // A new product has no id yet, and a standalone sub-assembly no owner: that isn't a match. Packaging comes after

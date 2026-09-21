@@ -37,9 +37,10 @@ public static class SubAssemblyRules
 
     /// <summary>
     /// A packaging set needs at least one line, a positive quantity per set, and no material used twice. The
-    /// materials' type is checked where they're loaded (RawMaterialRules.EnsureUsableAsPackaging).
+    /// materials' type is checked where they're loaded (RawMaterialRules.EnsureUsableAsPackaging), and each
+    /// line's unit is checked there too: it must be one of that material's own units, or null for its base unit.
     /// </summary>
-    public static void EnsureValidPackagingLines(IReadOnlyList<(int PackagingMaterialId, decimal QtyPerSet)> lines)
+    public static void EnsureValidPackagingLines(IReadOnlyList<(int PackagingMaterialId, int? UnitId, decimal QtyPerSet)> lines)
     {
         if (lines.Count == 0)
         {

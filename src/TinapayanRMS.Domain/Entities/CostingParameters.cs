@@ -12,13 +12,13 @@ public class CostingParameters
 
     public Product? Product { get; set; }
 
-    /// <summary>Labor cost, as a percentage of the material cost per piece (sub-assemblies and packaging).</summary>
+    /// <summary>Labor cost, as a percentage of the sub-assembly (ingredient) cost per piece; packaging isn't in the base.</summary>
     public decimal LaborPercent { get; set; }
 
-    /// <summary>Overhead cost, as a percentage of the material cost per piece.</summary>
+    /// <summary>Overhead cost, as a percentage of the sub-assembly cost per piece.</summary>
     public decimal OverheadPercent { get; set; }
 
-    /// <summary>Administrative cost (office, permits, bookkeeping and the like), as a percentage of the material cost per piece.</summary>
+    /// <summary>Administrative cost (office, permits, bookkeeping and the like), as a percentage of the sub-assembly cost per piece.</summary>
     public decimal AdministrativePercent { get; set; }
 
     /// <summary>Markup on cost (materials + labor + overhead + administrative), as a percentage.</summary>

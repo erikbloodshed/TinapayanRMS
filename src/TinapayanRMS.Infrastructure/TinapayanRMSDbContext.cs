@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure;
@@ -51,6 +51,48 @@ public class TinapayanRMSDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TinapayanRMSDbContext).Assembly);
+    }
+
+    /// <summary>
+    /// Stamps <see cref="RawMaterial.CostUpdatedAt"/> on every material whose stored cost this save actually
+    /// changes. It lives here rather than in each repository because a cost is written from many places — a brand
+    /// price, a buffer or buffered-cost edit, a BOM or weight-loss edit, a unit multiplier correction, and the
+    /// cascade reaching a made or linked ingredient from a component — and a new one would be easy to forget.
+    /// Comparing the original values means a save that leaves the cost alone leaves the date alone too.
+    /// </summary>
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        StampCostUpdatedAt();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        StampCostUpdatedAt();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    private void StampCostUpdatedAt()
+    {
+        var now = DateTime.Now;
+        foreach (var entry in ChangeTracker.Entries<RawMaterial>())
+        {
+            var costChanged = entry.State switch
+            {
+                EntityState.Added => entry.Entity.CostPerBaseUnit != 0m || entry.Entity.BufferedCostPerBaseUnit != 0m,
+                EntityState.Modified =>
+                    entry.Property(m => m.CostPerBaseUnit).IsModified
+                        && !Equals(entry.Property(m => m.CostPerBaseUnit).OriginalValue, entry.Entity.CostPerBaseUnit)
+                    || entry.Property(m => m.BufferedCostPerBaseUnit).IsModified
+                        && !Equals(entry.Property(m => m.BufferedCostPerBaseUnit).OriginalValue, entry.Entity.BufferedCostPerBaseUnit),
+                _ => false,
+            };
+
+            if (costChanged)
+            {
+                entry.Entity.CostUpdatedAt = now;
+            }
+        }
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

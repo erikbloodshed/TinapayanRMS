@@ -261,7 +261,7 @@ public class SubAssemblyRulesTests
     [Fact]
     public void EnsureValidPackagingLines_accepts_distinct_positive_lines()
     {
-        var act = () => SubAssemblyRules.EnsureValidPackagingLines([(1, 1m), (2, 30m)]);
+        var act = () => SubAssemblyRules.EnsureValidPackagingLines([(1, null, 1m), (2, null, 30m)]);
 
         act.Should().NotThrow();
     }
@@ -271,7 +271,7 @@ public class SubAssemblyRulesTests
     [InlineData(-1)]
     public void EnsureValidPackagingLines_rejects_a_quantity_that_isnt_positive(int qty)
     {
-        var act = () => SubAssemblyRules.EnsureValidPackagingLines([(1, qty)]);
+        var act = () => SubAssemblyRules.EnsureValidPackagingLines([(1, null, qty)]);
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*quantity must be positive*");
     }
@@ -280,7 +280,7 @@ public class SubAssemblyRulesTests
     public void EnsureValidPackagingLines_rejects_no_lines_and_a_material_twice()
     {
         var none = () => SubAssemblyRules.EnsureValidPackagingLines([]);
-        var twice = () => SubAssemblyRules.EnsureValidPackagingLines([(1, 1m), (1, 2m)]);
+        var twice = () => SubAssemblyRules.EnsureValidPackagingLines([(1, null, 1m), (1, null, 2m)]);
 
         none.Should().Throw<InvalidOperationException>().WithMessage("*at least one line*");
         twice.Should().Throw<InvalidOperationException>().WithMessage("*same material more than once*");

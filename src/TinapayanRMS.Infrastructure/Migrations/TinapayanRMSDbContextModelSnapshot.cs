@@ -290,7 +290,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     b.ToTable("ProductSubAssemblyUsages", t =>
                         {
-                            t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "[AuthoredValue] > 0");
+                            t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "[AuthoredValue] >= 0");
                         });
                 });
 
@@ -324,6 +324,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
+                    b.Property<DateTime?>("CostUpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int?>("LinkedToId")
                         .HasColumnType("int");
 
@@ -341,6 +344,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<decimal?>("WeightLossPercent")
                         .HasPrecision(18, 4)
@@ -591,9 +597,14 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Property<int>("SubAssemblyId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("UnitId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PackagingMaterialId");
+
+                    b.HasIndex("UnitId");
 
                     b.HasIndex("SubAssemblyId", "PackagingMaterialId")
                         .IsUnique();
@@ -973,9 +984,16 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("TinapayanRMS.Domain.Entities.RawMaterialUnit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("PackagingMaterial");
 
                     b.Navigation("SubAssembly");
+
+                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.UsageAddInLine", b =>

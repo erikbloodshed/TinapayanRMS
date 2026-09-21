@@ -156,12 +156,15 @@ public class ReportsViewModel : ReactiveObject
                 .ToList();
 
             // Per sellable unit, as the Products screen prices it: the pieces that unit holds at the recipe's
-            // cost per piece, plus the packaging that wraps the whole unit.
-            var materialCost = ProductRules.CalculateMaterialCost(usageCosts, product.QuantityRequired, packagingCosts);
+            // cost per piece, and the packaging that wraps the whole unit. The two stay apart because labor,
+            // overhead and administrative are percentages of the sub-assemblies alone.
+            var subAssemblyCost = usageCosts.Sum() * product.QuantityRequired;
+            var packagingCost = packagingCosts.Sum();
 
             var costingParameters = await _costingParametersRepository.GetForProductAsync(product.Id, CancellationToken.None);
             var (baseCost, _, sellingPrice) = CostingRules.CalculateSellingPrice(
-                materialCost,
+                subAssemblyCost,
+                packagingCost,
                 costingParameters?.LaborPercent ?? 0m,
                 costingParameters?.OverheadPercent ?? 0m,
                 costingParameters?.AdministrativePercent ?? 0m,

@@ -22,6 +22,8 @@ public class ProductSubAssemblyUsageConfiguration : IEntityTypeConfiguration<Pro
 
         builder.HasIndex(u => new { u.ProductId, u.SubAssemblyId }).IsUnique();
 
-        builder.ToTable(t => t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "[AuthoredValue] > 0"));
+        // 0 means "not sized yet": a section goes into the recipe before how much of it a piece takes is
+        // known (ProductRules.EnsureValidUsages). Only a negative piece size is refused.
+        builder.ToTable(t => t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "[AuthoredValue] >= 0"));
     }
 }

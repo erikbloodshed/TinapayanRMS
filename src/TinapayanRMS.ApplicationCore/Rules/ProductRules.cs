@@ -6,14 +6,16 @@ public static class ProductRules
 {
     /// <summary>
     /// A product's whole set of usages: an empty set is valid (PLAN.md doesn't require a product to
-    /// have a usage at all times), but every typed piece size must be positive, and a product uses each
-    /// sub-assembly once.
+    /// have a usage at all times), and so is a piece size of 0 — a section can go into the recipe before
+    /// anyone knows how much of it a piece takes (2026-09-20, at the user's request), and until it's
+    /// known the section costs the product nothing per piece (ResolvePieceSize, CalculateUsageCostPerPiece).
+    /// A negative piece size is still nonsense, and a product uses each sub-assembly once.
     /// </summary>
     public static void EnsureValidUsages(IReadOnlyList<(int SubAssemblyId, decimal AuthoredValue)> usages)
     {
-        if (usages.Any(u => u.AuthoredValue <= 0))
+        if (usages.Any(u => u.AuthoredValue < 0))
         {
-            throw new InvalidOperationException("A sub-assembly's weight per piece or yield must be positive.");
+            throw new InvalidOperationException("A sub-assembly's weight per piece or yield can't be negative.");
         }
 
         if (usages.Select(u => u.SubAssemblyId).Distinct().Count() != usages.Count)

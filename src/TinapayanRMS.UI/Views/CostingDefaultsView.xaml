@@ -35,20 +35,20 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="Labor %" Style="{StaticResource FieldLabelStyle}" ToolTip="Of the material cost per piece" />
+                    <TextBlock Text="Labor %" Style="{StaticResource FieldLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece" />
                     <syncfusion:DoubleTextBox Grid.Row="1"
                                               Margin="0,0,0,12"
                                               MinValue="0"
                                               Value="{Binding EditingLaborPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Column="2" Text="Overhead %" Style="{StaticResource FieldLabelStyle}" ToolTip="Of the material cost per piece" />
+                    <TextBlock Grid.Column="2" Text="Overhead %" Style="{StaticResource FieldLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece" />
                     <syncfusion:DoubleTextBox Grid.Row="1"
                                               Grid.Column="2"
                                               Margin="0,0,0,12"
                                               MinValue="0"
                                               Value="{Binding EditingOverheadPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="2" Text="Administrative %" Style="{StaticResource FieldLabelStyle}" ToolTip="Of the material cost per piece: office, permits, bookkeeping" />
+                    <TextBlock Grid.Row="2" Text="Administrative %" Style="{StaticResource FieldLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece: office, permits, bookkeeping" />
                     <syncfusion:DoubleTextBox Grid.Row="3"
                                               Margin="0,0,0,12"
                                               MinValue="0"

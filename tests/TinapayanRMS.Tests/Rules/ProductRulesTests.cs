@@ -16,11 +16,20 @@ public class ProductRulesTests
     }
 
     [Fact]
-    public void EnsureValidUsages_rejects_a_non_positive_piece_size()
+    public void EnsureValidUsages_accepts_a_section_that_has_no_piece_size_yet()
     {
+        // 0 is "not sized yet": a section goes into the recipe before how much of it a piece takes is known.
         var act = () => ProductRules.EnsureValidUsages([(SubAssemblyId: 1, AuthoredValue: 0m)]);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureValidUsages_rejects_a_negative_piece_size()
+    {
+        var act = () => ProductRules.EnsureValidUsages([(SubAssemblyId: 1, AuthoredValue: -1m)]);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*can't be negative*");
     }
 
     [Fact]

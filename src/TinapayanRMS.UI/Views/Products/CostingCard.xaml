@@ -63,7 +63,7 @@
             <StackPanel>
                 <Border Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource LaborTileBrush}">
                     <StackPanel>
-                        <TextBlock Text="Labor %" Style="{StaticResource FieldLabelStyle}" ToolTip="{Binding CostUnitCaption, StringFormat='Of the material cost. {0}.'}" />
+                        <TextBlock Text="Labor %" Style="{StaticResource FieldLabelStyle}" ToolTip="{Binding CostUnitCaption, StringFormat='Of the sub-assemblies (ingredients) cost, packaging not included. {0}.'}" />
                         <syncfusion:DoubleTextBox Value="{Binding EditingLaborPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
                         <TextBlock Style="{StaticResource TileCaptionStyle}">
                             <Run Text="{Binding Costs.Labor, StringFormat='₱{0:N4}', Mode=OneWay}" /><Run Text="{Binding Costs.LaborShare, StringFormat=' · {0:N1}% of the price', Mode=OneWay}" />
@@ -73,7 +73,7 @@
 
                 <Border Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource OverheadTileBrush}">
                     <StackPanel>
-                        <TextBlock Text="Overhead %" Style="{StaticResource FieldLabelStyle}" ToolTip="{Binding CostUnitCaption, StringFormat='Of the material cost. {0}.'}" />
+                        <TextBlock Text="Overhead %" Style="{StaticResource FieldLabelStyle}" ToolTip="{Binding CostUnitCaption, StringFormat='Of the sub-assemblies (ingredients) cost, packaging not included. {0}.'}" />
                         <syncfusion:DoubleTextBox Value="{Binding EditingOverheadPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
                         <TextBlock Style="{StaticResource TileCaptionStyle}">
                             <Run Text="{Binding Costs.Overhead, StringFormat='₱{0:N4}', Mode=OneWay}" /><Run Text="{Binding Costs.OverheadShare, StringFormat=' · {0:N1}% of the price', Mode=OneWay}" />
@@ -83,7 +83,7 @@
 
                 <Border Style="{StaticResource CostTileStyle}" BorderBrush="{StaticResource AdministrativeTileBrush}">
                     <StackPanel>
-                        <TextBlock Text="Administrative %" Style="{StaticResource FieldLabelStyle}" ToolTip="{Binding CostUnitCaption, StringFormat='Of the material cost: office, permits, bookkeeping. {0}.'}" />
+                        <TextBlock Text="Administrative %" Style="{StaticResource FieldLabelStyle}" ToolTip="{Binding CostUnitCaption, StringFormat='Of the sub-assemblies (ingredients) cost, packaging not included: office, permits, bookkeeping. {0}.'}" />
                         <syncfusion:DoubleTextBox Value="{Binding EditingAdministrativePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
                         <TextBlock Style="{StaticResource TileCaptionStyle}">
                             <Run Text="{Binding Costs.Administrative, StringFormat='₱{0:N4}', Mode=OneWay}" /><Run Text="{Binding Costs.AdministrativeShare, StringFormat=' · {0:N1}% of the price', Mode=OneWay}" />
@@ -151,21 +151,21 @@
 
                 <Border Grid.Row="3" Style="{StaticResource RowRuleStyle}" />
                 <TextBlock Grid.Row="3" Style="{StaticResource LabelCellStyle}">
-                    <Run Text="Labor (" /><Run Text="{Binding Costs.LaborPercent, StringFormat='{}{0:0.##}', Mode=OneWay}" /><Run Text="% of materials)" />
+                    <Run Text="Labor (" /><Run Text="{Binding Costs.LaborPercent, StringFormat='{}{0:0.##}', Mode=OneWay}" /><Run Text="% of sub-assemblies)" />
                 </TextBlock>
                 <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Costs.Labor, StringFormat='₱{0:N4}'}" Style="{StaticResource AmountCellStyle}" />
                 <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding Costs.LaborShare, StringFormat='{}{0:N1}%'}" Style="{StaticResource ShareCellStyle}" />
 
                 <Border Grid.Row="4" Style="{StaticResource RowRuleStyle}" />
                 <TextBlock Grid.Row="4" Style="{StaticResource LabelCellStyle}">
-                    <Run Text="Overhead (" /><Run Text="{Binding Costs.OverheadPercent, StringFormat='{}{0:0.##}', Mode=OneWay}" /><Run Text="% of materials)" />
+                    <Run Text="Overhead (" /><Run Text="{Binding Costs.OverheadPercent, StringFormat='{}{0:0.##}', Mode=OneWay}" /><Run Text="% of sub-assemblies)" />
                 </TextBlock>
                 <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Costs.Overhead, StringFormat='₱{0:N4}'}" Style="{StaticResource AmountCellStyle}" />
                 <TextBlock Grid.Row="4" Grid.Column="2" Text="{Binding Costs.OverheadShare, StringFormat='{}{0:N1}%'}" Style="{StaticResource ShareCellStyle}" />
 
                 <Border Grid.Row="5" Style="{StaticResource RowRuleStyle}" />
                 <TextBlock Grid.Row="5" Style="{StaticResource LabelCellStyle}">
-                    <Run Text="Administrative (" /><Run Text="{Binding Costs.AdministrativePercent, StringFormat='{}{0:0.##}', Mode=OneWay}" /><Run Text="% of materials)" />
+                    <Run Text="Administrative (" /><Run Text="{Binding Costs.AdministrativePercent, StringFormat='{}{0:0.##}', Mode=OneWay}" /><Run Text="% of sub-assemblies)" />
                 </TextBlock>
                 <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Costs.Administrative, StringFormat='₱{0:N4}'}" Style="{StaticResource AmountCellStyle}" />
                 <TextBlock Grid.Row="5" Grid.Column="2" Text="{Binding Costs.AdministrativeShare, StringFormat='{}{0:N1}%'}" Style="{StaticResource ShareCellStyle}" />

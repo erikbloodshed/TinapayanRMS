@@ -1,4 +1,4 @@
-<UserControl x:Class="TinapayanRMS.UI.Views.Products.ProductHeaderCard"
+﻿<UserControl x:Class="TinapayanRMS.UI.Views.Products.ProductHeaderCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
@@ -69,26 +69,11 @@
 
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <Border Width="40"
-                    Height="40"
-                    Margin="0,0,12,0"
-                    CornerRadius="8"
-                    VerticalAlignment="Center"
-                    Background="{StaticResource AccentSoftBrush}">
-                <TextBlock Text="{Binding HeaderInitial}"
-                           FontSize="18"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource AccentBrush}"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center" />
-            </Border>
-
-            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+            <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                 <TextBlock Text="{Binding HeaderTitle}"
                            FontSize="20"
                            FontWeight="SemiBold"
@@ -149,7 +134,7 @@
                 </Popup>
             </StackPanel>
 
-            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                 <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />
                 <syncfusion:ButtonAdv Label="Save"
                                       IconTemplate="{StaticResource SaveIconTemplate}"
@@ -183,7 +168,7 @@
             sellable unit — a piece, unless Quantity Required says otherwise, which CostUnitCaption spells out in each
             tooltip — worked out from the form as it's edited; the current price shows as it's typed in under the header.
         -->
-        <Grid Grid.Row="1" Margin="0,12,0,0">
+        <Grid Grid.Row="1" Margin="0,4,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />

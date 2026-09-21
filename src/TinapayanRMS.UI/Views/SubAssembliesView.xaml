@@ -1,4 +1,4 @@
-<UserControl x:Class="TinapayanRMS.UI.Views.SubAssembliesView"
+﻿<UserControl x:Class="TinapayanRMS.UI.Views.SubAssembliesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -42,17 +42,22 @@
         <controls:SuccessToast Grid.ColumnSpan="3" />
 
         <Border Grid.Column="0" Style="{StaticResource CardStyle}">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <TextBlock Text="Sub-Assemblies" Style="{StaticResource SectionHeaderStyle}" />
+            <DockPanel>
+                <!-- Title and search on one row, laid out as the Raw Materials and Products list cards lay out their own -->
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                    <syncfusion:SfTextBoxExt DockPanel.Dock="Right"
+                                             Width="190"
+                                             Watermark="Search sub-assembly"
+                                             WatermarkTemplate="{StaticResource AlignedWatermarkTemplate}"
+                                             Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Text="Sub-Assemblies"
+                               Style="{StaticResource SectionHeaderStyle}"
+                               Margin="0"
+                               VerticalAlignment="Center" />
+                </DockPanel>
 
                 <!-- Fixed widths, so the card is as wide as its columns and never cuts one off -->
-                <syncfusion:SfDataGrid Grid.Row="1"
-                                       ItemsSource="{Binding Rows}"
+                <syncfusion:SfDataGrid ItemsSource="{Binding VisibleRows}"
                                        SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
                                        GridLinesVisibility="Both"
                                        CurrentCellBorderBrush="{StaticResource AccentBrush}"
@@ -68,7 +73,7 @@
                         <syncfusion:GridTextColumn MappingName="RoleName" HeaderText="Role" Width="160" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
-            </Grid>
+            </DockPanel>
         </Border>
 
         <Border Grid.Column="2" Style="{StaticResource CardStyle}">
@@ -83,7 +88,7 @@
 
                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                             <TextBlock Text="{Binding HeaderTitle}"
-                                       FontSize="24"
+                                       FontSize="20"
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource HeadingForegroundBrush}"
                                        TextTrimming="CharacterEllipsis" />
@@ -244,7 +249,19 @@
                                 </syncfusion:GridMultiColumnDropDownList.Columns>
                             </syncfusion:GridMultiColumnDropDownList>
                             <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
-                            <syncfusion:GridTextColumn MappingName="Unit" HeaderText="Unit" Width="64" AllowEditing="False" />
+                            <!--
+                                The unit the Qty is typed in: the material's base unit, or one of its alternative units. Each row has its
+                                own material, so its list comes from the row (PackagingUnitSelector). Editable, so the unit can be typed
+                                as well as picked. What the quantity comes to in base units is never shown — the conversion is behind
+                                the scenes, in Unit Cost (what one of the picked unit costs) and in the line's own total.
+                            -->
+                            <syncfusion:GridComboBoxColumn MappingName="UnitKey"
+                                                           HeaderText="Unit"
+                                                           Width="72"
+                                                           ItemsSourceSelector="{StaticResource PackagingUnitSelector}"
+                                                           DisplayMemberPath="Abbreviation"
+                                                           SelectedValuePath="Key"
+                                                           IsEditable="True" />
                             <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" AllowEditing="False" />
                             <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Set" Width="104" NumberDecimalDigits="4" AllowEditing="False" />
                         </syncfusion:SfDataGrid.Columns>
@@ -257,7 +274,6 @@
                                            Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}"
                                            controls:GridAddNewRow.HideCheckBoxes="True"
                                            controls:GridCellEditing.IsEnabled="True"
-                                           controls:GridCellEmphasis.IsEnabled="True"
                                            SelectedItem="{Binding SelectedLine, Mode=TwoWay}"
                                            GridLinesVisibility="Both"
                                            CurrentCellBorderBrush="{StaticResource AccentBrush}"
@@ -306,8 +322,7 @@
                                                     Width="86"
                                                     NumberDecimalDigits="1"
                                                     AllowNullValue="True"
-                                                    controls:GridCellEditing.AllowWhen="CanTypeBakersPercent"
-                                                    controls:GridCellEmphasis.When="IsPercentTyped" />
+                                                    controls:GridCellEditing.AllowWhen="CanTypeBakersPercent" />
                             <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost per g" Width="120" NumberDecimalDigits="4" AllowEditing="False" />
                             <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="120" NumberDecimalDigits="2" AllowEditing="False" />
                             <!-- The formula's 100% base for baker's percentage, usually the flour; more than one can be ticked. -->

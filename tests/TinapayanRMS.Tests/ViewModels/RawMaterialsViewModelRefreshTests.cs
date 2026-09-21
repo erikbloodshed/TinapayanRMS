@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -599,7 +599,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
-    public async Task A_made_ingredient_left_at_the_default_weight_loss_saves_with_0_percent()
+    public async Task A_made_ingredient_left_at_the_default_weight_loss_saves_with_3_percent()
     {
         await SeedCategoryAsync("Syrups");
         var viewModel = CreateViewModel();
@@ -610,13 +610,130 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         PickCategory(viewModel);
         viewModel.EditingWeightLossPercent.Should().BeNull("a purchased material has no weight loss");
         viewModel.EditingSource = RawMaterialSource.Made;
-        viewModel.EditingWeightLossPercent.Should().Be(0m, "a made ingredient starts at 0%");
+        viewModel.EditingWeightLossPercent.Should().Be(3m, "a made ingredient starts at 3%");
 
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
-        (await dbContext.RawMaterials.SingleAsync(Cancellation)).WeightLossPercent.Should().Be(0m);
+        (await dbContext.RawMaterials.SingleAsync(Cancellation)).WeightLossPercent.Should().Be(3m);
+    }
+
+    [Fact]
+    public async Task The_header_shows_a_made_ingredients_yield_and_bom_cost_and_its_buffered_cost_follows_them()
+    {
+        var sugarId = await SeedCostedIngredientAsync("Sugar", costPerGram: 0.10m, bufferedCostPerGram: 0.11m);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Simple Syrup";
+        PickCategory(viewModel);
+        viewModel.EditingSource = RawMaterialSource.Made;
+        viewModel.EditingWeightLossPercent.Should().Be(3m);
+        viewModel.BomTotalWeight.Should().Be(0m, "nothing in the BOM yet");
+        viewModel.BomTotalCost.Should().Be(0m);
+
+        viewModel.BomLineEdits.Add(new IngredientLineRow { IngredientId = sugarId, Grams = 1000m });
+
+        viewModel.BomTotalWeight.Should().Be(970m, "1,000 g less the 3% lost while making it");
+        viewModel.BomTotalCost.Should().Be(110m, "1,000 g of sugar at its buffered ₱0.11");
+        viewModel.BufferedCostText.Should().Be("₱0.1134", "₱110 over the 970 g it yields, as the BOM stands");
+
+        // The weight loss moves the yield, not the cost.
+        viewModel.EditingWeightLossPercent = 20m;
+        viewModel.BomTotalWeight.Should().Be(800m);
+        viewModel.BomTotalCost.Should().Be(110m);
+        viewModel.BufferedCostText.Should().Be("₱0.1375");
+
+        await viewModel.SaveCommand.Execute();
+
+        await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial is not null && viewModel.BomLineEdits.Count == 1,
+            () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.BomLineEdits.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.BomTotalWeight.Should().Be(800m);
+        viewModel.BomTotalCost.Should().Be(110m);
+        (viewModel.BomTotalCost / viewModel.BomTotalWeight).Should().Be(viewModel.SelectedRawMaterial!.BufferedCostPerBaseUnit,
+            "the tiles are the two sides of the buffered cost the cascade saved");
+        viewModel.SelectedRawMaterial!.CostBufferPercent.Should().Be(0m, "a made ingredient carries no buffer of its own");
+        viewModel.BufferedCostText.Should().Be("₱0.1375");
+    }
+
+    [Fact]
+    public async Task A_purchased_materials_header_keeps_showing_its_saved_buffered_cost()
+    {
+        var flourId = await SeedCostedIngredientAsync("Flour", costPerGram: 0.05m, bufferedCostPerGram: 0.0525m);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == flourId);
+
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "details never arrived");
+        viewModel.CurrentCostText.Should().Be("₱0.0500");
+        viewModel.BufferedCostText.Should().Be("₱0.0525", "only a made ingredient's follows the form");
+        viewModel.BomTotalWeight.Should().Be(0m, "it has no BOM");
+        viewModel.BomTotalCost.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task A_component_repriced_elsewhere_reaches_the_header_totals_on_the_next_load()
+    {
+        var sugarId = await SeedCostedIngredientAsync("Sugar", costPerGram: 0.10m, bufferedCostPerGram: 0.11m);
+        var syrupId = await SeedMadeIngredientAsync("Simple Syrup", (sugarId, 1000m));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == syrupId);
+        await WaitUntilSettledAsync(() => viewModel.BomLineEdits.Count == 1, () => $"lines={viewModel.BomLineEdits.Count}");
+        viewModel.BomTotalCost.Should().Be(110m);
+
+        // Sugar goes up behind the screen's back, as another screen or the cascade would leave it.
+        await using (var dbContext = CreateDbContext())
+        {
+            var sugar = await dbContext.RawMaterials.SingleAsync(m => m.Id == sugarId, Cancellation);
+            sugar.BufferedCostPerBaseUnit = 0.22m;
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.BomTotalCost.Should().Be(220m, "the refreshed component is what the rows point at");
+        viewModel.BomTotalWeight.Should().Be(1000m, "seeded with no weight loss");
+        viewModel.BufferedCostText.Should().Be("₱0.2200");
+    }
+
+    [Fact]
+    public async Task The_last_updated_tile_is_the_day_the_cost_last_moved_not_the_day_it_was_saved()
+    {
+        var saved = new DateTime(2026, 9, 18, 15, 4, 0, DateTimeKind.Unspecified);
+        var costMoved = new DateTime(2026, 9, 21, 9, 30, 0, DateTimeKind.Unspecified);
+        var syrupId = await SeedMadeIngredientAsync("Simple Syrup");
+        await using (var dbContext = CreateDbContext())
+        {
+            var syrup = await dbContext.RawMaterials.SingleAsync(m => m.Id == syrupId, Cancellation);
+            syrup.UpdatedAt = saved;
+            syrup.CostUpdatedAt = costMoved;
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == syrupId);
+
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "details never arrived");
+        viewModel.LastUpdatedText.Should().Be("Sep 21, 2026", "the tile is one date, the day its cost changed, with no time");
+    }
+
+    [Fact]
+    public async Task The_last_updated_tile_falls_back_to_a_dash_for_a_material_whose_cost_has_never_moved()
+    {
+        var flourId = await SeedPurchasedIngredientAsync("Flour");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == flourId);
+
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "details never arrived");
+        viewModel.LastUpdatedText.Should().Be("—", "it was seeded straight into the database and has never been priced");
     }
 
     [Fact]
@@ -734,10 +851,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
         viewModel.BufferedCostWarningText.Should().BeEmpty();
 
-        // The bag goes up to ₱1,500 (₱0.06/g): the buffered cost stays, and the screen says the buffer's gone.
+        // The bag goes up to ₱1,500 (₱0.06/g): the buffered cost stays, the % follows it over the new price, and the
+        // screen says the buffer's gone.
         viewModel.BrandPriceRows.Single().Price = 1500m;
-        viewModel.EditingBufferedCost.Should().Be(0.0525m);
-        viewModel.EditingCostBufferPercent.Should().Be(5m, "a new price moves neither");
+        viewModel.EditingBufferedCost.Should().Be(0.0525m, "a new price doesn't move the amount");
+        viewModel.EditingCostBufferPercent.Should().Be(0m, "₱1,312.50 is under ₱1,500, so the buffer's gone");
         viewModel.BrandPriceRows.Single().BufferPercent.Should().Be(-12.5m, "₱1,312.50 is 12.5% under ₱1,500");
         viewModel.BufferedCostWarningText.Should().NotBeEmpty();
 
@@ -754,9 +872,13 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingCostBufferPercent.Should().Be(20m);
         viewModel.TypedCostBufferPercent.Should().Be(20m, "the box shows it");
 
-        // Recalculate puts the percent back on top of the dearest brand after a price change.
+        // A dearer bag leaves the amount alone and works the % out afresh: ₱1,800 over ₱1,600 is 12.5%.
         viewModel.BrandPriceRows.Single().Price = 1600m;
-        await viewModel.RecalculateBufferCommand.Execute();
+        viewModel.EditingBufferedCostInUnit.Should().Be(1800m);
+        viewModel.EditingCostBufferPercent.Should().Be(12.5m);
+
+        // Typing the percent again puts it back on top of the new dearest price.
+        viewModel.TypedCostBufferPercent = 20m;
         viewModel.EditingBufferedCostInUnit.Should().Be(1920m, "₱1,600 with 20% on top");
 
         await viewModel.SaveCommand.Execute();
@@ -830,6 +952,18 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         dearer.Price = 1.5m;
         viewModel.EditingBufferedCost.Should().Be(1.2m, "a new price doesn't move it");
         dearer.BufferPercent.Should().Be(-20m);
+        viewModel.EditingCostBufferPercent.Should().Be(0m, "the % follows the price: ₱1.20 is under ₱1.50, so it pins at 0");
+
+        // The % the amount works out to is held to the 0-100 the box and the validator allow, and the buffered
+        // cost itself stays exactly as typed.
+        viewModel.EditingBufferedCostInUnit = 1m;
+        viewModel.EditingBufferedCost.Should().Be(1m);
+        viewModel.EditingCostBufferPercent.Should().Be(0m, "₱1.00 is under the dearest ₱1.50, so the buffer's gone");
+        viewModel.BufferedCostWarningText.Should().NotBeEmpty();
+
+        viewModel.EditingBufferedCostInUnit = 4m;
+        viewModel.EditingBufferedCost.Should().Be(4m);
+        viewModel.EditingCostBufferPercent.Should().Be(100m, "₱4.00 is 166.67% over ₱1.50, more than the box allows");
     }
 
     [Fact]
@@ -1311,6 +1445,18 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         dbContext.RawMaterials.Add(ingredient);
         await dbContext.SaveChangesAsync(Cancellation);
         return ingredient.Id;
+    }
+
+    /// <summary>A purchased ingredient with its costs written straight onto the row: a true cost per gram and a buffered one.</summary>
+    private async Task<int> SeedCostedIngredientAsync(string name, decimal costPerGram, decimal bufferedCostPerGram)
+    {
+        var id = await SeedPurchasedIngredientAsync(name);
+        await using var dbContext = CreateDbContext();
+        var ingredient = await dbContext.RawMaterials.SingleAsync(m => m.Id == id, Cancellation);
+        ingredient.CostPerBaseUnit = costPerGram;
+        ingredient.BufferedCostPerBaseUnit = bufferedCostPerGram;
+        await dbContext.SaveChangesAsync(Cancellation);
+        return id;
     }
 
     /// <summary>A made ingredient with a bill of materials: grams of each component.</summary>

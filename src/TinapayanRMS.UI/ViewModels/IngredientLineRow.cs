@@ -1,4 +1,4 @@
-using ReactiveUI;
+﻿using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 
@@ -187,8 +187,8 @@ public sealed class IngredientLineRow : ReactiveObject
     }
 
     /// <summary>
-    /// The line's percentage, not its grams, is what was typed: the table shows it in bold. Only while there's a base,
-    /// since the figure showing without one is the absolute percentage, which is never typed.
+    /// The line's percentage, not its grams, is what was typed. Only while there's a base, since the figure showing
+    /// without one is the absolute percentage, which is never typed.
     /// </summary>
     public bool IsPercentTyped => AuthoredBakersPercent is not null && BaseWeight > 0;
 

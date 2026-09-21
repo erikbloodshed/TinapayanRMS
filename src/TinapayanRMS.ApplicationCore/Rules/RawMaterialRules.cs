@@ -278,6 +278,16 @@ public static class RawMaterialRules
         cost * (1 + bufferPercent / 100m);
 
     /// <summary>
+    /// The buffer percent a material is stored with. A made ingredient's is always 0 (2026-09-21, at the user's
+    /// request): its components' buffers are already inside its BOM rollup, so it adds none of its own, and since
+    /// it has no buffer box on the screen a stale stored percent is normalised away by any save rather than
+    /// rejected — which would leave it unsaveable. A linked ingredient takes the one it's linked to
+    /// (<paramref name="inheritedBuffer"/>); anything else keeps what the form sent.
+    /// </summary>
+    public static decimal StoredCostBufferPercent(RawMaterialSource source, decimal? inheritedBuffer, decimal sent) =>
+        source == RawMaterialSource.Made ? 0m : inheritedBuffer ?? sent;
+
+    /// <summary>
     /// BufferedCost the other way round: the buffer that takes <paramref name="cost"/> to
     /// <paramref name="bufferedCost"/>. ₱930 buffered to ₱976.50 is a 5% buffer. The cost must be above 0.
     /// </summary>
