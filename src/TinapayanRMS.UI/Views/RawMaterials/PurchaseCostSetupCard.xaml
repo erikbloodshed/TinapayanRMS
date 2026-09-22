@@ -108,6 +108,7 @@
                 <syncfusion:DoubleTextBox Grid.Row="1"
                                           Grid.Column="2"
                                           controls:FieldUndoStep.Recorder="{Binding}"
+                                          controls:FieldUndoStep.LandsOnLeave="True"
                                           Value="{Binding EditingBufferedCostInUnit, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                                           NumberDecimalDigits="-1"
                                           MinimumNumberDecimalDigits="2"

@@ -15,14 +15,28 @@ public class UndoHistoryTests
     /// <summary>A form of one value, which the history captures and compares by its text.</summary>
     private sealed class Form
     {
-        public string Value { get; set; } = string.Empty;
+        private string _value = string.Empty;
+
+        /// <summary>
+        /// Setting it refreshes the dirty flag, which is what a screen does: it watches its own property changes
+        /// rather than waiting for the step around the gesture to settle, so the Save button follows what's typed.
+        /// </summary>
+        public string Value
+        {
+            get => _value;
+            set
+            {
+                _value = value;
+                History.RefreshDirty();
+            }
+        }
 
         public bool CanRecord { get; set; } = true;
 
         public UndoHistory<string> History { get; }
 
         public Form(int depth = 50) =>
-            History = new UndoHistory<string>(() => Value, (a, b) => a == b, () => CanRecord, depth);
+            History = new UndoHistory<string>(() => Value, (a, b) => a == b, () => CanRecord, depth: depth);
 
         /// <summary>One finished change, as a screen's Begin/End bracketing of a gesture would make it.</summary>
         public void Change(string to)
@@ -185,6 +199,110 @@ public class UndoHistoryTests
 
         form.History.CanUndo.Should().BeFalse();
         form.History.CanRedo.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Nothing_to_save_until_the_form_has_been_settled_and_then_changed()
+    {
+        var form = new Form();
+        form.History.IsDirty.Should().BeFalse("a form still being loaded holds nothing of the user's");
+
+        form.History.MarkClean();
+        form.History.IsDirty.Should().BeFalse();
+
+        form.Change("one");
+        form.History.IsDirty.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_form_typed_back_to_what_it_was_settled_with_has_nothing_to_save()
+    {
+        var form = new Form();
+        form.History.MarkClean();
+        form.Change("one");
+
+        form.Change("");
+
+        form.History.IsDirty.Should().BeFalse("it shows what it was settled with, however it got there");
+        form.History.CanUndo.Should().BeTrue("both changes are still steps to take back");
+    }
+
+    [Fact]
+    public void Stepping_back_to_the_settled_form_leaves_nothing_to_save()
+    {
+        var form = new Form();
+        form.History.MarkClean();
+        form.Change("one");
+        form.Change("two");
+
+        form.Undo();
+        form.History.IsDirty.Should().BeTrue("it's back at 'one', which was never saved");
+
+        form.Undo();
+        form.History.IsDirty.Should().BeFalse();
+    }
+
+    [Fact]
+    public void What_a_save_wrote_becomes_the_form_there_is_nothing_to_save_against()
+    {
+        var form = new Form();
+        form.History.MarkClean();
+        form.Change("one");
+
+        // A Save throws the history away, then settles the form on what it wrote.
+        form.History.Clear();
+        form.History.MarkClean();
+
+        form.History.IsDirty.Should().BeFalse();
+        form.Change("two");
+        form.History.IsDirty.Should().BeTrue();
+        form.Change("one");
+        form.History.IsDirty.Should().BeFalse("'one' is what was saved");
+    }
+
+    [Fact]
+    public void A_form_being_loaded_has_nothing_to_save_however_far_it_has_got()
+    {
+        var form = new Form();
+        form.History.MarkClean();
+        form.Change("one");
+
+        // Another record picked: the history goes, and the form is written to before it settles.
+        form.History.Clear();
+        form.Value = "half-loaded";
+
+        form.History.IsDirty.Should().BeFalse("nothing is the user's until the screen says the form has landed");
+    }
+
+    [Fact]
+    public void An_edit_the_form_has_not_seen_yet_keeps_Save_offered()
+    {
+        var form = new Form();
+        form.History.MarkClean();
+
+        // A cell opened for editing: whatever is typed there won't reach the form until the edit ends.
+        form.History.IsEditPending = true;
+        form.History.IsDirty.Should().BeTrue("the click that saves is the click that ends the edit");
+
+        // It ended with nothing typed.
+        form.History.IsEditPending = false;
+        form.History.IsDirty.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsDirty_tells_the_Save_button_when_it_changes()
+    {
+        var form = new Form();
+        form.History.MarkClean();
+        List<string> raised = [];
+        form.History.PropertyChanged += (_, e) => raised.Add(e.PropertyName!);
+
+        form.Change("one");
+        raised.Should().Contain(nameof(UndoHistory<string>.IsDirty));
+
+        raised.Clear();
+        form.Change("");
+        raised.Should().Contain(nameof(UndoHistory<string>.IsDirty));
     }
 
     [Fact]

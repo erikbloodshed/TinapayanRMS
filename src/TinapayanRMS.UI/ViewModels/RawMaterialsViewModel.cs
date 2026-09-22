@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Reactive.Linq;
 using DynamicData;
@@ -919,6 +920,15 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, History.WhenAnyValue(h => h.CanUndo));
         RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, History.WhenAnyValue(h => h.CanRedo));
 
+        // Save offers itself only when the form holds something the saved material doesn't. Measured on every
+        // change rather than only when an undo step settles: a step closes on the way out of a field, and a Save
+        // button still disabled under the cursor would swallow the very click that enabled it. A grid's add row
+        // is the same story the other way round - the grid raises nothing when it commits, so the step stays open.
+        this.Changed.Subscribe(_ => History.RefreshDirty());
+        WatchForSave(UnitRows);
+        WatchForSave(BrandPriceRows);
+        WatchForSave(BomLineEdits);
+
         // The header's saved costs; a new Per unit, or a unit's multiplier, updates them through UpdatePurchaseCostTexts.
         this.WhenAnyValue(x => x.SelectedRawMaterial)
             .Subscribe(_ => UpdateHeaderCostTexts());
@@ -1155,7 +1165,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             await LoadCommand.Execute();
             await ReloadSavedRawMaterialAsync(id);
             SuccessMessage = $"{EditingName} was saved.";
-        }));
+        }),
+        History.WhenAnyValue(h => h.IsDirty));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
             () => RunWithConfirmationAsync($"Delete '{SelectedRawMaterial!.Name}'? This can't be undone.", async () =>
@@ -1311,9 +1322,25 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         return $"Also linked to {linkedTo.Name}: {parts}. With this one, {totals} (at most 100% each).";
     }
 
+    /// <summary>
+    /// Follows <paramref name="rows"/> for Save's sake: a row added, removed or replaced can be something to
+    /// save. Watched through the collection's own PropertyChanged rather than its CollectionChanged, because an
+    /// ObservableCollection only enforces its re-entrancy guard once more than one handler is listening — and
+    /// these collections are changed from inside their own notifications, so a second CollectionChanged listener
+    /// would turn a change the guard tolerates today into an exception. What's typed into a row reaches Save
+    /// another way: the grid closes the cell's undo step, which re-reads whether there's anything to save.
+    /// </summary>
+    private void WatchForSave(INotifyPropertyChanged rows) => rows.PropertyChanged += (_, _) => History.RefreshDirty();
+
     void IUndoRecorder.BeginUndoStep() => History.Begin();
 
     void IUndoRecorder.EndUndoStep() => History.End();
+
+    bool IUndoRecorder.IsEditPending
+    {
+        get => History.IsEditPending;
+        set => History.IsEditPending = value;
+    }
 
     /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>
     private void AsUndoStep(Action change)
@@ -1613,6 +1640,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         _detailMaterialId = material?.Id;
         AreDetailsReady = true;
         RecomputeBomTotals();
+
+        // Everything the form holds is now the material's own, so this is what Save's dirty check measures
+        // against. Taken here rather than where the form is filled in: the units, brand prices and BOM land a
+        // moment after the rest, and a form measured before them would read as changed when they arrived.
+        History.MarkClean();
     }
 
     /// <summary>The Price History grid, newest first.</summary>

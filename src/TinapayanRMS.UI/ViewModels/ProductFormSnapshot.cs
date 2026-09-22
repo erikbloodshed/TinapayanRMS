@@ -129,6 +129,46 @@ public sealed record ProductFormSnapshot
         && UsageShrinkagePercent == other.UsageShrinkagePercent;
 
     /// <summary>
+    /// True when two snapshots would be saved the same, which is what the Save button is enabled by. It's
+    /// <see cref="ShowsSameAs"/> bar the Create Variant name, which no Save writes: that box belongs to the
+    /// button beside it. Everything else counts, the open sub-assembly form included, since a Save applies it
+    /// on the way in. Which section the form is pointed at isn't the user's change, so the screen moves what it
+    /// measures against on to the form showing (<see cref="WithFormOf"/>) whenever one opens over another.
+    /// </summary>
+    public bool SavesSameAs(ProductFormSnapshot other) =>
+        (this with { CloneName = other.CloneName }).ShowsSameAs(other);
+
+    /// <summary>
+    /// This snapshot with <paramref name="form"/>'s sub-assembly form and recipe tabs in place of its own, and
+    /// nothing else of it: the recipe, the packaging, the costing and the product's own fields stay as they were
+    /// settled, so a rebase can never hide a change a Save would write.
+    /// </summary>
+    public ProductFormSnapshot WithFormOf(ProductFormSnapshot form) => this with
+    {
+        SelectedTab = form.SelectedTab,
+        HasAddSubAssemblyTab = form.HasAddSubAssemblyTab,
+        IsUsageFormOpen = form.IsUsageFormOpen,
+        IsAddingUsage = form.IsAddingUsage,
+        UsageFormTitle = form.UsageFormTitle,
+        UsageMode = form.UsageMode,
+        IsFormEditingLines = form.IsFormEditingLines,
+        IsFormPickingSource = form.IsFormPickingSource,
+        IsFormAddInsExpanded = form.IsFormAddInsExpanded,
+        EditingUsageIndex = form.EditingUsageIndex,
+        UsageRoleId = form.UsageRoleId,
+        UsageName = form.UsageName,
+        UsageSourceKey = form.UsageSourceKey,
+        FormLines = form.FormLines,
+        FormAddIns = form.FormAddIns,
+        FormPackagingLines = form.FormPackagingLines,
+        FormFormulaBase = form.FormFormulaBase,
+        UsageAuthoredField = form.UsageAuthoredField,
+        UsageWeightPerPiece = form.UsageWeightPerPiece,
+        UsageYield = form.UsageYield,
+        UsageShrinkagePercent = form.UsageShrinkagePercent,
+    };
+
+    /// <summary>
     /// Whether two sets of sections hold the same recipe, by what the user put there: the sub-assembly, its role
     /// and name, its piece size, and each line's ingredient, grams and typed percentage. Prices are deliberately
     /// not compared. A LoadCommand landing mid-gesture swaps every section for a freshly priced copy, and comparing

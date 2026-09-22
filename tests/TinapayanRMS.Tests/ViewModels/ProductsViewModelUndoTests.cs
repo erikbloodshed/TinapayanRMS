@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Validators;
+using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
@@ -23,6 +24,8 @@ namespace TinapayanRMS.Tests.ViewModels;
 /// What these are mostly guarding is that a restore puts back state the public setters can't express, and that
 /// it leaves alone the baselines Save compares against: a change undone and a change never made have to come to
 /// the same thing, in the form and in the database.
+///
+/// The last few cover whether Save has anything to write, which is measured against the same snapshots.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
@@ -393,6 +396,116 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.TryUndo().Should().BeTrue();
         viewModel.EditingName.Should().Be("Ube Roll");
     }
+
+    [Fact]
+    public async Task Save_is_not_offered_until_the_form_is_changed()
+    {
+        var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
+
+        viewModel.History.IsDirty.Should().BeFalse("the load itself isn't a change");
+        (await CanSave(viewModel)).Should().BeFalse();
+
+        // Typed into the form and not applied: Save applies it on the way in, so it counts.
+        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 1500m);
+
+        (await CanSave(viewModel)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Moving_between_the_recipe_tabs_is_not_something_to_save()
+    {
+        // Each tab opens its section's form over the previous one, so the form holds different values without
+        // anything having been edited. What Save measures against follows the form through (RebaseSettledForm).
+        var (viewModel, _) = await OpenTwoSectionProductAsync();
+        var dough = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
+        var filling = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
+
+        viewModel.SelectedRecipeTab = dough;
+        (await CanSave(viewModel)).Should().BeFalse();
+
+        viewModel.SelectedRecipeTab = filling;
+        (await CanSave(viewModel)).Should().BeFalse();
+
+        viewModel.SelectedRecipeTab = dough;
+        (await CanSave(viewModel)).Should().BeFalse("clicking through the sections writes nothing");
+
+        // And the form is still live: typing in the one now showing does offer Save.
+        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 1500m);
+        (await CanSave(viewModel)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Save_stops_being_offered_once_the_change_is_taken_back()
+    {
+        var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
+        Edit(viewModel, () => viewModel.EditingName = "Renamed");
+        (await CanSave(viewModel)).Should().BeTrue();
+
+        viewModel.TryUndo().Should().BeTrue();
+
+        (await CanSave(viewModel)).Should().BeFalse("the form shows what was saved again");
+    }
+
+    [Fact]
+    public async Task Save_stops_being_offered_once_it_has_written()
+    {
+        var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
+        Edit(viewModel, () => viewModel.EditingName = "Renamed");
+
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.FormLines.Count == 1,
+            () => $"details={viewModel.AreDetailsReady} lines={viewModel.FormLines.Count}");
+
+        (await CanSave(viewModel)).Should().BeFalse("what was written is the new starting point");
+    }
+
+    [Fact]
+    public async Task A_cell_still_open_keeps_Save_offered()
+    {
+        // What's typed into a cell doesn't reach the line until the edit ends, and the click that saves is the
+        // click that ends it - a Save disabled under the cursor would swallow it.
+        var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
+        var recorder = (IUndoRecorder)viewModel;
+
+        recorder.IsEditPending = true;
+        (await CanSave(viewModel)).Should().BeTrue();
+
+        recorder.IsEditPending = false;
+        (await CanSave(viewModel)).Should().BeFalse("the cell closed with nothing typed");
+    }
+
+    [Fact]
+    public async Task Save_is_not_offered_on_the_blank_form_the_screen_opens_with()
+    {
+        // The screen's real opening order: the blank form is costed at nothing before the defaults exist, and the
+        // load then puts them on it. That isn't the user's change, so it mustn't read as something to save.
+        await new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(
+            new CostingDefaults { LaborPercent = 12m, OverheadPercent = 8m, AdministrativePercent = 5m, MarginPercent = 40m, VatPercent = 12m },
+            Cancellation);
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.EditingLaborPercent.Should().Be(12m, "a new product takes the defaults once they've loaded");
+        (await CanSave(viewModel)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Showing_the_tab_again_is_not_something_to_save()
+    {
+        // LoadCommand runs every time the tab is shown; it only merges in fresh data and re-points the pickers.
+        var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
+
+        await viewModel.LoadCommand.Execute();
+
+        (await CanSave(viewModel)).Should().BeFalse("a refresh isn't an edit");
+    }
+
+    /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the View binds it.</summary>
+    private static async Task<bool> CanSave(ProductsViewModel viewModel) =>
+        await viewModel.SaveCommand.CanExecute.FirstAsync();
 
     // ---- seeding and driving ----
 

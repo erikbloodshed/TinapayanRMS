@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
@@ -249,6 +250,13 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, History.WhenAnyValue(h => h.CanUndo));
         RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, History.WhenAnyValue(h => h.CanRedo));
 
+        // Save offers itself only when the form holds something the saved sub-assembly doesn't. Re-read on every
+        // change rather than only when an undo step settles: a step closes on the way out of a field, and a Save
+        // button still disabled under the cursor would swallow the very click that enabled it.
+        this.Changed.Subscribe(_ => History.RefreshDirty());
+        WatchForSave(Lines);
+        WatchForSave(PackagingLines);
+
         var byName = SortExpressionComparer<StandaloneSubAssemblyRow>.Ascending(r => r.Name);
 
         _rowCache.Connect()
@@ -352,6 +360,10 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             var selectedId = SelectedRow?.Id;
             var roleId = EditingRole?.Id;
 
+            // A brand-new form has no role until the roles arrive, and the merge below gives it the first one.
+            // That isn't the user's change, so what Save measures against has to follow it.
+            var formHasNoRole = _editingId == 0 && roleId is null;
+
             ApplyRefresh(() =>
             {
                 Roles.MergeFrom(roles, r => r.Id);
@@ -373,6 +385,13 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                     ShowUsedBy(linkedBy.GetValueOrDefault(_editingId) ?? []);
                 }
             });
+
+            // Only the role, and only when the form had none: a role the user picked must keep counting as a
+            // change, so this can't be a blanket MarkClean.
+            if (formHasNoRole && EditingRole is not null)
+            {
+                History.Rebase((settled, now) => settled with { RoleId = now.RoleId });
+            }
         });
 
         NewCommand = ReactiveCommand.Create(ClearForm);
@@ -423,7 +442,8 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             ApplyRefresh(() => SelectedRow = saved);
             await LoadIntoFormAsync(saved);
             SuccessMessage = $"{name} was saved.";
-        }));
+        }),
+        History.WhenAnyValue(h => h.IsDirty));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
             () => RunWithConfirmationAsync($"Delete '{SelectedRow!.Name}'? This can't be undone.", async () =>
@@ -454,9 +474,25 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 (line, packagingLine, isPackaging) => isPackaging ? packagingLine is not null : line is not null));
     }
 
+    /// <summary>
+    /// Follows <paramref name="rows"/> for Save's sake: a line added, removed or replaced can be something to
+    /// save. Watched through the collection's own PropertyChanged rather than its CollectionChanged, because an
+    /// ObservableCollection only enforces its re-entrancy guard once more than one handler is listening, so a
+    /// listener added for this could turn a re-entrant change the guard tolerates today into an exception. What's
+    /// typed into a line reaches Save another way: the grid closes the cell's undo step, which re-reads whether
+    /// there's anything to save.
+    /// </summary>
+    private void WatchForSave(INotifyPropertyChanged rows) => rows.PropertyChanged += (_, _) => History.RefreshDirty();
+
     void IUndoRecorder.BeginUndoStep() => History.Begin();
 
     void IUndoRecorder.EndUndoStep() => History.End();
+
+    bool IUndoRecorder.IsEditPending
+    {
+        get => History.IsEditPending;
+        set => History.IsEditPending = value;
+    }
 
     /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>
     private void AsUndoStep(Action change)
@@ -577,6 +613,9 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         SelectedPackagingLine = null;
         PackagingLines.Clear();
         UsedByText = NotUsedText;
+
+        // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
+        History.MarkClean();
     }
 
     /// <summary>
@@ -615,6 +654,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         PackagingLines.Clear();
         PackagingLines.AddRange(savedSet.Select(l => new PackagingLineRow(packagingById.GetValueOrDefault(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId)));
         ShowUsedBy(row.GetUsedBy());
+
+        // The form now holds what was saved, so this is what Save's dirty check measures against. Taken at the
+        // end: the lines land after the name and role, and a form measured before them would read as changed
+        // the moment they arrived.
+        History.MarkClean();
     }
 
     private void ShowUsedBy(IReadOnlyList<string> productNames)

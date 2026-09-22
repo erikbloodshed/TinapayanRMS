@@ -41,10 +41,45 @@ public static class FieldUndoStep
         field.LostKeyboardFocus += OnLostFocus;
     }
 
+    /// <summary>
+    /// Set alongside <see cref="RecorderProperty"/> on a box whose value only reaches the form when focus leaves
+    /// it (a binding with <c>UpdateSourceTrigger=LostFocus</c>). Until then the screen can't see what's been
+    /// typed, so while the box has the cursor it keeps Save offered rather than deciding there's nothing to save.
+    /// </summary>
+    public static readonly DependencyProperty LandsOnLeaveProperty = DependencyProperty.RegisterAttached(
+        "LandsOnLeave", typeof(bool), typeof(FieldUndoStep), new PropertyMetadata(false));
+
+    public static bool GetLandsOnLeave(DependencyObject element) => (bool)element.GetValue(LandsOnLeaveProperty);
+
+    public static void SetLandsOnLeave(DependencyObject element, bool value) => element.SetValue(LandsOnLeaveProperty, value);
+
     private static IUndoRecorder? RecorderOf(object sender) =>
         sender is DependencyObject element ? GetRecorder(element) : null;
 
-    private static void OnGotFocus(object sender, KeyboardFocusChangedEventArgs e) => RecorderOf(sender)?.BeginUndoStep();
+    private static bool LandsOnLeave(object sender) => sender is DependencyObject element && GetLandsOnLeave(element);
 
-    private static void OnLostFocus(object sender, KeyboardFocusChangedEventArgs e) => RecorderOf(sender)?.EndUndoStep();
+    private static void OnGotFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (RecorderOf(sender) is { } recorder)
+        {
+            recorder.BeginUndoStep();
+            if (LandsOnLeave(sender))
+            {
+                recorder.IsEditPending = true;
+            }
+        }
+    }
+
+    private static void OnLostFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (RecorderOf(sender) is { } recorder)
+        {
+            if (LandsOnLeave(sender))
+            {
+                recorder.IsEditPending = false;
+            }
+
+            recorder.EndUndoStep();
+        }
+    }
 }

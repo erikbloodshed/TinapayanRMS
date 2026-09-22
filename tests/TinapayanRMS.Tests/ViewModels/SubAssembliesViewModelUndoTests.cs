@@ -14,8 +14,9 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.Tests.ViewModels;
 
 /// <summary>
-/// Undo and redo on the Sub-Assemblies screen, the same mechanism Products uses with its own snapshot. Steps are
-/// recorded by bracketing a change with BeginUndoStep/EndUndoStep, which is what the Controls/ behaviours do.
+/// Undo and redo on the Sub-Assemblies screen, the same mechanism Products uses with its own snapshot, and with
+/// it whether Save has anything to write, which is measured against the same snapshots. Steps are recorded by
+/// bracketing a change with BeginUndoStep/EndUndoStep, which is what the Controls/ behaviours do.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
@@ -129,6 +130,100 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         await viewModel.NewCommand.Execute();
         viewModel.History.CanUndo.Should().BeFalse("a new sub-assembly has no history of its own");
     }
+
+    [Fact]
+    public async Task Save_is_not_offered_until_the_form_is_changed()
+    {
+        var (viewModel, _) = await OpenSavedSubAssemblyAsync();
+
+        viewModel.History.IsDirty.Should().BeFalse("the load itself isn't a change");
+        (await CanSave(viewModel)).Should().BeFalse();
+
+        Edit(viewModel, () => viewModel.Lines[0].Grams = 500m);
+
+        viewModel.History.IsDirty.Should().BeTrue();
+        (await CanSave(viewModel)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Save_stops_being_offered_once_the_change_is_taken_back()
+    {
+        var (viewModel, _) = await OpenSavedSubAssemblyAsync();
+        Edit(viewModel, () => viewModel.EditingName = "Renamed");
+        (await CanSave(viewModel)).Should().BeTrue();
+
+        viewModel.TryUndo().Should().BeTrue();
+
+        (await CanSave(viewModel)).Should().BeFalse("the form shows what was saved again");
+    }
+
+    [Fact]
+    public async Task Save_stops_being_offered_once_it_has_written()
+    {
+        var (viewModel, _) = await OpenSavedSubAssemblyAsync();
+        Edit(viewModel, () => viewModel.EditingName = "Renamed");
+
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+
+        (await CanSave(viewModel)).Should().BeFalse("what was written is the new starting point");
+    }
+
+    [Fact]
+    public async Task Save_is_not_offered_on_a_blank_new_form()
+    {
+        var (viewModel, _) = await OpenSavedSubAssemblyAsync();
+
+        await viewModel.NewCommand.Execute();
+        (await CanSave(viewModel)).Should().BeFalse("an empty form has nothing to write");
+
+        Edit(viewModel, () => viewModel.EditingName = "Sweet Dough II");
+        (await CanSave(viewModel)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_cell_still_open_keeps_Save_offered()
+    {
+        // What's typed into a cell doesn't reach the line until the edit ends, and the click that saves is the
+        // click that ends it - a Save disabled under the cursor would swallow it.
+        var (viewModel, _) = await OpenSavedSubAssemblyAsync();
+        var recorder = (IUndoRecorder)viewModel;
+
+        recorder.IsEditPending = true;
+        (await CanSave(viewModel)).Should().BeTrue();
+
+        recorder.IsEditPending = false;
+        (await CanSave(viewModel)).Should().BeFalse("the cell closed with nothing typed");
+    }
+
+    [Fact]
+    public async Task Save_is_not_offered_on_the_blank_form_the_screen_opens_with()
+    {
+        // The screen's real opening order: the form is blank before the roles exist, and the load then gives it
+        // the first one. That isn't the user's change, so it mustn't read as something to save.
+        await AddRoleAsync("Dough", sortOrder: 1);
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.EditingRole.Should().NotBeNull("a new form takes the first role once they've loaded");
+        (await CanSave(viewModel)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Showing_the_tab_again_is_not_something_to_save()
+    {
+        // LoadCommand runs every time the tab is shown; it only merges in fresh data and re-points the pickers.
+        var (viewModel, _) = await OpenSavedSubAssemblyAsync();
+
+        await viewModel.LoadCommand.Execute();
+
+        (await CanSave(viewModel)).Should().BeFalse("a refresh isn't an edit");
+    }
+
+    /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the View binds it.</summary>
+    private static async Task<bool> CanSave(SubAssembliesViewModel viewModel) =>
+        await viewModel.SaveCommand.CanExecute.FirstAsync();
 
     /// <summary>One finished change, as the Controls/ behaviours bracket a gesture in the app.</summary>
     private static void Edit(SubAssembliesViewModel viewModel, Action change)

@@ -14,9 +14,10 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.Tests.ViewModels;
 
 /// <summary>
-/// Undo and redo on the Raw Materials screen, the same mechanism Products uses with its own snapshot. The price
-/// history is deliberately outside it: its Delete writes to the database on the spot, so there is nothing unsaved
-/// for an undo to put back.
+/// Undo and redo on the Raw Materials screen, the same mechanism Products uses with its own snapshot, and with it
+/// whether Save has anything to write, which is measured against the same snapshots. The price history is
+/// deliberately outside it: its Delete writes to the database on the spot, so there is nothing unsaved for an
+/// undo to put back.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
@@ -206,6 +207,99 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.EditingWeightLossPercent.Should().Be(3m);
         viewModel.BomTotalWeight.Should().Be(970m);
     }
+
+    [Fact]
+    public async Task Save_is_not_offered_until_the_form_is_changed()
+    {
+        var (viewModel, _) = await OpenPurchasedIngredientAsync();
+
+        viewModel.History.IsDirty.Should().BeFalse("the load itself isn't a change");
+        (await CanSave(viewModel)).Should().BeFalse();
+
+        Edit(viewModel, () => viewModel.EditingName = "Flour, Renamed");
+
+        (await CanSave(viewModel)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Save_stops_being_offered_once_the_change_is_taken_back()
+    {
+        var (viewModel, _) = await OpenPurchasedIngredientAsync();
+        Edit(viewModel, () => viewModel.UnitRows[0].BaseUnitsPerUnit = 50000m);
+        (await CanSave(viewModel)).Should().BeTrue();
+
+        viewModel.TryUndo().Should().BeTrue();
+
+        (await CanSave(viewModel)).Should().BeFalse("the form shows what was saved again");
+    }
+
+    [Fact]
+    public async Task Save_stops_being_offered_once_it_has_written()
+    {
+        var (viewModel, materialId) = await OpenPurchasedIngredientAsync();
+        Edit(viewModel, () => viewModel.EditingName = "Flour, Renamed");
+
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.SelectedRawMaterial?.Id == materialId,
+            () => $"ready={viewModel.AreDetailsReady}, selected={viewModel.SelectedRawMaterial?.Id}");
+
+        (await CanSave(viewModel)).Should().BeFalse("what was written is the new starting point");
+    }
+
+    [Fact]
+    public async Task Save_is_not_offered_on_a_blank_new_form()
+    {
+        var (viewModel, _) = await OpenPurchasedIngredientAsync();
+
+        await viewModel.NewCommand.Execute();
+        (await CanSave(viewModel)).Should().BeFalse("an empty form has nothing to write");
+
+        Edit(viewModel, () => viewModel.EditingName = "Bread Flour");
+        (await CanSave(viewModel)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_cell_still_open_keeps_Save_offered()
+    {
+        // What's typed into a cell doesn't reach the row until the edit ends, and the click that saves is the
+        // click that ends it - a Save disabled under the cursor would swallow it.
+        var (viewModel, _) = await OpenPurchasedIngredientAsync();
+        var recorder = (IUndoRecorder)viewModel;
+
+        recorder.IsEditPending = true;
+        (await CanSave(viewModel)).Should().BeTrue();
+
+        recorder.IsEditPending = false;
+        (await CanSave(viewModel)).Should().BeFalse("the cell closed with nothing typed");
+    }
+
+    [Fact]
+    public async Task Save_is_not_offered_on_the_blank_form_the_screen_opens_with()
+    {
+        await GetOrCreateUnitOfMeasureAsync("kilogram", "kg");
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        (await CanSave(viewModel)).Should().BeFalse("an empty form has nothing to write");
+    }
+
+    [Fact]
+    public async Task Showing_the_tab_again_is_not_something_to_save()
+    {
+        // LoadCommand runs every time the tab is shown; it only merges in fresh data and re-points the pickers.
+        var (viewModel, _) = await OpenPurchasedIngredientAsync();
+
+        await viewModel.LoadCommand.Execute();
+
+        (await CanSave(viewModel)).Should().BeFalse("a refresh isn't an edit");
+    }
+
+    /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the View binds it.</summary>
+    private static async Task<bool> CanSave(RawMaterialsViewModel viewModel) =>
+        await viewModel.SaveCommand.CanExecute.FirstAsync();
 
     /// <summary>One finished change, as the Controls/ behaviours bracket a gesture in the app.</summary>
     private static void Edit(RawMaterialsViewModel viewModel, Action change)

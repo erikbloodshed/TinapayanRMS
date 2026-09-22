@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Globalization;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
@@ -1307,6 +1308,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             .Select(tab => tab is PackagingRecipeTab)
             .ToProperty(this, x => x.IsPackagingShowing);
 
+        // Nothing is recorded until a product's details have arrived, or while the screen is being written to
+        // wholesale: a load merging in fresh data and a restore putting a form back are neither of them edits.
+        // Set up before the subscriptions below rather than beside the Undo and Redo commands: the selection ones
+        // run as they're wired, with nothing selected, and the load that fires takes the blank form as the
+        // settled one - a history that didn't exist yet would take the whole subscription down with it.
+        History = new UndoHistory<ProductFormSnapshot>(
+            CaptureSnapshot,
+            (before, after) => before.ShowsSameAs(after),
+            () => AreDetailsReady && !IsBusyApplying,
+            (settled, now) => settled.SavesSameAs(now));
+
         // Every selection-driven subscription skips while LoadCommand merges in fresh data, which only
         // re-points a selection at its refreshed copy; the form, recipe and unsaved edits stay as-is.
         this.WhenAnyValue(x => x.SelectedProduct)
@@ -1448,15 +1460,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         this.WhenAnyValue(x => x.EditingQuantityRequired)
             .Subscribe(_ => this.RaisePropertyChanged(nameof(CostUnitCaption)));
 
-        // Nothing is recorded until a product's details have arrived, or while the screen is being written to
-        // wholesale: a load merging in fresh data and a restore putting a form back are neither of them edits.
-        History = new UndoHistory<ProductFormSnapshot>(
-            CaptureSnapshot,
-            (before, after) => before.ShowsSameAs(after),
-            () => AreDetailsReady && !IsBusyApplying);
-
         UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, History.WhenAnyValue(h => h.CanUndo));
         RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, History.WhenAnyValue(h => h.CanRedo));
+
+        // Save offers itself only when the form holds something the saved product doesn't. Re-read on every
+        // change rather than only when an undo step settles: a step closes on the way out of a field, and a Save
+        // button still disabled under the cursor would swallow the very click that enabled it.
+        this.Changed.Subscribe(_ => History.RefreshDirty());
+        WatchForSave(UsageEdits);
+        WatchForSave(LineEdits);
+        WatchForSave(FormLines);
+        WatchForSave(FormAddIns);
+        WatchForSave(FormPackagingLines);
+        ((INotifyPropertyChanged)RecipeTabs).PropertyChanged += (_, _) => RebaseSettledForm();
 
         // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
         // rather than replaces, so the screen keeps its selection, pickers and unsaved edits while
@@ -1614,7 +1630,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             // next Save compares against.
             await LoadCommand.Execute();
             await ReloadSavedProductAsync(id);
-        }));
+        }),
+        History.WhenAnyValue(h => h.IsDirty));
 
         // The description is edited in a pop-up under the header's title, straight into the form; Save saves it.
         EditDescriptionCommand = ReactiveCommand.Create(() =>
@@ -1909,6 +1926,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         SelectedLineEdit = null;
         ClearDetails();
         ApplyCostingDefaults();
+
+        // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
+        History.MarkClean();
     }
 
     /// <summary>
@@ -1964,6 +1984,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     {
         if (product is null)
         {
+            // Nothing picked: the form is a blank one, and there's nothing to save until it's typed into.
+            History.MarkClean();
             return;
         }
 
@@ -2004,6 +2026,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         SetCosting(detail.Costing);
         RefreshLinkableOptions();
         RecomputeCosts();
+        History.MarkClean();
     }
 
     /// <summary>Everything a product's detail shows, as LoadProductDetailAsync reads it.</summary>
@@ -2133,9 +2156,25 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         ReselectRecipeTab(previousTab, previousUsage);
     }
 
+    /// <summary>
+    /// Follows <paramref name="rows"/> for Save's sake: a row added, removed or replaced can be something to
+    /// save. Watched through the collection's own PropertyChanged rather than its CollectionChanged, because an
+    /// ObservableCollection only enforces its re-entrancy guard once more than one handler is listening - and
+    /// these collections are changed from inside their own notifications, so a second CollectionChanged listener
+    /// would turn a change the guard tolerates today into an exception. What's typed into a row reaches Save
+    /// another way: the grid closes the cell's undo step, which re-reads whether there's anything to save.
+    /// </summary>
+    private void WatchForSave(INotifyPropertyChanged rows) => rows.PropertyChanged += (_, _) => History.RefreshDirty();
+
     void IUndoRecorder.BeginUndoStep() => History.Begin();
 
     void IUndoRecorder.EndUndoStep() => History.End();
+
+    bool IUndoRecorder.IsEditPending
+    {
+        get => History.IsEditPending;
+        set => History.IsEditPending = value;
+    }
 
     /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>
     private void AsUndoStep(Action change)
@@ -2503,6 +2542,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         if (untouchedNewProduct)
         {
             ApplyCostingDefaults();
+
+            // The defaults landing on a form that was still showing the previous ones isn't the user's change -
+            // on the screen's first load they land on a blank form costed at nothing - so what Save measures
+            // against follows them. Only the costing moves: a product whose costing was typed into isn't here.
+            History.Rebase((settled, now) => settled with { Costing = now.Costing });
         }
     }
 
@@ -2890,6 +2934,23 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     {
         IsUsageFormOpen = false;
         EditingUsage = null;
+        RebaseSettledForm();
+    }
+
+    /// <summary>
+    /// The sub-assembly form now holds another section's values, or none, without anything having been edited,
+    /// so what Save measures itself against follows it: clicking through the recipe's tabs isn't a change to
+    /// write. Only the form and the tabs move (ProductFormSnapshot.WithFormOf) - the recipe a tab left has
+    /// already been applied into the sections by then, and those are measured as they were saved.
+    ///
+    /// Not while a restore is putting a form back: there the form's values are the user's, stepped back to.
+    /// </summary>
+    private void RebaseSettledForm()
+    {
+        if (!IsBusyApplying)
+        {
+            History.Rebase((settled, now) => settled.WithFormOf(now));
+        }
     }
 
     /// <summary>The form on <paramref name="usage"/>, as it was last applied: the whole of its tab.</summary>
@@ -2914,6 +2975,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         SelectedFormAddIn = null;
         SetPieceSize(usage.AuthoredField, usage.AuthoredValue, usage.ShrinkagePercent);
         IsUsageFormOpen = true;
+        RebaseSettledForm();
     }
 
     /// <summary>
@@ -2927,6 +2989,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         EditingUsageMode = UsageFormMode.New;
         IsUsageFormOpen = true;
         StartUsageFormMode();
+        RebaseSettledForm();
     }
 
     /// <summary>The add form as it opened: nothing picked to link or copy, no line and no piece size. Its role alone isn't an entry.</summary>

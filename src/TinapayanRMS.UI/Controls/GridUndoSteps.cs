@@ -56,14 +56,32 @@ public static class GridUndoSteps
     private static IUndoRecorder? RecorderOf(object sender) =>
         sender is DependencyObject element ? GetRecorder(element) : null;
 
-    private static void OnCellBeginEdit(object? sender, CurrentCellBeginEditEventArgs e) => RecorderOf(sender!)?.BeginUndoStep();
+    private static void OnCellBeginEdit(object? sender, CurrentCellBeginEditEventArgs e)
+    {
+        if (RecorderOf(sender!) is { } recorder)
+        {
+            recorder.BeginUndoStep();
+
+            // What's typed into the cell doesn't reach the line until the edit ends, so until then the screen
+            // can't tell whether there's anything to save and keeps Save offered: the click that saves is the
+            // click that ends the edit, and a Save button disabled under the cursor would swallow it.
+            recorder.IsEditPending = true;
+        }
+    }
 
     /// <summary>
     /// The row already holds the typed value here: the grid writes it through the cell's binding inside EndEdit,
     /// and only then raises this. Everything the change sets off has run by now too, so the step closes on a form
     /// that has settled.
     /// </summary>
-    private static void OnCellEndEdit(object? sender, CurrentCellEndEditEventArgs e) => RecorderOf(sender!)?.EndUndoStep();
+    private static void OnCellEndEdit(object? sender, CurrentCellEndEditEventArgs e)
+    {
+        if (RecorderOf(sender!) is { } recorder)
+        {
+            recorder.IsEditPending = false;
+            recorder.EndUndoStep();
+        }
+    }
 
     /// <summary>
     /// The Base column's tick. Its renderer handles the click itself and never opens an edit, so the cell events

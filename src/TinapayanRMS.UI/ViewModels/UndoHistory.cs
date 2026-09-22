@@ -15,6 +15,14 @@ public interface IUndoRecorder
 
     /// <summary>The change is finished: keep the step if it changed anything, drop it if it didn't.</summary>
     void EndUndoStep();
+
+    /// <summary>
+    /// Something is being typed that hasn't reached the form yet: a grid cell still open, or a box whose value
+    /// only lands when focus leaves it. Until it does, the screen can't tell whether there's anything to save,
+    /// so it keeps Save offered while this is set — the click that saves is also the click that ends the edit,
+    /// and a Save button disabled under the cursor would swallow it.
+    /// </summary>
+    bool IsEditPending { get; set; }
 }
 
 /// <summary>
@@ -39,11 +47,17 @@ public interface IUndoScreen : IUndoRecorder
 /// <param name="capture">Takes the screen's editable state as it stands.</param>
 /// <param name="showsSame">True when two snapshots would look the same to the user, so no step is worth keeping.</param>
 /// <param name="canRecord">False while the screen is mid-load or mid-restore, when a change isn't the user's.</param>
+/// <param name="savesSame">
+/// True when two snapshots would be saved the same, which is the narrower question behind <see cref="IsDirty"/>:
+/// a screen that holds nothing but the record's own data answers it with <paramref name="showsSame"/>, which is
+/// the default, and one that also holds where the user has got to gives its own.
+/// </param>
 /// <param name="depth">How many steps are kept; the oldest goes when a new one passes it.</param>
 public sealed class UndoHistory<TSnapshot>(
     Func<TSnapshot> capture,
     Func<TSnapshot, TSnapshot, bool> showsSame,
     Func<bool> canRecord,
+    Func<TSnapshot, TSnapshot, bool>? savesSame = null,
     int depth = 50) : ReactiveObject
     where TSnapshot : class
 {
@@ -54,8 +68,77 @@ public sealed class UndoHistory<TSnapshot>(
     /// <summary>How the form stood when the step now open was opened; null when no step is open.</summary>
     private TSnapshot? _pending;
 
+    /// <summary>
+    /// How the form stood when it was last settled: loaded, saved or reverted. Null between a <see cref="Clear"/>
+    /// and the <see cref="MarkClean"/> that follows it, while the form is mid-load and holds nothing of the user's.
+    /// </summary>
+    private TSnapshot? _baseline;
+
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
+
+    private bool _isDirty;
+
+    /// <summary>
+    /// Whether the form holds anything a Save would write. It's what the Save button is enabled by, so it has to
+    /// follow the form as it's typed into rather than only as each field is left: a button still disabled under
+    /// the cursor swallows the very click that would have enabled it. The screen calls <see cref="RefreshDirty"/>
+    /// for every change it can see; this class calls it for the ones it settles itself.
+    /// </summary>
+    public bool IsDirty
+    {
+        get => _isDirty;
+        private set => this.RaiseAndSetIfChanged(ref _isDirty, value);
+    }
+
+    private bool _isEditPending;
+
+    /// <summary>
+    /// An edit that hasn't reached the form yet, as <see cref="IUndoRecorder.IsEditPending"/> describes. While
+    /// it's set, <see cref="IsDirty"/> says there is something to save, since nothing else can say otherwise.
+    /// </summary>
+    public bool IsEditPending
+    {
+        get => _isEditPending;
+        set
+        {
+            _isEditPending = value;
+            RefreshDirty();
+        }
+    }
+
+    /// <summary>
+    /// Takes the form as it stands for the settled one: what a Save has just written, or what a load has just put
+    /// there. Called once the screen's details have all arrived, since a form measured half-loaded would read as
+    /// changed the moment the rest of it landed.
+    /// </summary>
+    public void MarkClean()
+    {
+        _baseline = capture();
+        RefreshDirty();
+    }
+
+    /// <summary>Re-reads whether the form still shows what it was settled with. Cheap enough for every keystroke.</summary>
+    public void RefreshDirty() =>
+        IsDirty = _isEditPending || (_baseline is not null && !(savesSame ?? showsSame)(_baseline, capture()));
+
+    private void RefreshDirty(TSnapshot now) =>
+        IsDirty = _isEditPending || (_baseline is { } baseline && !(savesSame ?? showsSame)(baseline, now));
+
+    /// <summary>
+    /// Moves part of the settled form on to what the form holds now, for a change that isn't the user's: a
+    /// section's form opened over the previous one shows other values without anything having been edited. The
+    /// screen says which part through <paramref name="rebase"/>, which is handed the settled form and the one
+    /// showing and returns the settled form to measure against from here.
+    /// </summary>
+    public void Rebase(Func<TSnapshot, TSnapshot, TSnapshot> rebase)
+    {
+        if (_baseline is { } baseline)
+        {
+            _baseline = rebase(baseline, capture());
+            RefreshDirty();
+        }
+    }
 
     /// <summary>Opens a step, settling one already open first.</summary>
     public void Begin()
@@ -76,7 +159,14 @@ public sealed class UndoHistory<TSnapshot>(
         }
 
         _pending = null;
-        if (!canRecord() || showsSame(before, capture()))
+        if (!canRecord())
+        {
+            return;
+        }
+
+        var now = capture();
+        RefreshDirty(now);
+        if (showsSame(before, now))
         {
             return;
         }
@@ -115,10 +205,16 @@ public sealed class UndoHistory<TSnapshot>(
         return true;
     }
 
-    /// <summary>Throws the history away: another product picked, a new one started, a Save or a Revert.</summary>
+    /// <summary>
+    /// Throws the history away: another product picked, a new one started, a Save or a Revert. The settled form
+    /// goes with it, so nothing is dirty until the screen says what the new one is (<see cref="MarkClean"/>) —
+    /// a form still being loaded holds no change of the user's to save.
+    /// </summary>
     public void Clear()
     {
         _pending = null;
+        _baseline = null;
+        RefreshDirty();
         var hadUndo = _undo.Count > 0;
         var hadRedo = _redo.Count > 0;
         _undo.Clear();
