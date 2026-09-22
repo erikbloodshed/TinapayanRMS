@@ -1,9 +1,10 @@
-using System.Reactive.Linq;
+﻿using System.Reactive.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 using ReactiveUI;
 using Syncfusion.SfSkinManager;
-using Syncfusion.UI.Xaml.NavigationDrawer;
 using Syncfusion.Windows.Tools.Controls;
 using TinapayanRMS.UI.ViewModels;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
@@ -15,6 +16,7 @@ public partial class MainWindow : Window
     // Each tab's screen LoadCommand, run whenever that tab is shown (see LoadSelectedTab).
     private readonly Dictionary<TabItemExt, ReactiveCommand<RxVoid, RxVoid>> _loadCommands = [];
     private readonly HashSet<TabItemExt> _loadingTabs = [];
+
     private readonly UnitsOfMeasureViewModel _unitsOfMeasureViewModel;
     private readonly CategoriesViewModel _categoriesViewModel;
     private readonly ProductCategoriesViewModel _productCategoriesViewModel;
@@ -60,15 +62,114 @@ public partial class MainWindow : Window
         Loaded += (_, _) => LoadSelectedTab();
     }
 
-    private void NavigationDrawer_ItemClicked(object sender, NavigationItemClickedEventArgs e)
+    /// <summary>
+    /// Summons the menu, or puts it away. ToggleDrawer() rather than IsOpen = true: it's the control's
+    /// documented way in (and what Syncfusion's own demos call), and it clears the secondary drawer's
+    /// state on the way. The toggle sits in the header row, outside the drawer's scrim, so it stays
+    /// clickable while the menu is open and this closes it again.
+    /// </summary>
+    private void ToggleNavigationButton_Click(object sender, RoutedEventArgs e)
     {
-        if (ReferenceEquals(e.Item, SettingsNavItem))
+        NavigationDrawer.ToggleDrawer();
+
+        if (NavigationDrawer.IsOpen)
         {
-            OpenSettings();
+            // The panel is Collapsed until the open animation starts, and a collapsed element can't take
+            // focus, so this waits for the layout pass. Focus goes to the list itself, not to a row: a
+            // row would light up the moment the menu opened, which is the "current page" look that was
+            // just taken out. The first Down then steps onto the top row (see MoveMenuFocus).
+            Dispatcher.BeginInvoke(() => NavigationMenu.Focus(), DispatcherPriority.Input);
         }
-        else if (e.Item.Tag is TabItemExt tab)
+    }
+
+    /// <summary>
+    /// Picking a destination navigates to it. Driven by the click, not by the ListBox's selection: the
+    /// menu doesn't mark the page showing (the tab strip right below already does), so its SelectedItem
+    /// would be both invisible and free to drift from the tab actually open — and a click on a row that
+    /// happened to still be selected raises no SelectionChanged, so it would close the menu without
+    /// navigating. The ListBox is kept for its templated rows and their hover, not for a selection.
+    /// </summary>
+    private void NavigationMenuItem_Clicked(object sender, MouseButtonEventArgs e) => Navigate(sender as ListBoxItem);
+
+    private void Navigate(ListBoxItem? row)
+    {
+        if (row is { Tag: TabItemExt tab })
         {
-            ShowTab(tab);
+            ShowTab(tab);   // closes the drawer
+        }
+        else
+        {
+            CloseDrawer();
+        }
+    }
+
+    /// <summary>
+    /// The keyboard model the drawer's own NavigationView gives Compact mode, which the Default
+    /// template doesn't: the arrows walk the rows without navigating, Enter opens the one in focus,
+    /// Escape puts the menu away. The arrows are handled here, in Preview, so the ListBox never sees
+    /// them: left to itself it would move its own selection, which this menu doesn't use. Handled on the
+    /// panel rather than the Window so Escape can't beat a grid cell editor's cancel.
+    /// </summary>
+    private void NavigationMenu_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Down or Key.Up:
+                MoveMenuFocus(e.Key == Key.Down ? 1 : -1);
+                e.Handled = true;
+                break;
+
+            case Key.Enter when Keyboard.FocusedElement is ListBoxItem row:
+                Navigate(row);
+                e.Handled = true;
+                break;
+
+            case Key.Escape:
+                CloseDrawer();
+                e.Handled = true;
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Steps the keyboard from one destination to the next. It walks <see cref="NavigationMenu"/>'s own
+    /// items rather than calling MoveFocus: a ListBox sets KeyboardNavigation.TabNavigation to Once, so
+    /// Next/Previous leave the list altogether instead of visiting the sibling rows — which is why the
+    /// arrows did nothing useful when this went through MoveFocus. With nothing in the list focused yet
+    /// (how the menu opens), Down starts at the top row and Up at the bottom one.
+    /// </summary>
+    private void MoveMenuFocus(int step)
+    {
+        var rows = NavigationMenu.Items.OfType<ListBoxItem>().ToList();
+
+        if (rows.Count == 0)
+        {
+            return;
+        }
+
+        var current = rows.FindIndex(row => row.IsKeyboardFocusWithin);
+        var next = current < 0
+            ? (step > 0 ? 0 : rows.Count - 1)
+            : Math.Clamp(current + step, 0, rows.Count - 1);
+
+        rows[next].Focus();
+    }
+
+    private void SettingsNavButton_Click(object sender, RoutedEventArgs e) => OpenSettings();
+
+    /// <summary>
+    /// Puts the menu away, and takes the keyboard off the rows it hides — focus left on a collapsed
+    /// element goes nowhere, and Tab from there starts over at the top of the window. IsOpen = false
+    /// rather than ToggleDrawer(): these are unconditional closes, and toggling would *open* a drawer
+    /// that happened to be shut.
+    /// </summary>
+    private void CloseDrawer()
+    {
+        NavigationDrawer.IsOpen = false;
+
+        if (NavigationMenu.IsKeyboardFocusWithin || SettingsNavButton.IsKeyboardFocused)
+        {
+            ToggleNavigationButton.Focus();
         }
     }
 
@@ -79,7 +180,7 @@ public partial class MainWindow : Window
     {
         tab.Visibility = Visibility.Visible;
         MainTabControl.SelectedItem = tab;
-        NavigationDrawer.IsOpen = false;
+        CloseDrawer();
     }
 
     /// <summary>
@@ -89,7 +190,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void OpenSettings()
     {
-        NavigationDrawer.IsOpen = false;
+        CloseDrawer();
 
         var settings = new SettingsWindow(
             _unitsOfMeasureViewModel, _categoriesViewModel, _productCategoriesViewModel, _rolesViewModel, _costingDefaultsViewModel) { Owner = this };

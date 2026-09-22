@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using DynamicData;
 using ReactiveUI;
@@ -144,8 +144,10 @@ public class ReportsViewModel : ReactiveObject
                         subAssembly.TotalWeight,
                         subAssembly.TotalCost,
                         [.. addInsByUsage[u.Id].Select(l => (l.Grams, l.Ingredient!.BufferedCostPerBaseUnit))]);
-                    var (weightPerPiece, _) = ProductRules.ResolvePieceSize(u.AuthoredField, u.AuthoredValue, totalWeight);
-                    return ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight);
+                    // The pieces come out of what the batch makes, so the batch's whole cost is spread over that.
+                    var finalWeight = ProductRules.CalculateFinalWeight(totalWeight, u.ShrinkagePercent);
+                    var (weightPerPiece, _) = ProductRules.ResolvePieceSize(u.AuthoredField, u.AuthoredValue, finalWeight);
+                    return finalWeight > 0 ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, finalWeight) : 0m;
                 })
                 .ToList();
 

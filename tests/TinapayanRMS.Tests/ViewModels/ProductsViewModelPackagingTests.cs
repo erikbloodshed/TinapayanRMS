@@ -38,7 +38,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.IsFormPackaging.Should().BeTrue();
         viewModel.IsFormEditingPackaging.Should().BeTrue();
         viewModel.FormPackagingLines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
-        viewModel.UsageFormPreviewText.Should().Be("₱30.0000 a piece");
+        viewModel.UsageFormPreviewText.Should().Be("30.0000 a piece");
 
         // The form has no Apply of its own: Save puts it in the recipe and shows its tab, as leaving the tab would.
         await viewModel.SaveCommand.Execute();

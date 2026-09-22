@@ -322,6 +322,40 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         (await dbContext.SubAssemblies.SingleAsync(s => s.Id == doughId, Cancellation)).TotalWeight.Should().Be(1500m);
     }
 
+    [Fact]
+    public async Task Shrinkage_cuts_the_yield_and_makes_every_piece_dearer()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var (productId, _) = await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 1700m)], weightPerPiece: 60m);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        await viewModel.EditUsageCommand.Execute(viewModel.UsageEdits.Single());
+        viewModel.EditingUsageYield.Should().Be(28.33m, "1,700 g at 60 g a piece, with nothing lost baking it");
+
+        // A tenth of the batch bakes off: the typed weight per piece is the finished piece, so the yield drops.
+        viewModel.EditingUsageShrinkagePercent = 10m;
+
+        viewModel.EditingUsageWeightPerPiece.Should().Be(60m, "the typed figure stays put");
+        viewModel.EditingUsageYield.Should().Be(25.5m, "the pieces come out of the 1,530 g the batch makes");
+        viewModel.UsageFormTotalWeightText.Should().Be("1,700 g", "the lines that go in are unchanged");
+        viewModel.UsageFormFinalWeightText.Should().Be("1,530 g");
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        var usage = await dbContext.ProductSubAssemblyUsages.SingleAsync(u => u.ProductId == productId, Cancellation);
+        usage.ShrinkagePercent.Should().Be(10m);
+        usage.AuthoredValue.Should().Be(60m, "shrinkage is its own figure, not a piece size");
+
+        // The batch still costs ₱85 (1,700 g of flour at ₱0.05), now spread over 25.5 pieces instead of 28.33.
+        viewModel.UsageEdits.Single().CostPerPiece.Should().BeApproximately(85m / 25.5m, 0.0001m);
+    }
+
     /// <summary>
     /// Add Sub-Assembly is a drop-down of the three ways in (RecipeStructureCard), and the way it carries is what the
     /// form opens in — the form has no picker of its own any more. Another item picked while the add tab shows changes

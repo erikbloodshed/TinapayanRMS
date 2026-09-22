@@ -278,6 +278,10 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
 
+                    b.Property<decimal>("ShrinkagePercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<int>("SubAssemblyId")
                         .HasColumnType("int");
 
@@ -291,6 +295,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.ToTable("ProductSubAssemblyUsages", t =>
                         {
                             t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "[AuthoredValue] >= 0");
+
+                            t.HasCheckConstraint("CK_ProductSubAssemblyUsages_ShrinkagePercent", "[ShrinkagePercent] >= 0 AND [ShrinkagePercent] < 100");
                         });
                 });
 

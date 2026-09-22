@@ -190,7 +190,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var brand = viewModel.BrandPriceRows.Single();
         (brand.Brand, brand.UnitKey, brand.Price).Should().Be(("Gold Medal", bagId, 1250m), "the form reloads what was saved");
         viewModel.HeaderCostUnitText.Should().Be("bag", "the header's costs are in the Per unit, the dearest brand's");
-        viewModel.CurrentCostText.Should().Be("₱1,250.00");
+        viewModel.CurrentCostText.Should().Be("1,250.00");
         viewModel.CanChangeTypeAndSource.Should().BeFalse();
     }
 
@@ -251,7 +251,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         brand.Price = 1500m;
         viewModel.BrandPriceRows.Add(brand);
         viewModel.UnitRows.Single().BaseEquivalentText.Should().Be("25,000 g", "the quantity typed is the unit's multiplier");
-        viewModel.PurchaseCostText.Should().Be("₱0.0600");
+        viewModel.PurchaseCostText.Should().Be("0.0600");
 
         await viewModel.SaveCommand.Execute();
 
@@ -265,7 +265,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var reloaded = viewModel.BrandPriceRows.Single();
         (reloaded.UnitKey, reloaded.Quantity).Should().Be((sackId, 25000m));
         reloaded.CanTypeQuantity.Should().BeFalse("a saved unit's multiplier is corrected in Alternative Units");
-        viewModel.CurrentCostText.Should().Be("₱1,500.00", "a 25 kg sack's worth, the Per unit");
+        viewModel.CurrentCostText.Should().Be("1,500.00", "a 25 kg sack's worth, the Per unit");
     }
 
 
@@ -441,7 +441,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.CanAddUnit.Should().BeFalse("the ingredient already has the two alternative units allowed");
 
         AddBrandPrice(viewModel, null, "pack", 60m);
-        viewModel.PurchaseCostText.Should().Be("₱0.0600", "the cost per gram is worked out as the price is typed");
+        viewModel.PurchaseCostText.Should().Be("0.0600", "the cost per gram is worked out as the price is typed");
         await viewModel.SaveCommand.Execute();
 
         await WaitUntilSettledAsync(() => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 1,
@@ -465,7 +465,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         AddBrandPrice(viewModel, "Gold Medal", "bag", 900m); // ₱0.036/g
         AddBrandPrice(viewModel, "Wellington", "pack", 40m); // ₱0.04/g
-        viewModel.PurchaseCostText.Should().Be("₱0.0400");
+        viewModel.PurchaseCostText.Should().Be("0.0400");
         viewModel.PurchaseCostSourceText.Should().Be("From Wellington, the dearest of 2 brands.");
 
         await viewModel.SaveCommand.Execute();
@@ -535,7 +535,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.BomLineEdits.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.HeaderCostUnitText.Should().Be("g", "a made ingredient has no Purchase Cost Setup, so its header stays per gram");
-        viewModel.CurrentCostText.Should().MatchRegex(@"^₱\d+\.\d{4}$");
+        viewModel.CurrentCostText.Should().MatchRegex(@"^\d+\.\d{4}$");
         var lineId = await BomLineIdAsync();
 
         viewModel.EditingName = "Syrup";
@@ -638,13 +638,13 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.BomTotalWeight.Should().Be(970m, "1,000 g less the 3% lost while making it");
         viewModel.BomTotalCost.Should().Be(110m, "1,000 g of sugar at its buffered ₱0.11");
-        viewModel.BufferedCostText.Should().Be("₱0.1134", "₱110 over the 970 g it yields, as the BOM stands");
+        viewModel.BufferedCostText.Should().Be("0.1134", "₱110 over the 970 g it yields, as the BOM stands");
 
         // The weight loss moves the yield, not the cost.
         viewModel.EditingWeightLossPercent = 20m;
         viewModel.BomTotalWeight.Should().Be(800m);
         viewModel.BomTotalCost.Should().Be(110m);
-        viewModel.BufferedCostText.Should().Be("₱0.1375");
+        viewModel.BufferedCostText.Should().Be("0.1375");
 
         await viewModel.SaveCommand.Execute();
 
@@ -656,7 +656,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         (viewModel.BomTotalCost / viewModel.BomTotalWeight).Should().Be(viewModel.SelectedRawMaterial!.BufferedCostPerBaseUnit,
             "the tiles are the two sides of the buffered cost the cascade saved");
         viewModel.SelectedRawMaterial!.CostBufferPercent.Should().Be(0m, "a made ingredient carries no buffer of its own");
-        viewModel.BufferedCostText.Should().Be("₱0.1375");
+        viewModel.BufferedCostText.Should().Be("0.1375");
     }
 
     [Fact]
@@ -669,8 +669,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == flourId);
 
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "details never arrived");
-        viewModel.CurrentCostText.Should().Be("₱0.0500");
-        viewModel.BufferedCostText.Should().Be("₱0.0525", "only a made ingredient's follows the form");
+        viewModel.CurrentCostText.Should().Be("0.0500");
+        viewModel.BufferedCostText.Should().Be("0.0525", "only a made ingredient's follows the form");
         viewModel.BomTotalWeight.Should().Be(0m, "it has no BOM");
         viewModel.BomTotalCost.Should().Be(0m);
     }
@@ -699,7 +699,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.BomTotalCost.Should().Be(220m, "the refreshed component is what the rows point at");
         viewModel.BomTotalWeight.Should().Be(1000m, "seeded with no weight loss");
-        viewModel.BufferedCostText.Should().Be("₱0.2200");
+        viewModel.BufferedCostText.Should().Be("0.2200");
     }
 
     [Fact]
@@ -823,10 +823,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var brand = AddBrandPrice(viewModel, null, "bag", 1250m);
         viewModel.TypedCostBufferPercent = 5m;
         viewModel.EditingBufferedCost.Should().Be(0.0525m, "typing the percent puts it on top of the dearest brand");
-        viewModel.PurchaseCostText.Should().Be("₱0.0500");
+        viewModel.PurchaseCostText.Should().Be("0.0500");
         viewModel.BufferedCostUnit!.Key.Should().Be(PurchaseUnitChoice.BaseUnitKey, "a new material starts on its base unit");
         viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
-        viewModel.PurchaseBufferedCostText.Should().Contain("₱1,312.50/bag");
+        viewModel.PurchaseBufferedCostText.Should().Contain("1,312.50/bag");
         brand.BufferPercent.Should().Be(5m, "the brand's Buffer % column is the buffered cost over its price");
 
         await viewModel.SaveCommand.Execute();
@@ -840,14 +840,14 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.BufferedCostUnit!.Name.Should().Be("bag", "a saved material starts on its dearest brand's unit");
         viewModel.EditingBufferedCostInUnit.Should().Be(1312.5m);
         viewModel.HeaderCostUnitText.Should().Be("bag");
-        viewModel.CurrentCostText.Should().Be("₱1,250.00");
-        viewModel.BufferedCostText.Should().Be("₱1,312.50");
+        viewModel.CurrentCostText.Should().Be("1,250.00");
+        viewModel.BufferedCostText.Should().Be("1,312.50");
 
         // The header follows the Per unit: per gram, to 4 decimals.
         viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions[0];
         viewModel.HeaderCostUnitText.Should().Be("g");
-        viewModel.CurrentCostText.Should().Be("₱0.0500");
-        viewModel.BufferedCostText.Should().Be("₱0.0525");
+        viewModel.CurrentCostText.Should().Be("0.0500");
+        viewModel.BufferedCostText.Should().Be("0.0525");
         viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
         viewModel.BufferedCostWarningText.Should().BeEmpty();
 
@@ -882,7 +882,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingBufferedCostInUnit.Should().Be(1920m, "₱1,600 with 20% on top");
 
         await viewModel.SaveCommand.Execute();
-        await WaitUntilSettledAsync(() => viewModel.BufferedCostText == "₱1,920.00",
+        await WaitUntilSettledAsync(() => viewModel.BufferedCostText == "1,920.00",
             () => $"buffered={viewModel.BufferedCostText}, error={viewModel.ErrorMessage ?? "none"}");
 
         await viewModel.NewCommand.Execute();
@@ -987,7 +987,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingCostBufferPercent.Should().Be(5m);
         var brand = viewModel.BrandPriceRows.Single();
         (brand.UnitKey, brand.Price, brand.BufferPercent).Should().Be((PurchaseUnitChoice.BaseUnitKey, 930m, 5m));
-        viewModel.PurchaseCostText.Should().Be("₱930.0000");
+        viewModel.PurchaseCostText.Should().Be("930.0000");
     }
 
     [Fact]
@@ -1070,7 +1070,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         box.Type.Should().Be(RawMaterialType.Packaging);
         box.BaseUnitId.Should().Be(pieceId);
         viewModel.SelectedRawMaterial.Should().BeSameAs(box, "saving a new material selects it");
-        viewModel.CurrentCostText.Should().Be("₱0.0000");
+        viewModel.CurrentCostText.Should().Be("0.0000");
         viewModel.CanChangeTypeAndSource.Should().BeFalse("the type is fixed once saved");
         viewModel.Ingredients.Should().NotContain(box, "the BOM component picker lists ingredients only");
     }
@@ -1295,7 +1295,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         // A multiplier corrected in the grid shows as the brand's quantity, and reprices it.
         row.BaseUnitsPerUnit = 20000m;
         brand.Quantity.Should().Be(20000m);
-        viewModel.PurchaseCostText.Should().Be("₱0.0500");
+        viewModel.PurchaseCostText.Should().Be("0.0500");
     }
 
     [Theory]

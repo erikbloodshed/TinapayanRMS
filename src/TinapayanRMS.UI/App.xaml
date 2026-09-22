@@ -81,6 +81,15 @@
             <TextBlock Text="&#xE71B;" Style="{StaticResource IconGlyphStyle}" />
         </DataTemplate>
 
+        <!-- The header's navigation toggle (GlobalNavigationButton) and the drawer's Settings row -->
+        <DataTemplate x:Key="MenuIconTemplate">
+            <TextBlock Text="&#xE700;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="SettingsIconTemplate">
+            <TextBlock Text="&#xE713;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
         <!--
             A collapse toggle's chevron (a checkable ButtonAdv): pointing up while the section is open
             (unchecked), down once it's collapsed (checked).

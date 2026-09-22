@@ -194,13 +194,13 @@
             <TextBlock Text="Material Cost"
                        Style="{StaticResource FigureLabelStyle}"
                        ToolTip="{Binding CostUnitCaption, StringFormat='{}{0}: the share of every sub-assembly it holds, plus its packaging'}" />
-            <TextBlock Grid.Row="1" Text="{Binding Costs.Material, StringFormat='₱{0:N4}'}" Style="{StaticResource FigureAmountStyle}" />
+            <TextBlock Grid.Row="1" Text="{Binding Costs.Material, StringFormat='{}{0:N2}'}" Style="{StaticResource FigureAmountStyle}" />
 
             <TextBlock Grid.Column="2"
                        Text="Base Cost"
                        Style="{StaticResource FigureLabelStyle}"
                        ToolTip="{Binding CostUnitCaption, StringFormat='{}{0}: the material cost with labor, overhead and administrative on top, before markup and VAT'}" />
-            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Costs.BaseCost, StringFormat='₱{0:N4}'}" Style="{StaticResource FigureAmountStyle}" />
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Costs.BaseCost, StringFormat='{}{0:N2}'}" Style="{StaticResource FigureAmountStyle}" />
 
             <TextBlock Grid.Column="4"
                        Text="Current Price"
@@ -208,7 +208,7 @@
                        ToolTip="{Binding CostUnitCaption, StringFormat='{}{0}, with VAT: what the shop charges now'}" />
             <TextBlock Grid.Row="1"
                        Grid.Column="4"
-                       Text="{Binding EditingCurrentPrice, StringFormat='₱{0:N2}', TargetNullValue='—'}"
+                       Text="{Binding EditingCurrentPrice, StringFormat='{}{0:N2}', TargetNullValue='—'}"
                        Style="{StaticResource FigureAmountStyle}"
                        Foreground="{StaticResource AccentBrush}" />
 

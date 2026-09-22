@@ -29,7 +29,7 @@
                        Style="{StaticResource CaptionStyle}"
                        VerticalAlignment="Center"
                        Margin="12,0,0,10">
-                <Run Text="{Binding CostUnitCaption, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Costs.Packaging, StringFormat='₱{0:N4}', Mode=OneWay}" />
+                <Run Text="{Binding CostUnitCaption, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Costs.Packaging, StringFormat='{}{0:N2}', Mode=OneWay}" />
             </TextBlock>
         </Grid>
 

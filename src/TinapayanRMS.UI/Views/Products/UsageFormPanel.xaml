@@ -110,8 +110,18 @@
         -->
         <StackPanel Margin="0,0,0,8" Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}">
             <TextBlock Text="Existing Sub-Assembly or Packaging" Style="{StaticResource FieldLabelStyle}" />
+            <!--
+                IsEditable and AutoCompleteMode are spelled out here, unlike every other picker, which takes them from
+                App's ApplyPickerDefaults as it loads (2026-09-22, at the user's request: "the combobox for selecting
+                Existing Sub-Assembly or Packaging is not searchable"). This form is a UserControl inside a collapsed
+                Border (RecipeStructureCard), so it isn't measured with the screen, its template never applies, and its
+                pickers never raise Loaded — the class handler that sets those two properties never sees them. Set in
+                XAML they hold from the first template application. Same for Role below.
+            -->
             <syncfusion:ComboBoxAdv ItemsSource="{Binding LinkableSubAssemblies}"
                                     DisplayMemberPath="DisplayName"
+                                    IsEditable="True"
+                                    AutoCompleteMode="Suggest"
                                     controls:FieldUndoStep.Recorder="{Binding}"
                                     SelectedItem="{Binding EditingUsageSource, Mode=TwoWay}"
                                     ToolTip="Another product's, or a standalone one from the Sub-Assemblies screen; or packaging: a packaging set, or another product's. A link follows every change made to it where it's kept; a copy is this product's own from then on." />
@@ -148,6 +158,8 @@
                                     HorizontalAlignment="Left"
                                     ItemsSource="{Binding FormRoleOptions}"
                                     DisplayMemberPath="Name"
+                                    IsEditable="True"
+                                    AutoCompleteMode="Suggest"
                                     controls:FieldUndoStep.Recorder="{Binding}"
                                     SelectedItem="{Binding EditingUsageRole, Mode=TwoWay}"
                                     ToolTip="What it's called in the recipe. Roles are added in Settings → Roles." />
@@ -475,14 +487,25 @@
                 </StackPanel>
             </StackPanel>
 
-            <!-- The piece size: type the yield or the weight per piece, and the other follows from the batch -->
+            <!--
+                The piece size: what the batch loses being made, then the yield or the weight per piece — type either
+                and the other follows from what the batch makes, which is the total weight less that shrinkage.
+            -->
             <StackPanel Grid.Column="2" Width="150">
-                <!-- The two typed boxes first, then the batch they work out to. -->
-                <TextBlock Text="Weight per Piece (g)" Style="{StaticResource FieldLabelStyle}" />
+                <!-- The three typed boxes first, then the two weights they work out to. -->
+                <TextBlock Text="Shrinkage %" Style="{StaticResource FieldLabelStyle}" />
+                <syncfusion:DoubleTextBox controls:FieldUndoStep.Recorder="{Binding}"
+                                          MinValue="0"
+                                          MaxValue="99.99"
+                                          Value="{Binding EditingUsageShrinkagePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          NumberDecimalDigits="2"
+                                          ToolTip="How much of the batch's weight this product loses making it — baking a dough off, reducing a filling. The pieces come out of what's left, so the batch's cost is spread over fewer of them. Leave it at 0 if nothing is lost." />
+
+                <TextBlock Text="Weight per Piece (g)" Style="{StaticResource FieldLabelStyle}" Margin="0,10,0,4" />
                 <syncfusion:DoubleTextBox controls:FieldUndoStep.Recorder="{Binding}"
                                           Value="{Binding EditingUsageWeightPerPiece, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           NumberDecimalDigits="2"
-                                          ToolTip="Grams of the batch in one piece. Type it, and the yield is worked out." />
+                                          ToolTip="What one finished piece weighs, out of the batch's final weight. Type it, and the yield is worked out." />
 
                 <TextBlock Text="Yield (pcs)" Style="{StaticResource FieldLabelStyle}" Margin="0,10,0,4" />
                 <syncfusion:DoubleTextBox controls:FieldUndoStep.Recorder="{Binding}"
@@ -498,8 +521,14 @@
                     theme's text box.
                 -->
                 <Border Style="{StaticResource ValueBoxStyle}"
-                        ToolTip="The batch: the sum of its lines, and of this product's add-ins to them.">
+                        ToolTip="The batch that goes in: the sum of its lines, and of this product's add-ins to them.">
                     <TextBlock Text="{Binding UsageFormTotalWeightText}" Foreground="{StaticResource ValueBoxForegroundBrush}" VerticalAlignment="Center" />
+                </Border>
+
+                <TextBlock Text="Final Weight (g)" Style="{StaticResource FieldLabelStyle}" Margin="0,10,0,4" />
+                <Border Style="{StaticResource ValueBoxStyle}"
+                        ToolTip="What the batch makes: the total weight less its shrinkage. This is what the yield and the weight per piece share out.">
+                    <TextBlock Text="{Binding UsageFormFinalWeightText}" Foreground="{StaticResource ValueBoxForegroundBrush}" VerticalAlignment="Center" />
                 </Border>
 
                 <TextBlock Text="{Binding UsageFormPieceSizeCaption}" Style="{StaticResource CaptionStyle}" Margin="0,8,0,0" />

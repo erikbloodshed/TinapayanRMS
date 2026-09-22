@@ -65,7 +65,7 @@
                     <TextBlock FontSize="28"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource SuccessForegroundBrush}"
-                               Text="{Binding ExampleResult.BufferedTotalCost, StringFormat='₱{0:N2}'}" />
+                               Text="{Binding ExampleResult.BufferedTotalCost, StringFormat='{}{0:N2}'}" />
                     <TextBlock Style="{StaticResource CaptionStyle}">
                         <Run Text="Buffered cost, with a" /><Run Text="{Binding ExampleResult.BufferPercent, StringFormat=' {0:0.##}%', Mode=OneWay}" /><Run Text=" buffer" />
                     </TextBlock>
@@ -83,11 +83,11 @@
                     <TextBlock Text="Quantity in base unit" Style="{StaticResource CaptionStyle}" />
                 </DockPanel>
                 <DockPanel Style="{StaticResource BreakdownRowStyle}">
-                    <TextBlock DockPanel.Dock="Right" Text="{Binding ExampleResult.CostPerBaseUnit, StringFormat='₱{0:N4}'}" />
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding ExampleResult.CostPerBaseUnit, StringFormat='{}{0:N4}'}" />
                     <TextBlock Text="Cost per base unit" Style="{StaticResource CaptionStyle}" />
                 </DockPanel>
                 <DockPanel Style="{StaticResource BreakdownRowStyle}">
-                    <TextBlock DockPanel.Dock="Right" Text="{Binding ExampleResult.TotalCost, StringFormat='₱{0:N2}'}" />
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding ExampleResult.TotalCost, StringFormat='{}{0:N2}'}" />
                     <TextBlock Text="Calculated cost" Style="{StaticResource CaptionStyle}" />
                 </DockPanel>
                 <DockPanel Style="{StaticResource BreakdownRowStyle}">
@@ -95,7 +95,7 @@
                     <TextBlock Text="Buffer" Style="{StaticResource CaptionStyle}" />
                 </DockPanel>
                 <DockPanel Style="{StaticResource BreakdownRowStyle}">
-                    <TextBlock DockPanel.Dock="Right" FontWeight="SemiBold" Text="{Binding ExampleResult.BufferedTotalCost, StringFormat='₱{0:N2}'}" />
+                    <TextBlock DockPanel.Dock="Right" FontWeight="SemiBold" Text="{Binding ExampleResult.BufferedTotalCost, StringFormat='{}{0:N2}'}" />
                     <TextBlock Text="Buffered cost" Style="{StaticResource CaptionStyle}" />
                 </DockPanel>
             </StackPanel>

@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
@@ -73,8 +73,8 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
         // A new sub-assembly has no id yet: a negative stand-in keeps it distinct from every other.
         ProductRules.EnsureValidUsages(
         [
-            .. recipe.Owned.Select((o, i) => (o.Id > 0 ? o.Id : -(i + 1), o.AuthoredValue)),
-            .. recipe.Linked.Select(l => (l.SubAssemblyId, l.AuthoredValue)),
+            .. recipe.Owned.Select((o, i) => (o.Id > 0 ? o.Id : -(i + 1), o.AuthoredValue, o.ShrinkagePercent)),
+            .. recipe.Linked.Select(l => (l.SubAssemblyId, l.AuthoredValue, l.ShrinkagePercent)),
         ]);
 
         var productExists = await dbContext.Products.AnyAsync(p => p.Id == productId, cancellationToken);
@@ -229,6 +229,7 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 SubAssemblyId = subAssembly.Id,
                 AuthoredField = owned.AuthoredField,
                 AuthoredValue = owned.AuthoredValue,
+                ShrinkagePercent = owned.ShrinkagePercent,
             });
         }
 
@@ -242,6 +243,7 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 SubAssemblyId = l.SubAssemblyId,
                 AuthoredField = l.AuthoredField,
                 AuthoredValue = l.AuthoredValue,
+                ShrinkagePercent = l.ShrinkagePercent,
             })),
         ];
 

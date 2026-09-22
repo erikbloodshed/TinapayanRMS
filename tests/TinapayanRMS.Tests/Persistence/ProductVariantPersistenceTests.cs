@@ -1,4 +1,4 @@
-using AwesomeAssertions;
+﻿using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
@@ -63,9 +63,9 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
             .SaveStandaloneAsync(new SubAssembly { Name = "Glaze", RoleId = glazeRoleId }, [(sugarId, 100m)], Cancellation);
         var sourceId = await AddProductAsync("Ube Loaf Big");
         await SaveRecipeAsync(sourceId, new RecipeDraft(
-            [new OwnedSubAssemblyDraft(0, fillingRoleId, [(ubeId, 100m)], UsageAuthoredField.Yield, 10m)],
+            [new OwnedSubAssemblyDraft(0, fillingRoleId, [(ubeId, 100m)], UsageAuthoredField.Yield, 10m) { ShrinkagePercent = 12m }],
             [
-                new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 60m) { AddIns = [(flavourId, 20m)] },
+                new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 60m) { AddIns = [(flavourId, 20m)], ShrinkagePercent = 8m },
                 new LinkedUsageDraft(glazeId, UsageAuthoredField.WeightPerPiece, 5m),
             ]));
         var fillingId = await OwnedSubAssemblyIdAsync(sourceId, fillingRoleId);
@@ -73,11 +73,12 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         var variantId = await CreateVariantAsync(sourceId, "Ube Loaf Small");
 
         var usages = await CreateUsageRepository().GetForProductAsync(variantId, Cancellation);
-        usages.Select(u => (u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)).Should().BeEquivalentTo(new[]
+        // The shrinkage comes over with the piece size: the variant makes its sections the same way.
+        usages.Select(u => (u.SubAssemblyId, u.AuthoredField, u.AuthoredValue, u.ShrinkagePercent)).Should().BeEquivalentTo(new[]
         {
-            (fillingId, UsageAuthoredField.Yield, 10m),
-            (doughId, UsageAuthoredField.WeightPerPiece, 60m),
-            (glazeId, UsageAuthoredField.WeightPerPiece, 5m),
+            (fillingId, UsageAuthoredField.Yield, 10m, 12m),
+            (doughId, UsageAuthoredField.WeightPerPiece, 60m, 8m),
+            (glazeId, UsageAuthoredField.WeightPerPiece, 5m, 0m),
         });
 
         await using var dbContext = CreateDbContext();

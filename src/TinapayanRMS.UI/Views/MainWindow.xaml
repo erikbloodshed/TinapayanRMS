@@ -1,4 +1,4 @@
-<Window x:Class="TinapayanRMS.UI.Views.MainWindow"
+﻿<Window x:Class="TinapayanRMS.UI.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -9,16 +9,60 @@
         Title="{Binding Title}" Height="800" Width="1400"
         skinManager:SfSkinManager.SizeMode="Default">
     <Window.Resources>
-        <!--
-            A NavigationItem's Icon is dropped into a fixed-size ContentPresenter in the
-            drawer's item template, so the icon element has to center itself — without
-            these alignments the glyph sits wherever the box's default alignment and
-            negative left margin leave it. Matches how Syncfusion's own NavigationDrawer
-            demo aligns its Path icons.
-        -->
-        <Style x:Key="NavigationIconStyle" TargetType="TextBlock" BasedOn="{StaticResource IconGlyphStyle}">
-            <Setter Property="HorizontalAlignment" Value="Center" />
+        <!-- A menu row's glyph, in a fixed box so the labels line up whatever the glyph's width -->
+        <Style x:Key="DrawerIconStyle" TargetType="TextBlock" BasedOn="{StaticResource IconGlyphStyle}">
+            <Setter Property="Width" Value="20" />
+            <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+
+        <!--
+            A destination row. The Windows11Light theme doesn't reach a plain ListBoxItem
+            (SfSkinManager.ApplyThemeAsDefaultStyle is deliberately off, App.xaml.cs), so the row is
+            templated here rather than left at the OS default, whose blue selection would fight the
+            app's amber accent. Templating a *framework* control is fine; App.xaml's no-Style rule is
+            about Syncfusion controls, whose templates must stay intact.
+            **There is no selected state, and no focus outline**: marking the page showing here only
+            repeated the tab strip right below it (dropped 2026-09-22, at the user's request). So the
+            template answers hover and keyboard focus with the same wash and nothing else, and
+            MainWindow.xaml.cs navigates from the click rather than from the ListBox's selection, which
+            is now neither shown nor read.
+        -->
+        <Style x:Key="DrawerItemStyle" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+            <EventSetter Event="PreviewMouseLeftButtonUp" Handler="NavigationMenuItem_Clicked" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Row"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="9,0">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="#14000000" />
+                            </Trigger>
+                            <!--
+                                Keyboard focus looks exactly like hover, deliberately: an outline of its
+                                own read as "this is the current page" all over again (2026-09-22, at the
+                                user's request). A row still has to show where the keyboard is, or the
+                                arrows move something invisible.
+                            -->
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="#14000000" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
@@ -33,64 +77,140 @@
                 BorderBrush="{StaticResource CardBorderBrush}"
                 BorderThickness="1,1,1,1"
                 Padding="4,4,4,4">
-            <TextBlock Text="{Binding Heading}" Style="{StaticResource AppTitleStyle}" />
+            <!--
+                The drawer lives in row 1, so its scrim covers the tabs but not this bar: the toggle
+                stays visible and clickable while the menu is open, and clicking it again puts the
+                menu away. Icon only — the Windows11Light ButtonAdv template has no SizeMode="Small"
+                handling (its AccessText is always bound to Label), so Label is left unset and the
+                name lives in ToolTip/AutomationProperties. Flattened with plain properties, never a
+                Style, the same way the Add Sub-Assembly drop-down's rows are.
+            -->
+            <DockPanel>
+                <syncfusion:ButtonAdv x:Name="ToggleNavigationButton"
+                                      DockPanel.Dock="Left"
+                                      Width="32"
+                                      Margin="0,0,8,0"
+                                      IconTemplate="{StaticResource MenuIconTemplate}"
+                                      Background="Transparent"
+                                      BorderThickness="0"
+                                      ToolTip="Show the navigation menu"
+                                      AutomationProperties.Name="Navigation menu"
+                                      Click="ToggleNavigationButton_Click" />
+                <TextBlock Text="{Binding Heading}" Style="{StaticResource AppTitleStyle}" VerticalAlignment="Center" />
+            </DockPanel>
         </Border>
 
         <!--
-            DisplayMode=Compact, not the default: only the Compact/Expanded control template
-            draws the drawer's own built-in hamburger toggle (two-way bound to IsOpen) and
-            renders the Items collection. The Default mode's template has neither — it draws
-            no toggle at all and presents DrawerContentView instead — so it would need a
-            hand-rolled toggle button and a hand-rolled menu.
-            Collapsed, the drawer is a CompactModeWidth-wide icon rail, which is why every
-            NavigationItem needs an Icon; expanded, it overlays the content at DrawerWidth
-            and shows the headers too.
+            DisplayMode=Default: the menu is hidden until the header's hamburger summons it, slides in
+            over the tabs (Transition=SlideOnTop, already the DP default) and closes when you click the
+            page behind it.
+            The Default control template draws no toggle button of its own and ignores Items/FooterItems
+            entirely — it presents DrawerHeaderView/DrawerContentView/DrawerFooterView instead — so the
+            toggle and the menu are both hand-rolled (see MainWindow.xaml.cs and PLAN.md).
+            Only DrawerContentView is used: the template's three presenters are just the Auto/*/Auto rows
+            of one grid, and HeaderHeight/FooterHeight are registered but never bound by it, so one Border
+            gives the panel one padding and one edge.
+            The size property swaps with Position, and both apply only in Default mode: DrawerWidth sizes a
+            Left/Right drawer, DrawerHeight a Top/Bottom one, and under Compact neither is read (the drawer
+            expands to ExpandedModeWidth), which is why the DrawerWidth="220" this screen carried under
+            Compact never did anything. Position is left unset, since Left is its default.
+            Position="Top" was tried and reverted (2026-09-22): a top drawer is always a full-width band,
+            which forces the destinations into a row, and the user wants them stacked.
+            DrawerHeight is left unset: RefreshSlider derives it from ActualHeight and re-runs on
+            SizeChanged, so the panel fills the tab area.
         -->
         <syncfusion:SfNavigationDrawer x:Name="NavigationDrawer"
                                         Grid.Row="1"
-                                        DisplayMode="Compact"
-                                        DrawerWidth="220"
-                                        ItemClicked="NavigationDrawer_ItemClicked">
-            <syncfusion:SfNavigationDrawer.ToggleButtonContentTemplate>
-                <DataTemplate>
-                    <TextBlock Text="Navigate" FontWeight="Bold" VerticalAlignment="Center" Margin="5,0,0,0" />
-                </DataTemplate>
-            </syncfusion:SfNavigationDrawer.ToggleButtonContentTemplate>
+                                        DisplayMode="Default"
+                                        DrawerWidth="240"
+                                        Background="{StaticResource CardBackgroundBrush}">
+            <syncfusion:SfNavigationDrawer.DrawerContentView>
+                <Border BorderBrush="{StaticResource CardBorderBrush}"
+                        BorderThickness="0,0,1,0"
+                        Padding="8"
+                        KeyboardNavigation.TabNavigation="Cycle"
+                        PreviewKeyDown="NavigationMenu_PreviewKeyDown">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-            <syncfusion:SfNavigationDrawer.Items>
-                <syncfusion:NavigationItem x:Name="RawMaterialsNavItem" Header="Raw Materials" IsSelected="True">
-                    <syncfusion:NavigationItem.Icon>
-                        <TextBlock Text="&#xE8F1;" Style="{StaticResource NavigationIconStyle}" />
-                    </syncfusion:NavigationItem.Icon>
-                </syncfusion:NavigationItem>
-                <syncfusion:NavigationItem x:Name="SubAssembliesNavItem" Header="Sub-Assemblies">
-                    <syncfusion:NavigationItem.Icon>
-                        <TextBlock Text="&#xE8FD;" Style="{StaticResource NavigationIconStyle}" />
-                    </syncfusion:NavigationItem.Icon>
-                </syncfusion:NavigationItem>
-                <syncfusion:NavigationItem x:Name="ProductsNavItem" Header="Products">
-                    <syncfusion:NavigationItem.Icon>
-                        <TextBlock Text="&#xE71D;" Style="{StaticResource NavigationIconStyle}" />
-                    </syncfusion:NavigationItem.Icon>
-                </syncfusion:NavigationItem>
-                <syncfusion:NavigationItem x:Name="ReportsNavItem" Header="Reports">
-                    <syncfusion:NavigationItem.Icon>
-                        <TextBlock Text="&#xEB05;" Style="{StaticResource NavigationIconStyle}" />
-                    </syncfusion:NavigationItem.Icon>
-                </syncfusion:NavigationItem>
-            </syncfusion:SfNavigationDrawer.Items>
+                        <TextBlock Text="NAVIGATE"
+                                   Style="{StaticResource CaptionStyle}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Margin="10,4,0,8" />
 
-            <!--
-                Settings opens a dialog rather than a tab, so it's ItemType="Button": clicking it raises
-                ItemClicked without selecting it, and the highlighted page stays the one on screen.
-            -->
-            <syncfusion:SfNavigationDrawer.FooterItems>
-                <syncfusion:NavigationItem x:Name="SettingsNavItem" Header="Settings" ItemType="Button">
-                    <syncfusion:NavigationItem.Icon>
-                        <TextBlock Text="&#xE713;" Style="{StaticResource NavigationIconStyle}" />
-                    </syncfusion:NavigationItem.Icon>
-                </syncfusion:NavigationItem>
-            </syncfusion:SfNavigationDrawer.FooterItems>
+                        <!--
+                            The destinations. Still a ListBox now that the "you are here" state is gone,
+                            and not the stacked ButtonAdvs the Add Sub-Assembly drop-down uses, for the
+                            hover: a flattened ButtonAdv's themed hover is an opaque #FFF9F9F9 set by the
+                            template on its own border, which beats any Background set on the control and
+                            is a 3-level grey step against this panel — measured. DrawerItemStyle's rows
+                            own their hover outright, so it actually reads. Every row is templated, so
+                            nothing of the OS default look survives.
+                            Each row needs AutomationProperties.Name: its content is a glyph and a label
+                            in a StackPanel, not a string, so UI Automation would otherwise read the row
+                            out as "System.Windows.Controls.ListBoxItem" (checked in the running app).
+                            NavigationItem's Header used to supply this.
+                        -->
+                        <ListBox x:Name="NavigationMenu"
+                                 Grid.Row="1"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Padding="0"
+                                 ItemContainerStyle="{StaticResource DrawerItemStyle}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBoxItem x:Name="RawMaterialsNavItem" AutomationProperties.Name="Raw Materials">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8F1;" Style="{StaticResource DrawerIconStyle}" />
+                                    <TextBlock Text="Raw Materials" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="SubAssembliesNavItem" AutomationProperties.Name="Sub-Assemblies">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8FD;" Style="{StaticResource DrawerIconStyle}" />
+                                    <TextBlock Text="Sub-Assemblies" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="ProductsNavItem" AutomationProperties.Name="Products">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE71D;" Style="{StaticResource DrawerIconStyle}" />
+                                    <TextBlock Text="Products" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="ReportsNavItem" AutomationProperties.Name="Reports">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xEB05;" Style="{StaticResource DrawerIconStyle}" />
+                                    <TextBlock Text="Reports" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ListBoxItem>
+                        </ListBox>
+
+                        <!--
+                            Settings opens a dialog rather than a tab, so it sits outside the list and
+                            can't take its selection: the highlighted page stays the one on screen. That's
+                            what ItemType="Button" in FooterItems used to buy, and it's still the bottom of
+                            the drawer, where the gear was. Height overrides App.xaml.cs's 24px ButtonAdv
+                            type default (a Height set in XAML wins) so the row matches the ones above it.
+                        -->
+                        <syncfusion:ButtonAdv x:Name="SettingsNavButton"
+                                              Grid.Row="2"
+                                              Label="Settings"
+                                              IconTemplate="{StaticResource SettingsIconTemplate}"
+                                              Height="34"
+                                              Margin="0,8,0,0"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Left"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              ToolTip="Units of measure, categories, roles and costing defaults"
+                                              Click="SettingsNavButton_Click" />
+                    </Grid>
+                </Border>
+            </syncfusion:SfNavigationDrawer.DrawerContentView>
 
             <syncfusion:SfNavigationDrawer.ContentView>
                 <!--

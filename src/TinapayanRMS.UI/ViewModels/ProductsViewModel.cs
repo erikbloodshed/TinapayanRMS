@@ -65,12 +65,14 @@ public sealed class ProductUsageEdit : ReactiveObject
     /// <param name="linkedBy">For the product's own sub-assembly, the other products linking it.</param>
     /// <param name="addIns">This product's own extra ingredients on top of a linked recipe; always empty for its own sub-assembly.</param>
     /// <param name="name">A product's sub-assembly's optional name, this product's or the one it's linked from; null for a standalone one.</param>
+    /// <param name="shrinkagePercent">What the batch loses being made, as a share of itself; the pieces come out of what's left.</param>
     public ProductUsageEdit(
         int subAssemblyId,
         SubAssemblyRole? role,
         IReadOnlyList<SubAssemblyLineEdit> lines,
         UsageAuthoredField authoredField,
         decimal authoredValue,
+        decimal shrinkagePercent,
         string? ownerName,
         string? standaloneName,
         IReadOnlyList<string> linkedBy,
@@ -83,6 +85,7 @@ public sealed class ProductUsageEdit : ReactiveObject
         Lines = lines;
         AuthoredField = authoredField;
         AuthoredValue = authoredValue;
+        ShrinkagePercent = shrinkagePercent;
         OwnerName = ownerName;
         StandaloneName = standaloneName;
         LinkedBy = linkedBy;
@@ -93,12 +96,16 @@ public sealed class ProductUsageEdit : ReactiveObject
         (BaseTotalWeight, var baseCost) = SubAssemblyRules.CalculateTotals([.. lines.Select(l => (l.Grams, l.Ingredient.BufferedCostPerBaseUnit))]);
         (TotalWeight, TotalCost) = ProductRules.CalculateEffectiveBatch(
             BaseTotalWeight, baseCost, [.. AddIns.Select(a => (a.Grams, a.Ingredient.BufferedCostPerBaseUnit))]);
-        (WeightPerPiece, Yield) = ProductRules.ResolvePieceSize(authoredField, authoredValue, TotalWeight);
+
+        // The pieces come out of what the batch makes, not out of what went into it: the batch keeps its whole
+        // cost, so shrinking it leaves fewer, dearer pieces.
+        FinalWeight = ProductRules.CalculateFinalWeight(TotalWeight, shrinkagePercent);
+        (WeightPerPiece, Yield) = ProductRules.ResolvePieceSize(authoredField, authoredValue, FinalWeight);
 
         // A batch that weighs nothing has nothing to share out per piece.
-        if (TotalWeight > 0 && WeightPerPiece > 0)
+        if (FinalWeight > 0 && WeightPerPiece > 0)
         {
-            CostPerPiece = ProductRules.CalculateUsageCostPerPiece(TotalCost, WeightPerPiece, TotalWeight);
+            CostPerPiece = ProductRules.CalculateUsageCostPerPiece(TotalCost, WeightPerPiece, FinalWeight);
         }
     }
 
@@ -154,6 +161,9 @@ public sealed class ProductUsageEdit : ReactiveObject
 
     public decimal AuthoredValue { get; }
 
+    /// <summary>What the batch loses being made, as a percentage of itself; 0 when nothing is lost.</summary>
+    public decimal ShrinkagePercent { get; }
+
     /// <summary>Where a standalone sub-assembly (no owner product) is kept, in place of an owner's name.</summary>
     public const string StandaloneSourceName = "Sub-Assemblies";
 
@@ -192,6 +202,10 @@ public sealed class ProductUsageEdit : ReactiveObject
 
     public decimal TotalCost { get; }
 
+    /// <summary>What the batch weighs once it's made: TotalWeight less its shrinkage. The pieces are cut from this.</summary>
+    public decimal FinalWeight { get; }
+
+    /// <summary>Grams of the finished batch in one piece.</summary>
     public decimal WeightPerPiece { get; }
 
     /// <summary>Pieces one batch makes. Expected to differ across a product's sub-assemblies.</summary>
@@ -215,12 +229,12 @@ public sealed class ProductUsageEdit : ReactiveObject
     /// <summary>The same section with other lines (repriced ingredients, or the owner's edits), add-ins or role.</summary>
     public ProductUsageEdit With(
         SubAssemblyRole? role, IReadOnlyList<SubAssemblyLineEdit> lines, IReadOnlyList<string> linkedBy, IReadOnlyList<SubAssemblyLineEdit>? addIns = null) =>
-        new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, OwnerName, StandaloneName, linkedBy, addIns ?? AddIns, Name);
+        new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, ShrinkagePercent, OwnerName, StandaloneName, linkedBy, addIns ?? AddIns, Name);
 
-    /// <summary>The same linked section at another piece size, with the add-ins the form now holds.</summary>
+    /// <summary>The same linked section at another piece size and shrinkage, with the add-ins the form now holds.</summary>
     public ProductUsageEdit WithPieceSizeAndAddIns(
-        UsageAuthoredField authoredField, decimal authoredValue, IReadOnlyList<SubAssemblyLineEdit> addIns) =>
-        new(SubAssemblyId, Role, Lines, authoredField, authoredValue, OwnerName, StandaloneName, LinkedBy, addIns, Name);
+        UsageAuthoredField authoredField, decimal authoredValue, decimal shrinkagePercent, IReadOnlyList<SubAssemblyLineEdit> addIns) =>
+        new(SubAssemblyId, Role, Lines, authoredField, authoredValue, shrinkagePercent, OwnerName, StandaloneName, LinkedBy, addIns, Name);
 
     /// <summary>Whether <paramref name="other"/> shows the same thing: the same role, owner and name, sharing, piece size, and lines and add-ins at the same costs.</summary>
     public bool ShowsSameAs(ProductUsageEdit other) =>
@@ -232,6 +246,7 @@ public sealed class ProductUsageEdit : ReactiveObject
         && LinkedBy.SequenceEqual(other.LinkedBy)
         && AuthoredField == other.AuthoredField
         && AuthoredValue == other.AuthoredValue
+        && ShrinkagePercent == other.ShrinkagePercent
         && Lines.Count == other.Lines.Count
         && Lines.Zip(other.Lines).All(pair =>
             pair.First.Grams == pair.Second.Grams
@@ -980,12 +995,32 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         set => this.RaiseAndSetIfChanged(ref _editingUsageYield, value);
     }
 
+    private decimal _editingUsageShrinkagePercent;
+    /// <summary>
+    /// What the batch loses being made, as a percentage of itself. It isn't one of the pair — neither box
+    /// is "the one typed" because of it — but the batch the pair divides is the final weight, so a change
+    /// here works the other figure out again just as a line does.
+    /// </summary>
+    public decimal EditingUsageShrinkagePercent
+    {
+        get => _editingUsageShrinkagePercent;
+        set => this.RaiseAndSetIfChanged(ref _editingUsageShrinkagePercent, value);
+    }
+
     private string _usageFormTotalWeightText = "0 g";
-    /// <summary>The batch the form's piece size shares out, e.g. "1,700 g".</summary>
+    /// <summary>The batch that goes in, e.g. "1,700 g".</summary>
     public string UsageFormTotalWeightText
     {
         get => _usageFormTotalWeightText;
         private set => this.RaiseAndSetIfChanged(ref _usageFormTotalWeightText, value);
+    }
+
+    private string _usageFormFinalWeightText = "0 g";
+    /// <summary>What the batch makes, which the form's piece size shares out: the total weight less its shrinkage, e.g. "1,530 g".</summary>
+    public string UsageFormFinalWeightText
+    {
+        get => _usageFormFinalWeightText;
+        private set => this.RaiseAndSetIfChanged(ref _usageFormFinalWeightText, value);
     }
 
     private string _usageFormPieceSizeCaption = string.Empty;
@@ -997,7 +1032,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     }
 
     private string _usageFormPreviewText = string.Empty;
-    /// <summary>What a piece of the form's sub-assembly costs, e.g. "₱0.5000 a piece": the add form's footer.</summary>
+    /// <summary>What a piece of the form's sub-assembly costs, e.g. "0.5000 a piece": the add form's footer.</summary>
     public string UsageFormPreviewText
     {
         get => _usageFormPreviewText;
@@ -1032,7 +1067,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     }
 
     private string _usageFormCostPerPieceText = "—";
-    /// <summary>The same figure on its own, e.g. "₱0.5000": the form header's, for a section being edited.</summary>
+    /// <summary>The same figure on its own, e.g. "0.5000": the form header's, for a section being edited.</summary>
     public string UsageFormCostPerPieceText
     {
         get => _usageFormCostPerPieceText;
@@ -1376,6 +1411,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             .Where(_ => !_syncingPieceSize && !IsBusyApplying)
             .Subscribe(_ => PieceSizeTyped(UsageAuthoredField.Yield));
 
+        // Shrinkage changes what the batch makes, so the figure the user didn't type follows it; which one
+        // they typed doesn't change.
+        this.WhenAnyValue(x => x.EditingUsageShrinkagePercent)
+            .Skip(1)
+            .Where(_ => !_syncingPieceSize && !IsBusyApplying)
+            .Subscribe(_ => ResyncPieceSize());
+
         // A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.
         LineEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
@@ -1705,7 +1747,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             // Never a duplicate ingredient, since an add-in can't be one the recipe already has.
             // It keeps what it went by, so a copy in a role the recipe has more than one in is still told apart.
             var copy = new ProductUsageEdit(
-                0, usage.Role, [.. usage.Lines, .. usage.AddIns], usage.AuthoredField, usage.AuthoredValue,
+                0, usage.Role, [.. usage.Lines, .. usage.AddIns], usage.AuthoredField, usage.AuthoredValue, usage.ShrinkagePercent,
                 ownerName: null, standaloneName: null, linkedBy: [], name: usage.IsRoleRepeated ? usage.Label : usage.Name);
             ReplaceUsage(usage, copy);
         }));
@@ -2170,6 +2212,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         UsageAuthoredField = _usageAuthoredField,
         UsageWeightPerPiece = EditingUsageWeightPerPiece,
         UsageYield = EditingUsageYield,
+        UsageShrinkagePercent = EditingUsageShrinkagePercent,
     };
 
     private static IngredientLineState CaptureIngredientLine(IngredientLineRow row) =>
@@ -2309,6 +2352,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             this.RaisePropertyChanged(nameof(EditingUsageWeightPerPiece));
             _editingUsageYield = snapshot.UsageYield;
             this.RaisePropertyChanged(nameof(EditingUsageYield));
+            _editingUsageShrinkagePercent = snapshot.UsageShrinkagePercent;
+            this.RaisePropertyChanged(nameof(EditingUsageShrinkagePercent));
 
             EditingUsage = snapshot.EditingUsageIndex is { } usageIndex && usageIndex < UsageEdits.Count
                 ? UsageEdits[usageIndex]
@@ -2393,6 +2438,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             [.. lines.Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
             usage.AuthoredField,
             usage.AuthoredValue,
+            usage.ShrinkagePercent,
             isOwn ? null : ProductUsageEdit.SourceNameOf(subAssembly),
             subAssembly.OwnerProductId is null ? subAssembly.Name : null,
             isOwn ? _linkedBy.GetValueOrDefault(subAssembly.Id) ?? [] : [],
@@ -2468,9 +2514,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     private RecipeDraft CurrentRecipe() =>
         new(
             [.. UsageEdits.Where(u => u.IsOwned).Select(u => new OwnedSubAssemblyDraft(
-                u.SubAssemblyId, u.RoleId, [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], u.AuthoredField, u.AuthoredValue, u.Name))],
+                u.SubAssemblyId, u.RoleId, [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], u.AuthoredField, u.AuthoredValue, u.Name)
+            {
+                ShrinkagePercent = u.ShrinkagePercent,
+            })],
             [.. UsageEdits.Where(u => u.IsLinked).Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
             {
+                ShrinkagePercent = u.ShrinkagePercent,
                 AddIns = [.. u.AddIns.Select(a => (a.Ingredient.Id, a.Grams))],
             })]);
 
@@ -2486,6 +2536,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             pair.First.SubAssemblyId == pair.Second.SubAssemblyId
             && pair.First.AuthoredField == pair.Second.AuthoredField
             && pair.First.AuthoredValue == pair.Second.AuthoredValue
+            && pair.First.ShrinkagePercent == pair.Second.ShrinkagePercent
             && pair.First.AddIns.SequenceEqual(pair.Second.AddIns))
         && a.Owned.Count == b.Owned.Count
         && a.Owned.Zip(b.Owned).All(pair =>
@@ -2494,6 +2545,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             && pair.First.Name == pair.Second.Name
             && pair.First.AuthoredField == pair.Second.AuthoredField
             && pair.First.AuthoredValue == pair.Second.AuthoredValue
+            && pair.First.ShrinkagePercent == pair.Second.ShrinkagePercent
             && pair.First.Lines.SequenceEqual(pair.Second.Lines));
 
     /// <summary>The packaging lines when they differ from those last loaded, else null. Linked packaging is never saved here.</summary>
@@ -2562,7 +2614,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         EditingUsageRole = FormRoleOptions.FirstOrDefault(r => !takenRoleIds.Contains(r.Id)) ?? FormRoleOptions.FirstOrDefault();
         EditingUsageName = null;
         EditingUsageSource = null;
-        SetPieceSize(UsageAuthoredField.WeightPerPiece, 0m);
+        SetPieceSize(UsageAuthoredField.WeightPerPiece, 0m, 0m);
     }
 
     /// <summary>
@@ -2658,11 +2710,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     private ProductUsageEdit ApplyUsageForm()
     {
         var authoredValue = CurrentAuthoredValue();
+        var shrinkagePercent = CurrentShrinkagePercent();
         ProductUsageEdit usage;
 
         if (EditingUsage is { IsLinked: true } linked)
         {
-            usage = linked.WithPieceSizeAndAddIns(_usageAuthoredField, authoredValue, CompleteAddIns(linked.DisplayName, linked.Lines));
+            usage = linked.WithPieceSizeAndAddIns(
+                _usageAuthoredField, authoredValue, shrinkagePercent, CompleteAddIns(linked.DisplayName, linked.Lines));
         }
         else if (IsFormEditingLines)
         {
@@ -2676,7 +2730,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             }
 
             usage = new ProductUsageEdit(
-                EditingUsage?.SubAssemblyId ?? 0, role, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], _usageAuthoredField, authoredValue, ownerName: null, standaloneName: null, EditingUsage?.LinkedBy ?? [], name: EditingUsageName);
+                EditingUsage?.SubAssemblyId ?? 0, role, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], _usageAuthoredField, authoredValue, shrinkagePercent, ownerName: null, standaloneName: null, EditingUsage?.LinkedBy ?? [], name: EditingUsageName);
         }
         else
         {
@@ -2700,6 +2754,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
                 sourceLines,
                 _usageAuthoredField,
                 authoredValue,
+                shrinkagePercent,
                 ProductUsageEdit.SourceNameOf(source),
                 source.OwnerProductId is null ? source.Name : null,
                 linkedBy: [],
@@ -2857,7 +2912,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         IsFormAddInsExpanded = usage.AddIns.Count > 0;
         SelectedFormLine = null;
         SelectedFormAddIn = null;
-        SetPieceSize(usage.AuthoredField, usage.AuthoredValue);
+        SetPieceSize(usage.AuthoredField, usage.AuthoredValue, usage.ShrinkagePercent);
         IsUsageFormOpen = true;
     }
 
@@ -2882,7 +2937,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         && FormLines.All(l => l.IngredientId is null && l.Grams == 0)
         && FormAddIns.All(l => l.IngredientId is null && l.Grams == 0)
         && FormPackagingLines.All(l => l.PackagingMaterialId is null && l.QtyPerUnit == 0)
-        && CurrentAuthoredValue() == 0;
+        && CurrentAuthoredValue() == 0
+        && EditingUsageShrinkagePercent == 0;
 
     /// <summary>The form's lines changed, or its source's were loaded: the batch weight, the other piece-size figure and the preview follow.</summary>
     private void FormLinesChanged()
@@ -2891,26 +2947,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         this.RaisePropertyChanged(nameof(IsFormOfferingAddIns));
         this.RaisePropertyChanged(nameof(IsFormShowingAddIns));
         this.RaisePropertyChanged(nameof(FormAddInsToggleText));
-        _syncingPieceSize = true;
-        try
-        {
-            UpdateOtherPieceSizeFigure();
-        }
-        finally
-        {
-            _syncingPieceSize = false;
-        }
-
-        RecomputeUsageForm();
+        ResyncPieceSize();
     }
 
-    /// <summary>Shows a piece size in the form, with the other figure worked out, without either counting as typed.</summary>
-    private void SetPieceSize(UsageAuthoredField authoredField, decimal authoredValue)
+    /// <summary>Shows a piece size and shrinkage in the form, with the other figure worked out, without any of it counting as typed.</summary>
+    private void SetPieceSize(UsageAuthoredField authoredField, decimal authoredValue, decimal shrinkagePercent)
     {
         _usageAuthoredField = authoredField;
         _syncingPieceSize = true;
         try
         {
+            EditingUsageShrinkagePercent = shrinkagePercent;
             if (authoredField == UsageAuthoredField.WeightPerPiece)
             {
                 EditingUsageWeightPerPiece = authoredValue;
@@ -2919,20 +2966,27 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             {
                 EditingUsageYield = authoredValue;
             }
-
-            UpdateOtherPieceSizeFigure();
         }
         finally
         {
             _syncingPieceSize = false;
         }
 
-        RecomputeUsageForm();
+        ResyncPieceSize();
     }
 
     private void PieceSizeTyped(UsageAuthoredField authoredField)
     {
         _usageAuthoredField = authoredField;
+        ResyncPieceSize();
+    }
+
+    /// <summary>
+    /// Whatever the piece size is worked out from has changed — a line, an add-in, the shrinkage, or the box
+    /// the user just typed in: the other figure follows, and the form's figures with it.
+    /// </summary>
+    private void ResyncPieceSize()
+    {
         _syncingPieceSize = true;
         try
         {
@@ -2949,7 +3003,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// <summary>Works out the figure the user didn't type from the one they did, rounded to the 2 decimals the box shows. Call with _syncingPieceSize set.</summary>
     private void UpdateOtherPieceSizeFigure()
     {
-        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(_usageAuthoredField, CurrentAuthoredValue(), UsageFormBatch().Sum(l => l.Grams));
+        var finalWeight = ProductRules.CalculateFinalWeight(UsageFormBatch().Sum(l => l.Grams), CurrentShrinkagePercent());
+        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(_usageAuthoredField, CurrentAuthoredValue(), finalWeight);
         if (_usageAuthoredField == UsageAuthoredField.WeightPerPiece)
         {
             EditingUsageYield = Math.Round(yield, 2);
@@ -2962,6 +3017,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
 
     private decimal CurrentAuthoredValue() =>
         _usageAuthoredField == UsageAuthoredField.WeightPerPiece ? EditingUsageWeightPerPiece : EditingUsageYield;
+
+    /// <summary>
+    /// The form's shrinkage, clamped to what a batch can actually lose (EnsureValidUsages). The box stops at
+    /// 99.99, so this only catches a figure that reached the form another way; without it a batch could work
+    /// out to nothing or less and the preview would price a piece at a negative.
+    /// </summary>
+    private decimal CurrentShrinkagePercent() => Math.Clamp(EditingUsageShrinkagePercent, 0m, 99.99m);
 
     /// <summary>
     /// The form's batch, as each line's grams and buffered cost per gram: both its tables, the recipe and
@@ -2979,28 +3041,36 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         if (IsFormPackaging)
         {
             var packagingCost = FormPackagingLines.Sum(l => l.CostPerUnit);
-            UsageFormPreviewText = FormPackagingLines.Any(l => l.PackagingMaterial is not null) ? $"₱{packagingCost:N4} a piece" : string.Empty;
+            UsageFormPreviewText = FormPackagingLines.Any(l => l.PackagingMaterial is not null) ? $"{packagingCost:N4} a piece" : string.Empty;
             return;
         }
 
         var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(UsageFormBatch());
+        var shrinkagePercent = CurrentShrinkagePercent();
+        var finalWeight = ProductRules.CalculateFinalWeight(totalWeight, shrinkagePercent);
         var authoredValue = CurrentAuthoredValue();
-        var (weightPerPiece, _) = ProductRules.ResolvePieceSize(_usageAuthoredField, authoredValue, totalWeight);
+        var (weightPerPiece, _) = ProductRules.ResolvePieceSize(_usageAuthoredField, authoredValue, finalWeight);
 
         UsageFormTotalWeightText = $"{totalWeight:#,0.##} g";
+        UsageFormFinalWeightText = $"{finalWeight:#,0.##} g";
         // Neither figure is needed to put the section in (ProductRules.EnsureValidUsages), so with none typed the
-        // caption says what that costs: nothing per piece, until one is.
+        // caption says what that costs: nothing per piece, until one is. With a shrinkage it says which batch the
+        // pair is read against, since that's the figure that stops matching the lines above.
         UsageFormPieceSizeCaption = authoredValue <= 0
             ? "Type the weight per piece or the yield; the other is worked out. Until then this section costs nothing per piece."
-            : _usageAuthoredField == UsageAuthoredField.WeightPerPiece
-                ? $"Weight per piece stays at {authoredValue:#,0.##} g if the batch changes."
-                : $"The yield stays at {authoredValue:#,0.##} pieces if the batch changes.";
+            : shrinkagePercent > 0
+                ? _usageAuthoredField == UsageAuthoredField.WeightPerPiece
+                    ? $"A finished piece weighs {authoredValue:#,0.##} g, out of the {finalWeight:#,0.##} g the batch makes; it stays there if the batch changes."
+                    : $"The yield stays at {authoredValue:#,0.##} pieces, out of the {finalWeight:#,0.##} g the batch makes, if the batch changes."
+                : _usageAuthoredField == UsageAuthoredField.WeightPerPiece
+                    ? $"Weight per piece stays at {authoredValue:#,0.##} g if the batch changes."
+                    : $"The yield stays at {authoredValue:#,0.##} pieces if the batch changes.";
 
-        var costPerPiece = totalWeight > 0 && weightPerPiece > 0
-            ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight)
+        var costPerPiece = finalWeight > 0 && weightPerPiece > 0
+            ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, finalWeight)
             : (decimal?)null;
-        UsageFormPreviewText = costPerPiece is { } preview ? $"₱{preview:N4} a piece" : string.Empty;
-        UsageFormCostPerPieceText = costPerPiece is { } figure ? $"₱{figure:N4}" : "—";
+        UsageFormPreviewText = costPerPiece is { } preview ? $"{preview:N4} a piece" : string.Empty;
+        UsageFormCostPerPieceText = costPerPiece is { } figure ? $"{figure:N4}" : "—";
 
         // The formula's base and the batch, given to both tables: an add-in is read against the recipe's base, never its own,
         // and with no base every line of both is read against the whole batch, add-ins included, so they come to 100%.
@@ -3340,6 +3410,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
                     [.. linkedLinesById[subAssembly.Id].Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
                     edit.AuthoredField,
                     edit.AuthoredValue,
+                    edit.ShrinkagePercent,
                     ProductUsageEdit.SourceNameOf(subAssembly),
                     subAssembly.OwnerProductId is null ? subAssembly.Name : null,
                     linkedBy: [],

@@ -192,7 +192,7 @@
                            Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <TextBlock Grid.Row="1"
                            Grid.Column="8"
-                           Text="{Binding BomTotalCost, StringFormat='₱{0:N2}'}"
+                           Text="{Binding BomTotalCost, StringFormat='{}{0:N2}'}"
                            Style="{StaticResource TileValueStyle}"
                            ToolTip="What the BOM costs at its components' buffered costs, as it stands — the grid's Cost column. Over the Total Weight, it's the Buffered Cost per gram."
                            Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />

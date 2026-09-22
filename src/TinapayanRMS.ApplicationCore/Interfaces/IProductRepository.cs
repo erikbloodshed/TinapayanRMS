@@ -1,4 +1,4 @@
-using TinapayanRMS.Domain.Entities;
+﻿using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.ApplicationCore.Interfaces;
@@ -16,7 +16,14 @@ public sealed record OwnedSubAssemblyDraft(
     IReadOnlyList<RecipeLine> Lines,
     UsageAuthoredField AuthoredField,
     decimal AuthoredValue,
-    string? Name = null);
+    string? Name = null)
+{
+    /// <summary>
+    /// How much of the batch's weight this product loses making it, as a percentage of what went in: at
+    /// least 0 and less than 100. Pieces are cut from what's left (ProductRules.CalculateFinalWeight).
+    /// </summary>
+    public decimal ShrinkagePercent { get; init; }
+}
 
 /// <summary>A sub-assembly the product links (another product's, or a standalone one), at the product's own piece size.</summary>
 public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField AuthoredField, decimal AuthoredValue)
@@ -27,6 +34,12 @@ public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField Auth
     /// owner's lines plus these. Empty for a usage that takes the recipe as it is.
     /// </summary>
     public IReadOnlyList<(int IngredientId, decimal Grams)> AddIns { get; init; } = [];
+
+    /// <summary>
+    /// How much of the batch's weight this product loses making it, as a percentage of what went in: at
+    /// least 0 and less than 100. Pieces are cut from what's left (ProductRules.CalculateFinalWeight).
+    /// </summary>
+    public decimal ShrinkagePercent { get; init; }
 }
 
 /// <summary>

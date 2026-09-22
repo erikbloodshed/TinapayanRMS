@@ -65,7 +65,7 @@
                                             TypedDecimalDigits="4"
                                             AllowNullValue="True"
                                             controls:GridCellEditing.AllowWhen="CanTypeQuantity" />
-                    <controls:NumericColumn MappingName="Price" HeaderText="Purchase Price (₱)" NumberDecimalDigits="2" AllowNullValue="True" />
+                    <controls:NumericColumn MappingName="Price" HeaderText="Purchase Price" NumberDecimalDigits="2" AllowNullValue="True" />
                     <!-- How far the buffered cost is over this brand's price -->
                     <controls:NumericColumn MappingName="BufferPercent" HeaderText="Buffer %" NumberDecimalDigits="2" AllowNullValue="True" AllowEditing="False" />
                 </syncfusion:SfDataGrid.Columns>
@@ -103,7 +103,7 @@
                                           MinValue="0"
                                           MaxValue="100"
                                           ToolTip="The cushion on top of the dearest brand, for price swings, waste and yield variation. Typing it works out the Buffered Cost; typing the Buffered Cost works it out." />
-                <TextBlock Grid.Column="2" Text="Buffered Cost (₱)" Style="{StaticResource FieldLabelStyle}" />
+                <TextBlock Grid.Column="2" Text="Buffered Cost" Style="{StaticResource FieldLabelStyle}" />
                 <!-- Updated when focus leaves, since the value it shows back is rounded to the centavo -->
                 <syncfusion:DoubleTextBox Grid.Row="1"
                                           Grid.Column="2"

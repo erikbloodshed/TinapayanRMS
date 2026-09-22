@@ -91,7 +91,7 @@
                                     UseNullOption="True"
                                     NullValue="{x:Null}"
                                     MinValue="0"
-                                    CurrencySymbol="₱"
+                                    CurrencySymbol=""
                                     CurrencyDecimalDigits="2"
                                     ToolTip="{Binding CostUnitCaption, StringFormat='{}{0}, with VAT: what the shop charges now. The Markup % in the header shows what it earns.'}" />
     </Grid>

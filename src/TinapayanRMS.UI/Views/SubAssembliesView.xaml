@@ -167,7 +167,7 @@
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
                                    Grid.Column="6"
-                                   Text="{Binding BatchCost, StringFormat='₱{0:N2}'}"
+                                   Text="{Binding BatchCost, StringFormat='{}{0:N2}'}"
                                    Style="{StaticResource TotalValueStyle}"
                                    VerticalAlignment="Center"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
@@ -178,7 +178,7 @@
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
                                    Grid.Column="8"
-                                   Text="{Binding CostPerGram, StringFormat='₱{0:N4}'}"
+                                   Text="{Binding CostPerGram, StringFormat='{}{0:N4}'}"
                                    Style="{StaticResource TotalValueStyle}"
                                    VerticalAlignment="Center"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
@@ -189,7 +189,7 @@
                                    Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
                                    Grid.Column="8"
-                                   Text="{Binding SetCost, StringFormat='₱{0:N4}'}"
+                                   Text="{Binding SetCost, StringFormat='{}{0:N4}'}"
                                    Style="{StaticResource TotalValueStyle}"
                                    VerticalAlignment="Center"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />

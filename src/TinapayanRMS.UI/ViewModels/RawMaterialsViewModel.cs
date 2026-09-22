@@ -535,8 +535,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
     private string _currentCostText = "—";
     /// <summary>
-    /// The saved cost in the Purchase Cost Setup's Per unit (BufferedCostUnit): "₱0.0372" a gram, to 4 decimals, or
-    /// "₱930.00" a bag, to 2; "—" for a material not saved yet.
+    /// The saved cost in the Purchase Cost Setup's Per unit (BufferedCostUnit): "0.0372" a gram, to 4 decimals, or
+    /// "930.00" a bag, to 2; "—" for a material not saved yet.
     /// </summary>
     public string CurrentCostText
     {
@@ -545,7 +545,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     private string _bufferedCostText = "—";
-    /// <summary>The saved buffered cost, as CurrentCostText: "₱0.0391" a gram, "₱976.50" a bag, or "—" for a material not saved yet.</summary>
+    /// <summary>The saved buffered cost, as CurrentCostText: "0.0391" a gram, "976.50" a bag, or "—" for a material not saved yet.</summary>
     public string BufferedCostText
     {
         get => _bufferedCostText;
@@ -641,7 +641,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private int _savedBrandPriceCount;
 
     private string _purchaseCostText = "—";
-    /// <summary>What the dearest brand comes to per base unit, recalculated as the grid is typed into, e.g. "₱0.0372".</summary>
+    /// <summary>What the dearest brand comes to per base unit, recalculated as the grid is typed into, e.g. "0.0372".</summary>
     public string PurchaseCostText
     {
         get => _purchaseCostText;
@@ -649,7 +649,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     private string _purchaseBufferedCostText = string.Empty;
-    /// <summary>What EditingBufferedCost comes to over the dearest brand, e.g. "₱0.0391/g is 5.11% over the dearest brand's ₱0.0372/g.", or empty while unpriced.</summary>
+    /// <summary>What EditingBufferedCost comes to over the dearest brand, e.g. "0.0391/g is 5.11% over the dearest brand's 0.0372/g.", or empty while unpriced.</summary>
     public string PurchaseBufferedCostText
     {
         get => _purchaseBufferedCostText;
@@ -1262,7 +1262,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     /// <summary>
-    /// "Egg costs ₱0.0900/g, buffered ₱0.0990/g. At 70% of its weight for 30% of its cost, this costs ₱0.0386/g, buffered ₱0.0424/g."
+    /// "Egg costs 0.0900/g, buffered 0.0990/g. At 70% of its weight for 30% of its cost, this costs 0.0386/g, buffered 0.0424/g."
     /// Worked out with the same rule the cascade saves with, from the linked-to ingredient's stored costs: the
     /// same share of its true cost and of its (fixed) buffered cost.
     /// </summary>
@@ -1273,7 +1273,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             return "Pick the ingredient this one is a part of.";
         }
 
-        var linkedToText = $"{linkedTo.Name} costs ₱{linkedTo.CostPerBaseUnit:N4}/g, buffered ₱{linkedTo.BufferedCostPerBaseUnit:N4}/g.";
+        var linkedToText = $"{linkedTo.Name} costs {linkedTo.CostPerBaseUnit:N4}/g, buffered {linkedTo.BufferedCostPerBaseUnit:N4}/g.";
         if (weightShare is not (> 0 and <= 100) || costShare is not (> 0 and <= 100))
         {
             return $"{linkedToText} Enter this part's share of its weight and of its cost.";
@@ -1281,7 +1281,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         var cost = RawMaterialRules.LinkedCost(linkedTo.CostPerBaseUnit, weightShare.Value, costShare.Value);
         var buffered = RawMaterialRules.LinkedCost(linkedTo.BufferedCostPerBaseUnit, weightShare.Value, costShare.Value);
-        return $"{linkedToText} At {weightShare:0.##}% of its weight for {costShare:0.##}% of its cost, this costs ₱{cost:N4}/g, buffered ₱{buffered:N4}/g.";
+        return $"{linkedToText} At {weightShare:0.##}% of its weight for {costShare:0.##}% of its cost, this costs {cost:N4}/g, buffered {buffered:N4}/g.";
     }
 
     /// <summary>
@@ -1878,7 +1878,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     {
         var onBaseUnit = BufferedCostUnit is null or { Key: PurchaseUnitChoice.BaseUnitKey };
         var size = BufferedCostUnitSize();
-        string Format(decimal costPerBaseUnit) => onBaseUnit ? $"₱{costPerBaseUnit:N4}" : $"₱{costPerBaseUnit * size:N2}";
+        string Format(decimal costPerBaseUnit) => onBaseUnit ? $"{costPerBaseUnit:N4}" : $"{costPerBaseUnit * size:N2}";
 
         HeaderCostUnitText = BufferedCostUnit?.Abbreviation ?? BaseUnitAbbreviation;
         CurrentCostText = SelectedRawMaterial is { } material ? Format(material.CostPerBaseUnit) : "—";
@@ -2000,7 +2000,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         var unit = BufferedCostUnit?.Abbreviation ?? BaseUnitAbbreviation;
         var size = BufferedCostUnitSize();
         DearestPurchaseCost = cost;
-        PurchaseCostText = $"₱{cost:N4}";
+        PurchaseCostText = $"{cost:N4}";
         if (EditingBufferedCost is > 0 and var buffered)
         {
             var over = RawMaterialRules.CostBufferPercentOf(cost, buffered);
@@ -2009,14 +2009,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             // check constraint allow, so a buffer that's gone (or more than double) pins it; the line below and the
             // warning say where it really stands. Typing the % still works the other way, through TypedCostBufferPercent.
             EditingCostBufferPercent = Math.Clamp(Math.Round(over, 4), 0m, 100m);
-            PurchaseBufferedCostText = $"₱{buffered * size:N2}/{unit} is {over:0.##}% over the dearest brand's ₱{cost * size:N2}/{unit}.";
+            PurchaseBufferedCostText = $"{buffered * size:N2}/{unit} is {over:0.##}% over the dearest brand's {cost * size:N2}/{unit}.";
             BufferedCostWarningText = buffered < cost
                 ? "The dearest brand now costs more than the buffered cost. Type the Cost Buffer % again to put the buffer back on top."
                 : string.Empty;
         }
         else
         {
-            PurchaseBufferedCostText = $"Save works it out as ₱{RawMaterialRules.BufferedCost(cost, EditingCostBufferPercent ?? 0m) * size:N2}/{unit}, the dearest brand with the buffer on top.";
+            PurchaseBufferedCostText = $"Save works it out as {RawMaterialRules.BufferedCost(cost, EditingCostBufferPercent ?? 0m) * size:N2}/{unit}, the dearest brand with the buffer on top.";
             BufferedCostWarningText = string.Empty;
         }
 

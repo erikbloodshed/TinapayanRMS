@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -131,6 +131,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
             [
                 .. usages.Select(usage => new LinkedUsageDraft(usage.SubAssemblyId, usage.AuthoredField, usage.AuthoredValue)
                 {
+                    ShrinkagePercent = usage.ShrinkagePercent,
                     AddIns = [.. addInsByUsage[usage.Id].Select(l => (l.IngredientId, l.Grams))],
                 }),
             ]);
@@ -155,6 +156,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                 // Still a link, so its add-ins stay add-ins: the clone puts the same extras in.
                 linked.Add(new LinkedUsageDraft(usage.SubAssemblyId, usage.AuthoredField, usage.AuthoredValue)
                 {
+                    ShrinkagePercent = usage.ShrinkagePercent,
                     AddIns = [.. addInsByUsage[usage.Id].Select(l => (l.IngredientId, l.Grams))],
                 });
                 continue;
@@ -175,7 +177,10 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                 usage.AuthoredValue,
                 repeatedRoleIds.Contains(usage.SubAssembly.RoleId)
                     ? SubAssemblyRules.SectionLabel(usage.SubAssembly, sourceProductId)
-                    : SubAssemblyRules.NormalizeName(usage.SubAssembly.Name)));
+                    : SubAssemblyRules.NormalizeName(usage.SubAssembly.Name))
+            {
+                ShrinkagePercent = usage.ShrinkagePercent,
+            });
         }
 
         return new RecipeDraft(owned, linked);
