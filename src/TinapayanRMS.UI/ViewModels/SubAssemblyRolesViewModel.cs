@@ -13,8 +13,9 @@ namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// The Settings dialog's Roles tab: the sections a product's recipe is split into (Dough, Filling, …),
-/// in their order. Picking a role loads it for editing; New, or finishing a Save or Delete, clears the
-/// form, so the next Save always adds a role rather than renaming the last one touched.
+/// in their order, and which of them are product-owned (a section made in a product stays that product's own).
+/// Picking a role loads it for editing; New, or finishing a Save or Delete, clears the form, so the next Save
+/// always adds a role rather than renaming the last one touched.
 /// </summary>
 public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
 {
@@ -49,6 +50,25 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
         set => this.RaiseAndSetIfChanged(ref _editingSortOrder, value);
     }
 
+    private bool _editingIsProductOwned;
+    /// <summary>
+    /// A section in this role made in a product (new, copied, or Make a Copy) stays that product's own: edited in its
+    /// recipe, not on the Sub-Assemblies screen, and copied rather than linked by other products.
+    /// </summary>
+    public bool EditingIsProductOwned
+    {
+        get => _editingIsProductOwned;
+        set => this.RaiseAndSetIfChanged(ref _editingIsProductOwned, value);
+    }
+
+    private bool _canEditProductOwned = true;
+    /// <summary>False for the Packaging role, which holds packaging sets from the Sub-Assemblies screen.</summary>
+    public bool CanEditProductOwned
+    {
+        get => _canEditProductOwned;
+        private set => this.RaiseAndSetIfChanged(ref _canEditProductOwned, value);
+    }
+
     private readonly ObservableAsPropertyHelper<string> _formTitle;
     /// <summary>"New Role", or "Edit Role" while one is picked, so it's clear what Save will do.</summary>
     public string FormTitle => _formTitle.Value;
@@ -80,6 +100,8 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
                 _editingId = role!.Id;
                 EditingName = role.Name;
                 EditingSortOrder = role.SortOrder;
+                EditingIsProductOwned = role.IsProductOwned;
+                CanEditProductOwned = !role.IsPackaging;
             });
 
         // Runs each time Settings opens and after this tab's own saves. It merges rather than
@@ -106,7 +128,15 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
-            var role = new SubAssemblyRole { Id = _editingId, Name = EditingName.Trim(), SortOrder = (int)EditingSortOrder };
+            var stored = Roles.FirstOrDefault(r => r.Id == _editingId);
+            var role = new SubAssemblyRole
+            {
+                Id = _editingId,
+                Name = EditingName.Trim(),
+                SortOrder = (int)EditingSortOrder,
+                IsPackaging = stored?.IsPackaging ?? false,
+                IsProductOwned = EditingIsProductOwned,
+            };
 
             var validation = _roleValidator.Validate(role);
             if (!validation.IsValid)
@@ -118,14 +148,25 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
             if (_editingId == 0)
             {
                 await _roleRepository.AddAsync(role, CancellationToken.None);
-            }
-            else
-            {
-                await _roleRepository.UpdateAsync(role, CancellationToken.None);
+                await FinishSaveAsync();
+                return;
             }
 
-            ClearForm();
-            await LoadCommand.Execute();
+            // Turning it on or off moves sub-assemblies between products and the Sub-Assemblies screen, which turning it
+            // round again doesn't quite undo (merged add-ins stay merged), so it's confirmed first.
+            if (stored is not null && stored.IsProductOwned != role.IsProductOwned)
+            {
+                var count = await _roleRepository.CountOwnershipChangesAsync(role.Id, role.IsProductOwned, CancellationToken.None);
+                await RunWithConfirmationAsync(OwnershipChangeMessage(role, count), async () =>
+                {
+                    await _roleRepository.UpdateAsync(role, CancellationToken.None);
+                    await FinishSaveAsync();
+                });
+                return;
+            }
+
+            await _roleRepository.UpdateAsync(role, CancellationToken.None);
+            await FinishSaveAsync();
         }));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
@@ -138,6 +179,28 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
             this.WhenAnyValue(x => x.SelectedRole).Select(role => role is not null));
     }
 
+    private async Task FinishSaveAsync()
+    {
+        ClearForm();
+        await LoadCommand.Execute();
+    }
+
+    /// <summary>What Save asks before turning a role product-owned, or back, saying how many sub-assemblies it moves.</summary>
+    public static string OwnershipChangeMessage(SubAssemblyRole role, int count)
+    {
+        var them = count == 1 ? "1 sub-assembly" : $"{count} sub-assemblies";
+        if (role.IsProductOwned)
+        {
+            return count == 0
+                ? $"Make {role.Name} product-owned? New {role.Name} sections made in a product will stay that product's own. No sub-assembly on the Sub-Assemblies screen is used by just one product, so none moves."
+                : $"Make {role.Name} product-owned? {them} on the Sub-Assemblies screen used by just one product will become that product's own: edited in its recipe, gone from the Sub-Assemblies screen, and copied rather than linked by other products. Any add-ins on them are merged into their lines. Ones used by several products stay where they are.";
+        }
+
+        return count == 0
+            ? $"Stop making {role.Name} product-owned? New {role.Name} sections will be kept on the Sub-Assemblies screen and linked. No product owns one now, so none moves."
+            : $"Stop making {role.Name} product-owned? The {them} products own in it will move to the Sub-Assemblies screen, still used by the same products, which will link them. Add-ins merged into their lines stay merged.";
+    }
+
     /// <summary>An empty form for a new role, which goes after the others unless its order is changed.</summary>
     private void ClearForm()
     {
@@ -145,6 +208,8 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
         _editingId = 0;
         EditingName = string.Empty;
         EditingSortOrder = NextSortOrder();
+        EditingIsProductOwned = false;
+        CanEditProductOwned = true;
     }
 
     private int NextSortOrder() => Roles.Count == 0 ? 1 : Roles.Max(r => r.SortOrder) + 1;

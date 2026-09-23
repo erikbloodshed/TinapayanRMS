@@ -19,5 +19,12 @@ public class SubAssemblyConfiguration : IEntityTypeConfiguration<SubAssembly>
             .WithMany()
             .HasForeignKey(s => s.RoleId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Deleting a product takes its own sub-assemblies (and their lines) with it. Nothing but the owner uses one: other
+        // products can copy it, not link it. One on the Sub-Assemblies screen has no owner.
+        builder.HasOne(s => s.OwnerProduct)
+            .WithMany()
+            .HasForeignKey(s => s.OwnerProductId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

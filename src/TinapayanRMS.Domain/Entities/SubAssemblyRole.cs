@@ -20,4 +20,11 @@ public class SubAssemblyRole
     /// deleted, and nothing clears the flag.
     /// </summary>
     public bool IsPackaging { get; set; }
+
+    /// <summary>
+    /// A section in this role made in a product (new, copied, or Make a Copy) is saved as that product's own
+    /// sub-assembly (SubAssembly.OwnerProductId): edited in its recipe, and not on the Sub-Assemblies screen. Set on the
+    /// Settings dialog's Roles tab; never on the Packaging role.
+    /// </summary>
+    public bool IsProductOwned { get; set; }
 }

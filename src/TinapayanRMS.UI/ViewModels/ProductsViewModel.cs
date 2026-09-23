@@ -62,9 +62,9 @@ public sealed class ProductUsageEdit : ReactiveObject
 
     private static int SavedOrder(ProductUsageEdit usage) => usage.SubAssemblyId > 0 ? usage.SubAssemblyId : int.MaxValue;
 
-    /// <param name="subAssemblyId">The linked sub-assembly's id, or 0 for a new section, not saved yet.</param>
-    /// <param name="linkedName">The linked sub-assembly's name, e.g. "Cheese Roll Filling: Ube"; null for a new section.</param>
-    /// <param name="addIns">This product's own extra ingredients on top of a linked recipe; always empty for a new section.</param>
+    /// <param name="subAssemblyId">The sub-assembly's id, or 0 for a new section, not saved yet.</param>
+    /// <param name="linkedName">The linked sub-assembly's name, e.g. "Cheese Roll Filling: Ube"; null for the product's own or a new section.</param>
+    /// <param name="addIns">This product's own extra ingredients on top of a linked recipe; always empty for its own or a new section.</param>
     /// <param name="name">
     /// What it goes by beside its role: the optional name typed for a new section, or a linked one's name less this
     /// product's own and its role (SubAssemblyRules.SectionLabel), "Ube".
@@ -170,13 +170,27 @@ public sealed class ProductUsageEdit : ReactiveObject
     /// <summary>Where every sub-assembly is kept, and edited: the Sub-Assemblies screen.</summary>
     public const string StandaloneSourceName = "Sub-Assemblies";
 
-    /// <summary>The linked sub-assembly's name, e.g. "Cheese Roll Filling: Ube"; null for a new section.</summary>
+    /// <summary>The linked sub-assembly's name, e.g. "Cheese Roll Filling: Ube"; null for the product's own or a new section.</summary>
     public string? LinkedName { get; }
 
-    /// <summary>Not saved yet: the form edits its lines, and Save keeps it on the Sub-Assemblies screen and links it.</summary>
-    public bool IsNew => LinkedName is null;
+    /// <summary>
+    /// The form edits its lines: the product's own (<see cref="IsOwned"/>), or a new section, which Save makes the
+    /// product's own in a product-owned role, and otherwise keeps on the Sub-Assemblies screen and links.
+    /// </summary>
+    public bool IsEditable => LinkedName is null;
+
+    /// <summary>Not saved yet.</summary>
+    public bool IsNew => SubAssemblyId == 0;
+
+    /// <summary>
+    /// The product's own saved sub-assembly, in a product-owned role (SubAssemblyRole.IsProductOwned): edited here, not on
+    /// the Sub-Assemblies screen, and deleted when it's taken out of the recipe.
+    /// </summary>
+    public bool IsOwned => SubAssemblyId > 0 && LinkedName is null;
 
     public bool IsLinked => LinkedName is not null;
+
+
 
     /// <summary>The badge beside a linked section's heading, which opens it on the Sub-Assemblies screen: "Cheese Roll Dough, from Sub-Assemblies".</summary>
     public string LinkedFromText => $"{LinkedName}, from {StandaloneSourceName}";
@@ -304,7 +318,7 @@ public sealed class LinkableSubAssemblyOption
 
     public string DisplayName => SubAssembly is null
         ? $"Packaging — {PackagingTarget!.Name}"
-        : $"{SubAssembly.Name} — {ProductUsageEdit.StandaloneSourceName} ({SubAssembly.Role?.Name})";
+        : $"{SubAssembly.Name} — {SubAssembly.OwnerProduct?.Name ?? ProductUsageEdit.StandaloneSourceName} ({SubAssembly.Role?.Name})";
 }
 
 /// <summary>
@@ -1347,7 +1361,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             .Subscribe();
 
         this.WhenAnyValue(x => x.SelectedRecipeTab)
-            .Subscribe(RecipeTabShown);
+            .Subscribe(RecipeTabPicked);
 
         // The sub-assembly form: where its sub-assembly comes from, then the one it links or copies.
         this.WhenAnyValue(x => x.EditingUsageMode)
@@ -1499,9 +1513,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             var costingDefaults = await _costingDefaultsRepository.GetAsync(CancellationToken.None);
 
             // A linked section reads a sub-assembly kept on the Sub-Assemblies screen, which can change there (its
-            // lines, name or role), so those are fetched again; new sections only need their ingredients' new costs.
+            // lines, name or role), so those are fetched again; the product's own and new sections only need their
+            // ingredients' new costs. Every saved one is fetched: a role made product-owned, or no longer, in Settings
+            // turns a linked one into the product's own, or back.
             var detailProductId = _detailProductId;
-            HashSet<int> linkedIds = [.. UsageEdits.Where(u => u.IsLinked).Select(u => u.SubAssemblyId)];
+            HashSet<int> linkedIds = [.. UsageEdits.Where(u => u.SubAssemblyId > 0).Select(u => u.SubAssemblyId)];
             var linkedSubAssemblies = await _subAssemblyRepository.GetByIdsAsync(linkedIds, CancellationToken.None);
             var linkedLines = await _subAssemblyLineRepository.GetForSubAssembliesAsync(linkedIds, CancellationToken.None);
             var packagingLink = detailProductId is { } linkProductId
@@ -1516,6 +1532,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             var linkedPackagingLines = showsSavedLink
                 ? await _packagingLineRepository.GetEffectiveForProductAsync(packagingLink!.ProductId, CancellationToken.None)
                 : null;
+
+            // A role made product-owned in Settings, or no longer, since the product was loaded: a section it linked is its
+            // own now, or one of its own is linked now. With nothing typed into the form, the product is read again, so what
+            // Save compares against is how it's saved now; with something typed, RefreshRecipeRows turns the section round
+            // in place, and the next Save writes it as it shows.
+            var ownershipChanged = UsageEdits.Any(u => linkedSubAssemblies.FirstOrDefault(s => s.Id == u.SubAssemblyId) is { } saved
+                && (saved.OwnerProductId is not null && saved.OwnerProductId == detailProductId) != u.IsOwned);
+            var reloadDetails = ownershipChanged && !History.IsDirty && detailProductId is not null;
 
             // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
             var selectedId = SelectedProduct?.Id;
@@ -1561,6 +1585,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
                 RecomputeUsageForm();
                 RecomputeCosts();
             });
+
+            if (reloadDetails && SelectedProduct is { } reloaded && reloaded.Id == detailProductId)
+            {
+                await LoadProductDetailAsync(reloaded, CancellationToken.None);
+            }
 
             // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the product's form.
             if (_productToOpen is { } productId)
@@ -1717,7 +1746,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
             () => RunWithConfirmationAsync(
-                $"Delete '{SelectedProduct!.Name}'? Its sub-assemblies stay on the Sub-Assemblies screen. This can't be undone.",
+                $"Delete '{SelectedProduct!.Name}'? Its own sub-assemblies go with it; the ones it links stay on the Sub-Assemblies screen. This can't be undone.",
                 async () =>
                 {
                     await _productRepository.DeleteAsync(SelectedProduct!.Id, CancellationToken.None);
@@ -2503,6 +2532,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     {
         var subAssembly = usage.SubAssembly!;
         var role = Roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role;
+        var isOwn = subAssembly.OwnerProductId == usage.ProductId;
         return new ProductUsageEdit(
             subAssembly.Id,
             role,
@@ -2510,7 +2540,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             usage.AuthoredField,
             usage.AuthoredValue,
             usage.ShrinkagePercent,
-            subAssembly.Name,
+            isOwn ? null : subAssembly.Name,
             [.. addIns.Select(a => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(a.IngredientId) ?? a.Ingredient!, a.Grams))],
             SectionLabelOf(subAssembly.Name, role));
     }
@@ -2594,9 +2624,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// <summary>The recipe as Save writes it: the new sections with their lines, and the sub-assemblies it links.</summary>
     private RecipeDraft CurrentRecipe() =>
         new(
-            [.. UsageEdits.Where(u => u.IsNew).Select(u => new NewSubAssemblyDraft(
+            [.. UsageEdits.Where(u => u.IsEditable).Select(u => new NewSubAssemblyDraft(
                 u.RoleId, [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], u.AuthoredField, u.AuthoredValue, u.Name)
             {
+                // The product's own keeps its id, so Save rewrites it in place; a new section's is 0.
+                Id = u.SubAssemblyId,
                 ShrinkagePercent = u.ShrinkagePercent,
             })],
             [.. UsageEdits.Where(u => u.IsLinked).Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
@@ -2621,7 +2653,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             && pair.First.AddIns.SequenceEqual(pair.Second.AddIns))
         && a.New.Count == b.New.Count
         && a.New.Zip(b.New).All(pair =>
-            pair.First.RoleId == pair.Second.RoleId
+            pair.First.Id == pair.Second.Id
+            && pair.First.RoleId == pair.Second.RoleId
             && pair.First.SectionName == pair.Second.SectionName
             && pair.First.AuthoredField == pair.Second.AuthoredField
             && pair.First.AuthoredValue == pair.Second.AuthoredValue
@@ -2815,8 +2848,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
                 throw new InvalidOperationException($"Add the ingredients that go into the {role.Name}, in grams.");
             }
 
+            // One of the product's own keeps its id, so Save rewrites it in place; a new one has none yet.
             usage = new ProductUsageEdit(
-                0, role, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], _usageAuthoredField, authoredValue, shrinkagePercent, linkedName: null, name: EditingUsageName);
+                EditingUsage is { IsOwned: true } own ? own.SubAssemblyId : 0, role, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], _usageAuthoredField, authoredValue, shrinkagePercent, linkedName: null, name: EditingUsageName);
         }
         else
         {
@@ -2896,7 +2930,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
 
         // Applying a section is one undo step, wherever it's applied from: a tab left, or a Save. A refused one
         // changes only the message and whether the add-ins table is open, neither of which counts as a change, so
-        // the step settles into nothing of its own accord.
+        // the step settles into nothing of its own accord. An apply closes the form, which isn't a change either:
+        // the step is measured by what it did to the recipe, as Save's is (WithFormOf), so a tab left with nothing
+        // typed into its form records nothing.
         History.Begin();
         try
         {
@@ -2911,7 +2947,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         }
         finally
         {
-            History.End();
+            History.End((before, now) => before.WithFormOf(now));
         }
     }
 
@@ -2950,7 +2986,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     {
         List<ProductUsageEdit> sections = [.. UsageEdits.Where(u => !ReferenceEquals(u, replacing)), usage];
         SubAssemblyRules.EnsureSectionsDistinct([.. sections.Select(u => (u.RoleId, u.RoleName, u.Label))]);
-        SubAssemblyRules.EnsureValidSectionName(usage.IsNew ? usage.Name : null);
+        SubAssemblyRules.EnsureValidSectionName(usage.IsEditable ? usage.Name : null);
     }
 
     /// <summary>
@@ -2999,8 +3035,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     {
         EditingUsage = usage;
         IsAddingUsage = false;
-        UsageFormTitle = usage.IsNew ? $"Edit {usage.SectionName}" : $"Edit {usage.SectionName} ({usage.LinkedFromText})";
-        IsFormEditingLines = usage.IsNew;
+        UsageFormTitle = usage.IsEditable ? $"Edit {usage.SectionName}" : $"Edit {usage.SectionName} ({usage.LinkedFromText})";
+        IsFormEditingLines = usage.IsEditable;
         IsFormPickingSource = false;
         EditingUsageSource = null;
         RefreshFormRoleOptions();
@@ -3275,15 +3311,25 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             case NotifyCollectionChangedAction.Replace:
             {
                 var replacement = (ProductUsageEdit)e.NewItems![0]!;
+                var previous = (ProductUsageEdit)e.OldItems![0]!;
                 ((SubAssemblyRecipeTab)RecipeTabs[e.NewStartingIndex]).Usage = replacement;
-                if (ReferenceEquals(e.OldItems![0], EditingUsage))
+                if (ReferenceEquals(previous, EditingUsage))
                 {
-                    EditingUsage = replacement;
-
-                    // A linked one's lines aren't the form's to keep: show the owner's, as they now are.
-                    if (replacement.IsLinked)
+                    if (replacement.IsEditable != previous.IsEditable)
                     {
-                        ShowFormLines(replacement.Lines);
+                        // Its role was made product-owned in Settings, or no longer is: the form opens on it again, its
+                        // lines now the product's to type into, or the Sub-Assemblies screen's to show.
+                        OpenUsageForm(replacement);
+                    }
+                    else
+                    {
+                        EditingUsage = replacement;
+
+                        // A linked one's lines aren't the form's to keep: show the Sub-Assemblies screen's, as they now are.
+                        if (replacement.IsLinked)
+                        {
+                            ShowFormLines(replacement.Lines);
+                        }
                     }
                 }
 
@@ -3325,6 +3371,33 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         }
 
         RecipeTabShown(tab);
+    }
+
+    /// <summary>
+    /// A tab was picked in the strip, or SelectedRecipeTab set. A pick the screen makes itself (SelectRecipeTab,
+    /// or the tabs rearranged) belongs to whatever step it's part of. The user's own runs between steps: WPF selects
+    /// a tab as it takes the cursor, before the field it takes it from hears so (TabItem.OnPreviewGotKeyboardFocus),
+    /// so that field's step is still open while the form changes over to the other tab's section, and closed after,
+    /// it would record the change of section as an edit. So the step closes on the tab being left, keeping what
+    /// was typed there, and another opens on the tab arrived at, for the field to close.
+    /// </summary>
+    private void RecipeTabPicked(RecipeTab? tab)
+    {
+        if (_selectingRecipeTab || _arrangingRecipeTabs || _revertingRecipeTab || IsBusyApplying || !History.IsStepOpen)
+        {
+            RecipeTabShown(tab);
+            return;
+        }
+
+        History.End();
+        try
+        {
+            RecipeTabShown(tab);
+        }
+        finally
+        {
+            History.Begin();
+        }
     }
 
     /// <summary>
@@ -3418,7 +3491,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// sub-assembly's, which is the first in role order, else Packaging. Another product's recipe has no tab
     /// that showed (<paramref name="previous"/> is null), so it opens on its first.
     /// </summary>
-    /// <param name="previousIds">The sub-assemblies the recipe linked before, which a new section saved since isn't among.</param>
+    /// <param name="previousIds">The sub-assemblies the recipe used before, which a new section saved since isn't among.</param>
     private void ReselectRecipeTab(RecipeTab? previous, ProductUsageEdit? previousUsage, HashSet<int> previousIds)
     {
         RecipeTab? tab = previous is PackagingRecipeTab ? PackagingTabIfShown : null;
@@ -3428,7 +3501,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
 
             // A linked sub-assembly is known by its id. A new section saved since is linked now, under an id the recipe
             // didn't have, in its role, and by the name it went by when it can be.
-            tab = previousUsage.IsLinked
+            tab = previousUsage.SubAssemblyId > 0
                 ? tabs.FirstOrDefault(t => t.Usage.SubAssemblyId == previousUsage.SubAssemblyId)
                 : tabs.Where(t => t.Usage.RoleId == previousUsage.RoleId && !previousIds.Contains(t.Usage.SubAssemblyId))
                     .OrderBy(t => t.Usage.Name == previousUsage.Name ? 0 : 1)
@@ -3454,7 +3527,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         LinkableSubAssemblies.MergeFrom(
             [
                 .. _linkable
-                    .Where(s => !(linking && usedIds.Contains(s.Id)))
+                    .Where(s => linking
+                        ? s.OwnerProductId is null && !usedIds.Contains(s.Id)
+                        : s.OwnerProductId is null || s.OwnerProductId != _detailProductId)
                     .Select(s => new LinkableSubAssemblyOption(s)),
                 .. HasPackaging ? [] : _packagingSets.Select(s => new LinkableSubAssemblyOption(s)),
                 .. HasPackaging ? [] : Products.Where(p => p.Id != _detailProductId).Select(p => new LinkableSubAssemblyOption(p)),
@@ -3502,9 +3577,26 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         {
             var edit = UsageEdits[i];
             ProductUsageEdit fresh;
-            if (edit.IsLinked)
+            var saved = edit.SubAssemblyId > 0 ? linkedById.GetValueOrDefault(edit.SubAssemblyId) : null;
+            var isOwnNow = saved is not null && saved.OwnerProductId is { } ownerId && ownerId == _detailProductId;
+            if (saved is not null && edit.IsLinked && isOwnNow)
             {
-                if (!linkedById.TryGetValue(edit.SubAssemblyId, out var subAssembly))
+                // Its role was made product-owned: the product owns it now, with any add-ins it had merged into its lines.
+                var role = Roles.FirstOrDefault(r => r.Id == saved.RoleId) ?? saved.Role;
+                fresh = new ProductUsageEdit(
+                    saved.Id,
+                    role,
+                    [.. linkedLinesById[saved.Id].Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
+                    edit.AuthoredField,
+                    edit.AuthoredValue,
+                    edit.ShrinkagePercent,
+                    linkedName: null,
+                    name: SectionLabelOf(saved.Name, role));
+            }
+            else if (edit.IsLinked || (edit.IsOwned && saved is not null && !isOwnNow))
+            {
+                // A linked one, or one of its own whose role is no longer product-owned, which it links now.
+                if (saved is not { } subAssembly)
                 {
                     continue;
                 }

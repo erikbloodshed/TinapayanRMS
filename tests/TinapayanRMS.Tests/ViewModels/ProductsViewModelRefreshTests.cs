@@ -404,6 +404,113 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task A_products_own_section_is_edited_in_its_recipe_and_Save_rewrites_it_in_place()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var milkId = await AddIngredientAsync("Milk", costPerGram: 0.1m);
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [new NewSubAssemblyDraft(fillingRoleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
+        var fillingId = await SubAssemblyIdAsync(productId, fillingRoleId);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1 && viewModel.EditingUsage is not null, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        var usage = viewModel.UsageEdits.Single();
+        usage.IsOwned.Should().BeTrue();
+        usage.IsLinked.Should().BeFalse();
+        viewModel.IsFormEditingLines.Should().BeTrue("its lines are the product's to type into");
+        viewModel.FormLines.Add(new IngredientLineRow { IngredientId = milkId, Grams = 50m });
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Single().TotalWeight == 150m, () => $"ready={viewModel.AreDetailsReady}");
+        var saved = viewModel.UsageEdits.Single();
+        saved.SubAssemblyId.Should().Be(fillingId, "Save rewrites the product's own in place");
+        saved.IsOwned.Should().BeTrue();
+        viewModel.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>().Which.Usage.Should().BeSameAs(saved);
+        await using var dbContext = CreateDbContext();
+        (await dbContext.SubAssemblies.SingleAsync(Cancellation)).TotalWeight.Should().Be(150m);
+    }
+
+    [Fact]
+    public async Task A_new_section_in_a_product_owned_role_is_the_products_own_after_Save()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var productId = await AddProductAsync("Cheese Roll");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == productId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.New);
+        viewModel.EditingUsageRole = viewModel.Roles.Single(r => r.Id == fillingRoleId);
+        viewModel.FormLines.Add(new IngredientLineRow { IngredientId = cheeseId, Grams = 100m });
+        viewModel.EditingUsageWeightPerPiece = 10m;
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.SingleOrDefault()?.IsOwned == true,
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}");
+        viewModel.IsFormEditingLines.Should().BeTrue();
+        viewModel.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>().Which.Usage.Should().BeSameAs(viewModel.UsageEdits.Single());
+        (await new SubAssemblyRepository(CreateDbContextFactory()).GetStandaloneAsync(Cancellation)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Another_products_own_is_offered_to_copy_but_not_to_link()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var ownerId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(ownerId, new RecipeDraft(
+            [new NewSubAssemblyDraft(fillingRoleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m, SectionName: "Cheese")], []));
+        var productId = await AddProductAsync("Cheese Bun");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == productId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}");
+
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
+        viewModel.LinkableSubAssemblies.Where(o => !o.IsPackaging).Should().BeEmpty("a product's own is copied, never linked");
+
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
+        viewModel.LinkableSubAssemblies.Where(o => !o.IsPackaging).Select(o => o.DisplayName)
+            .Should().Equal("Cheese Roll Filling: Cheese — Cheese Roll (Filling)");
+    }
+
+    [Fact]
+    public async Task A_role_made_product_owned_in_Settings_turns_a_linked_section_into_the_products_own_on_coming_back()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling");
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var (_, fillingId) = await AddProductWithSubAssemblyAsync("Cheese Roll", fillingRoleId, [(cheeseId, 100m)]);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1 && viewModel.EditingUsage is not null, () => $"usage rows={viewModel.UsageEdits.Count}");
+        viewModel.UsageEdits.Single().IsLinked.Should().BeTrue();
+        viewModel.IsFormEditingLines.Should().BeFalse();
+
+        var roles = new SubAssemblyRoleRepository(CreateDbContextFactory());
+        var role = (await roles.GetAllAsync(Cancellation)).Single(r => r.Id == fillingRoleId);
+        role.IsProductOwned = true;
+        await roles.UpdateAsync(role, Cancellation);
+        await viewModel.LoadCommand.Execute();
+
+        var usage = viewModel.UsageEdits.Single();
+        usage.SubAssemblyId.Should().Be(fillingId);
+        usage.IsOwned.Should().BeTrue();
+        viewModel.EditingUsage.Should().BeSameAs(usage);
+        viewModel.IsFormEditingLines.Should().BeTrue("the form opens on it again, its lines the product's now");
+        viewModel.History.IsDirty.Should().BeFalse("nothing was typed");
+    }
+
+    [Fact]
     public async Task A_typed_yield_is_kept_and_the_weight_per_piece_follows_the_batch()
     {
         var roleId = await AddRoleAsync("Dough");

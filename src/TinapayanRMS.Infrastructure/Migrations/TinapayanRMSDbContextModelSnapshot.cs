@@ -532,6 +532,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("OwnerProductId")
+                        .HasColumnType("int");
+
                     b.Property<int>("RoleId")
                         .HasColumnType("int");
 
@@ -547,6 +550,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique();
+
+                    b.HasIndex("OwnerProductId");
 
                     b.HasIndex("RoleId");
 
@@ -641,6 +646,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Property<bool>("IsPackaging")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsProductOwned")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -661,6 +669,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         {
                             Id = 1,
                             IsPackaging = false,
+                            IsProductOwned = false,
                             Name = "Dough",
                             SortOrder = 1
                         },
@@ -668,6 +677,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         {
                             Id = 2,
                             IsPackaging = false,
+                            IsProductOwned = false,
                             Name = "Filling",
                             SortOrder = 2
                         },
@@ -675,6 +685,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         {
                             Id = 3,
                             IsPackaging = false,
+                            IsProductOwned = false,
                             Name = "Topping",
                             SortOrder = 3
                         },
@@ -682,6 +693,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         {
                             Id = 4,
                             IsPackaging = false,
+                            IsProductOwned = false,
                             Name = "Inclusion",
                             SortOrder = 4
                         },
@@ -689,6 +701,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         {
                             Id = 5,
                             IsPackaging = false,
+                            IsProductOwned = false,
                             Name = "Finishing",
                             SortOrder = 5
                         },
@@ -696,6 +709,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         {
                             Id = 6,
                             IsPackaging = true,
+                            IsProductOwned = false,
                             Name = "Packaging",
                             SortOrder = 6
                         });
@@ -953,11 +967,18 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssembly", b =>
                 {
+                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "OwnerProduct")
+                        .WithMany()
+                        .HasForeignKey("OwnerProductId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("TinapayanRMS.Domain.Entities.SubAssemblyRole", "Role")
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("OwnerProduct");
 
                     b.Navigation("Role");
                 });

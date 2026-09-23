@@ -150,8 +150,18 @@ public sealed class UndoHistory<TSnapshot>(
         }
     }
 
+    /// <summary>Whether a step is open: begun and not yet ended.</summary>
+    public bool IsStepOpen => _pending is not null;
+
     /// <summary>Closes the open step, keeping it only if the form actually changed while it was open.</summary>
-    public void End()
+    public void End() => End(rebase: null);
+
+    /// <summary>
+    /// Closes the open step as <see cref="End()"/> does, but measures it from where it began moved on by
+    /// <paramref name="rebase"/>, as <see cref="Rebase"/> moves the settled form: for a change that carries along
+    /// a part that isn't the user's. What's kept is still where it began, so an undo puts all of it back.
+    /// </summary>
+    public void End(Func<TSnapshot, TSnapshot, TSnapshot>? rebase)
     {
         if (_pending is not { } before)
         {
@@ -166,7 +176,7 @@ public sealed class UndoHistory<TSnapshot>(
 
         var now = capture();
         RefreshDirty(now);
-        if (showsSame(before, now))
+        if (showsSame(rebase is null ? before : rebase(before, now), now))
         {
             return;
         }

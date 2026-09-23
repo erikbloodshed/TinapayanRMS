@@ -142,6 +142,29 @@ public class UndoHistoryTests
     }
 
     [Fact]
+    public void A_step_ended_with_a_rebase_is_measured_from_it_but_puts_back_where_it_began()
+    {
+        // The form's text stands for "the user's part:the part that isn't". Only a change to the
+        // first part is a step, and undoing it puts back both, as they were when the step began.
+        static string Rebase(string before, string now) => before.Split(':')[0] + ":" + now.Split(':')[1];
+
+        var form = new Form();
+        form.Value = "a:x";
+
+        form.History.Begin();
+        form.Value = "a:y";
+        form.History.End(Rebase);
+        form.History.CanUndo.Should().BeFalse("only the part that isn't the user's moved");
+
+        form.History.Begin();
+        form.Value = "b:z";
+        form.History.End(Rebase);
+
+        form.Undo().Should().BeTrue();
+        form.Value.Should().Be("a:y");
+    }
+
+    [Fact]
     public void Opening_a_step_settles_the_one_already_open()
     {
         var form = new Form();

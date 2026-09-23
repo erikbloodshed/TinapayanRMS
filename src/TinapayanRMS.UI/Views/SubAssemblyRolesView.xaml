@@ -42,6 +42,7 @@
                     <syncfusion:SfDataGrid.Columns>
                         <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
                         <controls:NumericColumn MappingName="SortOrder" HeaderText="Order" Width="90" NumberDecimalDigits="0" />
+                        <syncfusion:GridCheckBoxColumn MappingName="IsProductOwned" HeaderText="Product-owned" Width="120" AllowEditing="False" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </Grid>
@@ -62,6 +63,13 @@
                                           NumberDecimalDigits="0"
                                           ToolTip="Where the role's section goes in a recipe: lower comes first."
                                           Margin="0,0,0,12" />
+
+                <!-- Syncfusion has no check box of its own outside its grids and ribbon; its samples use WPF's, which the theme styles -->
+                <CheckBox Content="Product-owned"
+                          IsChecked="{Binding EditingIsProductOwned, Mode=TwoWay}"
+                          IsEnabled="{Binding CanEditProductOwned}"
+                          ToolTip="A section in this role made in a product stays that product's own: edited in its recipe, not on the Sub-Assemblies screen, and copied rather than linked by other products. Not for the Packaging role."
+                          Margin="0,0,0,12" />
 
                 <StackPanel Orientation="Horizontal">
                     <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />

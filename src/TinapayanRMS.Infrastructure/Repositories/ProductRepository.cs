@@ -1,6 +1,7 @@
 using Dapper;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Queries;
@@ -42,7 +43,9 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     public async Task UpdateAsync(Product product, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         await UpdateAsync(dbContext, product, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task<int> SaveAsync(
@@ -131,8 +134,13 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
                 + $"{(packagingLinkedBy.Count == 1 ? "links" : "link")} this product's packaging. Unlink it there first.");
         }
 
-        // The product's cascades take its packaging lines, its usages with their add-ins, and its costing
-        // parameters with it. The sub-assemblies it used stay on the Sub-Assemblies screen.
+        // Its own sub-assemblies go with it (Cascade). Nothing else can link one, but should another product's recipe
+        // somehow use it, say so rather than let the database refuse.
+        await SubAssemblyRepository.EnsureNoneLinkedElsewhereAsync(
+            dbContext, u => u.SubAssembly!.OwnerProductId == id && u.ProductId != id, cancellationToken);
+
+        // The product's cascades take its own sub-assemblies, its packaging lines, its usages with their add-ins, and
+        // its costing parameters with it. The ones it links from the Sub-Assemblies screen stay there.
         await dbContext.Products.Where(p => p.Id == id).ExecuteDeleteAsync(cancellationToken);
     }
 
@@ -150,6 +158,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         var existing = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == product.Id, cancellationToken)
             ?? throw new InvalidOperationException($"Product {product.Id} does not exist.");
 
+        var oldName = existing.Name;
         existing.Name = product.Name;
         existing.Description = product.Description;
         existing.CategoryId = product.CategoryId;
@@ -158,5 +167,20 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         existing.UpdatedAt = DateTime.Now;
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // Its own sub-assemblies are named after it, "Cheese Roll Filling: Cheese": they take its new name. Run on the
+        // caller's context, which should hold a transaction.
+        if (!string.Equals(oldName, existing.Name, StringComparison.Ordinal))
+        {
+            var owned = await dbContext.SubAssemblies
+                .Include(s => s.Role)
+                .Where(s => s.OwnerProductId == existing.Id)
+                .ToListAsync(cancellationToken);
+            await SubAssemblyRepository.ResyncOwnedNamesAsync(
+                dbContext,
+                owned,
+                s => SubAssemblyRules.OwnedNameAfterRename(s.Name, oldName, s.Role!.Name, existing.Name, s.Role.Name),
+                cancellationToken);
+        }
     }
 }

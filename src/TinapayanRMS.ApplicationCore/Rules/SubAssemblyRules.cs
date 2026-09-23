@@ -85,6 +85,51 @@ public static class SubAssemblyRules
         }
     }
 
+    /// <summary>
+    /// A product's own sub-assembly is copied by other products, never linked: it's edited in its product, which can
+    /// change or remove it at any time. <paramref name="ownerName"/> is its product's, or null for one on the
+    /// Sub-Assemblies screen, which any product can link.
+    /// </summary>
+    public static void EnsureLinkable(string subAssemblyName, string? ownerName)
+    {
+        if (ownerName is not null)
+        {
+            throw new InvalidOperationException(
+                $"{subAssemblyName} is {ownerName}'s own, so it can't be linked. Copy it instead: Add Sub-Assembly, then Copy an existing one.");
+        }
+    }
+
+    /// <summary>
+    /// A product's own sub-assembly's name once its product or its role is renamed: one named after them
+    /// (<see cref="StandaloneNameFor"/>) is named after the new ones, keeping its own part, so "Cheese Roll Filling: Cheese"
+    /// becomes "Cheese Bun Filling: Cheese". One named otherwise, as a sub-assembly from the Sub-Assemblies screen a
+    /// product came to own keeps its name, is left as it is. Not yet unique.
+    /// </summary>
+    public static string OwnedNameAfterRename(string name, string oldProductName, string oldRoleName, string newProductName, string newRoleName)
+    {
+        var oldBase = StandaloneNameFor(oldProductName, oldRoleName, null);
+        var trimmed = name.Trim();
+        if (string.Equals(trimmed, oldBase, StringComparison.OrdinalIgnoreCase))
+        {
+            return StandaloneNameFor(newProductName, newRoleName, null);
+        }
+
+        var prefix = oldBase + ": ";
+        return trimmed.Length > prefix.Length && trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? StandaloneNameFor(newProductName, newRoleName, trimmed[prefix.Length..])
+            : name;
+    }
+
+    /// <summary>The Packaging role holds packaging sets from the Sub-Assemblies screen, so it's never product-owned.</summary>
+    public static void EnsureProductOwnedAllowed(SubAssemblyRole role)
+    {
+        if (role.IsPackaging && role.IsProductOwned)
+        {
+            throw new InvalidOperationException(
+                $"The {role.Name} role holds packaging sets from the Sub-Assemblies screen, so it can't be product-owned.");
+        }
+    }
+
     /// <summary>TotalWeight = Σ grams; TotalCost = Σ (grams × that line's ingredient cost per gram, its CostPerBaseUnit).</summary>
     public static (decimal TotalWeight, decimal TotalCost) CalculateTotals(IReadOnlyList<(decimal Grams, decimal IngredientCostPerGram)> lines)
     {

@@ -19,4 +19,11 @@ public class SubAssemblyRoleValidatorTests
     {
         _validator.Validate(new SubAssemblyRole { Name = "", SortOrder = 1 }).IsValid.Should().BeFalse();
     }
+
+    [Fact]
+    public void Rejects_a_product_owned_packaging_role_and_accepts_any_other()
+    {
+        _validator.Validate(new SubAssemblyRole { Name = "Packaging", IsPackaging = true, IsProductOwned = true }).IsValid.Should().BeFalse();
+        _validator.Validate(new SubAssemblyRole { Name = "Filling", IsProductOwned = true }).IsValid.Should().BeTrue();
+    }
 }

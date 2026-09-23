@@ -86,6 +86,13 @@
                 <Run Text="Cost per piece · " /><Run Text="{Binding UsageFormCostPerPieceText, Mode=OneWay}" />
             </TextBlock>
             <StackPanel Orientation="Horizontal">
+                <!-- One of the product's own, in a product-owned role (Settings → Roles): edited here, and nowhere else -->
+                <Border Style="{StaticResource LinkedBadgeStyle}"
+                        Margin="0,0,8,10"
+                        ToolTip="Edited here, not on the Sub-Assemblies screen. Other products can copy it, not link it; taking it out of the recipe deletes it with Save."
+                        Visibility="{Binding EditingUsage.IsOwned, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="This product's own" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
+                </Border>
                 <!-- A linked one's badge is a link: it opens the sub-assembly on the Sub-Assemblies screen (MainWindow subscribes to SubAssemblyOpenRequests) -->
                 <Button Style="{StaticResource LinkedBadgeLinkStyle}"
                         Margin="0,0,8,10"
@@ -546,7 +553,7 @@
                        Visibility="{Binding IsAddingUsage, Converter={StaticResource BooleanToVisibilityConverter}}" />
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <syncfusion:ButtonAdv Label="Make a Copy"
-                                      ToolTip="Make a copy of it, to change its lines here. Save keeps the copy on the Sub-Assemblies screen, named after this product, and links it instead."
+                                      ToolTip="Make a copy of it, to change its lines here. Save keeps the copy named after this product, and uses it instead: as its own in a product-owned role, otherwise on the Sub-Assemblies screen, linked."
                                       IconTemplate="{StaticResource CopyIconTemplate}"
                                       Command="{Binding MakeCopyCommand}"
                                       CommandParameter="{Binding EditingUsage}"

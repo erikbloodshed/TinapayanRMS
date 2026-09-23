@@ -149,6 +149,34 @@ public class SubAssemblyRulesTests
     }
 
     [Fact]
+    public void OwnedNameAfterRename_follows_the_product_or_role_it_was_named_after()
+    {
+        SubAssemblyRules.OwnedNameAfterRename("Cheese Roll Filling: Cheese", "Cheese Roll", "Filling", "Cheese Bun", "Filling").Should().Be("Cheese Bun Filling: Cheese");
+        SubAssemblyRules.OwnedNameAfterRename("cheese roll filling", "Cheese Roll", "Filling", "Cheese Roll", "Stuffing").Should().Be("Cheese Roll Stuffing");
+        SubAssemblyRules.OwnedNameAfterRename("Pan de Coco", "Coco Bun", "Filling", "Coco Roll", "Filling").Should().Be("Pan de Coco", "one not named after them keeps its name");
+    }
+
+    [Fact]
+    public void EnsureLinkable_refuses_a_products_own_and_names_whose_it_is()
+    {
+        var own = () => SubAssemblyRules.EnsureLinkable("Cheese Roll Filling: Cheese", "Cheese Roll");
+        var standalone = () => SubAssemblyRules.EnsureLinkable("Pan de Coco", null);
+
+        own.Should().Throw<InvalidOperationException>().WithMessage("Cheese Roll Filling: Cheese is Cheese Roll's own, so it can't be linked. Copy it instead*");
+        standalone.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureProductOwnedAllowed_refuses_only_a_product_owned_packaging_role()
+    {
+        var packaging = () => SubAssemblyRules.EnsureProductOwnedAllowed(new SubAssemblyRole { Name = "Packaging", IsPackaging = true, IsProductOwned = true });
+        var filling = () => SubAssemblyRules.EnsureProductOwnedAllowed(new SubAssemblyRole { Name = "Filling", IsProductOwned = true });
+
+        packaging.Should().Throw<InvalidOperationException>().WithMessage("*can't be product-owned*");
+        filling.Should().NotThrow();
+    }
+
+    [Fact]
     public void SectionLabel_is_a_sub_assemblys_name_less_the_product_and_role_it_was_saved_under_from_there()
     {
         SubAssemblyRules.SectionLabel("Cheese Roll Filling: Cheese", "Cheese Roll", "Filling").Should().Be("Cheese");

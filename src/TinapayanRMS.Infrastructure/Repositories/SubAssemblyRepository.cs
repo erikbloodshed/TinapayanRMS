@@ -1,3 +1,4 @@
+using Dapper;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
@@ -29,14 +30,32 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             cancellationToken);
     }
 
+    /// <summary>With each one's owner, if a product owns it: that one can only be copied.</summary>
     public Task<IReadOnlyList<SubAssembly>> GetLinkableAsync(CancellationToken cancellationToken) =>
-        dbContextFactory.ReadAsync(
-            dbContext => SubAssemblyReads.GetWithRoleAsync(dbContext, "WHERE s.TotalWeight > 0 AND r.IsPackaging = 0\nORDER BY s.Name", null, cancellationToken),
+        dbContextFactory.ReadAsync<IReadOnlyList<SubAssembly>>(
+            async dbContext => (await dbContext.Connection().QueryAsync<SubAssembly, SubAssemblyRole, Product?, SubAssembly>(
+                dbContext.Command(
+                    $"""
+                    SELECT {SubAssemblyReads.ColumnsWithRole}, o.Id, o.Name
+                    FROM SubAssemblies s
+                    {SubAssemblyReads.RoleJoin}
+                    LEFT JOIN Products o ON o.Id = s.OwnerProductId
+                    WHERE s.TotalWeight > 0 AND r.IsPackaging = 0
+                    ORDER BY s.Name
+                    """,
+                    null,
+                    cancellationToken),
+                (subAssembly, role, owner) =>
+                {
+                    subAssembly.OwnerProduct = owner;
+                    return SubAssemblyReads.WithRole(subAssembly, role);
+                },
+                splitOn: "Id,Id")).AsList(),
             cancellationToken);
 
     public Task<IReadOnlyList<SubAssembly>> GetStandaloneAsync(CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(
-            dbContext => SubAssemblyReads.GetWithRoleAsync(dbContext, "ORDER BY s.Name", null, cancellationToken),
+            dbContext => SubAssemblyReads.GetWithRoleAsync(dbContext, "WHERE s.OwnerProductId IS NULL\nORDER BY s.Name", null, cancellationToken),
             cancellationToken);
 
     /// <summary>The recipes linking a sub-assembly, and the products whose packaging links a set, in one query.</summary>
@@ -167,8 +186,13 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         }
         else
         {
-            stored = await dbContext.SubAssemblies.Include(s => s.Role).FirstOrDefaultAsync(s => s.Id == subAssembly.Id, cancellationToken)
+            stored = await dbContext.SubAssemblies.Include(s => s.Role).Include(s => s.OwnerProduct).FirstOrDefaultAsync(s => s.Id == subAssembly.Id, cancellationToken)
                 ?? throw new InvalidOperationException($"Sub-assembly {subAssembly.Id} does not exist.");
+            if (stored.OwnerProduct is { } owner)
+            {
+                throw new InvalidOperationException($"{stored.Name} is {owner.Name}'s own. Change it in that product's recipe.");
+            }
+
             SubAssemblyRules.EnsureKindUnchanged(stored.Role!.IsPackaging, isPackaging);
 
             // Every product using it links it, and takes its new role and name with it.
@@ -188,8 +212,14 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var name = await dbContext.SubAssemblies.Where(s => s.Id == id).Select(s => s.Name).FirstOrDefaultAsync(cancellationToken)
+        var stored = await dbContext.SubAssemblies.Where(s => s.Id == id).Select(s => new { s.Name, OwnerName = s.OwnerProduct!.Name }).FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException($"Sub-assembly {id} does not exist.");
+        if (stored.OwnerName is { } ownerName)
+        {
+            throw new InvalidOperationException($"{stored.Name} is {ownerName}'s own. Remove it from that product's recipe instead.");
+        }
+
+        var name = stored.Name;
 
         // Every product using a sub-assembly links it: a recipe through a usage, a set through its
         // packaging link.
@@ -303,4 +333,119 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
                 $"{recipe.First().Product!.Name}, which links this sub-assembly,");
         }
     }
+
+    /// <summary>
+    /// Gives each sub-assembly (tracked on the caller's context) the name it's paired with, made unique against every
+    /// other (SubAssemblyRules.UniqueStandaloneName). Each first takes a name no one could have, so two can swap names
+    /// in one go without the unique index refusing the first halfway.
+    /// </summary>
+    internal static async Task RenameAsync(
+        TinapayanRMSDbContext dbContext, IReadOnlyList<(SubAssembly SubAssembly, string Name)> renames, CancellationToken cancellationToken)
+    {
+        if (renames.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var (subAssembly, _) in renames)
+        {
+            subAssembly.Name = $"~{Guid.NewGuid():N}";
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        List<int> renamedIds = [.. renames.Select(r => r.SubAssembly.Id)];
+        List<string> taken = await dbContext.SubAssemblies.Where(s => !renamedIds.Contains(s.Id)).Select(s => s.Name).ToListAsync(cancellationToken);
+        foreach (var (subAssembly, name) in renames)
+        {
+            subAssembly.Name = SubAssemblyRules.UniqueStandaloneName(name, taken);
+            taken.Add(subAssembly.Name);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// The name each of <paramref name="owned"/> (tracked, with their roles and owners) should have, from
+    /// <paramref name="nameOf"/>, given where it differs: after its product or its role was renamed, so its name goes on
+    /// reading "Cheese Roll Filling: Cheese".
+    /// </summary>
+    internal static Task ResyncOwnedNamesAsync(
+        TinapayanRMSDbContext dbContext, IEnumerable<SubAssembly> owned, Func<SubAssembly, string> nameOf, CancellationToken cancellationToken) =>
+        RenameAsync(
+            dbContext,
+            [.. owned.Select(s => (SubAssembly: s, Name: nameOf(s))).Where(r => !string.Equals(r.SubAssembly.Name, r.Name, StringComparison.Ordinal))],
+            cancellationToken);
+
+    /// <summary>
+    /// The sub-assemblies on the Sub-Assemblies screen in <paramref name="roleId"/> that making it product-owned would
+    /// give to a product: the ones exactly one product's recipe uses.
+    /// </summary>
+    internal static IQueryable<SubAssembly> SingleUse(TinapayanRMSDbContext dbContext, int roleId) =>
+        dbContext.SubAssemblies.Where(s =>
+            s.OwnerProductId == null
+            && s.RoleId == roleId
+            && dbContext.ProductSubAssemblyUsages.Count(u => u.SubAssemblyId == s.Id) == 1);
+
+    /// <summary>
+    /// A role made product-owned: each of its sub-assemblies on the Sub-Assemblies screen that exactly one product uses
+    /// becomes that product's own, keeping its name. The product's add-ins on it go into its lines, after its own, since
+    /// the recipe is the product's alone now (an add-in is never one of its ingredients: ProductRules.EnsureValidAddIns).
+    /// </summary>
+    internal static async Task AdoptSingleUseAsync(TinapayanRMSDbContext dbContext, int roleId, CancellationToken cancellationToken)
+    {
+        var adopted = await SingleUse(dbContext, roleId).ToListAsync(cancellationToken);
+        if (adopted.Count == 0)
+        {
+            return;
+        }
+
+        List<int> ids = [.. adopted.Select(s => s.Id)];
+        var usages = await dbContext.ProductSubAssemblyUsages
+            .AsNoTracking()
+            .Where(u => ids.Contains(u.SubAssemblyId))
+            .ToDictionaryAsync(u => u.SubAssemblyId, cancellationToken);
+        List<int> usageIds = [.. usages.Values.Select(u => u.Id)];
+        var addIns = (await dbContext.UsageAddInLines
+                .AsNoTracking()
+                .Where(l => usageIds.Contains(l.UsageId))
+                .OrderBy(l => l.SortOrder).ThenBy(l => l.Id)
+                .ToListAsync(cancellationToken))
+            .ToLookup(l => l.UsageId);
+
+        foreach (var subAssembly in adopted)
+        {
+            var usage = usages[subAssembly.Id];
+            subAssembly.OwnerProductId = usage.ProductId;
+
+            if (addIns[usage.Id].Any())
+            {
+                var lines = await dbContext.SubAssemblyLines
+                    .AsNoTracking()
+                    .Where(l => l.SubAssemblyId == subAssembly.Id)
+                    .OrderBy(l => l.SortOrder).ThenBy(l => l.Id)
+                    .ToListAsync(cancellationToken);
+                await SubAssemblyLineRepository.SetLinesAsync(
+                    dbContext,
+                    subAssembly,
+                    [
+                        .. lines.Select(l => new RecipeLine(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)),
+                        .. addIns[usage.Id].Select(l => new RecipeLine(l.IngredientId, l.Grams)),
+                    ],
+                    cancellationToken);
+                await dbContext.UsageAddInLines.Where(l => l.UsageId == usage.Id).ExecuteDeleteAsync(cancellationToken);
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// A role no longer product-owned: every sub-assembly products own in it goes to the Sub-Assemblies screen, and its
+    /// product links it from there. Its name already is one no other has.
+    /// </summary>
+    internal static Task ReleaseOwnedAsync(TinapayanRMSDbContext dbContext, int roleId, CancellationToken cancellationToken) =>
+        dbContext.SubAssemblies
+            .Where(s => s.RoleId == roleId && s.OwnerProductId != null)
+            .ExecuteUpdateAsync(set => set.SetProperty(s => s.OwnerProductId, (int?)null), cancellationToken);
 }

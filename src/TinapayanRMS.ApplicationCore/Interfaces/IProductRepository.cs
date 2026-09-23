@@ -4,9 +4,10 @@ using TinapayanRMS.Domain.Enums;
 namespace TinapayanRMS.ApplicationCore.Interfaces;
 
 /// <summary>
-/// A recipe section written in the product's Recipe Structure, which Save turns into a sub-assembly on the
-/// Sub-Assemblies screen, named after the product and its role (SubAssemblyRules.StandaloneNameFor), and links at
-/// the product's piece size: its role, its gram lines and that piece size.
+/// A recipe section whose lines the product's Recipe Structure edits: its role, its gram lines and the product's piece
+/// size. In a product-owned role (SubAssemblyRole.IsProductOwned) it's the product's own sub-assembly, new or saved
+/// (<see cref="Id"/>); in any other a new one, which Save keeps on the Sub-Assemblies screen and links. Either is named
+/// after the product and its role (SubAssemblyRules.StandaloneNameFor).
 /// </summary>
 /// <param name="SectionName">
 /// Optional: what tells it apart from others in its role, e.g. "Ube" beside "Cheese" (SubAssemblyRules.EnsureSectionsDistinct),
@@ -19,6 +20,12 @@ public sealed record NewSubAssemblyDraft(
     decimal AuthoredValue,
     string? SectionName = null)
 {
+    /// <summary>
+    /// The product's own saved sub-assembly this section is, whose lines, role and name Save rewrites in place; 0 for a
+    /// new one.
+    /// </summary>
+    public int Id { get; init; }
+
     /// <summary>
     /// How much of the batch's weight this product loses making it, as a percentage of what went in: at
     /// least 0 and less than 100. Pieces are cut from what's left (ProductRules.CalculateFinalWeight).
@@ -44,8 +51,9 @@ public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField Auth
 }
 
 /// <summary>
-/// A product's whole recipe of sub-assemblies: new sections, saved as sub-assemblies of their own, and the ones
-/// it links. Saving it replaces the product's usages; a sub-assembly it no longer lists is kept.
+/// A product's whole recipe of sub-assemblies: the sections whose lines it edits (its own, and new ones), and the ones
+/// it links. Saving it replaces the product's usages; one of its own it no longer lists is deleted, and one on the
+/// Sub-Assemblies screen is kept.
 /// </summary>
 public sealed record RecipeDraft(IReadOnlyList<NewSubAssemblyDraft> New, IReadOnlyList<LinkedUsageDraft> Linked);
 
@@ -79,8 +87,8 @@ public interface IProductRepository
     /// </summary>
     /// <param name="product">Only its Id, Name, Description, CategoryId, QuantityRequired and CurrentPrice are read; it's never given an id.</param>
     /// <param name="recipe">
-    /// The product's complete recipe of sub-assemblies, or null to leave it as it is. A sub-assembly it no
-    /// longer lists stays on the Sub-Assemblies screen.
+    /// The product's complete recipe of sub-assemblies, or null to leave it as it is. One of its own it no longer lists is
+    /// deleted; one from the Sub-Assemblies screen stays there.
     /// </param>
     /// <param name="packagingLink">
     /// What the packaging links from now on, or null to leave the link as it is. Written before the lines, so
@@ -98,8 +106,8 @@ public interface IProductRepository
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Deletes the product with its usages, packaging and costing; the sub-assemblies it used stay on the
-    /// Sub-Assemblies screen. Refused while another product links its packaging.
+    /// Deletes the product with its own sub-assemblies, usages, packaging and costing; the ones it links from the
+    /// Sub-Assemblies screen stay there. Refused while another product links its packaging.
     /// </summary>
     Task DeleteAsync(int id, CancellationToken cancellationToken);
 }

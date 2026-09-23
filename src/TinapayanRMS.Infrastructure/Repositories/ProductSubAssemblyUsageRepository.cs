@@ -56,10 +56,14 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
 
     /// <summary>
     /// Replaces the product's recipe on the caller's context, which should hold a transaction: its usages, one for each
-    /// sub-assembly <paramref name="recipe"/> links, and one for each new section, which is first saved as a sub-assembly
-    /// of its own, named after the product and its role (SubAssemblyRules.StandaloneNameFor, made unique). A sub-assembly
-    /// the recipe no longer lists is kept. Every check runs before anything is written: the new sections' lines, names and
-    /// piece sizes, that no section is a packaging set, sections in one role told apart by their names, and add-ins.
+    /// sub-assembly <paramref name="recipe"/> links and one for each section whose lines it edits (RecipeDraft.New).
+    /// Such a section in a product-owned role (SubAssemblyRole.IsProductOwned) is the product's own sub-assembly, added
+    /// or rewritten in place; in any other role a new one is kept on the Sub-Assemblies screen and linked, and one of its
+    /// own moved there is released to it. Either is named after the product and its role
+    /// (SubAssemblyRules.StandaloneNameFor, made unique). One of its own the recipe no longer lists is deleted; one on the
+    /// Sub-Assemblies screen is kept. Every check runs before anything is written: the sections' lines, names and piece
+    /// sizes, that a saved one is the product's own, that no section is a packaging set, that nothing linked is another
+    /// product's own, sections in one role told apart by their names, and add-ins.
     /// </summary>
     internal static async Task SetRecipeAsync(TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, CancellationToken cancellationToken)
     {
@@ -72,7 +76,7 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
         // A new sub-assembly has no id yet: a negative stand-in keeps it distinct from every other.
         ProductRules.EnsureValidUsages(
         [
-            .. recipe.New.Select((n, i) => (-(i + 1), n.AuthoredValue, n.ShrinkagePercent)),
+            .. recipe.New.Select((n, i) => (n.Id > 0 ? n.Id : -(i + 1), n.AuthoredValue, n.ShrinkagePercent)),
             .. recipe.Linked.Select(l => (l.SubAssemblyId, l.AuthoredValue, l.ShrinkagePercent)),
         ]);
 
@@ -83,22 +87,34 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException($"Product {productId} does not exist.");
 
-        var newRoleIds = recipe.New.Select(n => n.RoleId).Distinct().ToList();
-        var newRoles = await dbContext.SubAssemblyRoles.AsNoTracking().Where(r => newRoleIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, cancellationToken);
-        if (newRoleIds.Count != newRoles.Count)
+        var roleIds = recipe.New.Select(n => n.RoleId).Distinct().ToList();
+        var roles = await dbContext.SubAssemblyRoles.AsNoTracking().Where(r => roleIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, cancellationToken);
+        if (roleIds.Count != roles.Count)
         {
             throw new InvalidOperationException("Every sub-assembly needs a role, and that role must still exist.");
         }
 
-        foreach (var role in newRoles.Values)
+        foreach (var role in roles.Values)
         {
             SubAssemblyRules.EnsureRecipeRole(role);
+        }
+
+        // Tracked: the ones kept are rewritten in place.
+        var existingOwned = await dbContext.SubAssemblies
+            .Include(s => s.Role)
+            .Where(s => s.OwnerProductId == productId)
+            .ToDictionaryAsync(s => s.Id, cancellationToken);
+        foreach (var section in recipe.New.Where(n => n.Id > 0 && !existingOwned.ContainsKey(n.Id)))
+        {
+            throw new InvalidOperationException(
+                $"Sub-assembly {section.Id} isn't one of this product's own any more. Revert the product to see its recipe as it's saved now.");
         }
 
         var linkedIds = recipe.Linked.Select(l => l.SubAssemblyId).ToList();
         var linkedSubAssemblies = await dbContext.SubAssemblies
             .AsNoTracking()
             .Include(s => s.Role)
+            .Include(s => s.OwnerProduct)
             .Where(s => linkedIds.Contains(s.Id))
             .ToDictionaryAsync(s => s.Id, cancellationToken);
 
@@ -109,15 +125,16 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 throw new InvalidOperationException($"Sub-assembly {id} does not exist.");
             }
 
-            // A packaging set is linked by the product's packaging, never as a recipe section.
+            // A packaging set is linked by the product's packaging, never as a recipe section; a product's own is copied.
             SubAssemblyRules.EnsureRecipeRole(linked.Role!);
+            SubAssemblyRules.EnsureLinkable(linked.Name, linked.OwnerProduct?.Name);
         }
 
         SubAssemblyRules.EnsureSectionsDistinct(
         [
-            .. recipe.New.Select(n => (n.RoleId, newRoles[n.RoleId].Name, SubAssemblyRules.NormalizeName(n.SectionName))),
+            .. recipe.New.Select(n => (n.RoleId, roles[n.RoleId].Name, SubAssemblyRules.NormalizeName(n.SectionName))),
             .. recipe.Linked.Select(l => linkedSubAssemblies[l.SubAssemblyId])
-                .Select(s => (s.RoleId, s.Role!.Name, (string?)SubAssemblyRules.SectionLabel(s.Name, productName, s.Role.Name))),
+                .Select(s => (s.RoleId, s.Role!.Name, SubAssemblyRules.SectionLabel(s.Name, productName, s.Role.Name))),
         ]);
 
         // Add-ins go on top of a linked recipe, so they're only for what it doesn't already have. Checked
@@ -144,23 +161,66 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             }
         }
 
-        // Only the usages go: a sub-assembly the recipe no longer lists stays on the Sub-Assemblies screen.
+        // The usages go first: they reference the product's own sub-assemblies about to be deleted. One on the
+        // Sub-Assemblies screen the recipe no longer lists stays there; one of its own goes, with its lines (Cascade).
         await dbContext.ProductSubAssemblyUsages
             .Where(u => u.ProductId == productId)
             .ExecuteDeleteAsync(cancellationToken);
 
-        // Each new section becomes a sub-assembly, saved one at a time for the id its lines are written against, and
-        // named apart from every other, those saved just before it included.
-        List<string> takenNames = recipe.New.Count > 0 ? await dbContext.SubAssemblies.Select(s => s.Name).ToListAsync(cancellationToken) : [];
+        HashSet<int> keptIds = [.. recipe.New.Where(n => n.Id > 0).Select(n => n.Id)];
+        List<int> removedIds = [.. existingOwned.Keys.Where(id => !keptIds.Contains(id))];
+        if (removedIds.Count > 0)
+        {
+            foreach (var id in removedIds)
+            {
+                dbContext.Entry(existingOwned[id]).State = EntityState.Detached;
+            }
+
+            await dbContext.SubAssemblies.Where(s => removedIds.Contains(s.Id)).ExecuteDeleteAsync(cancellationToken);
+        }
+
+        // Its own ones kept take their role, and go to the Sub-Assemblies screen when that role isn't product-owned (any
+        // more). One given another role or name is named after it again.
+        List<(SubAssembly SubAssembly, string Name)> renames = [];
+        foreach (var section in recipe.New.Where(n => n.Id > 0))
+        {
+            var stored = existingOwned[section.Id];
+            var role = roles[section.RoleId];
+            var label = SubAssemblyRules.SectionLabel(stored.Name, productName, stored.Role!.Name);
+            if (stored.RoleId != section.RoleId
+                || !string.Equals(label, SubAssemblyRules.NormalizeName(section.SectionName), StringComparison.Ordinal))
+            {
+                renames.Add((stored, SubAssemblyRules.StandaloneNameFor(productName, role.Name, section.SectionName)));
+            }
+
+            stored.RoleId = section.RoleId;
+            stored.OwnerProductId = role.IsProductOwned ? productId : null;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await SubAssemblyRepository.RenameAsync(dbContext, renames, cancellationToken);
+
+        // New ones: the product's own in a product-owned role, otherwise kept on the Sub-Assemblies screen. Saved one at
+        // a time for the id its lines are written against, and named apart from every other, those saved just before it
+        // included. The ones kept are relined, and every one is used at the product's piece size.
+        List<string> takenNames = recipe.New.Any(n => n.Id == 0) ? await dbContext.SubAssemblies.Select(s => s.Name).ToListAsync(cancellationToken) : [];
         foreach (var section in recipe.New)
         {
-            var name = SubAssemblyRules.UniqueStandaloneName(
-                SubAssemblyRules.StandaloneNameFor(productName, newRoles[section.RoleId].Name, section.SectionName), takenNames);
-            takenNames.Add(name);
+            SubAssembly subAssembly;
+            if (section.Id > 0)
+            {
+                subAssembly = existingOwned[section.Id];
+            }
+            else
+            {
+                var role = roles[section.RoleId];
+                var name = SubAssemblyRules.UniqueStandaloneName(SubAssemblyRules.StandaloneNameFor(productName, role.Name, section.SectionName), takenNames);
+                takenNames.Add(name);
+                subAssembly = new SubAssembly { Name = name, RoleId = section.RoleId, OwnerProductId = role.IsProductOwned ? productId : null };
+                dbContext.SubAssemblies.Add(subAssembly);
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
 
-            var subAssembly = new SubAssembly { Name = name, RoleId = section.RoleId };
-            dbContext.SubAssemblies.Add(subAssembly);
-            await dbContext.SaveChangesAsync(cancellationToken);
             await SubAssemblyLineRepository.SetLinesAsync(dbContext, subAssembly, section.Lines, cancellationToken);
 
             dbContext.ProductSubAssemblyUsages.Add(new ProductSubAssemblyUsage

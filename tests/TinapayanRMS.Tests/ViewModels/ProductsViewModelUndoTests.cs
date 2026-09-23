@@ -183,6 +183,49 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
     }
 
     [Fact]
+    public async Task Moving_between_the_recipe_tabs_is_not_something_to_undo()
+    {
+        // Leaving a tab applies its form, which closes it, and a form closed isn't an edit: only the section it
+        // applied is, and nothing was typed.
+        var (viewModel, _) = await OpenTwoSectionProductAsync();
+        var dough = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
+        var filling = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
+
+        viewModel.SelectedRecipeTab = filling;
+        viewModel.SelectedRecipeTab = dough;
+        viewModel.SelectedRecipeTab = filling;
+
+        viewModel.History.CanUndo.Should().BeFalse("clicking through the sections changes nothing");
+    }
+
+    [Fact]
+    public async Task A_step_left_open_across_a_change_of_tab_records_nothing()
+    {
+        // WPF selects a tab as it takes the cursor, before the field it takes it from hears so: the field's step
+        // is still open while the form changes over to the other tab's section, and closes after it.
+        var (viewModel, _) = await OpenTwoSectionProductAsync(withPackaging: true);
+        var recorder = (IUndoRecorder)viewModel;
+
+        viewModel.SelectedRecipeTab = viewModel.PackagingTab;
+        recorder.BeginUndoStep();
+        viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
+        recorder.EndUndoStep();
+
+        viewModel.History.CanUndo.Should().BeFalse("the form opening on the tab picked isn't an edit");
+
+        // And a field still holding the cursor after the change records what's typed into it next.
+        recorder.BeginUndoStep();
+        viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
+        viewModel.EditingUsageWeightPerPiece = 12m;
+        recorder.EndUndoStep();
+
+        viewModel.History.CanUndo.Should().BeTrue();
+        viewModel.TryUndo().Should().BeTrue();
+        viewModel.EditingUsageWeightPerPiece.Should().Be(10m);
+        viewModel.History.CanUndo.Should().BeFalse("the change of tab was never a step of its own");
+    }
+
+    [Fact]
     public async Task A_tab_change_after_an_undo_still_applies_the_form_it_leaves()
     {
         // Guards the bookkeeping a restore does by hand: RecipeTabShown is skipped while the tab is put back,
@@ -554,8 +597,8 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         return (viewModel, new SeededIngredients(flourId, sugarId));
     }
 
-    /// <summary>A product with a Dough and a Filling, so tabs can be moved between.</summary>
-    private async Task<(ProductsViewModel ViewModel, int ProductId)> OpenTwoSectionProductAsync()
+    /// <summary>A product with a Dough and a Filling, so tabs can be moved between, and a box a piece if asked.</summary>
+    private async Task<(ProductsViewModel ViewModel, int ProductId)> OpenTwoSectionProductAsync(bool withPackaging = false)
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -568,9 +611,33 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
                 new NewSubAssemblyDraft(fillingRoleId, [(sugarId, 200m)], UsageAuthoredField.WeightPerPiece, 10m),
             ],
             []));
+        if (withPackaging)
+        {
+            await AddPackagingLineAsync(productId);
+        }
 
-        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 2);
+        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 2 && vm.HasPackaging == withPackaging);
         return (viewModel, productId);
+    }
+
+    /// <summary>A box a piece, saved straight to the product.</summary>
+    private async Task AddPackagingLineAsync(int productId)
+    {
+        await using var dbContext = CreateDbContext();
+        var box = new RawMaterial
+        {
+            Name = "Gift Box", Type = RawMaterialType.Packaging, Category = new RawMaterialCategory { Name = "Boxes" },
+            BaseUnit = new UnitOfMeasure { Name = "piece", Abbreviation = "pc" },
+            CostPerBaseUnit = 30m, BufferedCostPerBaseUnit = 30m,
+        };
+        dbContext.RawMaterials.Add(box);
+        await dbContext.SaveChangesAsync(Cancellation);
+
+        dbContext.PackagingLines.Add(new PackagingLine
+        {
+            ProductId = productId, PackagingMaterialId = box.Id, AuthoredField = PackagingLineAuthoredField.QtyPerUnit, QtyPerUnit = 1m,
+        });
+        await dbContext.SaveChangesAsync(Cancellation);
     }
 
     private async Task<ProductsViewModel> OpenAsync(int productId, Func<ProductsViewModel, bool> ready)
