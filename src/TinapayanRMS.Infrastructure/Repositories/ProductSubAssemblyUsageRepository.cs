@@ -42,7 +42,7 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                     JOIN ProductSubAssemblyUsages u ON u.Id = l.UsageId
                     JOIN RawMaterials i ON i.Id = l.IngredientId
                     WHERE u.ProductId = @productId
-                    ORDER BY l.Id
+                    ORDER BY l.SortOrder, l.Id
                     """,
                     new { productId },
                     cancellationToken),

@@ -17,4 +17,10 @@ public class IngredientBomLine
 
     /// <summary>The amount, always in grams: recipe lines have no unit of their own.</summary>
     public decimal Grams { get; set; }
+
+    /// <summary>
+    /// Where the line sits in its BOM's table, from 0: the user orders the lines by dragging them, and every save
+    /// writes each one's position. Lines are read in this order, then by Id.
+    /// </summary>
+    public int SortOrder { get; set; }
 }

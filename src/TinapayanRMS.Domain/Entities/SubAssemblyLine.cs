@@ -33,4 +33,10 @@ public class SubAssemblyLine
     /// is costed from; this only says which of the two the user gave.
     /// </summary>
     public decimal? AuthoredBakersPercent { get; set; }
+
+    /// <summary>
+    /// Where the line sits in its sub-assembly's table, from 0: the user orders the lines by dragging them, and every save
+    /// writes each one's position. Lines are read in this order, then by Id.
+    /// </summary>
+    public int SortOrder { get; set; }
 }

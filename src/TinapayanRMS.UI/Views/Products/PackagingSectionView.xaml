@@ -49,6 +49,7 @@
         -->
         <syncfusion:SfDataGrid ItemsSource="{Binding LineEdits}"
                                controls:GridUndoSteps.Recorder="{Binding}"
+                               controls:GridRowReordering.IsEnabled="True"
                                controls:NumericEditing.IsEnabled="True"
                                SelectedItem="{Binding SelectedLineEdit, Mode=TwoWay}"
                                GridLinesVisibility="Both"

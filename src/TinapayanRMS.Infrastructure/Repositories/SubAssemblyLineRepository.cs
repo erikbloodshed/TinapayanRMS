@@ -24,7 +24,7 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
                     FROM SubAssemblyLines l
                     JOIN RawMaterials i ON i.Id = l.IngredientId
                     WHERE l.SubAssemblyId IN ({DapperReads.IdsTable})
-                    ORDER BY l.Id
+                    ORDER BY l.SortOrder, l.Id
                     """,
                     new { ids = DapperReads.IdList(subAssemblyIds) },
                     cancellationToken),
@@ -72,13 +72,14 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
             .Where(l => l.SubAssemblyId == subAssembly.Id)
             .ExecuteDeleteAsync(cancellationToken);
 
-        dbContext.SubAssemblyLines.AddRange(lines.Select(l => new SubAssemblyLine
+        dbContext.SubAssemblyLines.AddRange(lines.Select((l, index) => new SubAssemblyLine
         {
             SubAssemblyId = subAssembly.Id,
             IngredientId = l.IngredientId,
             Grams = l.Grams,
             IsFormulaBase = l.IsFormulaBase,
             AuthoredBakersPercent = l.AuthoredBakersPercent,
+            SortOrder = index,
         }));
 
         var costInputs = lines.Select(l => (l.Grams, IngredientCostPerGram: ingredients[l.IngredientId].BufferedCostPerBaseUnit)).ToList();

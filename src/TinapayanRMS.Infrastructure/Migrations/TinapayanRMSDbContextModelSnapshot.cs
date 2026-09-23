@@ -112,6 +112,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Property<int>("IngredientId")
                         .HasColumnType("int");
 
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ComponentIngredientId");
@@ -142,6 +145,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Property<decimal>("QtyPerUnit")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
 
                     b.Property<int?>("UnitId")
                         .HasColumnType("int");
@@ -569,6 +575,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Property<bool>("IsFormulaBase")
                         .HasColumnType("bit");
 
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
                     b.Property<int>("SubAssemblyId")
                         .HasColumnType("int");
 
@@ -596,6 +605,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Property<decimal>("QtyPerSet")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
 
                     b.Property<int>("SubAssemblyId")
                         .HasColumnType("int");
@@ -731,6 +743,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasColumnType("decimal(18,4)");
 
                     b.Property<int>("IngredientId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
                         .HasColumnType("int");
 
                     b.Property<int>("UsageId")

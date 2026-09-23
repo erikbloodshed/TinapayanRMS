@@ -58,11 +58,12 @@ public static class UsageAddInLineRepository
             .Where(l => l.UsageId == usage.Id)
             .ExecuteDeleteAsync(cancellationToken);
 
-        dbContext.UsageAddInLines.AddRange(lines.Select(l => new UsageAddInLine
+        dbContext.UsageAddInLines.AddRange(lines.Select((l, index) => new UsageAddInLine
         {
             UsageId = usage.Id,
             IngredientId = l.IngredientId,
             Grams = l.Grams,
+            SortOrder = index,
         }));
 
         await dbContext.SaveChangesAsync(cancellationToken);

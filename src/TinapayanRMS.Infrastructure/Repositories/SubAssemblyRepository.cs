@@ -112,12 +112,13 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         // Saved here so a new one has its id for its lines. A set is costed on read, so its stored totals stay 0.
         await dbContext.SaveChangesAsync(cancellationToken);
         await dbContext.SubAssemblyPackagingLines.Where(l => l.SubAssemblyId == stored.Id).ExecuteDeleteAsync(cancellationToken);
-        dbContext.SubAssemblyPackagingLines.AddRange(lines.Select(l => new SubAssemblyPackagingLine
+        dbContext.SubAssemblyPackagingLines.AddRange(lines.Select((l, index) => new SubAssemblyPackagingLine
         {
             SubAssemblyId = stored.Id,
             PackagingMaterialId = l.PackagingMaterialId,
             UnitId = l.UnitId,
             QtyPerSet = l.QtyPerSet,
+            SortOrder = index,
         }));
         await dbContext.SaveChangesAsync(cancellationToken);
 

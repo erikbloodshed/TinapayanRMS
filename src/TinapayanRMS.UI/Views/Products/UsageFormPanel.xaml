@@ -183,6 +183,7 @@
         <StackPanel Visibility="{Binding IsFormPackaging, Converter={StaticResource BooleanToVisibilityConverter}}">
             <syncfusion:SfDataGrid ItemsSource="{Binding FormPackagingLines}"
                                    controls:GridUndoSteps.Recorder="{Binding}"
+                                   controls:GridRowReordering.IsEnabled="True"
                                    controls:NumericEditing.IsEnabled="True"
                                    SelectedItem="{Binding SelectedFormPackagingLine, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
@@ -300,6 +301,7 @@
                 <StackPanel Visibility="{Binding IsFormShowingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <syncfusion:SfDataGrid ItemsSource="{Binding FormLines}"
                                            controls:GridUndoSteps.Recorder="{Binding}"
+                                           controls:GridRowReordering.IsEnabled="True"
                                            controls:NumericEditing.IsEnabled="True"
                                            controls:GridAddNewRow.HideCheckBoxes="True"
                                            controls:GridCellEditing.IsEnabled="True"
@@ -417,6 +419,7 @@
                 <StackPanel Margin="0,6,0,0" Visibility="{Binding IsFormShowingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <syncfusion:SfDataGrid ItemsSource="{Binding FormAddIns}"
                                            controls:GridUndoSteps.Recorder="{Binding}"
+                                           controls:GridRowReordering.IsEnabled="True"
                                            controls:NumericEditing.IsEnabled="True"
                                            controls:GridCellEditing.IsEnabled="True"
                                            SelectedItem="{Binding SelectedFormAddIn, Mode=TwoWay}"

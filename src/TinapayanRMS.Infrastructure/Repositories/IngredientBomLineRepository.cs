@@ -22,7 +22,7 @@ public class IngredientBomLineRepository(
                     FROM IngredientBomLines l
                     JOIN RawMaterials c ON c.Id = l.ComponentIngredientId
                     WHERE l.IngredientId = @ingredientId
-                    ORDER BY l.Id
+                    ORDER BY l.SortOrder, l.Id
                     """,
                     new { ingredientId },
                     cancellationToken),
@@ -99,11 +99,12 @@ public class IngredientBomLineRepository(
             .Where(l => l.IngredientId == ingredientId)
             .ExecuteDeleteAsync(cancellationToken);
 
-        dbContext.IngredientBomLines.AddRange(lines.Select(l => new IngredientBomLine
+        dbContext.IngredientBomLines.AddRange(lines.Select((l, index) => new IngredientBomLine
         {
             IngredientId = ingredientId,
             ComponentIngredientId = l.ComponentIngredientId,
             Grams = l.Grams,
+            SortOrder = index,
         }));
 
         await dbContext.SaveChangesAsync(cancellationToken);

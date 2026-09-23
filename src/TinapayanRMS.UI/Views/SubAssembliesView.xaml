@@ -245,6 +245,7 @@
                     -->
                     <syncfusion:SfDataGrid ItemsSource="{Binding PackagingLines}"
                                            controls:GridUndoSteps.Recorder="{Binding}"
+                                           controls:GridRowReordering.IsEnabled="True"
                                            controls:NumericEditing.IsEnabled="True"
                                            Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}"
                                            SelectedItem="{Binding SelectedPackagingLine, Mode=TwoWay}"
@@ -312,6 +313,7 @@
                     <!-- Typed straight into: the add row at the bottom starts a line, Delete removes the selected one -->
                     <syncfusion:SfDataGrid ItemsSource="{Binding Lines}"
                                            controls:GridUndoSteps.Recorder="{Binding}"
+                                           controls:GridRowReordering.IsEnabled="True"
                                            controls:NumericEditing.IsEnabled="True"
                                            Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}"
                                            controls:GridAddNewRow.HideCheckBoxes="True"

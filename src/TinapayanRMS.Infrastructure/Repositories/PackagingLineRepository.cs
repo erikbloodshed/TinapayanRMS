@@ -150,7 +150,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             .Where(l => l.ProductId == productId)
             .ExecuteDeleteAsync(cancellationToken);
 
-        dbContext.PackagingLines.AddRange(lines.Select(l =>
+        dbContext.PackagingLines.AddRange(lines.Select((l, index) =>
         {
             var (qtyPerUnit, unitsPerPackagingUnit) = ProductRules.ReconcileReciprocal(l.AuthoredField, l.AuthoredValue);
             return new PackagingLine
@@ -161,6 +161,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
                 QtyPerUnit = qtyPerUnit,
                 UnitsPerPackagingUnit = unitsPerPackagingUnit,
                 AuthoredField = l.AuthoredField,
+                SortOrder = index,
             };
         }));
 

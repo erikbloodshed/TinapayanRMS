@@ -52,7 +52,7 @@ internal static class RawMaterialReads
 
     /// <summary>
     /// The product packaging lines <paramref name="filter"/> (a WHERE over <c>l</c>) selects, in the order
-    /// they were added: each with its material's details, and the unit the line is entered in.
+    /// the user put them in: each with its material's details, and the unit the line is entered in.
     /// </summary>
     public static async Task<IReadOnlyList<PackagingLine>> GetPackagingLinesAsync(
         TinapayanRMSDbContext dbContext, string filter, object? parameters, CancellationToken cancellationToken)
@@ -67,7 +67,7 @@ internal static class RawMaterialReads
                 LEFT JOIN RawMaterialUnits lu ON lu.Id = l.UnitId
                 LEFT JOIN UnitsOfMeasure lum ON lum.Id = lu.UnitOfMeasureId
                 {filter}
-                ORDER BY l.Id
+                ORDER BY l.SortOrder, l.Id
                 """,
                 parameters,
                 cancellationToken),
@@ -84,7 +84,7 @@ internal static class RawMaterialReads
     }
 
     /// <summary>
-    /// A packaging set's lines, in the order they were added: each with its material's details, and the unit
+    /// A packaging set's lines, in the order the user put them in: each with its material's details, and the unit
     /// the line is entered in.
     /// </summary>
     public static async Task<IReadOnlyList<SubAssemblyPackagingLine>> GetSetLinesAsync(
@@ -100,7 +100,7 @@ internal static class RawMaterialReads
                 LEFT JOIN RawMaterialUnits lu ON lu.Id = l.UnitId
                 LEFT JOIN UnitsOfMeasure lum ON lum.Id = lu.UnitOfMeasureId
                 WHERE l.SubAssemblyId = @subAssemblyId
-                ORDER BY l.Id
+                ORDER BY l.SortOrder, l.Id
                 """,
                 new { subAssemblyId },
                 cancellationToken),

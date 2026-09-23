@@ -24,4 +24,10 @@ public class SubAssemblyPackagingLine
 
     /// <summary>How much of the material one set takes, in the line's unit: 1 box, 30 cm of ribbon, 1 roll.</summary>
     public decimal QtyPerSet { get; set; }
+
+    /// <summary>
+    /// Where the line sits in its set's table, from 0: the user orders the lines by dragging them, and every save
+    /// writes each one's position. Lines are read in this order, then by Id.
+    /// </summary>
+    public int SortOrder { get; set; }
 }

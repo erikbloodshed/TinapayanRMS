@@ -32,4 +32,10 @@ public class PackagingLine
 
     /// <summary>Which of the two fields above the user typed; the other is recalculated from it on every edit.</summary>
     public PackagingLineAuthoredField AuthoredField { get; set; }
+
+    /// <summary>
+    /// Where the line sits in its product's packaging's table, from 0: the user orders the lines by dragging them, and every save
+    /// writes each one's position. Lines are read in this order, then by Id.
+    /// </summary>
+    public int SortOrder { get; set; }
 }

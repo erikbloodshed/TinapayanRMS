@@ -40,7 +40,8 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         var addInsByUsage = (await dbContext.UsageAddInLines
                 .AsNoTracking()
                 .Where(l => usageIds.Contains(l.UsageId))
-                .OrderBy(l => l.Id)
+                .OrderBy(l => l.SortOrder)
+                .ThenBy(l => l.Id)
                 .ToListAsync(cancellationToken))
             .ToLookup(l => l.UsageId);
         var packagingLines = await PackagingLineRepository.ResolveEffectiveAsync(dbContext, sourceProductId, [], cancellationToken);
