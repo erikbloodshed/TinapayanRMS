@@ -267,6 +267,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
     private int _editingId;
 
+    /// <summary>A material <see cref="OpenRawMaterial"/> was asked for before the list held it, for LoadCommand to open once it does.</summary>
+    private int? _rawMaterialToOpen;
+
     private string _editingName = string.Empty;
     public string EditingName
     {
@@ -1097,6 +1100,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                     ExampleResult = null;
                 }
             });
+
+            // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the material's form.
+            if (_rawMaterialToOpen is { } rawMaterialId)
+            {
+                _rawMaterialToOpen = null;
+                TrySelectRawMaterial(rawMaterialId);
+            }
         });
 
         NewCommand = ReactiveCommand.Create(ClearForm);
@@ -2125,6 +2135,32 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             _detailMaterialId = id;
             SelectedRawMaterial = saved;
         }
+    }
+
+    /// <summary>
+    /// Opens a material as picking it in the list would, for another screen (the main window's Back and Forward). A
+    /// search hiding it is cleared, so the list shows the row picked. A list that doesn't hold it yet (the screen not
+    /// loaded since, or ever) opens it at the end of the next LoadCommand, which showing the screen runs.
+    /// </summary>
+    public void OpenRawMaterial(int rawMaterialId)
+    {
+        _rawMaterialToOpen = TrySelectRawMaterial(rawMaterialId) ? null : rawMaterialId;
+    }
+
+    private bool TrySelectRawMaterial(int rawMaterialId)
+    {
+        if (RawMaterials.FirstOrDefault(m => m.Id == rawMaterialId) is not { } material)
+        {
+            return false;
+        }
+
+        if (!VisibleRawMaterials.Contains(material))
+        {
+            SearchText = string.Empty;
+        }
+
+        SelectedRawMaterial = material;
+        return true;
     }
 
     public void Dispose()

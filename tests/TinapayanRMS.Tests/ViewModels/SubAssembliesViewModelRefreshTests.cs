@@ -131,6 +131,36 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
     }
 
     [Fact]
+    public async Task OpenSubAssembly_waits_for_a_list_not_loaded_yet_and_clears_a_search_hiding_it()
+    {
+        var roleId = await AddRoleAsync("Glaze");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var repository = new SubAssemblyRepository(CreateDbContextFactory());
+        var chocolateId = await repository.SaveStandaloneAsync(new SubAssembly { Name = "Chocolate Glaze", RoleId = roleId }, [(sugarId, 100m)], Cancellation);
+        var ubeId = await repository.SaveStandaloneAsync(new SubAssembly { Name = "Ube Glaze", RoleId = roleId }, [(sugarId, 200m)], Cancellation);
+        var viewModel = CreateViewModel();
+
+        // As a linked badge on Products does before the Sub-Assemblies screen was ever shown.
+        viewModel.OpenSubAssembly(ubeId);
+        viewModel.SelectedRow.Should().BeNull("the list is empty until the screen loads");
+
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedRow!.Id.Should().Be(ubeId);
+        await WaitUntilSettledAsync(() => viewModel.EditingName == "Ube Glaze", () => $"name={viewModel.EditingName}");
+
+        viewModel.SearchText = "Chocolate";
+        viewModel.OpenSubAssembly(chocolateId);
+        viewModel.SelectedRow!.Id.Should().Be(chocolateId);
+        viewModel.SearchText.Should().Be("Chocolate", "a search showing it is left alone");
+
+        viewModel.OpenSubAssembly(ubeId);
+        viewModel.SelectedRow!.Id.Should().Be(ubeId);
+        viewModel.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
+        viewModel.VisibleRows.Should().Contain(viewModel.SelectedRow);
+    }
+
+    [Fact]
     public async Task In_the_packaging_role_the_form_saves_and_reloads_a_packaging_set()
     {
         await AddRoleAsync("Glaze");

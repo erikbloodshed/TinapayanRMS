@@ -94,7 +94,8 @@
                 </DockPanel>
 
                 <!-- Fixed widths, so the card is as wide as its columns and never cuts one off -->
-                <syncfusion:SfDataGrid ItemsSource="{Binding VisibleRows}"
+                <syncfusion:SfDataGrid x:Name="List"
+                                       ItemsSource="{Binding VisibleRows}"
                                        SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
                                        GridLinesVisibility="Both"
                                        CurrentCellBorderBrush="{StaticResource AccentBrush}"
@@ -396,7 +397,8 @@
                         line up down the page as well as across, and as many fit on a row as the card is wide. A long
                         name wraps inside its tile, and the WrapPanel stretches the row's other tiles to its height.
                         A tile opens its product on the Products screen (MainWindow subscribes to OpenProductCommand).
-                        The icon is the navigation menu's Products glyph.
+                        The icon says what the product is, from its category: a cake, a pastry, a bread, or else the
+                        navigation menu's Products glyph (ProductCategoryIconConverter).
                     -->
                     <ItemsControl ItemsSource="{Binding UsedBy}" Focusable="False">
                         <ItemsControl.ItemsPanel>
@@ -412,12 +414,10 @@
                                         ToolTip="Open on the Products screen"
                                         AutomationProperties.Name="{Binding Name}">
                                     <StackPanel>
-                                        <TextBlock Text="&#xE71D;"
-                                                   Style="{StaticResource IconGlyphStyle}"
-                                                   FontSize="32"
-                                                   Foreground="{StaticResource AccentBrush}"
-                                                   HorizontalAlignment="Center"
-                                                   Margin="0,0,0,6" />
+                                        <ContentPresenter Content="{Binding}"
+                                                          ContentTemplate="{Binding CategoryName, Converter={StaticResource ProductCategoryIconConverter}}"
+                                                          HorizontalAlignment="Center"
+                                                          Margin="0,0,0,6" />
                                         <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" />
                                     </StackPanel>
                                 </Button>

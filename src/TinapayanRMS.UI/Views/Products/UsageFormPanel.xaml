@@ -89,9 +89,17 @@
                 <Border Style="{StaticResource LinkedBadgeStyle}"
                         Margin="0,0,8,10"
                         ToolTip="Its lines come from where it's kept, and follow its changes."
-                        Visibility="{Binding EditingUsage.IsLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        Visibility="{Binding EditingUsage.IsLinkedFromProduct, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <TextBlock Text="{Binding EditingUsage.LinkedFromText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
                 </Border>
+                <!-- A standalone one's badge is a link: it opens the sub-assembly on the Sub-Assemblies screen (MainWindow subscribes to SubAssemblyOpenRequests) -->
+                <Button Style="{StaticResource LinkedBadgeLinkStyle}"
+                        Margin="0,0,8,10"
+                        Content="{Binding EditingUsage.LinkedFromText}"
+                        Command="{Binding OpenSubAssemblyCommand}"
+                        CommandParameter="{Binding EditingUsage.SubAssemblyId}"
+                        ToolTip="Its lines come from where it's kept, and follow its changes. Click to open it on the Sub-Assemblies screen."
+                        Visibility="{Binding EditingUsage.IsLinkedStandalone, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <Border Style="{StaticResource LinkedBadgeStyle}"
                         Margin="0,0,8,10"
                         ToolTip="Changing its lines changes theirs too."

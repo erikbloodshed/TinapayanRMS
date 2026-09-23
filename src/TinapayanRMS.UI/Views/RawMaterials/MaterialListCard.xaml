@@ -23,7 +23,8 @@
                 sort apply live to rows added or replaced while the app runs too (a refresh replacing
                 a changed row); by default they landed at the end of the list instead of in order.
             -->
-            <syncfusion:SfDataGrid ItemsSource="{Binding VisibleRawMaterials}"
+            <syncfusion:SfDataGrid x:Name="List"
+                                   ItemsSource="{Binding VisibleRawMaterials}"
                                    SelectedItem="{Binding SelectedRawMaterial, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"

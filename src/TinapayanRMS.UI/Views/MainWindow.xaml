@@ -7,7 +7,8 @@
         xmlns:skinManager="clr-namespace:Syncfusion.SfSkinManager;assembly=Syncfusion.SfSkinManager.WPF"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="800" Width="1400"
-        skinManager:SfSkinManager.SizeMode="Default">
+        skinManager:SfSkinManager.SizeMode="Default"
+        PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
         <!-- A menu row's glyph, in a fixed box so the labels line up whatever the glyph's width -->
         <Style x:Key="DrawerIconStyle" TargetType="TextBlock" BasedOn="{StaticResource IconGlyphStyle}">
@@ -81,21 +82,53 @@
                 The drawer lives in row 1, so its scrim covers the tabs but not this bar: the toggle
                 stays visible and clickable while the menu is open, and clicking it again puts the
                 menu away. Icon only — the Windows11Light ButtonAdv template has no SizeMode="Small"
-                handling (its AccessText is always bound to Label), so Label is left unset and the
-                name lives in ToolTip/AutomationProperties. Flattened with plain properties, never a
-                Style, the same way the Add Sub-Assembly drop-down's rows are.
+                handling (its AccessText is always bound to Label), so the name lives in
+                ToolTip/AutomationProperties and Label is set to empty. Not left unset: Label defaults
+                to "Button", and a sliver of that text showed beside each glyph, clipped by the 32px
+                width. Flattened with plain properties, never a Style, the same way the Add
+                Sub-Assembly drop-down's rows are.
             -->
             <DockPanel>
                 <syncfusion:ButtonAdv x:Name="ToggleNavigationButton"
                                       DockPanel.Dock="Left"
                                       Width="32"
                                       Margin="0,0,8,0"
+                                      Label=""
                                       IconTemplate="{StaticResource MenuIconTemplate}"
                                       Background="Transparent"
                                       BorderThickness="0"
                                       ToolTip="Show the navigation menu"
                                       AutomationProperties.Name="Navigation menu"
                                       Click="ToggleNavigationButton_Click" />
+                <!--
+                    Back and Forward between screens, as a browser has them (NavigationHistory): a step is a change of
+                    screen, and going back reopens the record that screen had open. Flattened the same way as the
+                    toggle, and outside the drawer's scrim too, so they still work with the menu open. Alt+Left and
+                    Alt+Right do the same (MainWindow.xaml.cs).
+                -->
+                <syncfusion:ButtonAdv x:Name="BackButton"
+                                      DockPanel.Dock="Left"
+                                      Width="32"
+                                      Label=""
+                                      IconTemplate="{StaticResource BackIconTemplate}"
+                                      Background="Transparent"
+                                      BorderThickness="0"
+                                      IsEnabled="{Binding Navigation.CanGoBack}"
+                                      ToolTip="Back (Alt+Left)"
+                                      AutomationProperties.Name="Back"
+                                      Click="BackButton_Click" />
+                <syncfusion:ButtonAdv x:Name="ForwardButton"
+                                      DockPanel.Dock="Left"
+                                      Width="32"
+                                      Margin="0,0,8,0"
+                                      Label=""
+                                      IconTemplate="{StaticResource ForwardIconTemplate}"
+                                      Background="Transparent"
+                                      BorderThickness="0"
+                                      IsEnabled="{Binding Navigation.CanGoForward}"
+                                      ToolTip="Forward (Alt+Right)"
+                                      AutomationProperties.Name="Forward"
+                                      Click="ForwardButton_Click" />
                 <TextBlock Text="{Binding Heading}" Style="{StaticResource AppTitleStyle}" VerticalAlignment="Center" />
             </DockPanel>
         </Border>

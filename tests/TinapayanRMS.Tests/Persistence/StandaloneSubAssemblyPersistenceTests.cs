@@ -154,6 +154,31 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
     }
 
     [Fact]
+    public async Task Used_By_names_each_linking_products_category_for_its_icon()
+    {
+        var roleId = await AddRoleAsync("Glaze");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var glazeId = await SaveStandaloneAsync("Glaze", roleId, [(sugarId, 100m)]);
+        var creamLoafId = await AddProductAsync("Cream Loaf");
+        var ubeRollId = await AddProductAsync("Ube Roll");
+        await using (var dbContext = CreateDbContext())
+        {
+            var breads = new ProductCategory { Name = "Breads" };
+            dbContext.ProductCategories.Add(breads);
+            await dbContext.SaveChangesAsync(Cancellation);
+            await dbContext.Products.Where(p => p.Id == creamLoafId)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.CategoryId, breads.Id), Cancellation);
+        }
+
+        await LinkAsync(creamLoafId, glazeId, 5m);
+        await LinkAsync(ubeRollId, glazeId, 5m);
+
+        (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation))[glazeId].Should().Equal(
+            new LinkingProduct(creamLoafId, "Cream Loaf", "Breads"),
+            new LinkingProduct(ubeRollId, "Ube Roll", null));
+    }
+
+    [Fact]
     public async Task A_standalone_sub_assembly_cant_be_saved_as_a_products_own()
     {
         var roleId = await AddRoleAsync("Glaze");

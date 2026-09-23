@@ -57,6 +57,9 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// <summary>The sub-assembly the form shows: 0 for a new one.</summary>
     private int _editingId;
 
+    /// <summary>A sub-assembly <see cref="OpenSubAssembly"/> was asked for before the list held it, for LoadCommand to open once it does.</summary>
+    private int? _subAssemblyToOpen;
+
     /// <summary>Counts form loads, so a load overtaken by a newer one drops its lines instead of adding them too.</summary>
     private int _formLoadVersion;
 
@@ -415,6 +418,13 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             {
                 History.Rebase((settled, now) => settled with { RoleId = now.RoleId });
             }
+
+            // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the sub-assembly's form.
+            if (_subAssemblyToOpen is { } subAssemblyId)
+            {
+                _subAssemblyToOpen = null;
+                TrySelectSubAssembly(subAssemblyId);
+            }
         });
 
         NewCommand = ReactiveCommand.Create(ClearForm);
@@ -712,6 +722,32 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         BatchWeight = Lines.Where(l => l.Ingredient is not null).Sum(l => l.Grams ?? 0m);
         BatchCost = Lines.Sum(l => l.Cost);
         CostPerGram = BatchWeight > 0 ? BatchCost / BatchWeight : 0m;
+    }
+
+    /// <summary>
+    /// Opens a sub-assembly as picking it in the list would, for another screen (a linked badge on Products). A search
+    /// hiding it is cleared, so the list shows the row picked. A list that doesn't hold it yet (the screen not loaded
+    /// since, or ever) opens it at the end of the next LoadCommand, which showing the screen runs.
+    /// </summary>
+    public void OpenSubAssembly(int subAssemblyId)
+    {
+        _subAssemblyToOpen = TrySelectSubAssembly(subAssemblyId) ? null : subAssemblyId;
+    }
+
+    private bool TrySelectSubAssembly(int subAssemblyId)
+    {
+        if (Rows.FirstOrDefault(r => r.Id == subAssemblyId) is not { } row)
+        {
+            return false;
+        }
+
+        if (!VisibleRows.Contains(row))
+        {
+            SearchText = string.Empty;
+        }
+
+        SelectedRow = row;
+        return true;
     }
 
     public void Dispose()

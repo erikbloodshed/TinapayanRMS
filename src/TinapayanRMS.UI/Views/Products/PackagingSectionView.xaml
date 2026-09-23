@@ -22,9 +22,18 @@
             <Border HorizontalAlignment="Left"
                     Style="{StaticResource LinkedBadgeStyle}"
                     Margin="0,0,0,10"
-                    Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    Visibility="{Binding IsPackagingLinkedToProduct, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <TextBlock Text="{Binding PackagingLinkedToText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
             </Border>
+            <!-- A packaging set's badge is a link: it opens the set on the Sub-Assemblies screen -->
+            <Button HorizontalAlignment="Left"
+                    Style="{StaticResource LinkedBadgeLinkStyle}"
+                    Margin="0,0,0,10"
+                    Content="{Binding PackagingLinkedToText}"
+                    Command="{Binding OpenSubAssemblyCommand}"
+                    CommandParameter="{Binding PackagingLinkedSetId}"
+                    ToolTip="Open the packaging set on the Sub-Assemblies screen"
+                    Visibility="{Binding IsPackagingLinkedToSet, Converter={StaticResource BooleanToVisibilityConverter}}" />
             <TextBlock Grid.Column="1"
                        Style="{StaticResource CaptionStyle}"
                        VerticalAlignment="Center"

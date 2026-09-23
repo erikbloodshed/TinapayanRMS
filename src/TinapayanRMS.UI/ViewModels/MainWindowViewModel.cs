@@ -20,6 +20,9 @@ public class MainWindowViewModel : ReactiveObject
     private readonly ObservableAsPropertyHelper<string> _heading;
     public string Heading => _heading.Value;
 
+    /// <summary>Back and Forward between the screens, which the header's buttons are enabled by. MainWindow records and follows it.</summary>
+    public NavigationHistory Navigation { get; } = new();
+
     public MainWindowViewModel()
     {
         _heading = this.WhenAnyValue(x => x.Title)

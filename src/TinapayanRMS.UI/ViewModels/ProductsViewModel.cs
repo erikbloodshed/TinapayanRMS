@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
@@ -181,6 +182,12 @@ public sealed class ProductUsageEdit : ReactiveObject
     public bool IsOwned => OwnerName is null;
 
     public bool IsLinked => OwnerName is not null;
+
+    /// <summary>A linked standalone one, kept on the Sub-Assemblies screen: its badge opens it there.</summary>
+    public bool IsLinkedStandalone => StandaloneName is not null;
+
+    /// <summary>A linked one kept in another product's recipe: its badge only shows where it's from.</summary>
+    public bool IsLinkedFromProduct => IsLinked && StandaloneName is null;
 
     /// <summary>The other products linking it: they follow every change to its lines.</summary>
     public IReadOnlyList<string> LinkedBy { get; }
@@ -808,6 +815,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _packagingLinkedToText, value);
     }
 
+    /// <summary>The packaging set linked packaging comes from, whose badge opens it on Sub-Assemblies; null for another product's, or none.</summary>
+    public int? PackagingLinkedSetId => _packagingLinkTarget?.SubAssemblyId;
+
+    public bool IsPackagingLinkedToSet => PackagingLinkedSetId is not null;
+
+    public bool IsPackagingLinkedToProduct => IsPackagingLinked && !IsPackagingLinkedToSet;
+
     private bool _hasPackaging;
     /// <summary>
     /// The product has packaging, its own lines or a link, so the Recipe Structure has its Packaging tab. A new product
@@ -1151,6 +1165,20 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// discard of its own, so this is what abandons a section being added or edited, along with the rest.
     /// </summary>
     public ReactiveCommand<RxVoid, RxVoid> RevertCommand { get; }
+
+    /// <summary>
+    /// A linked standalone sub-assembly's badge clicked (a recipe section's, or linked packaging's for a packaging set):
+    /// asks for the sub-assembly with this id to be opened, through <see cref="SubAssemblyOpenRequests"/>.
+    /// </summary>
+    public ReactiveCommand<int, RxVoid> OpenSubAssemblyCommand { get; }
+
+    private readonly Subject<int> _subAssemblyOpenRequests = new();
+
+    /// <summary>
+    /// The sub-assemblies linked badges ask to open, by id. The main window, which owns the tabs, subscribes and opens
+    /// each on the Sub-Assemblies screen, as Sub-Assemblies' Used By tiles open their products here.
+    /// </summary>
+    public IObservable<int> SubAssemblyOpenRequests => _subAssemblyOpenRequests;
 
     /// <summary>
     /// The form's undo and redo stacks. One step is one finished change — a cell edit committed, a row added or
@@ -1572,6 +1600,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         });
 
         NewCommand = ReactiveCommand.Create(StartNewProduct);
+
+        OpenSubAssemblyCommand = ReactiveCommand.Create<int>(_subAssemblyOpenRequests.OnNext);
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
@@ -2103,6 +2133,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         _packagingLinkTarget = target;
         IsPackagingLinked = target is not null;
         PackagingLinkedToText = target?.LinkedToText ?? string.Empty;
+        this.RaisePropertyChanged(nameof(PackagingLinkedSetId));
+        this.RaisePropertyChanged(nameof(IsPackagingLinkedToSet));
+        this.RaisePropertyChanged(nameof(IsPackagingLinkedToProduct));
     }
 
     private static PackagingLinkTarget ToLinkTarget(PackagingLink link) =>
@@ -3600,5 +3633,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         _productCache.Dispose();
         _categoryCache.Dispose();
         _addNewCategoryOption.Dispose();
+        _subAssemblyOpenRequests.Dispose();
     }
 }

@@ -51,6 +51,34 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task OpenRawMaterial_waits_for_a_list_not_loaded_yet_and_clears_a_search_hiding_it()
+    {
+        var flourId = await AddIngredientAsync("Flour");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var viewModel = CreateViewModel();
+
+        // As the main window's Back does before the Raw Materials screen was loaded.
+        viewModel.OpenRawMaterial(sugarId);
+        viewModel.SelectedRawMaterial.Should().BeNull("the list is empty until the screen loads");
+
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedRawMaterial!.Id.Should().Be(sugarId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.EditingName == "Sugar", () => $"name={viewModel.EditingName}");
+
+        viewModel.SearchText = "Flour";
+        viewModel.OpenRawMaterial(flourId);
+        viewModel.SelectedRawMaterial!.Id.Should().Be(flourId);
+        viewModel.SearchText.Should().Be("Flour", "a search showing it is left alone");
+
+        viewModel.OpenRawMaterial(sugarId);
+        viewModel.SelectedRawMaterial!.Id.Should().Be(sugarId);
+        viewModel.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
+        viewModel.VisibleRawMaterials.Should().Contain(viewModel.SelectedRawMaterial);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "Sugar's details never arrived");
+    }
+
+    [Fact]
     public async Task Reloading_shows_a_unit_renamed_on_another_tab_without_reloading_the_form()
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");

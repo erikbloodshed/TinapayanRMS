@@ -17,6 +17,15 @@ public partial class MainWindow : Window
     private readonly Dictionary<TabItemExt, ReactiveCommand<RxVoid, RxVoid>> _loadCommands = [];
     private readonly HashSet<TabItemExt> _loadingTabs = [];
 
+    // Each tab's screen as Back and Forward see it: which one it is, the record it has open, how to reopen one, and
+    // whether its form holds unsaved changes. Reports has no record to reopen.
+    private readonly Dictionary<TabItemExt, HistoryScreen> _historyScreens = [];
+
+    private readonly NavigationHistory _navigation;
+
+    // Set while Back or Forward shows a tab, so the switch isn't recorded as a new step.
+    private bool _isRestoringHistory;
+
     private readonly UnitsOfMeasureViewModel _unitsOfMeasureViewModel;
     private readonly CategoriesViewModel _categoriesViewModel;
     private readonly ProductCategoriesViewModel _productCategoriesViewModel;
@@ -58,6 +67,15 @@ public partial class MainWindow : Window
         _loadCommands[ProductsTab] = productsViewModel.LoadCommand;
         _loadCommands[ReportsTab] = reportsViewModel.LoadCommand;
 
+        _navigation = viewModel.Navigation;
+        _historyScreens[RawMaterialsTab] = new(AppScreen.RawMaterials,
+            () => rawMaterialsViewModel.SelectedRawMaterial?.Id, rawMaterialsViewModel.OpenRawMaterial, () => rawMaterialsViewModel.History.IsDirty);
+        _historyScreens[SubAssembliesTab] = new(AppScreen.SubAssemblies,
+            () => subAssembliesViewModel.SelectedRow?.Id, subAssembliesViewModel.OpenSubAssembly, () => subAssembliesViewModel.History.IsDirty);
+        _historyScreens[ProductsTab] = new(AppScreen.Products,
+            () => productsViewModel.SelectedProduct?.Id, productsViewModel.OpenProduct, () => productsViewModel.History.IsDirty);
+        _historyScreens[ReportsTab] = new(AppScreen.Reports, () => null, null, () => false);
+
         // A Used By tile on Sub-Assemblies opens its product on Products. Picked before the tab shows, so a list
         // not loaded yet has the product waiting for the load that showing the tab starts.
         subAssembliesViewModel.ProductOpenRequests.Subscribe(productId =>
@@ -66,8 +84,83 @@ public partial class MainWindow : Window
             ShowTab(ProductsTab);
         });
 
+        // And the other way: a linked badge on Products opens its standalone sub-assembly on Sub-Assemblies.
+        productsViewModel.SubAssemblyOpenRequests.Subscribe(subAssemblyId =>
+        {
+            subAssembliesViewModel.OpenSubAssembly(subAssemblyId);
+            ShowTab(SubAssembliesTab);
+        });
+
         // The tab that's selected at startup; every later switch goes through SelectionChanged.
-        Loaded += (_, _) => LoadSelectedTab();
+        Loaded += (_, _) =>
+        {
+            if (MainTabControl.SelectedItem is TabItemExt tab && _historyScreens.TryGetValue(tab, out var screen))
+            {
+                _navigation.Start(screen.Visit());
+            }
+
+            LoadSelectedTab();
+        };
+    }
+
+    private void BackButton_Click(object sender, RoutedEventArgs e) => NavigateHistory(back: true);
+
+    private void ForwardButton_Click(object sender, RoutedEventArgs e) => NavigateHistory(back: false);
+
+    /// <summary>
+    /// Alt+Left and Alt+Right, as a browser and File Explorer have them. On the window's tunnelling PreviewKeyDown, so
+    /// a grid or box that has the cursor can't take the key first. With Alt held WPF reports the key as Key.System,
+    /// the real one in SystemKey. The key is only marked handled when there was somewhere to go.
+    /// </summary>
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.System || e.KeyboardDevice.Modifiers != ModifierKeys.Alt)
+        {
+            return;
+        }
+
+        if (e.SystemKey is Key.Left or Key.Right)
+        {
+            e.Handled = NavigateHistory(back: e.SystemKey == Key.Left);
+        }
+    }
+
+    /// <summary>
+    /// Goes back or forward one screen, and reopens the record that screen had open — unless its form holds unsaved
+    /// changes, which Back never throws away: the screen then shows as it is. The record is asked for before the tab
+    /// shows, as the links between screens do, so a list not loaded yet opens it once the load that showing the tab
+    /// starts brings it in. False when there was nowhere to go.
+    /// </summary>
+    private bool NavigateHistory(bool back)
+    {
+        if (MainTabControl.SelectedItem is not TabItemExt currentTab || !_historyScreens.TryGetValue(currentTab, out var current))
+        {
+            return false;
+        }
+
+        var leaving = current.Visit();
+        if ((back ? _navigation.GoBack(leaving) : _navigation.GoForward(leaving)) is not { } target)
+        {
+            return false;
+        }
+
+        var (targetTab, screen) = _historyScreens.First(pair => pair.Value.Screen == target.Screen);
+        if (target.RecordId is { } recordId && screen.Open is { } open && screen.CurrentRecord() != recordId && !screen.IsDirty())
+        {
+            open(recordId);
+        }
+
+        _isRestoringHistory = true;
+        try
+        {
+            ShowTab(targetTab);
+        }
+        finally
+        {
+            _isRestoringHistory = false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -213,8 +306,34 @@ public partial class MainWindow : Window
         // SelectionChanged bubbles, so a grid or picker inside a tab raises it here too.
         if (ReferenceEquals(e.OriginalSource, MainTabControl) && IsLoaded)
         {
+            RecordHistoryStep(e);
             LoadSelectedTab();
         }
+    }
+
+    /// <summary>
+    /// Every change of screen that isn't Back or Forward itself — the menu, the tab strip, a tab closed, a link from
+    /// another screen — is a step: the screen left goes into the history with the record it has open as it's left.
+    /// </summary>
+    private void RecordHistoryStep(SelectionChangedEventArgs e)
+    {
+        if (_isRestoringHistory
+            || e.RemovedItems.OfType<TabItemExt>().FirstOrDefault() is not { } leftTab
+            || e.AddedItems.OfType<TabItemExt>().FirstOrDefault() is not { } shownTab
+            || !_historyScreens.TryGetValue(leftTab, out var left)
+            || !_historyScreens.TryGetValue(shownTab, out var shown))
+        {
+            return;
+        }
+
+        _navigation.Visit(left.Visit(), shown.Screen);
+    }
+
+    /// <summary>A tab's screen as <see cref="NavigationHistory"/> sees it; <paramref name="Open"/> is null for one with no record to reopen.</summary>
+    private sealed record HistoryScreen(AppScreen Screen, Func<int?> CurrentRecord, Action<int>? Open, Func<bool> IsDirty)
+    {
+        /// <summary>The screen with the record it has open now.</summary>
+        public ScreenVisit Visit() => new(Screen, CurrentRecord());
     }
 
     /// <summary>
