@@ -58,6 +58,14 @@ public partial class MainWindow : Window
         _loadCommands[ProductsTab] = productsViewModel.LoadCommand;
         _loadCommands[ReportsTab] = reportsViewModel.LoadCommand;
 
+        // A Used By tile on Sub-Assemblies opens its product on Products. Picked before the tab shows, so a list
+        // not loaded yet has the product waiting for the load that showing the tab starts.
+        subAssembliesViewModel.ProductOpenRequests.Subscribe(productId =>
+        {
+            productsViewModel.OpenProduct(productId);
+            ShowTab(ProductsTab);
+        });
+
         // The tab that's selected at startup; every later switch goes through SelectionChanged.
         Loaded += (_, _) => LoadSelectedTab();
     }

@@ -20,7 +20,8 @@
             </DockPanel>
 
             <!-- A flat, name-sorted list (VisibleProducts is sorted). Category has a fixed width and Name takes the rest; a product without a category shows an empty cell. -->
-            <syncfusion:SfDataGrid ItemsSource="{Binding VisibleProducts}"
+            <syncfusion:SfDataGrid x:Name="List"
+                                   ItemsSource="{Binding VisibleProducts}"
                                    SelectedItem="{Binding SelectedProduct, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"

@@ -113,7 +113,16 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.Rows.Single().UsedByText.Should().Be("Cream Loaf");
         viewModel.SelectedRow = viewModel.Rows.Single();
         await WaitUntilSettledAsync(() => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}");
-        viewModel.UsedByText.Should().StartWith("Used by Cream Loaf.");
+        var creamLoaf = viewModel.UsedBy.Should().ContainSingle().Subject;
+        creamLoaf.Name.Should().Be("Cream Loaf");
+        int? opened = null;
+        using (viewModel.ProductOpenRequests.Subscribe(productId => opened = productId))
+        {
+            await viewModel.OpenProductCommand.Execute(creamLoaf.Id);
+        }
+
+        opened.Should().Be(creamLoaf.Id, "a tile hands its product's id on, for the main window to open it");
+        viewModel.UsedByText.Should().StartWith("These products follow every change");
 
         await viewModel.DeleteCommand.Execute();
 

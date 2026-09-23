@@ -9,11 +9,11 @@ namespace TinapayanRMS.Infrastructure.Repositories;
 public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ISubAssemblyRepository
 {
     /// <summary>
-    /// A product's name for each recipe usage of a sub-assembly by a product other than its owner, for the
+    /// A product's id and name for each recipe usage of a sub-assembly by a product other than its owner, for the
     /// sub-assemblies <c>s</c> the appended condition selects.
     /// </summary>
     private const string RecipeLinksSql = """
-        SELECT u.SubAssemblyId, p.Name AS ProductName
+        SELECT u.SubAssemblyId, p.Id AS ProductId, p.Name AS ProductName
         FROM ProductSubAssemblyUsages u
         JOIN SubAssemblies s ON s.Id = u.SubAssemblyId
         JOIN Products p ON p.Id = u.ProductId
@@ -55,13 +55,13 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             cancellationToken);
 
     /// <summary>The recipes linking a standalone sub-assembly, and the products whose packaging links a set, in one query.</summary>
-    public async Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetStandaloneLinkedByAsync(CancellationToken cancellationToken) =>
+    public async Task<IReadOnlyDictionary<int, IReadOnlyList<LinkingProduct>>> GetStandaloneLinkedByAsync(CancellationToken cancellationToken) =>
         // A sub-assembly is either a recipe or a set, so no id is in both halves.
-        ToLinkedBy(await dbContextFactory.QueryAsync<LinkRow>(
+        ToLinkingProducts(await dbContextFactory.QueryAsync<LinkRow>(
             $"""
             {RecipeLinksSql} s.OwnerProductId IS NULL
             UNION ALL
-            SELECT l.LinkedSubAssemblyId AS SubAssemblyId, p.Name AS ProductName
+            SELECT l.LinkedSubAssemblyId AS SubAssemblyId, p.Id AS ProductId, p.Name AS ProductName
             FROM PackagingLinks l
             JOIN Products p ON p.Id = l.ProductId
             WHERE l.LinkedSubAssemblyId IS NOT NULL
@@ -245,19 +245,30 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         var links = await dbContext.ProductSubAssemblyUsages
             .Where(subAssemblyFilter)
             .Where(u => u.ProductId != u.SubAssembly!.OwnerProductId)
-            .Select(u => new LinkRow(u.SubAssemblyId, u.Product!.Name))
+            .Select(u => new LinkRow(u.SubAssemblyId, u.ProductId, u.Product!.Name))
             .ToListAsync(cancellationToken);
 
         return ToLinkedBy(links);
     }
 
-    private sealed record LinkRow(int SubAssemblyId, string ProductName);
+    private sealed record LinkRow(int SubAssemblyId, int ProductId, string ProductName);
 
     /// <summary>Each sub-assembly's linking products' names, alphabetically.</summary>
     private static Dictionary<int, IReadOnlyList<string>> ToLinkedBy(IEnumerable<LinkRow> links) =>
         links
             .GroupBy(l => l.SubAssemblyId)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)[.. g.Select(l => l.ProductName).Order(StringComparer.CurrentCultureIgnoreCase)]);
+
+    /// <summary>Each sub-assembly's linking products, alphabetically, each once however many of its usages link it.</summary>
+    private static Dictionary<int, IReadOnlyList<LinkingProduct>> ToLinkingProducts(IEnumerable<LinkRow> links) =>
+        links
+            .GroupBy(l => l.SubAssemblyId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<LinkingProduct>)
+            [
+                .. g.DistinctBy(l => l.ProductId)
+                    .Select(l => new LinkingProduct(l.ProductId, l.ProductName))
+                    .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase),
+            ]);
 
     /// <summary>
     /// Refuses to go on while another product links a sub-assembly matching

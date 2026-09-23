@@ -150,7 +150,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         usage.AuthoredValue.Should().Be(5m);
         usage.SubAssembly!.OwnerProductId.Should().BeNull("the product links it; nothing owns it");
         usage.SubAssembly.TotalWeight.Should().Be(200m, "a link reads the sub-assembly as it's saved now");
-        (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation))[glazeId].Should().Equal("Cream Loaf");
+        (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation))[glazeId].Select(p => p.Name).Should().Equal("Cream Loaf");
     }
 
     [Fact]
@@ -246,7 +246,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         var dough = usages.Should().ContainSingle(u => u.SubAssemblyId != glazeId).Subject;
         dough.SubAssembly!.OwnerProductId.Should().Be(cloneId, "the source's own sub-assembly becomes the clone's own copy");
         dough.SubAssembly.RoleId.Should().Be(doughRoleId);
-        (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation))[glazeId].Should().Equal("Cream Loaf", "Cream Loaf Mini");
+        (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation))[glazeId].Select(p => p.Name).Should().Equal("Cream Loaf", "Cream Loaf Mini");
     }
 
     [Fact]

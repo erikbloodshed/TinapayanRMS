@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
@@ -18,7 +19,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// as text: CollectionMerge compares a row's scalar properties, so a changed list of products shows up
 /// as a changed row.
 /// </summary>
-public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyList<string> usedBy)
+public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyList<LinkingProduct> usedBy)
 {
     public SubAssembly SubAssembly { get; } = subAssembly;
 
@@ -33,10 +34,10 @@ public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyL
     public decimal TotalCost => SubAssembly.TotalCost;
 
     /// <summary>The products linking it, e.g. "Cream Loaf, Cream Loaf Mini", or empty when none do.</summary>
-    public string UsedByText { get; } = string.Join(", ", usedBy);
+    public string UsedByText { get; } = string.Join(", ", usedBy.Select(p => p.Name));
 
-    /// <summary>The products linking it, by name. A method, not a property: CollectionMerge would compare a list's strings by length only.</summary>
-    public IReadOnlyList<string> GetUsedBy() => usedBy;
+    /// <summary>The products linking it, by name. A method, not a property: CollectionMerge would compare the list by its scalar properties only.</summary>
+    public IReadOnlyList<LinkingProduct> GetUsedBy() => usedBy;
 }
 
 /// <summary>
@@ -201,8 +202,16 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         private set => this.RaiseAndSetIfChanged(ref _costPerGram, value);
     }
 
+    private IReadOnlyList<LinkingProduct> _usedBy = [];
+    /// <summary>The products linking the sub-assembly the form shows, by name: one tile each under Used By, which opens it.</summary>
+    public IReadOnlyList<LinkingProduct> UsedBy
+    {
+        get => _usedBy;
+        private set => this.RaiseAndSetIfChanged(ref _usedBy, value);
+    }
+
     private string _usedByText = NotUsedText;
-    /// <summary>Which products link the sub-assembly the form shows, and what that means for editing it.</summary>
+    /// <summary>The caption under the Used By tiles: what linking means for editing it, or how to link it when nothing does.</summary>
     public string UsedByText
     {
         get => _usedByText;
@@ -213,11 +222,25 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
     private const string SetNotUsedText = "No product uses it yet. Link it from a product's Recipe Structure: Add Sub-Assembly, Link an existing one.";
 
+    private const string UsedText = "These products follow every change saved here, and it can't be deleted while they use it.";
+
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
+
+    /// <summary>A Used By tile's click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
+    public ReactiveCommand<int, RxVoid> OpenProductCommand { get; }
+
+    private readonly Subject<int> _productOpenRequests = new();
+
+    /// <summary>
+    /// The products Used By tiles ask to open, by id. The main window, which owns the tabs, subscribes and opens each
+    /// on the Products screen. Raised as the tile is clicked, not on the main-thread scheduler a command's own results
+    /// wait for.
+    /// </summary>
+    public IObservable<int> ProductOpenRequests => _productOpenRequests;
 
     /// <summary>
     /// The form's undo and redo stacks, the same shape as Products'. One step is one finished change — a cell
@@ -395,6 +418,8 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         });
 
         NewCommand = ReactiveCommand.Create(ClearForm);
+
+        OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
@@ -612,6 +637,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         Lines.Clear();
         SelectedPackagingLine = null;
         PackagingLines.Clear();
+        UsedBy = [];
         UsedByText = NotUsedText;
 
         // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
@@ -661,11 +687,12 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         History.MarkClean();
     }
 
-    private void ShowUsedBy(IReadOnlyList<string> productNames)
+    private void ShowUsedBy(IReadOnlyList<LinkingProduct> products)
     {
-        UsedByText = productNames.Count == 0
+        UsedBy = products;
+        UsedByText = products.Count == 0
             ? IsPackaging ? SetNotUsedText : NotUsedText
-            : $"Used by {string.Join(", ", productNames)}. They follow every change saved here, and it can't be deleted while they use it.";
+            : UsedText;
     }
 
     /// <summary>The formula's base, given to every row so each reads its own percentage, and said in the caption.</summary>
@@ -687,5 +714,9 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         CostPerGram = BatchWeight > 0 ? BatchCost / BatchWeight : 0m;
     }
 
-    public void Dispose() => _rowCache.Dispose();
+    public void Dispose()
+    {
+        _rowCache.Dispose();
+        _productOpenRequests.Dispose();
+    }
 }

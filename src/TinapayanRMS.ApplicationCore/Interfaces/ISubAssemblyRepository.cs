@@ -28,10 +28,10 @@ public interface ISubAssemblyRepository
     Task<IReadOnlyList<SubAssembly>> GetStandaloneAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// For each standalone sub-assembly a product uses, the names of those products: a recipe's linking usages,
+    /// For each standalone sub-assembly a product uses, those products, by name: a recipe's linking usages,
     /// a packaging set's packaging links. One no product uses isn't listed.
     /// </summary>
-    Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetStandaloneLinkedByAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<int, IReadOnlyList<LinkingProduct>>> GetStandaloneLinkedByAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Adds (Id 0) or updates a standalone sub-assembly's name and role, and replaces its lines (grams of

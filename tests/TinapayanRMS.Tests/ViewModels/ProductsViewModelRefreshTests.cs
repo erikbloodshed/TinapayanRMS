@@ -587,6 +587,33 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task OpenProduct_waits_for_a_list_not_loaded_yet_and_clears_a_search_hiding_the_product()
+    {
+        var creamLoafId = await AddProductAsync("Cream Loaf");
+        var ensaymadaId = await AddProductAsync("Ensaymada");
+        var viewModel = CreateViewModel();
+
+        // As a Sub-Assemblies Used By tile does before the Products screen was ever shown.
+        viewModel.OpenProduct(ensaymadaId);
+        viewModel.SelectedProduct.Should().BeNull("the list is empty until the screen loads");
+
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedProduct!.Id.Should().Be(ensaymadaId);
+        viewModel.EditingName.Should().Be("Ensaymada", "the product's form is loaded, as picking it in the list would");
+
+        viewModel.SearchText = "Cream";
+        viewModel.OpenProduct(creamLoafId);
+        viewModel.SelectedProduct!.Id.Should().Be(creamLoafId);
+        viewModel.SearchText.Should().Be("Cream", "a search showing the product is left alone");
+
+        viewModel.OpenProduct(ensaymadaId);
+        viewModel.SelectedProduct!.Id.Should().Be(ensaymadaId);
+        viewModel.SearchText.Should().BeEmpty("a search hiding the product is cleared, so the list shows the row picked");
+        viewModel.VisibleProducts.Should().Contain(viewModel.SelectedProduct);
+    }
+
+    [Fact]
     public async Task Changing_a_sub_assemblys_role_on_Save_moves_its_tab_to_where_the_new_role_sorts()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);

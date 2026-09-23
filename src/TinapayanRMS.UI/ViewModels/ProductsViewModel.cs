@@ -656,6 +656,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         set => this.RaiseAndSetIfChanged(ref _selectedProduct, value);
     }
 
+    /// <summary>A product <see cref="OpenProduct"/> was asked for before the list held it, for LoadCommand to open once it does.</summary>
+    private int? _productToOpen;
+
     private int _editingId;
 
     /// <summary>The product whose recipe, packaging, costing and links the form holds, or null for a new product.</summary>
@@ -1559,6 +1562,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
                 RecomputeUsageForm();
                 RecomputeCosts();
             });
+
+            // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the product's form.
+            if (_productToOpen is { } productId)
+            {
+                _productToOpen = null;
+                TrySelectProduct(productId);
+            }
         });
 
         NewCommand = ReactiveCommand.Create(StartNewProduct);
@@ -1905,6 +1915,32 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         CloseUsageForm();
         SelectedLineEdit = null;
         ClearDetails(keepRecipeTabs);
+    }
+
+    /// <summary>
+    /// Opens a product as picking it in the list would, for another screen (Sub-Assemblies' Used By tiles). A search
+    /// hiding it is cleared, so the list shows the row picked. A list that doesn't hold it yet (the screen not loaded
+    /// since, or ever) opens it at the end of the next LoadCommand, which showing the screen runs.
+    /// </summary>
+    public void OpenProduct(int productId)
+    {
+        _productToOpen = TrySelectProduct(productId) ? null : productId;
+    }
+
+    private bool TrySelectProduct(int productId)
+    {
+        if (Products.FirstOrDefault(p => p.Id == productId) is not { } product)
+        {
+            return false;
+        }
+
+        if (!VisibleProducts.Contains(product))
+        {
+            SearchText = string.Empty;
+        }
+
+        SelectedProduct = product;
+        return true;
     }
 
     /// <summary>A new product: no name, recipe, packaging or links, its costing at the defaults, and nothing selected.</summary>

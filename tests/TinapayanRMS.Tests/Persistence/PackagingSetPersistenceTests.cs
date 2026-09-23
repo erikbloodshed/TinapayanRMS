@@ -337,7 +337,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var productId = await AddProductAsync("Ensaymada");
         await CreatePackagingLinkRepository().SetSubAssemblyLinkAsync(productId, setId, Cancellation);
 
-        (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation))[setId].Should().Equal("Ensaymada");
+        (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation))[setId].Select(p => p.Name).Should().Equal("Ensaymada");
         var act = () => CreateRepository().DeleteStandaloneAsync(setId, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Ensaymada links Gift Box Set*");
