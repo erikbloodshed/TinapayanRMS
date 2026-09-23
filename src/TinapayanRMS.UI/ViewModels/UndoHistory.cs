@@ -61,12 +61,16 @@ public sealed class UndoHistory<TSnapshot>(
     int depth = 50) : ReactiveObject
     where TSnapshot : class
 {
-    // Lists rather than Stacks: capping the depth means dropping from the far end, which a Stack can't do.
-    private readonly List<TSnapshot> _undo = [];
-    private readonly List<TSnapshot> _redo = [];
+    // Lists rather than Stacks: capping the depth means dropping from the far end, which a Stack can't do. Each step
+    // keeps the settled form as it stood when the step was taken beside it (see TryUndo's second overload).
+    private readonly List<(TSnapshot Snapshot, TSnapshot? Settled)> _undo = [];
+    private readonly List<(TSnapshot Snapshot, TSnapshot? Settled)> _redo = [];
 
     /// <summary>How the form stood when the step now open was opened; null when no step is open.</summary>
     private TSnapshot? _pending;
+
+    /// <summary>The settled form as it stood when the step now open was opened.</summary>
+    private TSnapshot? _pendingSettled;
 
     /// <summary>
     /// How the form stood when it was last settled: loaded, saved or reverted. Null between a <see cref="Clear"/>
@@ -147,6 +151,7 @@ public sealed class UndoHistory<TSnapshot>(
         if (canRecord())
         {
             _pending = capture();
+            _pendingSettled = _baseline;
         }
     }
 
@@ -168,7 +173,9 @@ public sealed class UndoHistory<TSnapshot>(
             return;
         }
 
+        var settled = _pendingSettled;
         _pending = null;
+        _pendingSettled = null;
         if (!canRecord())
         {
             return;
@@ -181,7 +188,7 @@ public sealed class UndoHistory<TSnapshot>(
             return;
         }
 
-        _undo.Add(before);
+        _undo.Add((before, settled));
         if (_undo.Count > depth)
         {
             _undo.RemoveAt(0);
@@ -194,23 +201,37 @@ public sealed class UndoHistory<TSnapshot>(
     }
 
     /// <summary>Hands back the step before the last change, putting the form as it stands now on the redo stack.</summary>
-    public bool TryUndo(out TSnapshot restore) => TryMove(_undo, _redo, out restore);
+    public bool TryUndo(out TSnapshot restore) => TryMove(_undo, _redo, out restore, out _);
+
+    /// <summary>
+    /// <see cref="TryUndo(out TSnapshot)"/>, also handing back the settled form as it stood when that step was taken
+    /// (null if none had been settled yet). A screen that rebases the settled form as the user moves around
+    /// (<see cref="Rebase"/>) takes the rebased part back from it: the restore puts back where the user was, and what
+    /// was measured against there has to come back with it. Without it, the settled form still points wherever the
+    /// step being undone moved it, and a form put back just as it was saved reads as changed.
+    /// </summary>
+    public bool TryUndo(out TSnapshot restore, out TSnapshot? settled) => TryMove(_undo, _redo, out restore, out settled);
 
     /// <summary>Hands back the step an undo stepped off, putting the form as it stands now back on the undo stack.</summary>
-    public bool TryRedo(out TSnapshot restore) => TryMove(_redo, _undo, out restore);
+    public bool TryRedo(out TSnapshot restore) => TryMove(_redo, _undo, out restore, out _);
 
-    private bool TryMove(List<TSnapshot> from, List<TSnapshot> to, out TSnapshot restore)
+    /// <summary><see cref="TryRedo(out TSnapshot)"/>, with the settled form as <see cref="TryUndo(out TSnapshot, out TSnapshot?)"/> hands it back.</summary>
+    public bool TryRedo(out TSnapshot restore, out TSnapshot? settled) => TryMove(_redo, _undo, out restore, out settled);
+
+    private bool TryMove(
+        List<(TSnapshot Snapshot, TSnapshot? Settled)> from, List<(TSnapshot Snapshot, TSnapshot? Settled)> to, out TSnapshot restore, out TSnapshot? settled)
     {
         restore = default!;
+        settled = null;
         if (from.Count == 0)
         {
             return false;
         }
 
         var last = from.Count - 1;
-        restore = from[last];
+        (restore, settled) = from[last];
         from.RemoveAt(last);
-        to.Add(capture());
+        to.Add((capture(), _baseline));
         RaiseCanChanged(redoToo: true);
         return true;
     }
@@ -223,6 +244,7 @@ public sealed class UndoHistory<TSnapshot>(
     public void Clear()
     {
         _pending = null;
+        _pendingSettled = null;
         _baseline = null;
         RefreshDirty();
         var hadUndo = _undo.Count > 0;

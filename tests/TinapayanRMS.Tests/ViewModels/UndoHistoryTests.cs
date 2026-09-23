@@ -72,6 +72,31 @@ public class UndoHistoryTests
     }
 
     [Fact]
+    public void Each_step_hands_back_the_settled_form_as_it_stood_when_the_step_was_taken()
+    {
+        // As Products rebases its settled form when another section's form opens: the step moves it, and the undo
+        // has to be able to put it back.
+        var form = new Form();
+        form.History.MarkClean();
+        form.History.Begin();
+        form.Value = "copy";
+        form.History.Rebase((_, now) => now);
+        form.History.End();
+
+        form.History.TryUndo(out var restore, out var settledThen).Should().BeTrue();
+        restore.Should().Be("");
+        settledThen.Should().Be("", "the settled form before the step moved it");
+
+        form.Value = restore;
+        form.History.Rebase((_, _) => settledThen!);
+        form.History.IsDirty.Should().BeFalse();
+
+        form.History.TryRedo(out var redone, out var settledAtUndo).Should().BeTrue();
+        redone.Should().Be("copy");
+        settledAtUndo.Should().Be("copy", "the settled form as it stood when the undo stepped off it");
+    }
+
+    [Fact]
     public void Nothing_to_undo_on_a_form_that_has_not_been_changed()
     {
         var form = new Form();

@@ -26,8 +26,9 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
 
     private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());
 
-    private static NewSubAssemblyDraft Own(int roleId, IReadOnlyList<RecipeLine> lines, int id = 0, string? sectionName = null, decimal weightPerPiece = 10m) =>
-        new(roleId, lines, UsageAuthoredField.WeightPerPiece, weightPerPiece, sectionName) { Id = id };
+    private static NewSubAssemblyDraft Own(
+        int roleId, IReadOnlyList<RecipeLine> lines, int id = 0, string? sectionName = null, decimal weightPerPiece = 10m, bool isOwn = false) =>
+        new(roleId, lines, UsageAuthoredField.WeightPerPiece, weightPerPiece, sectionName) { Id = id, IsOwn = isOwn };
 
     private async Task<SubAssembly?> FindAsync(int id)
     {
@@ -142,6 +143,71 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         moved.OwnerProductId.Should().BeNull();
         moved.Name.Should().Be("Cheese Roll Dough");
         (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Single().SubAssemblyId.Should().Be(id);
+    }
+
+    [Fact]
+    public async Task An_unlinked_section_is_the_products_own_in_a_role_that_isnt_product_owned_and_stays_so_wherever_it_moves()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 3);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var houseDoughId = await CreateSubAssemblyRepository().SaveStandaloneAsync(
+            new SubAssembly { Name = "House Dough", RoleId = doughRoleId }, [(flourId, 1000m)], Cancellation);
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(houseDoughId, UsageAuthoredField.WeightPerPiece, 50m)]));
+
+        // Unlink: the linked dough's lines, as a new section of the product's own.
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m, isOwn: true)], []));
+
+        (await SubAssembliesAsync()).Should().Equal(("House Dough", null), ("Cheese Roll Dough", productId));
+        (await CreateSubAssemblyRepository().GetStandaloneAsync(Cancellation)).Select(s => s.Name).Should().Equal(["House Dough"], "the copy isn't on the Sub-Assemblies screen");
+        (await CreateSubAssemblyRepository().GetStandaloneLinkedByAsync(Cancellation)).Should().NotContainKey(houseDoughId, "the product doesn't link it any more");
+        var ownId = await SubAssemblyIdAsync(productId, doughRoleId);
+
+        var otherId = await AddProductAsync("Cheese Bun");
+        var link = () => SaveRecipeAsync(otherId, new RecipeDraft([], [new LinkedUsageDraft(ownId, UsageAuthoredField.WeightPerPiece, 10m)]));
+        await link.Should().ThrowAsync<InvalidOperationException>().WithMessage("*is Cheese Roll's own, so it can't be linked*");
+
+        // Saved again with its id, as the Products form does, and in another role that isn't product-owned: still its own.
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 900m)], id: ownId, isOwn: true)], []));
+        (await FindAsync(ownId))!.OwnerProductId.Should().Be(productId);
+
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(toppingRoleId, [(flourId, 900m)], id: ownId, isOwn: true)], []));
+        var moved = (await FindAsync(ownId))!;
+        moved.OwnerProductId.Should().Be(productId, "it was never the role's, so moving it doesn't release it");
+        moved.Name.Should().Be("Cheese Roll Topping");
+    }
+
+    [Fact]
+    public async Task A_clone_gets_its_own_copy_of_a_section_the_source_unlinked()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour");
+        var sourceId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(sourceId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], isOwn: true)], []));
+        var sourceDoughId = await SubAssemblyIdAsync(sourceId, doughRoleId);
+
+        var cloneId = await new ProductCloner(CreateDbContextFactory()).CloneAsync(sourceId, "Cheese Roll Mini", Cancellation);
+
+        var dough = (await CreateUsageRepository().GetForProductAsync(cloneId, Cancellation)).Single().SubAssembly!;
+        dough.Id.Should().NotBe(sourceDoughId, "another product's own is copied, never linked");
+        dough.Name.Should().Be("Cheese Roll Mini Dough");
+        dough.OwnerProductId.Should().Be(cloneId);
+    }
+
+    [Fact]
+    public async Task Renaming_a_role_that_isnt_product_owned_renames_the_own_ones_named_after_it()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour");
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], isOwn: true)], []));
+        var role = await RoleAsync(doughRoleId);
+
+        role.Name = "Bread Dough";
+        await CreateRoleRepository().UpdateAsync(role, Cancellation);
+
+        (await SubAssembliesAsync()).Should().Equal(("Cheese Roll Bread Dough", productId));
     }
 
     [Fact]

@@ -546,6 +546,58 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeFalse("a refresh isn't an edit");
     }
 
+    [Fact]
+    public async Task Undoing_Unlink_puts_the_link_back_and_redo_unlinks_again()
+    {
+        var (viewModel, doughId) = await OpenLinkedDoughProductAsync();
+
+        await viewModel.UnlinkCommand.Execute(viewModel.UsageEdits.Single());
+
+        viewModel.UsageEdits.Single().IsOwned.Should().BeTrue();
+        (await CanSave(viewModel)).Should().BeTrue();
+
+        viewModel.TryUndo().Should().BeTrue();
+
+        var linked = viewModel.UsageEdits.Single();
+        linked.IsLinked.Should().BeTrue();
+        linked.SubAssemblyId.Should().Be(doughId);
+        (await CanSave(viewModel)).Should().BeFalse("the recipe links the dough again, as saved, and its form shows it as it was");
+
+        viewModel.TryRedo().Should().BeTrue();
+        viewModel.UsageEdits.Single().IsOwned.Should().BeTrue();
+        (await CanSave(viewModel)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Undoing_Make_a_Copy_stops_offering_Save()
+    {
+        var (viewModel, _) = await OpenLinkedDoughProductAsync();
+
+        await viewModel.MakeCopyCommand.Execute(viewModel.UsageEdits.Single());
+        (await CanSave(viewModel)).Should().BeTrue();
+
+        viewModel.TryUndo().Should().BeTrue();
+
+        viewModel.UsageEdits.Single().IsLinked.Should().BeTrue();
+        (await CanSave(viewModel)).Should().BeFalse("opening the copy's form moved what Save measures against, and the undo moves it back");
+    }
+
+    [Fact]
+    public async Task Undoing_to_a_form_with_typing_not_yet_applied_still_offers_Save()
+    {
+        // The other half of taking the settled form back from when the step was taken: it's the form as the
+        // section showed, not as it was typed into, so typing an undo puts back still counts as a change.
+        var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
+        viewModel.EditingUsageWeightPerPiece = 70m;
+
+        Edit(viewModel, () => viewModel.EditingName = "Renamed");
+        viewModel.TryUndo().Should().BeTrue();
+
+        viewModel.EditingName.Should().Be("Ube Roll");
+        viewModel.EditingUsageWeightPerPiece.Should().Be(70m);
+        (await CanSave(viewModel)).Should().BeTrue("the 70 g typed into the form isn't in the recipe yet, and Save would write it");
+    }
+
     /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the View binds it.</summary>
     private static async Task<bool> CanSave(ProductsViewModel viewModel) =>
         await viewModel.SaveCommand.CanExecute.FirstAsync();
@@ -577,6 +629,20 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
 
         var viewModel = await OpenAsync(productId, vm => vm.FormLines.Count == 1);
         return (viewModel, new Seeded(productId, doughRoleId, new SeededIngredients(flourId, sugarId)));
+    }
+
+    /// <summary>A product linking House Dough from the Sub-Assemblies screen (1,000 g of flour), opened with its form showing.</summary>
+    private async Task<(ProductsViewModel ViewModel, int DoughId)> OpenLinkedDoughProductAsync()
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var doughId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Name = "House Dough", RoleId = doughRoleId }, [(flourId, 1000m)], Cancellation);
+        var productId = await AddProductAsync("Ube Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 50m)]));
+
+        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 1 && vm.FormLines.Count == 1);
+        return (viewModel, doughId);
     }
 
     /// <summary>The same product, with a second line so one can be the base and the other typed as a percentage.</summary>

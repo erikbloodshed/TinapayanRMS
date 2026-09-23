@@ -5,9 +5,9 @@ namespace TinapayanRMS.ApplicationCore.Interfaces;
 
 /// <summary>
 /// A recipe section whose lines the product's Recipe Structure edits: its role, its gram lines and the product's piece
-/// size. In a product-owned role (SubAssemblyRole.IsProductOwned) it's the product's own sub-assembly, new or saved
-/// (<see cref="Id"/>); in any other a new one, which Save keeps on the Sub-Assemblies screen and links. Either is named
-/// after the product and its role (SubAssemblyRules.StandaloneNameFor).
+/// size. In a product-owned role (SubAssemblyRole.IsProductOwned), or marked <see cref="IsOwn"/>, it's the product's own
+/// sub-assembly, new or saved (<see cref="Id"/>); otherwise a new one, which Save keeps on the Sub-Assemblies screen and
+/// links. Either is named after the product and its role (SubAssemblyRules.StandaloneNameFor).
 /// </summary>
 /// <param name="SectionName">
 /// Optional: what tells it apart from others in its role, e.g. "Ube" beside "Cheese" (SubAssemblyRules.EnsureSectionsDistinct),
@@ -25,6 +25,13 @@ public sealed record NewSubAssemblyDraft(
     /// new one.
     /// </summary>
     public int Id { get; init; }
+
+    /// <summary>
+    /// Save makes a new one the product's own whatever its role: a linked section unlinked in the Products form, or a
+    /// clone's copy of its source's own. Otherwise its role decides (SubAssemblyRole.IsProductOwned). A saved one of the
+    /// product's own stays its own, unless it moves out of a product-owned role into one that isn't.
+    /// </summary>
+    public bool IsOwn { get; init; }
 
     /// <summary>
     /// How much of the batch's weight this product loses making it, as a percentage of what went in: at

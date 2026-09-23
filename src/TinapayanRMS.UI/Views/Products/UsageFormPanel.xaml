@@ -552,6 +552,13 @@
                        Margin="0,0,12,0"
                        Visibility="{Binding IsAddingUsage, Converter={StaticResource BooleanToVisibilityConverter}}" />
             <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <syncfusion:ButtonAdv Label="Unlink"
+                                      ToolTip="Make it this product's own copy, to change its lines here, whatever its role. The one on the Sub-Assemblies screen stays as it is. Save keeps the copy with this product, named after it: other products can copy it but not link it."
+                                      IconTemplate="{StaticResource UnlinkIconTemplate}"
+                                      Command="{Binding UnlinkCommand}"
+                                      CommandParameter="{Binding EditingUsage}"
+                                      Visibility="{Binding IsEditingLinkedUsage, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                      Margin="0,0,8,0" />
                 <syncfusion:ButtonAdv Label="Make a Copy"
                                       ToolTip="Make a copy of it, to change its lines here. Save keeps the copy named after this product, and uses it instead: as its own in a product-owned role, otherwise on the Sub-Assemblies screen, linked."
                                       IconTemplate="{StaticResource CopyIconTemplate}"

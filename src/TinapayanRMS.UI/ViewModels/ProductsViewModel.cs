@@ -70,6 +70,10 @@ public sealed class ProductUsageEdit : ReactiveObject
     /// product's own and its role (SubAssemblyRules.SectionLabel), "Ube".
     /// </param>
     /// <param name="shrinkagePercent">What the batch loses being made, as a share of itself; the pieces come out of what's left.</param>
+    /// <param name="isOwn">
+    /// A new section Save makes the product's own whatever its role: a linked one unlinked here. A saved one of the
+    /// product's own is its own without it.
+    /// </param>
     public ProductUsageEdit(
         int subAssemblyId,
         SubAssemblyRole? role,
@@ -79,8 +83,10 @@ public sealed class ProductUsageEdit : ReactiveObject
         decimal shrinkagePercent,
         string? linkedName,
         IReadOnlyList<SubAssemblyLineEdit>? addIns = null,
-        string? name = null)
+        string? name = null,
+        bool isOwn = false)
     {
+        _isOwn = isOwn;
         Name = SubAssemblyRules.NormalizeName(name);
         SubAssemblyId = subAssemblyId;
         Role = role;
@@ -182,15 +188,16 @@ public sealed class ProductUsageEdit : ReactiveObject
     /// <summary>Not saved yet.</summary>
     public bool IsNew => SubAssemblyId == 0;
 
+    private readonly bool _isOwn;
+
     /// <summary>
-    /// The product's own saved sub-assembly, in a product-owned role (SubAssemblyRole.IsProductOwned): edited here, not on
-    /// the Sub-Assemblies screen, and deleted when it's taken out of the recipe.
+    /// The product's own sub-assembly: a saved one, made in a product-owned role (SubAssemblyRole.IsProductOwned) or
+    /// unlinked, or a linked one unlinked here and not saved yet. Edited here, not on the Sub-Assemblies screen, and
+    /// deleted when it's taken out of the recipe.
     /// </summary>
-    public bool IsOwned => SubAssemblyId > 0 && LinkedName is null;
+    public bool IsOwned => LinkedName is null && (SubAssemblyId > 0 || _isOwn);
 
     public bool IsLinked => LinkedName is not null;
-
-
 
     /// <summary>The badge beside a linked section's heading, which opens it on the Sub-Assemblies screen: "Cheese Roll Dough, from Sub-Assemblies".</summary>
     public string LinkedFromText => $"{LinkedName}, from {StandaloneSourceName}";
@@ -232,7 +239,7 @@ public sealed class ProductUsageEdit : ReactiveObject
 
     /// <summary>A new section with its role refreshed (renamed in Settings) and its lines repriced with their ingredients.</summary>
     public ProductUsageEdit With(SubAssemblyRole? role, IReadOnlyList<SubAssemblyLineEdit> lines) =>
-        new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, ShrinkagePercent, LinkedName, AddIns, Name);
+        new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, ShrinkagePercent, LinkedName, AddIns, Name, _isOwn);
 
     /// <summary>
     /// A linked section as the Sub-Assemblies screen now has it — its name, the label it gives (<paramref name="name"/>),
@@ -250,6 +257,7 @@ public sealed class ProductUsageEdit : ReactiveObject
     /// <summary>Whether <paramref name="other"/> shows the same thing: the same role and names, piece size, and lines and add-ins at the same costs.</summary>
     public bool ShowsSameAs(ProductUsageEdit other) =>
         SubAssemblyId == other.SubAssemblyId
+        && IsOwned == other.IsOwned
         && CollectionMerge.HasSameValues(Role, other.Role)
         && LinkedName == other.LinkedName
         && Name == other.Name
@@ -854,7 +862,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     }
 
     /// <summary>
-    /// The form edits a section linked from elsewhere, so Make a Copy has something to copy. A plain
+    /// The form edits a section linked from elsewhere, so Unlink and Make a Copy have something to copy. A plain
     /// <c>EditingUsage.IsLinked</c> binding can't say this: with no section it has no value at all, and the
     /// button would fall back to showing.
     /// </summary>
@@ -1200,6 +1208,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     public ReactiveCommand<UsageFormMode, RxVoid> AddUsageCommand { get; }
     public ReactiveCommand<ProductUsageEdit, RxVoid> EditUsageCommand { get; }
     public ReactiveCommand<ProductUsageEdit, RxVoid> MakeCopyCommand { get; }
+
+    /// <summary>Unlink on a linked section: it becomes a copy of the product's own, in whatever role, and the link goes with Save.</summary>
+    public ReactiveCommand<ProductUsageEdit, RxVoid> UnlinkCommand { get; }
 
     /// <summary>Delete Sub-Assembly: takes the sub-assembly whose tab is showing out of the recipe.</summary>
     public ReactiveCommand<RxVoid, RxVoid> RemoveUsageCommand { get; }
@@ -1798,17 +1809,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         EditUsageCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => SelectRecipeTab(TabFor(usage)));
 
         // A linked sub-assembly becomes a new section in the same role and at the same piece size, whose lines the form
-        // edits; Save keeps it on the Sub-Assemblies screen as a sub-assembly of its own, and links that instead.
-        MakeCopyCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => AsUndoStep(() =>
-        {
-            // Its add-ins become plain lines of the copy: the batch it was showing is the batch it keeps.
-            // Never a duplicate ingredient, since an add-in can't be one the recipe already has.
-            // In a role the recipe has more than one in, it keeps what it went by, so it's still told apart.
-            var copy = new ProductUsageEdit(
-                0, usage.Role, [.. usage.Lines, .. usage.AddIns], usage.AuthoredField, usage.AuthoredValue, usage.ShrinkagePercent,
-                linkedName: null, name: usage.IsRoleRepeated ? usage.Label : null);
-            ReplaceUsage(usage, copy);
-        }));
+        // edits; Save makes it the product's own in a product-owned role, and otherwise keeps it on the Sub-Assemblies
+        // screen as a sub-assembly of its own, and links that instead.
+        MakeCopyCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => AsUndoStep(() => ReplaceUsage(usage, CopyOfLinked(usage, isOwn: false))));
+
+        // The same copy, but the product's own whatever its role: Save keeps it with the product, off the
+        // Sub-Assemblies screen, and the one it was linked to stays there as it is.
+        UnlinkCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => AsUndoStep(() => ReplaceUsage(usage, CopyOfLinked(usage, isOwn: true))));
 
         // Delete Sub-Assembly takes out the one whose tab is showing. Nothing to confirm: it only leaves the recipe,
         // with Save, and the sub-assembly stays on the Sub-Assemblies screen. On the Packaging tab it takes out the
@@ -1878,6 +1885,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         CloneCommand = ReactiveCommand.CreateFromTask(() => MakeFromSelectedAsync(_productCloner.CloneAsync), canMakeFromSelected);
         CreateVariantCommand = ReactiveCommand.CreateFromTask(() => MakeFromSelectedAsync(_productCloner.CreateVariantAsync), canMakeFromSelected);
     }
+
+    /// <summary>
+    /// A linked section as a new one whose lines the form edits, at the same role and piece size (Make a Copy, Unlink):
+    /// <paramref name="isOwn"/> makes it the product's own whatever its role.
+    /// </summary>
+    private static ProductUsageEdit CopyOfLinked(ProductUsageEdit usage, bool isOwn) =>
+        // Its add-ins become plain lines of the copy: the batch it was showing is the batch it keeps.
+        // Never a duplicate ingredient, since an add-in can't be one the recipe already has.
+        // In a role the recipe has more than one in, it keeps what it went by, so it's still told apart.
+        new(0, usage.Role, [.. usage.Lines, .. usage.AddIns], usage.AuthoredField, usage.AuthoredValue, usage.ShrinkagePercent,
+            linkedName: null, name: usage.IsRoleRepeated ? usage.Label : null, isOwn: isOwn);
 
     /// <summary>Makes a new product named EditingCloneName from the selected one as saved (a clone or a variant), then shows it.</summary>
     private Task MakeFromSelectedAsync(Func<int, string, CancellationToken, Task<int>> make) =>
@@ -2255,12 +2273,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     public bool TryUndo()
     {
         History.End();
-        if (!History.TryUndo(out var restore))
+        if (!History.TryUndo(out var restore, out var settled))
         {
             return false;
         }
 
-        RestoreSnapshot(restore);
+        RestoreSnapshot(restore, settled);
         return true;
     }
 
@@ -2268,12 +2286,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     public bool TryRedo()
     {
         History.End();
-        if (!History.TryRedo(out var restore))
+        if (!History.TryRedo(out var restore, out var settled))
         {
             return false;
         }
 
-        RestoreSnapshot(restore);
+        RestoreSnapshot(restore, settled);
         return true;
     }
 
@@ -2333,7 +2351,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// step by step below; the one recompute runs at the end, outside IsRestoring, so the figures are worked out
     /// once from the restored form rather than over and over from a half-restored one.
     /// </summary>
-    private void RestoreSnapshot(ProductFormSnapshot snapshot)
+    /// <param name="settledThen">What Save measured against when <paramref name="snapshot"/> was taken, or null.</param>
+    private void RestoreSnapshot(ProductFormSnapshot snapshot, ProductFormSnapshot? settledThen)
     {
         // A message about a form that no longer exists would outlive what it was about.
         ErrorMessage = null;
@@ -2469,6 +2488,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         this.RaisePropertyChanged(nameof(IsFormEditingPackaging));
         FormLinesChanged();
         RecomputeCosts();
+
+        // 9. What Save measures the form against goes back to where it was when the step was taken, for the form and
+        //    tabs only (WithFormOf): the step being undone may have opened another section's form (Make a Copy, Unlink),
+        //    which moved it there (RebaseSettledForm), and a restore doesn't rebase, since the form it puts back may
+        //    hold typing that isn't in the recipe yet. Taking the settled form of that moment instead keeps both
+        //    right: a form put back as it was saved is clean again, and typing put back still counts. The recipe,
+        //    costing and the rest stay as settled now, so a costing-defaults rebase since then isn't lost.
+        if (settledThen is not null)
+        {
+            History.Rebase((settled, _) => settled.WithFormOf(settledThen));
+        }
     }
 
     private void RestoreIngredientLines(
@@ -2629,6 +2659,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             {
                 // The product's own keeps its id, so Save rewrites it in place; a new section's is 0.
                 Id = u.SubAssemblyId,
+                IsOwn = u.IsOwned,
                 ShrinkagePercent = u.ShrinkagePercent,
             })],
             [.. UsageEdits.Where(u => u.IsLinked).Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
@@ -2654,6 +2685,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         && a.New.Count == b.New.Count
         && a.New.Zip(b.New).All(pair =>
             pair.First.Id == pair.Second.Id
+            && pair.First.IsOwn == pair.Second.IsOwn
             && pair.First.RoleId == pair.Second.RoleId
             && pair.First.SectionName == pair.Second.SectionName
             && pair.First.AuthoredField == pair.Second.AuthoredField
@@ -2848,9 +2880,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
                 throw new InvalidOperationException($"Add the ingredients that go into the {role.Name}, in grams.");
             }
 
-            // One of the product's own keeps its id, so Save rewrites it in place; a new one has none yet.
+            // One of the product's own keeps its id, so Save rewrites it in place; a new one has none yet. One unlinked
+            // and not saved yet stays the product's own.
             usage = new ProductUsageEdit(
-                EditingUsage is { IsOwned: true } own ? own.SubAssemblyId : 0, role, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], _usageAuthoredField, authoredValue, shrinkagePercent, linkedName: null, name: EditingUsageName);
+                EditingUsage is { IsOwned: true } own ? own.SubAssemblyId : 0, role, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], _usageAuthoredField, authoredValue, shrinkagePercent, linkedName: null, name: EditingUsageName, isOwn: EditingUsage?.IsOwned == true);
         }
         else
         {

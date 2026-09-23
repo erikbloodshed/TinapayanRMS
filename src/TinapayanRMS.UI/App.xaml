@@ -81,6 +81,11 @@
             <TextBlock Text="&#xE71B;" Style="{StaticResource IconGlyphStyle}" />
         </DataTemplate>
 
+        <!-- Unlink: the font has no broken-link glyph, so the scissors (Cut) cut the link -->
+        <DataTemplate x:Key="UnlinkIconTemplate">
+            <TextBlock Text="&#xE8C6;" Style="{StaticResource IconGlyphStyle}" />
+        </DataTemplate>
+
         <!-- The header's navigation toggle (GlobalNavigationButton) and the drawer's Settings row -->
         <DataTemplate x:Key="MenuIconTemplate">
             <TextBlock Text="&#xE700;" Style="{StaticResource IconGlyphStyle}" />

@@ -47,9 +47,11 @@ public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> 
         {
             await SubAssemblyRepository.ReleaseOwnedAsync(dbContext, role.Id, cancellationToken);
         }
-        else if (role.IsProductOwned && !string.Equals(oldName, role.Name, StringComparison.Ordinal))
+
+        if (!string.Equals(oldName, role.Name, StringComparison.Ordinal))
         {
             // The ones products own in it are named after the role, "Cheese Roll Filling: Cheese": they take its new name.
+            // Whether or not it's product-owned, since a product can unlink a section into its own in any role.
             var owned = await dbContext.SubAssemblies
                 .Include(s => s.OwnerProduct)
                 .Where(s => s.RoleId == role.Id && s.OwnerProductId != null)

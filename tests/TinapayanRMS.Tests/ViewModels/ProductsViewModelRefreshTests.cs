@@ -692,6 +692,53 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task Unlink_makes_a_linked_section_the_products_own_in_a_role_that_isnt_product_owned()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
+        var subAssemblies = new SubAssemblyRepository(CreateDbContextFactory());
+        var doughId = await subAssemblies.SaveStandaloneAsync(new SubAssembly { Name = "House Dough", RoleId = roleId }, [(flourId, 1000m)], Cancellation);
+        var productId = await AddProductAsync("Cream Loaf Mini");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m) { AddIns = [(butterId, 250m)] }]));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+        viewModel.IsEditingLinkedUsage.Should().BeTrue("Unlink shows on a linked section");
+
+        await viewModel.UnlinkCommand.Execute(viewModel.UsageEdits.Single());
+
+        // Its own before Save: the badge shows, its lines are typed into, and its add-in is one of them.
+        var copy = viewModel.UsageEdits.Single();
+        copy.IsOwned.Should().BeTrue();
+        copy.IsLinked.Should().BeFalse();
+        copy.Lines.Select(l => (l.Ingredient.Name, l.Grams)).Should().Equal(("Flour", 1000m), ("Butter", 250m));
+        viewModel.EditingUsage!.IsOwned.Should().BeTrue();
+        viewModel.IsFormEditingLines.Should().BeTrue();
+        viewModel.IsEditingLinkedUsage.Should().BeFalse();
+
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1 && viewModel.UsageEdits[0].SubAssemblyId > 0,
+            () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        viewModel.UsageEdits.Single().IsOwned.Should().BeTrue("it's read back as the product's own");
+        await using var dbContext = CreateDbContext();
+        var usage = await dbContext.ProductSubAssemblyUsages.Include(u => u.SubAssembly).SingleAsync(u => u.ProductId == productId, Cancellation);
+        usage.SubAssemblyId.Should().NotBe(doughId);
+        usage.SubAssembly!.Name.Should().Be("Cream Loaf Mini Dough");
+        usage.SubAssembly.OwnerProductId.Should().Be(productId);
+        usage.SubAssembly.TotalWeight.Should().Be(1250m);
+        usage.AuthoredValue.Should().Be(30m);
+        (await dbContext.UsageAddInLines.AnyAsync(Cancellation)).Should().BeFalse("the add-in went into the copy's lines");
+        (await subAssemblies.GetStandaloneAsync(Cancellation)).Select(s => (s.Name, s.TotalWeight)).Should()
+            .Equal([("House Dough", 1000m)], "the one it was linked to stays on the Sub-Assemblies screen as it was, and the copy isn't there");
+    }
+
+    [Fact]
     public async Task Removing_a_sub_assembly_another_product_links_leaves_it_there()
     {
         var roleId = await AddRoleAsync("Dough");

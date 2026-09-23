@@ -149,6 +149,8 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                     usage.AuthoredValue,
                     SubAssemblyRules.SectionLabel(subAssembly.Name, sourceName, subAssembly.Role!.Name))
                 {
+                    // Its own whatever its role: the source's may have been unlinked in a role that isn't product-owned.
+                    IsOwn = true,
                     ShrinkagePercent = usage.ShrinkagePercent,
                 });
                 continue;
