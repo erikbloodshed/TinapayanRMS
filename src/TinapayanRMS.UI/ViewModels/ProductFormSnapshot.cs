@@ -188,8 +188,7 @@ public sealed record ProductFormSnapshot
             if (a.SubAssemblyId != b.SubAssemblyId
                 || a.Role?.Id != b.Role?.Id
                 || a.Name != b.Name
-                || a.OwnerName != b.OwnerName
-                || a.StandaloneName != b.StandaloneName
+                || a.LinkedName != b.LinkedName
                 || a.AuthoredField != b.AuthoredField
                 || a.AuthoredValue != b.AuthoredValue
                 || a.ShrinkagePercent != b.ShrinkagePercent

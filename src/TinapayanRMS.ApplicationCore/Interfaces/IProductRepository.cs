@@ -4,19 +4,20 @@ using TinapayanRMS.Domain.Enums;
 namespace TinapayanRMS.ApplicationCore.Interfaces;
 
 /// <summary>
-/// One of the product's own sub-assemblies as Save writes it: its role, which is what it's called, its gram
-/// lines, and the product's piece size for it (an owner always uses its own sub-assemblies). Id is 0 for a new one.
+/// A recipe section written in the product's Recipe Structure, which Save turns into a sub-assembly on the
+/// Sub-Assemblies screen, named after the product and its role (SubAssemblyRules.StandaloneNameFor), and links at
+/// the product's piece size: its role, its gram lines and that piece size.
 /// </summary>
-/// <param name="Name">
-/// Optional: what tells it apart from others in its role, e.g. "Ube" beside "Cheese" (SubAssemblyRules.EnsureSectionsDistinct).
+/// <param name="SectionName">
+/// Optional: what tells it apart from others in its role, e.g. "Ube" beside "Cheese" (SubAssemblyRules.EnsureSectionsDistinct),
+/// and what's put after the product and role in its saved name.
 /// </param>
-public sealed record OwnedSubAssemblyDraft(
-    int Id,
+public sealed record NewSubAssemblyDraft(
     int RoleId,
     IReadOnlyList<RecipeLine> Lines,
     UsageAuthoredField AuthoredField,
     decimal AuthoredValue,
-    string? Name = null)
+    string? SectionName = null)
 {
     /// <summary>
     /// How much of the batch's weight this product loses making it, as a percentage of what went in: at
@@ -25,7 +26,7 @@ public sealed record OwnedSubAssemblyDraft(
     public decimal ShrinkagePercent { get; init; }
 }
 
-/// <summary>A sub-assembly the product links (another product's, or a standalone one), at the product's own piece size.</summary>
+/// <summary>A sub-assembly the product links, at the product's own piece size.</summary>
 public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField AuthoredField, decimal AuthoredValue)
 {
     /// <summary>
@@ -43,11 +44,10 @@ public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField Auth
 }
 
 /// <summary>
-/// A product's whole recipe of sub-assemblies: the ones it owns and the ones it links. Saving it replaces
-/// the product's usages, adds, updates and relines its own sub-assemblies, and deletes the ones it no
-/// longer lists.
+/// A product's whole recipe of sub-assemblies: new sections, saved as sub-assemblies of their own, and the ones
+/// it links. Saving it replaces the product's usages; a sub-assembly it no longer lists is kept.
 /// </summary>
-public sealed record RecipeDraft(IReadOnlyList<OwnedSubAssemblyDraft> Owned, IReadOnlyList<LinkedUsageDraft> Linked);
+public sealed record RecipeDraft(IReadOnlyList<NewSubAssemblyDraft> New, IReadOnlyList<LinkedUsageDraft> Linked);
 
 /// <summary>
 /// What a product's packaging links, as Save writes it: another product's packaging, a standalone packaging
@@ -79,8 +79,8 @@ public interface IProductRepository
     /// </summary>
     /// <param name="product">Only its Id, Name, Description, CategoryId, QuantityRequired and CurrentPrice are read; it's never given an id.</param>
     /// <param name="recipe">
-    /// The product's complete recipe of sub-assemblies, or null to leave it as it is. An owned
-    /// sub-assembly it no longer lists is deleted, unless another product links it.
+    /// The product's complete recipe of sub-assemblies, or null to leave it as it is. A sub-assembly it no
+    /// longer lists stays on the Sub-Assemblies screen.
     /// </param>
     /// <param name="packagingLink">
     /// What the packaging links from now on, or null to leave the link as it is. Written before the lines, so
@@ -98,8 +98,8 @@ public interface IProductRepository
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Deletes the product with its own sub-assemblies, usages, packaging and costing. Refused while
-    /// another product links one of its sub-assemblies, or links its packaging.
+    /// Deletes the product with its usages, packaging and costing; the sub-assemblies it used stay on the
+    /// Sub-Assemblies screen. Refused while another product links its packaging.
     /// </summary>
     Task DeleteAsync(int id, CancellationToken cancellationToken);
 }

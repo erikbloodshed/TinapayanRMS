@@ -63,12 +63,12 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
             .SaveStandaloneAsync(new SubAssembly { Name = "Glaze", RoleId = glazeRoleId }, [(sugarId, 100m)], Cancellation);
         var sourceId = await AddProductAsync("Ube Loaf Big");
         await SaveRecipeAsync(sourceId, new RecipeDraft(
-            [new OwnedSubAssemblyDraft(0, fillingRoleId, [(ubeId, 100m)], UsageAuthoredField.Yield, 10m) { ShrinkagePercent = 12m }],
+            [new NewSubAssemblyDraft(fillingRoleId, [(ubeId, 100m)], UsageAuthoredField.Yield, 10m) { ShrinkagePercent = 12m }],
             [
                 new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 60m) { AddIns = [(flavourId, 20m)], ShrinkagePercent = 8m },
                 new LinkedUsageDraft(glazeId, UsageAuthoredField.WeightPerPiece, 5m),
             ]));
-        var fillingId = await OwnedSubAssemblyIdAsync(sourceId, fillingRoleId);
+        var fillingId = await SubAssemblyIdAsync(sourceId, fillingRoleId);
 
         var variantId = await CreateVariantAsync(sourceId, "Ube Loaf Small");
 
@@ -82,8 +82,8 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         });
 
         await using var dbContext = CreateDbContext();
-        (await dbContext.SubAssemblies.CountAsync(s => s.OwnerProductId == variantId, Cancellation))
-            .Should().Be(0, "a variant links every section; it owns none");
+        (await dbContext.SubAssemblies.CountAsync(Cancellation))
+            .Should().Be(3, "a variant links every section; it makes none");
         (await dbContext.UsageAddInLines.AsNoTracking()
                 .Where(l => l.Usage!.ProductId == variantId)
                 .Select(l => new { l.Usage!.SubAssemblyId, l.IngredientId, l.Grams })
@@ -101,9 +101,8 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         var (sourceId, doughId) = await AddProductWithSubAssemblyAsync("Ensaymada Big", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
         var variantId = await CreateVariantAsync(sourceId, "Ensaymada Small");
 
-        await SaveRecipeAsync(sourceId, new RecipeDraft(
-            [new OwnedSubAssemblyDraft(doughId, roleId, [(flourId, 1500m)], UsageAuthoredField.WeightPerPiece, 60m)],
-            []));
+        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Id = doughId, Name = "Ensaymada Big Dough", RoleId = roleId }, [(flourId, 1500m)], Cancellation);
 
         var usage = (await CreateUsageRepository().GetForProductAsync(variantId, Cancellation)).Should().ContainSingle().Subject;
         usage.SubAssemblyId.Should().Be(doughId);
@@ -191,34 +190,37 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
     }
 
     [Fact]
-    public async Task Keeps_two_sections_in_one_role_apart_by_their_owners_names()
+    public async Task Keeps_two_sections_in_one_role_apart_by_their_names()
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour");
         var (_, pandesalDoughId) = await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 800m)]);
         var (sourceId, sourceDoughId) = await AddProductWithSubAssemblyAsync("Source", roleId, [(flourId, 1000m)]);
         await SaveRecipeAsync(sourceId, new RecipeDraft(
-            [new OwnedSubAssemblyDraft(sourceDoughId, roleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 10m)],
-            [new LinkedUsageDraft(pandesalDoughId, UsageAuthoredField.WeightPerPiece, 20m)]));
+            [],
+            [
+                new LinkedUsageDraft(sourceDoughId, UsageAuthoredField.WeightPerPiece, 10m),
+                new LinkedUsageDraft(pandesalDoughId, UsageAuthoredField.WeightPerPiece, 20m),
+            ]));
 
         var variantId = await CreateVariantAsync(sourceId, "Variant");
 
-        // "Dough" and "Dough: Pandesal" on the source; "Dough: Source" and "Dough: Pandesal" on the variant.
+        // "Dough: Source Dough" and "Dough: Pandesal Dough", on the source and the variant alike.
         (await CreateUsageRepository().GetForProductAsync(variantId, Cancellation))
             .Select(u => u.SubAssemblyId).Should().BeEquivalentTo([sourceDoughId, pandesalDoughId]);
     }
 
     [Fact]
-    public async Task The_source_cant_drop_a_sub_assembly_its_variant_links()
+    public async Task The_source_dropping_a_sub_assembly_leaves_its_variant_linking_it()
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour");
-        var (sourceId, _) = await AddProductWithSubAssemblyAsync("Ensaymada Big", roleId, [(flourId, 1000m)]);
-        await CreateVariantAsync(sourceId, "Ensaymada Small");
+        var (sourceId, doughId) = await AddProductWithSubAssemblyAsync("Ensaymada Big", roleId, [(flourId, 1000m)]);
+        var variantId = await CreateVariantAsync(sourceId, "Ensaymada Small");
 
-        var act = () => SaveRecipeAsync(sourceId, new RecipeDraft([], []));
+        await SaveRecipeAsync(sourceId, new RecipeDraft([], []));
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Ensaymada Small*");
+        (await CreateUsageRepository().GetForProductAsync(variantId, Cancellation)).Should().ContainSingle(u => u.SubAssemblyId == doughId);
     }
 
     [Fact]
@@ -226,26 +228,21 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour");
-        var (sourceId, _) = await AddProductWithSubAssemblyAsync("Almond Cheese Bread", roleId, [(flourId, 1000m)]);
-        await using (var dbContext = CreateDbContext())
-        {
-            // A second unnamed Dough of its own, saved before that was refused: in the variant, both would go by the source's name.
-            var second = new SubAssembly { RoleId = roleId, OwnerProductId = sourceId };
-            dbContext.SubAssemblies.Add(second);
-            await dbContext.SaveChangesAsync(Cancellation);
-            dbContext.ProductSubAssemblyUsages.Add(new ProductSubAssemblyUsage
-            {
-                ProductId = sourceId,
-                SubAssemblyId = second.Id,
-                AuthoredField = UsageAuthoredField.WeightPerPiece,
-                AuthoredValue = 20m,
-            });
-            await dbContext.SaveChangesAsync(Cancellation);
-        }
+        var subAssemblies = new SubAssemblyRepository(CreateDbContextFactory());
+        var ubeId = await subAssemblies.SaveStandaloneAsync(new SubAssembly { Name = "Ube", RoleId = roleId }, [(flourId, 100m)], Cancellation);
+        var variantUbeId = await subAssemblies.SaveStandaloneAsync(new SubAssembly { Name = "Variant Dough: Ube", RoleId = roleId }, [(flourId, 200m)], Cancellation);
+        var sourceId = await AddProductAsync("Almond Cheese Bread");
+        await SaveRecipeAsync(sourceId, new RecipeDraft(
+            [],
+            [
+                new LinkedUsageDraft(ubeId, UsageAuthoredField.WeightPerPiece, 10m),
+                new LinkedUsageDraft(variantUbeId, UsageAuthoredField.WeightPerPiece, 10m),
+            ]));
 
+        // In a product called Variant, "Variant Dough: Ube" goes by Ube, as the other one does.
         var act = () => CreateVariantAsync(sourceId, "Variant");
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*two Dough sub-assemblies called Ube*");
         await using var check = CreateDbContext();
         (await check.Products.AnyAsync(p => p.Name == "Variant", Cancellation)).Should().BeFalse("it's one transaction");
     }

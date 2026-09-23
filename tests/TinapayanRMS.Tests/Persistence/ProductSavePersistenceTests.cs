@@ -58,7 +58,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var id = await CreateProductRepository().SaveAsync(
             product,
             new RecipeDraft(
-                [new OwnedSubAssemblyDraft(0, doughRoleId, [(flourId, 1000m)], UsageAuthoredField.Yield, 40m)],
+                [new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.Yield, 40m)],
                 [new LinkedUsageDraft(linkedFillingId, UsageAuthoredField.WeightPerPiece, 10m)]),
             null,
             [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)],
@@ -73,10 +73,10 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         saved.UpdatedAt.Should().BeCloseTo(DateTime.Now, TimeSpan.FromMinutes(1));
 
         var usages = await CreateUsageRepository().GetForProductAsync(id, Cancellation);
-        usages.Select(u => (u.SubAssembly!.Role!.Name, u.SubAssembly.OwnerProductId == id, u.AuthoredField, u.AuthoredValue)).Should().BeEquivalentTo(new[]
+        usages.Select(u => (u.SubAssembly!.Role!.Name, u.SubAssembly.Name, u.AuthoredField, u.AuthoredValue)).Should().BeEquivalentTo(new[]
         {
-            ("Dough", true, UsageAuthoredField.Yield, 40m),
-            ("Filling", false, UsageAuthoredField.WeightPerPiece, 10m),
+            ("Dough", "Cream Loaf Mini Dough", UsageAuthoredField.Yield, 40m),
+            ("Filling", "Cream Loaf Filling", UsageAuthoredField.WeightPerPiece, 10m),
         });
         (await CreatePackagingLineRepository().GetForProductAsync(id, Cancellation)).Should().ContainSingle(l => l.UnitsPerPackagingUnit == 6m);
 
@@ -122,7 +122,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         // The same box twice is rejected, after the name and the recipe were written.
         var act = () => CreateProductRepository().SaveAsync(
             new Product { Id = productId, Name = "Ube Ensaymada", Description = "Now with ube" },
-            new RecipeDraft([new OwnedSubAssemblyDraft(custardId, fillingRoleId, [(ubeId, 200m)], UsageAuthoredField.WeightPerPiece, 15m)], []),
+            new RecipeDraft([new NewSubAssemblyDraft(fillingRoleId, [(ubeId, 200m)], UsageAuthoredField.WeightPerPiece, 15m)], []),
             null,
             [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m), (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 4m)],
             new CostingParameters { LaborPercent = 5m },
@@ -137,7 +137,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         usage.AuthoredValue.Should().Be(10m);
         await using var dbContext = CreateDbContext();
         (await dbContext.SubAssemblyLines.SingleAsync(Cancellation)).IngredientId.Should().Be(sugarId);
-        (await dbContext.SubAssemblies.SingleAsync(Cancellation)).TotalCost.Should().Be(9m);
+        (await dbContext.SubAssemblies.SingleAsync(Cancellation)).TotalCost.Should().Be(9m, "the sub-assembly the new section made is rolled back");
         (await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation)).Should().BeEmpty();
         (await CreateCostingParametersRepository().GetForProductAsync(productId, Cancellation)).Should().BeNull();
     }
@@ -151,7 +151,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         var act = () => CreateProductRepository().SaveAsync(
             new Product { Name = "Custard Bun" },
-            new RecipeDraft([new OwnedSubAssemblyDraft(0, fillingRoleId, [(sugarId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []),
+            new RecipeDraft([new NewSubAssemblyDraft(fillingRoleId, [(sugarId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []),
             null,
             [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m), (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 4m)],
             costing: null,
@@ -164,7 +164,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
     }
 
     [Fact]
-    public async Task SaveAsync_keeps_a_sub_assemblys_id_when_it_is_resaved_so_its_links_still_hold()
+    public async Task A_sub_assembly_a_product_saved_is_edited_on_the_Sub_Assemblies_screen_and_every_product_linking_it_follows()
     {
         var doughRoleId = await AddRoleAsync("Dough", 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -173,13 +173,16 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var smallId = await AddProductAsync("Ensaymada Small");
         await SaveRecipeAsync(smallId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m)]));
 
-        // The owner edits its dough: the smaller product, which links it, follows.
-        await SaveRecipeAsync(bigId, new RecipeDraft(
-            [new OwnedSubAssemblyDraft(doughId, doughRoleId, [(flourId, 1000m), (butterId, 100m)], UsageAuthoredField.WeightPerPiece, 60m)], []));
+        // The dough Ensaymada Big made is edited where it's kept: both products follow.
+        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Id = doughId, Name = "Ensaymada Big Dough", RoleId = doughRoleId }, [(flourId, 1000m), (butterId, 100m)], Cancellation);
 
-        var linked = (await CreateUsageRepository().GetForProductAsync(smallId, Cancellation)).Should().ContainSingle().Subject;
-        linked.SubAssemblyId.Should().Be(doughId);
-        linked.SubAssembly!.TotalWeight.Should().Be(1100m);
-        linked.SubAssembly.TotalCost.Should().Be(90m); // 1000*0.05 + 100*0.4
+        foreach (var productId in new[] { bigId, smallId })
+        {
+            var linked = (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Should().ContainSingle().Subject;
+            linked.SubAssemblyId.Should().Be(doughId);
+            linked.SubAssembly!.TotalWeight.Should().Be(1100m);
+            linked.SubAssembly.TotalCost.Should().Be(90m); // 1000*0.05 + 100*0.4
+        }
     }
 }

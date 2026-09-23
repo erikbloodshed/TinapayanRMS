@@ -1,6 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -16,8 +15,9 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         CreateFromAsync(sourceProductId, newProductName, asVariant: true, cancellationToken);
 
     /// <summary>
-    /// A clone and a variant differ only in their recipe and packaging: a clone copies them, a variant links
-    /// them. The product row — its quantity required among the rest — and its costing are copied alike.
+    /// A clone and a variant differ only in their packaging: a clone copies it, a variant links it. Both link the
+    /// sub-assemblies the source's recipe does. The product row — its quantity required among the rest — and its
+    /// costing are copied alike.
     /// </summary>
     private async Task<int> CreateFromAsync(int sourceProductId, string newProductName, bool asVariant, CancellationToken cancellationToken)
     {
@@ -27,22 +27,12 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         var source = await dbContext.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == sourceProductId, cancellationToken)
             ?? throw new InvalidOperationException($"Product {sourceProductId} does not exist.");
 
-        // What the source shows: its usages (its own sub-assemblies and linked ones alike), their lines,
-        // its packaging resolved through any link, and its costing.
+        // What the source shows: its usages, its packaging resolved through any link, and its costing.
         var usages = await dbContext.ProductSubAssemblyUsages
             .AsNoTracking()
-            .Include(u => u.SubAssembly)
-            .ThenInclude(s => s!.OwnerProduct)
             .Where(u => u.ProductId == sourceProductId)
             .OrderBy(u => u.Id)
             .ToListAsync(cancellationToken);
-        var subAssemblyIds = usages.Select(u => u.SubAssemblyId).ToList();
-        var linesBySubAssembly = (await dbContext.SubAssemblyLines
-                .AsNoTracking()
-                .Where(l => subAssemblyIds.Contains(l.SubAssemblyId))
-                .OrderBy(l => l.Id)
-                .ToListAsync(cancellationToken))
-            .ToLookup(l => l.SubAssemblyId);
 
         // Keyed on the usage, not the sub-assembly: an add-in is the source product's own, and two
         // products linking the same sub-assembly each have their own set.
@@ -55,7 +45,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
             .ToLookup(l => l.UsageId);
         var packagingLines = await PackagingLineRepository.ResolveEffectiveAsync(dbContext, sourceProductId, [], cancellationToken);
 
-        // A packaging set the source links directly stays linked, like a standalone sub-assembly: it's kept apart to
+        // A packaging set the source links directly stays linked, like its recipe's sub-assemblies: it's kept apart to
         // be shared. Reached through another product's link, it's copied like the rest of that product's packaging.
         var sourceLink = await dbContext.PackagingLinks.AsNoTracking().FirstOrDefaultAsync(l => l.ProductId == sourceProductId, cancellationToken);
         var costing = await dbContext.CostingParameters.AsNoTracking().FirstOrDefaultAsync(c => c.ProductId == sourceProductId, cancellationToken);
@@ -70,10 +60,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         };
         await ProductRepository.AddAsync(dbContext, newProduct, cancellationToken);
 
-        var recipe = asVariant
-            ? VariantRecipe(usages, addInsByUsage)
-            : CloneRecipe(sourceProductId, usages, linesBySubAssembly, addInsByUsage);
-        await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, newProduct.Id, recipe, cancellationToken);
+        await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, newProduct.Id, LinkedRecipe(usages, addInsByUsage), cancellationToken);
 
         if (asVariant)
         {
@@ -120,12 +107,10 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
     }
 
     /// <summary>
-    /// A variant links everything the source's recipe uses, at the source's piece sizes. Links don't chain, so one the
-    /// source links itself is linked where it's kept, and the source's add-ins on it become the variant's own; the
-    /// source's own sub-assemblies have none. Where a role repeats, one of the source's own without a name goes by the
-    /// source's name in the variant (SubAssemblyRules.SectionLabel), so the sections stay apart.
+    /// The new product links everything the source's recipe does, at the source's piece sizes and shrinkage, with the
+    /// source's add-ins as its own.
     /// </summary>
-    private static RecipeDraft VariantRecipe(List<ProductSubAssemblyUsage> usages, ILookup<int, UsageAddInLine> addInsByUsage) =>
+    private static RecipeDraft LinkedRecipe(List<ProductSubAssemblyUsage> usages, ILookup<int, UsageAddInLine> addInsByUsage) =>
         new(
             [],
             [
@@ -135,54 +120,4 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                     AddIns = [.. addInsByUsage[usage.Id].Select(l => (l.IngredientId, l.Grams))],
                 }),
             ]);
-
-    private static RecipeDraft CloneRecipe(
-        int sourceProductId,
-        List<ProductSubAssemblyUsage> usages,
-        ILookup<int, SubAssemblyLine> linesBySubAssembly,
-        ILookup<int, UsageAddInLine> addInsByUsage)
-    {
-        // A standalone sub-assembly stays linked, at the same piece size: it's kept apart to be shared.
-        // Every other one becomes the clone's own, in the role it has, with its name. In a role the source has more
-        // than one in, a linked one without a name of its own takes its owner's, which is what told it apart there,
-        // so the clone's sections stay apart too (SetRecipeAsync checks it).
-        var repeatedRoleIds = usages.GroupBy(u => u.SubAssembly!.RoleId).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
-        var owned = new List<OwnedSubAssemblyDraft>();
-        var linked = new List<LinkedUsageDraft>();
-        foreach (var usage in usages)
-        {
-            if (usage.SubAssembly!.OwnerProductId is null)
-            {
-                // Still a link, so its add-ins stay add-ins: the clone puts the same extras in.
-                linked.Add(new LinkedUsageDraft(usage.SubAssemblyId, usage.AuthoredField, usage.AuthoredValue)
-                {
-                    ShrinkagePercent = usage.ShrinkagePercent,
-                    AddIns = [.. addInsByUsage[usage.Id].Select(l => (l.IngredientId, l.Grams))],
-                });
-                continue;
-            }
-
-            // The link is broken here, so the source's add-ins become plain lines of the clone's own copy:
-            // the batch it had is the batch it keeps. Never a duplicate ingredient, since an add-in can't
-            // be one the recipe already has (ProductRules.EnsureValidAddIns).
-            owned.Add(new OwnedSubAssemblyDraft(
-                0,
-                usage.SubAssembly.RoleId,
-                [
-                    // The formula's base comes with its lines; the add-ins folded in beside them never are one.
-                    .. linesBySubAssembly[usage.SubAssemblyId].Select(l => new RecipeLine(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)),
-                    .. addInsByUsage[usage.Id].Select(l => new RecipeLine(l.IngredientId, l.Grams)),
-                ],
-                usage.AuthoredField,
-                usage.AuthoredValue,
-                repeatedRoleIds.Contains(usage.SubAssembly.RoleId)
-                    ? SubAssemblyRules.SectionLabel(usage.SubAssembly, sourceProductId)
-                    : SubAssemblyRules.NormalizeName(usage.SubAssembly.Name))
-            {
-                ShrinkagePercent = usage.ShrinkagePercent,
-            });
-        }
-
-        return new RecipeDraft(owned, linked);
-    }
 }

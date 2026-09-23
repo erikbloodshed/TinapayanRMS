@@ -105,7 +105,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         var act = async () => await SaveRecipeAsync(linkerId, new RecipeDraft([], [Linked(doughId, 30m, (flourId, 100m))]));
 
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Flour*").WithMessage("*Cream Loaf's Dough*");
+            .WithMessage("*Flour*").WithMessage("*Cream Loaf Dough*");
         (await CreateUsageRepository().GetForProductAsync(linkerId, Cancellation)).Should().ContainSingle("the recipe it refused is left as it was");
         (await AddInsAsync(linkerId)).Select(l => l.IngredientId).Should().Equal(ubeId);
     }

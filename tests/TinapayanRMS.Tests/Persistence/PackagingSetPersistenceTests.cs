@@ -127,7 +127,6 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         await using var dbContext = CreateDbContext();
         var set = await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == id, Cancellation);
         set.Name.Should().Be("Gift Box Set");
-        set.OwnerProductId.Should().BeNull();
         set.TotalWeight.Should().Be(0m);
         set.TotalCost.Should().Be(0m);
         var lines = await CreateRepository().GetPackagingLinesAsync(id, Cancellation);
@@ -187,14 +186,14 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
     }
 
     [Fact]
-    public async Task A_products_own_sub_assembly_cant_take_the_packaging_role()
+    public async Task A_new_recipe_section_cant_take_the_packaging_role()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var sugarId = await AddIngredientAsync("Sugar");
         var productId = await AddProductAsync("Cream Loaf");
 
         var act = () => SaveRecipeAsync(productId, new RecipeDraft(
-            [new OwnedSubAssemblyDraft(0, packagingRoleId, [(sugarId, 100m)], UsageAuthoredField.Yield, 10m)], []));
+            [new NewSubAssemblyDraft(packagingRoleId, [(sugarId, 100m)], UsageAuthoredField.Yield, 10m)], []));
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*for packaging sets*");
     }

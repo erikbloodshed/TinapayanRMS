@@ -108,41 +108,55 @@ public class SubAssemblyRulesTests
     }
 
     [Fact]
-    public void EnsureValidOwnedNames_rejects_one_name_twice_even_in_different_roles()
+    public void EnsureValidSectionName_takes_no_name_and_refuses_one_too_long()
     {
-        var fine = () => SubAssemblyRules.EnsureValidOwnedNames([null, null, "Ube", "Cheese"]);
-        var twice = () => SubAssemblyRules.EnsureValidOwnedNames(["Ube", "UBE"]);
+        var none = () => SubAssemblyRules.EnsureValidSectionName(null);
+        var blank = () => SubAssemblyRules.EnsureValidSectionName("  ");
+        var tooLong = () => SubAssemblyRules.EnsureValidSectionName(new string('a', SubAssemblyRules.MaxNameLength + 1));
 
-        fine.Should().NotThrow("names are optional");
-        twice.Should().Throw<InvalidOperationException>()
-            .WithMessage("This product has two sub-assemblies of its own named Ube. Give one of them another name.");
+        none.Should().NotThrow("names are optional");
+        blank.Should().NotThrow();
+        tooLong.Should().Throw<InvalidOperationException>().WithMessage("*keep it to 100 characters*");
     }
 
     [Fact]
-    public void SectionLabel_is_a_products_own_name_and_a_linked_ones_name_or_else_its_owners()
+    public void StandaloneNameFor_is_the_product_and_role_with_the_sections_own_name_after_them()
     {
-        var cheese = new SubAssembly { Name = "Cheese", OwnerProductId = 7, OwnerProduct = new Product { Id = 7, Name = "Cream Loaf" } };
-        var unnamed = new SubAssembly { OwnerProductId = 7, OwnerProduct = new Product { Id = 7, Name = "Cream Loaf" } };
-        var standalone = new SubAssembly { Name = "Ube Halaya" };
-
-        SubAssemblyRules.SectionLabel(cheese, productId: 7).Should().Be("Cheese");
-        SubAssemblyRules.SectionLabel(unnamed, productId: 7).Should().BeNull("a product's own needn't have a name");
-        SubAssemblyRules.SectionLabel(unnamed, productId: 9).Should().Be("Cream Loaf", "a linked one without a name goes by its owner");
-        SubAssemblyRules.SectionLabel(standalone, productId: 9).Should().Be("Ube Halaya");
+        SubAssemblyRules.StandaloneNameFor(" Cheese Roll ", "Dough", null).Should().Be("Cheese Roll Dough");
+        SubAssemblyRules.StandaloneNameFor("Cheese Roll", "Filling", " Cheese ").Should().Be("Cheese Roll Filling: Cheese");
+        SubAssemblyRules.StandaloneNameFor("Cheese Roll", "Dough", "dough").Should().Be("Cheese Roll Dough", "a name that's just the role's adds nothing");
+        SubAssemblyRules.StandaloneNameFor("Cheese Roll", "Dough", "  ").Should().Be("Cheese Roll Dough");
     }
 
     [Fact]
-    public void DisplayName_is_a_standalone_ones_name_and_a_products_own_role_as_that_products()
+    public void UniqueStandaloneName_numbers_a_name_already_taken_whatever_its_case_and_spacing()
     {
-        var dough = new SubAssemblyRole { Id = 1, Name = "Dough" };
-        var cream = new Product { Id = 7, Name = "Cream Loaf" };
-        var standalone = new SubAssembly { Name = "Variety Bread Dough", RoleId = 1, Role = dough };
-        var owned = new SubAssembly { RoleId = 1, Role = dough, OwnerProductId = 7, OwnerProduct = cream };
-        var named = new SubAssembly { Name = "Sweet", RoleId = 1, Role = dough, OwnerProductId = 7, OwnerProduct = cream };
+        SubAssemblyRules.UniqueStandaloneName("Cheese Roll Dough", ["Pandesal Dough"]).Should().Be("Cheese Roll Dough");
+        SubAssemblyRules.UniqueStandaloneName("Cheese Roll Dough", [" cheese roll dough "]).Should().Be("Cheese Roll Dough 2");
+        SubAssemblyRules.UniqueStandaloneName("Cheese Roll Dough", ["Cheese Roll Dough", "CHEESE ROLL DOUGH 2"]).Should().Be("Cheese Roll Dough 3");
+    }
 
-        SubAssemblyRules.DisplayName(standalone).Should().Be("Variety Bread Dough");
-        SubAssemblyRules.DisplayName(owned).Should().Be("Cream Loaf's Dough");
-        SubAssemblyRules.DisplayName(named).Should().Be("Cream Loaf's Dough: Sweet");
+    [Fact]
+    public void UniqueStandaloneName_cuts_a_long_name_to_fit_its_number()
+    {
+        var longName = new string('a', 95) + " Dough";
+
+        var alone = SubAssemblyRules.UniqueStandaloneName(longName, []);
+        var numbered = SubAssemblyRules.UniqueStandaloneName(longName, [alone]);
+
+        alone.Should().HaveLength(SubAssemblyRules.MaxNameLength);
+        numbered.Should().Be(new string('a', 95) + " Do 2");
+    }
+
+    [Fact]
+    public void SectionLabel_is_a_sub_assemblys_name_less_the_product_and_role_it_was_saved_under_from_there()
+    {
+        SubAssemblyRules.SectionLabel("Cheese Roll Filling: Cheese", "Cheese Roll", "Filling").Should().Be("Cheese");
+        SubAssemblyRules.SectionLabel("cheese roll filling: Cheese", " Cheese Roll ", "Filling").Should().Be("Cheese", "the name is matched as the rules match names");
+        SubAssemblyRules.SectionLabel("cheese roll filling", "Cheese Roll", "Filling").Should().BeNull("saved from there without a name, it goes by its role alone");
+        SubAssemblyRules.SectionLabel("Cheese Roll Filling 2", "Cheese Roll", "Filling").Should().Be("Cheese Roll Filling 2");
+        SubAssemblyRules.SectionLabel("Cheese Roll Filling: Cheese", "Ube Roll", "Filling").Should().Be("Cheese Roll Filling: Cheese", "another product's goes by its whole name");
+        SubAssemblyRules.SectionLabel("Ube Halaya", null, "Filling").Should().Be("Ube Halaya");
     }
 
     [Fact]
@@ -176,7 +190,7 @@ public class SubAssemblyRulesTests
     {
         var act = () => SubAssemblyRules.EnsureStandaloneNameAvailable(" sweet dough ", ["Sweet Dough"]);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("There's already a standalone sub-assembly named 'sweet dough'. Give this one its own name.");
+        act.Should().Throw<InvalidOperationException>().WithMessage("There's already a sub-assembly named 'sweet dough'. Give this one its own name.");
     }
 
     [Fact]

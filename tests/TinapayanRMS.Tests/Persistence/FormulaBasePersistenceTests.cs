@@ -37,13 +37,13 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         await SaveRecipeAsync(productId, new RecipeDraft(
             [
-                new OwnedSubAssemblyDraft(0, roleId,
+                new NewSubAssemblyDraft(roleId,
                     [new RecipeLine(flourId, 1000m, IsFormulaBase: true), new RecipeLine(waterId, 650m)],
                     UsageAuthoredField.WeightPerPiece, 50m),
             ],
             []));
 
-        var lines = await LinesAsync(await OwnedSubAssemblyIdAsync(productId, roleId));
+        var lines = await LinesAsync(await SubAssemblyIdAsync(productId, roleId));
         lines.Single(l => l.IngredientId == flourId).IsFormulaBase.Should().BeTrue();
         lines.Single(l => l.IngredientId == waterId).IsFormulaBase.Should().BeFalse();
     }
@@ -59,7 +59,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         await SaveRecipeAsync(productId, new RecipeDraft(
             [
-                new OwnedSubAssemblyDraft(0, roleId,
+                new NewSubAssemblyDraft(roleId,
                     [
                         new RecipeLine(breadFlourId, 700m, IsFormulaBase: true),
                         new RecipeLine(cakeFlourId, 300m, IsFormulaBase: true),
@@ -69,7 +69,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
             ],
             []));
 
-        var lines = await LinesAsync(await OwnedSubAssemblyIdAsync(productId, roleId));
+        var lines = await LinesAsync(await SubAssemblyIdAsync(productId, roleId));
         lines.Where(l => l.IsFormulaBase).Sum(l => l.Grams).Should().Be(1000m, "they make 100% between them");
     }
 
@@ -82,12 +82,12 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         await SaveRecipeAsync(productId, new RecipeDraft(
             [
-                new OwnedSubAssemblyDraft(0, roleId,
+                new NewSubAssemblyDraft(roleId,
                     [new RecipeLine(flourId, 1000m, IsFormulaBase: true)], UsageAuthoredField.WeightPerPiece, 50m),
             ],
             []));
 
-        var doughId = await OwnedSubAssemblyIdAsync(productId, roleId);
+        var doughId = await SubAssemblyIdAsync(productId, roleId);
         await using var dbContext = CreateDbContext();
         var dough = await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == doughId, Cancellation);
         dough.TotalWeight.Should().Be(1000m, "a tick is a reading of the batch, not a change to it");
@@ -120,7 +120,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var productId = await AddProductAsync("Pandesal");
         await SaveRecipeAsync(productId, new RecipeDraft(
             [
-                new OwnedSubAssemblyDraft(0, roleId,
+                new NewSubAssemblyDraft(roleId,
                     [new RecipeLine(flourId, 1000m, IsFormulaBase: true), new RecipeLine(waterId, 650m)],
                     UsageAuthoredField.WeightPerPiece, 50m),
             ],
@@ -128,7 +128,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         var cloneId = await new ProductCloner(CreateDbContextFactory()).CloneAsync(productId, "Pandesal Mini", Cancellation);
 
-        var lines = await LinesAsync(await OwnedSubAssemblyIdAsync(cloneId, roleId));
+        var lines = await LinesAsync(await SubAssemblyIdAsync(cloneId, roleId));
         lines.Single(l => l.IngredientId == flourId).IsFormulaBase.Should().BeTrue("the clone's copy is the same formula");
         lines.Single(l => l.IngredientId == waterId).IsFormulaBase.Should().BeFalse();
     }
@@ -179,7 +179,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var productId = await AddProductAsync("Pandesal");
         await SaveRecipeAsync(productId, new RecipeDraft(
             [
-                new OwnedSubAssemblyDraft(0, roleId,
+                new NewSubAssemblyDraft(roleId,
                     [new RecipeLine(flourId, 1000m, IsFormulaBase: true), new RecipeLine(waterId, 650m, AuthoredBakersPercent: 65m)],
                     UsageAuthoredField.WeightPerPiece, 50m),
             ],
@@ -187,7 +187,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         var cloneId = await new ProductCloner(CreateDbContextFactory()).CloneAsync(productId, "Pandesal Mini", Cancellation);
 
-        var lines = await LinesAsync(await OwnedSubAssemblyIdAsync(cloneId, roleId));
+        var lines = await LinesAsync(await SubAssemblyIdAsync(cloneId, roleId));
         lines.Single(l => l.IngredientId == waterId).AuthoredBakersPercent.Should().Be(65m, "the copy is the same formula, typed the same way");
     }
 }

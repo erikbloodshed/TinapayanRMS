@@ -129,18 +129,67 @@ public static class SubAssemblyRules
     /// <summary>The longest name a sub-assembly can have (the Name column's length).</summary>
     public const int MaxNameLength = 100;
 
-    /// <summary>A name as it's saved: trimmed, and null when nothing's left, since a product's own needn't have one.</summary>
+    /// <summary>A name as it's saved: trimmed, and null when nothing's left.</summary>
     public static string? NormalizeName(string? name) => string.IsNullOrWhiteSpace(name) ? null : name.Trim();
 
     /// <summary>
-    /// The name a recipe section goes by beside its role, once the recipe has more than one in that role: a product's
-    /// own by its name, which it needn't have, and a linked one by its name, or else by its owner product's.
-    /// Needs a linked one's OwnerProduct.
+    /// What a sub-assembly first written in a product's Recipe Structure is saved as on the Sub-Assemblies screen: the
+    /// product and its role, "Cheese Roll Dough", and the section's own name after them when it has one that isn't just
+    /// the role's, "Cheese Roll Filling: Cheese". Not yet unique (<see cref="UniqueStandaloneName"/>) nor cut to length.
     /// </summary>
-    public static string? SectionLabel(SubAssembly subAssembly, int productId) =>
-        subAssembly.OwnerProductId == productId
-            ? NormalizeName(subAssembly.Name)
-            : NormalizeName(subAssembly.Name) ?? subAssembly.OwnerProduct?.Name ?? "another product";
+    public static string StandaloneNameFor(string productName, string roleName, string? sectionName)
+    {
+        var baseName = $"{productName.Trim()} {roleName.Trim()}";
+        return NormalizeName(sectionName) is { } section && !string.Equals(section, roleName.Trim(), StringComparison.OrdinalIgnoreCase)
+            ? $"{baseName}: {section}"
+            : baseName;
+    }
+
+    /// <summary>
+    /// <paramref name="name"/>, or the first of "name 2", "name 3", … that no sub-assembly in <paramref name="taken"/> has
+    /// (case- and space-insensitively), cut so the whole still fits <see cref="MaxNameLength"/>.
+    /// </summary>
+    public static string UniqueStandaloneName(string name, IReadOnlyCollection<string> taken)
+    {
+        var names = taken.Select(n => n.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var trimmed = name.Trim();
+        for (var n = 1; ; n++)
+        {
+            var suffix = n == 1 ? string.Empty : $" {n}";
+            var stem = trimmed.Length + suffix.Length > MaxNameLength ? trimmed[..(MaxNameLength - suffix.Length)].TrimEnd() : trimmed;
+            if (!names.Contains(stem + suffix))
+            {
+                return stem + suffix;
+            }
+        }
+    }
+
+    /// <summary>
+    /// What a linked sub-assembly goes by beside its role in a product's recipe, once the recipe has more than one in
+    /// that role: its name, less the "Cheese Roll Filling: " it was saved under by that product
+    /// (<see cref="StandaloneNameFor"/>), so its tab reads "Filling: Cheese"; and nothing when it's just "Cheese Roll
+    /// Filling", which was saved from that product without a name of its own, so it goes by its role alone there, as it
+    /// did before it was saved.
+    /// </summary>
+    public static string? SectionLabel(string subAssemblyName, string? productName, string roleName)
+    {
+        if (NormalizeName(productName) is { } product)
+        {
+            var saved = StandaloneNameFor(product, roleName, null);
+            if (string.Equals(subAssemblyName.Trim(), saved, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var prefix = saved + ": ";
+            if (subAssemblyName.Length > prefix.Length && subAssemblyName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return subAssemblyName[prefix.Length..].Trim();
+            }
+        }
+
+        return subAssemblyName;
+    }
 
     /// <summary>
     /// A product can have several sub-assemblies in one role (an ube filling and a cheese filling), its own and the ones
@@ -166,45 +215,25 @@ public static class SubAssemblyRules
         }
     }
 
-    /// <summary>
-    /// A product's own sub-assemblies' names: optional, at most <see cref="MaxNameLength"/> characters, and no two alike
-    /// (case- and space-insensitively), whatever their roles, as the database keeps them unique within their product.
-    /// </summary>
-    public static void EnsureValidOwnedNames(IReadOnlyList<string?> names)
+    /// <summary>The name typed for a new recipe section is optional, and at most <see cref="MaxNameLength"/> characters.</summary>
+    public static void EnsureValidSectionName(string? name)
     {
-        var named = names.Select(NormalizeName).OfType<string>().ToList();
-        if (named.FirstOrDefault(n => n.Length > MaxNameLength) is { } tooLong)
+        if (NormalizeName(name) is { Length: > MaxNameLength } tooLong)
         {
             throw new InvalidOperationException($"'{tooLong[..20]}…' is too long for a sub-assembly's name: keep it to {MaxNameLength} characters.");
-        }
-
-        if (named.GroupBy(n => n, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1) is { } repeated)
-        {
-            throw new InvalidOperationException($"This product has two sub-assemblies of its own named {repeated.Key}. Give one of them another name.");
         }
     }
 
     /// <summary>
-    /// What a sub-assembly is called where it isn't plain whose it is: a standalone one by its name, and a
-    /// product's own as that product's role, with its name when it has one, e.g. "Cream Loaf's Dough" or
-    /// "Cream Loaf's Filling: Ube". Needs its Role and, for a product's own, its OwnerProduct.
-    /// </summary>
-    public static string DisplayName(SubAssembly subAssembly) =>
-        subAssembly.OwnerProductId is null
-            ? subAssembly.Name ?? string.Empty
-            : $"{subAssembly.OwnerProduct?.Name ?? "Another product"}'s {subAssembly.Role?.Name ?? "sub-assembly"}"
-                + (NormalizeName(subAssembly.Name) is { } name ? $": {name}" : string.Empty);
-
-    /// <summary>
-    /// A standalone sub-assembly needs a name no other standalone one has (case- and space-insensitively):
-    /// products pick them by name. <paramref name="otherStandaloneNames"/> leaves out the one being saved.
+    /// A sub-assembly needs a name no other has (case- and space-insensitively): products pick them by name.
+    /// <paramref name="otherStandaloneNames"/> leaves out the one being saved.
     /// </summary>
     public static void EnsureStandaloneNameAvailable(string name, IReadOnlyCollection<string> otherStandaloneNames)
     {
         var trimmed = name.Trim();
         if (otherStandaloneNames.Any(n => string.Equals(n.Trim(), trimmed, StringComparison.OrdinalIgnoreCase)))
         {
-            throw new InvalidOperationException($"There's already a standalone sub-assembly named '{trimmed}'. Give this one its own name.");
+            throw new InvalidOperationException($"There's already a sub-assembly named '{trimmed}'. Give this one its own name.");
         }
     }
 

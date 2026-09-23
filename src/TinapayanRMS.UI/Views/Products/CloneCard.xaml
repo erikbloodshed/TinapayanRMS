@@ -22,6 +22,6 @@
                    MaxWidth="420"
                    HorizontalAlignment="Left"
                    Margin="0,8,0,0"
-                   Text="Clone copies the recipe and packaging: the new product's own from then on. Create Variant links them instead: the new product follows every change made here, at piece sizes of its own." />
+                   Text="Both link the same sub-assemblies, at piece sizes the new product can change. Clone copies the packaging: the new product's own from then on. Create Variant links it instead, so the new product follows every change made to it here." />
     </StackPanel>
 </UserControl>

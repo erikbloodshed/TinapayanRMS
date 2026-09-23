@@ -54,7 +54,7 @@
                                               Margin="0,0,8,0">
                     <StackPanel MinWidth="190" Margin="2">
                         <syncfusion:ButtonAdv Label="New sub-assembly"
-                                              ToolTip="A sub-assembly of this product's own: type its lines in here."
+                                              ToolTip="Type its lines in here. Save keeps it on the Sub-Assemblies screen, named after this product and its role, and links it."
                                               IconTemplate="{StaticResource AddIconTemplate}"
                                               HorizontalAlignment="Stretch"
                                               HorizontalContentAlignment="Left"
@@ -64,7 +64,7 @@
                                               CommandParameter="{x:Static viewModels:UsageFormMode.New}"
                                               Click="AddSubAssemblyItem_Click" />
                         <syncfusion:ButtonAdv Label="Link an existing one"
-                                              ToolTip="Another product's, a standalone one from the Sub-Assemblies screen, or packaging. Its lines stay where they're kept, and it follows every change made to them."
+                                              ToolTip="One from the Sub-Assemblies screen, or packaging. Its lines stay where they're kept, and it follows every change made to them."
                                               IconTemplate="{StaticResource LinkIconTemplate}"
                                               HorizontalAlignment="Stretch"
                                               HorizontalContentAlignment="Left"
@@ -75,7 +75,7 @@
                                               CommandParameter="{x:Static viewModels:UsageFormMode.Link}"
                                               Click="AddSubAssemblyItem_Click" />
                         <syncfusion:ButtonAdv Label="Copy an existing one"
-                                              ToolTip="Starts from an existing one's lines and role, and is this product's own from then on."
+                                              ToolTip="Starts from an existing one's lines and role. Save keeps it on the Sub-Assemblies screen as a new one, named after this product, and links it."
                                               IconTemplate="{StaticResource CopyIconTemplate}"
                                               HorizontalAlignment="Stretch"
                                               HorizontalContentAlignment="Left"
@@ -88,7 +88,7 @@
                     </StackPanel>
                 </syncfusion:DropDownButtonAdv>
                 <syncfusion:ButtonAdv Label="Delete Sub-Assembly"
-                                      ToolTip="Take the sub-assembly showing out of the recipe. Save deletes the product's own; a linked one stays where it's from."
+                                      ToolTip="Take the sub-assembly showing out of the recipe, with Save. It stays on the Sub-Assemblies screen."
                                       IconTemplate="{StaticResource DeleteIconTemplate}"
                                       Command="{Binding RemoveUsageCommand}" />
             </StackPanel>

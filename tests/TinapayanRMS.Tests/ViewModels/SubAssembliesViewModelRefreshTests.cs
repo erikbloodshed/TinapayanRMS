@@ -45,7 +45,6 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         {
             var saved = await dbContext.SubAssemblies.SingleAsync(Cancellation);
             saved.Name.Should().Be("Chocolate Glaze");
-            saved.OwnerProductId.Should().BeNull();
             saved.TotalCost.Should().Be(18m);
         }
 

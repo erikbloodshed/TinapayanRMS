@@ -129,7 +129,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         // The direct test that the baselines weren't restored: a change undone must leave the database exactly
         // as a change never made would. Restoring _savedRecipe would make Save think the recipe had changed.
         var (viewModel, seeded) = await OpenOneSubAssemblyProductAsync();
-        var subAssemblyId = await OwnedSubAssemblyIdAsync(seeded.ProductId, seeded.DoughRoleId);
+        var subAssemblyId = await SubAssemblyIdAsync(seeded.ProductId, seeded.DoughRoleId);
 
         Edit(viewModel, () => viewModel.FormLines.Single().Grams = 500m);
         viewModel.TryUndo().Should().BeTrue();
@@ -169,16 +169,16 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var filling = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
         viewModel.SelectedRecipeTab = dough;
-        viewModel.FormLines.Single().Grams = 1500m;
+        viewModel.EditingUsageWeightPerPiece = 75m;
 
         // Leaving the tab applies the form, which is one step.
         viewModel.SelectedRecipeTab = filling;
-        viewModel.UsageEdits.Single(u => u.RoleName == "Dough").TotalWeight.Should().Be(1500m);
+        viewModel.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(75m);
 
         viewModel.TryUndo().Should().BeTrue();
 
         viewModel.ErrorMessage.Should().BeNull("restoring must not run the apply again");
-        viewModel.UsageEdits.Single(u => u.RoleName == "Dough").TotalWeight.Should().Be(1000m);
+        viewModel.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(50m);
         viewModel.SelectedRecipeTab.Should().BeSameAs(filling, "the undo takes back the change, not where you navigated to");
     }
 
@@ -192,18 +192,18 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var filling = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
         viewModel.SelectedRecipeTab = dough;
-        viewModel.FormLines.Single().Grams = 1500m;
+        viewModel.EditingUsageWeightPerPiece = 75m;
         viewModel.SelectedRecipeTab = filling;
         viewModel.TryUndo().Should().BeTrue();
 
         // Back to Dough's tab by hand, then type and leave: the apply must still happen, which it wouldn't if
         // the restore had left behind a stale note of which tab's form was open.
         viewModel.SelectedRecipeTab = dough;
-        viewModel.FormLines.Single().Grams = 1750m;
+        viewModel.EditingUsageWeightPerPiece = 80m;
         viewModel.SelectedRecipeTab = filling;
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.UsageEdits.Single(u => u.RoleName == "Dough").TotalWeight.Should().Be(1750m);
+        viewModel.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(80m);
     }
 
     [Fact]
@@ -530,7 +530,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
         var productId = await AddProductAsync("Ube Roll");
         await SaveRecipeAsync(productId, new RecipeDraft(
-            [new OwnedSubAssemblyDraft(0, doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m)], []));
+            [new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m)], []));
 
         var viewModel = await OpenAsync(productId, vm => vm.FormLines.Count == 1);
         return (viewModel, new Seeded(productId, doughRoleId, new SeededIngredients(flourId, sugarId)));
@@ -545,8 +545,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var productId = await AddProductAsync("Ube Roll");
         await SaveRecipeAsync(productId, new RecipeDraft(
             [
-                new OwnedSubAssemblyDraft(
-                    0, doughRoleId, [(flourId, 1000m), (sugarId, 200m)], UsageAuthoredField.WeightPerPiece, 50m),
+                new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m), (sugarId, 200m)], UsageAuthoredField.WeightPerPiece, 50m),
             ],
             []));
 
@@ -565,8 +564,8 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var productId = await AddProductAsync("Ube Roll");
         await SaveRecipeAsync(productId, new RecipeDraft(
             [
-                new OwnedSubAssemblyDraft(0, doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m),
-                new OwnedSubAssemblyDraft(0, fillingRoleId, [(sugarId, 200m)], UsageAuthoredField.WeightPerPiece, 10m),
+                new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m),
+                new NewSubAssemblyDraft(fillingRoleId, [(sugarId, 200m)], UsageAuthoredField.WeightPerPiece, 10m),
             ],
             []));
 

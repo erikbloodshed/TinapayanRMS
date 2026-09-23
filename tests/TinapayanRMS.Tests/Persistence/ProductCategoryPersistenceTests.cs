@@ -127,7 +127,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
             new Product { Name = "Pandesal", CategoryId = breads.Id }, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
 
         // As a recipe saved from the product as it was read (SaveRecipeAsync reads it with GetByIdAsync first).
-        await SaveRecipeAsync(productId, new RecipeDraft([new OwnedSubAssemblyDraft(0, roleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m)], []));
+        await SaveRecipeAsync(productId, new RecipeDraft([new NewSubAssemblyDraft(roleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m)], []));
 
         (await CreateProductRepository().GetByIdAsync(productId, Cancellation))!.CategoryId.Should().Be(breads.Id);
     }

@@ -39,7 +39,7 @@ public sealed class SubAssemblyRecipeTab(ProductUsageEdit usage) : RecipeTab
     /// <summary>Shows the header again once the recipe has gained or lost another section in the role (ProductUsageEdit.IsRoleRepeated).</summary>
     public void RefreshHeader() => this.RaisePropertyChanged(nameof(Header));
 
-    /// <summary>A list for the product's own sub-assembly, a link for another product's.</summary>
+    /// <summary>A list for a new section, whose lines are typed in here; a link for a linked one.</summary>
     public override string Glyph => Usage.IsLinked ? "" : "";
 }
 

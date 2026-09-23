@@ -3,31 +3,26 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Queries;
 
-/// <summary>Sub-assemblies with their role and owning product (if any), which is what they're called by.</summary>
+/// <summary>Sub-assemblies with their role, which decides the recipe section they show in.</summary>
 internal static class SubAssemblyReads
 {
-    /// <summary>The columns of <c>s</c>, its role <c>r</c> and its owner <c>o</c>, in the order <see cref="WithRoleAndOwner"/> maps them.</summary>
-    public static readonly string ColumnsWithRoleAndOwner =
-        $"{Columns.Of<SubAssembly>("s")}, {Columns.Of<SubAssemblyRole>("r")}, {Columns.Of<Product>("o")}";
+    /// <summary>The columns of <c>s</c> and its role <c>r</c>, in the order <see cref="WithRole"/> maps them.</summary>
+    public static readonly string ColumnsWithRole = $"{Columns.Of<SubAssembly>("s")}, {Columns.Of<SubAssemblyRole>("r")}";
 
-    /// <summary>Joins <c>s</c>'s role and owner.</summary>
-    public const string RoleAndOwnerJoins = """
-        JOIN SubAssemblyRoles r ON r.Id = s.RoleId
-        LEFT JOIN Products o ON o.Id = s.OwnerProductId
-        """;
+    /// <summary>Joins <c>s</c>'s role.</summary>
+    public const string RoleJoin = "JOIN SubAssemblyRoles r ON r.Id = s.RoleId";
 
-    /// <summary>The sub-assemblies <paramref name="filterAndOrder"/> (a WHERE and ORDER BY over <c>s</c>, <c>r</c> and <c>o</c>) selects.</summary>
-    public static async Task<IReadOnlyList<SubAssembly>> GetWithRoleAndOwnerAsync(
+    /// <summary>The sub-assemblies <paramref name="filterAndOrder"/> (a WHERE and ORDER BY over <c>s</c> and <c>r</c>) selects.</summary>
+    public static async Task<IReadOnlyList<SubAssembly>> GetWithRoleAsync(
         TinapayanRMSDbContext dbContext, string filterAndOrder, object? parameters, CancellationToken cancellationToken) =>
-        (await dbContext.Connection().QueryAsync<SubAssembly, SubAssemblyRole, Product?, SubAssembly>(
-            dbContext.Command($"SELECT {ColumnsWithRoleAndOwner}\nFROM SubAssemblies s\n{RoleAndOwnerJoins}\n{filterAndOrder}", parameters, cancellationToken),
-            WithRoleAndOwner,
-            splitOn: "Id,Id")).AsList();
+        (await dbContext.Connection().QueryAsync<SubAssembly, SubAssemblyRole, SubAssembly>(
+            dbContext.Command($"SELECT {ColumnsWithRole}\nFROM SubAssemblies s\n{RoleJoin}\n{filterAndOrder}", parameters, cancellationToken),
+            WithRole,
+            splitOn: "Id")).AsList();
 
-    public static SubAssembly WithRoleAndOwner(SubAssembly subAssembly, SubAssemblyRole role, Product? owner)
+    public static SubAssembly WithRole(SubAssembly subAssembly, SubAssemblyRole role)
     {
         subAssembly.Role = role;
-        subAssembly.OwnerProduct = owner;
         return subAssembly;
     }
 }

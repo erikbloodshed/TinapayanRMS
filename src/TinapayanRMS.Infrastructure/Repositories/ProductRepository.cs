@@ -120,9 +120,6 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        // Its own sub-assemblies go with it (Cascade), so none may still be in another product's recipe.
-        await SubAssemblyRepository.EnsureNoneLinkedElsewhereAsync(dbContext, u => u.SubAssembly!.OwnerProductId == id, cancellationToken);
-
         var packagingLinkedBy = await dbContext.PackagingLinks
             .Where(l => l.LinkedProductId == id)
             .Select(l => l.Product!.Name)
@@ -134,8 +131,8 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
                 + $"{(packagingLinkedBy.Count == 1 ? "links" : "link")} this product's packaging. Unlink it there first.");
         }
 
-        // The product's remaining cascades take its packaging lines, its usages, its own sub-assemblies
-        // and its costing parameters with it.
+        // The product's cascades take its packaging lines, its usages with their add-ins, and its costing
+        // parameters with it. The sub-assemblies it used stay on the Sub-Assemblies screen.
         await dbContext.Products.Where(p => p.Id == id).ExecuteDeleteAsync(cancellationToken);
     }
 

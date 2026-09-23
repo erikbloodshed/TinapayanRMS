@@ -106,9 +106,13 @@
                                        SelectionMode="Single"
                                        NavigationMode="Row">
                     <syncfusion:SfDataGrid.Columns>
-                        <!-- The Raw Materials list's widths, so the three lists are the same width -->
-                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="210" />
-                        <syncfusion:GridTextColumn MappingName="RoleName" HeaderText="Role" Width="160" />
+                        <!--
+                            The Raw Materials list's width in all, so the three lists are the same width, but more of it for
+                            the name: one saved from a product is named after it and its role ("Almond Cheese Bread
+                            Filling: Cheesy Corn Custard"), and a role is one short word. The tooltip shows a name cut short.
+                        -->
+                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="260" ShowToolTip="True" />
+                        <syncfusion:GridTextColumn MappingName="RoleName" HeaderText="Role" Width="110" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </DockPanel>

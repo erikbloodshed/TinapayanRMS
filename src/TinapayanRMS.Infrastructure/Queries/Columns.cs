@@ -24,7 +24,7 @@ internal static class Columns
         [typeof(RawMaterialPriceHistory)] = ["Id", "RawMaterialId", "Date", "UnitId", "Brand", "Price"],
         [typeof(IngredientBomLine)] = ["Id", "IngredientId", "ComponentIngredientId", "Grams"],
         [typeof(SubAssemblyRole)] = ["Id", "Name", "SortOrder", "IsPackaging"],
-        [typeof(SubAssembly)] = ["Id", "Name", "RoleId", "OwnerProductId", "TotalWeight", "TotalCost"],
+        [typeof(SubAssembly)] = ["Id", "Name", "RoleId", "TotalWeight", "TotalCost"],
         [typeof(SubAssemblyLine)] = ["Id", "SubAssemblyId", "IngredientId", "Grams", "IsFormulaBase", "AuthoredBakersPercent"],
         [typeof(SubAssemblyPackagingLine)] = ["Id", "SubAssemblyId", "PackagingMaterialId", "UnitId", "QtyPerSet"],
         [typeof(ProductCategory)] = ["Id", "Name"],

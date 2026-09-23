@@ -522,11 +522,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
+                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<int?>("OwnerProductId")
-                        .HasColumnType("int");
 
                     b.Property<int>("RoleId")
                         .HasColumnType("int");
@@ -541,11 +539,10 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RoleId");
+                    b.HasIndex("Name")
+                        .IsUnique();
 
-                    b.HasIndex("OwnerProductId", "Name")
-                        .IsUnique()
-                        .HasFilter("[Name] IS NOT NULL");
+                    b.HasIndex("RoleId");
 
                     b.ToTable("SubAssemblies");
                 });
@@ -941,18 +938,11 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssembly", b =>
                 {
-                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "OwnerProduct")
-                        .WithMany()
-                        .HasForeignKey("OwnerProductId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
                     b.HasOne("TinapayanRMS.Domain.Entities.SubAssemblyRole", "Role")
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("OwnerProduct");
 
                     b.Navigation("Role");
                 });

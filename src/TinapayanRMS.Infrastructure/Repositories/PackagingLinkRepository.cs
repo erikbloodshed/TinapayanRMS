@@ -122,15 +122,15 @@ public class PackagingLinkRepository(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>Links the product's packaging to a standalone packaging set, which is all it can link among sub-assemblies.</summary>
+    /// <summary>Links the product's packaging to a packaging set, which is all it can link among sub-assemblies.</summary>
     private static async Task SetSetLinkAsync(TinapayanRMSDbContext dbContext, int productId, int subAssemblyId, CancellationToken cancellationToken)
     {
         var set = await dbContext.SubAssemblies
             .Where(s => s.Id == subAssemblyId)
-            .Select(s => new { s.OwnerProductId, s.Role!.IsPackaging })
+            .Select(s => new { s.Role!.IsPackaging })
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException($"Sub-assembly {subAssemblyId} does not exist.");
-        if (set.OwnerProductId is not null || !set.IsPackaging)
+        if (!set.IsPackaging)
         {
             throw new InvalidOperationException("A product's packaging can only link a packaging set from the Sub-Assemblies screen.");
         }
