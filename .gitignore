@@ -28,3 +28,7 @@ __pycache__/
 # Local copy of a Theme Studio export, from when the theme was a trimmed in-repo
 # project. Superseded by the official theme package (see PLAN.md) and safe to delete.
 ThemeStudioReference/
+
+
+# APM dependencies
+apm_modules/
