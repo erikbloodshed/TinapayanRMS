@@ -69,6 +69,7 @@
                 -->
                 <syncfusion:TabControlExt BorderThickness="0"
                                           AllowDragDrop="False"
+                                          EnableLabelEdit="False"
                                           IsHitTestVisible="{Binding AreDetailsReady}"
                                           TabStripPlacement="Bottom"
                                           CloseButtonType="Hide"

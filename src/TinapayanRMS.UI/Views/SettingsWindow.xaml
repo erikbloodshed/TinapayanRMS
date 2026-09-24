@@ -24,6 +24,7 @@
         <!-- Fixed tabs, like Products' sub-tabs: nothing here to close or reopen. -->
         <syncfusion:TabControlExt Grid.Row="0"
                                   Margin="8,8,8,0"
+                                  EnableLabelEdit="False"
                                   CloseButtonType="Hide"
                                   ShowTabItemContextMenu="False"
                                   ShowTabListContextMenu="False">

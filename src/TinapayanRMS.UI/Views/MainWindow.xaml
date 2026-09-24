@@ -265,6 +265,7 @@
                 -->
                 <syncfusion:TabControlExt x:Name="MainTabControl" Margin="8" CloseMode="Hide"
                                           IsDisableUnloadTabItemExtContent="True"
+                                          EnableLabelEdit="False"
                                           SelectionChanged="MainTabControl_SelectionChanged">
                     <syncfusion:TabItemExt x:Name="RawMaterialsTab" Header="Raw Materials" />
                     <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />

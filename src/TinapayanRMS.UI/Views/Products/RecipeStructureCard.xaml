@@ -104,6 +104,8 @@
             AllowDragDrop on unless it's set False (its coercion), and a tab dropped on another is removed from
             RecipeTabs and inserted at the drop (TabLayoutPanel.MoveItem). That took the tabs out of role order,
             and out of step with UsageEdits, which MirrorUsageTabs keeps them in index for index.
+            Nor can a header be renamed: EnableLabelEdit (on by default) turns a double-click into an edit box
+            holding the tab's type name, and committing it blanks the header.
             An empty ContentTemplate, so a tab shows nothing of its own (not its type's name), and no border, so the
             empty content area draws nothing: the frame below stands in for it.
         -->
@@ -122,6 +124,7 @@
                                   SelectedItem="{Binding SelectedRecipeTab, Mode=TwoWay}"
                                   BorderThickness="0"
                                   AllowDragDrop="False"
+                                  EnableLabelEdit="False"
                                   CloseButtonType="Hide"
                                   CloseMode="Delete"
                                   SelectOnCreatingNewItem="False"

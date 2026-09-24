@@ -51,6 +51,7 @@
             <!-- No frame of its own: the card around it is the frame -->
             <syncfusion:TabControlExt IsHitTestVisible="{Binding AreDetailsReady}"
                                       BorderThickness="0"
+                                      EnableLabelEdit="False"
                                       TabStripPlacement="Bottom"
                                       CloseButtonType="Hide"
                                       ShowTabItemContextMenu="False"
