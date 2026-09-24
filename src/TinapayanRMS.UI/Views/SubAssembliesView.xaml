@@ -22,43 +22,6 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
         </Style>
-        <!--
-            A product under Used By, as File Explorer shows a file: an icon over its name, flat until the mouse is over it,
-            then a wash, and a click opens it. A plain Button, templated here like the navigation menu's rows (MainWindow),
-            for the same reason: a flattened ButtonAdv's themed hover is opaque and barely reads. Keyboard focus draws the
-            accent border, since Tab can reach the tiles.
-        -->
-        <Style x:Key="UsedByTileStyle" TargetType="Button">
-            <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Margin" Value="0,0,4,4" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Tile"
-                                Background="Transparent"
-                                BorderBrush="Transparent"
-                                BorderThickness="1"
-                                CornerRadius="4"
-                                Padding="6,10,6,8">
-                            <ContentPresenter VerticalAlignment="Top" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Tile" Property="Background" Value="#14000000" />
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Tile" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Tile" Property="Background" Value="#24000000" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </UserControl.Resources>
 
     <!--
@@ -130,7 +93,7 @@
 
                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                             <TextBlock Text="{Binding HeaderTitle}"
-                                       FontSize="20"
+                                       FontSize="18"
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource HeadingForegroundBrush}"
                                        TextTrimming="CharacterEllipsis" />
@@ -159,82 +122,92 @@
 
                     <Border Style="{StaticResource SectionDividerStyle}" />
 
-                    <!-- Labels in the first row, fields and totals in the second -->
+                    <!--
+                        The batch totals first, each label over its figure as the other headers' figures are; then the
+                        fields 16 under them, each label on the left of its field (FormLabelStyle; 2026-09-24, at the
+                        user's request, as the Products header has them). They shared one row, labels above, until then.
+                    -->
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="2*" />
-                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="24" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="24" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="24" />
-                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:SfTextBoxExt Grid.Row="1"
-                                                 Grid.Column="0"
-                                                 controls:FieldUndoStep.Recorder="{Binding}"
-                                                 Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                        <TextBlock Grid.Column="2" Text="Role" Style="{StaticResource FieldLabelStyle}" />
-                        <syncfusion:ComboBoxAdv Grid.Row="1"
-                                                Grid.Column="2"
-                                                ItemsSource="{Binding Roles}"
-                                                DisplayMemberPath="Name"
-                                                controls:FieldUndoStep.Recorder="{Binding}"
-                                                SelectedItem="{Binding EditingRole, Mode=TwoWay}" />
-
                         <!-- A recipe's batch totals; a packaging set has its set cost in their place -->
-                        <TextBlock Grid.Column="4"
+                        <TextBlock Grid.Column="0"
                                    Text="Batch Weight"
                                    Style="{StaticResource FieldLabelStyle}"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
-                                   Grid.Column="4"
+                                   Grid.Column="0"
                                    Text="{Binding BatchWeight, StringFormat='{}{0:#,0.##} g'}"
                                    Style="{StaticResource TotalValueStyle}"
                                    VerticalAlignment="Center"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
 
-                        <TextBlock Grid.Column="6"
+                        <TextBlock Grid.Column="2"
                                    Text="Batch Cost"
                                    Style="{StaticResource FieldLabelStyle}"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
-                                   Grid.Column="6"
+                                   Grid.Column="2"
                                    Text="{Binding BatchCost, StringFormat='{}{0:N2}'}"
                                    Style="{StaticResource TotalValueStyle}"
                                    VerticalAlignment="Center"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
 
-                        <TextBlock Grid.Column="8"
+                        <TextBlock Grid.Column="4"
                                    Text="Cost per g"
                                    Style="{StaticResource FieldLabelStyle}"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
-                                   Grid.Column="8"
+                                   Grid.Column="4"
                                    Text="{Binding CostPerGram, StringFormat='{}{0:N4}'}"
                                    Style="{StaticResource TotalValueStyle}"
                                    VerticalAlignment="Center"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
 
-                        <TextBlock Grid.Column="8"
+                        <!-- A packaging set's one figure, first in the row: the recipe totals are collapsed beside it -->
+                        <TextBlock Grid.Column="0"
                                    Text="Set Cost"
                                    Style="{StaticResource FieldLabelStyle}"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
-                                   Grid.Column="8"
+                                   Grid.Column="0"
                                    Text="{Binding SetCost, StringFormat='{}{0:N4}'}"
                                    Style="{StaticResource TotalValueStyle}"
                                    VerticalAlignment="Center"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </Grid>
+
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="Name" Style="{StaticResource FormLabelStyle}" />
+                        <syncfusion:SfTextBoxExt Grid.Column="1"
+                                                 controls:FieldUndoStep.Recorder="{Binding}"
+                                                 Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Grid.Column="3" Text="Role" Style="{StaticResource FormLabelStyle}" />
+                        <syncfusion:ComboBoxAdv Grid.Column="4"
+                                                ItemsSource="{Binding Roles}"
+                                                DisplayMemberPath="Name"
+                                                controls:FieldUndoStep.Recorder="{Binding}"
+                                                SelectedItem="{Binding EditingRole, Mode=TwoWay}" />
                     </Grid>
 
                     <TextBlock Text="Lines" Style="{StaticResource PanelHeaderStyle}" Margin="0,16,0,8" />
@@ -398,38 +371,8 @@
 
                     <TextBlock Text="Used By" Style="{StaticResource PanelHeaderStyle}" Margin="0,0,0,8" />
 
-                    <!--
-                        One tile per product linking it, in rows and columns: every tile is ItemWidth wide, so they
-                        line up down the page as well as across, and as many fit on a row as the card is wide. A long
-                        name wraps inside its tile, and the WrapPanel stretches the row's other tiles to its height.
-                        A tile opens its product on the Products screen (MainWindow subscribes to OpenProductCommand).
-                        The icon says what the product is, from its category: a cake, a pastry, a bread, or else the
-                        navigation menu's Products glyph (ProductCategoryIconConverter).
-                    -->
-                    <ItemsControl ItemsSource="{Binding UsedBy}" Focusable="False">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel ItemWidth="124" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Button Style="{StaticResource UsedByTileStyle}"
-                                        Command="{Binding DataContext.OpenProductCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                        CommandParameter="{Binding Id}"
-                                        ToolTip="Open on the Products screen"
-                                        AutomationProperties.Name="{Binding Name}">
-                                    <StackPanel>
-                                        <ContentPresenter Content="{Binding}"
-                                                          ContentTemplate="{Binding CategoryName, Converter={StaticResource ProductCategoryIconConverter}}"
-                                                          HorizontalAlignment="Center"
-                                                          Margin="0,0,0,6" />
-                                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" />
-                                    </StackPanel>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <!-- One tile per product linking it (UsedByTilesStyle), which opens it on the Products screen -->
+                    <ItemsControl ItemsSource="{Binding UsedBy}" Style="{StaticResource UsedByTilesStyle}" />
 
                     <TextBlock Text="{Binding UsedByText}" Style="{StaticResource CaptionStyle}" Margin="0,2,0,0" />
                 </StackPanel>

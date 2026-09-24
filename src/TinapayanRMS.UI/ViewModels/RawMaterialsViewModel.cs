@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Globalization;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
@@ -515,8 +516,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>A saved purchased material: a new one has no price history yet.</summary>
     public bool ShowPriceHistory => _showPriceHistory.Value;
 
-    /// <summary>The details tabs along the bottom: Cost Setup, Alternative Units, Usage Example, then Price History.</summary>
-    public const int PriceHistoryTab = 3;
+    /// <summary>The details tabs along the bottom: Cost Setup, Alternative Units, Usage Example, Used By, then Price History.</summary>
+    public const int PriceHistoryTab = 4;
 
     /// <summary>The details tab showing. Moves to Cost Setup when Price History is about to hide (ShowPriceHistory).</summary>
     private int _selectedDetailsTab;
@@ -742,6 +743,41 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public ReactiveCommand<RxVoid, RxVoid> RemoveBrandPriceCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveBomLineCommand { get; }
 
+    private IReadOnlyList<LinkingProduct> _usedBy = [];
+    /// <summary>
+    /// The products the material showing goes into, by name (IRawMaterialRepository.GetUsedByAsync): one tile each on the
+    /// Used By tab, which opens it. Empty for a new material.
+    /// </summary>
+    public IReadOnlyList<LinkingProduct> UsedBy
+    {
+        get => _usedBy;
+        private set => this.RaiseAndSetIfChanged(ref _usedBy, value);
+    }
+
+    private string _usedByText = NotUsedText;
+    /// <summary>The caption under the Used By tiles: what they mean for a change of cost, or that nothing uses the material.</summary>
+    public string UsedByText
+    {
+        get => _usedByText;
+        private set => this.RaiseAndSetIfChanged(ref _usedByText, value);
+    }
+
+    private const string NotUsedText = "No product uses it yet.";
+
+    private const string UsedText =
+        "These products use it in their recipe or packaging, directly or through a made or linked ingredient, so a change to its cost reaches each of them.";
+
+    /// <summary>A Used By tile's click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
+    public ReactiveCommand<int, RxVoid> OpenProductCommand { get; }
+
+    private readonly Subject<int> _productOpenRequests = new();
+
+    /// <summary>
+    /// The products Used By tiles ask to open, by id. The main window, which owns the tabs, subscribes and opens each on
+    /// the Products screen, as it does for Sub-Assemblies' tiles.
+    /// </summary>
+    public IObservable<int> ProductOpenRequests => _productOpenRequests;
+
     /// <summary>
     /// The form's undo and redo stacks, the same shape as Products'. One step is one finished change. The price
     /// history is left out: its Delete writes to the database on the spot, so there is nothing unsaved to put back.
@@ -848,12 +884,12 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // a real category's rename already flows through, so the picker's own CollectionView sees a proper replace
         // notification — no dependence on RawMaterialCategory raising PropertyChanged, which it doesn't.
         this.WhenAnyValue(x => x.CategorySearchText)
-            .Select(text => text.Trim())
+            .Select(AddNewCategoryLabel.TypedText)
             .DistinctUntilChanged()
             .Subscribe(text => _addNewCategoryOption.AddOrUpdate(new RawMaterialCategory
             {
                 Id = AddNewCategoryId,
-                Name = text.Length == 0 ? "< Add New .. >" : $"< Add New \"{text}\" .. >",
+                Name = AddNewCategoryLabel.For(text),
             }));
 
         // A new material's type changed under a category of the other type: that category is no longer one it can go in.
@@ -1101,6 +1137,17 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 }
             });
 
+            // Products may have started or stopped using the material on another tab. Kept only if the details
+            // showing are still that material's once the read is back.
+            if (_detailMaterialId is { } detailMaterialId)
+            {
+                var usedBy = await _rawMaterialRepository.GetUsedByAsync(detailMaterialId, CancellationToken.None);
+                if (_detailMaterialId == detailMaterialId)
+                {
+                    ShowUsedBy(usedBy);
+                }
+            }
+
             // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the material's form.
             if (_rawMaterialToOpen is { } rawMaterialId)
             {
@@ -1110,6 +1157,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         });
 
         NewCommand = ReactiveCommand.Create(ClearForm);
+
+        OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
@@ -1191,7 +1240,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // being edited, so filing one under a new category doesn't mean a trip to Settings and back.
         AddCategoryCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var name = await PromptForNewCategory.Handle(("Name for the new category:", CategorySearchText.Trim()));
+            var name = await PromptForNewCategory.Handle(("Name", AddNewCategoryLabel.TypedText(CategorySearchText)));
 
             if (!string.IsNullOrWhiteSpace(name))
             {
@@ -1605,26 +1654,34 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         ShowDetails(material, detail);
     }
 
-    /// <summary>A material's price history, brand prices and BOM lines, as LoadDetailsAsync reads them.</summary>
+    /// <summary>A material's price history, brand prices, BOM lines and the products using it, as LoadDetailsAsync reads them.</summary>
     private sealed record RawMaterialDetail(
         IReadOnlyList<RawMaterialPriceHistory> PriceHistory,
         IReadOnlyList<RawMaterialBrandPrice> BrandPrices,
-        IReadOnlyList<IngredientBomLine> BomLines)
+        IReadOnlyList<IngredientBomLine> BomLines,
+        IReadOnlyList<LinkingProduct> UsedBy)
     {
-        public static readonly RawMaterialDetail None = new([], [], []);
+        public static readonly RawMaterialDetail None = new([], [], [], []);
     }
 
-    /// <summary>Only the repositories: this runs off the UI thread. A purchased material has prices, a made one a BOM, and a linked one neither.</summary>
-    private async Task<RawMaterialDetail> ReadDetailAsync(RawMaterial material, CancellationToken cancellationToken) =>
-        material.Source switch
+    /// <summary>
+    /// Only the repositories: this runs off the UI thread. A purchased material has prices, a made one a BOM, and a linked
+    /// one neither; any of them can be used by products.
+    /// </summary>
+    private async Task<RawMaterialDetail> ReadDetailAsync(RawMaterial material, CancellationToken cancellationToken)
+    {
+        var usedBy = await _rawMaterialRepository.GetUsedByAsync(material.Id, cancellationToken);
+        return material.Source switch
         {
             RawMaterialSource.Purchased => new RawMaterialDetail(
                 await _priceHistoryRepository.GetForRawMaterialAsync(material.Id, cancellationToken),
                 await _brandPriceRepository.GetForRawMaterialAsync(material.Id, cancellationToken),
-                []),
-            RawMaterialSource.Made => new RawMaterialDetail([], [], await _bomLineRepository.GetForIngredientAsync(material.Id, cancellationToken)),
-            _ => RawMaterialDetail.None,
+                [],
+                usedBy),
+            RawMaterialSource.Made => new RawMaterialDetail([], [], await _bomLineRepository.GetForIngredientAsync(material.Id, cancellationToken), usedBy),
+            _ => RawMaterialDetail.None with { UsedBy = usedBy },
         };
+    }
 
     /// <summary>
     /// Puts <paramref name="material"/>'s details in place of whatever the grids held, in one pass, so nothing is drawn in
@@ -1644,6 +1701,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             new BrandPriceRow(this, p.Brand, p.Unit?.UnitOfMeasureId ?? PurchaseUnitChoice.BaseUnitKey, p.Price)));
         _savedBrandPriceCount = detail.BrandPrices.Count;
 
+        ShowUsedBy(detail.UsedBy);
+
         UpdateCanChangeBaseUnit();
         RebuildBufferedCostUnitOptions();
         BufferedCostUnit = DearestBrandUnit();
@@ -1655,6 +1714,12 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // against. Taken here rather than where the form is filled in: the units, brand prices and BOM land a
         // moment after the rest, and a form measured before them would read as changed when they arrived.
         History.MarkClean();
+    }
+
+    private void ShowUsedBy(IReadOnlyList<LinkingProduct> products)
+    {
+        UsedBy = products;
+        UsedByText = products.Count == 0 ? NotUsedText : UsedText;
     }
 
     /// <summary>The Price History grid, newest first.</summary>
@@ -2168,5 +2233,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         _rawMaterialCache.Dispose();
         _categoryCache.Dispose();
         _addNewCategoryOption.Dispose();
+        _productOpenRequests.Dispose();
     }
 }

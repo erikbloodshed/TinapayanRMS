@@ -387,6 +387,38 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task Used_By_lists_the_picked_materials_products_follows_other_tabs_and_opens_one_on_a_tile()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var (pandesalId, _) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [(flourId, 1000m)]);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single(m => m.Id == flourId));
+        viewModel.UsedBy.Select(p => p.Name).Should().Equal("Pandesal");
+        viewModel.UsedByText.Should().StartWith("These products use it");
+
+        // A product made on the Products tab while this screen kept Flour open.
+        await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m), (sugarId, 100m)]);
+        await viewModel.LoadCommand.Execute();
+        viewModel.UsedBy.Select(p => p.Name).Should().Equal("Ensaymada", "Pandesal");
+
+        var opened = new List<int>();
+        using (viewModel.ProductOpenRequests.Subscribe(opened.Add))
+        {
+            await viewModel.OpenProductCommand.Execute(pandesalId);
+        }
+
+        opened.Should().Equal(pandesalId);
+
+        await viewModel.NewCommand.Execute();
+        viewModel.UsedBy.Should().BeEmpty("a new material isn't used by anything");
+        viewModel.UsedByText.Should().Be("No product uses it yet.");
+    }
+
+    [Fact]
     public async Task A_rejected_save_saves_nothing_and_keeps_every_edit()
     {
         await SeedPurchasedIngredientAsync("Flour");
@@ -1234,6 +1266,36 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.CategoryOptions.Should().ContainSingle(c => c.Id == RawMaterialsViewModel.AddNewCategoryId)
             .Which.Name.Should().Be("< Add New .. >", "an empty search is back to the plain row");
+    }
+
+    [Fact]
+    public async Task Arrowing_onto_Add_New_reads_its_name_as_what_was_typed_rather_than_nesting_it()
+    {
+        var viewModel = CreateViewModel();
+        (string Label, string InitialValue) promptedWith = default;
+        viewModel.PromptForNewCategory.RegisterHandler(interaction =>
+        {
+            promptedWith = interaction.Input;
+            interaction.SetOutput("Additives");
+        });
+        await viewModel.LoadCommand.Execute();
+        viewModel.CategorySearchText = "Additives";
+
+        // Arrowing down the open picker onto the row puts the row's own name in the picker's text, and arrowing on and
+        // back again does it over and over.
+        for (var i = 0; i < 3; i++)
+        {
+            viewModel.CategorySearchText = viewModel.CategoryOptions.Single(c => c.Id == RawMaterialsViewModel.AddNewCategoryId).Name;
+        }
+
+        var addNewRow = viewModel.CategoryOptions.Single(c => c.Id == RawMaterialsViewModel.AddNewCategoryId);
+        addNewRow.Name.Should().Be("< Add New \"Additives\" .. >", "the row's name in the text isn't new typing to wrap again");
+
+        viewModel.EditingCategory = addNewRow;
+
+        await WaitUntilSettledAsync(() => viewModel.EditingCategory is not null,
+            () => $"picked={viewModel.EditingCategory?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
+        promptedWith.InitialValue.Should().Be("Additives", "the prompt starts with what was typed, not the row's label");
     }
 
     [Fact]

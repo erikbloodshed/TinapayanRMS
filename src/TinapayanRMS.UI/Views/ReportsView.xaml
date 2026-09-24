@@ -19,9 +19,11 @@
             <StackPanel>
                 <TextBlock Text="Price Trend" Style="{StaticResource SectionHeaderStyle}" />
 
-                <StackPanel Width="280" HorizontalAlignment="Left" Margin="0,0,0,12">
-                    <TextBlock Text="Raw Material" Style="{StaticResource FieldLabelStyle}" />
-                    <syncfusion:ComboBoxAdv ItemsSource="{Binding RawMaterials}"
+                <!-- The label on the left of its picker (FormLabelStyle) -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                    <TextBlock Text="Raw Material" Style="{StaticResource FormLabelStyle}" />
+                    <syncfusion:ComboBoxAdv Width="280"
+                                             ItemsSource="{Binding RawMaterials}"
                                              DisplayMemberPath="Name"
                                              SelectedItem="{Binding SelectedRawMaterial, Mode=TwoWay}" />
                 </StackPanel>

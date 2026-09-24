@@ -1,0 +1,15 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.RawMaterials.UsedByCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- No frame of its own: it sits straight in its tab, whose card has the border and rounded corners -->
+    <Border Padding="12">
+        <StackPanel>
+            <TextBlock Text="Used By" Style="{StaticResource SectionHeaderStyle}" />
+
+            <!-- One tile per product the material goes into (UsedByTilesStyle), which opens it on the Products screen -->
+            <ItemsControl ItemsSource="{Binding UsedBy}" Style="{StaticResource UsedByTilesStyle}" />
+
+            <TextBlock Text="{Binding UsedByText}" Style="{StaticResource CaptionStyle}" Margin="0,2,0,0" />
+        </StackPanel>
+    </Border>
+</UserControl>

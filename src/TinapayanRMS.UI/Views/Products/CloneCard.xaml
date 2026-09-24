@@ -6,8 +6,15 @@
     <StackPanel>
         <TextBlock Text="Clone This Product" Style="{StaticResource PanelHeaderStyle}" />
 
-        <TextBlock Text="New Product Name" Style="{StaticResource FieldLabelStyle}" />
-        <syncfusion:SfTextBoxExt Text="{Binding EditingCloneName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" Margin="0,0,0,8" />
+        <!-- The label on the left of its field (FormLabelStyle) -->
+        <Grid Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="New Product Name" Style="{StaticResource FormLabelStyle}" />
+            <syncfusion:SfTextBoxExt Grid.Column="1" Text="{Binding EditingCloneName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
+        </Grid>
 
         <StackPanel Orientation="Horizontal">
             <syncfusion:ButtonAdv Label="Clone" IconTemplate="{StaticResource CopyIconTemplate}" Command="{Binding CloneCommand}" />

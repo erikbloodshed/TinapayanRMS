@@ -49,20 +49,33 @@
 
         <!-- New / edit a category -->
         <Border Grid.Column="2" Style="{StaticResource CardStyle}" VerticalAlignment="Top">
-            <StackPanel>
+            <!-- Labels on the left of their fields, lined up by FormLabel (FormLabelStyle) -->
+            <StackPanel Grid.IsSharedSizeScope="True">
                 <TextBlock Text="{Binding FormTitle}" Style="{StaticResource SectionHeaderStyle}" />
 
-                <TextBlock Text="Name" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:SfTextBoxExt x:Name="NameTextBox"
-                                         Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         Margin="0,0,0,12" />
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="FormLabel" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Name" Style="{StaticResource FormLabelStyle}" />
+                    <syncfusion:SfTextBoxExt x:Name="NameTextBox"
+                                             Grid.Column="1"
+                                             Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </Grid>
 
                 <!-- Which materials it's for: a material only goes in a category of its own type -->
-                <TextBlock Text="Type" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:ComboBoxAdv ItemsSource="{Binding Types}"
-                                        SelectedItem="{Binding EditingType, Mode=TwoWay}"
-                                        ToolTip="Ingredient categories are offered to ingredients, packaging ones to packaging materials. It can't change while a material is in it."
-                                        Margin="0,0,0,12" />
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="FormLabel" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Type" Style="{StaticResource FormLabelStyle}" />
+                    <syncfusion:ComboBoxAdv Grid.Column="1"
+                                            ItemsSource="{Binding Types}"
+                                            SelectedItem="{Binding EditingType, Mode=TwoWay}"
+                                            ToolTip="Ingredient categories are offered to ingredients, packaging ones to packaging materials. It can't change while a material is in it." />
+                </Grid>
 
                 <StackPanel Orientation="Horizontal">
                     <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />

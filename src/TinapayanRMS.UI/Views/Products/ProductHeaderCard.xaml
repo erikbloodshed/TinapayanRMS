@@ -1,8 +1,7 @@
 ﻿<UserControl x:Class="TinapayanRMS.UI.Views.Products.ProductHeaderCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
-             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
     <UserControl.Resources>
         <!-- A figure: a muted label over its value -->
         <Style x:Key="FigureLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource FieldLabelStyle}" />
@@ -28,41 +27,17 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-
-        <!-- The description under the title, as a link: just its content, in the accent, underlined under the mouse -->
-        <Style x:Key="DescriptionLinkStyle" TargetType="Button">
-            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="HorizontalAlignment" Value="Left" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="Transparent" Padding="0,2">
-                            <ContentPresenter />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="LinkTextStyle" TargetType="TextBlock">
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
-                    <Setter Property="TextDecorations" Value="Underline" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
     </UserControl.Resources>
 
     <!--
-        The product's title under its initial, with its description as a link under the title (the link opens
-        a pop-up to edit it), and New/Save/Delete; then a row of figures, nothing typed into: the material cost and
+        The product's title and New/Save/Delete, a line under them, then a row of figures, nothing typed into: the material cost and
         base cost for one sellable unit, the price the shop charges now with the markup it earns, and when it was
         last saved. The name, category, quantity required and current price are typed in under the header
         (ProductDetailsCard).
     -->
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -73,66 +48,13 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                <TextBlock Text="{Binding HeaderTitle}"
-                           FontSize="20"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource HeadingForegroundBrush}"
-                           TextTrimming="CharacterEllipsis" />
-
-                <Button x:Name="DescriptionLink"
-                        Style="{StaticResource DescriptionLinkStyle}"
-                        Command="{Binding EditDescriptionCommand}"
-                        ToolTip="Edit the description">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE70F;" Style="{StaticResource IconGlyphStyle}" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding DescriptionLinkText}" Style="{StaticResource LinkTextStyle}" />
-                    </StackPanel>
-                </Button>
-
-                <!--
-                    The description's editor, under the link. It edits the form's description as it's typed:
-                    Done or a click elsewhere keeps it, Cancel (or Esc) puts back what was there. Save saves it.
-                -->
-                <Popup IsOpen="{Binding IsDescriptionEditorOpen, Mode=TwoWay}"
-                       PlacementTarget="{Binding ElementName=DescriptionLink}"
-                       Placement="Bottom"
-                       VerticalOffset="4"
-                       StaysOpen="False"
-                       AllowsTransparency="True"
-                       Opened="OnDescriptionEditorOpened">
-                    <Border Width="420"
-                            Margin="0,0,8,8"
-                            Padding="12"
-                            CornerRadius="8"
-                            Background="{StaticResource CardBackgroundBrush}"
-                            BorderBrush="{StaticResource CardBorderBrush}"
-                            BorderThickness="1">
-                        <Border.Effect>
-                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.18" />
-                        </Border.Effect>
-                        <StackPanel>
-                            <TextBlock Text="Description" Style="{StaticResource FieldLabelStyle}" />
-                            <syncfusion:SfTextBoxExt x:Name="DescriptionBox"
-                                                     Height="64"
-                                                     MaxLength="500"
-                                                     TextWrapping="Wrap"
-                                                     VerticalContentAlignment="Top"
-                                                     controls:FieldUndoStep.Recorder="{Binding}"
-                                                     Text="{Binding EditingDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                                <syncfusion:SfTextBoxExt.InputBindings>
-                                    <KeyBinding Key="Enter" Command="{Binding CloseDescriptionEditorCommand}" />
-                                    <KeyBinding Key="Escape" Command="{Binding CancelDescriptionEditCommand}" />
-                                </syncfusion:SfTextBoxExt.InputBindings>
-                            </syncfusion:SfTextBoxExt>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-                                <syncfusion:ButtonAdv Label="Cancel" IconTemplate="{StaticResource CancelIconTemplate}" Command="{Binding CancelDescriptionEditCommand}" Margin="0,0,8,0" />
-                                <syncfusion:ButtonAdv Label="Done" IconTemplate="{StaticResource ApplyIconTemplate}" Command="{Binding CloseDescriptionEditorCommand}" />
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-                </Popup>
-            </StackPanel>
+            <TextBlock Text="{Binding HeaderTitle}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,12,0"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource HeadingForegroundBrush}"
+                       TextTrimming="CharacterEllipsis" />
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                 <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />
@@ -163,12 +85,15 @@
             </StackPanel>
         </Grid>
 
+        <!-- A line between the title row and the figures, as the Sub-Assemblies and Raw Materials headers have -->
+        <Border Grid.Row="1" Style="{StaticResource SectionDividerStyle}" />
+
         <!--
             The figures: labels over values, nothing typed into. Every cost and price on this screen is for one whole
             sellable unit — a piece, unless Quantity Required says otherwise, which CostUnitCaption spells out in each
             tooltip — worked out from the form as it's edited; the current price shows as it's typed in under the header.
         -->
-        <Grid Grid.Row="1" Margin="0,4,0,0">
+        <Grid Grid.Row="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />

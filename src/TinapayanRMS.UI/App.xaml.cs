@@ -62,8 +62,10 @@ public partial class App : Application
         // Every text box and button is 24px tall. At SizeMode="Default" the theme sets no height on
         // them, so each took its content's: an SfTextBoxExt 18-20px, a DoubleTextBox 22px, a
         // ButtonAdv 24px, or whatever its layout row stretched it to. A type default is the lowest
-        // precedence, so a Height set in XAML still wins.
-        foreach (var type in new[] { typeof(SfTextBoxExt), typeof(DoubleTextBox), typeof(ButtonAdv) })
+        // precedence, so a Height set in XAML still wins. IntegerTextBox and CurrencyTextBox (Products'
+        // Quantity Required and Current Price) joined on 2026-09-24: with their labels moved beside them
+        // they stood shorter than the Product Name box next to them.
+        foreach (var type in new[] { typeof(SfTextBoxExt), typeof(DoubleTextBox), typeof(IntegerTextBox), typeof(CurrencyTextBox), typeof(ButtonAdv) })
         {
             FrameworkElement.HeightProperty.OverrideMetadata(type, new FrameworkPropertyMetadata(ControlHeight));
         }
@@ -159,7 +161,7 @@ public partial class App : Application
         // controls (CheckBox, Expander, ProgressBar) keep the OS default look.
         SfSkinManager.RegisterThemeSettings("Windows11Light", new Windows11LightThemeSettings
         {
-            PrimaryBackground = new SolidColorBrush(Color.FromRgb(0xB4, 0x53, 0x09)),
+            PrimaryBackground = new SolidColorBrush((Color)Resources["Amber700Color"]),
             PrimaryForeground = Brushes.White,
         });
 

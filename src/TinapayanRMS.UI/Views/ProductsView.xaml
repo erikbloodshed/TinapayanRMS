@@ -47,10 +47,13 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <!-- The header only shows figures; what's typed in about the product sits under it -->
+                    <!--
+                        The header only shows figures; what's typed in about the product sits under it, 16 below the
+                        figures (4 until 2026-09-24, when its labels moved beside the boxes and the row needed setting apart)
+                    -->
                     <p:ProductHeaderCard />
 
-                    <p:ProductDetailsCard x:Name="Details" Grid.Row="1" Margin="0,4,0,0" />
+                    <p:ProductDetailsCard x:Name="Details" Grid.Row="1" Margin="0,16,0,0" />
                 </Grid>
             </Border>
 

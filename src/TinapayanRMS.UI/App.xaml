@@ -7,428 +7,544 @@
              xmlns:sys="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
              xmlns:system="clr-namespace:System;assembly=System.Runtime">
     <Application.Resources>
-        <sys:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-        <converters:AddNewRowPositionConverter x:Key="AddNewRowPositionConverter" />
-        <converters:BooleanToStarWidthConverter x:Key="BooleanToStarWidthConverter" />
-        <converters:EmptyStateVisibilityConverter x:Key="EmptyStateVisibilityConverter" />
-        <converters:NotNullToVisibilityConverter x:Key="NotNullToVisibilityConverter" />
+        <ResourceDictionary>
+            <!-- The colour scales the design tokens below are named from -->
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Palette.xaml" />
+            </ResourceDictionary.MergedDictionaries>
 
-        <!--
-            The Unit cell of every packaging grid (a product's Packaging tab, the Add Sub-Assembly form, and a
-            packaging set's Lines) offers the units of that row's own material, so its list comes from the row.
-            One instance serves all three: it holds nothing.
-        -->
-        <controls:PackagingUnitSelector x:Key="PackagingUnitSelector" />
+            <sys:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+            <converters:AddNewRowPositionConverter x:Key="AddNewRowPositionConverter" />
+            <converters:BooleanToStarWidthConverter x:Key="BooleanToStarWidthConverter" />
+            <converters:EmptyStateVisibilityConverter x:Key="EmptyStateVisibilityConverter" />
+            <converters:NotNullToVisibilityConverter x:Key="NotNullToVisibilityConverter" />
 
-        <!--
-            ButtonAdv.IconTemplate glyphs, Segoe Fluent Icons (Windows 11) falling back to
-            Segoe MDL2 Assets (Windows 10+) — no extra icon package, and it matches the
-            Windows11Light theme natively. One template per verb, reused across every
-            CRUD screen's buttons instead of repeating the glyph markup on each one.
-        -->
-        <FontFamily x:Key="IconFontFamily">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+            <!--
+                The Unit cell of every packaging grid (a product's Packaging tab, the Add Sub-Assembly form, and a
+                packaging set's Lines) offers the units of that row's own material, so its list comes from the row.
+                One instance serves all three: it holds nothing.
+            -->
+            <controls:PackagingUnitSelector x:Key="PackagingUnitSelector" />
 
-        <Style x:Key="IconGlyphStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}" />
-            <Setter Property="FontSize" Value="14" />
-        </Style>
+            <!--
+                ButtonAdv.IconTemplate glyphs, Segoe Fluent Icons (Windows 11) falling back to
+                Segoe MDL2 Assets (Windows 10+) — no extra icon package, and it matches the
+                Windows11Light theme natively. One template per verb, reused across every
+                CRUD screen's buttons instead of repeating the glyph markup on each one.
+            -->
+            <FontFamily x:Key="IconFontFamily">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
-        <DataTemplate x:Key="AddIconTemplate">
-            <TextBlock Text="&#xE710;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <Style x:Key="IconGlyphStyle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}" />
+                <Setter Property="FontSize" Value="14" />
+            </Style>
 
-        <DataTemplate x:Key="SaveIconTemplate">
-            <TextBlock Text="&#xE74E;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="AddIconTemplate">
+                <TextBlock Text="&#xE710;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="UndoIconTemplate">
-            <TextBlock Text="&#xE10E;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="SaveIconTemplate">
+                <TextBlock Text="&#xE74E;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="RedoIconTemplate">
-            <TextBlock Text="&#xE10D;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="UndoIconTemplate">
+                <TextBlock Text="&#xE10E;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="ApplyIconTemplate">
-            <TextBlock Text="&#xE73E;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="RedoIconTemplate">
+                <TextBlock Text="&#xE10D;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="DeleteIconTemplate">
-            <TextBlock Text="&#xE74D;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="ApplyIconTemplate">
+                <TextBlock Text="&#xE73E;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="RemoveIconTemplate">
-            <TextBlock Text="&#xE738;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="DeleteIconTemplate">
+                <TextBlock Text="&#xE74D;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="CancelIconTemplate">
-            <TextBlock Text="&#xE711;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="RemoveIconTemplate">
+                <TextBlock Text="&#xE738;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="EditIconTemplate">
-            <TextBlock Text="&#xE70F;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="CancelIconTemplate">
+                <TextBlock Text="&#xE711;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="CalculateIconTemplate">
-            <TextBlock Text="&#xE8EF;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="EditIconTemplate">
+                <TextBlock Text="&#xE70F;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="CopyIconTemplate">
-            <TextBlock Text="&#xE8C8;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="CalculateIconTemplate">
+                <TextBlock Text="&#xE8EF;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="LinkIconTemplate">
-            <TextBlock Text="&#xE71B;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="CopyIconTemplate">
+                <TextBlock Text="&#xE8C8;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <!-- Unlink: the font has no broken-link glyph, so the scissors (Cut) cut the link -->
-        <DataTemplate x:Key="UnlinkIconTemplate">
-            <TextBlock Text="&#xE8C6;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="LinkIconTemplate">
+                <TextBlock Text="&#xE71B;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <!-- The header's navigation toggle (GlobalNavigationButton) and the drawer's Settings row -->
-        <DataTemplate x:Key="MenuIconTemplate">
-            <TextBlock Text="&#xE700;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <!-- Unlink: the font has no broken-link glyph, so the scissors (Cut) cut the link -->
+            <DataTemplate x:Key="UnlinkIconTemplate">
+                <TextBlock Text="&#xE8C6;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <!-- The header's Back and Forward between screens -->
-        <DataTemplate x:Key="BackIconTemplate">
-            <TextBlock Text="&#xE72B;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <!-- The header's navigation toggle (GlobalNavigationButton) and the drawer's Settings row -->
+            <DataTemplate x:Key="MenuIconTemplate">
+                <TextBlock Text="&#xE700;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="ForwardIconTemplate">
-            <TextBlock Text="&#xE72A;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <!-- The header's Back and Forward between screens -->
+            <DataTemplate x:Key="BackIconTemplate">
+                <TextBlock Text="&#xE72B;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="SettingsIconTemplate">
-            <TextBlock Text="&#xE713;" Style="{StaticResource IconGlyphStyle}" />
-        </DataTemplate>
+            <DataTemplate x:Key="ForwardIconTemplate">
+                <TextBlock Text="&#xE72A;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <!--
-            A collapse toggle's chevron (a checkable ButtonAdv): pointing up while the section is open
-            (unchecked), down once it's collapsed (checked).
-        -->
-        <Style x:Key="ExpandChevronStyle" TargetType="TextBlock" BasedOn="{StaticResource IconGlyphStyle}">
-            <Setter Property="Text" Value="&#xE70E;" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=syncfusion:ButtonAdv}}" Value="True">
-                    <Setter Property="Text" Value="&#xE70D;" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+            <DataTemplate x:Key="SettingsIconTemplate">
+                <TextBlock Text="&#xE713;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
 
-        <DataTemplate x:Key="ExpandIconTemplate">
-            <TextBlock Style="{StaticResource ExpandChevronStyle}" />
-        </DataTemplate>
+            <!--
+                A collapse toggle's chevron (a checkable ButtonAdv): pointing up while the section is open
+                (unchecked), down once it's collapsed (checked).
+            -->
+            <Style x:Key="ExpandChevronStyle" TargetType="TextBlock" BasedOn="{StaticResource IconGlyphStyle}">
+                <Setter Property="Text" Value="&#xE70E;" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=syncfusion:ButtonAdv}}" Value="True">
+                        <Setter Property="Text" Value="&#xE70D;" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
 
-        <!--
-            SfTextBoxExt.WatermarkTemplate: the theme shows the watermark in a plain ContentControl,
-            which ignores VerticalContentAlignment, so the hint sits at the top of the box, and 4px
-            right of where typed text starts (measured). This puts the hint where typed text goes.
-        -->
-        <DataTemplate x:Key="AlignedWatermarkTemplate">
-            <TextBlock Text="{Binding}" VerticalAlignment="Center" Margin="-4,0,0,0" />
-        </DataTemplate>
+            <DataTemplate x:Key="ExpandIconTemplate">
+                <TextBlock Style="{StaticResource ExpandChevronStyle}" />
+            </DataTemplate>
 
-        <!--
-            Design tokens for the app's own surfaces (cards, page background, banners). These
-            are plain app resources, not Syncfusion theme resources — Syncfusion controls only
-            ever get recolored through Windows11LightThemeSettings (see App.xaml.cs), never
-            through a Style, so their templates stay intact. Kept in one neutral (Stone-ish)
-            scale plus the warm amber accent that matches PrimaryBackground/PrimaryForeground.
-        -->
-        <SolidColorBrush x:Key="PageBackgroundBrush" Color="#F5F5F4" />
-        <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FFFFFF" />
-        <SolidColorBrush x:Key="CardBorderBrush" Color="#E7E5E4" />
-        <SolidColorBrush x:Key="HeadingForegroundBrush" Color="#1C1917" />
-        <SolidColorBrush x:Key="MutedForegroundBrush" Color="#57534E" />
-        <!-- A read-only value's text, greyed out so it doesn't look typeable (Controls/ReadOnlyText) -->
-        <SolidColorBrush x:Key="ReadOnlyForegroundBrush" Color="#A8A29E" />
-        <SolidColorBrush x:Key="AccentBrush" Color="#B45309" />
-        <SolidColorBrush x:Key="AccentSoftBrush" Color="#FEF3C7" />
-        <SolidColorBrush x:Key="SuccessBackgroundBrush" Color="#ECFDF5" />
-        <SolidColorBrush x:Key="SuccessForegroundBrush" Color="#047857" />
-        <!-- The success toast's border (Controls/SuccessToast) -->
-        <SolidColorBrush x:Key="SuccessBorderBrush" Color="#34D399" />
+            <!--
+                SfTextBoxExt.WatermarkTemplate: the theme shows the watermark in a plain ContentControl,
+                which ignores VerticalContentAlignment, so the hint sits at the top of the box, and 4px
+                right of where typed text starts (measured). This puts the hint where typed text goes.
+            -->
+            <DataTemplate x:Key="AlignedWatermarkTemplate">
+                <TextBlock Text="{Binding}" VerticalAlignment="Center" Margin="-4,0,0,0" />
+            </DataTemplate>
 
-        <!-- The error toast (Controls/ErrorToast) -->
-        <SolidColorBrush x:Key="ErrorBackgroundBrush" Color="#FEF2F2" />
-        <SolidColorBrush x:Key="ErrorBorderBrush" Color="#F87171" />
-        <SolidColorBrush x:Key="ErrorForegroundBrush" Color="#B91C1C" />
-        <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#FFFBEB" />
-        <SolidColorBrush x:Key="WarningForegroundBrush" Color="#92400E" />
+            <!--
+                Design tokens for the app's own surfaces (cards, page background, banners). These
+                are plain app resources, not Syncfusion theme resources — Syncfusion controls only
+                ever get recolored through Windows11LightThemeSettings (see App.xaml.cs), never
+                through a Style, so their templates stay intact. Kept in one neutral (Stone-ish)
+                scale and shades of the warm amber accent that matches PrimaryBackground/PrimaryForeground,
+                named from Themes/Palette.xaml; only success and error keep their own green and red.
+                The accent is Amber 700, not a lighter step: white text on Amber 500 is only 2.15:1.
+            -->
+            <SolidColorBrush x:Key="PageBackgroundBrush" Color="#F5F5F4" />
+            <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="CardBorderBrush" Color="#E7E5E4" />
+            <SolidColorBrush x:Key="HeadingForegroundBrush" Color="#1C1917" />
+            <SolidColorBrush x:Key="MutedForegroundBrush" Color="#57534E" />
+            <!-- A read-only value's text, greyed out so it doesn't look typeable (Controls/ReadOnlyText) -->
+            <SolidColorBrush x:Key="ReadOnlyForegroundBrush" Color="#A8A29E" />
+            <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Amber700Color}" />
+            <!-- The Costing Summary's Subtotal and Total Selling Price bands: the palest step, a soft wash rather than a block -->
+            <SolidColorBrush x:Key="AccentSoftBrush" Color="{StaticResource Amber50Color}" />
+            <!--
+                A neutral notice that explains rather than warns (the linked-cost preview on Raw Materials): a step deeper
+                than the warning's Amber 50/800, so the two don't read as the same banner.
+            -->
+            <SolidColorBrush x:Key="InfoBackgroundBrush" Color="{StaticResource Amber100Color}" />
+            <SolidColorBrush x:Key="InfoForegroundBrush" Color="{StaticResource Amber900Color}" />
+            <!--
+                Something clickable that takes you elsewhere (a linked badge, a Used By tile's focus). On Amber 100 rather
+                than the plain badges' Amber 50, and underlined under the mouse, so a clickable badge still reads apart.
+                Amber 800, not the accent's 700: the badge text is 11px, and 700 on Amber 100 only just makes 4.5:1.
+            -->
+            <SolidColorBrush x:Key="LinkBackgroundBrush" Color="{StaticResource Amber100Color}" />
+            <SolidColorBrush x:Key="LinkForegroundBrush" Color="{StaticResource Amber800Color}" />
+            <SolidColorBrush x:Key="SuccessBackgroundBrush" Color="#ECFDF5" />
+            <SolidColorBrush x:Key="SuccessForegroundBrush" Color="#047857" />
+            <!-- The success toast's border (Controls/SuccessToast) -->
+            <SolidColorBrush x:Key="SuccessBorderBrush" Color="#34D399" />
 
-        <!-- The toasts' close button (Controls/ErrorToast, Controls/SuccessToast): just the glyph, with a soft highlight under the mouse -->
-        <Style x:Key="ToastCloseButtonStyle" TargetType="Button">
-            <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome" Width="24" Height="24" CornerRadius="4" Background="Transparent">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#14000000" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#24000000" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+            <!-- The error toast (Controls/ErrorToast) -->
+            <SolidColorBrush x:Key="ErrorBackgroundBrush" Color="#FEF2F2" />
+            <SolidColorBrush x:Key="ErrorBorderBrush" Color="#F87171" />
+            <SolidColorBrush x:Key="ErrorForegroundBrush" Color="#B91C1C" />
+            <SolidColorBrush x:Key="WarningBackgroundBrush" Color="{StaticResource Amber50Color}" />
+            <SolidColorBrush x:Key="WarningForegroundBrush" Color="{StaticResource Amber800Color}" />
 
-        <!-- Chart series colors for the Reports screen — same-hue with the accent, distinguished by adornment labels rather than color alone. -->
-        <SolidColorBrush x:Key="ChartBaseCostBrush" Color="#D97706" />
-        <SolidColorBrush x:Key="ChartSellingPriceBrush" Color="#92400E" />
+            <!-- The toasts' close button (Controls/ErrorToast, Controls/SuccessToast): just the glyph, with a soft highlight under the mouse -->
+            <Style x:Key="ToastCloseButtonStyle" TargetType="Button">
+                <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Chrome" Width="24" Height="24" CornerRadius="4" Background="Transparent">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Chrome" Property="Background" Value="#14000000" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Chrome" Property="Background" Value="#24000000" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
 
-        <!--
-            A product's icon, by what its category holds (ProductCategoryIconConverter): flat, full-color drawings on a
-            32×32 canvas, so they stay crisp at any size. The transparent square keeps each drawing's bounds the full
-            canvas, so all three sit the same way in a 32×32 Image. Any other product gets the navigation menu's
-            Products glyph in the accent.
-        -->
-        <!-- Cakes: two tiers of cream sponge, pink icing dripping over each, a cherry on top, on a plate -->
-        <DrawingImage x:Key="CakeIcon">
-            <DrawingImage.Drawing>
-                <DrawingGroup>
-                    <GeometryDrawing Brush="Transparent" Geometry="M0,0 H32 V32 H0 Z" />
-                    <GeometryDrawing Brush="#B0BEC5" Geometry="M3,27 H29 A1.5,1.5 0 0 1 29,30 H3 A1.5,1.5 0 0 1 3,27 Z" />
-                    <GeometryDrawing Brush="#FBE3C0" Geometry="M5,17 H27 V27 H5 Z" />
-                    <GeometryDrawing Brush="#F8BBD0" Geometry="M5,23 H27 V24.5 H5 Z" />
-                    <GeometryDrawing Brush="#EC407A" Geometry="M6,16 H26 A1,1 0 0 1 27,17 V19.5 Q25.17,22 23.33,19.5 Q21.5,22 19.67,19.5 Q17.83,22 16,19.5 Q14.17,22 12.33,19.5 Q10.5,22 8.67,19.5 Q6.83,22 5,19.5 V17 A1,1 0 0 1 6,16 Z" />
-                    <GeometryDrawing Brush="#FBE3C0" Geometry="M9,10 H23 V16 H9 Z" />
-                    <GeometryDrawing Brush="#EC407A" Geometry="M10,9 H22 A1,1 0 0 1 23,10 V12.5 Q21.25,15 19.5,12.5 Q17.75,15 16,12.5 Q14.25,15 12.5,12.5 Q10.75,15 9,12.5 V10 A1,1 0 0 1 10,9 Z" />
-                    <GeometryDrawing Geometry="M16,5.5 Q16.4,3.2 18.6,2.4">
-                        <GeometryDrawing.Pen>
-                            <Pen Brush="#6D4C41" Thickness="1" StartLineCap="Round" EndLineCap="Round" />
-                        </GeometryDrawing.Pen>
-                    </GeometryDrawing>
-                    <GeometryDrawing Brush="#D32F2F" Geometry="M18.2,7 A2.2,2.2 0 1 1 13.8,7 A2.2,2.2 0 1 1 18.2,7 Z" />
-                    <GeometryDrawing Brush="#FFFFFF" Geometry="M15.8,6.2 A0.6,0.6 0 1 1 14.6,6.2 A0.6,0.6 0 1 1 15.8,6.2 Z" />
-                </DrawingGroup>
-            </DrawingImage.Drawing>
-        </DrawingImage>
+            <!-- Chart series colors for the Reports screen — same-hue with the accent, distinguished by adornment labels rather than color alone. -->
+            <SolidColorBrush x:Key="ChartBaseCostBrush" Color="{StaticResource Amber600Color}" />
+            <SolidColorBrush x:Key="ChartSellingPriceBrush" Color="{StaticResource Amber800Color}" />
 
-        <!-- Pastries: a croissant, golden lobes along a crescent with the middle one in front, each outlined in a darker bake -->
-        <DrawingImage x:Key="PastryIcon">
-            <DrawingImage.Drawing>
-                <DrawingGroup>
-                    <GeometryDrawing Brush="Transparent" Geometry="M0,0 H32 V32 H0 Z" />
-                    <GeometryDrawing Brush="#E9A84C">
-                        <GeometryDrawing.Pen>
-                            <Pen Brush="#A8611F" Thickness="1" />
-                        </GeometryDrawing.Pen>
-                        <GeometryDrawing.Geometry>
-                            <EllipseGeometry Center="6,21" RadiusX="2.6" RadiusY="4.2">
-                                <EllipseGeometry.Transform>
-                                    <RotateTransform Angle="-58" CenterX="6" CenterY="21" />
-                                </EllipseGeometry.Transform>
-                            </EllipseGeometry>
-                        </GeometryDrawing.Geometry>
-                    </GeometryDrawing>
-                    <GeometryDrawing Brush="#E9A84C">
-                        <GeometryDrawing.Pen>
-                            <Pen Brush="#A8611F" Thickness="1" />
-                        </GeometryDrawing.Pen>
-                        <GeometryDrawing.Geometry>
-                            <EllipseGeometry Center="26,21" RadiusX="2.6" RadiusY="4.2">
-                                <EllipseGeometry.Transform>
-                                    <RotateTransform Angle="58" CenterX="26" CenterY="21" />
-                                </EllipseGeometry.Transform>
-                            </EllipseGeometry>
-                        </GeometryDrawing.Geometry>
-                    </GeometryDrawing>
-                    <GeometryDrawing Brush="#EDB35C">
-                        <GeometryDrawing.Pen>
-                            <Pen Brush="#A8611F" Thickness="1" />
-                        </GeometryDrawing.Pen>
-                        <GeometryDrawing.Geometry>
-                            <EllipseGeometry Center="10.3,16.6" RadiusX="3.6" RadiusY="5.8">
-                                <EllipseGeometry.Transform>
-                                    <RotateTransform Angle="-30" CenterX="10.3" CenterY="16.6" />
-                                </EllipseGeometry.Transform>
-                            </EllipseGeometry>
-                        </GeometryDrawing.Geometry>
-                    </GeometryDrawing>
-                    <GeometryDrawing Brush="#EDB35C">
-                        <GeometryDrawing.Pen>
-                            <Pen Brush="#A8611F" Thickness="1" />
-                        </GeometryDrawing.Pen>
-                        <GeometryDrawing.Geometry>
-                            <EllipseGeometry Center="21.7,16.6" RadiusX="3.6" RadiusY="5.8">
-                                <EllipseGeometry.Transform>
-                                    <RotateTransform Angle="30" CenterX="21.7" CenterY="16.6" />
-                                </EllipseGeometry.Transform>
-                            </EllipseGeometry>
-                        </GeometryDrawing.Geometry>
-                    </GeometryDrawing>
-                    <GeometryDrawing Brush="#F2BE6B">
-                        <GeometryDrawing.Pen>
-                            <Pen Brush="#A8611F" Thickness="1" />
-                        </GeometryDrawing.Pen>
-                        <GeometryDrawing.Geometry>
-                            <EllipseGeometry Center="16,14.5" RadiusX="4.4" RadiusY="7" />
-                        </GeometryDrawing.Geometry>
-                    </GeometryDrawing>
-                    <GeometryDrawing Brush="#FAD99C" Geometry="M14.2,10 A1.2,2.6 0 1 1 14.2,15.2 A1.2,2.6 0 1 1 14.2,10 Z" />
-                </DrawingGroup>
-            </DrawingImage.Drawing>
-        </DrawingImage>
+            <!--
+                A product's icon, by what its category holds (ProductCategoryIconConverter): flat, full-color drawings on a
+                32×32 canvas, so they stay crisp at any size. The transparent square keeps each drawing's bounds the full
+                canvas, so all three sit the same way in a 32×32 Image. Any other product gets the navigation menu's
+                Products glyph in the accent.
+            -->
+            <!-- Cakes: two tiers of cream sponge, pink icing dripping over each, a cherry on top, on a plate -->
+            <DrawingImage x:Key="CakeIcon">
+                <DrawingImage.Drawing>
+                    <DrawingGroup>
+                        <GeometryDrawing Brush="Transparent" Geometry="M0,0 H32 V32 H0 Z" />
+                        <GeometryDrawing Brush="#B0BEC5" Geometry="M3,27 H29 A1.5,1.5 0 0 1 29,30 H3 A1.5,1.5 0 0 1 3,27 Z" />
+                        <GeometryDrawing Brush="#FBE3C0" Geometry="M5,17 H27 V27 H5 Z" />
+                        <GeometryDrawing Brush="#F8BBD0" Geometry="M5,23 H27 V24.5 H5 Z" />
+                        <GeometryDrawing Brush="#EC407A" Geometry="M6,16 H26 A1,1 0 0 1 27,17 V19.5 Q25.17,22 23.33,19.5 Q21.5,22 19.67,19.5 Q17.83,22 16,19.5 Q14.17,22 12.33,19.5 Q10.5,22 8.67,19.5 Q6.83,22 5,19.5 V17 A1,1 0 0 1 6,16 Z" />
+                        <GeometryDrawing Brush="#FBE3C0" Geometry="M9,10 H23 V16 H9 Z" />
+                        <GeometryDrawing Brush="#EC407A" Geometry="M10,9 H22 A1,1 0 0 1 23,10 V12.5 Q21.25,15 19.5,12.5 Q17.75,15 16,12.5 Q14.25,15 12.5,12.5 Q10.75,15 9,12.5 V10 A1,1 0 0 1 10,9 Z" />
+                        <GeometryDrawing Geometry="M16,5.5 Q16.4,3.2 18.6,2.4">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#6D4C41" Thickness="1" StartLineCap="Round" EndLineCap="Round" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#D32F2F" Geometry="M18.2,7 A2.2,2.2 0 1 1 13.8,7 A2.2,2.2 0 1 1 18.2,7 Z" />
+                        <GeometryDrawing Brush="#FFFFFF" Geometry="M15.8,6.2 A0.6,0.6 0 1 1 14.6,6.2 A0.6,0.6 0 1 1 15.8,6.2 Z" />
+                    </DrawingGroup>
+                </DrawingImage.Drawing>
+            </DrawingImage>
 
-        <!-- Breads: a slice of loaf bread, a golden-brown crust around a soft crumb flecked with air holes -->
-        <DrawingImage x:Key="BreadIcon">
-            <DrawingImage.Drawing>
-                <DrawingGroup>
-                    <GeometryDrawing Brush="Transparent" Geometry="M0,0 H32 V32 H0 Z" />
-                    <GeometryDrawing Brush="#C8762F" Geometry="M4,12.5 C4,7.5 9,5 16,5 C23,5 28,7.5 28,12.5 C28,14.6 27,15.8 26,16.2 V27 Q26,29 24,29 H8 Q6,29 6,27 V16.2 C5,15.8 4,14.6 4,12.5 Z" />
-                    <GeometryDrawing Brush="#FDE8C4" Geometry="M6.5,12.6 C6.5,9.3 10.3,7.5 16,7.5 C21.7,7.5 25.5,9.3 25.5,12.6 C25.5,14 24.6,14.7 23.6,15 V25.7 Q23.6,26.6 22.7,26.6 H9.3 Q8.4,26.6 8.4,25.7 V15 C7.4,14.7 6.5,14 6.5,12.6 Z" />
-                    <GeometryDrawing Brush="#EBC88E" Geometry="M12.2,13 A0.9,0.9 0 1 1 10.4,13 A0.9,0.9 0 1 1 12.2,13 Z M19,11.4 A0.8,0.8 0 1 1 17.4,11.4 A0.8,0.8 0 1 1 19,11.4 Z M21,18 A0.9,0.9 0 1 1 19.2,18 A0.9,0.9 0 1 1 21,18 Z M14.6,20.6 A0.8,0.8 0 1 1 13,20.6 A0.8,0.8 0 1 1 14.6,20.6 Z M11.8,23.6 A0.7,0.7 0 1 1 10.4,23.6 A0.7,0.7 0 1 1 11.8,23.6 Z M20.4,23.4 A0.7,0.7 0 1 1 19,23.4 A0.7,0.7 0 1 1 20.4,23.4 Z M16.6,16 A0.7,0.7 0 1 1 15.2,16 A0.7,0.7 0 1 1 16.6,16 Z" />
-                </DrawingGroup>
-            </DrawingImage.Drawing>
-        </DrawingImage>
+            <!-- Pastries: a croissant, golden lobes along a crescent with the middle one in front, each outlined in a darker bake -->
+            <DrawingImage x:Key="PastryIcon">
+                <DrawingImage.Drawing>
+                    <DrawingGroup>
+                        <GeometryDrawing Brush="Transparent" Geometry="M0,0 H32 V32 H0 Z" />
+                        <GeometryDrawing Brush="#E9A84C">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#A8611F" Thickness="1" />
+                            </GeometryDrawing.Pen>
+                            <GeometryDrawing.Geometry>
+                                <EllipseGeometry Center="6,21" RadiusX="2.6" RadiusY="4.2">
+                                    <EllipseGeometry.Transform>
+                                        <RotateTransform Angle="-58" CenterX="6" CenterY="21" />
+                                    </EllipseGeometry.Transform>
+                                </EllipseGeometry>
+                            </GeometryDrawing.Geometry>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#E9A84C">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#A8611F" Thickness="1" />
+                            </GeometryDrawing.Pen>
+                            <GeometryDrawing.Geometry>
+                                <EllipseGeometry Center="26,21" RadiusX="2.6" RadiusY="4.2">
+                                    <EllipseGeometry.Transform>
+                                        <RotateTransform Angle="58" CenterX="26" CenterY="21" />
+                                    </EllipseGeometry.Transform>
+                                </EllipseGeometry>
+                            </GeometryDrawing.Geometry>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#EDB35C">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#A8611F" Thickness="1" />
+                            </GeometryDrawing.Pen>
+                            <GeometryDrawing.Geometry>
+                                <EllipseGeometry Center="10.3,16.6" RadiusX="3.6" RadiusY="5.8">
+                                    <EllipseGeometry.Transform>
+                                        <RotateTransform Angle="-30" CenterX="10.3" CenterY="16.6" />
+                                    </EllipseGeometry.Transform>
+                                </EllipseGeometry>
+                            </GeometryDrawing.Geometry>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#EDB35C">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#A8611F" Thickness="1" />
+                            </GeometryDrawing.Pen>
+                            <GeometryDrawing.Geometry>
+                                <EllipseGeometry Center="21.7,16.6" RadiusX="3.6" RadiusY="5.8">
+                                    <EllipseGeometry.Transform>
+                                        <RotateTransform Angle="30" CenterX="21.7" CenterY="16.6" />
+                                    </EllipseGeometry.Transform>
+                                </EllipseGeometry>
+                            </GeometryDrawing.Geometry>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#F2BE6B">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#A8611F" Thickness="1" />
+                            </GeometryDrawing.Pen>
+                            <GeometryDrawing.Geometry>
+                                <EllipseGeometry Center="16,14.5" RadiusX="4.4" RadiusY="7" />
+                            </GeometryDrawing.Geometry>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#FAD99C" Geometry="M14.2,10 A1.2,2.6 0 1 1 14.2,15.2 A1.2,2.6 0 1 1 14.2,10 Z" />
+                    </DrawingGroup>
+                </DrawingImage.Drawing>
+            </DrawingImage>
 
-        <converters:ProductCategoryIconConverter x:Key="ProductCategoryIconConverter">
-            <converters:ProductCategoryIconConverter.Cake>
-                <DataTemplate>
-                    <Image Source="{StaticResource CakeIcon}" Width="32" Height="32" />
-                </DataTemplate>
-            </converters:ProductCategoryIconConverter.Cake>
-            <converters:ProductCategoryIconConverter.Pastry>
-                <DataTemplate>
-                    <Image Source="{StaticResource PastryIcon}" Width="32" Height="32" />
-                </DataTemplate>
-            </converters:ProductCategoryIconConverter.Pastry>
-            <converters:ProductCategoryIconConverter.Bread>
-                <DataTemplate>
-                    <Image Source="{StaticResource BreadIcon}" Width="32" Height="32" />
-                </DataTemplate>
-            </converters:ProductCategoryIconConverter.Bread>
-            <converters:ProductCategoryIconConverter.Other>
-                <DataTemplate>
-                    <TextBlock Text="&#xE71D;" Style="{StaticResource IconGlyphStyle}" FontSize="32" Foreground="{StaticResource AccentBrush}" />
-                </DataTemplate>
-            </converters:ProductCategoryIconConverter.Other>
-        </converters:ProductCategoryIconConverter>
+            <!-- Breads: a slice of loaf bread, a golden-brown crust around a soft crumb flecked with air holes -->
+            <DrawingImage x:Key="BreadIcon">
+                <DrawingImage.Drawing>
+                    <DrawingGroup>
+                        <GeometryDrawing Brush="Transparent" Geometry="M0,0 H32 V32 H0 Z" />
+                        <GeometryDrawing Brush="#C8762F" Geometry="M4,12.5 C4,7.5 9,5 16,5 C23,5 28,7.5 28,12.5 C28,14.6 27,15.8 26,16.2 V27 Q26,29 24,29 H8 Q6,29 6,27 V16.2 C5,15.8 4,14.6 4,12.5 Z" />
+                        <GeometryDrawing Brush="#FDE8C4" Geometry="M6.5,12.6 C6.5,9.3 10.3,7.5 16,7.5 C21.7,7.5 25.5,9.3 25.5,12.6 C25.5,14 24.6,14.7 23.6,15 V25.7 Q23.6,26.6 22.7,26.6 H9.3 Q8.4,26.6 8.4,25.7 V15 C7.4,14.7 6.5,14 6.5,12.6 Z" />
+                        <GeometryDrawing Brush="#EBC88E" Geometry="M12.2,13 A0.9,0.9 0 1 1 10.4,13 A0.9,0.9 0 1 1 12.2,13 Z M19,11.4 A0.8,0.8 0 1 1 17.4,11.4 A0.8,0.8 0 1 1 19,11.4 Z M21,18 A0.9,0.9 0 1 1 19.2,18 A0.9,0.9 0 1 1 21,18 Z M14.6,20.6 A0.8,0.8 0 1 1 13,20.6 A0.8,0.8 0 1 1 14.6,20.6 Z M11.8,23.6 A0.7,0.7 0 1 1 10.4,23.6 A0.7,0.7 0 1 1 11.8,23.6 Z M20.4,23.4 A0.7,0.7 0 1 1 19,23.4 A0.7,0.7 0 1 1 20.4,23.4 Z M16.6,16 A0.7,0.7 0 1 1 15.2,16 A0.7,0.7 0 1 1 16.6,16 Z" />
+                    </DrawingGroup>
+                </DrawingImage.Drawing>
+            </DrawingImage>
 
-        <!--
-            The height both detail screens' header cards are held to (Raw Materials' natural height), so the
-            card below starts at the same place on either screen and nothing jumps when the tab changes. It's a
-            floor rather than a fixed height: the content still decides, this only stops the shorter card short.
-        -->
-        <system:Double x:Key="HeaderCardHeight">166</system:Double>
+            <converters:ProductCategoryIconConverter x:Key="ProductCategoryIconConverter">
+                <converters:ProductCategoryIconConverter.Cake>
+                    <DataTemplate>
+                        <Image Source="{StaticResource CakeIcon}" Width="32" Height="32" />
+                    </DataTemplate>
+                </converters:ProductCategoryIconConverter.Cake>
+                <converters:ProductCategoryIconConverter.Pastry>
+                    <DataTemplate>
+                        <Image Source="{StaticResource PastryIcon}" Width="32" Height="32" />
+                    </DataTemplate>
+                </converters:ProductCategoryIconConverter.Pastry>
+                <converters:ProductCategoryIconConverter.Bread>
+                    <DataTemplate>
+                        <Image Source="{StaticResource BreadIcon}" Width="32" Height="32" />
+                    </DataTemplate>
+                </converters:ProductCategoryIconConverter.Bread>
+                <converters:ProductCategoryIconConverter.Other>
+                    <DataTemplate>
+                        <TextBlock Text="&#xE71D;" Style="{StaticResource IconGlyphStyle}" FontSize="32" Foreground="{StaticResource AccentBrush}" />
+                    </DataTemplate>
+                </converters:ProductCategoryIconConverter.Other>
+            </converters:ProductCategoryIconConverter>
 
-        <!-- Card container: the shared "panel on a surface" look used by every screen's list and detail sections. -->
-        <Style x:Key="CardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="16" />
-        </Style>
+            <!--
+                The height both detail screens' header cards are held to (Raw Materials' natural height), so the
+                card below starts at the same place on either screen and nothing jumps when the tab changes. It's a
+                floor rather than a fixed height: the content still decides, this only stops the shorter card short.
+            -->
+            <system:Double x:Key="HeaderCardHeight">179</system:Double>
 
-        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="16" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
-            <Setter Property="Margin" Value="0,0,0,12" />
-        </Style>
+            <!-- Card container: the shared "panel on a surface" look used by every screen's list and detail sections. -->
+            <Style x:Key="CardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="16" />
+            </Style>
 
-        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
-            <Setter Property="Margin" Value="0,0,0,4" />
-        </Style>
+            <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="16" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
+                <Setter Property="Margin" Value="0,0,0,12" />
+            </Style>
 
-        <Style x:Key="CaptionStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
+            <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
+                <Setter Property="Margin" Value="0,0,0,4" />
+            </Style>
 
-        <!--
-            The compact screen's sections (Products): unboxed sections inside one bordered region, each a
-            smaller header, set apart from the next by a divider line.
-        -->
-        <Style x:Key="PanelHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionHeaderStyle}">
-            <Setter Property="FontSize" Value="16" />
-            <Setter Property="Margin" Value="0,0,0,8" />
-        </Style>
+            <!--
+                A stacked form's field label, on the left of its input (2026-09-24, the user's practice for a desktop app:
+                labels beside inputs, not above them). Each field is a row Grid of its own, the label in an Auto column
+                that a SharedSizeGroup lines up down the form, and the gap to the next field on the row, so the label
+                centres on its box. FieldLabelStyle, above its input, stays for side-by-side strips of fields (the
+                headers), where a label beside every box wouldn't fit on one row.
+            -->
+            <Style x:Key="FormLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource FieldLabelStyle}">
+                <!-- 6 to its box, not 12: at 12 the label read as apart from its field (the user's call, the same day) -->
+                <Setter Property="Margin" Value="0,0,6,0" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
 
-        <Style x:Key="SectionDividerStyle" TargetType="Border">
-            <Setter Property="Height" Value="1" />
-            <Setter Property="Margin" Value="0,12" />
-            <Setter Property="Background" Value="{StaticResource CardBorderBrush}" />
-        </Style>
+            <Style x:Key="CaptionStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
 
-        <Style x:Key="EmptyStateStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="TextAlignment" Value="Center" />
-            <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
+            <!--
+                The compact screen's sections (Products): unboxed sections inside one bordered region, each a
+                smaller header, set apart from the next by a divider line.
+            -->
+            <Style x:Key="PanelHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionHeaderStyle}">
+                <Setter Property="FontSize" Value="16" />
+                <Setter Property="Margin" Value="0,0,0,8" />
+            </Style>
 
-        <Style x:Key="WarningBannerStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource WarningBackgroundBrush}" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="10,8" />
-        </Style>
+            <Style x:Key="SectionDividerStyle" TargetType="Border">
+                <Setter Property="Height" Value="1" />
+                <Setter Property="Margin" Value="0,12" />
+                <Setter Property="Background" Value="{StaticResource CardBorderBrush}" />
+            </Style>
 
-        <!-- A small "Linked to …" tag beside a Products recipe section's name. -->
-        <Style x:Key="LinkedBadgeStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource WarningBackgroundBrush}" />
-            <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="Padding" Value="6,1" />
-            <Setter Property="Margin" Value="8,0,0,0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
+            <Style x:Key="EmptyStateStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="TextAlignment" Value="Center" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
 
-        <!-- The same tag as a link, for one that names where it's kept: its text underlined under the mouse, as a link's is. -->
-        <Style x:Key="LinkedBadgeLinkStyle" TargetType="Button">
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{StaticResource WarningBackgroundBrush}" CornerRadius="4" Padding="6,1">
-                            <TextBlock x:Name="BadgeText"
-                                       Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
-                                       FontSize="11"
-                                       Foreground="{StaticResource WarningForegroundBrush}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="BadgeText" Property="TextDecorations" Value="Underline" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+            <Style x:Key="WarningBannerStyle" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource WarningBackgroundBrush}" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="10,8" />
+            </Style>
 
-        <!--
-            A value in a Products recipe section's Total row, under its table: right-aligned like the
-            grid's number cells, which the grid's own summary row doesn't do.
-        -->
-        <Style x:Key="SectionTotalCellStyle" TargetType="TextBlock">
-            <Setter Property="Margin" Value="5,9" />
-            <Setter Property="HorizontalAlignment" Value="Right" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
-        </Style>
+            <!-- A small "Linked to …" tag beside a Products recipe section's name. -->
+            <Style x:Key="LinkedBadgeStyle" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource WarningBackgroundBrush}" />
+                <Setter Property="CornerRadius" Value="4" />
+                <Setter Property="Padding" Value="6,1" />
+                <Setter Property="Margin" Value="8,0,0,0" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
 
-        <!-- The line on a Total row cell's right, carrying the grid's vertical lines (GridLinesVisibility="Both") through the total -->
-        <Style x:Key="SectionTotalDividerStyle" TargetType="Border">
-            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
-            <Setter Property="BorderThickness" Value="0,0,1,0" />
-        </Style>
+            <!--
+                The same tag as a link, for one that names where it's kept: in the link colours (a deeper amber than the
+                plain tag's), so a clickable tag reads apart from a plain one, and its text underlined under the mouse, as a
+                link's is.
+            -->
+            <Style x:Key="LinkedBadgeLinkStyle" TargetType="Button">
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{StaticResource LinkBackgroundBrush}" CornerRadius="4" Padding="6,1">
+                                <TextBlock x:Name="BadgeText"
+                                           Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource LinkForegroundBrush}" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="BadgeText" Property="TextDecorations" Value="Underline" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
 
-        <Style x:Key="AppTitleStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
-        </Style>
+            <!--
+                A product under Used By (Sub-Assemblies, Raw Materials), as File Explorer shows a file: an icon over its name,
+                flat until the mouse is over it, then a wash, and a click opens it. A plain Button, templated here like the
+                navigation menu's rows (MainWindow), for the same reason: a flattened ButtonAdv's themed hover is opaque and
+                barely reads. Keyboard focus draws the link-colour border (LinkForegroundBrush), since Tab can reach the tiles.
+            -->
+            <Style x:Key="UsedByTileStyle" TargetType="Button">
+                <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Margin" Value="0,0,4,4" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Tile"
+                                    Background="Transparent"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="6,10,6,8">
+                                <ContentPresenter VerticalAlignment="Top" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Tile" Property="Background" Value="#14000000" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Tile" Property="BorderBrush" Value="{StaticResource LinkForegroundBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Tile" Property="Background" Value="#24000000" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!--
+                The Used By tiles, bound to a screen's UsedBy (LinkingProducts): one per product, in rows and columns. Every
+                tile is ItemWidth wide, so they line up down the page as well as across, and as many fit on a row as the card
+                is wide. A long name wraps inside its tile, and the WrapPanel stretches the row's other tiles to its height.
+                A tile runs the screen's OpenProductCommand, which opens its product on the Products screen (MainWindow
+                subscribes). The icon says what the product is, from its category: a cake, a pastry, a bread, or else the
+                navigation menu's Products glyph (ProductCategoryIconConverter).
+            -->
+            <Style x:Key="UsedByTilesStyle" TargetType="ItemsControl">
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="ItemsPanel">
+                    <Setter.Value>
+                        <ItemsPanelTemplate>
+                            <WrapPanel ItemWidth="124" />
+                        </ItemsPanelTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="ItemTemplate">
+                    <Setter.Value>
+                        <DataTemplate>
+                            <Button Style="{StaticResource UsedByTileStyle}"
+                                    Command="{Binding DataContext.OpenProductCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding Id}"
+                                    ToolTip="Open on the Products screen"
+                                    AutomationProperties.Name="{Binding Name}">
+                                <StackPanel>
+                                    <ContentPresenter Content="{Binding}"
+                                                      ContentTemplate="{Binding CategoryName, Converter={StaticResource ProductCategoryIconConverter}}"
+                                                      HorizontalAlignment="Center"
+                                                      Margin="0,0,0,6" />
+                                    <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!--
+                A value in a Products recipe section's Total row, under its table: right-aligned like the
+                grid's number cells, which the grid's own summary row doesn't do.
+            -->
+            <Style x:Key="SectionTotalCellStyle" TargetType="TextBlock">
+                <Setter Property="Margin" Value="5,9" />
+                <Setter Property="HorizontalAlignment" Value="Right" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
+            </Style>
+
+            <!-- The line on a Total row cell's right, carrying the grid's vertical lines (GridLinesVisibility="Both") through the total -->
+            <Style x:Key="SectionTotalDividerStyle" TargetType="Border">
+                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                <Setter Property="BorderThickness" Value="0,0,1,0" />
+            </Style>
+
+            <Style x:Key="AppTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
+            </Style>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

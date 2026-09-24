@@ -89,6 +89,13 @@
                     </ScrollViewer>
                 </syncfusion:TabItemExt>
 
+                <!-- Before Price History, so it keeps its place on the strip when that tab hides -->
+                <syncfusion:TabItemExt Header="Used By" CanClose="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <rm:UsedByCard />
+                    </ScrollViewer>
+                </syncfusion:TabItemExt>
+
                 <syncfusion:TabItemExt Header="Price History"
                                        CanClose="False"
                                        Visibility="{Binding ShowPriceHistory, Converter={StaticResource BooleanToVisibilityConverter}}">

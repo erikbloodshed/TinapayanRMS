@@ -50,26 +50,45 @@
 
         <!-- New / edit a role -->
         <Border Grid.Column="2" Style="{StaticResource CardStyle}" VerticalAlignment="Top">
-            <StackPanel>
+            <!-- Labels on the left of their fields, lined up by FormLabel (FormLabelStyle); the check box under the fields -->
+            <StackPanel Grid.IsSharedSizeScope="True">
                 <TextBlock Text="{Binding FormTitle}" Style="{StaticResource SectionHeaderStyle}" />
 
-                <TextBlock Text="Name" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:SfTextBoxExt x:Name="NameTextBox"
-                                         Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         Margin="0,0,0,12" />
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="FormLabel" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Name" Style="{StaticResource FormLabelStyle}" />
+                    <syncfusion:SfTextBoxExt x:Name="NameTextBox"
+                                             Grid.Column="1"
+                                             Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </Grid>
 
-                <TextBlock Text="Order" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:DoubleTextBox Value="{Binding EditingSortOrder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                          NumberDecimalDigits="0"
-                                          ToolTip="Where the role's section goes in a recipe: lower comes first."
-                                          Margin="0,0,0,12" />
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="FormLabel" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Order" Style="{StaticResource FormLabelStyle}" />
+                    <syncfusion:DoubleTextBox Grid.Column="1"
+                                              Value="{Binding EditingSortOrder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              NumberDecimalDigits="0"
+                                              ToolTip="Where the role's section goes in a recipe: lower comes first." />
+                </Grid>
 
-                <!-- Syncfusion has no check box of its own outside its grids and ribbon; its samples use WPF's, which the theme styles -->
-                <CheckBox Content="Product-owned"
-                          IsChecked="{Binding EditingIsProductOwned, Mode=TwoWay}"
-                          IsEnabled="{Binding CanEditProductOwned}"
-                          ToolTip="A section in this role made in a product stays that product's own: edited in its recipe, not on the Sub-Assemblies screen, and copied rather than linked by other products. Not for the Packaging role."
-                          Margin="0,0,0,12" />
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="FormLabel" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <!-- Syncfusion has no check box of its own outside its grids and ribbon; its samples use WPF's, which the theme styles -->
+                    <CheckBox Grid.Column="1"
+                              Content="Product-owned"
+                              IsChecked="{Binding EditingIsProductOwned, Mode=TwoWay}"
+                              IsEnabled="{Binding CanEditProductOwned}"
+                              ToolTip="A section in this role made in a product stays that product's own: edited in its recipe, not on the Sub-Assemblies screen, and copied rather than linked by other products. Not for the Packaging role." />
+                </Grid>
 
                 <StackPanel Orientation="Horizontal">
                     <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />

@@ -1,18 +1,24 @@
 using System.Windows;
+using System.Windows.Input;
+using Syncfusion.SfSkinManager;
 
 namespace TinapayanRMS.UI.Views;
 
 /// <summary>
 /// A modal one-box prompt: a label, a text box and OK/Cancel. What the Raw Materials screen's Category
 /// picker opens for its "&lt; Add New .. &gt;" row, so a category can be named without leaving the screen
-/// for Settings. WPF has no input box of its own, and a MessageBox can't take text.
+/// for Settings. WPF has no input box of its own, and a MessageBox can't take text. Chromeless: the card's own
+/// heading carries the title, and dragging it moves the dialog.
 /// </summary>
 public partial class TextPromptWindow : Window
 {
     private TextPromptWindow(string title, string label, string initialValue)
     {
         InitializeComponent();
+
+        // Title too, though nothing draws it: it's still the window's name to UI Automation and screen readers.
         Title = title;
+        HeadingText.Text = title;
         PromptLabel.Text = label;
         ValueTextBox.Text = initialValue;
     }
@@ -24,6 +30,14 @@ public partial class TextPromptWindow : Window
     public static string? Prompt(string title, string label, string initialValue, Window? owner)
     {
         var window = new TextPromptWindow(title, label, initialValue) { Owner = owner };
+
+        // SfSkinManager themes only the windows it's given: a new Window isn't in its owner's tree, Owner or not, so
+        // without this its buttons and box fell back to Syncfusion's unthemed default look (as MainWindow does for Settings).
+        if (owner is not null)
+        {
+            SfSkinManager.SetTheme(window, SfSkinManager.GetTheme(owner));
+        }
+
         window.ValueTextBox.Loaded += (_, _) =>
         {
             window.ValueTextBox.Focus();
@@ -34,6 +48,8 @@ public partial class TextPromptWindow : Window
             ? window.ValueTextBox.Text
             : null;
     }
+
+    private void Heading_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => DragMove();
 
     private void OkButton_Click(object sender, RoutedEventArgs e) => DialogResult = true;
 

@@ -69,9 +69,9 @@
                                           ToolTip="Inherited from the linked ingredient, for show: this part takes the same share of that ingredient's buffered cost as of its cost. Change the buffer there." />
             </Grid>
 
-            <!-- Follows the link and both shares as they're typed -->
-            <Border Margin="0,12,0,0" Padding="12" CornerRadius="6" Background="{StaticResource AccentSoftBrush}">
-                <TextBlock Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Text="{Binding LinkedCostPreviewText}" />
+            <!-- Follows the link and both shares as they're typed; an info notice, in the info colours -->
+            <Border Margin="0,12,0,0" Padding="12" CornerRadius="6" Background="{StaticResource InfoBackgroundBrush}">
+                <TextBlock Foreground="{StaticResource InfoForegroundBrush}" TextWrapping="Wrap" Text="{Binding LinkedCostPreviewText}" />
             </Border>
 
             <TextBlock Text="{Binding LinkedPartsText}"

@@ -49,17 +49,30 @@
 
         <!-- Details -->
         <Border Grid.Column="2" Style="{StaticResource CardStyle}" VerticalAlignment="Top">
-            <StackPanel>
+            <!-- Labels on the left of their fields, lined up by FormLabel (FormLabelStyle) -->
+            <StackPanel Grid.IsSharedSizeScope="True">
                 <TextBlock Text="{Binding FormTitle}" Style="{StaticResource SectionHeaderStyle}" />
 
-                <TextBlock Text="Name" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:SfTextBoxExt x:Name="NameTextBox"
-                                          Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                          Margin="0,0,0,12" />
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="FormLabel" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Name" Style="{StaticResource FormLabelStyle}" />
+                    <syncfusion:SfTextBoxExt x:Name="NameTextBox"
+                                             Grid.Column="1"
+                                             Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </Grid>
 
-                <TextBlock Text="Abbreviation" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:SfTextBoxExt Text="{Binding EditingAbbreviation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                          Margin="0,0,0,12" />
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="FormLabel" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Abbreviation" Style="{StaticResource FormLabelStyle}" />
+                    <syncfusion:SfTextBoxExt Grid.Column="1"
+                                             Text="{Binding EditingAbbreviation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </Grid>
 
                 <StackPanel Orientation="Horizontal">
                     <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />

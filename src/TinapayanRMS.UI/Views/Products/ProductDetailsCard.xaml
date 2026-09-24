@@ -31,33 +31,33 @@
 
     <!--
         What's typed in about the product itself, under the header's figures: its name, its category, how many pieces
-        make one sellable unit, and the price the shop charges now. Labels in the first row, fields in the second, as
-        Raw Materials lays out its own. Save writes them with the rest of the form.
+        make one sellable unit, and the price the shop charges now. One row, each label on the left of its field
+        (FormLabelStyle; 2026-09-24, at the user's request, though Raw Materials' header keeps its labels above).
+        Save writes them with the rest of the form.
     -->
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="2*" />
             <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <TextBlock Text="Product Name" Style="{StaticResource FieldLabelStyle}" />
+        <TextBlock Text="Product Name" Style="{StaticResource FormLabelStyle}" />
         <syncfusion:SfTextBoxExt x:Name="NameTextBox"
-                                 Grid.Row="1"
+                                 Grid.Column="1"
                                  Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  controls:FieldUndoStep.Recorder="{Binding}" />
 
-        <TextBlock Grid.Column="2" Text="Category" Style="{StaticResource FieldLabelStyle}" />
-        <syncfusion:ComboBoxAdv Grid.Row="1"
-                                Grid.Column="2"
+        <TextBlock Grid.Column="3" Text="Category" Style="{StaticResource FormLabelStyle}" />
+        <syncfusion:ComboBoxAdv Grid.Column="4"
                                 ItemsSource="{Binding CategoryOptions}"
                                 DisplayMemberPath="Name"
                                 ItemContainerStyle="{StaticResource CategoryOptionStyle}"
@@ -71,21 +71,19 @@
             The recipe stays per piece; every figure in the header and on the Costing tab is for one whole unit, so
             this multiplies the recipe's share of it. The packaging lines are already for one unit and don't rescale.
         -->
-        <TextBlock Grid.Column="4"
+        <TextBlock Grid.Column="6"
                    Text="Quantity Required"
-                   Style="{StaticResource FieldLabelStyle}"
+                   Style="{StaticResource FormLabelStyle}"
                    ToolTip="How many finished pieces make one sellable unit. 1 for a product sold by the piece." />
-        <syncfusion:IntegerTextBox Grid.Row="1"
-                                   Grid.Column="4"
+        <syncfusion:IntegerTextBox Grid.Column="7"
                                    controls:FieldUndoStep.Recorder="{Binding}"
                                    Value="{Binding EditingQuantityRequired, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                    MinValue="1"
                                    ToolTip="How many finished pieces make one sellable unit: 1 by the piece, 8 for a &quot;Box of 8&quot;. The recipe stays per piece; the costing multiplies by this." />
 
         <!-- Saved with the product. Empty rather than 0.00 until typed (UseNullOption). -->
-        <TextBlock Grid.Column="6" Text="Current Price" Style="{StaticResource FieldLabelStyle}" ToolTip="{Binding CostUnitCaption, StringFormat='{}{0}, with VAT: what the shop charges now'}" />
-        <syncfusion:CurrencyTextBox Grid.Row="1"
-                                    Grid.Column="6"
+        <TextBlock Grid.Column="9" Text="Current Price" Style="{StaticResource FormLabelStyle}" ToolTip="{Binding CostUnitCaption, StringFormat='{}{0}, with VAT: what the shop charges now'}" />
+        <syncfusion:CurrencyTextBox Grid.Column="10"
                                     controls:FieldUndoStep.Recorder="{Binding}"
                                     Value="{Binding EditingCurrentPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                     UseNullOption="True"

@@ -187,6 +187,7 @@ public sealed record ProductFormSnapshot
             var (a, b) = (left[i], right[i]);
             if (a.SubAssemblyId != b.SubAssemblyId
                 || a.IsOwned != b.IsOwned
+                || a.IsReleasing != b.IsReleasing
                 || a.Role?.Id != b.Role?.Id
                 || a.Name != b.Name
                 || a.LinkedName != b.LinkedName

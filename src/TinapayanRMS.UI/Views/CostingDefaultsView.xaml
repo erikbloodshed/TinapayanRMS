@@ -20,49 +20,50 @@
                            Margin="0,0,0,12"
                            Text="What a new product's costing starts with. Each product keeps its own from its first Save: changing these doesn't change any saved product." />
 
+                <!-- One under another, each label on the left of its box (FormLabelStyle); the Auto column lines the boxes up -->
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="Labor %" Style="{StaticResource FieldLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece" />
-                    <syncfusion:DoubleTextBox Grid.Row="1"
-                                              Margin="0,0,0,12"
+                    <TextBlock Text="Labor %" Style="{StaticResource FormLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece" />
+                    <syncfusion:DoubleTextBox Grid.Column="1"
                                               MinValue="0"
                                               Value="{Binding EditingLaborPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Column="2" Text="Overhead %" Style="{StaticResource FieldLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece" />
-                    <syncfusion:DoubleTextBox Grid.Row="1"
-                                              Grid.Column="2"
-                                              Margin="0,0,0,12"
+                    <TextBlock Grid.Row="2" Text="Overhead %" Style="{StaticResource FormLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece" />
+                    <syncfusion:DoubleTextBox Grid.Row="2"
+                                              Grid.Column="1"
                                               MinValue="0"
                                               Value="{Binding EditingOverheadPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="2" Text="Administrative %" Style="{StaticResource FieldLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece: office, permits, bookkeeping" />
-                    <syncfusion:DoubleTextBox Grid.Row="3"
-                                              Margin="0,0,0,12"
+                    <TextBlock Grid.Row="4" Text="Administrative %" Style="{StaticResource FormLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece: office, permits, bookkeeping" />
+                    <syncfusion:DoubleTextBox Grid.Row="4"
+                                              Grid.Column="1"
                                               MinValue="0"
                                               Value="{Binding EditingAdministrativePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="2" Grid.Column="2" Text="Markup %" Style="{StaticResource FieldLabelStyle}" ToolTip="On the base cost: materials, labor, overhead and administrative" />
-                    <syncfusion:DoubleTextBox Grid.Row="3"
-                                              Grid.Column="2"
-                                              Margin="0,0,0,12"
+                    <TextBlock Grid.Row="6" Text="Markup %" Style="{StaticResource FormLabelStyle}" ToolTip="On the base cost: materials, labor, overhead and administrative" />
+                    <syncfusion:DoubleTextBox Grid.Row="6"
+                                              Grid.Column="1"
                                               MinValue="0"
                                               Value="{Binding EditingMarginPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="4" Text="VAT %" Style="{StaticResource FieldLabelStyle}" ToolTip="On top of the marked-up price" />
-                    <syncfusion:DoubleTextBox Grid.Row="5"
+                    <TextBlock Grid.Row="8" Text="VAT %" Style="{StaticResource FormLabelStyle}" ToolTip="On top of the marked-up price" />
+                    <syncfusion:DoubleTextBox Grid.Row="8"
+                                              Grid.Column="1"
                                               MinValue="0"
                                               Value="{Binding EditingVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 </Grid>

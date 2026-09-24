@@ -21,6 +21,56 @@ public class RawMaterialRepository(
             dbContext => RawMaterialReads.GetWithDetailsAsync(dbContext, "WHERE m.Id = @id", new { id }, cancellationToken), cancellationToken))
         .SingleOrDefault();
 
+    public async Task<IReadOnlyList<LinkingProduct>> GetUsedByAsync(int id, CancellationToken cancellationToken) =>
+        [
+            .. (await dbContextFactory.QueryAsync<LinkingProduct>(UsedBySql, new { id }, cancellationToken))
+                .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase),
+        ];
+
+    /// <summary>
+    /// GetUsedByAsync's products. Feeds is the material and every ingredient whose cost it feeds: a made one with it in its
+    /// BOM, a linked one cut from it, and on up (both kinds are rejected when they'd close a loop). A recipe takes an
+    /// ingredient through a sub-assembly's lines or a usage's add-ins. Packaging is read as a product sees it: its own
+    /// lines unless its packaging links, a set's lines when it links a set, and another product's packaging when it
+    /// links that product, followed down the chain (PackagingLineRepository.ResolveEffectiveAsync).
+    /// </summary>
+    private const string UsedBySql = """
+        WITH Feeds AS (
+            SELECT @id AS Id
+            UNION ALL
+            SELECT b.IngredientId FROM IngredientBomLines b JOIN Feeds f ON f.Id = b.ComponentIngredientId
+            UNION ALL
+            SELECT m.Id FROM RawMaterials m JOIN Feeds f ON f.Id = m.LinkedToId
+        ),
+        RecipeUsers AS (
+            SELECT u.ProductId
+            FROM ProductSubAssemblyUsages u
+            JOIN SubAssemblyLines l ON l.SubAssemblyId = u.SubAssemblyId
+            WHERE l.IngredientId IN (SELECT Id FROM Feeds)
+            UNION
+            SELECT u.ProductId
+            FROM ProductSubAssemblyUsages u
+            JOIN UsageAddInLines a ON a.UsageId = u.Id
+            WHERE a.IngredientId IN (SELECT Id FROM Feeds)
+        ),
+        PackagingUsers AS (
+            SELECT l.ProductId
+            FROM PackagingLines l
+            WHERE l.PackagingMaterialId = @id
+                AND NOT EXISTS (SELECT 1 FROM PackagingLinks k WHERE k.ProductId = l.ProductId)
+            UNION ALL
+            SELECT k.ProductId
+            FROM PackagingLinks k
+            WHERE EXISTS (SELECT 1 FROM SubAssemblyPackagingLines s WHERE s.SubAssemblyId = k.LinkedSubAssemblyId AND s.PackagingMaterialId = @id)
+            UNION ALL
+            SELECT k.ProductId FROM PackagingLinks k JOIN PackagingUsers p ON p.ProductId = k.LinkedProductId
+        )
+        SELECT p.Id, p.Name, c.Name AS CategoryName
+        FROM Products p
+        LEFT JOIN ProductCategories c ON c.Id = p.CategoryId
+        WHERE p.Id IN (SELECT ProductId FROM RecipeUsers) OR p.Id IN (SELECT ProductId FROM PackagingUsers)
+        """;
+
     public async Task AddAsync(RawMaterial material, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);

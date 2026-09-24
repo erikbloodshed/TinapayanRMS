@@ -10,6 +10,15 @@ public interface IRawMaterialRepository
     Task<RawMaterial?> GetByIdAsync(int id, CancellationToken cancellationToken);
 
     /// <summary>
+    /// The products whose cost the material goes into, alphabetically, each once. An ingredient counts through the
+    /// sub-assemblies a product uses (its own and linked ones) and the add-ins on its linked usages, and so does every
+    /// made ingredient it's in and linked ingredient cut from it, however deep. Packaging counts through a product's own
+    /// packaging lines and a packaging set its packaging links, and so does every product whose packaging links that
+    /// product's, down the chain.
+    /// </summary>
+    Task<IReadOnlyList<LinkingProduct>> GetUsedByAsync(int id, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Rejects fields that don't fit the material's type or source (RawMaterialRules), and a linked
     /// ingredient's link to itself, to packaging, past 100% of the linked-to ingredient's weight or cost
     /// together with its other parts, or round a loop. A linked ingredient is costed as it's added.

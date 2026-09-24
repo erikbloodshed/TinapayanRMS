@@ -6,40 +6,76 @@
         xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
         xmlns:skinManager="clr-namespace:Syncfusion.SfSkinManager;assembly=Syncfusion.SfSkinManager.WPF"
         mc:Ignorable="d"
-        Width="380"
+        Width="412"
         SizeToContent="Height"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
-        skinManager:SfSkinManager.SizeMode="Default"
-        Background="{StaticResource PageBackgroundBrush}">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        skinManager:SfSkinManager.SizeMode="Default">
+    <!--
+        Chromeless: no OS title bar, just a card with its own heading, over a transparent window. The margin is room
+        for the shadow, which a layered window (AllowsTransparency) draws inside its own bounds; it's the same on every
+        side, so CenterOwner still centres the card.
+    -->
+    <Border Margin="16"
+            Background="{StaticResource CardBackgroundBrush}"
+            BorderBrush="{StaticResource CardBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="4" Direction="270" Opacity="0.22" Color="Black" />
+        </Border.Effect>
 
-        <StackPanel Grid.Row="0" Margin="16,16,16,12">
-            <TextBlock x:Name="PromptLabel" Style="{StaticResource FieldLabelStyle}" />
-            <syncfusion:SfTextBoxExt x:Name="ValueTextBox" />
-        </StackPanel>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-        <Border Grid.Row="1"
-                Background="{StaticResource CardBackgroundBrush}"
-                BorderBrush="{StaticResource CardBorderBrush}"
-                BorderThickness="0,1,0,0"
-                Padding="16,10">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <syncfusion:ButtonAdv Label="OK"
-                                      IconTemplate="{StaticResource ApplyIconTemplate}"
-                                      IsDefault="True"
-                                      Click="OkButton_Click"
-                                      Margin="0,0,8,0" />
-                <syncfusion:ButtonAdv Label="Cancel"
-                                      IconTemplate="{StaticResource CancelIconTemplate}"
-                                      IsCancel="True"
-                                      Click="CancelButton_Click" />
-            </StackPanel>
-        </Border>
-    </Grid>
+            <!-- The heading stands in for the title bar, and like one it moves the dialog when dragged -->
+            <Border Grid.Row="0"
+                    Background="Transparent"
+                    Padding="16,14,16,0"
+                    MouseLeftButtonDown="Heading_MouseLeftButtonDown">
+                <TextBlock x:Name="HeadingText"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource HeadingForegroundBrush}" />
+            </Border>
+
+            <!-- The label on the left of its box (FormLabelStyle), so keep it short: the heading says what it's for -->
+            <Grid Grid.Row="1" Margin="16,12,16,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="PromptLabel" Style="{StaticResource FormLabelStyle}" />
+                <syncfusion:SfTextBoxExt x:Name="ValueTextBox" Grid.Column="1" />
+            </Grid>
+
+            <!-- Inside the card's 1px border, so its corners are rounded 1 less to sit flush -->
+            <Border Grid.Row="2"
+                    Background="{StaticResource PageBackgroundBrush}"
+                    BorderBrush="{StaticResource CardBorderBrush}"
+                    BorderThickness="0,1,0,0"
+                    CornerRadius="0,0,7,7"
+                    Padding="16,10">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <syncfusion:ButtonAdv Label="OK"
+                                          IconTemplate="{StaticResource ApplyIconTemplate}"
+                                          IsDefault="True"
+                                          Click="OkButton_Click"
+                                          Margin="0,0,8,0" />
+                    <syncfusion:ButtonAdv Label="Cancel"
+                                          IconTemplate="{StaticResource CancelIconTemplate}"
+                                          IsCancel="True"
+                                          Click="CancelButton_Click" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
 </Window>

@@ -74,6 +74,7 @@ public sealed class ProductUsageEdit : ReactiveObject
     /// A new section Save makes the product's own whatever its role: a linked one unlinked here. A saved one of the
     /// product's own is its own without it.
     /// </param>
+    /// <param name="isReleasing">One of the product's own that Save moves to the Sub-Assemblies screen and links (Move to Sub-Assemblies).</param>
     public ProductUsageEdit(
         int subAssemblyId,
         SubAssemblyRole? role,
@@ -84,9 +85,11 @@ public sealed class ProductUsageEdit : ReactiveObject
         string? linkedName,
         IReadOnlyList<SubAssemblyLineEdit>? addIns = null,
         string? name = null,
-        bool isOwn = false)
+        bool isOwn = false,
+        bool isReleasing = false)
     {
         _isOwn = isOwn;
+        _isReleasing = isReleasing;
         Name = SubAssemblyRules.NormalizeName(name);
         SubAssemblyId = subAssemblyId;
         Role = role;
@@ -197,6 +200,14 @@ public sealed class ProductUsageEdit : ReactiveObject
     /// </summary>
     public bool IsOwned => LinkedName is null && (SubAssemblyId > 0 || _isOwn);
 
+    private readonly bool _isReleasing;
+
+    /// <summary>
+    /// One of the product's own that Save moves to the Sub-Assemblies screen, keeping its name and lines, and links
+    /// (Move to Sub-Assemblies). Its lines are still edited here until then.
+    /// </summary>
+    public bool IsReleasing => IsOwned && _isReleasing;
+
     public bool IsLinked => LinkedName is not null;
 
     /// <summary>The badge beside a linked section's heading, which opens it on the Sub-Assemblies screen: "Cheese Roll Dough, from Sub-Assemblies".</summary>
@@ -239,7 +250,11 @@ public sealed class ProductUsageEdit : ReactiveObject
 
     /// <summary>A new section with its role refreshed (renamed in Settings) and its lines repriced with their ingredients.</summary>
     public ProductUsageEdit With(SubAssemblyRole? role, IReadOnlyList<SubAssemblyLineEdit> lines) =>
-        new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, ShrinkagePercent, LinkedName, AddIns, Name, _isOwn);
+        new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, ShrinkagePercent, LinkedName, AddIns, Name, _isOwn, _isReleasing);
+
+    /// <summary>The same section of the product's own, for Save to move to the Sub-Assemblies screen and link.</summary>
+    public ProductUsageEdit Released() =>
+        new(SubAssemblyId, Role, Lines, AuthoredField, AuthoredValue, ShrinkagePercent, LinkedName, AddIns, Name, _isOwn, isReleasing: true);
 
     /// <summary>
     /// A linked section as the Sub-Assemblies screen now has it — its name, the label it gives (<paramref name="name"/>),
@@ -258,6 +273,7 @@ public sealed class ProductUsageEdit : ReactiveObject
     public bool ShowsSameAs(ProductUsageEdit other) =>
         SubAssemblyId == other.SubAssemblyId
         && IsOwned == other.IsOwned
+        && IsReleasing == other.IsReleasing
         && CollectionMerge.HasSameValues(Role, other.Role)
         && LinkedName == other.LinkedName
         && Name == other.Name
@@ -759,24 +775,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// <summary>The header's title, and the usage example's: the product's name, or "New product".</summary>
     public string HeaderTitle => _headerTitle.Value;
 
-    private readonly ObservableAsPropertyHelper<string> _descriptionLinkText;
-    /// <summary>The link under the header's title: the description, or "Add description" while there's none.</summary>
-    public string DescriptionLinkText => _descriptionLinkText.Value;
-
-    private bool _isDescriptionEditorOpen;
-    /// <summary>
-    /// The description's pop-up is open. It edits EditingDescription as it's typed; closing it any way but
-    /// Cancel keeps what was typed (EditDescriptionCommand remembers what to go back to).
-    /// </summary>
-    public bool IsDescriptionEditorOpen
-    {
-        get => _isDescriptionEditorOpen;
-        set => this.RaiseAndSetIfChanged(ref _isDescriptionEditorOpen, value);
-    }
-
-    /// <summary>The description when its pop-up opened, for Cancel.</summary>
-    private string _descriptionBeforeEdit = string.Empty;
-
     /// <summary>When the product was last saved, e.g. "Sep 14, 2026, 6:27 PM", or "—".</summary>
     private string _lastUpdatedText = "—";
     public string LastUpdatedText
@@ -858,6 +856,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         {
             this.RaiseAndSetIfChanged(ref _editingUsage, value);
             this.RaisePropertyChanged(nameof(IsEditingLinkedUsage));
+            this.RaisePropertyChanged(nameof(IsEditingOwnedUsage));
         }
     }
 
@@ -867,6 +866,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// button would fall back to showing.
     /// </summary>
     public bool IsEditingLinkedUsage => EditingUsage?.IsLinked == true;
+
+    /// <summary>
+    /// The form edits one of the product's own that isn't already on its way to the Sub-Assemblies screen, so Move to
+    /// Sub-Assemblies has something to move. Its own property for the same reason as <see cref="IsEditingLinkedUsage"/>.
+    /// </summary>
+    public bool IsEditingOwnedUsage => EditingUsage is { IsOwned: true, IsReleasing: false };
 
     private bool _isUsageFormOpen;
     public bool IsUsageFormOpen
@@ -1053,14 +1058,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _usageFormPieceSizeCaption, value);
     }
 
-    private string _usageFormPreviewText = string.Empty;
-    /// <summary>What a piece of the form's sub-assembly costs, e.g. "0.5000 a piece": the add form's footer.</summary>
-    public string UsageFormPreviewText
-    {
-        get => _usageFormPreviewText;
-        private set => this.RaiseAndSetIfChanged(ref _usageFormPreviewText, value);
-    }
-
     private string _usageFormBaseCaption = string.Empty;
     /// <summary>
     /// The formula in baker's terms, e.g. "Base 1,000 g · whole formula 167.7%" — the figure a batch is scaled by — or,
@@ -1089,11 +1086,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     }
 
     private string _usageFormCostPerPieceText = "—";
-    /// <summary>The same figure on its own, e.g. "0.5000": the form header's, for a section being edited.</summary>
+    /// <summary>What a piece of the form's sub-assembly or packaging costs, e.g. "0.5000": the piece-size column's first tile, and the packaging table's footer.</summary>
     public string UsageFormCostPerPieceText
     {
         get => _usageFormCostPerPieceText;
         private set => this.RaiseAndSetIfChanged(ref _usageFormCostPerPieceText, value);
+    }
+
+    private string _usageFormBatchCostText = "—";
+    /// <summary>What the form's whole batch costs, its lines and add-ins together, e.g. "73.98": the piece-size column's second tile.</summary>
+    public string UsageFormBatchCostText
+    {
+        get => _usageFormBatchCostText;
+        private set => this.RaiseAndSetIfChanged(ref _usageFormBatchCostText, value);
     }
 
     private PackagingLineRow? _selectedLineEdit;
@@ -1193,9 +1198,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     public ReactiveCommand<RxVoid, RxVoid> UndoCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RedoCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> EditDescriptionCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> CloseDescriptionEditorCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> CancelDescriptionEditCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddCategoryCommand { get; }
 
     /// <summary>
@@ -1211,6 +1213,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
 
     /// <summary>Unlink on a linked section: it becomes a copy of the product's own, in whatever role, and the link goes with Save.</summary>
     public ReactiveCommand<ProductUsageEdit, RxVoid> UnlinkCommand { get; }
+
+    /// <summary>
+    /// Move to Sub-Assemblies on one of the product's own: Save puts it on the Sub-Assemblies screen, keeping its name and
+    /// lines, and links it. Unlink the other way round.
+    /// </summary>
+    public ReactiveCommand<ProductUsageEdit, RxVoid> MoveToSubAssembliesCommand { get; }
 
     /// <summary>Delete Sub-Assembly: takes the sub-assembly whose tab is showing out of the recipe.</summary>
     public ReactiveCommand<RxVoid, RxVoid> RemoveUsageCommand { get; }
@@ -1306,21 +1314,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         // The picker's AutoComplete filters its rows by what's typed, Add New's too, so the row takes the typed text into
         // its name and always matches (RawMaterialsViewModel explains it in full).
         this.WhenAnyValue(x => x.CategorySearchText)
-            .Select(text => text.Trim())
+            .Select(AddNewCategoryLabel.TypedText)
             .DistinctUntilChanged()
             .Subscribe(text => _addNewCategoryOption.AddOrUpdate(new ProductCategory
             {
                 Id = AddNewCategoryId,
-                Name = text.Length == 0 ? "< Add New .. >" : $"< Add New \"{text}\" .. >",
+                Name = AddNewCategoryLabel.For(text),
             }));
 
         _headerTitle = this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingName, (product, name) =>
                 product is null && string.IsNullOrWhiteSpace(name) ? "New product" : name)
             .ToProperty(this, x => x.HeaderTitle, "New product");
-
-        _descriptionLinkText = this.WhenAnyValue(x => x.EditingDescription)
-            .Select(description => string.IsNullOrWhiteSpace(description) ? "Add description" : description.Trim())
-            .ToProperty(this, x => x.DescriptionLinkText, "Add description");
 
         // A hidden tab can't stay the one showing: leaving a saved product while on Clone goes
         // back to Recipe. Subscribed before ShowLinks, so the tab strip moves before the tab hides; a
@@ -1684,26 +1688,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         }),
         History.WhenAnyValue(h => h.IsDirty));
 
-        // The description is edited in a pop-up under the header's title, straight into the form; Save saves it.
-        EditDescriptionCommand = ReactiveCommand.Create(() =>
-        {
-            _descriptionBeforeEdit = EditingDescription;
-            IsDescriptionEditorOpen = true;
-        });
-
-        CloseDescriptionEditorCommand = ReactiveCommand.Create(() => { IsDescriptionEditorOpen = false; });
-
-        CancelDescriptionEditCommand = ReactiveCommand.Create(() =>
-        {
-            EditingDescription = _descriptionBeforeEdit;
-            IsDescriptionEditorOpen = false;
-        });
-
         // The Category picker's "< Add New .. >" row: names a category, saves it, and picks it for the product, so a
         // product can go in a new category without a trip to Settings. Save saves the product's choice.
         AddCategoryCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var name = await PromptForNewCategory.Handle(("Name for the new category:", CategorySearchText.Trim()));
+            var name = await PromptForNewCategory.Handle(("Name", AddNewCategoryLabel.TypedText(CategorySearchText)));
 
             if (!string.IsNullOrWhiteSpace(name))
             {
@@ -1817,6 +1806,35 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         // Sub-Assemblies screen, and the one it was linked to stays there as it is.
         UnlinkCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => AsUndoStep(() => ReplaceUsage(usage, CopyOfLinked(usage, isOwn: true))));
 
+        // Anything typed into its form goes in first, so what moves is what shows; a form a rule refuses stays as it
+        // is, with the message. It's still edited here until Save, which moves it and links it.
+        MoveToSubAssembliesCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => AsUndoStep(() =>
+        {
+            var wasEditing = ReferenceEquals(usage, EditingUsage);
+            var applied = usage;
+            if (wasEditing)
+            {
+                try
+                {
+                    ErrorMessage = null;
+                    applied = ApplyUsageForm();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    ErrorMessage = ex.Message;
+                    return;
+                }
+            }
+
+            var moving = applied.Released();
+            ReplaceInRecipeOrder(applied, moving);
+            RecomputeCosts();
+            if (wasEditing)
+            {
+                OpenUsageForm(moving);
+            }
+        }));
+
         // Delete Sub-Assembly takes out the one whose tab is showing. Nothing to confirm: it only leaves the recipe,
         // with Save, and the sub-assembly stays on the Sub-Assemblies screen. On the Packaging tab it takes out the
         // packaging: its lines, or its link, go with Save.
@@ -1912,7 +1930,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
 
     private void LoadIntoForm(Product product)
     {
-        IsDescriptionEditorOpen = false;
         _editingId = product.Id;
         EditingName = product.Name;
         EditingDescription = product.Description ?? string.Empty;
@@ -1996,7 +2013,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         EditingCategory = null;
         EditingQuantityRequired = 1;
         EditingCurrentPrice = null;
-        IsDescriptionEditorOpen = false;
         ShowUpdatedAt(null);
         EditingCloneName = string.Empty;
 
@@ -2660,6 +2676,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
                 // The product's own keeps its id, so Save rewrites it in place; a new section's is 0.
                 Id = u.SubAssemblyId,
                 IsOwn = u.IsOwned,
+                Release = u.IsReleasing,
                 ShrinkagePercent = u.ShrinkagePercent,
             })],
             [.. UsageEdits.Where(u => u.IsLinked).Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
@@ -2686,6 +2703,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         && a.New.Zip(b.New).All(pair =>
             pair.First.Id == pair.Second.Id
             && pair.First.IsOwn == pair.Second.IsOwn
+            && pair.First.Release == pair.Second.Release
             && pair.First.RoleId == pair.Second.RoleId
             && pair.First.SectionName == pair.Second.SectionName
             && pair.First.AuthoredField == pair.Second.AuthoredField
@@ -2881,9 +2899,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             }
 
             // One of the product's own keeps its id, so Save rewrites it in place; a new one has none yet. One unlinked
-            // and not saved yet stays the product's own.
+            // and not saved yet stays the product's own, and one on its way to the Sub-Assemblies screen stays so.
             usage = new ProductUsageEdit(
-                EditingUsage is { IsOwned: true } own ? own.SubAssemblyId : 0, role, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], _usageAuthoredField, authoredValue, shrinkagePercent, linkedName: null, name: EditingUsageName, isOwn: EditingUsage?.IsOwned == true);
+                EditingUsage is { IsOwned: true } own ? own.SubAssemblyId : 0, role, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], _usageAuthoredField, authoredValue, shrinkagePercent, linkedName: null, name: EditingUsageName, isOwn: EditingUsage?.IsOwned == true, isReleasing: EditingUsage?.IsReleasing == true);
         }
         else
         {
@@ -3214,11 +3232,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         if (IsFormPackaging)
         {
             var packagingCost = FormPackagingLines.Sum(l => l.CostPerUnit);
-            UsageFormPreviewText = FormPackagingLines.Any(l => l.PackagingMaterial is not null) ? $"{packagingCost:N4} a piece" : string.Empty;
+            UsageFormCostPerPieceText = FormPackagingLines.Any(l => l.PackagingMaterial is not null) ? $"{packagingCost:N4}" : "—";
             return;
         }
 
-        var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(UsageFormBatch());
+        var batch = UsageFormBatch();
+        var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(batch);
+        UsageFormBatchCostText = batch.Count > 0 ? $"{totalCost:N2}" : "—";
         var shrinkagePercent = CurrentShrinkagePercent();
         var finalWeight = ProductRules.CalculateFinalWeight(totalWeight, shrinkagePercent);
         var authoredValue = CurrentAuthoredValue();
@@ -3242,7 +3262,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         var costPerPiece = finalWeight > 0 && weightPerPiece > 0
             ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, finalWeight)
             : (decimal?)null;
-        UsageFormPreviewText = costPerPiece is { } preview ? $"{preview:N4} a piece" : string.Empty;
         UsageFormCostPerPieceText = costPerPiece is { } figure ? $"{figure:N4}" : "—";
 
         // The formula's base and the batch, given to both tables: an add-in is read against the recipe's base, never its own,

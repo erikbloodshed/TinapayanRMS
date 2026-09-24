@@ -739,6 +739,48 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task Move_to_Sub_Assemblies_puts_the_products_own_there_with_what_was_typed_and_links_it()
+    {
+        var roleId = await AddRoleAsync("Filling", isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [new NewSubAssemblyDraft(roleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
+        var fillingId = await SubAssemblyIdAsync(productId, roleId);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.FormLines.Count == 1, () => $"form lines={viewModel.FormLines.Count}");
+        viewModel.EditingUsage!.IsOwned.Should().BeTrue();
+        viewModel.IsEditingOwnedUsage.Should().BeTrue("Move to Sub-Assemblies shows on the product's own");
+
+        // Typed into the form and not applied yet: the move takes it along.
+        viewModel.FormLines.Single().Grams = 120m;
+        await viewModel.MoveToSubAssembliesCommand.Execute(viewModel.EditingUsage);
+
+        var moving = viewModel.UsageEdits.Single();
+        moving.IsReleasing.Should().BeTrue();
+        moving.Lines.Single().Grams.Should().Be(120m);
+        viewModel.EditingUsage.Should().BeSameAs(moving, "its tab is its form, so the form stays open on it");
+        viewModel.IsEditingOwnedUsage.Should().BeFalse("it's on its way already");
+        viewModel.IsFormEditingLines.Should().BeTrue("its lines are still edited here until Save");
+        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeTrue();
+
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1 && viewModel.UsageEdits[0].IsLinked,
+            () => $"linked={viewModel.UsageEdits.FirstOrDefault()?.IsLinked}");
+
+        var linked = viewModel.UsageEdits.Single();
+        linked.SubAssemblyId.Should().Be(fillingId, "the same sub-assembly, not a copy");
+        linked.LinkedName.Should().Be("Cheese Roll Filling");
+        var moved = await new SubAssemblyRepository(CreateDbContextFactory()).GetStandaloneAsync(Cancellation);
+        moved.Should().ContainSingle().Which.TotalWeight.Should().Be(120m);
+    }
+
+    [Fact]
     public async Task Removing_a_sub_assembly_another_product_links_leaves_it_there()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -932,6 +974,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingUsageRole = viewModel.Roles.Single(r => r.Id == roleId);
         viewModel.FormLines.Add(new IngredientLineRow { IngredientId = flourId, Grams = 1000m });
         viewModel.UsageFormCostPerPieceText.Should().Be("\u2014", "a piece takes none of it yet");
+        viewModel.UsageFormBatchCostText.Should().Be("50.00", "the batch costs its lines, sized or not: 1,000 g at 0.05");
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -1290,26 +1333,11 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task The_description_link_edits_the_description_in_a_pop_up_and_Cancel_puts_it_back()
+    public async Task The_header_title_follows_the_name_as_it_is_typed()
     {
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.HeaderTitle.Should().Be("New product");
-        viewModel.DescriptionLinkText.Should().Be("Add description");
-
-        await viewModel.EditDescriptionCommand.Execute();
-        viewModel.IsDescriptionEditorOpen.Should().BeTrue();
-        viewModel.EditingDescription = "Soft bread";
-        viewModel.DescriptionLinkText.Should().Be("Soft bread", "the link shows what's typed");
-        await viewModel.CloseDescriptionEditorCommand.Execute();
-        viewModel.IsDescriptionEditorOpen.Should().BeFalse();
-        viewModel.EditingDescription.Should().Be("Soft bread");
-
-        await viewModel.EditDescriptionCommand.Execute();
-        viewModel.EditingDescription = "Something else";
-        await viewModel.CancelDescriptionEditCommand.Execute();
-        viewModel.EditingDescription.Should().Be("Soft bread", "Cancel puts back what was there when the pop-up opened");
-        viewModel.IsDescriptionEditorOpen.Should().BeFalse();
 
         viewModel.EditingName = "Cheese roll";
         viewModel.HeaderTitle.Should().Be("Cheese roll", "the header follows the name as it's typed");
@@ -1441,6 +1469,35 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.Categories.Select(c => c.Name).Should().Equal("Pastries");
         await using var dbContext = CreateDbContext();
         (await dbContext.ProductCategories.SingleAsync(Cancellation)).Name.Should().Be("Pastries");
+    }
+
+    [Fact]
+    public async Task Arrowing_onto_Add_New_reads_its_name_as_what_was_typed_rather_than_nesting_it()
+    {
+        var viewModel = CreateViewModel();
+        (string Label, string InitialValue) promptedWith = default;
+        viewModel.PromptForNewCategory.RegisterHandler(interaction =>
+        {
+            promptedWith = interaction.Input;
+            interaction.SetOutput("Pastries");
+        });
+        await viewModel.LoadCommand.Execute();
+        viewModel.CategorySearchText = "Pastries";
+
+        // Arrowing down the open picker onto the row puts the row's own name in the picker's text, as on Raw Materials.
+        for (var i = 0; i < 3; i++)
+        {
+            viewModel.CategorySearchText = viewModel.CategoryOptions.Single(c => c.Id == ProductsViewModel.AddNewCategoryId).Name;
+        }
+
+        var addNewRow = viewModel.CategoryOptions.Single(c => c.Id == ProductsViewModel.AddNewCategoryId);
+        addNewRow.Name.Should().Be("< Add New \"Pastries\" .. >", "the row's name in the text isn't new typing to wrap again");
+
+        viewModel.EditingCategory = addNewRow;
+
+        await WaitUntilSettledAsync(() => viewModel.EditingCategory is not null,
+            () => $"picked={viewModel.EditingCategory?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
+        promptedWith.InitialValue.Should().Be("Pastries", "the prompt starts with what was typed, not the row's label");
     }
 
     [Fact]

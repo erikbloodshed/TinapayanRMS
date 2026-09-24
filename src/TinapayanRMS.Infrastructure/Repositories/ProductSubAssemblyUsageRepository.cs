@@ -60,8 +60,8 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
     /// Such a section in a product-owned role (SubAssemblyRole.IsProductOwned), or marked NewSubAssemblyDraft.IsOwn (an
     /// unlinked one), is the product's own sub-assembly, added or rewritten in place; in any other role a new one is kept
     /// on the Sub-Assemblies screen and linked, and one of its own moved there out of a product-owned role is released to
-    /// it. Either is named after the product and its role
-    /// (SubAssemblyRules.StandaloneNameFor, made unique). One of its own the recipe no longer lists is deleted; one on the
+    /// it. One marked NewSubAssemblyDraft.Release goes to the Sub-Assemblies screen and is linked, whatever its role.
+    /// Either is named after the product and its role (SubAssemblyRules.StandaloneNameFor, made unique). One of its own the recipe no longer lists is deleted; one on the
     /// Sub-Assemblies screen is kept. Every check runs before anything is written: the sections' lines, names and piece
     /// sizes, that a saved one is the product's own, that no section is a packaging set, that nothing linked is another
     /// product's own, sections in one role told apart by their names, and add-ins.
@@ -195,17 +195,18 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 renames.Add((stored, SubAssemblyRules.StandaloneNameFor(productName, role.Name, section.SectionName)));
             }
 
-            // Read before RoleId changes: the tracked Role isn't moved over to the new one until SaveChanges.
+            // Read before RoleId changes: the tracked Role isn't moved over to the new one until SaveChanges. One moved to
+            // the Sub-Assemblies screen (Release) goes there whatever its role, keeping its name, and is linked below.
             var wasRoleProductOwned = stored.Role.IsProductOwned;
             stored.RoleId = section.RoleId;
-            stored.OwnerProductId = role.IsProductOwned || !wasRoleProductOwned ? productId : null;
+            stored.OwnerProductId = !section.Release && (role.IsProductOwned || !wasRoleProductOwned) ? productId : null;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await SubAssemblyRepository.RenameAsync(dbContext, renames, cancellationToken);
 
-        // New ones: the product's own in a product-owned role or when unlinked (IsOwn), otherwise kept on the
-        // Sub-Assemblies screen. Saved one at a time for the id its lines are written against, and named apart from every
+        // New ones: the product's own in a product-owned role or when unlinked (IsOwn), otherwise, or when moved there
+        // (Release), kept on the Sub-Assemblies screen. Saved one at a time for the id its lines are written against, and named apart from every
         // other, those saved just before it included. The ones kept are relined, and every one is used at the product's
         // piece size.
         List<string> takenNames = recipe.New.Any(n => n.Id == 0) ? await dbContext.SubAssemblies.Select(s => s.Name).ToListAsync(cancellationToken) : [];
@@ -221,7 +222,7 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 var role = roles[section.RoleId];
                 var name = SubAssemblyRules.UniqueStandaloneName(SubAssemblyRules.StandaloneNameFor(productName, role.Name, section.SectionName), takenNames);
                 takenNames.Add(name);
-                subAssembly = new SubAssembly { Name = name, RoleId = section.RoleId, OwnerProductId = section.IsOwn || role.IsProductOwned ? productId : null };
+                subAssembly = new SubAssembly { Name = name, RoleId = section.RoleId, OwnerProductId = !section.Release && (section.IsOwn || role.IsProductOwned) ? productId : null };
                 dbContext.SubAssemblies.Add(subAssembly);
                 await dbContext.SaveChangesAsync(cancellationToken);
             }

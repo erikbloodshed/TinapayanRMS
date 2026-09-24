@@ -85,19 +85,22 @@
 
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="{Binding HeaderTitle}"
-                               FontSize="20"
+                               FontSize="18"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource HeadingForegroundBrush}"
                                TextTrimming="CharacterEllipsis" />
                 </StackPanel>
             </DockPanel>
 
+            <!-- A line between the title row and the tiles, as the Sub-Assemblies and Products headers have -->
+            <Border Style="{StaticResource SectionDividerStyle}" />
+
             <!--
                 The tiles: labels in the first row, values in the second, with separators spanning both. A plain row
                 rather than a bordered box (2026-09-21, at the user's request that this header be as compact as the
                 Products one, whose figures row this now matches in every measurement).
             -->
-            <Grid Margin="0,12,0,0">
+            <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -207,45 +210,47 @@
                            ToolTip="When this material's cost last changed: a new price, a buffer edit, a recipe change, or the cascade reaching it from a component." />
                 </Grid>
 
-            <!-- Labels in the first row, fields in the second: Name first. Packaging is always purchased; only an ingredient can be made. -->
-            <Grid Margin="0,12,0,0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+            <!--
+                The fields, Name first, on one row 16 under the tiles, each label on the left of its field
+                (FormLabelStyle; 2026-09-24, at the user's request, as the Products header has them). Packaging is
+                always purchased; only an ingredient can be made.
+            -->
+            <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="1.5*" />
                     <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="16" />
                     <!-- Weight Loss %, made only: Auto, so the other fields take its width for any other material -->
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" />
+                <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FormLabelStyle}" />
                 <syncfusion:SfTextBoxExt x:Name="NameTextBox"
-                                         Grid.Row="1"
-                                         Grid.Column="0"
+                                         Grid.Column="1"
                                          controls:FieldUndoStep.Recorder="{Binding}"
                                          Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          LostFocus="NameTextBox_LostFocus" />
 
-                <TextBlock Grid.Column="2" Text="Type" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:ComboBoxAdv Grid.Row="1"
-                                        Grid.Column="2"
+                <TextBlock Grid.Column="3" Text="Type" Style="{StaticResource FormLabelStyle}" />
+                <syncfusion:ComboBoxAdv Grid.Column="4"
                                         ItemsSource="{Binding Types}"
                                         controls:FieldUndoStep.Recorder="{Binding}"
                                         SelectedItem="{Binding EditingType, Mode=TwoWay}"
                                         IsEnabled="{Binding CanChangeTypeAndSource}"
                                         ToolTip="Ingredients go in recipes; packaging goes on a product's packaging lines. Fixed once saved." />
 
-                <TextBlock Grid.Column="4" Text="Category" Style="{StaticResource FieldLabelStyle}" />
-                <syncfusion:ComboBoxAdv Grid.Row="1"
-                                        Grid.Column="4"
+                <TextBlock Grid.Column="6" Text="Category" Style="{StaticResource FormLabelStyle}" />
+                <syncfusion:ComboBoxAdv Grid.Column="7"
                                         ItemsSource="{Binding CategoryOptions}"
                                         DisplayMemberPath="Name"
                                         ItemContainerStyle="{StaticResource CategoryOptionStyle}"
@@ -254,25 +259,23 @@
                                         Text="{Binding CategorySearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                         ToolTip="Pick a category, or &quot;&lt; Add New .. &gt;&quot; to name one now." />
 
-                <TextBlock Grid.Column="6"
+                <TextBlock Grid.Column="9"
                            Text="Source"
-                           Style="{StaticResource FieldLabelStyle}"
+                           Style="{StaticResource FormLabelStyle}"
                            Visibility="{Binding IsEditingIngredient, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                <syncfusion:ComboBoxAdv Grid.Row="1"
-                                        Grid.Column="6"
+                <syncfusion:ComboBoxAdv Grid.Column="10"
                                         ItemsSource="{Binding Sources}"
                                         controls:FieldUndoStep.Recorder="{Binding}"
                                         SelectedItem="{Binding EditingSource, Mode=TwoWay}"
                                         IsEnabled="{Binding CanChangeTypeAndSource}"
                                         Visibility="{Binding IsEditingIngredient, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                <TextBlock Grid.Column="8"
+                <TextBlock Grid.Column="12"
                            Text="Weight Loss %"
-                           Style="{StaticResource FieldLabelStyle}"
+                           Style="{StaticResource FormLabelStyle}"
                            Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                <syncfusion:DoubleTextBox Grid.Row="1"
-                                          Grid.Column="8"
-                                          MinWidth="120"
+                <syncfusion:DoubleTextBox Grid.Column="13"
+                                          MinWidth="80"
                                           MinValue="0"
                                           MaxValue="99.99"
                                           controls:FieldUndoStep.Recorder="{Binding}"

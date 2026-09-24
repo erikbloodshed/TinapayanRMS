@@ -27,8 +27,8 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
     private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());
 
     private static NewSubAssemblyDraft Own(
-        int roleId, IReadOnlyList<RecipeLine> lines, int id = 0, string? sectionName = null, decimal weightPerPiece = 10m, bool isOwn = false) =>
-        new(roleId, lines, UsageAuthoredField.WeightPerPiece, weightPerPiece, sectionName) { Id = id, IsOwn = isOwn };
+        int roleId, IReadOnlyList<RecipeLine> lines, int id = 0, string? sectionName = null, decimal weightPerPiece = 10m, bool isOwn = false, bool release = false) =>
+        new(roleId, lines, UsageAuthoredField.WeightPerPiece, weightPerPiece, sectionName) { Id = id, IsOwn = isOwn, Release = release };
 
     private async Task<SubAssembly?> FindAsync(int id)
     {
@@ -176,6 +176,67 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         var moved = (await FindAsync(ownId))!;
         moved.OwnerProductId.Should().Be(productId, "it was never the role's, so moving it doesn't release it");
         moved.Name.Should().Be("Cheese Roll Topping");
+    }
+
+    [Fact]
+    public async Task An_own_section_moved_to_the_Sub_Assemblies_screen_keeps_its_name_and_the_product_links_it()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var milkId = await AddIngredientAsync("Milk", costPerGram: 0.1m);
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(fillingRoleId, [(cheeseId, 100m)], sectionName: "Cheese", weightPerPiece: 12m)], []));
+        var fillingId = await SubAssemblyIdAsync(productId, fillingRoleId);
+
+        // Moved with a line typed in the same save: the lines are written as they show, then it's released.
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [Own(fillingRoleId, [(cheeseId, 100m), (milkId, 50m)], id: fillingId, sectionName: "Cheese", weightPerPiece: 12m, release: true)], []));
+
+        var moved = (await FindAsync(fillingId))!;
+        moved.OwnerProductId.Should().BeNull("it's on the Sub-Assemblies screen now, even in a product-owned role");
+        moved.Name.Should().Be("Cheese Roll Filling: Cheese");
+        moved.TotalWeight.Should().Be(150m);
+        (await CreateSubAssemblyRepository().GetStandaloneAsync(Cancellation)).Select(s => s.Id).Should().Equal(fillingId);
+        var usage = (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Single();
+        usage.SubAssemblyId.Should().Be(fillingId);
+        usage.AuthoredValue.Should().Be(12m);
+
+        // Other products can link it now.
+        var otherId = await AddProductAsync("Cheese Bun");
+        await SaveRecipeAsync(otherId, new RecipeDraft([], [new LinkedUsageDraft(fillingId, UsageAuthoredField.WeightPerPiece, 10m)]));
+        (await CreateSubAssemblyRepository().GetStandaloneLinkedByAsync(Cancellation))[fillingId].Select(p => p.Name).Should()
+            .BeEquivalentTo(["Cheese Roll", "Cheese Bun"]);
+
+        // And the product that moved it saves it as a link from now on, keeping it there.
+        await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(fillingId, UsageAuthoredField.WeightPerPiece, 12m)]));
+        (await FindAsync(fillingId))!.OwnerProductId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task An_unlinked_section_moved_back_to_the_Sub_Assemblies_screen_is_linked_there()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour");
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], isOwn: true)], []));
+        var doughId = await SubAssemblyIdAsync(productId, doughRoleId);
+
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], id: doughId, isOwn: true, release: true)], []));
+
+        (await SubAssembliesAsync()).Should().Equal(("Cheese Roll Dough", null));
+        (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Single().SubAssemblyId.Should().Be(doughId);
+    }
+
+    [Fact]
+    public async Task A_new_section_moved_to_the_Sub_Assemblies_screen_goes_there_in_a_product_owned_role()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese");
+        var productId = await AddProductAsync("Cheese Roll");
+
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(fillingRoleId, [(cheeseId, 100m)], isOwn: true, release: true)], []));
+
+        (await SubAssembliesAsync()).Should().Equal(("Cheese Roll Filling", null));
     }
 
     [Fact]

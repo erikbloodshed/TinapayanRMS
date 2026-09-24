@@ -569,6 +569,32 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
     }
 
     [Fact]
+    public async Task Undoing_Move_to_Sub_Assemblies_keeps_it_the_products_own_and_stops_offering_Save()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 1, isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [new NewSubAssemblyDraft(fillingRoleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
+        var viewModel = await OpenAsync(productId, vm => vm.FormLines.Count == 1);
+        viewModel.IsEditingOwnedUsage.Should().BeTrue();
+
+        await viewModel.MoveToSubAssembliesCommand.Execute(viewModel.EditingUsage!);
+        viewModel.UsageEdits.Single().IsReleasing.Should().BeTrue();
+        (await CanSave(viewModel)).Should().BeTrue();
+
+        viewModel.TryUndo().Should().BeTrue();
+
+        viewModel.UsageEdits.Single().IsReleasing.Should().BeFalse();
+        viewModel.IsEditingOwnedUsage.Should().BeTrue();
+        (await CanSave(viewModel)).Should().BeFalse();
+
+        viewModel.TryRedo().Should().BeTrue();
+        viewModel.UsageEdits.Single().IsReleasing.Should().BeTrue();
+        (await CanSave(viewModel)).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Undoing_Make_a_Copy_stops_offering_Save()
     {
         var (viewModel, _) = await OpenLinkedDoughProductAsync();
