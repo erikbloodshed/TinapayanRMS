@@ -3,15 +3,13 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Threading;
 using ReactiveUI;
-using Syncfusion.SfSkinManager;
 using Syncfusion.UI.Xaml.TreeView;
 using Syncfusion.UI.Xaml.TreeView.Engine;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.UI.Controls;
 using TinapayanRMS.UI.ViewModels;
-using TreeViewItem = Syncfusion.UI.Xaml.TreeView.TreeViewItem;
 
 namespace TinapayanRMS.UI.Views.Products;
 
@@ -138,7 +136,7 @@ public partial class ProductListCard : UserControl
             viewModel.SelectedTreeNode = node;
         }
 
-        e.ContextMenu = BuildMenu(viewModel.TreeMenuFor(node));
+        e.ContextMenu = TreeContextMenu.Build(this, viewModel.TreeMenuFor(node));
     }
 
     /// <summary>
@@ -159,14 +157,14 @@ public partial class ProductListCard : UserControl
         if (e.CursorLeft < 0 && e.CursorTop < 0 && viewModel.SelectedTreeNode is ProductTreeNode node)
         {
             e.Handled = true;
-            var rowMenu = BuildMenu(viewModel.TreeMenuFor(node));
-            rowMenu.PlacementTarget = RowOf(node) ?? (UIElement)Tree;
+            var rowMenu = TreeContextMenu.Build(this, viewModel.TreeMenuFor(node));
+            rowMenu.PlacementTarget = TreeContextMenu.RowOf(Tree, node) ?? (UIElement)Tree;
             rowMenu.Placement = PlacementMode.Bottom;
             rowMenu.IsOpen = true;
             return;
         }
 
-        Tree.ContextMenu = BuildMenu(viewModel.TreeMenuFor(null));
+        Tree.ContextMenu = TreeContextMenu.Build(this, viewModel.TreeMenuFor(null));
     }
 
     /// <summary>
@@ -197,81 +195,6 @@ public partial class ProductListCard : UserControl
         {
             command.Execute(item.Parameter);
             e.Handled = true;
-        }
-    }
-
-    /// <summary>
-    /// A menu of <paramref name="items"/>, themed as the window is: a menu opens in a window of its own, which the theme
-    /// only reaches when it's given it, as a dialog is.
-    /// </summary>
-    private ContextMenu BuildMenu(IReadOnlyList<ProductTreeMenuItem> items)
-    {
-        var menu = new ContextMenu();
-        if (Window.GetWindow(this) is { } window)
-        {
-            SfSkinManager.SetTheme(menu, SfSkinManager.GetTheme(window));
-        }
-
-        foreach (var item in items)
-        {
-            menu.Items.Add(ToMenuItem(item));
-        }
-
-        return menu;
-    }
-
-    private Control ToMenuItem(ProductTreeMenuItem item)
-    {
-        if (item.IsSeparator)
-        {
-            return new Separator();
-        }
-
-        var menuItem = new MenuItem
-        {
-            // An underscore in a name would otherwise be taken for an access key's marker.
-            Header = item.Header.Replace("_", "__", StringComparison.Ordinal),
-            Command = item.Command,
-            CommandParameter = item.Parameter,
-            InputGestureText = item.Gesture,
-            IsEnabled = item.IsEnabled,
-        };
-
-        if (item.Glyph is not null)
-        {
-            menuItem.Icon = new TextBlock { Text = item.Glyph, Style = (Style)FindResource("IconGlyphStyle") };
-        }
-
-        foreach (var child in item.Items)
-        {
-            menuItem.Items.Add(ToMenuItem(child));
-        }
-
-        return menuItem;
-    }
-
-    /// <summary>The row showing <paramref name="node"/>, or null while it's scrolled out of sight or in a closed folder.</summary>
-    private TreeViewItem? RowOf(ProductTreeNode node)
-    {
-        return Find(Tree);
-
-        TreeViewItem? Find(DependencyObject parent)
-        {
-            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is TreeViewItem row && (row.DataContext == node || row.DataContext is TreeViewNode { Content: var content } && content == node))
-                {
-                    return row;
-                }
-
-                if (Find(child) is { } found)
-                {
-                    return found;
-                }
-            }
-
-            return null;
         }
     }
 

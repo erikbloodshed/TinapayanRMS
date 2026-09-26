@@ -4108,7 +4108,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// first (keeping the rows picked with it, when it was one of them), or on the list's empty space when it's null. A
     /// product's menu covers every product picked with it.
     /// </summary>
-    public IReadOnlyList<ProductTreeMenuItem> TreeMenuFor(ProductTreeNode? node) => node switch
+    public IReadOnlyList<TreeMenuItem> TreeMenuFor(ProductTreeNode? node) => node switch
     {
         ProductLeafNode leaf => ProductsMenu(SelectedTreeProducts is var picked && picked.Contains(leaf) ? picked : [leaf]),
         ProductFolderNode { IsStage: true } stage => StageMenu(stage),
@@ -4120,19 +4120,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// The item a key runs with the one row picked, as that row's menu shows the key beside it (F2, Del); null when the
     /// menu has none, or when several rows are picked.
     /// </summary>
-    public ProductTreeMenuItem? TreeShortcut(string gesture) =>
+    public TreeMenuItem? TreeShortcut(string gesture) =>
         SelectedTreeNodes is [ProductTreeNode node]
             ? TreeMenuFor(node).FirstOrDefault(item => item.Gesture == gesture && item.IsEnabled)
             : null;
 
-    private List<ProductTreeMenuItem> ProductsMenu(IReadOnlyList<ProductLeafNode> leaves)
+    private List<TreeMenuItem> ProductsMenu(IReadOnlyList<ProductLeafNode> leaves)
     {
         var products = leaves.Select(l => l.Product).ToList();
         var isOne = products.Count == 1;
         var toProduction = ProductTree.MovesTo(ProductStage.Production, null, keepCategory: true, products);
         var toResearch = ProductTree.MovesTo(ProductStage.ResearchAndDevelopment, null, keepCategory: true, products);
 
-        List<ProductTreeMenuItem> items = [];
+        List<TreeMenuItem> items = [];
         if (toProduction.Count > 0)
         {
             items.Add(new($"Promote {HowMany(toProduction)}to Production", MoveProductsCommand, toProduction) { Glyph = PromoteGlyph });
@@ -4154,11 +4154,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             var leaf = leaves[0];
             items.AddRange(
             [
-                ProductTreeMenuItem.Separator,
+                TreeMenuItem.Separator,
                 new("Rename…", RenameProductCommand, leaf) { Gesture = "F2", Glyph = RenameGlyph },
                 new("Clone…", CloneProductCommand, leaf) { Glyph = CopyGlyph },
                 new("Create Variant…", CreateVariantOfCommand, leaf) { Glyph = LinkGlyph },
-                ProductTreeMenuItem.Separator,
+                TreeMenuItem.Separator,
                 new("Delete", DeleteProductCommand, leaf) { Gesture = "Del", Glyph = DeleteGlyph },
             ]);
         }
@@ -4170,16 +4170,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             isOne ? string.Empty : $"{moves.Count} {(moves.Count == 1 ? "Product" : "Products")} ";
 
         // A stage's folders, each moving every product picked that isn't in it already, and greyed when none would move.
-        ProductTreeMenuItem MoveToStage(ProductStage stage)
+        TreeMenuItem MoveToStage(ProductStage stage)
         {
-            List<ProductTreeMenuItem> folders =
+            List<TreeMenuItem> folders =
             [
                 .. Categories.Select(c => MoveToFolder(c.Name, c.Id)),
                 MoveToFolder(ProductFolderNode.UncategorizedTitle, null),
             ];
             return new(ProductFolderNode.StageTitle(stage)) { Items = folders, IsEnabled = folders.Any(f => f.IsEnabled) };
 
-            ProductTreeMenuItem MoveToFolder(string title, int? categoryId)
+            TreeMenuItem MoveToFolder(string title, int? categoryId)
             {
                 var moves = ProductTree.MovesTo(stage, categoryId, keepCategory: false, products);
                 return new(title, MoveProductsCommand, moves) { IsEnabled = moves.Count > 0 };
@@ -4187,18 +4187,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }
     }
 
-    private List<ProductTreeMenuItem> StageMenu(ProductFolderNode stage) =>
+    private List<TreeMenuItem> StageMenu(ProductFolderNode stage) =>
     [
         new("New Product Here", NewProductInCommand, stage) { Glyph = AddGlyph },
         new("New Category…", NewCategoryCommand, stage) { Glyph = NewFolderGlyph },
-        ProductTreeMenuItem.Separator,
+        TreeMenuItem.Separator,
         new("Expand All", ExpandAllCommand, stage),
         new("Collapse All", CollapseAllCommand, stage),
     ];
 
-    private List<ProductTreeMenuItem> FolderMenu(ProductFolderNode folder)
+    private List<TreeMenuItem> FolderMenu(ProductFolderNode folder)
     {
-        List<ProductTreeMenuItem> items = [new("New Product Here", NewProductInCommand, folder) { Glyph = AddGlyph }];
+        List<TreeMenuItem> items = [new("New Product Here", NewProductInCommand, folder) { Glyph = AddGlyph }];
 
         // What the folder shows: with a search on, its matches.
         var toProduction = ProductTree.MovesTo(ProductStage.Production, null, keepCategory: true, folder.Products.Select(l => l.Product));
@@ -4211,7 +4211,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             items.AddRange(
             [
-                ProductTreeMenuItem.Separator,
+                TreeMenuItem.Separator,
                 new("New Category…", NewCategoryCommand, folder) { Glyph = NewFolderGlyph },
                 new("Rename Category…", RenameCategoryCommand, folder) { Gesture = "F2", Glyph = RenameGlyph },
                 new("Delete Category", DeleteCategoryCommand, folder) { Gesture = "Del", Glyph = DeleteGlyph },
@@ -4221,11 +4221,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         return items;
     }
 
-    private List<ProductTreeMenuItem> EmptySpaceMenu() =>
+    private List<TreeMenuItem> EmptySpaceMenu() =>
     [
         new("New Product", NewProductInCommand) { Glyph = AddGlyph },
         new("New Category…", NewCategoryCommand) { Glyph = NewFolderGlyph },
-        ProductTreeMenuItem.Separator,
+        TreeMenuItem.Separator,
         new("Expand All", ExpandAllCommand),
         new("Collapse All", CollapseAllCommand),
     ];

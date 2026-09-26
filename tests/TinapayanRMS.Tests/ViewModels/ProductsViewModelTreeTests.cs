@@ -374,8 +374,8 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         var breads = TreeFolder(viewModel, ProductStage.ResearchAndDevelopment, "Breads");
 
         viewModel.SelectedTreeNode = mamon;
-        viewModel.TreeShortcut("F2").Should().Match<ProductTreeMenuItem>(i => i.Command == viewModel.RenameProductCommand && i.Parameter == mamon);
-        viewModel.TreeShortcut("Del").Should().Match<ProductTreeMenuItem>(i => i.Command == viewModel.DeleteProductCommand && i.Parameter == mamon);
+        viewModel.TreeShortcut("F2").Should().Match<TreeMenuItem>(i => i.Command == viewModel.RenameProductCommand && i.Parameter == mamon);
+        viewModel.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == viewModel.DeleteProductCommand && i.Parameter == mamon);
 
         viewModel.SelectedTreeNode = breads;
         viewModel.TreeShortcut("F2")!.Command.Should().BeSameAs(viewModel.RenameCategoryCommand);
@@ -449,7 +449,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         store.ReadList(ProductsViewModel.OpenFoldersKey).Should().Contain($"Production/{cakesId}");
     }
 
-    private static IEnumerable<string> Headers(IEnumerable<ProductTreeMenuItem> menu) => menu.Where(i => !i.IsSeparator).Select(i => i.Header);
+    private static IEnumerable<string> Headers(IEnumerable<TreeMenuItem> menu) => menu.Where(i => !i.IsSeparator).Select(i => i.Header);
 
     private static IEnumerable<string> TitlesIn(ProductFolderNode folder) => folder.Children.Select(c => c.Title);
 
@@ -457,7 +457,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.ProductTree.StageFolder(stage).Children.OfType<ProductFolderNode>().Single(f => f.Title == title);
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
-    private static async Task RunAsync(ProductTreeMenuItem item)
+    private static async Task RunAsync(TreeMenuItem item)
     {
         switch (item.Command)
         {

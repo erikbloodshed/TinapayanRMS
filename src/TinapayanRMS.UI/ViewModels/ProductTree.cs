@@ -365,21 +365,25 @@ public sealed class ProductTree : IDisposable
             return wanted;
         });
 
+        // The top-level folders with nothing in them yet: on the screen showing at startup, the tree binds before the first
+        // load has filled them, and holds them closed however they're set (see below).
+        var emptyRoots = Roots.Where(r => r.Children.Count == 0).ToHashSet();
+
         // Everything leaving the tree goes before anything arrives, so a product moving from one folder to another is
         // never in both at once.
         foreach (var (root, wanted) in layout)
         {
-            RemoveMissing(root.Children, Shown(wanted));
+            TreeRows.RemoveMissing(root.Children, Shown(wanted));
             foreach (var (folder, rows) in wanted)
             {
-                RemoveMissing(folder.Children, rows);
+                TreeRows.RemoveMissing(folder.Children, rows);
             }
         }
 
         foreach (var (root, wanted) in layout)
         {
             var shown = Shown(wanted);
-            var added = Arrange(root.Children, shown);
+            var added = TreeRows.Arrange(root.Children, shown);
             List<ProductFolderNode> filled = [];
             foreach (var (folder, rows) in wanted)
             {
@@ -388,7 +392,7 @@ public sealed class ProductTree : IDisposable
                     filled.Add(folder);
                 }
 
-                Arrange(folder.Children, rows);
+                TreeRows.Arrange(folder.Children, rows);
                 folder.ShowCount(rows.Count);
             }
 
@@ -407,6 +411,11 @@ public sealed class ProductTree : IDisposable
             // The tree is told again about a folder shown again, and one that has just got its first rows: it can't open a
             // folder with nothing in it, and doesn't look at it again when rows arrive. The screen's load makes every
             // folder empty and fills it after, since the categories come in before the products.
+            if (emptyRoots.Contains(root) && root.Children.Count > 0 && root.IsExpanded)
+            {
+                root.AnnounceExpanded();
+            }
+
             foreach (var folder in added.Cast<ProductFolderNode>().Union(filled).Where(f => f.IsExpanded))
             {
                 folder.AnnounceExpanded();
@@ -419,18 +428,6 @@ public sealed class ProductTree : IDisposable
             [.. wanted.Where(f => !isFiltered || f.Rows.Count > 0).Select(f => f.Folder)];
     }
 
-    private static void RemoveMissing(ObservableCollection<ProductTreeNode> list, List<ProductTreeNode> wanted)
-    {
-        var keep = wanted.ToHashSet();
-        for (var i = list.Count - 1; i >= 0; i--)
-        {
-            if (!keep.Contains(list[i]))
-            {
-                list.RemoveAt(i);
-            }
-        }
-    }
-
     private sealed class StageFolders(ProductFolderNode uncategorized)
     {
         public Dictionary<int, ProductFolderNode> ByCategory { get; } = [];
@@ -439,34 +436,5 @@ public sealed class ProductTree : IDisposable
 
         /// <summary>Every folder in the stage: each category's, then Uncategorized.</summary>
         public IEnumerable<ProductFolderNode> All => ByCategory.Values.Append(Uncategorized);
-    }
-
-    /// <summary>
-    /// Puts <paramref name="list"/> in <paramref name="wanted"/>'s order, moving the rows it has and adding the ones it
-    /// hasn't. Returns the ones it added.
-    /// </summary>
-    private static List<ProductTreeNode> Arrange(ObservableCollection<ProductTreeNode> list, List<ProductTreeNode> wanted)
-    {
-        List<ProductTreeNode> added = [];
-        for (var i = 0; i < wanted.Count; i++)
-        {
-            if (i < list.Count && ReferenceEquals(list[i], wanted[i]))
-            {
-                continue;
-            }
-
-            var at = list.IndexOf(wanted[i]);
-            if (at >= 0)
-            {
-                list.Move(at, i);
-            }
-            else
-            {
-                list.Insert(i, wanted[i]);
-                added.Add(wanted[i]);
-            }
-        }
-
-        return added;
     }
 }

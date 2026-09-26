@@ -2,6 +2,12 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.ApplicationCore.Interfaces;
 
+/// <summary>
+/// A raw material filed under another folder of the Raw Materials list: the category it goes in from now on, which has
+/// to be one of its own type.
+/// </summary>
+public sealed record RawMaterialMove(int RawMaterialId, int CategoryId);
+
 public interface IRawMaterialRepository
 {
     /// <summary>Every raw material, both types, with its category, base unit and alternative units, by name.</summary>
@@ -31,6 +37,16 @@ public interface IRawMaterialRepository
     /// base unit. The type and source are fixed once created.
     /// </summary>
     Task UpdateAsync(RawMaterial material, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Files each material under another category, all in one save: sets its category, nothing else, and stamps
+    /// UpdatedAt. Refused, with nothing moved, if a material or a category doesn't exist, or a category is of the
+    /// other type. A category costs nothing, so nothing cascades.
+    /// </summary>
+    Task MoveAsync(IReadOnlyCollection<RawMaterialMove> moves, CancellationToken cancellationToken);
+
+    /// <summary>Renames the material and nothing else, stamping UpdatedAt.</summary>
+    Task RenameAsync(int id, string name, CancellationToken cancellationToken);
 
     /// <summary>
     /// Saves everything the Raw Materials screen edits in one transaction, so nothing is saved unless

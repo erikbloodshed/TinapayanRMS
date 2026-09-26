@@ -24,8 +24,17 @@ public partial class RawMaterialsView : UserControl
                 "New Category", "Name", interaction.Input, Window.GetWindow(this), NewCategoryMessage(interaction.Input)));
         });
 
-        // New clears the form; put the cursor in Name so typing can start straight away.
+        // A name asked for by the list's menu: a material's new name, or a category's (ProductsView does the same).
+        viewModel.PromptForName.RegisterHandler(async interaction =>
+        {
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            var request = interaction.Input;
+            interaction.SetOutput(TextPromptWindow.Prompt(request.Title, request.Label, request.InitialValue, Window.GetWindow(this), request.Message));
+        });
+
+        // New clears the form, as New … Here does; put the cursor in Name so typing can start straight away.
         viewModel.NewCommand.Subscribe(_ => SummaryHeader.FocusName());
+        viewModel.NewMaterialInCommand.Subscribe(_ => SummaryHeader.FocusName());
     }
 
     /// <summary>The prompt's line for a name typed into a Category picker that isn't a category yet (Products uses it too).</summary>

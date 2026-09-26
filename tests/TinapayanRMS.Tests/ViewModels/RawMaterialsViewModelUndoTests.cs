@@ -404,6 +404,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
             new RawMaterialUnitValidator(),
             new RawMaterialBrandPriceValidator(),
             new UnitOfMeasureRepository(factory),
+            new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
     }
 

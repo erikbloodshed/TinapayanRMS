@@ -89,6 +89,56 @@ public class RawMaterialRepository(
         }
     }
 
+    public async Task MoveAsync(IReadOnlyCollection<RawMaterialMove> moves, CancellationToken cancellationToken)
+    {
+        if (moves.Count == 0)
+        {
+            return;
+        }
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var materialIds = moves.Select(m => m.RawMaterialId).Distinct().ToList();
+        var materials = await dbContext.RawMaterials.Where(m => materialIds.Contains(m.Id)).ToDictionaryAsync(m => m.Id, cancellationToken);
+        if (materialIds.Where(id => !materials.ContainsKey(id)).ToList() is [var missingId, ..])
+        {
+            throw new InvalidOperationException($"Raw material {missingId} does not exist.");
+        }
+
+        // Checked rather than left to the foreign key, whose refusal would read as a duplicate name: a move undone after
+        // the category it came from was deleted.
+        var categoryIds = moves.Select(m => m.CategoryId).Distinct().ToList();
+        var categories = await dbContext.RawMaterialCategories
+            .Where(c => categoryIds.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, cancellationToken);
+        if (categories.Count < categoryIds.Count)
+        {
+            throw new InvalidOperationException("The category to move it to no longer exists.");
+        }
+
+        var now = DateTime.Now;
+        foreach (var move in moves)
+        {
+            var material = materials[move.RawMaterialId];
+            var category = categories[move.CategoryId];
+            RawMaterialRules.EnsureCategoryMatchesType(material.Type, category.Type, category.Name);
+            material.CategoryId = move.CategoryId;
+            material.UpdatedAt = now;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RenameAsync(int id, string name, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var existing = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException($"Raw material {id} does not exist.");
+
+        existing.Name = name;
+        existing.UpdatedAt = DateTime.Now;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<int> SaveAsync(
         RawMaterial material,
         IReadOnlyList<RawMaterialUnit> units,

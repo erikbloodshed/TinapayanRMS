@@ -1561,6 +1561,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             new RawMaterialUnitValidator(),
             new RawMaterialBrandPriceValidator(),
             new UnitOfMeasureRepository(factory),
+            new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
     }
 
