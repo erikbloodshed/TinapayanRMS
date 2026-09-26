@@ -43,16 +43,26 @@ public static class GridCellEditing
 
     private static void RefuseWhereNotAllowed(object? sender, CurrentCellBeginEditEventArgs e)
     {
-        if (sender is not SfDataGrid grid || e.Column is null || GetAllowWhen(e.Column) is not { Length: > 0 } propertyName)
+        if (sender is SfDataGrid grid && Refuses(grid, e))
         {
-            return;
+            e.Cancel = true;
+        }
+    }
+
+    /// <summary>
+    /// Whether the edit about to begin is one this refuses: the column names a row property, and the row says false.
+    /// GridUndoSteps asks too, since the grid raises nothing to end an edit that never began, and handlers of the same
+    /// event run in no order it can count on.
+    /// </summary>
+    internal static bool Refuses(SfDataGrid grid, CurrentCellBeginEditEventArgs e)
+    {
+        if (!GetIsEnabled(grid) || e.Column is null || GetAllowWhen(e.Column) is not { Length: > 0 } propertyName)
+        {
+            return false;
         }
 
         // The add row has no item until its edit begins; there's nothing to ask yet, so the grid decides.
         var row = grid.GetRecordAtRowIndex(e.RowColumnIndex.RowIndex);
-        if (row?.GetType().GetProperty(propertyName)?.GetValue(row) is false)
-        {
-            e.Cancel = true;
-        }
+        return row?.GetType().GetProperty(propertyName)?.GetValue(row) is false;
     }
 }

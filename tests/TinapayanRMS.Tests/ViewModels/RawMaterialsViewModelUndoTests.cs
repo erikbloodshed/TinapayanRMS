@@ -313,7 +313,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
     /// <summary>A saved purchased ingredient with one alternative unit (a 25 kg bag), open in the form.</summary>
     private async Task<(RawMaterialsViewModel ViewModel, int MaterialId)> OpenPurchasedIngredientAsync()
     {
-        var kilogramId = await GetOrCreateUnitOfMeasureAsync("kilogram", "kg");
+        var bagId = await GetOrCreateUnitOfMeasureAsync("bag", "bag");
         int materialId;
         await using (var dbContext = CreateDbContext())
         {
@@ -325,7 +325,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
                 Type = RawMaterialType.Ingredient,
                 Category = category,
                 Source = RawMaterialSource.Purchased,
-                Units = [new RawMaterialUnit { UnitOfMeasureId = kilogramId, BaseUnitsPerUnit = 25000m }],
+                Units = [new RawMaterialUnit { UnitOfMeasureId = bagId, BaseUnitsPerUnit = 25000m }],
             };
             dbContext.RawMaterials.Add(material);
             await dbContext.SaveChangesAsync(Cancellation);

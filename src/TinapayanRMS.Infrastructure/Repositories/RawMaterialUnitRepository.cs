@@ -49,17 +49,18 @@ public class RawMaterialUnitRepository(
 
     /// <summary>
     /// Adds the unit and saves it, rejecting a non-positive multiplier, a packaging material's own base
-    /// unit, a unit the material already has, and a third unit.
+    /// unit, a unit the material already has, and a third unit. A standard unit takes its fixed multiplier.
     /// </summary>
     internal static async Task AddAsync(TinapayanRMSDbContext dbContext, RawMaterialUnit unit, CancellationToken cancellationToken)
     {
-        UnitConversionRules.EnsureValidMultiplier(unit.BaseUnitsPerUnit);
-
         var material = await dbContext.RawMaterials
             .Where(m => m.Id == unit.RawMaterialId)
-            .Select(m => new { m.BaseUnitId })
+            .Select(m => new { m.Type, m.BaseUnitId })
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException($"Raw material {unit.RawMaterialId} does not exist.");
+
+        var baseUnitsPerUnit = await MultiplierToSaveAsync(dbContext, material.Type, material.BaseUnitId, unit, cancellationToken);
+        UnitConversionRules.EnsureValidMultiplier(baseUnitsPerUnit);
 
         RawMaterialRules.EnsureNotTheBaseUnit(material.BaseUnitId, unit.UnitOfMeasureId);
         await EnsureNotAlreadyAddedAsync(dbContext, unit.RawMaterialId, unit.UnitOfMeasureId, excludeId: 0, cancellationToken);
@@ -70,7 +71,7 @@ public class RawMaterialUnitRepository(
         {
             RawMaterialId = unit.RawMaterialId,
             UnitOfMeasureId = unit.UnitOfMeasureId,
-            BaseUnitsPerUnit = unit.BaseUnitsPerUnit,
+            BaseUnitsPerUnit = baseUnitsPerUnit,
             Description = unit.Description,
         });
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -78,26 +79,26 @@ public class RawMaterialUnitRepository(
 
     /// <summary>
     /// Changes the unit, multiplier or description of <paramref name="unit"/>, which must belong to its
-    /// RawMaterialId, and saves it. A new multiplier reprices the material when a brand is priced in
+    /// RawMaterialId, and saves it. A standard unit takes its fixed multiplier. A new multiplier reprices the material when a brand is priced in
     /// this unit (logging a new cost in price history); recipe lines are in grams, so nothing else moves. Returns whether that changed an
     /// ingredient's cost, for the caller to cascade once its transaction commits.
     /// </summary>
     internal static async Task<bool> UpdateAsync(TinapayanRMSDbContext dbContext, RawMaterialUnit unit, CancellationToken cancellationToken)
     {
-        UnitConversionRules.EnsureValidMultiplier(unit.BaseUnitsPerUnit);
-
         var existing = await dbContext.RawMaterialUnits
             .Include(u => u.RawMaterial)
             .FirstOrDefaultAsync(u => u.Id == unit.Id && u.RawMaterialId == unit.RawMaterialId, cancellationToken)
             ?? throw new InvalidOperationException($"Raw material unit {unit.Id} does not exist.");
 
         var material = existing.RawMaterial!;
+        var baseUnitsPerUnit = await MultiplierToSaveAsync(dbContext, material.Type, material.BaseUnitId, unit, cancellationToken);
+        UnitConversionRules.EnsureValidMultiplier(baseUnitsPerUnit);
         RawMaterialRules.EnsureNotTheBaseUnit(material.BaseUnitId, unit.UnitOfMeasureId);
         await EnsureNotAlreadyAddedAsync(dbContext, existing.RawMaterialId, unit.UnitOfMeasureId, existing.Id, cancellationToken);
 
-        var multiplierChanged = existing.BaseUnitsPerUnit != unit.BaseUnitsPerUnit;
+        var multiplierChanged = existing.BaseUnitsPerUnit != baseUnitsPerUnit;
         existing.UnitOfMeasureId = unit.UnitOfMeasureId;
-        existing.BaseUnitsPerUnit = unit.BaseUnitsPerUnit;
+        existing.BaseUnitsPerUnit = baseUnitsPerUnit;
         existing.Description = unit.Description;
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -163,6 +164,27 @@ public class RawMaterialUnitRepository(
     }
 
     /// <summary>A material can have each unit of measure only once; the unique index would otherwise report it as a duplicate name.</summary>
+    /// <summary>
+    /// The multiplier <paramref name="unit"/> is saved with: a standard unit's fixed one when it and the material's base
+    /// unit are of the same kind (StandardUnitRules: a kilogram of an ingredient is 1,000 g, whatever was sent), else
+    /// the one sent.
+    /// </summary>
+    private static async Task<decimal> MultiplierToSaveAsync(
+        TinapayanRMSDbContext dbContext, RawMaterialType type, int? baseUnitId, RawMaterialUnit unit, CancellationToken cancellationToken)
+    {
+        var unitsOfMeasure = await dbContext.UnitsOfMeasure
+            .AsNoTracking()
+            .Where(u => u.Id == unit.UnitOfMeasureId || u.Id == baseUnitId)
+            .ToListAsync(cancellationToken);
+
+        var unitOfMeasure = unitsOfMeasure.FirstOrDefault(u => u.Id == unit.UnitOfMeasureId);
+        var baseUnit = unitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId);
+
+        return unitOfMeasure is not null && StandardUnitRules.BaseUnitsPerUnit(unitOfMeasure, type, baseUnit) is { } standard
+            ? standard
+            : unit.BaseUnitsPerUnit;
+    }
+
     private static async Task EnsureNotAlreadyAddedAsync(
         TinapayanRMSDbContext dbContext, int rawMaterialId, int unitOfMeasureId, int excludeId, CancellationToken cancellationToken)
     {

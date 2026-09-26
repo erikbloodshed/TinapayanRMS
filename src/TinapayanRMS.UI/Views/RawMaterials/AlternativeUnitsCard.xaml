@@ -32,6 +32,7 @@
                                    controls:GridAddNewRow.ItemFactory="{Binding NewUnitRow}"
                                    controls:GridAddNewRow.DropWhenUntouched="True"
                                    controls:AutoCompleteDropDown.IsEnabled="True"
+                                   controls:GridCellEditing.IsEnabled="True"
                                    Height="160">
                 <syncfusion:SfDataGrid.Columns>
                     <!-- Typing opens the list of units containing the text and picks one: the first starting with it, else the first containing it -->
@@ -57,7 +58,11 @@
                         </syncfusion:GridMultiColumnDropDownList.Columns>
                     </syncfusion:GridMultiColumnDropDownList>
                     <syncfusion:GridTextColumn MappingName="Abbreviation" HeaderText="Abbreviation" AllowEditing="False" />
-                    <controls:NumericColumn MappingName="BaseUnitsPerUnit" HeaderText="Multiplier" NumberDecimalDigits="2" />
+                    <!-- A standard unit of the base unit's kind has a fixed multiplier (a kilogram of an ingredient is 1,000 g), so it isn't typed -->
+                    <controls:NumericColumn MappingName="BaseUnitsPerUnit"
+                                            HeaderText="Multiplier"
+                                            NumberDecimalDigits="2"
+                                            controls:GridCellEditing.AllowWhen="CanTypeMultiplier" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
 

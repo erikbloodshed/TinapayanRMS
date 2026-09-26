@@ -951,6 +951,59 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task A_kilogram_of_an_ingredient_is_1000_grams_as_its_picked_and_isnt_typed()
+    {
+        var kilogramId = await SeedUnitOfMeasureAsync("kilogram", "kg");
+        var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await viewModel.NewCommand.Execute();
+
+        // In the Alternative Units grid's add row.
+        var kilogram = viewModel.NewUnitRow();
+        kilogram.UnitOfMeasureId = kilogramId;
+        (kilogram.BaseUnitsPerUnit, kilogram.CanTypeMultiplier).Should().Be((1000m, false));
+        var bag = viewModel.NewUnitRow();
+        bag.UnitOfMeasureId = bagId;
+        (bag.BaseUnitsPerUnit, bag.CanTypeMultiplier).Should().Be((0m, true), "a bag's size is the material's own to type");
+
+        // Picked on a Purchase Cost Setup row, which adds the unit.
+        var brand = viewModel.NewBrandPriceRow();
+        brand.UnitKey = kilogramId;
+        brand.Quantity.Should().Be(1000m);
+        brand.CanTypeQuantity.Should().BeFalse();
+        viewModel.UnitRows.Should().ContainSingle().Which.BaseUnitsPerUnit.Should().Be(1000m);
+    }
+
+    [Fact]
+    public async Task An_unsaved_materials_buffered_cost_per_base_unit_is_shown_to_four_places()
+    {
+        // A new material's Per unit starts on the base unit, where the cost is a fraction of a centavo: ₱0.0525/g
+        // rounded to the centavo would read as ₱0.05/g, under the percent just typed.
+        var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Flour";
+        PickCategory(viewModel);
+        await AddUnitAsync(viewModel, bagId, 25000m);
+        AddBrandPrice(viewModel, null, "bag", 1250m);
+        viewModel.TypedCostBufferPercent = 5m;
+
+        viewModel.BufferedCostUnit!.Key.Should().Be(PurchaseUnitChoice.BaseUnitKey);
+        viewModel.EditingBufferedCostInUnit.Should().Be(0.0525m);
+        viewModel.PurchaseBufferedCostText.Should().Be("0.0525/g is 5% over the dearest brand's 0.0500/g.");
+        viewModel.EditingCostBufferPercent.Should().Be(5m);
+
+        // On the bag it's to the centavo, as before.
+        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
+        viewModel.EditingBufferedCostInUnit.Should().Be(1312.5m);
+        viewModel.PurchaseBufferedCostText.Should().Be("1,312.50/bag is 5% over the dearest brand's 1,250.00/bag.");
+    }
+
+    [Fact]
     public async Task A_saved_buffered_cost_rounded_to_four_places_doesnt_read_as_under_an_unchanged_dearest_brand()
     {
         var boxId = await SeedUnitOfMeasureAsync("box", "box");
@@ -986,7 +1039,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
-    public async Task The_buffered_cost_is_typed_in_the_picked_unit_kept_per_base_unit_unrounded_and_shown_to_the_centavo()
+    public async Task The_buffered_cost_is_typed_in_the_picked_unit_kept_per_base_unit_unrounded_and_only_rounded_for_show()
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedCategoryAsync("Dry goods");
@@ -1003,7 +1056,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingBufferedCostInUnit.Should().Be(1297.37m);
 
         viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions[0];
-        viewModel.EditingBufferedCostInUnit.Should().Be(0.05m, "shown to the centavo");
+        viewModel.EditingBufferedCostInUnit.Should().Be(0.0519m, "shown to 4 decimals on the base unit, where a centavo is too coarse");
         viewModel.EditingBufferedCost.Should().Be(0.0518948m, "which only rounds what's shown");
 
         // Removing the bag takes the picker back to the base unit.
@@ -1266,120 +1319,82 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
-    public async Task The_category_picker_lists_Add_New_above_the_categories_and_keeps_it_through_a_refresh()
+    public async Task The_category_picker_lists_just_the_categories_with_no_Add_New_row()
     {
         await SeedCategoryAsync("Dry goods");
         await SeedCategoryAsync("Butter");
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        viewModel.CategoryOptions.Select(c => c.Name).Should().Equal("< Add New .. >", "Butter", "Dry goods");
-        viewModel.Categories.Select(c => c.Name).Should().Equal(["Butter", "Dry goods"], "the row is the picker's, not a category");
-
-        // Not RawMaterialsViewModel.AddNewCategory itself: CategorySearchText's own subscription already replaced
-        // it once, at construction, with a fresh row of the same name (see CategorySearchText's doc comment).
-        var addNewRow = viewModel.CategoryOptions[0];
-        await viewModel.LoadCommand.Execute();
-
-        viewModel.CategoryOptions[0].Should().BeSameAs(addNewRow, "the refresh merges categories, not the row");
+        viewModel.CategoryOptions.Select(c => c.Name).Should().Equal("Butter", "Dry goods");
     }
 
     [Fact]
-    public async Task Typing_a_category_that_does_not_exist_renames_Add_New_so_it_still_matches_the_search()
+    public async Task Typing_a_listed_categorys_name_picks_it_whatever_its_case_without_asking()
     {
-        await SeedCategoryAsync("Butter");
+        await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
+        var prompted = false;
+        viewModel.PromptForNewCategory.RegisterHandler(interaction =>
+        {
+            prompted = true;
+            interaction.SetOutput(null);
+        });
         await viewModel.LoadCommand.Execute();
 
-        // The picker's own AutoComplete (ComboBoxAdv.FilterItem) is what filters "Butter" out as the user types
-        // something that doesn't match it — that happens inside the control's own CollectionView, invisible to
-        // CategoryOptions here. This only pins the rename that keeps the Add New row surviving that same filter.
-        viewModel.CategorySearchText = "Choco";
+        viewModel.BeginCategoryEdit();
+        TypeCategory(viewModel, "  dry GOODS ");
+        await viewModel.CommitCategoryTextAsync();
 
-        viewModel.CategoryOptions.Should().ContainSingle(c => c.Id == RawMaterialsViewModel.AddNewCategoryId)
-            .Which.Name.Should().Be("< Add New \"Choco\" .. >");
-        viewModel.CategoryOptions.Should().Contain(c => c.Name == "Butter", "CategoryOptions itself isn't filtered — only the picker's own CollectionView is");
-
-        viewModel.CategorySearchText = "";
-
-        viewModel.CategoryOptions.Should().ContainSingle(c => c.Id == RawMaterialsViewModel.AddNewCategoryId)
-            .Which.Name.Should().Be("< Add New .. >", "an empty search is back to the plain row");
+        prompted.Should().BeFalse("it's a category already");
+        viewModel.EditingCategory!.Name.Should().Be("Dry goods");
     }
 
     [Fact]
-    public async Task Arrowing_onto_Add_New_reads_its_name_as_what_was_typed_rather_than_nesting_it()
+    public async Task Typing_a_name_that_isnt_a_category_asks_to_add_it_and_files_the_material_under_it()
     {
         var viewModel = CreateViewModel();
-        (string Label, string InitialValue) promptedWith = default;
+        string? promptedWith = null;
         viewModel.PromptForNewCategory.RegisterHandler(interaction =>
         {
             promptedWith = interaction.Input;
-            interaction.SetOutput("Additives");
+            interaction.SetOutput(interaction.Input);
         });
         await viewModel.LoadCommand.Execute();
-        viewModel.CategorySearchText = "Additives";
 
-        // Arrowing down the open picker onto the row puts the row's own name in the picker's text, and arrowing on and
-        // back again does it over and over.
-        for (var i = 0; i < 3; i++)
-        {
-            viewModel.CategorySearchText = viewModel.CategoryOptions.Single(c => c.Id == RawMaterialsViewModel.AddNewCategoryId).Name;
-        }
+        viewModel.BeginCategoryEdit();
+        TypeCategory(viewModel, " Spices ");
+        await viewModel.CommitCategoryTextAsync();
 
-        var addNewRow = viewModel.CategoryOptions.Single(c => c.Id == RawMaterialsViewModel.AddNewCategoryId);
-        addNewRow.Name.Should().Be("< Add New \"Additives\" .. >", "the row's name in the text isn't new typing to wrap again");
-
-        viewModel.EditingCategory = addNewRow;
-
-        await WaitUntilSettledAsync(() => viewModel.EditingCategory is not null,
-            () => $"picked={viewModel.EditingCategory?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
-        promptedWith.InitialValue.Should().Be("Additives", "the prompt starts with what was typed, not the row's label");
-    }
-
-    [Fact]
-    public async Task Picking_the_renamed_Add_New_row_still_starts_the_add_category_flow()
-    {
-        var viewModel = CreateViewModel();
-        (string Label, string InitialValue) promptedWith = default;
-        viewModel.PromptForNewCategory.RegisterHandler(interaction =>
-        {
-            promptedWith = interaction.Input;
-            interaction.SetOutput("Spices");
-        });
-        await viewModel.LoadCommand.Execute();
-        viewModel.CategorySearchText = "Spi";
-
-        // By id, not the same instance as RawMaterialsViewModel.AddNewCategory — this is the row a user would
-        // actually click after typing, and EditingCategory's setter must still recognize it as the Add New row.
-        viewModel.EditingCategory = viewModel.CategoryOptions.Single(c => c.Id == RawMaterialsViewModel.AddNewCategoryId);
-
-        await WaitUntilSettledAsync(() => viewModel.EditingCategory is not null,
-            () => $"picked={viewModel.EditingCategory?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
-        viewModel.EditingCategory!.Name.Should().Be("Spices");
-        promptedWith.InitialValue.Should().Be("Spi", "the prompt should start with what was already typed, not an empty box");
-    }
-
-    [Fact]
-    public async Task Picking_Add_New_saves_the_category_it_asks_for_and_files_the_material_under_it()
-    {
-        var viewModel = CreateViewModel();
-        viewModel.PromptForNewCategory.RegisterHandler(interaction => interaction.SetOutput("Spices"));
-        await viewModel.LoadCommand.Execute();
-
-        viewModel.EditingCategory = RawMaterialsViewModel.AddNewCategory;
-
-        await WaitUntilSettledAsync(() => viewModel.EditingCategory is not null,
-            () => $"picked={viewModel.EditingCategory?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
+        promptedWith.Should().Be("Spices", "the prompt starts with the name typed, so it needn't be typed again");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("Spices was added.", "a toast says so");
         viewModel.EditingCategory!.Name.Should().Be("Spices", "the material is filed under the category just added");
+        viewModel.CategorySearchText.Should().Be("Spices");
         viewModel.Categories.Select(c => c.Name).Should().Equal("Spices");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterialCategories.SingleAsync(Cancellation)).Name.Should().Be("Spices");
     }
 
     [Fact]
-    public async Task Cancelling_the_new_category_prompt_leaves_the_category_that_was_picked()
+    public async Task A_name_changed_in_the_prompt_to_a_listed_category_picks_that_one_rather_than_adding_it_again()
+    {
+        await SeedCategoryAsync("Spices");
+        var viewModel = CreateViewModel();
+        viewModel.PromptForNewCategory.RegisterHandler(interaction => interaction.SetOutput("spices"));
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.BeginCategoryEdit();
+        TypeCategory(viewModel, "Spice");
+        await viewModel.CommitCategoryTextAsync();
+
+        viewModel.EditingCategory!.Name.Should().Be("Spices");
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.Categories.Should().ContainSingle("nothing was added");
+    }
+
+    [Fact]
+    public async Task Cancelling_the_new_category_prompt_puts_back_the_category_the_picker_had()
     {
         await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
@@ -1392,12 +1407,43 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
         PickCategory(viewModel);
 
-        viewModel.EditingCategory = RawMaterialsViewModel.AddNewCategory;
+        viewModel.BeginCategoryEdit();
+        TypeCategory(viewModel, "Spi");
+        viewModel.EditingCategory.Should().BeNull("the picker lets go of its pick as a name it doesn't list is typed");
+        await viewModel.CommitCategoryTextAsync();
 
-        await WaitUntilSettledAsync(() => prompted, () => "the prompt was never asked for");
-        viewModel.EditingCategory!.Name.Should().Be("Dry goods", "the row was never a category to file it under");
+        prompted.Should().BeTrue();
+        viewModel.EditingCategory!.Name.Should().Be("Dry goods");
+        viewModel.CategorySearchText.Should().Be("Dry goods", "the picker shows the category again, not what was typed");
         viewModel.Categories.Should().ContainSingle("nothing was added");
         viewModel.ErrorMessage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Leaving_the_picker_empty_or_on_its_own_category_asks_nothing()
+    {
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        var prompted = false;
+        viewModel.PromptForNewCategory.RegisterHandler(interaction =>
+        {
+            prompted = true;
+            interaction.SetOutput(null);
+        });
+        await viewModel.LoadCommand.Execute();
+        PickCategory(viewModel);
+
+        viewModel.BeginCategoryEdit();
+        TypeCategory(viewModel, "Dry goods");
+        await viewModel.CommitCategoryTextAsync();
+        viewModel.EditingCategory!.Name.Should().Be("Dry goods");
+
+        viewModel.BeginCategoryEdit();
+        TypeCategory(viewModel, "");
+        await viewModel.CommitCategoryTextAsync();
+
+        prompted.Should().BeFalse();
+        viewModel.EditingCategory.Should().BeNull("deleting the picker's text leaves the material with no category");
     }
 
     [Fact]
@@ -1544,6 +1590,19 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         row.Price = price;
         viewModel.BrandPriceRows.Add(row);
         return row;
+    }
+
+    /// <summary>
+    /// Types into the Category picker as ComboBoxAdv's Suggest mode does: the text lands, and a name the picker doesn't
+    /// list (exactly, whatever its case) lets go of the category it held.
+    /// </summary>
+    private static void TypeCategory(RawMaterialsViewModel viewModel, string text)
+    {
+        viewModel.CategorySearchText = text;
+        if (!viewModel.CategoryOptions.Any(c => string.Equals(c.Name, text, StringComparison.OrdinalIgnoreCase)))
+        {
+            viewModel.EditingCategory = null;
+        }
     }
 
     /// <summary>Picks the first category, which a new material starts without.</summary>

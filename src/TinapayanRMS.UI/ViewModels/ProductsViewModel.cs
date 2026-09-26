@@ -481,7 +481,7 @@ public sealed class ProductCostSummary
 /// recipe, packaging and costing are edited in memory, and Save writes them together
 /// (IProductRepository.SaveAsync).
 /// </summary>
-public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
+public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, then Clone.</summary>
     public const int RecipeTab = 0;
@@ -508,8 +508,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     private readonly ReadOnlyObservableCollection<Product> _visibleProducts;
     private readonly SourceCache<ProductCategory, int> _categoryCache = new(c => c.Id);
     private readonly ReadOnlyObservableCollection<ProductCategory> _categories;
-    private readonly SourceCache<ProductCategory, int> _addNewCategoryOption = new(c => c.Id);
-    private readonly ReadOnlyObservableCollection<ProductCategory> _categoryOptions;
 
     /// <summary>Every product, for the packaging link and clone pickers.</summary>
     public ReadOnlyObservableCollection<Product> Products => _products;
@@ -517,18 +515,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     /// <summary>The products the list shows: those whose name matches SearchText.</summary>
     public ReadOnlyObservableCollection<Product> VisibleProducts => _visibleProducts;
 
+    /// <summary>What the Category picker lists. A name that isn't one of them is added by typing it (CommitCategoryTextAsync).</summary>
     public ReadOnlyObservableCollection<ProductCategory> Categories => _categories;
-
-    /// <summary>
-    /// The Category picker's "&lt; Add New .. &gt;" row, as on Raw Materials (RawMaterialsViewModel.AddNewCategoryId):
-    /// a category-shaped stand-in for adding one, told apart by its Id and kept out of Categories.
-    /// </summary>
-    public const int AddNewCategoryId = -1;
-
-    public static readonly ProductCategory AddNewCategory = new() { Id = AddNewCategoryId, Name = "< Add New .. >" };
-
-    /// <summary>What the Category picker lists: the categories, with the "&lt; Add New .. &gt;" row above them.</summary>
-    public ReadOnlyObservableCollection<ProductCategory> CategoryOptions => _categoryOptions;
 
     public ObservableCollection<SubAssemblyRole> Roles { get; } = [];
 
@@ -768,8 +756,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
 
     private string _categorySearchText = string.Empty;
     /// <summary>
-    /// What's typed into the Category picker (bound to its Text). Renames the "&lt; Add New .. &gt;" row to include
-    /// it, so the row survives the picker's own AutoComplete filtering, as on Raw Materials.
+    /// What's typed into the Category picker (bound to its Text): settled into a category, or a new one, once the
+    /// picker is left (CommitCategoryTextAsync).
     /// </summary>
     public string CategorySearchText
     {
@@ -782,19 +770,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     public ProductCategory? EditingCategory
     {
         get => _editingCategory;
-        set
-        {
-            // The "< Add New .. >" row isn't a category to put the product in: AddCategoryCommand takes over, and puts
-            // a category back in the picker once it's done. By id, since the row is replaced as CategorySearchText changes.
-            if (value?.Id == AddNewCategoryId)
-            {
-                AddCategoryCommand.Execute().Subscribe();
-                return;
-            }
-
-            this.RaiseAndSetIfChanged(ref _editingCategory, value);
-        }
+        set => this.RaiseAndSetIfChanged(ref _editingCategory, value);
     }
+
+    /// <summary>The category the picker held when it took the cursor, for a cancelled prompt to put back (BeginCategoryEdit).</summary>
+    private ProductCategory? _categoryBeforeEdit;
+
+    /// <summary>Set while CommitCategoryTextAsync runs: its prompt takes the cursor from the picker, which would settle it again.</summary>
+    private bool _isCommittingCategory;
 
     private readonly ObservableAsPropertyHelper<string> _headerTitle;
     /// <summary>The header's title, and the usage example's: the product's name, or "New product".</summary>
@@ -1226,13 +1209,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     public ReactiveCommand<RxVoid, RxVoid> UndoCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RedoCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> AddCategoryCommand { get; }
 
     /// <summary>
-    /// Input: the label over the box, and what was already typed into the Category picker, which the box starts with.
-    /// Output: the name typed for the new category, or null if it was cancelled. The View shows a TextPromptWindow.
+    /// Input: the name typed into the Category picker that isn't a category yet, which the prompt starts with.
+    /// Output: the name to add it as, or null if it was cancelled. The View shows a TextPromptWindow.
     /// </summary>
-    public Interaction<(string Label, string InitialValue), string?> PromptForNewCategory { get; } = new();
+    public Interaction<string, string?> PromptForNewCategory { get; } = new();
 
     /// <summary>Adds a sub-assembly the way the parameter says: Add Sub-Assembly's drop-down carries one item per way.</summary>
     public ReactiveCommand<UsageFormMode, RxVoid> AddUsageCommand { get; }
@@ -1328,27 +1310,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         _categoryCache.Connect()
             .SortAndBind(out _categories, SortExpressionComparer<ProductCategory>.Ascending(c => c.Name))
             .Subscribe();
-
-        // The "< Add New .. >" row has a cache of its own, which LoadCommand's merge of the categories never touches.
-        _addNewCategoryOption.AddOrUpdate(AddNewCategory);
-
-        _categoryCache.Connect()
-            .Or(_addNewCategoryOption.Connect())
-            .SortAndBind(out _categoryOptions, SortExpressionComparer<ProductCategory>
-                .Ascending(c => c.Id == AddNewCategoryId ? 0 : 1)
-                .ThenByAscending(c => c.Name))
-            .Subscribe();
-
-        // The picker's AutoComplete filters its rows by what's typed, Add New's too, so the row takes the typed text into
-        // its name and always matches (RawMaterialsViewModel explains it in full).
-        this.WhenAnyValue(x => x.CategorySearchText)
-            .Select(AddNewCategoryLabel.TypedText)
-            .DistinctUntilChanged()
-            .Subscribe(text => _addNewCategoryOption.AddOrUpdate(new ProductCategory
-            {
-                Id = AddNewCategoryId,
-                Name = AddNewCategoryLabel.For(text),
-            }));
 
         _headerTitle = this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingName, (product, name) =>
                 product is null && string.IsNullOrWhiteSpace(name) ? "New product" : name)
@@ -1716,40 +1677,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             await ReloadSavedProductAsync(id);
         }),
         History.WhenAnyValue(h => h.IsDirty));
-
-        // The Category picker's "< Add New .. >" row: names a category, saves it, and picks it for the product, so a
-        // product can go in a new category without a trip to Settings. Save saves the product's choice.
-        AddCategoryCommand = ReactiveCommand.CreateFromTask(async () =>
-        {
-            var name = await PromptForNewCategory.Handle(("Name", AddNewCategoryLabel.TypedText(CategorySearchText)));
-
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                await RunSafelyAsync(async () =>
-                {
-                    var category = new ProductCategory { Name = name.Trim() };
-
-                    var validation = _categoryValidator.Validate(category);
-                    if (!validation.IsValid)
-                    {
-                        ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
-                        return;
-                    }
-
-                    // AddAsync fills in the saved Id, which the reloaded copy to pick is found by. Only the categories are
-                    // reloaded: nothing else on the screen changes with a new category.
-                    await _categoryRepository.AddAsync(category, CancellationToken.None);
-                    var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
-                    ApplyRefresh(() => _categoryCache.MergeFrom(categories));
-                    EditingCategory = Categories.FirstOrDefault(c => c.Id == category.Id);
-                    SuccessMessage = $"{category.Name} was added.";
-                });
-            }
-
-            // The picker is still showing the row that was picked, so the category goes back into it: the new one, or
-            // the one it had when the prompt was cancelled or the name refused (as RawMaterialsViewModel does).
-            this.RaisePropertyChanged(nameof(EditingCategory));
-        });
 
         // Revert reads the picked product's detail again, which replaces the recipe, packaging, packs and costing
         // wholesale, so anything staged but unsaved goes: a section added or edited in the form included, since the
@@ -2412,8 +2339,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             SelectedFormPackagingLine = null;
             SelectedLineEdit = null;
 
-            // 2. The product's own fields. The category goes back by id, into the field: assigning the property
-            //    runs the picker's "< Add New .. >" sentinel, which opens a prompt.
+            // 2. The product's own fields. The category goes back by id, as the reloaded list's own copy.
             _editingId = snapshot.EditingId;
             EditingName = snapshot.Name;
             EditingDescription = snapshot.Description;
@@ -3772,11 +3698,97 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
             EditingCurrentPrice);
     }
 
+    public void BeginCategoryEdit()
+    {
+        if (!_isCommittingCategory)
+        {
+            _categoryBeforeEdit = EditingCategory;
+        }
+    }
+
+    /// <summary>
+    /// ICategoryPickerScreen, as on Raw Materials: a name that isn't a category yet is offered as a new one, saved and
+    /// picked, so a product can go in a new category without a trip to Settings. Save saves the product's choice. A
+    /// cancelled prompt puts back the category the picker had; a name that turns out to be listed is picked instead.
+    /// </summary>
+    public async Task CommitCategoryTextAsync()
+    {
+        var typed = CategorySearchText.Trim();
+        if (_isCommittingCategory || typed.Length == 0 || IsNamed(EditingCategory, typed))
+        {
+            return;
+        }
+
+        _isCommittingCategory = true;
+        try
+        {
+            if (Categories.FirstOrDefault(c => IsNamed(c, typed)) is { } listed)
+            {
+                AsUndoStep(() => EditingCategory = listed);
+                return;
+            }
+
+            var name = (await PromptForNewCategory.Handle(typed))?.Trim();
+            if (string.IsNullOrEmpty(name))
+            {
+                AsUndoStep(() => EditingCategory = _categoryBeforeEdit);
+            }
+            else if (Categories.FirstOrDefault(c => IsNamed(c, name)) is { } named)
+            {
+                AsUndoStep(() => EditingCategory = named);
+            }
+            else
+            {
+                await AddCategoryAsync(name);
+            }
+
+            // The picker shows the category it now holds rather than what was typed: the new one, or the one put back.
+            CategorySearchText = EditingCategory?.Name ?? string.Empty;
+        }
+        finally
+        {
+            _isCommittingCategory = false;
+        }
+
+        static bool IsNamed(ProductCategory? category, string name) =>
+            string.Equals(category?.Name, name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Saves a category and picks it. A refused name puts back the category the picker had.</summary>
+    private async Task AddCategoryAsync(string name)
+    {
+        var added = false;
+        await RunSafelyAsync(async () =>
+        {
+            var category = new ProductCategory { Name = name };
+
+            var validation = _categoryValidator.Validate(category);
+            if (!validation.IsValid)
+            {
+                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
+
+            // AddAsync fills in the saved Id, which the reloaded copy to pick is found by. Only the categories are
+            // reloaded: nothing else on the screen changes with a new category.
+            await _categoryRepository.AddAsync(category, CancellationToken.None);
+            var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
+            ApplyRefresh(() => _categoryCache.MergeFrom(categories));
+            AsUndoStep(() => EditingCategory = Categories.FirstOrDefault(c => c.Id == category.Id));
+            SuccessMessage = $"{category.Name} was added.";
+            added = true;
+        });
+
+        if (!added)
+        {
+            AsUndoStep(() => EditingCategory = _categoryBeforeEdit);
+        }
+    }
+
     public void Dispose()
     {
         _productCache.Dispose();
         _categoryCache.Dispose();
-        _addNewCategoryOption.Dispose();
         _subAssemblyOpenRequests.Dispose();
     }
 }

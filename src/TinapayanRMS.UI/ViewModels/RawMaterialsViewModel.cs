@@ -21,25 +21,36 @@ namespace TinapayanRMS.UI.ViewModels;
 /// alternative units, already saved (its Unit has an Id) or not yet (Id 0). Typed straight into: the grid's
 /// unit cell sets <see cref="UnitOfMeasureId"/>, which the row resolves to its unit of measure, and the multiplier
 /// cell sets <see cref="BaseUnitsPerUnit"/>. Both write through to <see cref="Unit"/>, which Save writes. A row can be
-/// half filled in; Save checks them all first.
+/// half filled in; Save checks them all first. A standard unit of the base unit's kind (a kilogram of an ingredient) takes
+/// its fixed multiplier as it's picked, and its multiplier can't be typed (StandardUnitRules).
 /// </summary>
 public sealed class RawMaterialUnitRow : ReactiveObject
 {
     /// <summary>Looks up a unit of measure by id as the screen has it.</summary>
     private readonly Func<int, UnitOfMeasure?>? _findUnitOfMeasure;
 
+    /// <summary>A standard unit's fixed multiplier for the screen's material as it now is, or null for one that's typed.</summary>
+    private readonly Func<UnitOfMeasure, decimal?>? _standardMultiplier;
+
     /// <summary>An empty row, for the grid to compare an add row against (controls:GridAddNewRow.DropWhenUntouched).</summary>
     public RawMaterialUnitRow()
-        : this(new RawMaterialUnit(), string.Empty, findUnitOfMeasure: null)
+        : this(new RawMaterialUnit(), string.Empty, findUnitOfMeasure: null, standardMultiplier: null)
     {
     }
 
     /// <param name="findUnitOfMeasure">Resolves a picked unit of measure, so a row names its unit as soon as it's picked, even in the add row.</param>
-    public RawMaterialUnitRow(RawMaterialUnit unit, string baseUnitAbbreviation, Func<int, UnitOfMeasure?>? findUnitOfMeasure)
+    /// <param name="standardMultiplier">A standard unit's fixed multiplier for the material (StandardUnitRules), or null to type it.</param>
+    public RawMaterialUnitRow(
+        RawMaterialUnit unit,
+        string baseUnitAbbreviation,
+        Func<int, UnitOfMeasure?>? findUnitOfMeasure,
+        Func<UnitOfMeasure, decimal?>? standardMultiplier)
     {
         Unit = unit;
         _baseUnitAbbreviation = baseUnitAbbreviation;
         _findUnitOfMeasure = findUnitOfMeasure;
+        _standardMultiplier = standardMultiplier;
+        ApplyStandardMultiplier();
     }
 
     public RawMaterialUnit Unit { get; }
@@ -59,6 +70,7 @@ public sealed class RawMaterialUnitRow : ReactiveObject
             Unit.UnitOfMeasure = value is { } id ? _findUnitOfMeasure?.Invoke(id) : null;
             this.RaisePropertyChanged();
             RaiseUnitOfMeasureChanged();
+            ApplyStandardMultiplier();
         }
     }
 
@@ -69,7 +81,28 @@ public sealed class RawMaterialUnitRow : ReactiveObject
         {
             Unit.UnitOfMeasure = refreshed;
             RaiseUnitOfMeasureChanged();
+            ApplyStandardMultiplier();
         }
+    }
+
+    /// <summary>The fixed multiplier of the row's unit when it's a standard unit of the base unit's kind; null while it's typed.</summary>
+    public decimal? StandardMultiplier => Unit.UnitOfMeasure is { } unitOfMeasure ? _standardMultiplier?.Invoke(unitOfMeasure) : null;
+
+    /// <summary>Whether the multiplier cell can be typed into (controls:GridCellEditing.AllowWhen): not for a standard unit.</summary>
+    public bool CanTypeMultiplier => StandardMultiplier is null;
+
+    /// <summary>
+    /// Gives a standard unit its fixed multiplier: when it's picked, renamed into one in Settings, or the material's base
+    /// unit or type changes under it. Anything else keeps the multiplier typed.
+    /// </summary>
+    public void ApplyStandardMultiplier()
+    {
+        if (StandardMultiplier is { } standard)
+        {
+            BaseUnitsPerUnit = standard;
+        }
+
+        this.RaisePropertyChanged(nameof(CanTypeMultiplier));
     }
 
     public string UnitName => Unit.UnitOfMeasure?.Name ?? "?";
@@ -148,7 +181,7 @@ public sealed record UsageExampleResult(
 /// packaging material has a base unit of its own and is always purchased. Its details, alternative
 /// units, brand prices and BOM are all edited in memory, and Save writes them together.
 /// </summary>
-public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposable, IBrandPriceRowHost
+public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen
 {
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
@@ -167,7 +200,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private readonly ReadOnlyObservableCollection<RawMaterial> _bomComponentOptions;
     private readonly SourceCache<RawMaterialCategory, int> _categoryCache = new(c => c.Id);
     private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categories;
-    private readonly SourceCache<RawMaterialCategory, int> _addNewCategoryOption = new(c => c.Id);
     private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categoryOptions;
 
     /// <summary>Every raw material, for the usage example's picker.</summary>
@@ -199,15 +231,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public ReadOnlyObservableCollection<RawMaterialCategory> Categories => _categories;
 
     /// <summary>
-    /// The Category picker's "&lt; Add New .. &gt;" row: a category-shaped stand-in for adding one, not a category
-    /// itself. Its Id tells it apart from a saved category (a positive Id) and an unsaved one (0), and it's kept out
-    /// of Categories, so the lookups and the refresh merge that work over real categories never see it.
+    /// What the Category picker lists: the categories of the material's type. A name that isn't one of them is added
+    /// by typing it (CommitCategoryTextAsync).
     /// </summary>
-    public const int AddNewCategoryId = -1;
-
-    public static readonly RawMaterialCategory AddNewCategory = new() { Id = AddNewCategoryId, Name = "< Add New .. >" };
-
-    /// <summary>What the Category picker lists: the categories of the material's type, with the "&lt; Add New .. &gt;" row above them.</summary>
     public ReadOnlyObservableCollection<RawMaterialCategory> CategoryOptions => _categoryOptions;
 
     /// <summary>Every unit of measure, for the base unit picker and the Alternative Units grid's unit cell.</summary>
@@ -234,9 +260,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
     private string _categorySearchText = string.Empty;
     /// <summary>
-    /// What's typed into the Category picker (bound to its Text). Renames the "&lt; Add New .. &gt;" row to include
-    /// it, so the row always survives the picker's own AutoComplete filtering — see the subscription in the
-    /// constructor that reacts to this.
+    /// What's typed into the Category picker (bound to its Text): settled into a category, or a new one, once the
+    /// picker is left (CommitCategoryTextAsync).
     /// </summary>
     public string CategorySearchText
     {
@@ -311,21 +336,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public RawMaterialCategory? EditingCategory
     {
         get => _editingCategory;
-        set
-        {
-            // The "< Add New .. >" row isn't a category to file the material under: AddCategoryCommand takes over,
-            // and puts a category back in the picker once it's done. By id, not ReferenceEquals(value, AddNewCategory):
-            // the row is replaced (not mutated) every time CategorySearchText changes, so it's rarely still that exact
-            // instance by the time it's picked.
-            if (value?.Id == AddNewCategoryId)
-            {
-                AddCategoryCommand.Execute().Subscribe();
-                return;
-            }
-
-            this.RaiseAndSetIfChanged(ref _editingCategory, value);
-        }
+        set => this.RaiseAndSetIfChanged(ref _editingCategory, value);
     }
+
+    /// <summary>The category the picker held when it took the cursor, for a cancelled prompt to put back (BeginCategoryEdit).</summary>
+    private RawMaterialCategory? _categoryBeforeEdit;
+
+    /// <summary>Set while CommitCategoryTextAsync runs: its prompt takes the cursor from the picker, which would settle it again.</summary>
+    private bool _isCommittingCategory;
 
     private RawMaterialSource _editingSource = RawMaterialSource.Purchased;
     public RawMaterialSource EditingSource
@@ -437,13 +455,17 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private bool _rebuildingBufferedCostUnits;
 
     /// <summary>
-    /// EditingBufferedCost in BufferedCostUnit, rounded to the centavo for show: ₱0.0518948/g is ₱1,297.37 a 25 kg bag.
+    /// EditingBufferedCost in BufferedCostUnit, rounded for show as the screen's other costs are: to the centavo on an
+    /// alternative unit (₱0.0518948/g is ₱1,297.37 a 25 kg bag), and to 4 decimals on the base unit, where a cost is a
+    /// fraction of a centavo (₱0.0525/g would otherwise read as ₱0.05/g, and a new material starts there).
     /// What's typed is divided back to the base unit at full precision, so it isn't rounded, and the Cost Buffer % becomes
     /// what it is over the dearest brand, to the 4 decimals the percent keeps: ₱1,300 a bag over ₱1,250 is 4%.
     /// </summary>
     public decimal? EditingBufferedCostInUnit
     {
-        get => EditingBufferedCost is { } cost ? Math.Round(cost * BufferedCostUnitSize(), 2) : null;
+        get => EditingBufferedCost is { } cost
+            ? Math.Round(cost * BufferedCostUnitSize(), IsBufferedCostOnBaseUnit ? 4 : 2)
+            : null;
         set
         {
             // UpdatePurchaseCostTexts, which the change below reaches, works the % out from the new amount.
@@ -457,6 +479,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         && UnitRows.FirstOrDefault(r => r.Unit.UnitOfMeasureId == unit.Key)?.Unit is { BaseUnitsPerUnit: > 0 } row
             ? row.BaseUnitsPerUnit
             : 1m;
+
+    /// <summary>Whether BufferedCostUnit is the base unit, whose costs are shown to 4 decimals rather than to the centavo.</summary>
+    private bool IsBufferedCostOnBaseUnit => BufferedCostUnit is null or { Key: PurchaseUnitChoice.BaseUnitKey };
+
+    /// <summary>A cost per base unit in BufferedCostUnit, as the screen shows it: "0.0525" a gram, "1,312.50" a bag.</summary>
+    private string FormatInBufferedCostUnit(decimal costPerBaseUnit) =>
+        IsBufferedCostOnBaseUnit ? $"{costPerBaseUnit:N4}" : $"{costPerBaseUnit * BufferedCostUnitSize():N2}";
 
     /// <summary>Packaging only; an ingredient's base unit is always the gram.</summary>
     private UnitOfMeasure? _editingBaseUnit;
@@ -625,7 +654,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// The row the grid's add row edits (controls:GridAddNewRow.ItemFactory): one that names its unit as soon as it's
     /// picked and shows the current base unit, which a row the grid made itself couldn't.
     /// </summary>
-    public Func<RawMaterialUnitRow> NewUnitRow => () => new RawMaterialUnitRow(new RawMaterialUnit(), BaseUnitAbbreviation, FindUnitOfMeasure);
+    public Func<RawMaterialUnitRow> NewUnitRow => () => new RawMaterialUnitRow(new RawMaterialUnit(), BaseUnitAbbreviation, FindUnitOfMeasure, StandardMultiplierOf);
 
     /// <summary>Set while the screen itself replaces or changes the unit rows, so only the user's grid edits count as edits.</summary>
     private bool _syncingUnitRows;
@@ -744,7 +773,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> AddCategoryCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteUnitCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> CalculateExampleCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeletePriceCommand { get; }
@@ -797,12 +825,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public ReactiveCommand<RxVoid, RxVoid> RedoCommand { get; }
 
     /// <summary>
-    /// Input: the label to put over the box, and the value it starts with — what was already typed into the
-    /// Category picker, so confirming a category from "&lt; Add New "X" .. &gt;" doesn't mean typing X again.
-    /// Output: the name typed for the new category, or null if it was cancelled. The View registers a handler
-    /// that shows a prompt dialog (Views/TextPromptWindow).
+    /// Input: the name typed into the Category picker that isn't a category yet, which the prompt starts with so it
+    /// needn't be typed twice. Output: the name to add it as, or null if it was cancelled. The View registers a
+    /// handler that shows a prompt dialog (Views/TextPromptWindow).
     /// </summary>
-    public Interaction<(string Label, string InitialValue), string?> PromptForNewCategory { get; } = new();
+    public Interaction<string, string?> PromptForNewCategory { get; } = new();
 
     public RawMaterialsViewModel(
         IRawMaterialRepository rawMaterialRepository,
@@ -869,36 +896,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             .SortAndBind(out _categories, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name))
             .Subscribe();
 
-        // The "< Add New .. >" row comes from a cache of its own rather than _categoryCache, which LoadCommand's
-        // MergeFrom diffs against the categories it loaded — the row isn't one of them, so it would be dropped.
-        _addNewCategoryOption.AddOrUpdate(AddNewCategory);
-
         // The picker offers only the categories of the material's own type, which is all it can be saved in.
         _categoryCache.Connect()
             .Filter(this.WhenAnyValue(x => x.EditingType).Select(type => (Func<RawMaterialCategory, bool>)(c => c.Type == type)))
-            .Or(_addNewCategoryOption.Connect())
-            .SortAndBind(out _categoryOptions, SortExpressionComparer<RawMaterialCategory>
-                .Ascending(c => c.Id == AddNewCategoryId ? 0 : 1)
-                .ThenByAscending(c => c.Name))
+            .SortAndBind(out _categoryOptions, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name))
             .Subscribe();
-
-        // The picker's own AutoComplete (ComboBoxAdv.FilterItem) re-filters CategoryOptions by the same typed text
-        // against every item's Name, including "< Add New .. >" itself — so as soon as nothing matches, it filters
-        // that out too and the picker shows "No Records Found" exactly when Add New is the one useful option. There's
-        // no per-item exemption from that filter, so the row is renamed to always contain whatever's typed, the same
-        // way a search box with a "+ Create 'X'" row does: it can never fail to match, without touching how the real
-        // categories are filtered (still entirely AutoCompleteMode="Suggest", untouched). CategorySearchText is bound
-        // to the picker's Text (not SelectedItem), and AddOrUpdate replaces the row through the same SourceCache path
-        // a real category's rename already flows through, so the picker's own CollectionView sees a proper replace
-        // notification — no dependence on RawMaterialCategory raising PropertyChanged, which it doesn't.
-        this.WhenAnyValue(x => x.CategorySearchText)
-            .Select(AddNewCategoryLabel.TypedText)
-            .DistinctUntilChanged()
-            .Subscribe(text => _addNewCategoryOption.AddOrUpdate(new RawMaterialCategory
-            {
-                Id = AddNewCategoryId,
-                Name = AddNewCategoryLabel.For(text),
-            }));
 
         // A new material's type changed under a category of the other type: that category is no longer one it can go in.
         this.WhenAnyValue(x => x.EditingType)
@@ -1247,40 +1249,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             }),
             this.WhenAnyValue(x => x.SelectedRawMaterial).Select(material => material is not null));
 
-        // The Category picker's "< Add New .. >" row: names a category, saves it, and picks it for the material
-        // being edited, so filing one under a new category doesn't mean a trip to Settings and back.
-        AddCategoryCommand = ReactiveCommand.CreateFromTask(async () =>
-        {
-            var name = await PromptForNewCategory.Handle(("Name", AddNewCategoryLabel.TypedText(CategorySearchText)));
-
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                await RunSafelyAsync(async () =>
-                {
-                    // For the material's own type, the only kind the picker offers it.
-                    var category = new RawMaterialCategory { Name = name.Trim(), Type = EditingType };
-
-                    var validation = _categoryValidator.Validate(category);
-                    if (!validation.IsValid)
-                    {
-                        ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
-                        return;
-                    }
-
-                    // AddAsync fills in the saved Id, which the reloaded copy to pick is found by.
-                    await _categoryRepository.AddAsync(category, CancellationToken.None);
-                    await LoadCommand.Execute();
-                    EditingCategory = Categories.FirstOrDefault(c => c.Id == category.Id);
-                    SuccessMessage = $"{category.Name} was added.";
-                });
-            }
-
-            // The picker is still showing the row that was picked, so the category goes back into it: the new one,
-            // or the one it had when the prompt was cancelled or the name refused. Pushed back here rather than
-            // from the setter, since a value raised during the pick's own binding update is ignored.
-            this.RaisePropertyChanged(nameof(EditingCategory));
-        });
-
         var hasSelectedUnitRow = this.WhenAnyValue(x => x.SelectedUnitRow).Select(row => row is not null);
 
         // Nothing to confirm: the unit only leaves the list, and is deleted when the material is saved.
@@ -1524,7 +1492,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                             BaseUnitsPerUnit = unit.BaseUnitsPerUnit,
                         },
                         unit.BaseUnitAbbreviation,
-                        FindUnitOfMeasure));
+                        FindUnitOfMeasure,
+                        StandardMultiplierOf));
                 }
             });
             CanAddUnit = UnitRows.Count < UnitConversionRules.MaxAlternativeUnits;
@@ -1779,13 +1748,17 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         RebuildPurchaseUnitOptions();
     }
 
-    /// <summary>Tells each row the base unit, which its multiplier is in, without replacing the rows the grid is showing.</summary>
+    /// <summary>
+    /// Tells each row the base unit, which its multiplier is in, without replacing the rows the grid is showing. A standard
+    /// unit's fixed multiplier follows it: a new packaging material's inch is 25.4 over millimetres, 2.54 over centimetres.
+    /// </summary>
     private void UpdateUnitRowsBaseUnit()
     {
         var baseUnitAbbreviation = BaseUnitText.AbbreviationOf(EditingType, EditingBaseUnit);
         foreach (var row in UnitRows)
         {
             row.BaseUnitAbbreviation = baseUnitAbbreviation;
+            row.ApplyStandardMultiplier();
         }
     }
 
@@ -1796,7 +1769,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         {
             SelectedUnitRow = null;
             UnitRows.Clear();
-            UnitRows.AddRange(units.Select(u => new RawMaterialUnitRow(u, baseUnitAbbreviation, FindUnitOfMeasure)));
+            UnitRows.AddRange(units.Select(u => new RawMaterialUnitRow(u, baseUnitAbbreviation, FindUnitOfMeasure, StandardMultiplierOf)));
             SelectedUnitRow = UnitRows.FirstOrDefault(r => ReferenceEquals(r.Unit, selectedUnit));
         });
         CanAddUnit = UnitRows.Count < UnitConversionRules.MaxAlternativeUnits;
@@ -1817,6 +1790,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     private UnitOfMeasure? FindUnitOfMeasure(int id) => UnitsOfMeasure.FirstOrDefault(u => u.Id == id);
+
+    /// <summary>A standard unit's fixed multiplier for the material being edited (StandardUnitRules), or null for one that's typed.</summary>
+    private decimal? StandardMultiplierOf(UnitOfMeasure unit) => StandardUnitRules.BaseUnitsPerUnit(unit, EditingType, EditingBaseUnit);
 
     /// <summary>
     /// What an edit in the Alternative Units grid does: a brand bought in a unit whose multiplier changed there is repriced
@@ -1914,6 +1890,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     RawMaterialUnit? IBrandPriceRowHost.FindUnit(int unitOfMeasureId) =>
         UnitRows.FirstOrDefault(r => r.Unit.UnitOfMeasureId == unitOfMeasureId)?.Unit;
 
+    bool IBrandPriceRowHost.IsMultiplierFixed(int unitOfMeasureId) =>
+        UnitRows.FirstOrDefault(r => r.Unit.UnitOfMeasureId == unitOfMeasureId) is { CanTypeMultiplier: false };
+
     void IBrandPriceRowHost.SetMultiplier(int unitOfMeasureId, decimal baseUnitsPerUnit)
     {
         if (UnitRows.FirstOrDefault(r => r.Unit.UnitOfMeasureId == unitOfMeasureId) is { } row)
@@ -2009,19 +1988,15 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// </summary>
     private void UpdateHeaderCostTexts()
     {
-        var onBaseUnit = BufferedCostUnit is null or { Key: PurchaseUnitChoice.BaseUnitKey };
-        var size = BufferedCostUnitSize();
-        string Format(decimal costPerBaseUnit) => onBaseUnit ? $"{costPerBaseUnit:N4}" : $"{costPerBaseUnit * size:N2}";
-
         HeaderCostUnitText = BufferedCostUnit?.Abbreviation ?? BaseUnitAbbreviation;
-        CurrentCostText = SelectedRawMaterial is { } material ? Format(material.CostPerBaseUnit) : "—";
+        CurrentCostText = SelectedRawMaterial is { } material ? FormatInBufferedCostUnit(material.CostPerBaseUnit) : "—";
 
         // A made ingredient's buffered cost follows the form's BOM instead of the saved row (2026-09-21, at the
         // user's request), so the Total Cost and Total Weight tiles beside it always divide out to it as the grid
         // is typed into; Save then stores the same figure. Every other material shows what was last saved.
         BufferedCostText = IsEditingMade
-            ? Format(BomTotalWeight > 0 ? BomTotalCost / BomTotalWeight : 0m)
-            : SelectedRawMaterial is { } saved ? Format(saved.BufferedCostPerBaseUnit) : "—";
+            ? FormatInBufferedCostUnit(BomTotalWeight > 0 ? BomTotalCost / BomTotalWeight : 0m)
+            : SelectedRawMaterial is { } saved ? FormatInBufferedCostUnit(saved.BufferedCostPerBaseUnit) : "—";
     }
 
     /// <summary>
@@ -2131,7 +2106,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         var cost = priced[dearest].CostPerBaseUnit!.Value;
         var unit = BufferedCostUnit?.Abbreviation ?? BaseUnitAbbreviation;
-        var size = BufferedCostUnitSize();
         DearestPurchaseCost = cost;
         PurchaseCostText = $"{cost:N4}";
         if (EditingBufferedCost is > 0 and var buffered)
@@ -2142,7 +2116,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             // check constraint allow, so a buffer that's gone (or more than double) pins it; the line below and the
             // warning say where it really stands. Typing the % still works the other way, through TypedCostBufferPercent.
             EditingCostBufferPercent = Math.Clamp(Math.Round(over, 4), 0m, 100m);
-            PurchaseBufferedCostText = $"{buffered * size:N2}/{unit} is {over:0.##}% over the dearest brand's {cost * size:N2}/{unit}.";
+            PurchaseBufferedCostText = $"{FormatInBufferedCostUnit(buffered)}/{unit} is {over:0.##}% over the dearest brand's {FormatInBufferedCostUnit(cost)}/{unit}.";
             // Compared to the 4 places costs per base unit are shown to: a saved buffered cost comes back cut to its
             // column's 20 places, so a repeating one (170/240) would otherwise read as a hair under an unchanged dearest brand.
             BufferedCostWarningText = Math.Round(buffered, 4) < Math.Round(cost, 4)
@@ -2151,7 +2125,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         }
         else
         {
-            PurchaseBufferedCostText = $"Save works it out as {RawMaterialRules.BufferedCost(cost, EditingCostBufferPercent ?? 0m) * size:N2}/{unit}, the dearest brand with the buffer on top.";
+            PurchaseBufferedCostText = $"Save works it out as {FormatInBufferedCostUnit(RawMaterialRules.BufferedCost(cost, EditingCostBufferPercent ?? 0m))}/{unit}, the dearest brand with the buffer on top.";
             BufferedCostWarningText = string.Empty;
         }
 
@@ -2256,11 +2230,98 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         return true;
     }
 
+    public void BeginCategoryEdit()
+    {
+        if (!_isCommittingCategory)
+        {
+            _categoryBeforeEdit = EditingCategory;
+        }
+    }
+
+    /// <summary>
+    /// ICategoryPickerScreen: a name that isn't one of the material type's categories is offered as a new one, saved
+    /// for that type and picked, so filing a material under a new category doesn't mean a trip to Settings and back.
+    /// A cancelled prompt puts back the category the picker had; a name that turns out to be listed is picked instead.
+    /// </summary>
+    public async Task CommitCategoryTextAsync()
+    {
+        var typed = CategorySearchText.Trim();
+        if (_isCommittingCategory || typed.Length == 0 || IsNamed(EditingCategory, typed))
+        {
+            return;
+        }
+
+        _isCommittingCategory = true;
+        try
+        {
+            if (CategoryOptions.FirstOrDefault(c => IsNamed(c, typed)) is { } listed)
+            {
+                AsUndoStep(() => EditingCategory = listed);
+                return;
+            }
+
+            var name = (await PromptForNewCategory.Handle(typed))?.Trim();
+            if (string.IsNullOrEmpty(name))
+            {
+                AsUndoStep(() => EditingCategory = _categoryBeforeEdit);
+            }
+            else if (CategoryOptions.FirstOrDefault(c => IsNamed(c, name)) is { } named)
+            {
+                AsUndoStep(() => EditingCategory = named);
+            }
+            else
+            {
+                await AddCategoryAsync(name);
+            }
+
+            // The picker shows the category it now holds rather than what was typed: the new one, or the one put back.
+            CategorySearchText = EditingCategory?.Name ?? string.Empty;
+        }
+        finally
+        {
+            _isCommittingCategory = false;
+        }
+
+        static bool IsNamed(RawMaterialCategory? category, string name) =>
+            string.Equals(category?.Name, name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Saves a category of the material's own type, the only kind the picker offers it, and picks it. A refused name
+    /// puts back the category the picker had.
+    /// </summary>
+    private async Task AddCategoryAsync(string name)
+    {
+        var added = false;
+        await RunSafelyAsync(async () =>
+        {
+            var category = new RawMaterialCategory { Name = name, Type = EditingType };
+
+            var validation = _categoryValidator.Validate(category);
+            if (!validation.IsValid)
+            {
+                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
+
+            // AddAsync fills in the saved Id, which the reloaded copy to pick is found by.
+            await _categoryRepository.AddAsync(category, CancellationToken.None);
+            await LoadCommand.Execute();
+            AsUndoStep(() => EditingCategory = Categories.FirstOrDefault(c => c.Id == category.Id));
+            SuccessMessage = $"{category.Name} was added.";
+            added = true;
+        });
+
+        if (!added)
+        {
+            AsUndoStep(() => EditingCategory = _categoryBeforeEdit);
+        }
+    }
+
     public void Dispose()
     {
         _rawMaterialCache.Dispose();
         _categoryCache.Dispose();
-        _addNewCategoryOption.Dispose();
         _productOpenRequests.Dispose();
     }
 }

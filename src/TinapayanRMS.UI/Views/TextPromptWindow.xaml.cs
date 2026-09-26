@@ -5,14 +5,14 @@ using Syncfusion.SfSkinManager;
 namespace TinapayanRMS.UI.Views;
 
 /// <summary>
-/// A modal one-box prompt: a label, a text box and OK/Cancel. What the Raw Materials screen's Category
-/// picker opens for its "&lt; Add New .. &gt;" row, so a category can be named without leaving the screen
-/// for Settings. WPF has no input box of its own, and a MessageBox can't take text. Chromeless: the card's own
-/// heading carries the title, and dragging it moves the dialog.
+/// A modal one-box prompt: an optional line saying what it's for, a label, a text box and OK/Cancel. What the Raw
+/// Materials and Products Category pickers open when a name typed into them isn't a category yet, so it can be added
+/// without leaving the screen for Settings. WPF has no input box of its own, and a MessageBox can't take text.
+/// Chromeless: the card's own heading carries the title, and dragging it moves the dialog.
 /// </summary>
 public partial class TextPromptWindow : Window
 {
-    private TextPromptWindow(string title, string label, string initialValue)
+    private TextPromptWindow(string title, string label, string initialValue, string? message)
     {
         InitializeComponent();
 
@@ -21,15 +21,18 @@ public partial class TextPromptWindow : Window
         HeadingText.Text = title;
         PromptLabel.Text = label;
         ValueTextBox.Text = initialValue;
+        MessageText.Text = message;
+        MessageText.Visibility = string.IsNullOrEmpty(message) ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>
     /// Shows the prompt over <paramref name="owner"/>, starting with <paramref name="initialValue"/> selected so
-    /// typing replaces it outright. Returns what was typed, or null if it was cancelled or left empty.
+    /// typing replaces it outright, under <paramref name="message"/> when there is one. Returns what was typed, or null
+    /// if it was cancelled or left empty.
     /// </summary>
-    public static string? Prompt(string title, string label, string initialValue, Window? owner)
+    public static string? Prompt(string title, string label, string initialValue, Window? owner, string? message = null)
     {
-        var window = new TextPromptWindow(title, label, initialValue) { Owner = owner };
+        var window = new TextPromptWindow(title, label, initialValue, message) { Owner = owner };
 
         // SfSkinManager themes only the windows it's given: a new Window isn't in its owner's tree, Owner or not, so
         // without this its buttons and box fell back to Syncfusion's unthemed default look (as MainWindow does for Settings).

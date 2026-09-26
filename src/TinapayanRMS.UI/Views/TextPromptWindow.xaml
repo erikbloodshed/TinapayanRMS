@@ -34,6 +34,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <!-- The heading stands in for the title bar, and like one it moves the dialog when dragged -->
@@ -47,8 +48,14 @@
                            Foreground="{StaticResource HeadingForegroundBrush}" />
             </Border>
 
+            <!-- What the prompt is for, when the heading alone doesn't say: collapsed when there's no message -->
+            <TextBlock x:Name="MessageText"
+                       Grid.Row="1"
+                       Margin="16,8,16,0"
+                       TextWrapping="Wrap" />
+
             <!-- The label on the left of its box (FormLabelStyle), so keep it short: the heading says what it's for -->
-            <Grid Grid.Row="1" Margin="16,12,16,16">
+            <Grid Grid.Row="2" Margin="16,12,16,16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -58,7 +65,7 @@
             </Grid>
 
             <!-- Inside the card's 1px border, so its corners are rounded 1 less to sit flush -->
-            <Border Grid.Row="2"
+            <Border Grid.Row="3"
                     Background="{StaticResource PageBackgroundBrush}"
                     BorderBrush="{StaticResource CardBorderBrush}"
                     BorderThickness="0,1,0,0"

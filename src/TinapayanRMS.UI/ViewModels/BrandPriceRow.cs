@@ -105,9 +105,12 @@ public sealed class BrandPriceRow : ReactiveObject
         }
     }
 
-    /// <summary>Whether <see cref="Quantity"/> can be typed: the unit is one the material doesn't have saved yet.</summary>
+    /// <summary>
+    /// Whether <see cref="Quantity"/> can be typed: the unit is one the material doesn't have saved yet, and not a standard
+    /// unit whose multiplier is fixed (a kilogram of an ingredient is 1,000 g).
+    /// </summary>
     public bool CanTypeQuantity =>
-        UnitKey is { } key && key != PurchaseUnitChoice.BaseUnitKey && _host?.FindUnit(key) is { Id: 0 };
+        UnitKey is { } key && key != PurchaseUnitChoice.BaseUnitKey && _host?.FindUnit(key) is { Id: 0 } && !_host.IsMultiplierFixed(key);
 
     /// <summary>
     /// How far the material's buffered cost is over this brand's price, in percent: the buffered cost for one of the row's
@@ -140,6 +143,9 @@ public interface IBrandPriceRowHost
 {
     /// <summary>The form's alternative unit in the unit of measure <paramref name="unitOfMeasureId"/>, saved or not; null when it has none.</summary>
     RawMaterialUnit? FindUnit(int unitOfMeasureId);
+
+    /// <summary>Whether the form's alternative unit in <paramref name="unitOfMeasureId"/> is a standard unit with a fixed multiplier.</summary>
+    bool IsMultiplierFixed(int unitOfMeasureId);
 
     /// <summary>Sets a not-yet-saved alternative unit's multiplier, typed as the row's quantity.</summary>
     void SetMultiplier(int unitOfMeasureId, decimal baseUnitsPerUnit);

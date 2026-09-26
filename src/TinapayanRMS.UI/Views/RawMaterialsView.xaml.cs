@@ -13,17 +13,21 @@ public partial class RawMaterialsView : UserControl
         DataContext = viewModel;
         viewModel.RegisterNativeMessageBoxHandler();
 
-        // The Category picker's "< Add New .. >" row asks for the name here. The yield lets the picker finish with
-        // the click first: a prompt opened from inside the pick takes no typing, since the list it was picked from
-        // still has the mouse captured, and the list is left open behind it. The window is looked up as it's asked
-        // for, not now: the view isn't in one yet while its constructor runs.
+        // A name typed into the Category picker that isn't a category yet: asks whether to add it, starting with the
+        // name so it needn't be typed again. The yield lets the picker finish with the key or click that left it first:
+        // a prompt opened while something still has the mouse captured takes no typing. The window is looked up as
+        // it's asked for, not now: the view isn't in one yet while its constructor runs.
         viewModel.PromptForNewCategory.RegisterHandler(async interaction =>
         {
             await Dispatcher.Yield(DispatcherPriority.Background);
-            interaction.SetOutput(TextPromptWindow.Prompt("New Category", interaction.Input.Label, interaction.Input.InitialValue, Window.GetWindow(this)));
+            interaction.SetOutput(TextPromptWindow.Prompt(
+                "New Category", "Name", interaction.Input, Window.GetWindow(this), NewCategoryMessage(interaction.Input)));
         });
 
         // New clears the form; put the cursor in Name so typing can start straight away.
         viewModel.NewCommand.Subscribe(_ => SummaryHeader.FocusName());
     }
+
+    /// <summary>The prompt's line for a name typed into a Category picker that isn't a category yet (Products uses it too).</summary>
+    internal static string NewCategoryMessage(string name) => $"“{name}” isn't a category yet. Add it?";
 }

@@ -51,6 +51,21 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
             .Should().Equal(("bag", 25000m, "Standard flour bag (25 kg)"), ("pack", 1000m, "Small pack (1 kg)"));
     }
 
+    [Fact]
+    public async Task A_kilogram_of_an_ingredient_is_saved_as_1000_grams_whatever_multiplier_was_sent()
+    {
+        var flourId = await SeedIngredientAsync("Flour");
+        var kilogramId = await SeedUnitOfMeasureAsync("kilogram", "kg");
+        var repository = CreateRepository();
+
+        await repository.AddAsync(new RawMaterialUnit { RawMaterialId = flourId, UnitOfMeasureId = kilogramId, BaseUnitsPerUnit = 0m }, Cancellation);
+        var saved = (await repository.GetForRawMaterialAsync(flourId, Cancellation)).Single();
+        saved.BaseUnitsPerUnit.Should().Be(1000m, "a kilogram is 1,000 g by definition, so nothing typed changes it");
+
+        await repository.UpdateAsync(new RawMaterialUnit { Id = saved.Id, RawMaterialId = flourId, UnitOfMeasureId = kilogramId, BaseUnitsPerUnit = 25000m }, Cancellation);
+        (await repository.GetForRawMaterialAsync(flourId, Cancellation)).Single().BaseUnitsPerUnit.Should().Be(1000m);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-5)]

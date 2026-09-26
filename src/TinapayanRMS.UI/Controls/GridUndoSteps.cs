@@ -58,6 +58,13 @@ public static class GridUndoSteps
 
     private static void OnCellBeginEdit(object? sender, CurrentCellBeginEditEventArgs e)
     {
+        // An edit refused before it begins (a locked cell, GridCellEditing) never ends either, so it's no step: marked
+        // pending, it would keep Save offered with nothing changed.
+        if (e.Cancel || (sender is SfDataGrid grid && GridCellEditing.Refuses(grid, e)))
+        {
+            return;
+        }
+
         if (RecorderOf(sender!) is { } recorder)
         {
             recorder.BeginUndoStep();

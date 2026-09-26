@@ -53,6 +53,38 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
     }
 
     [Fact]
+    public async Task A_standard_unit_of_the_base_units_kind_takes_its_fixed_multiplier_and_any_other_keeps_the_one_typed()
+    {
+        var (ribbonId, _) = await SeedRibbonAsync();
+        var inchId = await SeedUnitOfMeasureAsync("inch", "in");
+        var repository = CreateRepository();
+
+        await repository.AddAsync(new RawMaterialUnit { RawMaterialId = ribbonId, UnitOfMeasureId = inchId, BaseUnitsPerUnit = 3m }, Cancellation);
+        (await repository.GetForRawMaterialAsync(ribbonId, Cancellation)).Single().BaseUnitsPerUnit.Should().Be(2.54m, "an inch is 2.54 cm");
+
+        // Wrappers counted in pieces, bought by the kilogram: a kilogram's worth of pieces is the wrapper's own.
+        var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
+        var kilogramId = await SeedUnitOfMeasureAsync("kilogram", "kg");
+        int wrapperId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var wrapper = new RawMaterial
+            {
+                Type = RawMaterialType.Packaging,
+                Name = "Cello Sheet Wrapper",
+                Category = new RawMaterialCategory { Name = "Wrappers" },
+                BaseUnitId = pieceId,
+            };
+            dbContext.RawMaterials.Add(wrapper);
+            await dbContext.SaveChangesAsync(Cancellation);
+            wrapperId = wrapper.Id;
+        }
+
+        await repository.AddAsync(new RawMaterialUnit { RawMaterialId = wrapperId, UnitOfMeasureId = kilogramId, BaseUnitsPerUnit = 240m }, Cancellation);
+        (await repository.GetForRawMaterialAsync(wrapperId, Cancellation)).Single().BaseUnitsPerUnit.Should().Be(240m);
+    }
+
+    [Fact]
     public async Task AddAsync_rejects_the_materials_own_base_unit()
     {
         var (ribbonId, centimeterId) = await SeedRibbonAsync();

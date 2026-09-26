@@ -1478,68 +1478,58 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
 
         viewModel.EditingCategory!.Name.Should().Be("Cakes & Tortes", "the unsaved pick points at the refreshed category");
-        viewModel.CategoryOptions.Select(c => c.Name).Should().Equal("< Add New .. >", "Cakes & Tortes");
+        viewModel.Categories.Select(c => c.Name).Should().Equal("Cakes & Tortes");
     }
 
     [Fact]
-    public async Task Picking_Add_New_saves_the_category_it_asks_for_and_picks_it_for_the_product()
+    public async Task Typing_a_name_that_isnt_a_category_asks_to_add_it_and_picks_it_for_the_product()
     {
         var viewModel = CreateViewModel();
-        (string Label, string InitialValue) promptedWith = default;
+        string? promptedWith = null;
         viewModel.PromptForNewCategory.RegisterHandler(interaction =>
         {
             promptedWith = interaction.Input;
             interaction.SetOutput("Pastries");
         });
         await viewModel.LoadCommand.Execute();
+
+        viewModel.BeginCategoryEdit();
         viewModel.CategorySearchText = "Pas";
+        await viewModel.CommitCategoryTextAsync();
 
-        viewModel.CategoryOptions.Should().ContainSingle(c => c.Id == ProductsViewModel.AddNewCategoryId)
-            .Which.Name.Should().Be("< Add New \"Pas\" .. >", "the row keeps matching what's typed");
-        viewModel.EditingCategory = viewModel.CategoryOptions.Single(c => c.Id == ProductsViewModel.AddNewCategoryId);
-
-        await WaitUntilSettledAsync(() => viewModel.EditingCategory is not null,
-            () => $"picked={viewModel.EditingCategory?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
-        promptedWith.InitialValue.Should().Be("Pas", "the prompt starts with what was typed");
+        promptedWith.Should().Be("Pas", "the prompt starts with what was typed");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("Pastries was added.");
         viewModel.EditingCategory!.Name.Should().Be("Pastries");
+        viewModel.CategorySearchText.Should().Be("Pastries");
         viewModel.Categories.Select(c => c.Name).Should().Equal("Pastries");
         await using var dbContext = CreateDbContext();
         (await dbContext.ProductCategories.SingleAsync(Cancellation)).Name.Should().Be("Pastries");
     }
 
     [Fact]
-    public async Task Arrowing_onto_Add_New_reads_its_name_as_what_was_typed_rather_than_nesting_it()
+    public async Task Typing_a_listed_categorys_name_picks_it_whatever_its_case_without_asking()
     {
+        await AddProductCategoryAsync("Breads");
         var viewModel = CreateViewModel();
-        (string Label, string InitialValue) promptedWith = default;
+        var prompted = false;
         viewModel.PromptForNewCategory.RegisterHandler(interaction =>
         {
-            promptedWith = interaction.Input;
-            interaction.SetOutput("Pastries");
+            prompted = true;
+            interaction.SetOutput(null);
         });
         await viewModel.LoadCommand.Execute();
-        viewModel.CategorySearchText = "Pastries";
 
-        // Arrowing down the open picker onto the row puts the row's own name in the picker's text, as on Raw Materials.
-        for (var i = 0; i < 3; i++)
-        {
-            viewModel.CategorySearchText = viewModel.CategoryOptions.Single(c => c.Id == ProductsViewModel.AddNewCategoryId).Name;
-        }
+        viewModel.BeginCategoryEdit();
+        viewModel.CategorySearchText = "breads";
+        await viewModel.CommitCategoryTextAsync();
 
-        var addNewRow = viewModel.CategoryOptions.Single(c => c.Id == ProductsViewModel.AddNewCategoryId);
-        addNewRow.Name.Should().Be("< Add New \"Pastries\" .. >", "the row's name in the text isn't new typing to wrap again");
-
-        viewModel.EditingCategory = addNewRow;
-
-        await WaitUntilSettledAsync(() => viewModel.EditingCategory is not null,
-            () => $"picked={viewModel.EditingCategory?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
-        promptedWith.InitialValue.Should().Be("Pastries", "the prompt starts with what was typed, not the row's label");
+        prompted.Should().BeFalse();
+        viewModel.EditingCategory!.Name.Should().Be("Breads");
     }
 
     [Fact]
-    public async Task Cancelling_the_new_category_prompt_leaves_the_category_that_was_picked()
+    public async Task Cancelling_the_new_category_prompt_puts_back_the_category_the_picker_had()
     {
         await AddProductCategoryAsync("Breads");
         var viewModel = CreateViewModel();
@@ -1552,10 +1542,15 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
         viewModel.EditingCategory = viewModel.Categories.Single();
 
-        viewModel.EditingCategory = ProductsViewModel.AddNewCategory;
+        // As ComboBoxAdv's Suggest mode does: a name it doesn't list lets go of its pick.
+        viewModel.BeginCategoryEdit();
+        viewModel.CategorySearchText = "Cakes";
+        viewModel.EditingCategory = null;
+        await viewModel.CommitCategoryTextAsync();
 
-        await WaitUntilSettledAsync(() => prompted, () => "the prompt was never asked for");
+        prompted.Should().BeTrue();
         viewModel.EditingCategory!.Name.Should().Be("Breads");
+        viewModel.CategorySearchText.Should().Be("Breads");
         viewModel.Categories.Should().ContainSingle("nothing was added");
     }
 
