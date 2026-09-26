@@ -190,6 +190,33 @@ public class UndoHistoryTests
     }
 
     [Fact]
+    public void RewriteAll_carries_a_change_saved_from_outside_the_form_into_every_step()
+    {
+        // As Products does for a product dragged into another category: the form's text stands for "name:category", and
+        // the category was saved from outside the form. No undo or redo may bring the old one back; they move the name only.
+        static string InCakes(string snapshot) => snapshot.Split(':')[0] + ":cakes";
+
+        var form = new Form { Value = "a:breads" };
+        form.History.MarkClean();
+        form.Change("b:breads");
+        form.Change("c:breads");
+        form.Undo();
+
+        form.Value = InCakes(form.Value);
+        form.History.RewriteAll(InCakes);
+
+        form.History.IsDirty.Should().BeTrue("the name still isn't what was saved");
+        form.Undo().Should().BeTrue();
+        form.Value.Should().Be("a:cakes");
+        form.History.IsDirty.Should().BeFalse("the settled form took the new category too");
+
+        form.Redo().Should().BeTrue();
+        form.Value.Should().Be("b:cakes");
+        form.Redo().Should().BeTrue();
+        form.Value.Should().Be("c:cakes");
+    }
+
+    [Fact]
     public void Opening_a_step_settles_the_one_already_open()
     {
         var form = new Form();

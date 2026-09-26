@@ -503,6 +503,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private readonly IValidator<CostingParameters> _costingParametersValidator;
     private readonly IProductCategoryRepository _categoryRepository;
     private readonly IValidator<ProductCategory> _categoryValidator;
+    private readonly IViewStateStore _viewStateStore;
     private readonly SourceCache<Product, int> _productCache = new(p => p.Id);
     private readonly ReadOnlyObservableCollection<Product> _products;
     private readonly ReadOnlyObservableCollection<Product> _visibleProducts;
@@ -514,6 +515,91 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>The products the list shows: those whose name matches SearchText.</summary>
     public ReadOnlyObservableCollection<Product> VisibleProducts => _visibleProducts;
+
+    /// <summary>The Products list (ProductListCard): VisibleProducts filed in a folder for their stage, then their category.</summary>
+    public ProductTree ProductTree { get; }
+
+    /// <summary>The view state key the open folders of the Products list are kept under (IViewStateStore).</summary>
+    public const string OpenFoldersKey = "Products.OpenFolders";
+
+    /// <summary>The open folders last written to the view state, so a write is only made for a change.</summary>
+    private IReadOnlyList<string> _writtenOpenFolders;
+
+    private readonly IDisposable _openFoldersWriter;
+
+    /// <summary>Held while writing the open folders, which the throttled writer does off the UI thread and Dispose on it.</summary>
+    private readonly Lock _openFoldersLock = new();
+
+    /// <summary>
+    /// The rows picked in the Products list, bound to the tree's SelectedItems, which it shares: one row, or several with
+    /// Ctrl or Shift held. Its first is <see cref="SelectedTreeNode"/>. The tree changes it as rows are clicked, and this
+    /// screen as SelectedProduct changes (SyncTreeSelection).
+    /// </summary>
+    public ObservableCollection<object> SelectedTreeNodes { get; } = [];
+
+    private object? _selectedTreeNode;
+    /// <summary>
+    /// The first row picked in the Products list: a product's (ProductLeafNode), a folder's, or null. Picking a product's
+    /// row picks the product; picking a folder's leaves the product showing as it is, as a file explorer does, and so do
+    /// more rows picked with Ctrl. SelectedProduct changed any other way (opened from Sub-Assemblies, saved, cloned, or
+    /// cleared for a new one) moves the row to it. Setting it picks that row alone, as a click does.
+    /// </summary>
+    public object? SelectedTreeNode
+    {
+        get => _selectedTreeNode;
+        set
+        {
+            if (value is null)
+            {
+                if (SelectedTreeNodes.Count > 0)
+                {
+                    SelectedTreeNodes.Clear();
+                }
+            }
+            else if (SelectedTreeNodes.Count != 1 || !ReferenceEquals(SelectedTreeNodes[0], value))
+            {
+                SelectedTreeNodes.Clear();
+                SelectedTreeNodes.Add(value);
+            }
+        }
+    }
+
+    /// <summary>The products picked in the list, in the order they were picked.</summary>
+    public IReadOnlyList<ProductLeafNode> SelectedTreeProducts => [.. SelectedTreeNodes.OfType<ProductLeafNode>()];
+
+    /// <summary>
+    /// Set while the list's selection changes for a reason that's no pick of the user's: SyncTreeSelection moving it to
+    /// SelectedProduct, or the tree dropping a row from it as the row moves to another folder.
+    /// </summary>
+    private bool _isSyncingTreeSelection;
+
+    private string? _moveNotice;
+    /// <summary>
+    /// What the last move in the list did, "Moved Pandesal to Production › Breads", on the list's notice bar with Undo
+    /// beside it (UndoMoveCommand); null once it's undone or dismissed. The bar hides itself after a few seconds.
+    /// </summary>
+    public string? MoveNotice
+    {
+        get => _moveNotice;
+        private set => this.RaiseAndSetIfChanged(ref _moveNotice, value);
+    }
+
+    /// <summary>Where the products the last move took were before it: what Undo on the notice puts back.</summary>
+    private IReadOnlyList<ProductMove> _moveUndo = [];
+
+    private ProductStage _newProductStage = ProductStage.ResearchAndDevelopment;
+    /// <summary>
+    /// The stage Save files a new product in: Research and Development after New, or the stage of the folder New Product
+    /// Here was picked on (the user's choice, 2026-09-26). Revert keeps it. The header says so (NewProductTag).
+    /// </summary>
+    public ProductStage NewProductStage
+    {
+        get => _newProductStage;
+        private set => this.RaiseAndSetIfChanged(ref _newProductStage, value);
+    }
+
+    /// <summary>The category New Product Here started the product in, which Revert puts back; null after New.</summary>
+    private int? _newProductCategoryId;
 
     /// <summary>What the Category picker lists. A name that isn't one of them is added by typing it (CommitCategoryTextAsync).</summary>
     public ReadOnlyObservableCollection<ProductCategory> Categories => _categories;
@@ -782,6 +868,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private readonly ObservableAsPropertyHelper<string> _headerTitle;
     /// <summary>The header's title, and the usage example's: the product's name, or "New product".</summary>
     public string HeaderTitle => _headerTitle.Value;
+
+    private readonly ObservableAsPropertyHelper<string?> _newProductTag;
+    /// <summary>
+    /// The tag beside the header's title while the form holds a product not saved yet: where Save will file it, "Goes in
+    /// Production" or "Goes in Research and Development". Null while a saved product is showing.
+    /// </summary>
+    public string? NewProductTag => _newProductTag.Value;
 
     /// <summary>When the product was last saved, e.g. "Sep 14, 2026, 6:27 PM", or "—".</summary>
     private string _lastUpdatedText = "—";
@@ -1211,6 +1304,60 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
 
     /// <summary>
+    /// Products moved to other folders of the Products list (ProductListCard), by a drag, Move To, or Promote: files each
+    /// under its folder's stage and category straight away, with no Save, and says so on the list's notice bar with an
+    /// Undo (MoveNotice). On the product the form shows, the Category picker follows, and the form's undo steps take the
+    /// new category as given, so no undo brings the old one back for a Save to write.
+    /// </summary>
+    public ReactiveCommand<IReadOnlyList<ProductMove>, RxVoid> MoveProductsCommand { get; }
+
+    /// <summary>Undo on the list's notice bar: puts the products the last move took back where they were.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> UndoMoveCommand { get; }
+
+    /// <summary>The notice bar's close button, and its timeout: the move stays, and can't be undone from there any more.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> DismissMoveNoticeCommand { get; }
+
+    /// <summary>
+    /// New Product Here on a folder of the list: a new product, as New starts one, whose Save files it in that folder's
+    /// stage and category. Null, from the list's empty space, is New itself.
+    /// </summary>
+    public ReactiveCommand<ProductFolderNode?, RxVoid> NewProductInCommand { get; }
+
+    /// <summary>Rename on a product of the list: saves the new name at once, like a move (IProductRepository.RenameAsync).</summary>
+    public ReactiveCommand<ProductLeafNode, RxVoid> RenameProductCommand { get; }
+
+    /// <summary>Clone on a product of the list: asks for the new product's name, then clones it as saved, as the Clone tab does.</summary>
+    public ReactiveCommand<ProductLeafNode, RxVoid> CloneProductCommand { get; }
+
+    /// <summary>Create Variant on a product of the list: asks for the variant's name, then makes it, as the Clone tab does.</summary>
+    public ReactiveCommand<ProductLeafNode, RxVoid> CreateVariantOfCommand { get; }
+
+    /// <summary>Delete on a product of the list: Delete for that product, asking first.</summary>
+    public ReactiveCommand<ProductLeafNode, RxVoid> DeleteProductCommand { get; }
+
+    /// <summary>New Category on the list: asks for its name and adds it, a folder in both stages. Its parameter is the folder asked on.</summary>
+    public ReactiveCommand<ProductFolderNode?, RxVoid> NewCategoryCommand { get; }
+
+    /// <summary>Rename Category on a category's folder: renames the category, and so its folder in both stages.</summary>
+    public ReactiveCommand<ProductFolderNode, RxVoid> RenameCategoryCommand { get; }
+
+    /// <summary>Delete Category on a category's folder: asks first, then deletes it, leaving its products uncategorized.</summary>
+    public ReactiveCommand<ProductFolderNode, RxVoid> DeleteCategoryCommand { get; }
+
+    /// <summary>Expand All: opens every folder in the stage given, or in both.</summary>
+    public ReactiveCommand<ProductFolderNode?, RxVoid> ExpandAllCommand { get; }
+
+    /// <summary>Collapse All: closes every folder in the stage given, or in both, leaving the stages open.</summary>
+    public ReactiveCommand<ProductFolderNode?, RxVoid> CollapseAllCommand { get; }
+
+    /// <summary>
+    /// Input: what the prompt is for, its box's label, the name it starts with, and a line saying more. Output: the name
+    /// typed, or null if it was cancelled. The View shows a TextPromptWindow. Asked by the list's Rename, Clone, Create
+    /// Variant, New Category and Rename Category.
+    /// </summary>
+    public Interaction<TextPromptRequest, string?> PromptForName { get; } = new();
+
+    /// <summary>
     /// Input: the name typed into the Category picker that isn't a category yet, which the prompt starts with.
     /// Output: the name to add it as, or null if it was cancelled. The View shows a TextPromptWindow.
     /// </summary>
@@ -1266,9 +1413,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         IValidator<Product> productValidator,
         IValidator<CostingParameters> costingParametersValidator,
         IValidator<ProductCategory> categoryValidator,
+        IViewStateStore viewStateStore,
         ILogger logger)
         : base(logger)
     {
+        _viewStateStore = viewStateStore;
         _productRepository = productRepository;
         _usageRepository = usageRepository;
         _packagingLineRepository = packagingLineRepository;
@@ -1282,6 +1431,21 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _costingParametersValidator = costingParametersValidator;
         _categoryRepository = categoryRepository;
         _categoryValidator = categoryValidator;
+
+        // The list's folders open as they were left last time. Once they've settled after a change (a search or Expand
+        // All opens several in a row) the ones open are written for next time, off the UI thread; Dispose writes any
+        // change still waiting.
+        var openFolders = viewStateStore.ReadList(OpenFoldersKey);
+        ProductTree = new ProductTree(openFolders);
+
+        // As they start, so nothing is written until a folder is opened or closed, not even the first time.
+        _writtenOpenFolders = ProductTree.OpenFolderKeys();
+        _openFoldersWriter = ProductTree.ExpansionChanged
+            .Select(_ => ProductTree.OpenFolderKeys())
+            .Throttle(TimeSpan.FromMilliseconds(500))
+            .Subscribe(WriteOpenFolders);
+
+        SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();
 
         // A new product starts with no tabs at all: packaging, like a recipe section, comes in through Add Sub-Assembly.
         RecipeTabs.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(HasRecipeTabs));
@@ -1302,18 +1466,31 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .DistinctUntilChanged()
             .Select(text => (Func<Product, bool>)(p => text.Length == 0 || p.Name.Contains(text, StringComparison.CurrentCultureIgnoreCase)));
 
+        // The list's tree follows both lists once each change has reached them: a product added, removed, renamed, moved or
+        // filtered out, and a category added, renamed or deleted. The categories are bound first, as the tree reads both.
+        _categoryCache.Connect()
+            .SortAndBind(out _categories, SortExpressionComparer<ProductCategory>.Ascending(c => c.Name))
+            .Subscribe(_ => RefreshProductTree());
+
         _productCache.Connect()
             .Filter(nameFilter)
             .SortAndBind(out _visibleProducts, byName)
-            .Subscribe();
+            .Subscribe(_ => RefreshProductTree());
 
-        _categoryCache.Connect()
-            .SortAndBind(out _categories, SortExpressionComparer<ProductCategory>.Ascending(c => c.Name))
-            .Subscribe();
+        // The search decides whether empty folders show, even when it leaves the same products showing.
+        this.WhenAnyValue(x => x.SearchText)
+            .Subscribe(_ => RefreshProductTree());
+
+        this.WhenAnyValue(x => x.SelectedProduct)
+            .Subscribe(_ => SyncTreeSelection());
 
         _headerTitle = this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingName, (product, name) =>
                 product is null && string.IsNullOrWhiteSpace(name) ? "New product" : name)
             .ToProperty(this, x => x.HeaderTitle, "New product");
+
+        _newProductTag = this.WhenAnyValue(x => x.SelectedProduct, x => x.NewProductStage, (product, stage) =>
+                product is null ? $"Goes in {ProductFolderNode.StageTitle(stage)}" : null)
+            .ToProperty(this, x => x.NewProductTag);
 
         // A hidden tab can't stay the one showing: leaving a saved product while on Clone goes
         // back to Recipe. Subscribed before ShowLinks, so the tab strip moves before the tab hides; a
@@ -1604,7 +1781,31 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             }
         });
 
-        NewCommand = ReactiveCommand.Create(StartNewProduct);
+        NewCommand = ReactiveCommand.Create(() => StartNewProduct());
+
+        // The list's commands, each run on the folder or product its menu was opened on (TreeMenuFor).
+        MoveProductsCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<ProductMove>>(
+            moves => RunSafelyAsync(() => MoveProductsAsync(moves, isUndo: false)));
+        var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
+        UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveProductsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
+        DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
+        NewProductInCommand = ReactiveCommand.Create<ProductFolderNode?>(folder => StartNewProduct(
+            folder?.Stage ?? ProductStage.ResearchAndDevelopment, folder?.CategoryId));
+        RenameProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(RenameProductAsync);
+        CloneProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => MakeFromWithPromptAsync(
+            leaf,
+            new TextPromptRequest("Clone Product", "Name", $"{leaf.Product.Name} Copy", $"A copy of {leaf.Product.Name} as last saved, filed in Research and Development."),
+            _productCloner.CloneAsync));
+        CreateVariantOfCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => MakeFromWithPromptAsync(
+            leaf,
+            new TextPromptRequest("Create Variant", "Name", $"{leaf.Product.Name} Copy", $"A new product that links {leaf.Product.Name}'s recipe and packaging, filed in Research and Development."),
+            _productCloner.CreateVariantAsync));
+        DeleteProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => DeleteProductAsync(leaf.Product));
+        NewCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(NewCategoryAsync);
+        RenameCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(RenameCategoryAsync);
+        DeleteCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(DeleteCategoryAsync);
+        ExpandAllCommand = ReactiveCommand.Create<ProductFolderNode?>(ProductTree.ExpandAll);
+        CollapseAllCommand = ReactiveCommand.Create<ProductFolderNode?>(ProductTree.CollapseAll);
 
         OpenSubAssemblyCommand = ReactiveCommand.Create<int>(_subAssemblyOpenRequests.OnNext);
 
@@ -1633,6 +1834,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 CategoryId = EditingCategory?.Id,
                 QuantityRequired = EditingQuantityRequired,
                 CurrentPrice = EditingCurrentPrice,
+
+                // Only a new product's is written: a saved one's changes by moving it in the list.
+                Stage = NewProductStage,
             };
 
             var validation = _productValidator.Validate(product);
@@ -1687,7 +1891,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             {
                 if (SelectedProduct is not { } product)
                 {
-                    StartNewProduct();
+                    StartNewProduct(NewProductStage, _newProductCategoryId);
                     History.Clear();
                     return;
                 }
@@ -1701,14 +1905,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             }));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
-            () => RunWithConfirmationAsync(
-                $"Delete '{SelectedProduct!.Name}'? Its own sub-assemblies go with it; the ones it links stay on the Sub-Assemblies screen. This can't be undone.",
-                async () =>
-                {
-                    await _productRepository.DeleteAsync(SelectedProduct!.Id, CancellationToken.None);
-                    StartNewProduct();
-                    await LoadCommand.Execute();
-                }),
+            () => DeleteProductAsync(SelectedProduct!),
             this.WhenAnyValue(x => x.SelectedProduct).Select(product => product is not null));
 
         // Add Sub-Assembly opens a New Sub-Assembly tab, after the sub-assemblies' and before Packaging's, with a fresh
@@ -1856,8 +2053,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // A clone copies the product as saved, and a variant links it as saved: unsaved edits stay with this one.
         var canMakeFromSelected = this.WhenAnyValue(
             x => x.SelectedProduct, x => x.EditingCloneName, (product, name) => product is not null && !string.IsNullOrWhiteSpace(name));
-        CloneCommand = ReactiveCommand.CreateFromTask(() => MakeFromSelectedAsync(_productCloner.CloneAsync), canMakeFromSelected);
-        CreateVariantCommand = ReactiveCommand.CreateFromTask(() => MakeFromSelectedAsync(_productCloner.CreateVariantAsync), canMakeFromSelected);
+        CloneCommand = ReactiveCommand.CreateFromTask(() => MakeFromAsync(SelectedProduct!.Id, EditingCloneName, _productCloner.CloneAsync), canMakeFromSelected);
+        CreateVariantCommand = ReactiveCommand.CreateFromTask(() => MakeFromAsync(SelectedProduct!.Id, EditingCloneName, _productCloner.CreateVariantAsync), canMakeFromSelected);
     }
 
     /// <summary>
@@ -1871,14 +2068,42 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         new(0, usage.Role, [.. usage.Lines, .. usage.AddIns], usage.AuthoredField, usage.AuthoredValue, usage.ShrinkagePercent,
             linkedName: null, name: usage.IsRoleRepeated ? usage.Label : null, isOwn: isOwn);
 
-    /// <summary>Makes a new product named EditingCloneName from the selected one as saved (a clone or a variant), then shows it.</summary>
-    private Task MakeFromSelectedAsync(Func<int, string, CancellationToken, Task<int>> make) =>
+    /// <summary>Makes a new product named <paramref name="name"/> from another as saved (a clone or a variant), then shows it.</summary>
+    private Task MakeFromAsync(int sourceProductId, string name, Func<int, string, CancellationToken, Task<int>> make) =>
         RunSafelyAsync(async () =>
         {
-            var newId = await make(SelectedProduct!.Id, EditingCloneName, CancellationToken.None);
+            var newId = await make(sourceProductId, name, CancellationToken.None);
             await LoadCommand.Execute();
             SelectedProduct = Products.FirstOrDefault(p => p.Id == newId);
         });
+
+    /// <summary>The list's Clone and Create Variant: asks for the new product's name first, starting from "… Copy".</summary>
+    private async Task MakeFromWithPromptAsync(ProductLeafNode leaf, TextPromptRequest prompt, Func<int, string, CancellationToken, Task<int>> make)
+    {
+        var name = (await PromptForName.Handle(prompt))?.Trim();
+        if (!string.IsNullOrEmpty(name))
+        {
+            await MakeFromAsync(leaf.Product.Id, name, make);
+        }
+    }
+
+    /// <summary>
+    /// Deletes <paramref name="product"/> once it's confirmed. The form starts a new product if it was showing this one,
+    /// as it was after the header's Delete, which only ever deletes the product showing.
+    /// </summary>
+    private Task DeleteProductAsync(Product product) =>
+        RunWithConfirmationAsync(
+            $"Delete '{product.Name}'? Its own sub-assemblies go with it; the ones it links stay on the Sub-Assemblies screen. This can't be undone.",
+            async () =>
+            {
+                await _productRepository.DeleteAsync(product.Id, CancellationToken.None);
+                if (SelectedProduct?.Id == product.Id || _editingId == product.Id)
+                {
+                    StartNewProduct();
+                }
+
+                await LoadCommand.Execute();
+            });
 
     /// <summary>The Last Updated figure: the day and the time; "—" for a product never saved since it was added.</summary>
     private void ShowUpdatedAt(DateTime? updatedAt) =>
@@ -1959,14 +2184,183 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         return true;
     }
 
-    /// <summary>A new product: no name, recipe, packaging or links, its costing at the defaults, and nothing selected.</summary>
-    private void StartNewProduct()
+    private void RefreshProductTree()
     {
+        // The tree drops a row from its selection as the row leaves its folder, which is no pick of the user's: with
+        // several picked, the first left would otherwise become SelectedTreeNode, and its product the one picked.
+        _isSyncingTreeSelection = true;
+        try
+        {
+            ProductTree.Refresh(Categories, VisibleProducts, isFiltered: SearchText.Trim().Length > 0);
+        }
+        finally
+        {
+            _isSyncingTreeSelection = false;
+        }
+
+        // A folder picked stays picked. Otherwise the row goes back to the product picked: a product moved to another
+        // folder leaves the tree's selection as it goes, and one a search hid gets its row back when the search ends.
+        if (SelectedTreeNode is not ProductFolderNode)
+        {
+            SyncTreeSelection();
+        }
+    }
+
+    /// <summary>
+    /// Puts SelectedProduct's row first among the rows picked in the list, and so makes it SelectedTreeNode: alone, unless
+    /// it's picked already, when the rows picked with it stay. Nothing picked, or a search hiding it, picks no row.
+    /// </summary>
+    private void SyncTreeSelection()
+    {
+        var row = SelectedProduct is { } product ? ProductTree.Find(product.Id) : null;
+        var at = row is null ? -1 : SelectedTreeNodes.IndexOf(row);
+        if (at == 0)
+        {
+            return;
+        }
+
+        _isSyncingTreeSelection = true;
+        try
+        {
+            if (at > 0)
+            {
+                SelectedTreeNodes.Move(at, 0);
+            }
+            else
+            {
+                SelectedTreeNode = row;
+            }
+        }
+        finally
+        {
+            _isSyncingTreeSelection = false;
+        }
+    }
+
+    /// <summary>
+    /// The list's selection changed: by a click (or several, with Ctrl or Shift), or by this screen. Its first row is
+    /// SelectedTreeNode, and a product's row picked by the user picks the product.
+    /// </summary>
+    private void TreeSelectionChanged()
+    {
+        var first = SelectedTreeNodes.Count > 0 ? SelectedTreeNodes[0] : null;
+        this.RaisePropertyChanged(nameof(SelectedTreeProducts));
+        if (ReferenceEquals(first, _selectedTreeNode))
+        {
+            return;
+        }
+
+        _selectedTreeNode = first;
+        this.RaisePropertyChanged(nameof(SelectedTreeNode));
+
+        // The tree calls this in the middle of changing SelectedItems: picking the product leads to SyncTreeSelection,
+        // which then finds its row first already and leaves the collection alone, as it must mid-change.
+        if (!_isSyncingTreeSelection && first is ProductLeafNode leaf && leaf.Product.Id != SelectedProduct?.Id)
+        {
+            SelectedProduct = leaf.Product;
+        }
+    }
+
+    private async Task MoveProductsAsync(IReadOnlyList<ProductMove> moves, bool isUndo)
+    {
+        if (moves.Count == 0)
+        {
+            return;
+        }
+
+        // Where each is now, which Undo puts back, and the rows picked, which the tree drops as they move.
+        var undo = moves
+            .Select(m => _productCache.Lookup(m.ProductId))
+            .Where(found => found.HasValue)
+            .Select(found => new ProductMove(found.Value.Id, found.Value.Stage, found.Value.CategoryId))
+            .ToList();
+        var picked = SelectedTreeNodes.ToList();
+
+        await _productRepository.MoveAsync(moves, CancellationToken.None);
+        var moved = await _productRepository.GetByIdsAsync([.. moves.Select(m => m.ProductId)], CancellationToken.None);
+
+        // The list files them in their new folders. A selection is only re-pointed at the fresh copy, as a load re-points
+        // it: the form isn't loaded again, so whatever's typed into it stays.
+        var onForm = moved.FirstOrDefault(p => p.Id == _editingId);
+        ApplyRefresh(() =>
+        {
+            _productCache.AddOrUpdate(moved);
+            if (SelectedProduct is { } selected && moved.FirstOrDefault(p => p.Id == selected.Id) is { } fresh)
+            {
+                SelectedProduct = fresh;
+            }
+
+            if (onForm is not null)
+            {
+                EditingCategory = Categories.FirstOrDefault(c => c.Id == onForm.CategoryId);
+                ShowUpdatedAt(onForm.UpdatedAt);
+            }
+        });
+
+        // The new category is saved, not typed: nothing for Save to write, and no undo step that puts the old one back.
+        if (onForm is not null)
+        {
+            History.RewriteAll(snapshot => snapshot with { CategoryId = onForm.CategoryId });
+        }
+
+        RestoreTreeSelection(picked);
+
+        _moveUndo = isUndo ? [] : undo;
+        MoveNotice = isUndo ? null : MoveNoticeFor(moves);
+    }
+
+    /// <summary>Picks again the rows of <paramref name="picked"/> the tree dropped from its selection as they moved.</summary>
+    private void RestoreTreeSelection(IReadOnlyList<object> picked)
+    {
+        _isSyncingTreeSelection = true;
+        try
+        {
+            foreach (var row in picked.Where(r => r is not ProductLeafNode leaf || ProductTree.Find(leaf.Product.Id) == leaf))
+            {
+                if (!SelectedTreeNodes.Contains(row))
+                {
+                    SelectedTreeNodes.Add(row);
+                }
+            }
+        }
+        finally
+        {
+            _isSyncingTreeSelection = false;
+        }
+    }
+
+    /// <summary>
+    /// What the notice bar says a move did: "Moved Pandesal to Production › Breads", "Moved 3 products to Production ›
+    /// Breads", "Moved 3 products to Production" (a Promote, each keeping its category), or "Moved 3 products".
+    /// </summary>
+    private string MoveNoticeFor(IReadOnlyList<ProductMove> moves)
+    {
+        var what = moves.Count == 1 && _productCache.Lookup(moves[0].ProductId) is { HasValue: true } one ? one.Value.Name : $"{moves.Count} products";
+        var first = moves[0];
+        if (moves.All(m => m.Stage == first.Stage && m.CategoryId == first.CategoryId))
+        {
+            var folder = first.CategoryId is { } id ? Categories.FirstOrDefault(c => c.Id == id)?.Name : ProductFolderNode.UncategorizedTitle;
+            return $"Moved {what} to {ProductFolderNode.StageTitle(first.Stage)} › {folder}";
+        }
+
+        return moves.All(m => m.Stage == first.Stage)
+            ? $"Moved {what} to {ProductFolderNode.StageTitle(first.Stage)}"
+            : $"Moved {what}";
+    }
+
+    /// <summary>
+    /// A new product: no name, recipe, packaging or links, its costing at the defaults, and nothing selected. Save files it
+    /// in <paramref name="stage"/> and <paramref name="categoryId"/>, which its Category picker starts on.
+    /// </summary>
+    private void StartNewProduct(ProductStage stage = ProductStage.ResearchAndDevelopment, int? categoryId = null)
+    {
+        NewProductStage = stage;
+        _newProductCategoryId = categoryId;
         SelectedProduct = null;
         _editingId = 0;
         EditingName = string.Empty;
         EditingDescription = string.Empty;
-        EditingCategory = null;
+        EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId);
         EditingQuantityRequired = 1;
         EditingCurrentPrice = null;
         ShowUpdatedAt(null);
@@ -3698,6 +4092,323 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             EditingCurrentPrice);
     }
 
+    // Segoe Fluent Icons glyphs for the list's menu, the ones the screen's buttons use where there's one.
+    private const string AddGlyph = "";
+    private const string NewFolderGlyph = "";
+    private const string MoveGlyph = "";
+    private const string PromoteGlyph = "";
+    private const string SendBackGlyph = "";
+    private const string RenameGlyph = "";
+    private const string CopyGlyph = "";
+    private const string LinkGlyph = "";
+    private const string DeleteGlyph = "";
+
+    /// <summary>
+    /// The menu a right-click opens on the list (ProductListCard): on <paramref name="node"/>'s row, which the View picks
+    /// first (keeping the rows picked with it, when it was one of them), or on the list's empty space when it's null. A
+    /// product's menu covers every product picked with it.
+    /// </summary>
+    public IReadOnlyList<ProductTreeMenuItem> TreeMenuFor(ProductTreeNode? node) => node switch
+    {
+        ProductLeafNode leaf => ProductsMenu(SelectedTreeProducts is var picked && picked.Contains(leaf) ? picked : [leaf]),
+        ProductFolderNode { IsStage: true } stage => StageMenu(stage),
+        ProductFolderNode folder => FolderMenu(folder),
+        _ => EmptySpaceMenu(),
+    };
+
+    /// <summary>
+    /// The item a key runs with the one row picked, as that row's menu shows the key beside it (F2, Del); null when the
+    /// menu has none, or when several rows are picked.
+    /// </summary>
+    public ProductTreeMenuItem? TreeShortcut(string gesture) =>
+        SelectedTreeNodes is [ProductTreeNode node]
+            ? TreeMenuFor(node).FirstOrDefault(item => item.Gesture == gesture && item.IsEnabled)
+            : null;
+
+    private List<ProductTreeMenuItem> ProductsMenu(IReadOnlyList<ProductLeafNode> leaves)
+    {
+        var products = leaves.Select(l => l.Product).ToList();
+        var isOne = products.Count == 1;
+        var toProduction = ProductTree.MovesTo(ProductStage.Production, null, keepCategory: true, products);
+        var toResearch = ProductTree.MovesTo(ProductStage.ResearchAndDevelopment, null, keepCategory: true, products);
+
+        List<ProductTreeMenuItem> items = [];
+        if (toProduction.Count > 0)
+        {
+            items.Add(new($"Promote {HowMany(toProduction)}to Production", MoveProductsCommand, toProduction) { Glyph = PromoteGlyph });
+        }
+
+        if (toResearch.Count > 0)
+        {
+            items.Add(new($"Send {HowMany(toResearch)}Back to Research and Development", MoveProductsCommand, toResearch) { Glyph = SendBackGlyph });
+        }
+
+        items.Add(new($"Move {(isOne ? string.Empty : $"{products.Count} Products ")}to")
+        {
+            Glyph = MoveGlyph,
+            Items = [MoveToStage(ProductStage.Production), MoveToStage(ProductStage.ResearchAndDevelopment)],
+        });
+
+        if (isOne)
+        {
+            var leaf = leaves[0];
+            items.AddRange(
+            [
+                ProductTreeMenuItem.Separator,
+                new("Rename…", RenameProductCommand, leaf) { Gesture = "F2", Glyph = RenameGlyph },
+                new("Clone…", CloneProductCommand, leaf) { Glyph = CopyGlyph },
+                new("Create Variant…", CreateVariantOfCommand, leaf) { Glyph = LinkGlyph },
+                ProductTreeMenuItem.Separator,
+                new("Delete", DeleteProductCommand, leaf) { Gesture = "Del", Glyph = DeleteGlyph },
+            ]);
+        }
+
+        return items;
+
+        // "3 Products " while several are picked, counting only those that would move; nothing for one.
+        string HowMany(IReadOnlyList<ProductMove> moves) =>
+            isOne ? string.Empty : $"{moves.Count} {(moves.Count == 1 ? "Product" : "Products")} ";
+
+        // A stage's folders, each moving every product picked that isn't in it already, and greyed when none would move.
+        ProductTreeMenuItem MoveToStage(ProductStage stage)
+        {
+            List<ProductTreeMenuItem> folders =
+            [
+                .. Categories.Select(c => MoveToFolder(c.Name, c.Id)),
+                MoveToFolder(ProductFolderNode.UncategorizedTitle, null),
+            ];
+            return new(ProductFolderNode.StageTitle(stage)) { Items = folders, IsEnabled = folders.Any(f => f.IsEnabled) };
+
+            ProductTreeMenuItem MoveToFolder(string title, int? categoryId)
+            {
+                var moves = ProductTree.MovesTo(stage, categoryId, keepCategory: false, products);
+                return new(title, MoveProductsCommand, moves) { IsEnabled = moves.Count > 0 };
+            }
+        }
+    }
+
+    private List<ProductTreeMenuItem> StageMenu(ProductFolderNode stage) =>
+    [
+        new("New Product Here", NewProductInCommand, stage) { Glyph = AddGlyph },
+        new("New Category…", NewCategoryCommand, stage) { Glyph = NewFolderGlyph },
+        ProductTreeMenuItem.Separator,
+        new("Expand All", ExpandAllCommand, stage),
+        new("Collapse All", CollapseAllCommand, stage),
+    ];
+
+    private List<ProductTreeMenuItem> FolderMenu(ProductFolderNode folder)
+    {
+        List<ProductTreeMenuItem> items = [new("New Product Here", NewProductInCommand, folder) { Glyph = AddGlyph }];
+
+        // What the folder shows: with a search on, its matches.
+        var toProduction = ProductTree.MovesTo(ProductStage.Production, null, keepCategory: true, folder.Products.Select(l => l.Product));
+        if (toProduction.Count > 0)
+        {
+            items.Add(new("Promote All to Production", MoveProductsCommand, toProduction) { Glyph = PromoteGlyph });
+        }
+
+        if (folder.IsCategory)
+        {
+            items.AddRange(
+            [
+                ProductTreeMenuItem.Separator,
+                new("New Category…", NewCategoryCommand, folder) { Glyph = NewFolderGlyph },
+                new("Rename Category…", RenameCategoryCommand, folder) { Gesture = "F2", Glyph = RenameGlyph },
+                new("Delete Category", DeleteCategoryCommand, folder) { Gesture = "Del", Glyph = DeleteGlyph },
+            ]);
+        }
+
+        return items;
+    }
+
+    private List<ProductTreeMenuItem> EmptySpaceMenu() =>
+    [
+        new("New Product", NewProductInCommand) { Glyph = AddGlyph },
+        new("New Category…", NewCategoryCommand) { Glyph = NewFolderGlyph },
+        ProductTreeMenuItem.Separator,
+        new("Expand All", ExpandAllCommand),
+        new("Collapse All", CollapseAllCommand),
+    ];
+
+    /// <summary>
+    /// The list's Rename: asks for the new name, and saves it at once. On the product the form shows, the name box takes
+    /// it, and the form's undo steps take it as given, as a move gives them its category: whatever else is typed there
+    /// stays to be saved, and no undo brings the old name back for a Save to write.
+    /// </summary>
+    private async Task RenameProductAsync(ProductLeafNode leaf)
+    {
+        var product = leaf.Product;
+        var name = (await PromptForName.Handle(new TextPromptRequest("Rename Product", "Name", product.Name)))?.Trim();
+        if (string.IsNullOrEmpty(name) || string.Equals(name, product.Name, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
+        {
+            await _productRepository.RenameAsync(product.Id, name, CancellationToken.None);
+
+            // What's named after it follows: its own sub-assemblies, as other products' pickers list them.
+            await LoadCommand.Execute();
+            if (_editingId == product.Id)
+            {
+                // The Clone tab's name follows too, while it's still the one it started with.
+                var oldCloneName = $"{product.Name} Copy";
+                var newCloneName = $"{name} Copy";
+                ApplyRefresh(() =>
+                {
+                    EditingName = name;
+                    if (EditingCloneName == oldCloneName)
+                    {
+                        EditingCloneName = newCloneName;
+                    }
+                });
+                History.RewriteAll(snapshot => snapshot with
+                {
+                    Name = name,
+                    CloneName = snapshot.CloneName == oldCloneName ? newCloneName : snapshot.CloneName,
+                });
+            }
+        });
+    }
+
+    /// <summary>
+    /// The list's New Category: asks for a name and adds it, then picks its folder in the stage it was asked in. A name
+    /// that's a category already picks that one's folder instead.
+    /// </summary>
+    private async Task NewCategoryAsync(ProductFolderNode? from)
+    {
+        var name = (await PromptForName.Handle(new TextPromptRequest(
+            "New Category", "Name", string.Empty, "A category is a folder in both Production and Research and Development.")))?.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
+        {
+            var category = Categories.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))
+                ?? await SaveNewCategoryAsync(name);
+            if (category is not null
+                && from is not null
+                && ProductTree.CategoryFolder(from.Stage, category.Id) is { } folder
+                && ProductTree.StageFolder(from.Stage).Children.Contains(folder))
+            {
+                SelectedTreeNode = folder;
+            }
+        });
+    }
+
+    /// <summary>The list's Rename Category: renames the category, which is its folder in both stages.</summary>
+    private async Task RenameCategoryAsync(ProductFolderNode folder)
+    {
+        if (Categories.FirstOrDefault(c => c.Id == folder.CategoryId) is not { } category)
+        {
+            return;
+        }
+
+        var name = (await PromptForName.Handle(new TextPromptRequest(
+            "Rename Category", "Name", category.Name, $"{category.Name} is a folder in both Production and Research and Development: it's renamed in both.")))?.Trim();
+        if (string.IsNullOrEmpty(name) || string.Equals(name, category.Name, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
+        {
+            var renamed = new ProductCategory { Id = category.Id, Name = name };
+            var validation = _categoryValidator.Validate(renamed);
+            if (!validation.IsValid)
+            {
+                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                return;
+            }
+
+            await _categoryRepository.UpdateAsync(renamed, CancellationToken.None);
+            await ReloadCategoriesAsync();
+        });
+    }
+
+    /// <summary>
+    /// The list's Delete Category: once it's confirmed, deletes the category, whose products are left uncategorized, in
+    /// whichever stage they're in.
+    /// </summary>
+    private Task DeleteCategoryAsync(ProductFolderNode folder)
+    {
+        if (Categories.FirstOrDefault(c => c.Id == folder.CategoryId) is not { } category)
+        {
+            return Task.CompletedTask;
+        }
+
+        var count = Products.Count(p => p.CategoryId == category.Id);
+        var products = count switch
+        {
+            0 => "it holds no products",
+            1 => "its one product is left uncategorized",
+            _ => $"its {count} products are left uncategorized",
+        };
+
+        return RunWithConfirmationAsync(
+            $"Delete the '{category.Name}' category? Its folder goes from both Production and Research and Development, and {products}. This can't be undone.",
+            async () =>
+            {
+                await _categoryRepository.DeleteAsync(category.Id, CancellationToken.None);
+
+                // Its products lost it in the database: every list is read again, and the form's undo steps forget it, so
+                // none puts back a category there's no longer any of to save.
+                await LoadCommand.Execute();
+                History.RewriteAll(snapshot => snapshot.CategoryId == category.Id ? snapshot with { CategoryId = null } : snapshot);
+            });
+    }
+
+    /// <summary>
+    /// Saves a new category and reads the categories again; null, with the reason showing, if its name is refused. Only
+    /// the categories are read: nothing else on the screen changes with a new one.
+    /// </summary>
+    private async Task<ProductCategory?> SaveNewCategoryAsync(string name)
+    {
+        var category = new ProductCategory { Name = name };
+        var validation = _categoryValidator.Validate(category);
+        if (!validation.IsValid)
+        {
+            ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+            return null;
+        }
+
+        // AddAsync fills in the saved Id, which the copy read back is found by.
+        await _categoryRepository.AddAsync(category, CancellationToken.None);
+        await ReloadCategoriesAsync();
+        return Categories.FirstOrDefault(c => c.Id == category.Id);
+    }
+
+    /// <summary>
+    /// Reads the categories again, keeping the Category picker on the one it holds: a picker whose item gets replaced can
+    /// clear its own selection mid-merge.
+    /// </summary>
+    private async Task ReloadCategoriesAsync()
+    {
+        var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
+        var editingId = EditingCategory?.Id;
+        ApplyRefresh(() =>
+        {
+            _categoryCache.MergeFrom(categories);
+            EditingCategory = Categories.FirstOrDefault(c => c.Id == editingId);
+        });
+    }
+
+    /// <summary>Writes the list's open folders for next time, when they differ from what was written last.</summary>
+    private void WriteOpenFolders(IReadOnlyList<string> openFolders)
+    {
+        lock (_openFoldersLock)
+        {
+            if (!openFolders.SequenceEqual(_writtenOpenFolders, StringComparer.Ordinal))
+            {
+                _viewStateStore.WriteList(OpenFoldersKey, openFolders);
+                _writtenOpenFolders = openFolders;
+            }
+        }
+    }
+
     public void BeginCategoryEdit()
     {
         if (!_isCommittingCategory)
@@ -3760,21 +4471,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var added = false;
         await RunSafelyAsync(async () =>
         {
-            var category = new ProductCategory { Name = name };
-
-            var validation = _categoryValidator.Validate(category);
-            if (!validation.IsValid)
+            if (await SaveNewCategoryAsync(name) is not { } category)
             {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
                 return;
             }
 
-            // AddAsync fills in the saved Id, which the reloaded copy to pick is found by. Only the categories are
-            // reloaded: nothing else on the screen changes with a new category.
-            await _categoryRepository.AddAsync(category, CancellationToken.None);
-            var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
-            ApplyRefresh(() => _categoryCache.MergeFrom(categories));
-            AsUndoStep(() => EditingCategory = Categories.FirstOrDefault(c => c.Id == category.Id));
+            AsUndoStep(() => EditingCategory = category);
             SuccessMessage = $"{category.Name} was added.";
             added = true;
         });
@@ -3787,6 +4489,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     public void Dispose()
     {
+        // A change still settling when the app closes is written now, rather than lost.
+        _openFoldersWriter.Dispose();
+        WriteOpenFolders(ProductTree.OpenFolderKeys());
+        ProductTree.Dispose();
+
         _productCache.Dispose();
         _categoryCache.Dispose();
         _subAssemblyOpenRequests.Dispose();

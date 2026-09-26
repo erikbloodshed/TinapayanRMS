@@ -63,6 +63,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         var sourceLink = await dbContext.PackagingLinks.AsNoTracking().FirstOrDefaultAsync(l => l.ProductId == sourceProductId, cancellationToken);
         var costing = await dbContext.CostingParameters.AsNoTracking().FirstOrDefaultAsync(c => c.ProductId == sourceProductId, cancellationToken);
 
+        // Not the source's stage: a clone is a new product, so it starts in Research and Development.
         var newProduct = new Product
         {
             Name = newProductName,

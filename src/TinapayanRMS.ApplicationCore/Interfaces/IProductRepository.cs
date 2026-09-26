@@ -81,17 +81,38 @@ public sealed record PackagingLinkDraft(int? LinkedProductId, int? LinkedSubAsse
     public static PackagingLinkDraft None { get; } = new(null, null);
 }
 
+/// <summary>
+/// A product filed under another folder of the Products list: the stage and category it goes in from now on.
+/// <paramref name="CategoryId"/> null leaves it uncategorized.
+/// </summary>
+public sealed record ProductMove(int ProductId, ProductStage Stage, int? CategoryId);
+
 public interface IProductRepository
 {
     Task<IReadOnlyList<Product>> GetAllAsync(CancellationToken cancellationToken);
 
     Task<Product?> GetByIdAsync(int id, CancellationToken cancellationToken);
 
+    /// <summary>The products with these ids, by name; an id with no product is left out.</summary>
+    Task<IReadOnlyList<Product>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken);
+
     /// <summary>Adds the product and stamps its UpdatedAt.</summary>
     Task AddAsync(Product product, CancellationToken cancellationToken);
 
-    /// <summary>Changes the name, description, category, quantity required and current price, and stamps UpdatedAt.</summary>
+    /// <summary>Changes the name, description, category, quantity required and current price, and stamps UpdatedAt. The stage stays as it is.</summary>
     Task UpdateAsync(Product product, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Files each product under another folder of the Products list, all in one save: sets its stage and category,
+    /// nothing else, and stamps UpdatedAt. Refused, with nothing moved, if a product or a category doesn't exist.
+    /// </summary>
+    Task MoveAsync(IReadOnlyCollection<ProductMove> moves, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Renames the product and nothing else, stamping UpdatedAt; its own sub-assemblies, named after it, take the new
+    /// name as a Save's rename gives it to them.
+    /// </summary>
+    Task RenameAsync(int productId, string name, CancellationToken cancellationToken);
 
     /// <summary>
     /// Saves everything the Products screen edits in one transaction, so nothing is saved unless every
@@ -99,7 +120,11 @@ public interface IProductRepository
     /// its recipe, its packaging lines and its costing parameters, each checked as their own repositories
     /// check them. Returns the product's id.
     /// </summary>
-    /// <param name="product">Only its Id, Name, Description, CategoryId, QuantityRequired and CurrentPrice are read; it's never given an id.</param>
+    /// <param name="product">
+    /// Only its Id, Name, Description, CategoryId, QuantityRequired and CurrentPrice are read, and a new one's Stage;
+    /// it's never given an id. A new product goes in the stage it holds (Research and Development unless it's set), and
+    /// a saved one keeps its stage.
+    /// </param>
     /// <param name="recipe">
     /// The product's complete recipe of sub-assemblies, or null to leave it as it is. One of its own it no longer lists is
     /// deleted; one from the Sub-Assemblies screen stays there.

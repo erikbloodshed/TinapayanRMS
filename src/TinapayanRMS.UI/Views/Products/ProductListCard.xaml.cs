@@ -1,27 +1,281 @@
 using System.ComponentModel;
+using System.Windows;
 using System.Windows.Controls;
-using Syncfusion.UI.Xaml.Grid;
-using Syncfusion.UI.Xaml.ScrollAxis;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
+using ReactiveUI;
+using Syncfusion.SfSkinManager;
+using Syncfusion.UI.Xaml.TreeView;
+using Syncfusion.UI.Xaml.TreeView.Engine;
+using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.UI.ViewModels;
+using TreeViewItem = Syncfusion.UI.Xaml.TreeView.TreeViewItem;
 
 namespace TinapayanRMS.UI.Views.Products;
 
-/// <summary>The Products list, with a search box. Inherits the Products screen's DataContext (ProductsViewModel).</summary>
+/// <summary>
+/// The Products list: the products in a folder for their stage, then their category, with a search box. Dragging products
+/// onto a folder moves them there; a right-click opens a menu of what can be done with the row, or with the list; F2, Del
+/// and Enter work on the row picked. Inherits the Products screen's DataContext (ProductsViewModel).
+/// </summary>
 public partial class ProductListCard : UserControl
 {
+    /// <summary>How long the notice of a move shows before hiding itself; checked again later while the mouse is over it.</summary>
+    private readonly DispatcherTimer _moveNoticeTimer = new() { Interval = TimeSpan.FromSeconds(8) };
+
     public ProductListCard()
     {
         InitializeComponent();
 
-        // A product picked from elsewhere (Sub-Assemblies' Used By tiles) may be scrolled out of sight: the grid
-        // doesn't bring a SelectedItem set through its binding into view itself. A row clicked is already in view,
-        // so this does nothing for it.
-        DependencyPropertyDescriptor.FromProperty(SfDataGrid.SelectedItemProperty, typeof(SfDataGrid))
-            .AddValueChanged(List, (_, _) =>
+        // A row picked from elsewhere (Sub-Assemblies' Used By tiles, a Save, a clone, a new category's folder) may be in a
+        // closed folder or scrolled out of sight: the tree doesn't bring a selection set from its SelectedItems into view
+        // itself. A row clicked is in view already, so this leaves it where it is.
+        DependencyPropertyDescriptor.FromProperty(SfTreeView.SelectedItemProperty, typeof(SfTreeView))
+            .AddValueChanged(Tree, (_, _) =>
             {
-                if (List.SelectedItem is { } product && List.ResolveToRowIndex(product) is var rowIndex and >= 0)
+                if (Tree.SelectedItem is ProductTreeNode node)
                 {
-                    List.ScrollInView(new RowColumnIndex(rowIndex, 0));
+                    ShowRow(node);
                 }
             });
+
+        // A new notice starts the clock again; none stops it.
+        DataContextChanged += (_, e) =>
+        {
+            if (e.NewValue is ProductsViewModel viewModel)
+            {
+                viewModel.WhenAnyValue(x => x.MoveNotice).Subscribe(notice =>
+                {
+                    _moveNoticeTimer.Stop();
+                    if (notice is not null)
+                    {
+                        _moveNoticeTimer.Start();
+                    }
+                });
+            }
+        };
+
+        _moveNoticeTimer.Tick += (_, _) =>
+        {
+            // Kept while the mouse is over it, which may be on its way to Undo.
+            if (!MoveNoticeBar.IsMouseOver && DataContext is ProductsViewModel viewModel)
+            {
+                _moveNoticeTimer.Stop();
+                viewModel.DismissMoveNoticeCommand.Execute().Subscribe();
+            }
+        };
     }
+
+    /// <summary>Only products can be dragged, one or several: the folders are fixed.</summary>
+    private void Tree_ItemDragStarting(object? sender, TreeViewItemDragStartingEventArgs e) =>
+        e.Cancel = e.DraggingNodes.Any(node => node.Content is not ProductLeafNode);
+
+    /// <summary>
+    /// Shows where a drop files the products: into a folder, highlighted whole, or beside another product in that one's
+    /// folder. Refuses a drop that would leave them all where they are, and anything dragged in from outside the list.
+    /// </summary>
+    private void Tree_ItemDragOver(object? sender, TreeViewItemDragOverEventArgs e)
+    {
+        if (MovesFor(e.DraggingNodes, e.TargetNode).Count == 0)
+        {
+            e.DropPosition = DropPosition.None;
+        }
+        else if (e.TargetNode.Content is ProductFolderNode)
+        {
+            e.DropPosition = DropPosition.DropAsChild;
+        }
+        else if (e.DropPosition is DropPosition.DropAsChild or DropPosition.None)
+        {
+            // A product holds nothing: over the middle of one, the line goes under it.
+            e.DropPosition = DropPosition.DropBelow;
+        }
+    }
+
+    /// <summary>
+    /// Moves the products through the Products screen, which saves the move and files them in their new folder; the tree
+    /// never moves a row itself. The folder the first lands in opens, so it's seen arriving.
+    /// </summary>
+    private void Tree_ItemDropping(object? sender, TreeViewItemDroppingEventArgs e)
+    {
+        e.Handled = true;
+        var moves = MovesFor(e.DraggingNodes, e.TargetNode);
+        if (moves.Count == 0 || DataContext is not ProductsViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.MoveProductsCommand.Execute(moves).Subscribe(_ =>
+        {
+            if (viewModel.ProductTree.Find(moves[0].ProductId) is { } leaf)
+            {
+                ShowRow(leaf);
+            }
+        });
+    }
+
+    /// <summary>What dropping the products dragged on <paramref name="target"/> would do: none for nothing.</summary>
+    private static IReadOnlyList<ProductMove> MovesFor(IList<TreeViewNode>? dragging, TreeViewNode? target) =>
+        dragging is { Count: > 0 } && dragging.All(node => node.Content is ProductLeafNode)
+            ? ProductTree.MovesTo(target?.Content as ProductTreeNode, dragging.Select(node => ((ProductLeafNode)node.Content).Product))
+            : [];
+
+    /// <summary>
+    /// A row right-clicked: its menu, for it and, when it was one of the rows picked, for the rest of them too, as in a
+    /// file explorer. A row outside the selection is picked alone first, so the product it opens on is the one showing.
+    /// </summary>
+    private void Tree_ItemContextMenuOpening(object? sender, ItemContextMenuOpeningEventArgs e)
+    {
+        if (DataContext is not ProductsViewModel viewModel || e.MenuInfo.Node?.Content is not ProductTreeNode node)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        if (!viewModel.SelectedTreeNodes.Contains(node))
+        {
+            viewModel.SelectedTreeNode = node;
+        }
+
+        e.ContextMenu = BuildMenu(viewModel.TreeMenuFor(node));
+    }
+
+    /// <summary>
+    /// The list's own menu, which opens where a right-click isn't on a row: New Product, New Category, Expand All and
+    /// Collapse All. From the keyboard (the menu key, or Shift+F10) it's the menu of the row picked instead, beneath it.
+    /// A row's own right-click never gets here: the tree has shown its menu and handled the event.
+    /// </summary>
+    private void Tree_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (DataContext is not ProductsViewModel viewModel)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        // Opened here rather than by the service, which places a menu it opens from the keyboard itself, whatever it's
+        // given: over the row rather than under it.
+        if (e.CursorLeft < 0 && e.CursorTop < 0 && viewModel.SelectedTreeNode is ProductTreeNode node)
+        {
+            e.Handled = true;
+            var rowMenu = BuildMenu(viewModel.TreeMenuFor(node));
+            rowMenu.PlacementTarget = RowOf(node) ?? (UIElement)Tree;
+            rowMenu.Placement = PlacementMode.Bottom;
+            rowMenu.IsOpen = true;
+            return;
+        }
+
+        Tree.ContextMenu = BuildMenu(viewModel.TreeMenuFor(null));
+    }
+
+    /// <summary>
+    /// F2 renames and Del deletes the row picked, product or category, as its menu shows; Enter opens or closes a folder,
+    /// as clicking it does.
+    /// </summary>
+    private void Tree_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (DataContext is not ProductsViewModel viewModel || Keyboard.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Enter && viewModel.SelectedTreeNodes is [ProductFolderNode folder])
+        {
+            folder.IsExpanded = !folder.IsExpanded;
+            e.Handled = true;
+            return;
+        }
+
+        var gesture = e.Key switch
+        {
+            Key.F2 => "F2",
+            Key.Delete => "Del",
+            _ => null,
+        };
+        if (gesture is not null && viewModel.TreeShortcut(gesture) is { Command: { } command } item && command.CanExecute(item.Parameter))
+        {
+            command.Execute(item.Parameter);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// A menu of <paramref name="items"/>, themed as the window is: a menu opens in a window of its own, which the theme
+    /// only reaches when it's given it, as a dialog is.
+    /// </summary>
+    private ContextMenu BuildMenu(IReadOnlyList<ProductTreeMenuItem> items)
+    {
+        var menu = new ContextMenu();
+        if (Window.GetWindow(this) is { } window)
+        {
+            SfSkinManager.SetTheme(menu, SfSkinManager.GetTheme(window));
+        }
+
+        foreach (var item in items)
+        {
+            menu.Items.Add(ToMenuItem(item));
+        }
+
+        return menu;
+    }
+
+    private Control ToMenuItem(ProductTreeMenuItem item)
+    {
+        if (item.IsSeparator)
+        {
+            return new Separator();
+        }
+
+        var menuItem = new MenuItem
+        {
+            // An underscore in a name would otherwise be taken for an access key's marker.
+            Header = item.Header.Replace("_", "__", StringComparison.Ordinal),
+            Command = item.Command,
+            CommandParameter = item.Parameter,
+            InputGestureText = item.Gesture,
+            IsEnabled = item.IsEnabled,
+        };
+
+        if (item.Glyph is not null)
+        {
+            menuItem.Icon = new TextBlock { Text = item.Glyph, Style = (Style)FindResource("IconGlyphStyle") };
+        }
+
+        foreach (var child in item.Items)
+        {
+            menuItem.Items.Add(ToMenuItem(child));
+        }
+
+        return menuItem;
+    }
+
+    /// <summary>The row showing <paramref name="node"/>, or null while it's scrolled out of sight or in a closed folder.</summary>
+    private TreeViewItem? RowOf(ProductTreeNode node)
+    {
+        return Find(Tree);
+
+        TreeViewItem? Find(DependencyObject parent)
+        {
+            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is TreeViewItem row && (row.DataContext == node || row.DataContext is TreeViewNode { Content: var content } && content == node))
+                {
+                    return row;
+                }
+
+                if (Find(child) is { } found)
+                {
+                    return found;
+                }
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>Opens the folders above <paramref name="node"/> and scrolls it into view, if it isn't already.</summary>
+    private void ShowRow(ProductTreeNode node) =>
+        Tree.BringIntoView(node, disableAnimation: true, canExpand: true, ScrollToPosition.MakeVisible);
 }

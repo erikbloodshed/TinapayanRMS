@@ -345,6 +345,12 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         await repository.UpdateAsync(product, Cancellation);
 
         (await SubAssembliesAsync()).Select(s => s.Name).Should().Equal("Cheese Roll Dough", "Cheese Loaf Filling: Cheese");
+
+        // The Products list's Rename, which writes the name alone.
+        await repository.RenameAsync(productId, "Cheese Twist", Cancellation);
+
+        (await SubAssembliesAsync()).Select(s => s.Name).Should().Equal("Cheese Roll Dough", "Cheese Twist Filling: Cheese");
+        (await repository.GetByIdAsync(productId, Cancellation))!.Name.Should().Be("Cheese Twist");
     }
 
     [Fact]

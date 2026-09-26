@@ -20,6 +20,7 @@
     <PackageReference Include="Syncfusion.SfNavigationDrawer.WPF" />
     <PackageReference Include="Syncfusion.SfSkinManager.WPF" />
     <PackageReference Include="Syncfusion.SfTextInputLayout.WPF" />
+    <PackageReference Include="Syncfusion.SfTreeView.WPF" />
     <PackageReference Include="Syncfusion.Themes.Windows11Light.WPF" />
     <PackageReference Include="Syncfusion.Tools.WPF" />
     <PackageReference Include="System.Reactive" />

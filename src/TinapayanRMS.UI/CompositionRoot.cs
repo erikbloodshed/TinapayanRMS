@@ -62,6 +62,7 @@ public static class CompositionRoot
                 services.AddSingleton<ICostingDefaultsRepository, CostingDefaultsRepository>();
                 services.AddSingleton<IPackagingLinkRepository, PackagingLinkRepository>();
                 services.AddSingleton<IProductCloner, ProductCloner>();
+                services.AddSingleton<IViewStateStore>(new JsonViewStateStore(JsonViewStateStore.DefaultFilePath));
 
                 services.AddSingleton(Log.Logger);
                 services.AddSingleton<IValidator<UnitOfMeasure>, UnitOfMeasureValidator>();

@@ -26,7 +26,7 @@
     </UserControl.Resources>
 
     <!--
-        The product's title and New/Save/Delete, a line under them, then a row of figures, nothing typed into: the material cost and
+        The product's title (with, for one not saved yet, where Save will file it) and New/Save/Delete, a line under them, then a row of figures, nothing typed into: the material cost and
         base cost for one sellable unit, the price the shop charges now with the markup it earns, and when it was
         last saved. The name, category, quantity required and current price are typed in under the header
         (ProductDetailsCard).
@@ -44,13 +44,25 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <TextBlock Text="{Binding HeaderTitle}"
-                       VerticalAlignment="Center"
-                       Margin="0,0,12,0"
-                       FontSize="18"
-                       FontWeight="SemiBold"
-                       Foreground="{StaticResource HeadingForegroundBrush}"
-                       TextTrimming="CharacterEllipsis" />
+            <!--
+                The title, and while the product isn't saved yet, where Save will file it (NewProductTag), styled as the
+                "Moves to Sub-Assemblies on Save" badge. Left-aligned with the tag docked first, so the tag sits just after
+                the name and a long name trims while the tag stays in sight.
+            -->
+            <DockPanel HorizontalAlignment="Left" Margin="0,0,12,0">
+                <Border DockPanel.Dock="Right"
+                        Style="{StaticResource LinkedBadgeStyle}"
+                        ToolTip="Where Save files this new product in the Products list: Research and Development after New, or the folder New Product Here was picked on."
+                        Visibility="{Binding NewProductTag, Converter={StaticResource NotNullToVisibilityConverter}}">
+                    <TextBlock Text="{Binding NewProductTag}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
+                </Border>
+                <TextBlock Text="{Binding HeaderTitle}"
+                           VerticalAlignment="Center"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource HeadingForegroundBrush}"
+                           TextTrimming="CharacterEllipsis" />
+            </DockPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                 <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />

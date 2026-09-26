@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
@@ -21,6 +22,15 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         // be refused, on an insert as on an update, rather than being quietly stored as 1.
         builder.Property(p => p.QuantityRequired).HasDefaultValue(1).HasSentinel(-1);
         builder.ToTable(t => t.HasCheckConstraint("CK_Products_QuantityRequired", "[QuantityRequired] > 0"));
+
+        // The database default is only for the products there before stages were: the column is added to them as
+        // Production. A new one is Research and Development, the CLR default, so HasSentinel moves the "leave it to
+        // the database" value off that: EF always writes the stage the product holds.
+        builder.Property(p => p.Stage)
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .HasDefaultValue(ProductStage.Production)
+            .HasSentinel((ProductStage)(-1));
 
         // A category is optional, so deleting one leaves its products uncategorized rather than being refused.
         builder.HasOne(p => p.Category)

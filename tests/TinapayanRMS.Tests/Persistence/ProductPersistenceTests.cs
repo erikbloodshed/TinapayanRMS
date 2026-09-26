@@ -392,4 +392,37 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
+
+    [Fact]
+    public async Task RenameAsync_changes_the_name_and_nothing_else()
+    {
+        var repository = CreateProductRepository();
+        var id = await repository.SaveAsync(
+            new Product { Name = "Mamon", Description = "Soft chiffon cake", QuantityRequired = 6, CurrentPrice = 120m },
+            recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
+        var before = (await repository.GetByIdAsync(id, Cancellation))!;
+
+        await repository.RenameAsync(id, "Mamon Tostado", Cancellation);
+
+        var renamed = (await repository.GetByIdAsync(id, Cancellation))!;
+        renamed.Name.Should().Be("Mamon Tostado");
+        renamed.Description.Should().Be("Soft chiffon cake");
+        renamed.QuantityRequired.Should().Be(6);
+        renamed.CurrentPrice.Should().Be(120m);
+        renamed.Stage.Should().Be(before.Stage);
+        renamed.UpdatedAt.Should().BeOnOrAfter(before.UpdatedAt!.Value, "a rename is a change to the product");
+    }
+
+    [Fact]
+    public async Task RenameAsync_to_another_products_name_is_refused()
+    {
+        var repository = CreateProductRepository();
+        await SeedProductAsync("Mamon");
+        var ensaymadaId = await SeedProductAsync("Ensaymada");
+
+        var act = () => repository.RenameAsync(ensaymadaId, "Mamon", Cancellation);
+
+        await act.Should().ThrowAsync<DbUpdateException>();
+        (await repository.GetByIdAsync(ensaymadaId, Cancellation))!.Name.Should().Be("Ensaymada");
+    }
 }

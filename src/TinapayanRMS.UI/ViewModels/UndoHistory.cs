@@ -144,6 +144,32 @@ public sealed class UndoHistory<TSnapshot>(
         }
     }
 
+    /// <summary>
+    /// Changes every snapshot the history holds through <paramref name="rewrite"/>: the settled form, the step open,
+    /// and each undo and redo step with the settled form beside it. It's for a change saved from outside the form,
+    /// which no undo or redo may take back: a product dragged into another category in the Products list. Rebasing
+    /// only the settled form would leave the steps before it holding the old value, so undoing one would put it
+    /// back, and a Save then undo the change unseen.
+    /// </summary>
+    public void RewriteAll(Func<TSnapshot, TSnapshot> rewrite)
+    {
+        _baseline = _baseline is null ? null : rewrite(_baseline);
+        _pending = _pending is null ? null : rewrite(_pending);
+        _pendingSettled = _pendingSettled is null ? null : rewrite(_pendingSettled);
+        RewriteSteps(_undo);
+        RewriteSteps(_redo);
+        RefreshDirty();
+
+        void RewriteSteps(List<(TSnapshot Snapshot, TSnapshot? Settled)> steps)
+        {
+            for (var i = 0; i < steps.Count; i++)
+            {
+                var (snapshot, settled) = steps[i];
+                steps[i] = (rewrite(snapshot), settled is null ? null : rewrite(settled));
+            }
+        }
+    }
+
     /// <summary>Opens a step, settling one already open first.</summary>
     public void Begin()
     {

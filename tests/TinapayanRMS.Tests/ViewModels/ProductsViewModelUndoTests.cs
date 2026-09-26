@@ -767,6 +767,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
             new ProductValidator(),
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
+            new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
     }
 

@@ -309,6 +309,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
             new ProductValidator(),
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
+            new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
         await viewModel.LoadCommand.Execute();
         return viewModel;

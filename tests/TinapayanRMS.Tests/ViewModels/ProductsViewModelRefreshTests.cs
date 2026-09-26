@@ -1555,6 +1555,105 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task The_lists_row_and_the_picked_product_follow_each_other_and_a_folder_picked_leaves_the_product()
+    {
+        var breadsId = await AddProductCategoryAsync("Breads");
+        var mamonId = await SaveProductAsync("Mamon", breadsId);
+        var ensaymadaId = await SaveProductAsync("Ensaymada", breadsId);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        var tree = viewModel.ProductTree;
+        var breads = TreeFolder(viewModel, ProductStage.ResearchAndDevelopment, "Breads");
+        breads.Children.Should().Equal(tree.Find(ensaymadaId)!, tree.Find(mamonId)!);
+
+        viewModel.SelectedTreeNode = tree.Find(mamonId);
+        viewModel.SelectedProduct!.Id.Should().Be(mamonId, "picking a product's row picks the product");
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
+
+        viewModel.SelectedTreeNode = breads;
+        viewModel.SelectedProduct!.Id.Should().Be(mamonId, "a folder picked leaves the product showing");
+
+        viewModel.OpenProduct(ensaymadaId);
+        viewModel.SelectedTreeNode.Should().BeSameAs(tree.Find(ensaymadaId), "a product opened from elsewhere takes the row with it");
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
+
+        viewModel.SearchText = "mam";
+        tree.Find(ensaymadaId).Should().BeNull();
+        viewModel.SelectedTreeNode.Should().BeNull("the search hides the product picked");
+        viewModel.SearchText = string.Empty;
+        viewModel.SelectedTreeNode.Should().BeSameAs(tree.Find(ensaymadaId), "its row comes back with it");
+
+        await viewModel.NewCommand.Execute();
+        viewModel.SelectedTreeNode.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Dragging_the_product_on_the_form_to_another_folder_saves_the_move_and_leaves_nothing_else_to_save()
+    {
+        var breadsId = await AddProductCategoryAsync("Breads");
+        var cakesId = await AddProductCategoryAsync("Cakes");
+        var mamonId = await SaveProductAsync("Mamon", breadsId);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.OpenProduct(mamonId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
+        TypeName(viewModel, "Mamon Special");
+
+        var move = ProductTree.MoveTo(TreeFolder(viewModel, ProductStage.Production, "Cakes"), viewModel.SelectedProduct!);
+        await viewModel.MoveProductsCommand.Execute([move!]);
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using (var dbContext = CreateDbContext())
+        {
+            var saved = await dbContext.Products.SingleAsync(Cancellation);
+            saved.Stage.Should().Be(ProductStage.Production);
+            saved.CategoryId.Should().Be(cakesId);
+            saved.Name.Should().Be("Mamon", "the move saves nothing typed into the form");
+        }
+
+        var leaf = viewModel.ProductTree.Find(mamonId);
+        TreeFolder(viewModel, ProductStage.Production, "Cakes").Children.Should().ContainSingle().Which.Should().BeSameAs(leaf);
+        TreeFolder(viewModel, ProductStage.ResearchAndDevelopment, "Breads").Children.Should().BeEmpty();
+        viewModel.SelectedTreeNode.Should().BeSameAs(leaf);
+        viewModel.SelectedProduct!.Stage.Should().Be(ProductStage.Production, "the selection is the product as it's saved now");
+        viewModel.EditingCategory!.Name.Should().Be("Cakes", "the Category picker follows the move");
+        viewModel.EditingName.Should().Be("Mamon Special", "what's typed into the form stays");
+        viewModel.History.IsDirty.Should().BeTrue("the new name is still to be saved");
+
+        viewModel.TryUndo().Should().BeTrue();
+        viewModel.EditingName.Should().Be("Mamon");
+        viewModel.EditingCategory!.Name.Should().Be("Cakes", "no undo takes back a move that's saved");
+        viewModel.History.IsDirty.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Dragging_another_product_leaves_the_form_as_it_is()
+    {
+        var breadsId = await AddProductCategoryAsync("Breads");
+        var mamonId = await SaveProductAsync("Mamon", breadsId);
+        var ensaymadaId = await SaveProductAsync("Ensaymada", breadsId);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.OpenProduct(mamonId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
+        TypeName(viewModel, "Mamon Special");
+
+        var ensaymada = viewModel.Products.Single(p => p.Id == ensaymadaId);
+        var move = ProductTree.MoveTo(viewModel.ProductTree.Roots.Single(r => r.Stage == ProductStage.Production), ensaymada);
+        await viewModel.MoveProductsCommand.Execute([move!]);
+
+        viewModel.ErrorMessage.Should().BeNull();
+        TreeFolder(viewModel, ProductStage.Production, "Breads").Children.Should().ContainSingle()
+            .Which.Should().BeSameAs(viewModel.ProductTree.Find(ensaymadaId), "dropped on the stage's folder, it keeps its category");
+        viewModel.SelectedProduct!.Id.Should().Be(mamonId);
+        viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.ProductTree.Find(mamonId));
+        viewModel.EditingName.Should().Be("Mamon Special");
+        viewModel.EditingCategory!.Name.Should().Be("Breads");
+        viewModel.History.CanUndo.Should().BeTrue();
+        viewModel.History.IsDirty.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Create_Variant_makes_a_product_that_links_the_recipe_and_packaging_and_shows_it()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -1641,6 +1740,23 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         return category.Id;
     }
 
+    /// <summary>A product with nothing but its name and category, saved as the Products screen saves a new one: in Research and Development.</summary>
+    private Task<int> SaveProductAsync(string name, int? categoryId) =>
+        new ProductRepository(CreateDbContextFactory()).SaveAsync(
+            new Product { Name = name, CategoryId = categoryId }, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
+
+    /// <summary>A name typed into the header and left, as one undo step, the way the name box records it.</summary>
+    private static void TypeName(ProductsViewModel viewModel, string name)
+    {
+        var recorder = (IUndoRecorder)viewModel;
+        recorder.BeginUndoStep();
+        viewModel.EditingName = name;
+        recorder.EndUndoStep();
+    }
+
+    private static ProductFolderNode TreeFolder(ProductsViewModel viewModel, ProductStage stage, string title) =>
+        viewModel.ProductTree.Roots.Single(r => r.Stage == stage).Children.OfType<ProductFolderNode>().Single(f => f.Title == title);
+
     /// <summary>Gives <paramref name="productId"/> a per-piece packaging line of a box, so it has a Packaging tab.</summary>
     private async Task<int> GivePackagingAsync(int productId, string boxName = "Box")
     {
@@ -1669,7 +1785,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         return boxId;
     }
 
-    private ProductsViewModel CreateViewModel()
+    private ProductsViewModel CreateViewModel(IViewStateStore? viewStateStore = null)
     {
         ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
@@ -1691,6 +1807,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             new ProductValidator(),
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
+            viewStateStore ?? new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
     }
 

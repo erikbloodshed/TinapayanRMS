@@ -22,6 +22,11 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     public async Task<Product?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
         (await GetWithCategoryAsync("WHERE p.Id = @id", new { id }, cancellationToken)).SingleOrDefault();
 
+    public async Task<IReadOnlyList<Product>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken) =>
+        ids.Count == 0
+            ? []
+            : await GetWithCategoryAsync($"WHERE p.Id IN ({DapperReads.IdsTable})\nORDER BY p.Name", new { ids = DapperReads.IdList(ids) }, cancellationToken);
+
     private Task<IReadOnlyList<Product>> GetWithCategoryAsync(string filterAndOrder, object? parameters, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<Product>>(
             async dbContext => (await dbContext.Connection().QueryAsync<Product, ProductCategory?, Product>(
@@ -48,6 +53,57 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         await transaction.CommitAsync(cancellationToken);
     }
 
+    public async Task MoveAsync(IReadOnlyCollection<ProductMove> moves, CancellationToken cancellationToken)
+    {
+        if (moves.Count == 0)
+        {
+            return;
+        }
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var productIds = moves.Select(m => m.ProductId).Distinct().ToList();
+        var products = await dbContext.Products.Where(p => productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, cancellationToken);
+        if (productIds.Where(id => !products.ContainsKey(id)).ToList() is [var missingId, ..])
+        {
+            throw new InvalidOperationException($"Product {missingId} does not exist.");
+        }
+
+        // Checked rather than left to the foreign key, whose refusal would read as a duplicate name: a move undone after
+        // the category it came from was deleted.
+        var categoryIds = moves.Select(m => m.CategoryId).OfType<int>().Distinct().ToList();
+        if (categoryIds.Count > 0
+            && await dbContext.ProductCategories.CountAsync(c => categoryIds.Contains(c.Id), cancellationToken) < categoryIds.Count)
+        {
+            throw new InvalidOperationException("The category to move it to no longer exists.");
+        }
+
+        var now = DateTime.Now;
+        foreach (var move in moves)
+        {
+            var product = products[move.ProductId];
+            product.Stage = move.Stage;
+            product.CategoryId = move.CategoryId;
+            product.UpdatedAt = now;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RenameAsync(int productId, string name, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var existing = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == productId, cancellationToken)
+            ?? throw new InvalidOperationException($"Product {productId} does not exist.");
+
+        var oldName = existing.Name;
+        existing.Name = name;
+        existing.UpdatedAt = DateTime.Now;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await ResyncOwnedNamesAsync(dbContext, existing.Id, oldName, existing.Name, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public async Task<int> SaveAsync(
         Product product,
         RecipeDraft? recipe,
@@ -64,7 +120,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         // A copy of the form's fields: the caller's entity is never attached, and never given an id by
-        // a save that then rolls back.
+        // a save that then rolls back. The stage is only a new product's: a saved one's changes by moving it.
         var fields = new Product
         {
             Id = product.Id,
@@ -73,6 +129,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             CategoryId = product.CategoryId,
             QuantityRequired = product.QuantityRequired,
             CurrentPrice = product.CurrentPrice,
+            Stage = product.Stage,
         };
         if (fields.Id == 0)
         {
@@ -167,20 +224,29 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         existing.UpdatedAt = DateTime.Now;
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await ResyncOwnedNamesAsync(dbContext, existing.Id, oldName, existing.Name, cancellationToken);
+    }
 
-        // Its own sub-assemblies are named after it, "Cheese Roll Filling: Cheese": they take its new name. Run on the
-        // caller's context, which should hold a transaction.
-        if (!string.Equals(oldName, existing.Name, StringComparison.Ordinal))
+    /// <summary>
+    /// Its own sub-assemblies are named after it, "Cheese Roll Filling: Cheese": they take its new name. Run on the
+    /// caller's context, which should hold a transaction.
+    /// </summary>
+    private static async Task ResyncOwnedNamesAsync(
+        TinapayanRMSDbContext dbContext, int productId, string oldName, string newName, CancellationToken cancellationToken)
+    {
+        if (string.Equals(oldName, newName, StringComparison.Ordinal))
         {
-            var owned = await dbContext.SubAssemblies
-                .Include(s => s.Role)
-                .Where(s => s.OwnerProductId == existing.Id)
-                .ToListAsync(cancellationToken);
-            await SubAssemblyRepository.ResyncOwnedNamesAsync(
-                dbContext,
-                owned,
-                s => SubAssemblyRules.OwnedNameAfterRename(s.Name, oldName, s.Role!.Name, existing.Name, s.Role.Name),
-                cancellationToken);
+            return;
         }
+
+        var owned = await dbContext.SubAssemblies
+            .Include(s => s.Role)
+            .Where(s => s.OwnerProductId == productId)
+            .ToListAsync(cancellationToken);
+        await SubAssemblyRepository.ResyncOwnedNamesAsync(
+            dbContext,
+            owned,
+            s => SubAssemblyRules.OwnedNameAfterRename(s.Name, oldName, s.Role!.Name, newName, s.Role.Name),
+            cancellationToken);
     }
 }

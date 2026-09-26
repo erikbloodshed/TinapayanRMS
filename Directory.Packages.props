@@ -28,6 +28,7 @@
     <PackageVersion Include="Syncfusion.SfNavigationDrawer.WPF" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.SfSkinManager.WPF" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.SfTextInputLayout.WPF" Version="$(SyncfusionVersion)" />
+    <PackageVersion Include="Syncfusion.SfTreeView.WPF" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.Themes.Windows11Light.WPF" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.Tools.WPF" Version="$(SyncfusionVersion)" />
   </ItemGroup>

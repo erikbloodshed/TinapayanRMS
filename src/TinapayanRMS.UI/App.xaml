@@ -150,6 +150,13 @@
             <SolidColorBrush x:Key="PageTabHoverBrush" Color="{StaticResource LatteSurface0Color}" />
             <SolidColorBrush x:Key="CardTabStripBrush" Color="{StaticResource LatteMantleColor}" />
             <SolidColorBrush x:Key="CardTabHoverBrush" Color="{StaticResource LatteCrustColor}" />
+            <!--
+                The one colour here that isn't Latte's: the white the Windows11Light theme fills a list's rows with (its
+                ContentBackground, on every SfDataGrid). It's for a list the theme leaves transparent, so it still matches the
+                grids: the Products tree (ProductListCard). The theme's own brush can't be looked up from here, since
+                SfSkinManager's ThemeResource needs ApplyThemeAsDefaultStyle, which stays off (App.xaml.cs).
+            -->
+            <SolidColorBrush x:Key="ListBackgroundBrush" Color="#FFFFFFFF" />
             <!-- A read-only value's text, greyed out so it doesn't look typeable (Controls/ReadOnlyText) -->
             <SolidColorBrush x:Key="ReadOnlyForegroundBrush" Color="{StaticResource LatteOverlay0Color}" />
             <!--

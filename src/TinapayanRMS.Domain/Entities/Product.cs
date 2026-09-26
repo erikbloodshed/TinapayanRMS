@@ -1,3 +1,5 @@
+using TinapayanRMS.Domain.Enums;
+
 namespace TinapayanRMS.Domain.Entities;
 
 public class Product
@@ -13,6 +15,12 @@ public class Product
     public int? CategoryId { get; set; }
 
     public ProductCategory? Category { get; set; }
+
+    /// <summary>
+    /// Whether it's under development or in production: the Products list's top-level folder for it. A new product
+    /// starts in Research and Development; dragging it to another folder in the list moves it (IProductRepository.MoveAsync).
+    /// </summary>
+    public ProductStage Stage { get; set; }
 
     /// <summary>
     /// How many finished pieces make one sellable unit: 1 for a product sold by the piece, 8 for a "Box of 8".

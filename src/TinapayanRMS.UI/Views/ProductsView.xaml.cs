@@ -22,7 +22,16 @@ public partial class ProductsView : UserControl
                 "New Category", "Name", interaction.Input, Window.GetWindow(this), RawMaterialsView.NewCategoryMessage(interaction.Input)));
         });
 
-        // New clears the form; put the cursor in the name so typing can start straight away.
+        // A name asked for by the list's menu: a product's new name, a clone's or a variant's, or a category's.
+        viewModel.PromptForName.RegisterHandler(async interaction =>
+        {
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            var request = interaction.Input;
+            interaction.SetOutput(TextPromptWindow.Prompt(request.Title, request.Label, request.InitialValue, Window.GetWindow(this), request.Message));
+        });
+
+        // New clears the form, as New Product Here does; put the cursor in the name so typing can start straight away.
         viewModel.NewCommand.Subscribe(_ => Details.FocusName());
+        viewModel.NewProductInCommand.Subscribe(_ => Details.FocusName());
     }
 }
