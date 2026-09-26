@@ -951,6 +951,41 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task A_saved_buffered_cost_rounded_to_four_places_doesnt_read_as_under_an_unchanged_dearest_brand()
+    {
+        var boxId = await SeedUnitOfMeasureAsync("box", "box");
+        await SeedCategoryAsync("Dry goods");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        // ₱170 for a box of 240 g is ₱0.708333…/g to 28 places, which the decimal(28,20) column cuts to 20.
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Cello Sheet";
+        PickCategory(viewModel);
+        await AddUnitAsync(viewModel, boxId, 240m);
+        AddBrandPrice(viewModel, null, "box", 170m);
+        viewModel.BufferedCostWarningText.Should().BeEmpty();
+
+        await viewModel.SaveCommand.Execute();
+
+        await WaitUntilSettledAsync(() => viewModel.PriceHistory.Count == 1,
+            () => $"price rows={viewModel.PriceHistory.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        viewModel.ErrorMessage.Should().BeNull();
+
+        // Opened afresh, as the next session does, the form has what the column kept.
+        var reopened = CreateViewModel();
+        await reopened.LoadCommand.Execute();
+        await SelectAsync(reopened, reopened.RawMaterials.Single());
+        reopened.EditingBufferedCost.Should().Be(0.70833333333333333333m);
+        reopened.DearestPurchaseCost.Should().BeGreaterThan(reopened.EditingBufferedCost!.Value, "the grid works it out to 28 places");
+        reopened.BufferedCostWarningText.Should().BeEmpty("the dearest brand hasn't moved, only the stored amount was rounded");
+
+        // A real rise still warns.
+        reopened.BrandPriceRows.Single().Price = 171m;
+        reopened.BufferedCostWarningText.Should().NotBeEmpty();
+    }
+
+    [Fact]
     public async Task The_buffered_cost_is_typed_in_the_picked_unit_kept_per_base_unit_unrounded_and_shown_to_the_centavo()
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
@@ -1105,6 +1140,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.NewCommand.Execute();
         viewModel.IsEditingIngredient.Should().BeTrue("a new material starts as an ingredient");
+        viewModel.SavedBaseUnitText.Should().Be("gram (g)", "an ingredient's base unit is always the gram");
         viewModel.CategoryOptions.Where(c => c.Id > 0).Should().NotContain(c => c.Id == boxesId, "an ingredient is offered ingredient categories only");
         viewModel.EditingName = "Cake Box";
         PickCategory(viewModel);
@@ -1123,6 +1159,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingBaseUnit = viewModel.UnitsOfMeasure.Single(u => u.Id == pieceId);
         viewModel.BaseUnitAbbreviation.Should().Be("pc", "the form names the base unit before the material is saved");
         viewModel.PurchaseUnitOptions.Select(o => o.Name).Should().Equal("piece");
+        viewModel.SavedBaseUnitText.Should().Be("—", "the Base Unit tile shows the unit only once it's saved");
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -1131,6 +1168,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         box.BaseUnitId.Should().Be(pieceId);
         viewModel.SelectedRawMaterial.Should().BeSameAs(box, "saving a new material selects it");
         viewModel.CurrentCostText.Should().Be("0.0000");
+        viewModel.SavedBaseUnitText.Should().Be("piece (pc)");
         viewModel.CanChangeTypeAndSource.Should().BeFalse("the type is fixed once saved");
         viewModel.Ingredients.Should().NotContain(box, "the BOM component picker lists ingredients only");
     }

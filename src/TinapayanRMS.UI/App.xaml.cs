@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Windows;
@@ -36,6 +37,13 @@ public partial class App : Application
                 retainedFileCountLimit: 31,
                 formatProvider: CultureInfo.InvariantCulture)
             .CreateLogger();
+
+#if DEBUG
+        // Failed bindings go to the log (BindingErrorLog). Refresh is what turns WPF's tracing on without a debugger.
+        PresentationTraceSources.Refresh();
+        PresentationTraceSources.DataBindingSource.Listeners.Add(new BindingErrorLog());
+        PresentationTraceSources.DataBindingSource.Switch.Level = SourceLevels.Warning;
+#endif
 
         try
         {
@@ -151,7 +159,8 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
 
         // Re-colors the theme's primary accent (buttons, grid selection, tab/drawer
-        // indicators, focus rings) to the app's warm amber. PrimaryBackground's setter
+        // indicators, focus rings) to the app's Catppuccin Latte Sky, with text on it in Sky's Ink
+        // (white on Sky is only 2.8:1; see Themes/Palette.xaml). PrimaryBackground's setter
         // derives the Dark1-3/Light1-3/Opacity1-3 shades, so this one property is enough.
         //
         // ApplyThemeAsDefaultStyle is deliberately NOT set: turning it on makes SfSkinManager
@@ -161,8 +170,8 @@ public partial class App : Application
         // controls (CheckBox, Expander, ProgressBar) keep the OS default look.
         SfSkinManager.RegisterThemeSettings("Windows11Light", new Windows11LightThemeSettings
         {
-            PrimaryBackground = new SolidColorBrush((Color)Resources["Amber700Color"]),
-            PrimaryForeground = Brushes.White,
+            PrimaryBackground = new SolidColorBrush((Color)Resources["LatteSkyColor"]),
+            PrimaryForeground = new SolidColorBrush((Color)Resources["LatteSkyInkColor"]),
         });
 
         _host = CompositionRoot.CreateHostBuilder(e.Args).Build();

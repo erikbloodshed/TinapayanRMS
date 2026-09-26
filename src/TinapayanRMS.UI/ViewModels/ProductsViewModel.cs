@@ -346,6 +346,13 @@ public sealed class LinkableSubAssemblyOption
 }
 
 /// <summary>
+/// One sub-assembly's part of the Costing Summary's Sub-assemblies row: what it costs in one sellable unit,
+/// and its share of the selling price.
+/// </summary>
+/// <param name="Name">What the recipe calls it: its tab's header (ProductUsageEdit.SectionName), e.g. "Filling: Ube".</param>
+public sealed record SubAssemblyCostLine(string Name, decimal Cost, decimal Share);
+
+/// <summary>
 /// A product's cost for one sellable unit, from its materials to its selling price (cost-plus,
 /// CostingRules), with each part's share of the selling price. The recipe is authored per piece, so the
 /// usages are multiplied by <c>quantityRequired</c>; the packaging lines already wrap one whole unit.
@@ -355,8 +362,9 @@ public sealed class ProductCostSummary
 {
     public static ProductCostSummary Empty { get; } = new([], 1, [], 0m, 0m, 0m, 0m, 0m, null);
 
+    /// <param name="usages">Each sub-assembly in the recipe, in recipe order: its name and its cost per piece.</param>
     public ProductCostSummary(
-        IReadOnlyList<decimal> usageCostsPerPiece,
+        IReadOnlyList<(string Name, decimal CostPerPiece)> usages,
         int quantityRequired,
         IReadOnlyList<decimal> packagingCosts,
         decimal laborPercent,
@@ -366,6 +374,7 @@ public sealed class ProductCostSummary
         decimal vatPercent,
         decimal? currentPrice)
     {
+        IReadOnlyList<decimal> usageCostsPerPiece = [.. usages.Select(u => u.CostPerPiece)];
         QuantityRequired = quantityRequired;
         SubAssemblies = usageCostsPerPiece.Sum() * quantityRequired;
         Packaging = packagingCosts.Sum();
@@ -384,12 +393,20 @@ public sealed class ProductCostSummary
         CurrentMarkupPercent = currentPrice is { } price
             ? CostingRules.CalculateMarkupPercentFromPrice(BaseCost, price, vatPercent)
             : null;
+        SubAssemblyLines = [.. usages.Select(u =>
+        {
+            var cost = u.CostPerPiece * quantityRequired;
+            return new SubAssemblyCostLine(u.Name, cost, CostingRules.PercentOf(cost, SellingPrice));
+        })];
     }
 
     /// <summary>How many finished pieces this unit holds: 1 for a product sold by the piece.</summary>
     public int QuantityRequired { get; }
 
     public decimal SubAssemblies { get; }
+
+    /// <summary>SubAssemblies broken down: each sub-assembly in the recipe, in recipe order, adding up to it.</summary>
+    public IReadOnlyList<SubAssemblyCostLine> SubAssemblyLines { get; }
 
     public decimal Packaging { get; }
 
@@ -646,6 +663,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     public bool IsFormEditingPackaging => IsFormPackaging && EditingUsageMode != UsageFormMode.Link;
 
     /// <summary>
+    /// The add form makes a new sub-assembly that Save keeps on the Sub-Assemblies screen, linked: its role isn't
+    /// product-owned (SubAssemblyRole.IsProductOwned), where it would stay the product's own, and it isn't packaging.
+    /// The form's "Moves to Sub-Assemblies on Save" badge shows then, in the place of a title.
+    /// </summary>
+    public bool IsFormNewMovingToSubAssemblies =>
+        IsAddingUsage && EditingUsageMode == UsageFormMode.New && EditingUsageRole is { IsPackaging: false, IsProductOwned: false };
+
+    /// <summary>
     /// Other products' sub-assemblies the form can link or copy. Linking leaves out the ones the recipe
     /// already uses; a product never links or copies its own.
     /// </summary>
@@ -880,7 +905,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _isUsageFormOpen, value);
     }
 
-    private string _usageFormTitle = "New sub-assembly";
+    private string _usageFormTitle = string.Empty;
     public string UsageFormTitle
     {
         get => _usageFormTitle;
@@ -1086,7 +1111,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     }
 
     private string _usageFormCostPerPieceText = "—";
-    /// <summary>What a piece of the form's sub-assembly or packaging costs, e.g. "0.5000": the piece-size column's first tile, and the packaging table's footer.</summary>
+    /// <summary>
+    /// What a piece of the form's sub-assembly or packaging costs: the piece-size column's first tile, to two decimals
+    /// ("0.50"), and the packaging table's footer, to four ("0.5000").
+    /// </summary>
     public string UsageFormCostPerPieceText
     {
         get => _usageFormCostPerPieceText;
@@ -1441,6 +1469,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
 
                 this.RaisePropertyChanged(nameof(IsFormPackaging));
                 this.RaisePropertyChanged(nameof(IsFormEditingPackaging));
+                this.RaisePropertyChanged(nameof(IsFormNewMovingToSubAssemblies));
                 RecomputeUsageForm();
             });
 
@@ -2502,6 +2531,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         //    back its BaseWeight and BatchWeight.
         this.RaisePropertyChanged(nameof(IsFormPackaging));
         this.RaisePropertyChanged(nameof(IsFormEditingPackaging));
+        this.RaisePropertyChanged(nameof(IsFormNewMovingToSubAssemblies));
         FormLinesChanged();
         RecomputeCosts();
 
@@ -2761,12 +2791,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
 
         // The title is the one thing on the form that says which way in was picked, now that the picker that used to
         // say it is on Add Sub-Assembly's drop-down instead. Set here, not in StartAddingUsage, so it follows another
-        // item picked while the form is open.
+        // item picked while the form is open. A new one has none: its "Moves to Sub-Assemblies on Save" badge
+        // (IsFormNewMovingToSubAssemblies) takes the title's place, and in a product-owned role nothing does.
         UsageFormTitle = mode switch
         {
             UsageFormMode.Link => "Link an existing sub-assembly",
             UsageFormMode.Copy => "Copy an existing sub-assembly",
-            _ => "New sub-assembly",
+            _ => string.Empty,
         };
         FormLines.Clear();
         FormAddIns.Clear();
@@ -3262,7 +3293,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
         var costPerPiece = finalWeight > 0 && weightPerPiece > 0
             ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, finalWeight)
             : (decimal?)null;
-        UsageFormCostPerPieceText = costPerPiece is { } figure ? $"{figure:N4}" : "—";
+        // Two decimals, as Batch cost beside it (2026-09-25, at the user's request); packaging's, above, keeps four.
+        UsageFormCostPerPieceText = costPerPiece is { } figure ? $"{figure:N2}" : "—";
 
         // The formula's base and the batch, given to both tables: an add-in is read against the recipe's base, never its own,
         // and with no base every line of both is read against the whole batch, add-ins included, so they come to 100%.
@@ -3565,17 +3597,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     }
 
     /// <summary>
-    /// The sub-assemblies the form can link or copy: every one, less (when linking) the ones the recipe already links.
-    /// Every one is offered to copy. A pick that's no longer offered is cleared. The roles the form offers follow the
-    /// recipe too (RefreshFormRoleOptions).
+    /// The sub-assemblies the form can link or copy. Linking offers only the Sub-Assemblies screen's (standalone) ones the
+    /// recipe doesn't already link, never anything a product keeps; copying offers every other one, and other products'
+    /// packaging. A pick that's no longer offered is cleared. The roles the form offers follow the recipe too
+    /// (RefreshFormRoleOptions).
     /// </summary>
     private void RefreshLinkableOptions()
     {
         var linking = EditingUsageMode == UsageFormMode.Link;
         var usedIds = UsageEdits.Select(u => u.SubAssemblyId).ToHashSet();
 
-        // Packaging comes after the recipes, while the product has none: the packaging sets, then every other product's
-        // packaging.
+        // Packaging comes after the recipes, while the product has none: the packaging sets, then (to copy only) every
+        // other product's packaging.
         LinkableSubAssemblies.MergeFrom(
             [
                 .. _linkable
@@ -3584,7 +3617,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
                         : s.OwnerProductId is null || s.OwnerProductId != _detailProductId)
                     .Select(s => new LinkableSubAssemblyOption(s)),
                 .. HasPackaging ? [] : _packagingSets.Select(s => new LinkableSubAssemblyOption(s)),
-                .. HasPackaging ? [] : Products.Where(p => p.Id != _detailProductId).Select(p => new LinkableSubAssemblyOption(p)),
+                .. HasPackaging || linking ? [] : Products.Where(p => p.Id != _detailProductId).Select(p => new LinkableSubAssemblyOption(p)),
             ],
             o => o.Key);
 
@@ -3728,7 +3761,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable
     private void RecomputeCosts()
     {
         Costs = new ProductCostSummary(
-            [.. UsageEdits.Select(u => u.CostPerPiece)],
+            [.. UsageEdits.Select(u => (u.SectionName, u.CostPerPiece))],
             EditingQuantityRequired,
             [.. LineEdits.Select(l => l.CostPerUnit)],
             EditingLaborPercent,

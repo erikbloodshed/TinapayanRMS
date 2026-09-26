@@ -247,8 +247,12 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Name == "Ensaymada", () => $"selected={viewModel.SelectedProduct?.Name}");
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
         viewModel.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal(
+            ["Gift Box Set — Sub-Assemblies (Packaging)"],
+            "linking offers only the Sub-Assemblies screen's, never another product's packaging");
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
+        viewModel.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal(
             ["Gift Box Set — Sub-Assemblies (Packaging)", "Packaging — Cream Loaf"],
-            "a product never links its own packaging");
+            "another product's packaging can still be copied, and a product never offers its own");
 
         // Picking another product closes the form with nothing applied, which is what abandons this add now.
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == ownId);

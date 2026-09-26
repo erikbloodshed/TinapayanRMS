@@ -1,3 +1,5 @@
+using System.Windows;
+using System.Windows.Threading;
 using ReactiveUI.Builder;
 
 namespace TinapayanRMS.UI;
@@ -13,6 +15,13 @@ public static class ReactiveUIBootstrapper
 {
     private static readonly Lazy<bool> Initialization = new(() =>
     {
+        // WithWpf() binds the main-thread scheduler to the Application's dispatcher,
+        // or, when there is no Application (tests), to the calling thread's existing
+        // dispatcher, and throws if that thread has none. Since ReactiveUI 24.3 it no
+        // longer creates one, so create it here as 24.2 did.
+        if (Application.Current is null)
+            _ = Dispatcher.CurrentDispatcher;
+
         RxAppBuilder.CreateReactiveUIBuilder()
             .WithCoreServices()
             .WithWpf()

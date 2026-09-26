@@ -38,6 +38,9 @@ namespace TinapayanRMS.UI.Controls;
 /// above the add-new row moves the current cell onto it. So nothing changes while a row is being edited (it's
 /// tried again shortly after), and a current cell moved by an addition is put back, but only from the add-new row
 /// onto a record that still exists.</item>
+/// <item>The grid can leave its current cell on a filler row, where it draws a second outline: when the last lines
+/// go while the current cell is on the add-new row, the add-new row moves up without it. It's put back on the
+/// add-new row.</item>
 /// </list>
 /// </summary>
 public static class GridFillerRows
@@ -372,11 +375,23 @@ public static class GridFillerRows
                 RemoveLastRow();
             }
 
-            if (!allowAdding || _rows.Count >= wanted)
+            if (!allowAdding)
             {
                 return;
             }
 
+            if (_rows.Count < wanted)
+            {
+                AddRows(wanted);
+            }
+
+            // After the rows just added are laid out: until then the grid can't find the add-new row's cell to take it as
+            // its current cell, so it would note the index alone, and the next move would leave that cell outlined.
+            _grid.Dispatcher.BeginInvoke(DispatcherPriority.Background, MoveCurrentCellOffFillerRow);
+        }
+
+        private void AddRows(int wanted)
+        {
             var currentCell = _grid.SelectionController?.CurrentCellManager?.CurrentRowColumnIndex ?? new RowColumnIndex(-1, -1);
             while (_rows.Count < wanted)
             {
@@ -397,6 +412,23 @@ public static class GridFillerRows
                 && _grid.IsAddNewIndex(manager.CurrentRowColumnIndex.RowIndex))
             {
                 _grid.MoveCurrentCell(currentCell, needToClearSelection: false);
+            }
+        }
+
+        /// <summary>
+        /// Puts a current cell left on a filler row back on the add-new row. When the last lines go (an undo back to no
+        /// lines, another material with none) while the current cell is on the add-new row, the grid moves the add-new
+        /// row up but leaves its current cell at the old row index. Without filler rows nothing is there, but with them
+        /// a filler row is, and the grid draws a second current cell on it. The add-new row keeps its own outline too,
+        /// and every later click moves only the filler row's. Moving the current cell again clears both.
+        /// </summary>
+        private void MoveCurrentCellOffFillerRow()
+        {
+            if (_grid.SelectionController?.CurrentCellManager is { } manager
+                && IsFillerRowIndex(manager.CurrentRowColumnIndex.RowIndex)
+                && _grid.GetAddNewRowIndex() is var addRow and >= 0)
+            {
+                _grid.MoveCurrentCell(new RowColumnIndex(addRow, manager.CurrentRowColumnIndex.ColumnIndex), needToClearSelection: false);
             }
         }
 

@@ -28,6 +28,7 @@ dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infras
 - **Build settings are centralized.** `Directory.Build.props` sets the shared compiler settings, the .NET analyzers (`AnalysisLevel` `latest-recommended`, with per-folder exceptions in `.editorconfig`) and the target frameworks (`net10.0` by default; UI and Tests use `$(WindowsTargetFramework)`). `Directory.Packages.props` turns on Central Package Management, so a `PackageReference` never carries a `Version`: add or bump versions there.
 - **Docker isn't used anywhere in this project.**
 - **`ilspycmd` (11.0, a global dotnet tool) is installed for decompiling and inspecting .NET assemblies.** Use it instead of writing reflection scripts. For example, `ilspycmd -l c <dll>` lists the classes in an assembly, `ilspycmd -t <Full.Type.Name> <dll>` decompiles one type, and `ilspycmd -m "M:Namespace.Type.Method(System.String)" <dll>` decompiles one member. The Syncfusion assemblies are in the NuGet cache under `~/.nuget/packages/syncfusion.*/<version>/lib/`.
+- **`dotnet-stack`, `dotnet-dump` and `dotnet-trace` (global dotnet tools) are installed for diagnosing the running app.** Use them instead of guessing or adding temporary logging. `dotnet-stack report -p <pid>` shows where a frozen UI thread is blocked. `dotnet-dump collect -p <pid>` followed by `dotnet-dump analyze <file>` covers crashes, deadlocks and memory growth. `dotnet-trace collect -p <pid>` covers slowness. Find the PID with `dotnet-trace ps`.
 
 ## Architecture in brief
 

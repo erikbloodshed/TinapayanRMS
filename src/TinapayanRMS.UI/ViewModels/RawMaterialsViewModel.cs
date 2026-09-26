@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Reactive.Linq;
@@ -538,6 +538,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private readonly ObservableAsPropertyHelper<string> _baseUnitAbbreviation;
     public string BaseUnitAbbreviation => _baseUnitAbbreviation.Value;
 
+    private readonly ObservableAsPropertyHelper<string> _savedBaseUnitText;
+    /// <summary>
+    /// The Base Unit tile: "gram (g)" for an ingredient, and a packaging material's base unit as last saved, e.g.
+    /// "centimeter (cm)", or "—" until its first Save. The unit is picked in the fields row (EditingBaseUnit), so
+    /// the tile shows what's saved, as the cost tiles beside it do (2026-09-26, at the user's request).
+    /// </summary>
+    public string SavedBaseUnitText => _savedBaseUnitText.Value;
+
     private string _currentCostText = "—";
     /// <summary>
     /// The saved cost in the Purchase Cost Setup's Per unit (BufferedCostUnit): "0.0372" a gram, to 4 decimals, or
@@ -949,6 +957,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         _baseUnitAbbreviation = this.WhenAnyValue(x => x.EditingType, x => x.EditingBaseUnit,
                 (type, baseUnit) => BaseUnitText.AbbreviationOf(type, baseUnit))
             .ToProperty(this, x => x.BaseUnitAbbreviation, "g");
+
+        _savedBaseUnitText = this.WhenAnyValue(x => x.EditingType, x => x.SelectedRawMaterial, SavedBaseUnitTextOf)
+            .ToProperty(this, x => x.SavedBaseUnitText, "gram (g)");
 
         // Nothing is recorded until a material's details have arrived, or while the screen is being written to
         // wholesale: the brand prices and the BOM land a moment after the pick (AreDetailsReady), and a step taken
@@ -1978,6 +1989,21 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     /// <summary>
+    /// SavedBaseUnitText. The saved base unit is looked up in the Units of Measure list, as the form's picker is, since
+    /// the list keeps it current through a rename; the material's own BaseUnit is the fallback before the list loads.
+    /// </summary>
+    private string SavedBaseUnitTextOf(RawMaterialType type, RawMaterial? saved)
+    {
+        if (type != RawMaterialType.Packaging)
+        {
+            return "gram (g)";
+        }
+
+        var unit = saved?.BaseUnitId is { } id ? UnitsOfMeasure.FirstOrDefault(u => u.Id == id) ?? saved.BaseUnit : null;
+        return unit is null ? "—" : $"{unit.Name} ({unit.Abbreviation})";
+    }
+
+    /// <summary>
     /// The header's saved costs in the Per unit: to 4 decimals on the base unit, whose costs are fractions of a centavo,
     /// and to the centavo on any other.
     /// </summary>
@@ -2117,8 +2143,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             // warning say where it really stands. Typing the % still works the other way, through TypedCostBufferPercent.
             EditingCostBufferPercent = Math.Clamp(Math.Round(over, 4), 0m, 100m);
             PurchaseBufferedCostText = $"{buffered * size:N2}/{unit} is {over:0.##}% over the dearest brand's {cost * size:N2}/{unit}.";
-            BufferedCostWarningText = buffered < cost
-                ? "The dearest brand now costs more than the buffered cost. Type the Cost Buffer % again to put the buffer back on top."
+            // Compared to the 4 places costs per base unit are shown to: a saved buffered cost comes back cut to its
+            // column's 20 places, so a repeating one (170/240) would otherwise read as a hair under an unchanged dearest brand.
+            BufferedCostWarningText = Math.Round(buffered, 4) < Math.Round(cost, 4)
+                ?"The dearest brand now costs more than the buffered cost. Type the Cost Buffer % again to put the buffer back on top."
                 : string.Empty;
         }
         else

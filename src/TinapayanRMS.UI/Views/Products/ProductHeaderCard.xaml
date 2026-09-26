@@ -3,18 +3,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf">
     <UserControl.Resources>
-        <!-- A figure: a muted label over its value -->
-        <Style x:Key="FigureLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource FieldLabelStyle}" />
+        <!-- A figure: its label (FigureTileLabelStyle) over its value, both centred in its tile (2026-09-25, at the user's request) -->
         <Style x:Key="FigureValueStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="14" />
             <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
             <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-        </Style>
-        <Style x:Key="FigureSeparatorStyle" TargetType="Border">
-            <Setter Property="Width" Value="1" />
-            <Setter Property="Margin" Value="16,0" />
-            <Setter Property="Background" Value="{StaticResource CardBorderBrush}" />
+            <Setter Property="Margin" Value="6,0,6,8" />
         </Style>
         <Style x:Key="FigureAmountStyle" TargetType="TextBlock" BasedOn="{StaticResource FigureValueStyle}">
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -107,46 +103,54 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="1.3*" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- A thin line between each figure and the next, as the Raw Materials header has -->
-            <Border Grid.Column="1" Grid.RowSpan="2" Style="{StaticResource FigureSeparatorStyle}" />
-            <Border Grid.Column="3" Grid.RowSpan="2" Style="{StaticResource FigureSeparatorStyle}" />
-            <Border Grid.Column="5" Grid.RowSpan="2" Style="{StaticResource FigureSeparatorStyle}" />
-            <Border Grid.Column="7" Grid.RowSpan="2" Style="{StaticResource FigureSeparatorStyle}" />
+            <!--
+                Each figure on a tile of its own colour, a gap between each and the next, as the Raw Materials and
+                Sub-Assemblies headers have. Current Price is on the accent's Sky, so its value is plain Text: Sky's Deep
+                shade makes only 4.4:1 on the Sky Wash.
+            -->
+            <Border Grid.Column="0" Grid.RowSpan="2" Style="{StaticResource FigureTileStyle}" Background="{StaticResource PeachTileBrush}" />
+            <Border Grid.Column="1" Grid.RowSpan="2" Style="{StaticResource FigureTileGapStyle}" />
+            <Border Grid.Column="2" Grid.RowSpan="2" Style="{StaticResource FigureTileStyle}" Background="{StaticResource PinkTileBrush}" />
+            <Border Grid.Column="3" Grid.RowSpan="2" Style="{StaticResource FigureTileGapStyle}" />
+            <Border Grid.Column="4" Grid.RowSpan="2" Style="{StaticResource FigureTileStyle}" Background="{StaticResource SkyTileBrush}" />
+            <Border Grid.Column="5" Grid.RowSpan="2" Style="{StaticResource FigureTileGapStyle}" />
+            <Border Grid.Column="6" Grid.RowSpan="2" Style="{StaticResource FigureTileStyle}" Background="{StaticResource GreenTileBrush}" />
+            <Border Grid.Column="7" Grid.RowSpan="2" Style="{StaticResource FigureTileGapStyle}" />
+            <Border Grid.Column="8" Grid.RowSpan="2" Style="{StaticResource FigureTileStyle}" Background="{StaticResource MauveTileBrush}" />
 
             <TextBlock Text="Material Cost"
-                       Style="{StaticResource FigureLabelStyle}"
+                       Style="{StaticResource FigureTileLabelStyle}"
                        ToolTip="{Binding CostUnitCaption, StringFormat='{}{0}: the share of every sub-assembly it holds, plus its packaging'}" />
             <TextBlock Grid.Row="1" Text="{Binding Costs.Material, StringFormat='{}{0:N2}'}" Style="{StaticResource FigureAmountStyle}" />
 
             <TextBlock Grid.Column="2"
                        Text="Base Cost"
-                       Style="{StaticResource FigureLabelStyle}"
+                       Style="{StaticResource FigureTileLabelStyle}"
                        ToolTip="{Binding CostUnitCaption, StringFormat='{}{0}: the material cost with labor, overhead and administrative on top, before markup and VAT'}" />
             <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Costs.BaseCost, StringFormat='{}{0:N2}'}" Style="{StaticResource FigureAmountStyle}" />
 
             <TextBlock Grid.Column="4"
                        Text="Current Price"
-                       Style="{StaticResource FigureLabelStyle}"
+                       Style="{StaticResource FigureTileLabelStyle}"
                        ToolTip="{Binding CostUnitCaption, StringFormat='{}{0}, with VAT: what the shop charges now'}" />
             <TextBlock Grid.Row="1"
                        Grid.Column="4"
                        Text="{Binding EditingCurrentPrice, StringFormat='{}{0:N2}', TargetNullValue='—'}"
-                       Style="{StaticResource FigureAmountStyle}"
-                       Foreground="{StaticResource AccentBrush}" />
+                       Style="{StaticResource FigureAmountStyle}" />
 
             <TextBlock Grid.Column="6"
                        Text="Markup %"
-                       Style="{StaticResource FigureLabelStyle}"
+                       Style="{StaticResource FigureTileLabelStyle}"
                        ToolTip="What the current price earns on the base cost, VAT taken out: the costing's Markup % at that price" />
             <TextBlock Grid.Row="1"
                        Grid.Column="6"
                        Text="{Binding Costs.CurrentMarkupPercent, StringFormat='{}{0:N2}%', TargetNullValue='—'}"
                        Style="{StaticResource CurrentMarkupStyle}" />
 
-            <TextBlock Grid.Column="8" Text="Last Updated" Style="{StaticResource FigureLabelStyle}" />
+            <TextBlock Grid.Column="8" Text="Last Updated" Style="{StaticResource FigureTileLabelStyle}" />
             <TextBlock Grid.Row="1"
                        Grid.Column="8"
                        Text="{Binding LastUpdatedText}"

@@ -17,10 +17,17 @@
         <DataTemplate x:Key="PercentHeaderTemplate">
             <TextBlock Text="{Binding DataContext.PercentHeader, RelativeSource={RelativeSource AncestorType=UserControl}}" />
         </DataTemplate>
+        <!--
+            A header figure's value, under its label (FigureTileLabelStyle), sized as the Products and Raw Materials
+            headers' figures are, and centred in the figure's tile as theirs are (2026-09-25, at the user's request)
+        -->
         <Style x:Key="TotalValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontSize" Value="14" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Margin" Value="6,0,6,8" />
         </Style>
     </UserControl.Resources>
 
@@ -126,6 +133,10 @@
                         The batch totals first, each label over its figure as the other headers' figures are; then the
                         fields 16 under them, each label on the left of its field (FormLabelStyle; 2026-09-24, at the
                         user's request, as the Products header has them). They shared one row, labels above, until then.
+                        The figures take equal shares of the width (2026-09-25, at the user's request, as the Raw
+                        Materials and Products headers lay theirs out), each on a tile of its own colour with a gap
+                        between each (a thin line until later that day); they sat packed at the left, 24 apart, before.
+                        A packaging set's Set Cost stands alone in the first share, with the gaps hidden.
                     -->
                     <Grid>
                         <Grid.RowDefinitions>
@@ -133,18 +144,48 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="24" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
+                        <!-- Each figure's tile, in the colour its kind of figure has on every screen (FigureTileStyle) -->
+                        <Border Grid.Column="0"
+                                Grid.RowSpan="2"
+                                Style="{StaticResource FigureTileStyle}"
+                                Background="{StaticResource TealTileBrush}"
+                                Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+                        <Border Grid.Column="0"
+                                Grid.RowSpan="2"
+                                Style="{StaticResource FigureTileStyle}"
+                                Background="{StaticResource FlamingoTileBrush}"
+                                Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <Border Grid.Column="2"
+                                Grid.RowSpan="2"
+                                Style="{StaticResource FigureTileStyle}"
+                                Background="{StaticResource FlamingoTileBrush}"
+                                Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+                        <Border Grid.Column="4"
+                                Grid.RowSpan="2"
+                                Style="{StaticResource FigureTileStyle}"
+                                Background="{StaticResource YellowTileBrush}"
+                                Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+
+                        <Border Grid.Column="1"
+                                Grid.RowSpan="2"
+                                Style="{StaticResource FigureTileGapStyle}"
+                                Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+                        <Border Grid.Column="3"
+                                Grid.RowSpan="2"
+                                Style="{StaticResource FigureTileGapStyle}"
+                                Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+
                         <!-- A recipe's batch totals; a packaging set has its set cost in their place -->
                         <TextBlock Grid.Column="0"
                                    Text="Batch Weight"
-                                   Style="{StaticResource FieldLabelStyle}"
+                                   Style="{StaticResource FigureTileLabelStyle}"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
                                    Grid.Column="0"
@@ -155,7 +196,7 @@
 
                         <TextBlock Grid.Column="2"
                                    Text="Batch Cost"
-                                   Style="{StaticResource FieldLabelStyle}"
+                                   Style="{StaticResource FigureTileLabelStyle}"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
                                    Grid.Column="2"
@@ -166,7 +207,7 @@
 
                         <TextBlock Grid.Column="4"
                                    Text="Cost per g"
-                                   Style="{StaticResource FieldLabelStyle}"
+                                   Style="{StaticResource FigureTileLabelStyle}"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
                                    Grid.Column="4"
@@ -178,7 +219,7 @@
                         <!-- A packaging set's one figure, first in the row: the recipe totals are collapsed beside it -->
                         <TextBlock Grid.Column="0"
                                    Text="Set Cost"
-                                   Style="{StaticResource FieldLabelStyle}"
+                                   Style="{StaticResource FigureTileLabelStyle}"
                                    Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <TextBlock Grid.Row="1"
                                    Grid.Column="0"

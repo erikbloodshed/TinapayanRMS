@@ -68,6 +68,10 @@
                     the tabs ignore the mouse (AreDetailsReady): what's in them is no longer the form's.
                 -->
                 <syncfusion:TabControlExt BorderThickness="0"
+                                          Background="{StaticResource CardBackgroundBrush}"
+                                          TabPanelBackground="{StaticResource CardTabStripBrush}"
+                                          TabItemSelectedBackground="{StaticResource CardBackgroundBrush}"
+                                          TabItemHoverBackground="{StaticResource CardTabHoverBrush}"
                                           AllowDragDrop="False"
                                           EnableLabelEdit="False"
                                           IsHitTestVisible="{Binding AreDetailsReady}"

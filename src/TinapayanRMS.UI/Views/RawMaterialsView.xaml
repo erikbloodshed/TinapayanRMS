@@ -48,9 +48,13 @@
         -->
         <!-- In a card of its own, as on Products, so the tabs get the rounded corners the theme's square frame doesn't have -->
         <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource CardStyle}" Padding="4">
-            <!-- No frame of its own: the card around it is the frame -->
+            <!-- No frame of its own: the card around it is the frame, and gives it its colour where the theme's is white -->
             <syncfusion:TabControlExt IsHitTestVisible="{Binding AreDetailsReady}"
                                       BorderThickness="0"
+                                      Background="{StaticResource CardBackgroundBrush}"
+                                      TabPanelBackground="{StaticResource CardTabStripBrush}"
+                                      TabItemSelectedBackground="{StaticResource CardBackgroundBrush}"
+                                      TabItemHoverBackground="{StaticResource CardTabHoverBrush}"
                                       EnableLabelEdit="False"
                                       TabStripPlacement="Bottom"
                                       CloseButtonType="Hide"

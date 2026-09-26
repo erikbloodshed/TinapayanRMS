@@ -6,7 +6,7 @@
     <!--
         Add a sub-assembly to the recipe: a new one of the product's own, a link to an existing one
         (another product's, or a standalone one from the Sub-Assemblies screen), or a copy of one — which of the three
-        it is was picked on Add Sub-Assembly's drop-down before the form opened, and the title says which (UsageFormTitle).
+        it is was picked on Add Sub-Assembly's drop-down before the form opened, and a link's or copy's title says which (UsageFormTitle).
         Or change one already in it: an own one's role, name, lines and piece size, a
         linked one's piece size and add-ins only. Apply only puts it in the recipe; Save saves it. It is all that shows under a
         sub-assembly's Recipe Structure tab (one panel for every tab, RecipeStructureCard), so it has no box of its own, and for a section already in the recipe it carries
@@ -14,16 +14,24 @@
         by its name too where the recipe has more than one in the role. Taking one out of the recipe is the card's Delete Sub-Assembly.
     -->
     <UserControl.Resources>
-        <!-- The piece-size column's pieces: a figure's tile, a group's small heading, and a label-and-value row ruled off from the next. -->
+        <!--
+            The piece-size column's pieces: a figure's tile, a group's small heading, and a label-and-value row ruled off
+            from the next. A tile's caption and value are centred in it (2026-09-25, at the user's request), as the
+            headers' tiles are.
+        -->
         <Style x:Key="StatTileStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource PageBackgroundBrush}" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="10,8" />
         </Style>
+        <Style x:Key="StatCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionStyle}">
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
         <Style x:Key="StatValueStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="20" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
+            <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
         <Style x:Key="GroupHeadingStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionStyle}">
@@ -64,11 +72,23 @@
     </UserControl.Resources>
 
     <StackPanel>
+        <!--
+            A link's or a copy's title (IsFormPickingSource is only ever on while adding one). A new sub-assembly has no
+            title: in its place, the badge saying Save keeps it on the Sub-Assemblies screen, which it does unless its
+            role is product-owned (Settings → Roles) or packaging — then neither shows, and the row takes no room.
+        -->
         <TextBlock Text="{Binding UsageFormTitle}"
                    FontWeight="SemiBold"
                    Foreground="{StaticResource HeadingForegroundBrush}"
                    Margin="0,0,0,8"
-                   Visibility="{Binding IsAddingUsage, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                   Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        <Border Style="{StaticResource LinkedBadgeStyle}"
+                HorizontalAlignment="Left"
+                Margin="0,0,0,8"
+                ToolTip="Save puts it on the Sub-Assemblies screen, named after this product and its role, and this product links it there. Pick a product-owned role to keep it this product's own."
+                Visibility="{Binding IsFormNewMovingToSubAssemblies, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <TextBlock Text="Moves to Sub-Assemblies on Save" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
+        </Border>
 
         <!--
             Which existing sub-assembly is linked or copied. Nothing here asks *how* any more: Add Sub-Assembly's
@@ -109,8 +129,10 @@
             screen's, so they don't show. An own one has no badge (the user's call, 2026-09-24): its Role and Name take
             the badge's place, level with its Move to Sub-Assemblies, as a linked one's badge is level with its Unlink
             and Copy. At the far right, those actions, never both sets. Packaging has no name: there's only ever one.
-            Each piece carries the row's bottom margin itself, so a row with nothing showing takes no room. What a piece
-            of it costs is the piece-size column's first tile; a packaging section's stays under its own table.
+            Each piece carries the row's bottom margin itself, so a row with nothing showing takes no room. The two badges
+            are collapsed by FallbackValue while adding: there's no EditingUsage then, and a binding through a null reads
+            as Visibility's default, Visible, which showed both on every add form. What a piece of it costs is the
+            piece-size column's first tile; a packaging section's stays under its own table.
         -->
         <Grid>
             <Grid.ColumnDefinitions>
@@ -123,7 +145,7 @@
                 <Border Style="{StaticResource LinkedBadgeStyle}"
                         Margin="0,0,16,8"
                         ToolTip="Save puts it on the Sub-Assemblies screen, keeping its name and these lines, and this product links it there. Undo or Revert to keep it this product's own."
-                        Visibility="{Binding EditingUsage.IsReleasing, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        Visibility="{Binding EditingUsage.IsReleasing, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
                     <TextBlock Text="Moves to Sub-Assemblies on Save" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
                 </Border>
                 <!-- A linked one's badge is a link: it opens the sub-assembly on the Sub-Assemblies screen (MainWindow subscribes to SubAssemblyOpenRequests) -->
@@ -133,7 +155,7 @@
                         Command="{Binding OpenSubAssemblyCommand}"
                         CommandParameter="{Binding EditingUsage.SubAssemblyId}"
                         ToolTip="Its lines are kept on the Sub-Assemblies screen, and follow its changes. Click to open it there and edit them."
-                        Visibility="{Binding EditingUsage.IsLinked, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        Visibility="{Binding EditingUsage.IsLinked, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}" />
             </StackPanel>
 
             <Grid Grid.Column="1" Margin="0,0,0,8" VerticalAlignment="Center" Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -353,7 +375,7 @@
                                            controls:GridAddNewRow.DropWhenUntouched="True"
                                            controls:AutoCompleteDropDown.IsEnabled="True"
                                            controls:GridAddNewRow.ItemFactory="{Binding NewFormLine}"
-                                           Height="200">
+                                           Height="314">
                         <syncfusion:SfDataGrid.Columns>
                             <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
                             <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
@@ -525,7 +547,7 @@
                     <Border Style="{StaticResource StatTileStyle}"
                             ToolTip="What one piece of the product takes of this section: the batch's cost shared out by weight per piece.">
                         <StackPanel>
-                            <TextBlock Text="Cost/piece" Style="{StaticResource CaptionStyle}" />
+                            <TextBlock Text="Cost/piece" Style="{StaticResource StatCaptionStyle}" />
                             <TextBlock Text="{Binding UsageFormCostPerPieceText}" Style="{StaticResource StatValueStyle}" />
                         </StackPanel>
                     </Border>
@@ -533,7 +555,7 @@
                             Style="{StaticResource StatTileStyle}"
                             ToolTip="What the whole batch costs: its lines, and this product's add-ins to them.">
                         <StackPanel>
-                            <TextBlock Text="Batch cost" Style="{StaticResource CaptionStyle}" />
+                            <TextBlock Text="Batch cost" Style="{StaticResource StatCaptionStyle}" />
                             <TextBlock Text="{Binding UsageFormBatchCostText}" Style="{StaticResource StatValueStyle}" />
                         </StackPanel>
                     </Border>

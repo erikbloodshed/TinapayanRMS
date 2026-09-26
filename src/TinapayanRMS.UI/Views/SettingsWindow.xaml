@@ -24,6 +24,10 @@
         <!-- Fixed tabs, like Products' sub-tabs: nothing here to close or reopen. -->
         <syncfusion:TabControlExt Grid.Row="0"
                                   Margin="8,8,8,0"
+                                  Background="{StaticResource PageBackgroundBrush}"
+                                  TabPanelBackground="{StaticResource PageTabStripBrush}"
+                                  TabItemSelectedBackground="{StaticResource PageBackgroundBrush}"
+                                  TabItemHoverBackground="{StaticResource PageTabHoverBrush}"
                                   EnableLabelEdit="False"
                                   CloseButtonType="Hide"
                                   ShowTabItemContextMenu="False"

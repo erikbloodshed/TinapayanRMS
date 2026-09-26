@@ -42,7 +42,7 @@
                     handles the click first), so each item closes it in AddSubAssemblyItem_Click.
                     ButtonAdv items rather than the ListBox in Syncfusion's own demos: a plain ListBox keeps the OS
                     default look here, since SfSkinManager.ApplyThemeAsDefaultStyle is deliberately off (App.xaml.cs),
-                    and its blue selection would fight the app's amber accent.
+                    and its blue selection would fight the app's accent.
                     Each item is flattened with Background="Transparent" and BorderThickness="0" so it reads as a
                     menu row rather than a raised button: the theme's own MouseOver still supplies the highlight.
                     Properties only, never a Style, so the ButtonAdv template stays intact (App.xaml's design tokens).
@@ -123,6 +123,10 @@
                                   Visibility="{Binding HasRecipeTabs, Converter={StaticResource BooleanToVisibilityConverter}}"
                                   SelectedItem="{Binding SelectedRecipeTab, Mode=TwoWay}"
                                   BorderThickness="0"
+                                  Background="{StaticResource CardBackgroundBrush}"
+                                  TabPanelBackground="{StaticResource CardTabStripBrush}"
+                                  TabItemSelectedBackground="{StaticResource CardBackgroundBrush}"
+                                  TabItemHoverBackground="{StaticResource CardTabHoverBrush}"
                                   AllowDragDrop="False"
                                   EnableLabelEdit="False"
                                   CloseButtonType="Hide"

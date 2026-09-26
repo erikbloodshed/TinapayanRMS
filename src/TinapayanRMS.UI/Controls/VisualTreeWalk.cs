@@ -8,7 +8,7 @@ namespace TinapayanRMS.UI.Controls;
 /// Walking up from an element to what contains it. A cell's dropdown and the description editor open in popups,
 /// which are outside the visual tree of what they belong to, so a plain parent walk stops at the popup's own root
 /// and the element looks as though it's in no grid and on no screen. Following a popup's PlacementTarget keeps the
-/// walk on the path the user sees.
+/// walk on the path the user sees. Also walking down, through the logical tree, to reach what isn't on show.
 /// </summary>
 internal static class VisualTreeWalk
 {
@@ -37,4 +37,21 @@ internal static class VisualTreeWalk
     public static T? FindAncestor<T>(DependencyObject? element)
         where T : class =>
         SelfAndAncestors(element).OfType<T>().FirstOrDefault();
+
+    /// <summary>
+    /// <paramref name="element"/> and everything in its logical tree. Unlike the visual tree, that takes in the tabs
+    /// not showing, since a tab keeps its content as a logical child while another one's is on show.
+    /// </summary>
+    public static IEnumerable<DependencyObject> SelfAndLogicalDescendants(DependencyObject element)
+    {
+        yield return element;
+
+        foreach (var child in LogicalTreeHelper.GetChildren(element).OfType<DependencyObject>())
+        {
+            foreach (var descendant in SelfAndLogicalDescendants(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
 }

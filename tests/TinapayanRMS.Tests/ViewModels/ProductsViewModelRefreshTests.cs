@@ -587,6 +587,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     public async Task Add_Sub_Assembly_opens_the_form_in_the_way_its_drop_down_asked_for_and_changes_it_in_place()
     {
         var roleId = await AddRoleAsync("Dough");
+        await AddRoleAsync("Filling", sortOrder: 2, isProductOwned: true);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         await AddProductWithSubAssemblyAsync("Cream Loaf", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
         var miniId = await AddProductAsync("Cream Loaf Mini");
@@ -602,6 +603,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageFormTitle.Should().Be("Link an existing sub-assembly");
         viewModel.IsFormPickingSource.Should().BeTrue("a link picks the sub-assembly it comes from");
         viewModel.IsFormEditingLines.Should().BeFalse("a link's lines are its owner's");
+        viewModel.IsFormNewMovingToSubAssemblies.Should().BeFalse("only a new one carries the badge");
 
         // Copy, from the same tab: the form changes in place, and nothing else does.
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
@@ -612,11 +614,16 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.IsFormEditingLines.Should().BeTrue("a copy is the product's own from then on");
         viewModel.UsageEdits.Should().BeEmpty("nothing is in the recipe until the form is applied");
 
-        // New: no source to pick, so the form's picker row isn't there at all.
+        // New: no source to pick, so the form's picker row isn't there at all, and no title either: in its place the
+        // badge says Save keeps it on the Sub-Assemblies screen, which it does unless its role is product-owned.
         await viewModel.AddUsageCommand.Execute(UsageFormMode.New);
-        viewModel.UsageFormTitle.Should().Be("New sub-assembly");
+        viewModel.UsageFormTitle.Should().BeEmpty();
         viewModel.IsFormPickingSource.Should().BeFalse();
         viewModel.EditingUsageRole!.Name.Should().Be("Dough", "the first role the recipe doesn't have yet");
+        viewModel.IsFormNewMovingToSubAssemblies.Should().BeTrue("a Dough isn't product-owned, so Save moves it to Sub-Assemblies");
+        viewModel.EditingUsageRole = viewModel.FormRoleOptions.Single(r => r.Name == "Filling");
+        viewModel.IsFormNewMovingToSubAssemblies.Should().BeFalse("a Filling is product-owned, so it stays the product's own");
+        viewModel.EditingUsageRole = viewModel.FormRoleOptions.Single(r => r.Name == "Dough");
 
         // Each pick is its own undo step, back to the add that opened the tab, and then the tab itself.
         viewModel.TryUndo().Should().BeTrue();
@@ -832,6 +839,36 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task The_costing_summary_breaks_the_sub_assemblies_down_one_by_one_per_sellable_unit()
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.24m);
+        var productId = await AddProductAsync("Ube Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [
+                new NewSubAssemblyDraft(fillingRoleId, [(ubeId, 100m)], UsageAuthoredField.WeightPerPiece, 10m),
+                new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m),
+            ],
+            []));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 2, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        // Sold in twos: each sub-assembly's cost is per unit of two pieces, as the Sub-assemblies row is.
+        viewModel.EditingQuantityRequired = 2;
+        viewModel.EditingLaborPercent = 20m;
+
+        var costs = viewModel.Costs;
+        costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should()
+            .Equal([("Dough", 5m), ("Filling", 4.8m)], "₱2.50 of dough and ₱2.40 of filling a piece, in recipe order");
+        costs.SubAssemblyLines.Sum(l => l.Cost).Should().Be(costs.SubAssemblies);
+        costs.SubAssemblyLines.Should().AllSatisfy(l => l.Share.Should().Be(CostingRules.PercentOf(l.Cost, costs.SellingPrice)));
+    }
+
+    [Fact]
     public async Task A_role_reordered_in_Settings_moves_its_tab_on_the_next_refresh()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -994,6 +1031,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single();
         viewModel.EditingUsageWeightPerPiece = 50m;
         viewModel.EditingUsageYield.Should().Be(20m, "1,000 g at 50 g a piece");
+        viewModel.UsageFormCostPerPieceText.Should().Be("2.50", "the batch's 50.00 over 20 pieces, to two decimals like the tile beside it");
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();

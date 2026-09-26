@@ -37,11 +37,14 @@
                                         ToolTip="The ingredient this one is a part of. Any ingredient but this one: purchased, made or linked." />
 
                 <TextBlock Grid.Row="3" Grid.Column="0" Text="Weight Share %" Style="{StaticResource FieldLabelStyle}" />
-                <!-- Empty rather than 0.00 until typed, as Quantity per Purchase Unit is (UseNullOption) -->
+                <!--
+                    Empty rather than 0.00 until typed, as Quantity per Purchase Unit is (UseNullOption). TargetNullValue={x:Null}
+                    passes the empty decimal? to the box's double? as null: WPF's default conversion throws on null.
+                -->
                 <syncfusion:DoubleTextBox Grid.Row="4"
                                           Grid.Column="0"
                                           controls:FieldUndoStep.Recorder="{Binding}"
-                                          Value="{Binding EditingWeightSharePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          Value="{Binding EditingWeightSharePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}"
                                           UseNullOption="True"
                                           NullValue="{x:Null}"
                                           NumberDecimalDigits="2"
@@ -51,7 +54,7 @@
                 <syncfusion:DoubleTextBox Grid.Row="4"
                                           Grid.Column="2"
                                           controls:FieldUndoStep.Recorder="{Binding}"
-                                          Value="{Binding EditingCostSharePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          Value="{Binding EditingCostSharePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}"
                                           UseNullOption="True"
                                           NullValue="{x:Null}"
                                           NumberDecimalDigits="2"

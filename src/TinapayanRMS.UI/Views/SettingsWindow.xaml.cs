@@ -1,6 +1,12 @@
+using System.ComponentModel;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Windows;
+using System.Windows.Data;
+using Syncfusion.UI.Xaml.Grid;
+using Syncfusion.Windows.Controls.Input;
+using Syncfusion.Windows.Tools.Controls;
+using TinapayanRMS.UI.Controls;
 using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Views;
@@ -29,13 +35,18 @@ public partial class SettingsWindow : Window
         RolesTab.Content = new SubAssemblyRolesView(rolesViewModel);
         CostingDefaultsTab.Content = new CostingDefaultsView(costingDefaultsViewModel);
 
-        // The ViewModels outlive this window, so their delete confirmations are removed with it.
+        // The ViewModels and the main window outlive this window, so their delete confirmations are removed with it, and
+        // so is everything that ties its controls to them.
         var confirmDeletes = new CompositeDisposable(
             unitsOfMeasureViewModel.RegisterNativeMessageBoxHandler(),
             categoriesViewModel.RegisterNativeMessageBoxHandler(),
             productCategoriesViewModel.RegisterNativeMessageBoxHandler(),
             rolesViewModel.RegisterNativeMessageBoxHandler());
-        Closed += (_, _) => confirmDeletes.Dispose();
+        Closed += (_, _) =>
+        {
+            confirmDeletes.Dispose();
+            ReleaseControls();
+        };
 
         // Every list is small, so each opening loads them all fresh rather than per tab.
         Loaded += (_, _) =>
@@ -49,4 +60,60 @@ public partial class SettingsWindow : Window
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>
+    /// Unties this window's controls from what outlives it. Each of these kept every closed Settings in memory:
+    /// <list type="bullet">
+    /// <item>An SfDataGrid's view follows its ViewModel list's changes and holds the grid until the grid is disposed;
+    /// unloading it isn't enough.</item>
+    /// <item>A picker that filters as you type (ComboBoxAdv, as App makes every one) adds its filter to its list's
+    /// shared default view, and takes it off only while it's loaded, which a closed window's pickers never are again.</item>
+    /// <item>An SfTextBoxExt that loads before its template has found this window (every tab's Name box but the first
+    /// tab's) hooks the main window's MouseDown, then unhooks from this window instead. Only Dispose unhooks the main
+    /// window's.</item>
+    /// </list>
+    /// Bindings are cleared before a control is disposed (a grid's selection, a text box's all), so nothing it resets on
+    /// the way out reaches the ViewModel: a tab keeps its selection and unsaved edits for next time. The walk is
+    /// logical, since only the tab showing is in the visual tree.
+    /// </summary>
+    private void ReleaseControls()
+    {
+        foreach (var element in VisualTreeWalk.SelfAndLogicalDescendants(this).ToList())
+        {
+            switch (element)
+            {
+                case SfDataGrid grid:
+                    BindingOperations.ClearBinding(grid, SfDataGrid.SelectedItemProperty);
+                    grid.Dispose();
+                    break;
+                case SfTextBoxExt box:
+                    BindingOperations.ClearAllBindings(box);
+                    box.Dispose();
+                    break;
+                case ComboBoxAdv { ItemsSource: { } items } picker:
+                    RemoveFilter(CollectionViewSource.GetDefaultView(items), picker);
+                    break;
+            }
+        }
+    }
+
+    /// <summary>Takes <paramref name="picker"/>'s own filter off <paramref name="view"/>, leaving any other's.</summary>
+    private static void RemoveFilter(ICollectionView view, ComboBoxAdv picker)
+    {
+        var filter = view.Filter;
+        var removed = false;
+        foreach (var part in filter?.GetInvocationList() ?? [])
+        {
+            if (ReferenceEquals(part.Target, picker))
+            {
+                filter = (Predicate<object>?)Delegate.Remove(filter, part);
+                removed = true;
+            }
+        }
+
+        if (removed)
+        {
+            view.Filter = filter;
+        }
+    }
 }

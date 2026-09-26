@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Media;
 using AwesomeAssertions;
 using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.UI.Xaml.Grid.Helpers;
@@ -82,6 +84,49 @@ public class GridFillerRowsCurrentCellTests
 
             grid.SelectionController.CurrentCellManager.CurrentRowColumnIndex.Should().Be(lastLine);
         });
+    }
+
+    [Fact]
+    public void Removing_every_line_while_the_add_row_is_current_leaves_one_current_cell_on_the_add_row()
+    {
+        // Ctrl+Z back to no brands on Raw Materials' Purchase Cost Setup, with the add row's cell current: the grid moved
+        // the add row up but kept its current cell at the old row index, a filler row now, and drew an outline on both.
+        OffscreenGrid.Run(LinesGrid, grid =>
+        {
+            var column = grid.GetFirstColumnIndex() + 1;
+            grid.MoveCurrentCell(new RowColumnIndex(grid.GetAddNewRowIndex(), column));
+            OffscreenGrid.Pump();
+
+            ((ObservableCollection<Line>)grid.ItemsSource).Clear();
+            OffscreenGrid.Pump();
+
+            var addRow = grid.GetAddNewRowIndex();
+            grid.SelectionController.CurrentCellManager.CurrentRowColumnIndex.Should().Be(new RowColumnIndex(addRow, column));
+            OutlinedCells(grid).Should().Equal(new RowColumnIndex(addRow, column));
+
+            // The add row's own outline has to go with the next move too, not stay behind.
+            grid.MoveCurrentCell(new RowColumnIndex(addRow, column - 1), needToClearSelection: false);
+            OffscreenGrid.Pump();
+
+            OutlinedCells(grid).Should().Equal(new RowColumnIndex(addRow, column - 1));
+        });
+    }
+
+    /// <summary>The cells drawing the current-cell outline.</summary>
+    private static List<RowColumnIndex> OutlinedCells(DependencyObject node)
+    {
+        var cells = new List<RowColumnIndex>();
+        if (node is GridCell { CurrentCellBorderVisibility: Visibility.Visible, IsVisible: true, ColumnBase: { } column })
+        {
+            cells.Add(new RowColumnIndex(column.RowIndex, column.ColumnIndex));
+        }
+
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
+        {
+            cells.AddRange(OutlinedCells(VisualTreeHelper.GetChild(node, i)));
+        }
+
+        return cells;
     }
 
     /// <summary>A 200 px lines table with two lines and an add row, with the app's add-row and commit behaviours.</summary>

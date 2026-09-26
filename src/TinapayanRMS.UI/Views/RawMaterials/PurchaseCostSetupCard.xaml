@@ -97,9 +97,13 @@
                 </Grid.ColumnDefinitions>
 
                 <TextBlock Grid.Column="0" Text="Cost Buffer %" Style="{StaticResource FieldLabelStyle}" />
+                <!--
+                    Both boxes: TargetNullValue={x:Null} passes an empty (null) decimal? to the box's double? as null. Without
+                    it, WPF's default decimal-to-double conversion throws on null, a binding error each time one empties.
+                -->
                 <syncfusion:DoubleTextBox Grid.Row="1"
                                           Grid.Column="0"
-                                          Value="{Binding TypedCostBufferPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          Value="{Binding TypedCostBufferPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}"
                                           MinValue="0"
                                           MaxValue="100"
                                           ToolTip="The cushion on top of the dearest brand, for price swings, waste and yield variation. Typing it works out the Buffered Cost; typing the Buffered Cost works it out." />
@@ -109,7 +113,7 @@
                                           Grid.Column="2"
                                           controls:FieldUndoStep.Recorder="{Binding}"
                                           controls:FieldUndoStep.LandsOnLeave="True"
-                                          Value="{Binding EditingBufferedCostInUnit, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                          Value="{Binding EditingBufferedCostInUnit, Mode=TwoWay, UpdateSourceTrigger=LostFocus, TargetNullValue={x:Null}}"
                                           NumberDecimalDigits="-1"
                                           MinimumNumberDecimalDigits="2"
                                           MaximumNumberDecimalDigits="10"
