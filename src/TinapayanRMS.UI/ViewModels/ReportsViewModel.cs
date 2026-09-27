@@ -1,5 +1,5 @@
-﻿using System.Collections.ObjectModel;
-using System.Reactive.Linq;
+using System.Collections.ObjectModel;
+using System.Reactive.Subjects;
 using DynamicData;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
@@ -10,48 +10,116 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.UI.ViewModels;
 
-/// <summary>One point on the price-trend chart: a purchase-unit price on a given date.</summary>
-public class PricePoint(DateTime date, decimal price)
+/// <summary>
+/// A row of the Product Cost Summary: a product's cost and price for one sellable unit, computed live from today's data,
+/// never historized.
+/// </summary>
+public sealed class ProductCostRow(Product product, ProductCostSummary costs)
 {
-    public DateTime Date { get; } = date;
+    public int ProductId => product.Id;
 
-    public decimal Price { get; } = price;
+    public string ProductName => product.Name;
+
+    public string Stage => ProductFolderNode.StageTitle(product.Stage);
+
+    public string Category => product.Category?.Name ?? ProductFolderNode.UncategorizedTitle;
+
+    /// <summary>How many pieces the sellable unit holds, which every figure after it is for.</summary>
+    public int Pieces => product.QuantityRequired;
+
+    public decimal BaseCost => costs.BaseCost;
+
+    public decimal SellingPrice => costs.SellingPrice;
+
+    /// <summary>Null when no current price is entered.</summary>
+    public decimal? CurrentPrice => costs.CurrentPrice;
+
+    /// <summary>The markup the current price earns, as the Products header shows it; null without a current price.</summary>
+    public decimal? MarkupPercent => costs.CurrentMarkupPercent;
 }
 
-/// <summary>One bar-group on the margin overview chart — a product's cost and selling price, computed live from today's data, never historized.</summary>
-public class MarginRow(string productName, decimal baseCost, decimal sellingPrice)
+/// <summary>
+/// A row of the Raw Materials Price Summary: a purchased material's latest price from its price history, and how far
+/// that moved its cost from the price before it. Blank figures for a material with no price yet.
+/// </summary>
+public sealed class RawMaterialPriceSummaryRow
 {
-    public string ProductName { get; } = productName;
+    /// <param name="history">The material's price entries, newest first.</param>
+    public RawMaterialPriceSummaryRow(RawMaterial material, IReadOnlyList<RawMaterialPriceHistory> history)
+    {
+        Name = material.Name;
+        Type = material.Type == RawMaterialType.Ingredient ? "Ingredient" : "Packaging";
+        Category = material.Category?.Name ?? string.Empty;
 
-    public decimal BaseCost { get; } = baseCost;
+        if (history.Count == 0)
+        {
+            UnitName = string.Empty;
+            return;
+        }
 
-    public decimal SellingPrice { get; } = sellingPrice;
+        var latest = history[0];
+        UnitName = latest.Unit?.UnitOfMeasure?.Name ?? BaseUnitText.NameOf(material);
+        Price = latest.Price;
+        PriceDate = latest.Date.ToDateTime(TimeOnly.MinValue);
+
+        // Per base unit, since the two prices can be for different units (a sack, then a kilo).
+        if (history.Count > 1)
+        {
+            var costNow = CostPerBaseUnit(latest);
+            var costBefore = CostPerBaseUnit(history[1]);
+            ChangePercent = CostingRules.PercentOf(costNow - costBefore, costBefore);
+        }
+    }
+
+    public string Name { get; }
+
+    public string Type { get; }
+
+    public string Category { get; }
+
+    /// <summary>What the price is for: one of the material's units, or its base unit. Empty with no price.</summary>
+    public string UnitName { get; }
+
+    /// <summary>The latest price, per <see cref="UnitName"/>; null with no price.</summary>
+    public decimal? Price { get; }
+
+    /// <summary>The change in cost per base unit from the price before the latest; null with fewer than two prices.</summary>
+    public decimal? ChangePercent { get; }
+
+    /// <summary>The day the latest price started; null with no price.</summary>
+    public DateTime? PriceDate { get; }
+
+    private static decimal CostPerBaseUnit(RawMaterialPriceHistory entry) =>
+        UnitConversionRules.CostPerBaseUnit(entry.Price, entry.Unit?.BaseUnitsPerUnit);
 }
 
-public class ReportsViewModel : ReactiveObject
+/// <summary>The Reports screen: summaries across every product and every purchased raw material, each on a tab of its own.</summary>
+public sealed class ReportsViewModel : ReactiveObject, IDisposable
 {
+    /// <summary>How many products the Product Cost Summary reads at a time: well inside SqlClient's pool of 100 connections.</summary>
+    private const int ProductsReadAtOnce = 8;
+
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
+    private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IProductRepository _productRepository;
     private readonly SavedProductReader _savedProducts;
 
-    // True while LoadCommand merges the material list, so re-pointing the selection doesn't also
-    // start its own chart reload.
-    private bool _isRefreshing;
+    public ObservableCollection<ProductCostRow> ProductCosts { get; } = [];
 
-    /// <summary>The purchased raw materials, ingredients and packaging alike: a made ingredient has no price history.</summary>
-    public ObservableCollection<RawMaterial> RawMaterials { get; } = [];
+    public ObservableCollection<RawMaterialPriceSummaryRow> RawMaterialPrices { get; } = [];
 
-    public ObservableCollection<PricePoint> PricePoints { get; } = [];
+    /// <summary>A Product Cost Summary row's double-click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
+    public ReactiveCommand<int, RxVoid> OpenProductCommand { get; }
 
-    public ObservableCollection<MarginRow> MarginRows { get; } = [];
+    private readonly Subject<int> _productOpenRequests = new();
 
-    private RawMaterial? _selectedRawMaterial;
-    public RawMaterial? SelectedRawMaterial
-    {
-        get => _selectedRawMaterial;
-        set => this.RaiseAndSetIfChanged(ref _selectedRawMaterial, value);
-    }
+    /// <summary>
+    /// The products the Product Cost Summary asks to open, by id. The main window, which owns the tabs, subscribes and
+    /// opens each on the Products screen, as it does for the Used By tiles on Raw Materials and Sub-Assemblies.
+    /// </summary>
+    public IObservable<int> ProductOpenRequests => _productOpenRequests;
 
+    /// <summary>Runs whenever the tab is shown (MainWindow), so both summaries are from current prices.</summary>
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
 
     public ReportsViewModel(
@@ -61,76 +129,63 @@ public class ReportsViewModel : ReactiveObject
         SavedProductReader savedProducts)
     {
         _priceHistoryRepository = priceHistoryRepository;
+        _rawMaterialRepository = rawMaterialRepository;
         _productRepository = productRepository;
         _savedProducts = savedProducts;
 
-        // Skips while LoadCommand merges, which reloads the chart itself once it's done.
-        this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Where(_ => !_isRefreshing)
-            .Select(_ => Observable.FromAsync(LoadPricePointsAsync))
-            .Switch()
-            .Subscribe();
+        OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
 
-        // Runs whenever the tab is shown (MainWindow). It merges the material list rather than
-        // replacing it, so the chosen material survives, and redraws both charts from current prices.
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var rawMaterials = await rawMaterialRepository.GetAllAsync(CancellationToken.None);
-            var marginRows = await CalculateMarginRowsAsync();
+            // Off the UI thread, as Products and Raw Materials read their details, and both summaries at once.
+            var productCostsRead = Task.Run(ReadProductCostsAsync);
+            var rawMaterialPricesRead = Task.Run(ReadRawMaterialPricesAsync);
+            var productCosts = await productCostsRead;
+            var rawMaterialPrices = await rawMaterialPricesRead;
 
-            var rawMaterialId = SelectedRawMaterial?.Id;
-
-            _isRefreshing = true;
-            try
-            {
-                RawMaterials.MergeFrom([.. rawMaterials.Where(m => m.Source == RawMaterialSource.Purchased).OrderBy(m => m.Name)], m => m.Id);
-
-                // The first one only until something has been chosen.
-                SelectedRawMaterial = RawMaterials.FirstOrDefault(m => m.Id == rawMaterialId) ?? RawMaterials.FirstOrDefault();
-
-                MarginRows.Clear();
-                MarginRows.AddRange(marginRows);
-            }
-            finally
-            {
-                _isRefreshing = false;
-            }
-
-            await LoadPricePointsAsync();
+            ProductCosts.Clear();
+            ProductCosts.AddRange(productCosts);
+            RawMaterialPrices.Clear();
+            RawMaterialPrices.AddRange(rawMaterialPrices);
         });
     }
 
-    private async Task LoadPricePointsAsync()
+    /// <summary>
+    /// Every product as it's saved, priced as the Products screen prices it once opened (SavedProductReader, which the
+    /// screen and Print read through too). A product takes six reads one after another, so several products are read at
+    /// once (each read has a context of its own); the rows stay in the list's order, by name.
+    /// </summary>
+    private async Task<ProductCostRow[]> ReadProductCostsAsync()
     {
-        PricePoints.Clear();
+        var products = await _productRepository.GetAllAsync(CancellationToken.None);
+        var rows = new ProductCostRow[products.Count];
 
-        IReadOnlyList<(DateOnly Date, decimal Price)> entries = SelectedRawMaterial is null
-            ? []
-            : [.. (await _priceHistoryRepository.GetForRawMaterialAsync(SelectedRawMaterial.Id, CancellationToken.None)).Select(h => (h.Date, h.Price))];
+        await Parallel.ForEachAsync(
+            Enumerable.Range(0, products.Count),
+            new ParallelOptions { MaxDegreeOfParallelism = ProductsReadAtOnce },
+            async (i, cancellationToken) =>
+                rows[i] = new ProductCostRow(products[i], (await _savedProducts.ReadAsync(products[i], cancellationToken)).Costs));
 
-        // Repositories return newest-first (for a price-history grid); a trend line needs
-        // oldest-first so it reads left to right.
-        foreach (var (date, price) in entries.OrderBy(e => e.Date))
-        {
-            PricePoints.Add(new PricePoint(date.ToDateTime(TimeOnly.MinValue), price));
-        }
+        return rows;
     }
 
-    /// <summary>
-    /// Every product's base cost and selling price as it's saved, priced as the Products screen prices it once opened
-    /// (SavedProductReader, which the screen and Print read through too).
-    /// </summary>
-    private async Task<List<MarginRow>> CalculateMarginRowsAsync()
+    /// <summary>The purchased materials, ingredients and packaging alike, by name: a made or linked ingredient has no price history.</summary>
+    private async Task<List<RawMaterialPriceSummaryRow>> ReadRawMaterialPricesAsync()
     {
-        var marginRows = new List<MarginRow>();
+        var materials = await _rawMaterialRepository.GetAllAsync(CancellationToken.None);
+        var history = (await _priceHistoryRepository.GetAllAsync(CancellationToken.None)).ToLookup(h => h.RawMaterialId);
 
-        var products = await _productRepository.GetAllAsync(CancellationToken.None);
-        foreach (var product in products)
-        {
-            var costs = (await _savedProducts.ReadAsync(product, CancellationToken.None)).Costs;
-            marginRows.Add(new MarginRow(product.Name, costs.BaseCost, costs.SellingPrice));
-        }
+        return
+        [
+            .. materials
+                .Where(m => m.Source == RawMaterialSource.Purchased)
+                .OrderBy(m => m.Name)
+                .Select(m => new RawMaterialPriceSummaryRow(m, [.. history[m.Id]])),
+        ];
+    }
 
-        return marginRows;
+    public void Dispose()
+    {
+        _productOpenRequests.Dispose();
     }
 }

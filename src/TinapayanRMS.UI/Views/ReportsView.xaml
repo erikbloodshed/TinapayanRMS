@@ -4,88 +4,99 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
              mc:Ignorable="d"
              d:DesignHeight="650" d:DesignWidth="1400">
-    <!-- Cards are 4px apart and 4px from the page's edge, as on Raw Materials -->
+    <!-- One card, 4px from the page's edge, as on Raw Materials -->
     <Grid Background="{StaticResource PageBackgroundBrush}" Margin="4">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="4" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+        <Border Style="{StaticResource CardStyle}" Padding="4">
+            <!--
+                One report per tab, fixed like Raw Materials' and Products' detail tabs: nothing to close, reopen or
+                drag into another order, and the strip along the bottom. Each grid only reads, and sorts by a click
+                on its column's header. The name, stage and pieces columns have fixed widths; the others share what's left.
+            -->
+            <syncfusion:TabControlExt BorderThickness="0"
+                                      Background="{StaticResource CardBackgroundBrush}"
+                                      TabPanelBackground="{StaticResource CardTabStripBrush}"
+                                      TabItemSelectedBackground="{StaticResource CardBackgroundBrush}"
+                                      TabItemHoverBackground="{StaticResource CardTabHoverBrush}"
+                                      AllowDragDrop="False"
+                                      EnableLabelEdit="False"
+                                      TabStripPlacement="Bottom"
+                                      CloseButtonType="Hide"
+                                      ShowTabItemContextMenu="False"
+                                      ShowTabListContextMenu="False">
+                <syncfusion:TabItemExt Header="Product Cost Summary" CanClose="False">
+                    <Border Padding="12">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Product Cost Summary" Style="{StaticResource SectionHeaderStyle}" />
+                            <TextBlock DockPanel.Dock="Top"
+                                       Text="Every product as it's saved, costed at today's prices. Each figure is for one sellable unit of the pieces shown; Markup % is what the current price earns on the base cost. Double-click a product to open it."
+                                       Style="{StaticResource CaptionStyle}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,12" />
+                            <!-- Double-clicking a product opens it on Products (CellDoubleTapped, which a header cell doesn't raise) -->
+                            <syncfusion:SfDataGrid ItemsSource="{Binding ProductCosts}"
+                                                   CellDoubleTapped="ProductCosts_CellDoubleTapped"
+                                                   GridLinesVisibility="Both"
+                                                   CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                                   CurrentCellBorderThickness="1"
+                                                   controls:GridFillerRows.IsEnabled="True"
+                                                   AutoGenerateColumns="False"
+                                                   AllowEditing="False"
+                                                   AllowSorting="True"
+                                                   SelectionMode="Single"
+                                                   NavigationMode="Row"
+                                                   ColumnSizer="Star">
+                                <syncfusion:SfDataGrid.Columns>
+                                    <syncfusion:GridTextColumn MappingName="ProductName" HeaderText="Product" Width="280" />
+                                    <syncfusion:GridTextColumn MappingName="Stage" HeaderText="Stage" Width="210" />
+                                    <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" />
+                                    <controls:NumericColumn MappingName="Pieces" HeaderText="Pieces" NumberDecimalDigits="0" Width="80" />
+                                    <controls:NumericColumn MappingName="BaseCost" HeaderText="Base Cost" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="SellingPrice" HeaderText="Selling Price" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="CurrentPrice" HeaderText="Current Price" NumberDecimalDigits="2" AllowNullValue="True" />
+                                    <controls:NumericColumn MappingName="MarkupPercent" HeaderText="Markup %" NumberDecimalDigits="2" AllowNullValue="True" />
+                                </syncfusion:SfDataGrid.Columns>
+                            </syncfusion:SfDataGrid>
+                        </DockPanel>
+                    </Border>
+                </syncfusion:TabItemExt>
 
-        <!-- Price Trend -->
-        <Border Grid.Column="0" Style="{StaticResource CardStyle}">
-            <StackPanel>
-                <TextBlock Text="Price Trend" Style="{StaticResource SectionHeaderStyle}" />
-
-                <!-- The label on the left of its picker (FormLabelStyle) -->
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                    <TextBlock Text="Raw Material" Style="{StaticResource FormLabelStyle}" />
-                    <syncfusion:ComboBoxAdv Width="280"
-                                             ItemsSource="{Binding RawMaterials}"
-                                             DisplayMemberPath="Name"
-                                             SelectedItem="{Binding SelectedRawMaterial, Mode=TwoWay}" />
-                </StackPanel>
-
-                <syncfusion:SfChart Header="Price Per Purchase Unit Over Time" Height="480">
-                    <syncfusion:SfChart.PrimaryAxis>
-                        <syncfusion:DateTimeAxis Header="Date" />
-                    </syncfusion:SfChart.PrimaryAxis>
-                    <syncfusion:SfChart.SecondaryAxis>
-                        <syncfusion:NumericalAxis Header="Price" />
-                    </syncfusion:SfChart.SecondaryAxis>
-                    <syncfusion:SfChart.Series>
-                        <syncfusion:LineSeries ItemsSource="{Binding PricePoints}"
-                                                XBindingPath="Date"
-                                                YBindingPath="Price"
-                                                Label="Price"
-                                                Interior="{StaticResource AccentBrush}"
-                                                ShowTooltip="True" />
-                    </syncfusion:SfChart.Series>
-                </syncfusion:SfChart>
-            </StackPanel>
-        </Border>
-
-        <!-- Margin Overview -->
-        <Border Grid.Column="2" Style="{StaticResource CardStyle}">
-            <StackPanel>
-                <TextBlock Text="Margin Overview" Style="{StaticResource SectionHeaderStyle}" />
-
-                <syncfusion:SfChart Header="Cost vs. Selling Price, Per Piece" Height="530">
-                    <syncfusion:SfChart.PrimaryAxis>
-                        <syncfusion:CategoryAxis Header="Product" />
-                    </syncfusion:SfChart.PrimaryAxis>
-                    <syncfusion:SfChart.SecondaryAxis>
-                        <syncfusion:NumericalAxis Header="Pesos" />
-                    </syncfusion:SfChart.SecondaryAxis>
-                    <syncfusion:SfChart.Series>
-                        <syncfusion:ColumnSeries ItemsSource="{Binding MarginRows}"
-                                                  XBindingPath="ProductName"
-                                                  YBindingPath="BaseCost"
-                                                  Label="Base Cost"
-                                                  Interior="{StaticResource ChartBaseCostBrush}"
-                                                  ShowTooltip="True">
-                            <syncfusion:ColumnSeries.AdornmentsInfo>
-                                <syncfusion:ChartAdornmentInfo ShowLabel="True" />
-                            </syncfusion:ColumnSeries.AdornmentsInfo>
-                        </syncfusion:ColumnSeries>
-                        <syncfusion:ColumnSeries ItemsSource="{Binding MarginRows}"
-                                                  XBindingPath="ProductName"
-                                                  YBindingPath="SellingPrice"
-                                                  Label="Selling Price"
-                                                  Interior="{StaticResource ChartSellingPriceBrush}"
-                                                  ShowTooltip="True">
-                            <syncfusion:ColumnSeries.AdornmentsInfo>
-                                <syncfusion:ChartAdornmentInfo ShowLabel="True" />
-                            </syncfusion:ColumnSeries.AdornmentsInfo>
-                        </syncfusion:ColumnSeries>
-                    </syncfusion:SfChart.Series>
-                    <syncfusion:SfChart.Legend>
-                        <syncfusion:ChartLegend />
-                    </syncfusion:SfChart.Legend>
-                </syncfusion:SfChart>
-            </StackPanel>
+                <syncfusion:TabItemExt Header="Raw Materials Price Summary" CanClose="False">
+                    <Border Padding="12">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Raw Materials Price Summary" Style="{StaticResource SectionHeaderStyle}" />
+                            <TextBlock DockPanel.Dock="Top"
+                                       Text="Every purchased material's latest price, from its price history. Change % is how far that price moved its cost from the price before it."
+                                       Style="{StaticResource CaptionStyle}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,12" />
+                            <syncfusion:SfDataGrid ItemsSource="{Binding RawMaterialPrices}"
+                                                   GridLinesVisibility="Both"
+                                                   CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                                   CurrentCellBorderThickness="1"
+                                                   controls:GridFillerRows.IsEnabled="True"
+                                                   AutoGenerateColumns="False"
+                                                   AllowEditing="False"
+                                                   AllowSorting="True"
+                                                   SelectionMode="Single"
+                                                   NavigationMode="Row"
+                                                   ColumnSizer="Star">
+                                <syncfusion:SfDataGrid.Columns>
+                                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Raw Material" Width="280" />
+                                    <syncfusion:GridTextColumn MappingName="Type" HeaderText="Type" />
+                                    <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" />
+                                    <syncfusion:GridTextColumn MappingName="UnitName" HeaderText="Unit" />
+                                    <controls:NumericColumn MappingName="Price" HeaderText="Price" NumberDecimalDigits="2" AllowNullValue="True" />
+                                    <controls:NumericColumn MappingName="ChangePercent" HeaderText="Change %" NumberDecimalDigits="2" AllowNullValue="True" />
+                                    <syncfusion:GridDateTimeColumn MappingName="PriceDate" HeaderText="Since" AllowNullValue="True" />
+                                </syncfusion:SfDataGrid.Columns>
+                            </syncfusion:SfDataGrid>
+                        </DockPanel>
+                    </Border>
+                </syncfusion:TabItemExt>
+            </syncfusion:TabControlExt>
         </Border>
     </Grid>
 </UserControl>

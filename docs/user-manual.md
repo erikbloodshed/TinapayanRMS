@@ -512,8 +512,32 @@ Close the Print tab with its ✕.
 
 ## 9. Reports
 
-- **Price Trend**: pick a **Raw Material** to see a chart of its price per purchase unit over time, taken from its price history. Only purchased materials have a price history.
-- **Margin Overview**: every product's **Base Cost** beside its computed **Selling Price**, per sellable unit, using today's costs. It shows at a glance where the margin is thin.
+Reports has two tabs along the bottom. Each is a table you can read but not edit. Click a column's heading to sort by it, and click it again to reverse the order. The figures are worked out again each time you open Reports, so they always use today's prices.
+
+### Product Cost Summary
+
+One row for every product, as it's saved:
+
+- **Product**, its **Stage** (Production or Research and Development) and its **Category**.
+- **Pieces**: how many pieces make one sellable unit (1 for a product sold by the piece). Every amount after it is for one sellable unit.
+- **Base Cost** and **Selling Price**: as the product's Costing tab works them out.
+- **Current Price**: what the shop charges now, as entered on the product. Blank if none is entered.
+- **Markup %**: what the current price earns on the base cost, as the product's header shows it. Blank without a current price.
+
+Sort by **Markup %** to see which products earn the least.
+
+Double-click a product to open it on the **Products** screen.
+
+### Raw Materials Price Summary
+
+One row for every purchased raw material, ingredients and packaging alike. Made and linked ingredients aren't listed, since they have no price of their own.
+
+- **Raw Material**, its **Type** and its **Category**.
+- **Price** and **Unit**: the latest price from the material's price history, and the unit it's for, such as a sack or a kilogram.
+- **Change %**: how much that price moved the material's cost from the price before it. It's worked out per gram (or per base unit, for packaging), so it's right even when the two prices are for different units. Blank if the material has only one price.
+- **Since**: the day the latest price started.
+
+A material that has never been priced shows blank figures.
 
 ---
 
@@ -614,7 +638,7 @@ The app keeps costs at full precision and rounds them only for display. So a tot
 
 ### Check whether a product's price still earns enough
 
-Open the product and compare the header's **Markup %**, which is what the current price earns, with the **Markup %** on the Costing tab, which is what you're aiming for. For an overview of all products, look at **Reports → Margin Overview**.
+Open the product and compare the header's **Markup %**, which is what the current price earns, with the **Markup %** on the Costing tab, which is what you're aiming for. For an overview of all products, look at **Reports → Product Cost Summary** and sort by **Markup %**.
 
 ### Move a product into production
 

@@ -14,6 +14,13 @@ public class RawMaterialPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbC
 {
     /// <summary>Newest first, each with its unit (if any) and that unit's unit of measure.</summary>
     public Task<IReadOnlyList<RawMaterialPriceHistory>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken) =>
+        GetAsync("WHERE h.RawMaterialId = @rawMaterialId", new { rawMaterialId }, cancellationToken);
+
+    /// <summary>Every material's entries, grouped by material and newest first within each, each with its unit as above.</summary>
+    public Task<IReadOnlyList<RawMaterialPriceHistory>> GetAllAsync(CancellationToken cancellationToken) =>
+        GetAsync(string.Empty, null, cancellationToken);
+
+    private Task<IReadOnlyList<RawMaterialPriceHistory>> GetAsync(string filter, object? parameters, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<RawMaterialPriceHistory>>(
             async dbContext => (await dbContext.Connection().QueryAsync<RawMaterialPriceHistory, RawMaterialUnit?, UnitOfMeasure?, RawMaterialPriceHistory>(
                 dbContext.Command(
@@ -22,10 +29,10 @@ public class RawMaterialPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbC
                     FROM RawMaterialPriceHistories h
                     LEFT JOIN RawMaterialUnits u ON u.Id = h.UnitId
                     LEFT JOIN UnitsOfMeasure m ON m.Id = u.UnitOfMeasureId
-                    WHERE h.RawMaterialId = @rawMaterialId
-                    ORDER BY h.Date DESC, h.Id DESC
+                    {filter}
+                    ORDER BY h.RawMaterialId, h.Date DESC, h.Id DESC
                     """,
-                    new { rawMaterialId },
+                    parameters,
                     cancellationToken),
                 (entry, unit, unitOfMeasure) =>
                 {

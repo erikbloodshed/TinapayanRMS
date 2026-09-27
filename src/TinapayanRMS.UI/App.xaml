@@ -219,10 +219,6 @@
                 </Setter>
             </Style>
 
-            <!-- Chart series colors for the Reports screen: Mauve for the cost, the accent's Sky for the price it builds to, also told apart by their adornment labels. -->
-            <SolidColorBrush x:Key="ChartBaseCostBrush" Color="{StaticResource LatteMauveColor}" />
-            <SolidColorBrush x:Key="ChartSellingPriceBrush" Color="{StaticResource LatteSkyColor}" />
-
             <!--
                 A printed product's table rules (Printing/ProductPrintLayout), which otherwise takes the Costing card's colours:
                 Surface 1, a step darker than the card's Crust lines, which all but vanish on white paper.

@@ -252,6 +252,21 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
     }
 
     [Fact]
+    public async Task The_whole_price_history_lists_each_materials_entries_together_newest_first()
+    {
+        var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
+        var (ribbonId, rollId) = await SeedPackagingMaterialAsync();
+        await SetPriceAsync(ingredientId, null, 0.05m);
+        await SetPriceAsync(ribbonId, rollId, 120m);
+        await SetPriceAsync(ingredientId, bagId, 900m);
+
+        var history = await new RawMaterialPriceHistoryRepository(CreateDbContextFactory()).GetAllAsync(Cancellation);
+
+        history.Select(h => (h.RawMaterialId, h.Price, h.Unit?.UnitOfMeasure?.Name)).Should().Equal(
+            (ingredientId, 900m, "bag"), (ingredientId, 0.05m, null), (ribbonId, 120m, "roll"));
+    }
+
+    [Fact]
     public async Task Deleting_a_price_history_entry_leaves_the_cost_as_it_is()
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();

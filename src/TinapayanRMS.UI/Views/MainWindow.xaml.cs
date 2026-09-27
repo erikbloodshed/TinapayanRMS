@@ -97,13 +97,17 @@ public partial class MainWindow : ChromelessWindow
             ShowTab(PrintTab);
         });
 
-        // A Used By tile on Sub-Assemblies or Raw Materials opens its product on Products. Picked before the tab shows, so a list
-        // not loaded yet has the product waiting for the load that showing the tab starts.
-        subAssembliesViewModel.ProductOpenRequests.Merge(rawMaterialsViewModel.ProductOpenRequests).Subscribe(productId =>
-        {
-            productsViewModel.OpenProduct(productId);
-            ShowTab(ProductsTab);
-        });
+        // A Used By tile on Sub-Assemblies or Raw Materials, or a double-clicked row of Reports' Product Cost Summary, opens its
+        // product on Products. Picked before the tab shows, so a list not loaded yet has the product waiting for the load
+        // that showing the tab starts.
+        subAssembliesViewModel.ProductOpenRequests
+            .Merge(rawMaterialsViewModel.ProductOpenRequests)
+            .Merge(reportsViewModel.ProductOpenRequests)
+            .Subscribe(productId =>
+            {
+                productsViewModel.OpenProduct(productId);
+                ShowTab(ProductsTab);
+            });
 
         // And the other way: a linked badge on Products opens its standalone sub-assembly on Sub-Assemblies.
         productsViewModel.SubAssemblyOpenRequests.Subscribe(subAssemblyId =>

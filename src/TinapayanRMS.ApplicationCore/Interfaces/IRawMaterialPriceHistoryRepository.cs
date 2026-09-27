@@ -11,5 +11,8 @@ public interface IRawMaterialPriceHistoryRepository
     /// <summary>The material's price entries with the unit each was priced in, latest first.</summary>
     Task<IReadOnlyList<RawMaterialPriceHistory>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken);
 
+    /// <summary>Every material's price entries with the unit each was priced in, latest first within each material.</summary>
+    Task<IReadOnlyList<RawMaterialPriceHistory>> GetAllAsync(CancellationToken cancellationToken);
+
     Task DeleteAsync(int id, CancellationToken cancellationToken);
 }
