@@ -62,7 +62,7 @@
                                Foreground="{StaticResource HeadingForegroundBrush}"
                                FontWeight="SemiBold" />
                     <!-- The buffered total is what recipes and products are costed with -->
-                    <TextBlock FontSize="28"
+                    <TextBlock FontSize="30"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource SuccessForegroundBrush}"
                                Text="{Binding ExampleResult.BufferedTotalCost, StringFormat='{}{0:N2}'}" />

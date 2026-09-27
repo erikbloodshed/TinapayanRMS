@@ -22,7 +22,7 @@
             headers' figures are, and centred in the figure's tile as theirs are (2026-09-25, at the user's request)
         -->
         <Style x:Key="TotalValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontSize" Value="16" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
             <Setter Property="TextAlignment" Value="Center" />
@@ -100,7 +100,7 @@
 
                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                             <TextBlock Text="{Binding HeaderTitle}"
-                                       FontSize="18"
+                                       FontSize="20"
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource HeadingForegroundBrush}"
                                        TextTrimming="CharacterEllipsis" />

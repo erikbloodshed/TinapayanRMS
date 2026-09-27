@@ -23,7 +23,7 @@
                     Style="{StaticResource LinkedBadgeStyle}"
                     Margin="0,0,0,10"
                     Visibility="{Binding IsPackagingLinkedToProduct, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock Text="{Binding PackagingLinkedToText}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
+                <TextBlock Text="{Binding PackagingLinkedToText}" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
             </Border>
             <!-- A packaging set's badge is a link: it opens the set on the Sub-Assemblies screen -->
             <Button HorizontalAlignment="Left"

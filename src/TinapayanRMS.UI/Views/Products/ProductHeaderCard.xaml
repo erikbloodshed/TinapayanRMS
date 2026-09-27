@@ -5,7 +5,7 @@
     <UserControl.Resources>
         <!-- A figure: its label (FigureTileLabelStyle) over its value, both centred in its tile (2026-09-25, at the user's request) -->
         <Style x:Key="FigureValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontSize" Value="16" />
             <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextAlignment" Value="Center" />
@@ -54,11 +54,11 @@
                         Style="{StaticResource LinkedBadgeStyle}"
                         ToolTip="Where Save files this new product in the Products list: Research and Development after New, or the folder New Product Here was picked on."
                         Visibility="{Binding NewProductTag, Converter={StaticResource NotNullToVisibilityConverter}}">
-                    <TextBlock Text="{Binding NewProductTag}" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
+                    <TextBlock Text="{Binding NewProductTag}" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
                 </Border>
                 <TextBlock Text="{Binding HeaderTitle}"
                            VerticalAlignment="Center"
-                           FontSize="18"
+                           FontSize="20"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource HeadingForegroundBrush}"
                            TextTrimming="CharacterEllipsis" />

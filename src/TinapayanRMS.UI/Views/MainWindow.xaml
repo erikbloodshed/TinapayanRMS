@@ -174,7 +174,7 @@
 
                         <TextBlock Text="NAVIGATE"
                                    Style="{StaticResource CaptionStyle}"
-                                   FontSize="11"
+                                   FontSize="13"
                                    FontWeight="SemiBold"
                                    Margin="10,4,0,8" />
 

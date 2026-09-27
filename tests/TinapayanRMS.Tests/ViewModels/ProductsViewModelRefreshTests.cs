@@ -699,6 +699,70 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task A_linked_sections_lines_are_edited_in_the_product_and_Save_writes_them_to_the_sub_assembly_after_asking()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
+        var (_, doughId) = await AddProductWithSubAssemblyAsync("Cream Loaf", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
+        var miniId = await AddProductAsync("Cream Loaf Mini");
+        await SaveRecipeAsync(miniId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m)]));
+        var viewModel = CreateViewModel();
+        string? confirmation = null;
+        var confirm = false;
+        viewModel.ConfirmDelete.RegisterHandler(context =>
+        {
+            confirmation = context.Input;
+            context.SetOutput(confirm);
+        });
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == miniId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        // Its form types into its lines as it would a section of the product's own.
+        await viewModel.EditUsageCommand.Execute(viewModel.UsageEdits.Single());
+        viewModel.IsEditingLinkedUsage.Should().BeTrue();
+        viewModel.IsFormEditingLines.Should().BeFalse("its role and name are still the Sub-Assemblies screen's");
+        viewModel.IsFormLinesEditable.Should().BeTrue();
+        viewModel.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m });
+
+        // A refresh while the form is open keeps what was typed into its lines.
+        await viewModel.LoadCommand.Execute();
+        viewModel.FormLines.Select(l => (l.IngredientId, l.Grams)).Should().Equal((flourId, 1000m), (butterId, 250m));
+
+        // Save asks first, since Cream Loaf changes too: declined, nothing is written and the change stays in the form.
+        await viewModel.SaveCommand.Execute();
+        confirmation.Should().Be("Save changes the lines of Cream Loaf Dough, also used by Cream Loaf. Their recipes and costs change with it. Save anyway?");
+        var edited = viewModel.UsageEdits.Single();
+        edited.AreLinkedLinesEdited.Should().BeTrue();
+        edited.TotalWeight.Should().Be(1250m);
+        await using (var dbContext = CreateDbContext())
+        {
+            (await dbContext.SubAssemblyLines.CountAsync(l => l.SubAssemblyId == doughId, Cancellation)).Should().Be(1);
+        }
+
+        confirm = true;
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.SingleOrDefault() is { AreLinkedLinesEdited: false, TotalWeight: 1250m },
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}");
+        var saved = viewModel.UsageEdits.Single();
+        saved.IsLinked.Should().BeTrue("it's still the one kept on the Sub-Assemblies screen, not a copy");
+        saved.SubAssemblyId.Should().Be(doughId);
+        saved.CostPerPiece.Should().Be(3.6m, "30 g of a ₱150, 1,250 g batch");
+        viewModel.History.IsDirty.Should().BeFalse("what was saved is the new starting point");
+        await using (var dbContext = CreateDbContext())
+        {
+            var dough = await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == doughId, Cancellation);
+            (dough.TotalWeight, dough.TotalCost).Should().Be((1250m, 150m));
+            (await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == doughId).OrderBy(l => l.SortOrder).Select(l => l.IngredientId).ToListAsync(Cancellation))
+                .Should().Equal(flourId, butterId);
+        }
+    }
+
+    [Fact]
     public async Task Unlink_makes_a_linked_section_the_products_own_in_a_role_that_isnt_product_owned()
     {
         var roleId = await AddRoleAsync("Dough");

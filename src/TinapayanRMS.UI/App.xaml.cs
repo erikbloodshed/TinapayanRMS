@@ -172,6 +172,15 @@ public partial class App : Application
         {
             PrimaryBackground = new SolidColorBrush((Color)Resources["LatteSkyColor"]),
             PrimaryForeground = new SolidColorBrush((Color)Resources["LatteSkyInkColor"]),
+            // Each 2 above the theme's defaults (16/14/14/12/12/10), for readability (2026-09-27, at the
+            // user's request). The themed windows take BodyFontSize as their FontSize, so plain TextBlocks
+            // inherit it too.
+            HeaderFontSize = 18,
+            SubHeaderFontSize = 16,
+            TitleFontSize = 16,
+            SubTitleFontSize = 14,
+            BodyFontSize = 14,
+            BodyAltFontSize = 12,
         });
 
         _host = CompositionRoot.CreateHostBuilder(e.Args).Build();

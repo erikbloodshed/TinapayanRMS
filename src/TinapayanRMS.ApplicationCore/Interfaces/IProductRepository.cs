@@ -62,6 +62,12 @@ public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField Auth
     /// least 0 and less than 100. Pieces are cut from what's left (ProductRules.CalculateFinalWeight).
     /// </summary>
     public decimal ShrinkagePercent { get; init; }
+
+    /// <summary>
+    /// The linked sub-assembly's new lines, changed in this product's recipe: Save writes them to the sub-assembly
+    /// itself, on the Sub-Assemblies screen, so every product linking it follows. Null leaves its lines as they are.
+    /// </summary>
+    public IReadOnlyList<RecipeLine>? Lines { get; init; }
 }
 
 /// <summary>

@@ -40,7 +40,7 @@
         <!-- A part of the row above it (each sub-assembly under Sub-assemblies): indented, smaller and muted -->
         <Style x:Key="PartLabelCellStyle" TargetType="TextBlock">
             <Setter Property="Margin" Value="24,2,8,2" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="14" />
             <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>

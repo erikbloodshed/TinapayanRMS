@@ -75,6 +75,10 @@ public sealed class ProductUsageEdit : ReactiveObject
     /// product's own is its own without it.
     /// </param>
     /// <param name="isReleasing">One of the product's own that Save moves to the Sub-Assemblies screen and links (Move to Sub-Assemblies).</param>
+    /// <param name="savedLines">
+    /// A linked one's lines as the Sub-Assemblies screen has them, when <paramref name="lines"/> were changed here since; null
+    /// when they're the same.
+    /// </param>
     public ProductUsageEdit(
         int subAssemblyId,
         SubAssemblyRole? role,
@@ -86,10 +90,12 @@ public sealed class ProductUsageEdit : ReactiveObject
         IReadOnlyList<SubAssemblyLineEdit>? addIns = null,
         string? name = null,
         bool isOwn = false,
-        bool isReleasing = false)
+        bool isReleasing = false,
+        IReadOnlyList<SubAssemblyLineEdit>? savedLines = null)
     {
         _isOwn = isOwn;
         _isReleasing = isReleasing;
+        _savedLines = savedLines ?? lines;
         Name = SubAssemblyRules.NormalizeName(name);
         SubAssemblyId = subAssemblyId;
         Role = role;
@@ -210,6 +216,20 @@ public sealed class ProductUsageEdit : ReactiveObject
 
     public bool IsLinked => LinkedName is not null;
 
+    private readonly IReadOnlyList<SubAssemblyLineEdit> _savedLines;
+
+    /// <summary>
+    /// A linked one's lines as the Sub-Assemblies screen has them, which Save compares against: the same as
+    /// <see cref="Lines"/> until they're changed here.
+    /// </summary>
+    public IReadOnlyList<SubAssemblyLineEdit> SavedLines => _savedLines;
+
+    /// <summary>
+    /// A linked one's lines were changed in this product: Save writes them to the sub-assembly where it's kept, and every
+    /// product linking it follows. Only what Save would write counts, not what the lines cost.
+    /// </summary>
+    public bool AreLinkedLinesEdited => IsLinked && !HaveSameRecipe(Lines, _savedLines);
+
     /// <summary>The badge beside a linked section's heading, which opens it on the Sub-Assemblies screen: "Cheese Roll Dough, from Sub-Assemblies".</summary>
     public string LinkedFromText => $"{LinkedName}, from {StandaloneSourceName}";
 
@@ -258,16 +278,27 @@ public sealed class ProductUsageEdit : ReactiveObject
 
     /// <summary>
     /// A linked section as the Sub-Assemblies screen now has it — its name, the label it gives (<paramref name="name"/>),
-    /// its role and lines — with its add-ins repriced; its piece size stays the product's.
+    /// its role and <paramref name="savedLines"/> — with its add-ins repriced; its piece size stays the product's. Lines
+    /// changed here and not saved yet stay as they are, repriced (<paramref name="editedLines"/>), and Save writes them over
+    /// the ones kept there.
     /// </summary>
     public ProductUsageEdit WithLinked(
-        string linkedName, string? name, SubAssemblyRole? role, IReadOnlyList<SubAssemblyLineEdit> lines, IReadOnlyList<SubAssemblyLineEdit> addIns) =>
-        new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, ShrinkagePercent, linkedName, addIns, name);
+        string linkedName,
+        string? name,
+        SubAssemblyRole? role,
+        IReadOnlyList<SubAssemblyLineEdit> savedLines,
+        IReadOnlyList<SubAssemblyLineEdit>? editedLines,
+        IReadOnlyList<SubAssemblyLineEdit> addIns) =>
+        new(SubAssemblyId, role, editedLines ?? savedLines, AuthoredField, AuthoredValue, ShrinkagePercent, linkedName, addIns, name, savedLines: savedLines);
 
-    /// <summary>The same linked section at another piece size and shrinkage, with the add-ins the form now holds.</summary>
-    public ProductUsageEdit WithPieceSizeAndAddIns(
-        UsageAuthoredField authoredField, decimal authoredValue, decimal shrinkagePercent, IReadOnlyList<SubAssemblyLineEdit> addIns) =>
-        new(SubAssemblyId, Role, Lines, authoredField, authoredValue, shrinkagePercent, LinkedName, addIns, Name);
+    /// <summary>The same linked section with the lines, piece size, shrinkage and add-ins the form now holds.</summary>
+    public ProductUsageEdit WithLinkedForm(
+        IReadOnlyList<SubAssemblyLineEdit> lines,
+        UsageAuthoredField authoredField,
+        decimal authoredValue,
+        decimal shrinkagePercent,
+        IReadOnlyList<SubAssemblyLineEdit> addIns) =>
+        new(SubAssemblyId, Role, lines, authoredField, authoredValue, shrinkagePercent, LinkedName, addIns, Name, savedLines: _savedLines);
 
     /// <summary>Whether <paramref name="other"/> shows the same thing: the same role and names, piece size, and lines and add-ins at the same costs.</summary>
     public bool ShowsSameAs(ProductUsageEdit other) =>
@@ -280,6 +311,7 @@ public sealed class ProductUsageEdit : ReactiveObject
         && AuthoredField == other.AuthoredField
         && AuthoredValue == other.AuthoredValue
         && ShrinkagePercent == other.ShrinkagePercent
+        && AreLinkedLinesEdited == other.AreLinkedLinesEdited
         && Lines.Count == other.Lines.Count
         && Lines.Zip(other.Lines).All(pair =>
             pair.First.Grams == pair.Second.Grams
@@ -288,6 +320,16 @@ public sealed class ProductUsageEdit : ReactiveObject
             && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient))
         && AddIns.Count == other.AddIns.Count
         && AddIns.Zip(other.AddIns).All(pair => pair.First.Grams == pair.Second.Grams && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient));
+
+    /// <summary>Whether two sets of lines would save the same: the same ingredients, grams and base ticks, in the same order, whatever they cost.</summary>
+    private static bool HaveSameRecipe(IReadOnlyList<SubAssemblyLineEdit> a, IReadOnlyList<SubAssemblyLineEdit> b) =>
+        ReferenceEquals(a, b)
+        || (a.Count == b.Count
+            && a.Zip(b).All(pair =>
+                pair.First.Ingredient.Id == pair.Second.Ingredient.Id
+                && pair.First.Grams == pair.Second.Grams
+                && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
+                && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent));
 }
 
 /// <summary>
@@ -958,8 +1000,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             this.RaiseAndSetIfChanged(ref _editingUsage, value);
             this.RaisePropertyChanged(nameof(IsEditingLinkedUsage));
             this.RaisePropertyChanged(nameof(IsEditingOwnedUsage));
+            this.RaisePropertyChanged(nameof(IsFormLinesEditable));
         }
     }
+
+    /// <summary>The products other than this one that use <paramref name="subAssemblyId"/>, by name.</summary>
+    private List<string> OtherProductsUsing(int subAssemblyId, IReadOnlyDictionary<int, IReadOnlyList<LinkingProduct>> usedBy) =>
+        [.. usedBy.GetValueOrDefault(subAssemblyId, [])
+            .Where(p => p.Id != _detailProductId)
+            .Select(p => p.Name)
+            .Order(StringComparer.CurrentCultureIgnoreCase)];
 
     /// <summary>
     /// The form edits a section linked from elsewhere, so Unlink and Make a Copy have something to copy. A plain
@@ -1012,6 +1062,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         private set
         {
             this.RaiseAndSetIfChanged(ref _isFormEditingLines, value);
+            this.RaisePropertyChanged(nameof(IsFormLinesEditable));
             this.RaisePropertyChanged(nameof(IsFormShowingLines));
             this.RaisePropertyChanged(nameof(IsFormOfferingAddIns));
             this.RaisePropertyChanged(nameof(IsFormShowingAddIns));
@@ -1023,6 +1074,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// has none to show until the sub-assembly it comes from has been picked and its lines loaded.
     /// </summary>
     public bool IsFormShowingLines => IsFormEditingLines || FormLines.Count > 0;
+
+    /// <summary>
+    /// The form's lines can be typed into: a new or own section's, and a linked one's too, which Save writes to the
+    /// sub-assembly where it's kept, for every product linking it. Only a link being picked shows them read-only.
+    /// </summary>
+    public bool IsFormLinesEditable => IsFormEditingLines || IsEditingLinkedUsage;
 
     /// <summary>
     /// The form can take add-ins: only for a sub-assembly the product links, and only once the recipe it sits on
@@ -1863,6 +1920,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             }
 
             var recipe = CurrentRecipe();
+            if (!await ConfirmSharedLinesAsync())
+            {
+                return;
+            }
+
             var id = await _productRepository.SaveAsync(
                 product,
                 IsSameRecipe(recipe, _savedRecipe) ? null : recipe,
@@ -3017,6 +3079,33 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> CurrentLines() =>
         [.. PackagingLineRow.CompleteLines(LineEdits).Select(l => (l.PackagingMaterial.Id, l.UnitId, PackagingLineAuthoredField.QtyPerUnit, l.QtyPerUnit))];
 
+    /// <summary>
+    /// Asks before Save changes the lines of a linked sub-assembly that other products use too, naming them as they are
+    /// now rather than as last loaded. True, without asking, when no other product would change.
+    /// </summary>
+    private async Task<bool> ConfirmSharedLinesAsync()
+    {
+        var edited = UsageEdits.Where(u => u.AreLinkedLinesEdited).ToList();
+        if (edited.Count == 0)
+        {
+            return true;
+        }
+
+        var usedBy = await _subAssemblyRepository.GetStandaloneLinkedByAsync(CancellationToken.None);
+        var shared = edited
+            .Select(u => (u.LinkedName, Others: OtherProductsUsing(u.SubAssemblyId, usedBy)))
+            .Where(s => s.Others.Count > 0)
+            .Select(s => $"{s.LinkedName}, also used by {string.Join(", ", s.Others)}")
+            .ToList();
+        if (shared.Count == 0)
+        {
+            return true;
+        }
+
+        return await ConfirmDelete.Handle(
+            $"Save changes the lines of {string.Join("; and ", shared)}. Their recipes and costs change with it. Save anyway?");
+    }
+
     /// <summary>The recipe as Save writes it: the new sections with their lines, and the sub-assemblies it links.</summary>
     private RecipeDraft CurrentRecipe() =>
         new(
@@ -3033,6 +3122,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             {
                 ShrinkagePercent = u.ShrinkagePercent,
                 AddIns = [.. u.AddIns.Select(a => (a.Ingredient.Id, a.Grams))],
+
+                // Only lines changed here are written, so a product's Save doesn't put back lines the Sub-Assemblies
+                // screen has changed since.
+                Lines = u.AreLinkedLinesEdited
+                    ? [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))]
+                    : null,
             })]);
 
     /// <summary>
@@ -3048,7 +3143,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             && pair.First.AuthoredField == pair.Second.AuthoredField
             && pair.First.AuthoredValue == pair.Second.AuthoredValue
             && pair.First.ShrinkagePercent == pair.Second.ShrinkagePercent
-            && pair.First.AddIns.SequenceEqual(pair.Second.AddIns))
+            && pair.First.AddIns.SequenceEqual(pair.Second.AddIns)
+            && (pair.First.Lines is null) == (pair.Second.Lines is null)
+            && (pair.First.Lines ?? []).SequenceEqual(pair.Second.Lines ?? []))
         && a.New.Count == b.New.Count
         && a.New.Zip(b.New).All(pair =>
             pair.First.Id == pair.Second.Id
@@ -3235,8 +3332,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         if (EditingUsage is { IsLinked: true } linked)
         {
-            usage = linked.WithPieceSizeAndAddIns(
-                _usageAuthoredField, authoredValue, shrinkagePercent, CompleteAddIns(linked.DisplayName, linked.Lines));
+            // Its lines are typed into as a new section's are, and Save writes them where it's kept.
+            var lines = IngredientLineRow.CompleteLines(FormLines, linked.DisplayName);
+            if (lines.Count == 0)
+            {
+                throw new InvalidOperationException($"Add the ingredients that go into {linked.DisplayName}, in grams.");
+            }
+
+            IReadOnlyList<SubAssemblyLineEdit> lineEdits = [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
+            usage = linked.WithLinkedForm(
+                lineEdits, _usageAuthoredField, authoredValue, shrinkagePercent, CompleteAddIns(linked.DisplayName, lineEdits));
         }
         else if (IsFormEditingLines)
         {
@@ -3729,8 +3834,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     {
                         EditingUsage = replacement;
 
-                        // A linked one's lines aren't the form's to keep: show the Sub-Assemblies screen's, as they now are.
-                        if (replacement.IsLinked)
+                        // A linked one's lines as they now are, from the Sub-Assemblies screen or changed here and applied;
+                        // lines typed into the form and not applied yet stay, repriced by RefreshFormLines.
+                        if (replacement.IsLinked && IsFormShowing(previous.Lines))
                         {
                             ShowFormLines(replacement.Lines);
                         }
@@ -4007,13 +4113,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 }
 
                 // Its lines, name and role come fresh from the Sub-Assemblies screen; its add-ins are this product's own,
-                // so they only need their ingredients' new costs.
+                // so they only need their ingredients' new costs. Lines changed here and not saved yet stay, repriced.
                 var role = Roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role;
                 fresh = edit.WithLinked(
                     subAssembly.Name,
                     SectionLabelOf(subAssembly.Name, role),
                     role,
                     [.. linkedLinesById[subAssembly.Id].Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
+                    edit.AreLinkedLinesEdited ? Repriced(edit.Lines, ingredientsById) : null,
                     Repriced(edit.AddIns, ingredientsById));
             }
             else
@@ -4063,6 +4170,15 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         FormLines.Clear();
         FormLines.AddRange(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)));
     }
+
+    /// <summary>Whether the form's lines table still shows <paramref name="lines"/>, with nothing typed into it since.</summary>
+    private bool IsFormShowing(IReadOnlyList<SubAssemblyLineEdit> lines) =>
+        FormLines.Count == lines.Count
+        && FormLines.Zip(lines).All(pair =>
+            pair.First.IngredientId == pair.Second.Ingredient.Id
+            && pair.First.Grams == pair.Second.Grams
+            && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
+            && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent);
 
     /// <summary>The same for the add-ins table under it.</summary>
     private void ShowFormAddIns(IEnumerable<SubAssemblyLineEdit> addIns)

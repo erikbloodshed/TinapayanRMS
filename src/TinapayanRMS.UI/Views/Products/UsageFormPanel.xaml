@@ -28,14 +28,14 @@
             <Setter Property="TextAlignment" Value="Center" />
         </Style>
         <Style x:Key="StatValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontSize" Value="22" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource HeadingForegroundBrush}" />
             <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
         <Style x:Key="GroupHeadingStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionStyle}">
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="14" />
             <Setter Property="Margin" Value="0,14,0,4" />
         </Style>
         <Style x:Key="ParamRowStyle" TargetType="Border">
@@ -87,7 +87,7 @@
                 Margin="0,0,0,8"
                 ToolTip="Save puts it on the Sub-Assemblies screen, named after this product and its role, and this product links it there. Pick a product-owned role to keep it this product's own."
                 Visibility="{Binding IsFormNewMovingToSubAssemblies, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <TextBlock Text="Moves to Sub-Assemblies on Save" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
+            <TextBlock Text="Moves to Sub-Assemblies on Save" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
         </Border>
 
         <!--
@@ -146,7 +146,7 @@
                         Margin="0,0,16,8"
                         ToolTip="Save puts it on the Sub-Assemblies screen, keeping its name and these lines, and this product links it there. Undo or Revert to keep it this product's own."
                         Visibility="{Binding EditingUsage.IsReleasing, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
-                    <TextBlock Text="Moves to Sub-Assemblies on Save" FontSize="11" Foreground="{StaticResource WarningForegroundBrush}" />
+                    <TextBlock Text="Moves to Sub-Assemblies on Save" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
                 </Border>
                 <!-- A linked one's badge is a link: it opens the sub-assembly on the Sub-Assemblies screen (MainWindow subscribes to SubAssemblyOpenRequests) -->
                 <Button Style="{StaticResource LinkedBadgeLinkStyle}"
@@ -154,7 +154,7 @@
                         Content="{Binding EditingUsage.LinkedFromText}"
                         Command="{Binding OpenSubAssemblyCommand}"
                         CommandParameter="{Binding EditingUsage.SubAssemblyId}"
-                        ToolTip="Its lines are kept on the Sub-Assemblies screen, and follow its changes. Click to open it there and edit them."
+                        ToolTip="It's kept on the Sub-Assemblies screen, and every product linking it uses its lines. Change them here or there: Save here writes them there. Click to open it there."
                         Visibility="{Binding EditingUsage.IsLinked, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}" />
             </StackPanel>
 
@@ -207,14 +207,14 @@
                         Margin="12,0,0,8"
                         Visibility="{Binding IsAddingUsage, Converter={StaticResource EmptyStateVisibilityConverter}}">
                 <syncfusion:ButtonAdv Label="Unlink"
-                                      ToolTip="Make it this product's own copy, to change its lines here, whatever its role. The one on the Sub-Assemblies screen stays as it is. Save keeps the copy with this product, named after it: other products can copy it but not link it."
+                                      ToolTip="Make it this product's own copy, to change its lines for this product alone, whatever its role. The one on the Sub-Assemblies screen stays as it is. Save keeps the copy with this product, named after it: other products can copy it but not link it."
                                       IconTemplate="{StaticResource UnlinkIconTemplate}"
                                       Command="{Binding UnlinkCommand}"
                                       CommandParameter="{Binding EditingUsage}"
                                       Visibility="{Binding IsEditingLinkedUsage, Converter={StaticResource BooleanToVisibilityConverter}}"
                                       Margin="0,0,8,0" />
                 <syncfusion:ButtonAdv Label="Copy"
-                                      ToolTip="Make a copy of it, to change its lines here. Save keeps the copy named after this product, and uses it instead: as its own in a product-owned role, otherwise on the Sub-Assemblies screen, linked."
+                                      ToolTip="Make a copy of it, to change its lines for this product alone. Save keeps the copy named after this product, and uses it instead: as its own in a product-owned role, otherwise on the Sub-Assemblies screen, linked."
                                       IconTemplate="{StaticResource CopyIconTemplate}"
                                       Command="{Binding MakeCopyCommand}"
                                       CommandParameter="{Binding EditingUsage}"
@@ -347,9 +347,10 @@
 
             <StackPanel Grid.Column="0">
                 <!--
-                    The lines that make one batch, in grams. The product's own are typed straight into: the add row at
-                    the bottom starts a line, Delete removes the selected one. A linked one's are its owner's, so they
-                    only show: AllowEditing is off and the add row goes with it (AddNewRowPositionConverter).
+                    The lines that make one batch, in grams, typed straight into: the add row at the bottom starts a
+                    line, Delete removes the selected one. A linked one's too, which Save writes to the sub-assembly where
+                    it's kept. Only a link being picked shows its lines read-only: AllowEditing is off and the add row goes
+                    with it (AddNewRowPositionConverter).
                 -->
                 <StackPanel Visibility="{Binding IsFormShowingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <syncfusion:SfDataGrid ItemsSource="{Binding FormLines}"
@@ -365,10 +366,10 @@
                                            controls:GridFillerRows.IsEnabled="True"
                                            ShowRowHeader="True"
                                            AutoGenerateColumns="False"
-                                           AllowEditing="{Binding IsFormEditingLines}"
-                                           AllowDeleting="{Binding IsFormEditingLines}"
+                                           AllowEditing="{Binding IsFormLinesEditable}"
+                                           AllowDeleting="{Binding IsFormLinesEditable}"
                                            EditTrigger="OnTap"
-                                           AddNewRowPosition="{Binding IsFormEditingLines, Converter={StaticResource AddNewRowPositionConverter}}"
+                                           AddNewRowPosition="{Binding IsFormLinesEditable, Converter={StaticResource AddNewRowPositionConverter}}"
                                            SelectionMode="Single"
                                            ColumnSizer="Star"
                                            controls:GridEditCommit.OnFocusLeave="True"
@@ -411,16 +412,16 @@
                             <!-- The ingredient's buffered cost per gram, as the picker's own column shows it: the rate this line's Cost comes from. -->
                             <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost per Gram" Width="96" NumberDecimalDigits="4" AllowEditing="False" />
                             <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="96" NumberDecimalDigits="2" AllowEditing="False" />
-                            <!-- The formula's 100% base for baker's percentage, usually the flour; a linked one's is its owner's to set. -->
+                            <!-- The formula's 100% base for baker's percentage, usually the flour. -->
                             <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"
                                                            HeaderText="Base"
                                                            Width="54"
                                                            HorizontalHeaderContentAlignment="Center"
-                                                           AllowEditing="{Binding IsFormEditingLines}" />
+                                                           AllowEditing="{Binding IsFormLinesEditable}" />
                         </syncfusion:SfDataGrid.Columns>
                     </syncfusion:SfDataGrid>
 
-                    <!-- The formula caption on the left; Remove Line only for the product's own lines -->
+                    <!-- The formula caption on the left; Remove Line only while the lines can be typed into -->
                     <Grid Margin="0,8,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -436,7 +437,7 @@
                                               Label="Remove Line"
                                               IconTemplate="{StaticResource RemoveIconTemplate}"
                                               Command="{Binding RemoveFormLineCommand}"
-                                              Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                              Visibility="{Binding IsFormLinesEditable, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </Grid>
 
                     <!-- A linked one's Show Add-Ins, which opens the table of this product's own extras under its lines -->

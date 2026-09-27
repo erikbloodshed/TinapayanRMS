@@ -17,7 +17,7 @@
                         Padding="12,8">
                     <StackPanel>
                         <TextBlock HorizontalAlignment="Center"
-                                   FontSize="15"
+                                   FontSize="17"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource HeadingForegroundBrush}">
                             <Run Text="1" />
@@ -75,7 +75,7 @@
                     Padding="16,8">
                 <StackPanel>
                     <TextBlock HorizontalAlignment="Center"
-                               FontSize="15"
+                               FontSize="17"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource HeadingForegroundBrush}"
                                Text="{Binding BaseUnitName, ElementName=Root}" />

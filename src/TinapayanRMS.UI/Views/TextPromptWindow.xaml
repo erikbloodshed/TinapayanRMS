@@ -43,7 +43,7 @@
                     Padding="16,14,16,0"
                     MouseLeftButtonDown="Heading_MouseLeftButtonDown">
                 <TextBlock x:Name="HeadingText"
-                           FontSize="15"
+                           FontSize="17"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource HeadingForegroundBrush}" />
             </Border>

@@ -62,7 +62,8 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
     /// on the Sub-Assemblies screen and linked, and one of its own moved there out of a product-owned role is released to
     /// it. One marked NewSubAssemblyDraft.Release goes to the Sub-Assemblies screen and is linked, whatever its role.
     /// Either is named after the product and its role (SubAssemblyRules.StandaloneNameFor, made unique). One of its own the recipe no longer lists is deleted; one on the
-    /// Sub-Assemblies screen is kept. Every check runs before anything is written: the sections' lines, names and piece
+    /// Sub-Assemblies screen is kept. A linked one carrying new lines (LinkedUsageDraft.Lines) is relined where it's kept,
+    /// for every product linking it. Every check runs before anything is written: the sections' lines, names and piece
     /// sizes, that a saved one is the product's own, that no section is a packaging set, that nothing linked is another
     /// product's own, sections in one role told apart by their names, and add-ins.
     /// </summary>
@@ -72,6 +73,14 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
         {
             SubAssemblyRules.EnsureValidLines(section.Lines);
             SubAssemblyRules.EnsureValidSectionName(section.SectionName);
+        }
+
+        foreach (var link in recipe.Linked)
+        {
+            if (link.Lines is { } lines)
+            {
+                SubAssemblyRules.EnsureValidLines(lines);
+            }
         }
 
         // A new sub-assembly has no id yet: a negative stand-in keeps it distinct from every other.
@@ -138,15 +147,19 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 .Select(s => (s.RoleId, s.Role!.Name, SubAssemblyRules.SectionLabel(s.Name, productName, s.Role.Name))),
         ]);
 
-        // Add-ins go on top of a linked recipe, so they're only for what it doesn't already have. Checked
-        // here, before anything is written; SetLinesAsync checks them again as it writes them.
+        // Add-ins go on top of a linked recipe, so they're only for what it doesn't already have: its lines as this save
+        // leaves them, the new ones where they're changed here. Checked here, before anything is written; SetLinesAsync
+        // checks them again as it writes them, after the new lines.
         if (recipe.Linked.Any(l => l.AddIns.Count > 0))
         {
-            var baseIngredientIds = (await dbContext.SubAssemblyLines
+            var storedIngredientIds = (await dbContext.SubAssemblyLines
                     .Where(l => linkedIds.Contains(l.SubAssemblyId))
                     .Select(l => new { l.SubAssemblyId, l.IngredientId })
                     .ToListAsync(cancellationToken))
                 .ToLookup(l => l.SubAssemblyId, l => l.IngredientId);
+            var baseIngredientIds = recipe.Linked.ToDictionary(
+                l => l.SubAssemblyId,
+                l => l.Lines?.Select(line => line.IngredientId).ToList() ?? [.. storedIngredientIds[l.SubAssemblyId]]);
 
             var addInIds = recipe.Linked.SelectMany(l => l.AddIns.Select(a => a.IngredientId)).Distinct().ToList();
             var addInNames = await dbContext.RawMaterials
@@ -237,6 +250,17 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 AuthoredValue = section.AuthoredValue,
                 ShrinkagePercent = section.ShrinkagePercent,
             });
+        }
+
+        // A linked one whose lines were changed in this recipe is relined where it's kept, before its add-ins are checked
+        // against them; every product linking it follows, their costs read from its new totals.
+        foreach (var link in recipe.Linked)
+        {
+            if (link.Lines is { } lines)
+            {
+                var linked = await dbContext.SubAssemblies.FirstAsync(s => s.Id == link.SubAssemblyId, cancellationToken);
+                await SubAssemblyLineRepository.SetLinesAsync(dbContext, linked, lines, cancellationToken);
+            }
         }
 
         // The linked usages go in together, then one save gives every one of them the id its add-ins need.
