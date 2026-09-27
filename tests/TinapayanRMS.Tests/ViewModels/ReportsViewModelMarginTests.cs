@@ -10,9 +10,10 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.Tests.ViewModels;
 
 /// <summary>
-/// The Reports margin chart costs every product from the database, without going through the Products
-/// screen's rows. It is the one place that reads a sub-assembly's stored totals as the usage's batch, so
-/// it has to add a linked usage's add-ins in itself or it understates every product that has them.
+/// The Reports margin chart costs every product from the database, as it's saved. Since 2026-09-27 it prices each
+/// through SavedProductReader, as the Products screen prices the product it opens; before, it had a copy of its own
+/// that read a sub-assembly's stored totals as the usage's batch. These figures were worked out for that copy and are
+/// unchanged, so the two pricings agree: a linked usage's add-ins included, and packaging in the unit it's entered in.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class ReportsViewModelMarginTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
@@ -27,9 +28,12 @@ public class ReportsViewModelMarginTests(DatabaseFixture fixture) : PersistenceT
             new RawMaterialPriceHistoryRepository(factory),
             new RawMaterialRepository(factory, CreateCostPropagator()),
             new ProductRepository(factory),
-            new ProductSubAssemblyUsageRepository(factory),
-            packagingLineRepository,
-            new CostingParametersRepository(factory));
+            new SavedProductReader(
+                new PackagingLinkRepository(factory, packagingLineRepository),
+                new ProductSubAssemblyUsageRepository(factory),
+                packagingLineRepository,
+                new CostingParametersRepository(factory),
+                new SubAssemblyLineRepository(factory)));
     }
 
     [Fact]

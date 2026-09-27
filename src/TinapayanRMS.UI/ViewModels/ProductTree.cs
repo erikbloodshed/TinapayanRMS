@@ -303,6 +303,21 @@ public sealed class ProductTree : IDisposable
             select new ProductMove(product.Id, stage, toCategory)];
 
     /// <summary>
+    /// <paramref name="products"/> in the order the list shows them, folders opened: Production's, then Research and
+    /// Development's; in each, a category's at a time by the category's name, then the uncategorized; in each folder,
+    /// by name. The order a set of products prints in.
+    /// </summary>
+    public static IReadOnlyList<Product> InListOrder(IEnumerable<Product> products) =>
+    [
+        .. products
+            .OrderBy(p => p.Stage == ProductStage.Production ? 0 : 1)
+            .ThenBy(p => p.CategoryId is null ? 1 : 0)
+            .ThenBy(p => p.Category?.Name ?? string.Empty, StringComparer.CurrentCulture)
+            .ThenBy(p => p.CategoryId)
+            .ThenBy(p => p.Name, StringComparer.CurrentCulture),
+    ];
+
+    /// <summary>
     /// Brings the tree in line with <paramref name="products"/> (in the order the list shows them) and
     /// <paramref name="categories"/>. Every category has a folder in each stage, so an empty one can still be dropped
     /// on; while a search filters the list (<paramref name="isFiltered"/>), only the folders holding a match show, open.

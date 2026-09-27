@@ -1,6 +1,7 @@
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.UI.ViewModels;
 
@@ -54,6 +55,17 @@ public sealed class PackagingLineRow : ReactiveObject
         _qtyPerUnit = qtyPerUnit;
         _unitOptions = OptionsFor(packagingMaterial);
         _unitKey = KeptKey(unitId ?? PackagingUnitChoice.BaseUnitKey, _unitOptions);
+    }
+
+    /// <summary>
+    /// A saved packaging line as a table row, its quantity in the unit it was entered in. A line saved as pieces per unit
+    /// shows as the quantity it comes to, at the same cost, and is saved that way once the packaging changes.
+    /// </summary>
+    public static PackagingLineRow FromSaved(PackagingLine line)
+    {
+        var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? line.QtyPerUnit : line.UnitsPerPackagingUnit;
+        var qtyPerUnit = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerUnit;
+        return new PackagingLineRow(line.PackagingMaterial!, qtyPerUnit, line.UnitId);
     }
 
     private int? _packagingMaterialId;

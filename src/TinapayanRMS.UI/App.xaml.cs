@@ -174,20 +174,9 @@ public partial class App : Application
         // replacing the native title bar with Syncfusion's custom chrome. Without it, Syncfusion
         // controls still pick up the theme and accent via SetTheme below; only plain framework
         // controls (CheckBox, Expander, ProgressBar) keep the OS default look.
-        SfSkinManager.RegisterThemeSettings("Windows11Light", new Windows11LightThemeSettings
-        {
-            PrimaryBackground = new SolidColorBrush((Color)Resources["LatteSkyColor"]),
-            PrimaryForeground = new SolidColorBrush((Color)Resources["LatteSkyInkColor"]),
-            // Each 2 above the theme's defaults (16/14/14/12/12/10), for readability (2026-09-27, at the
-            // user's request). The themed windows take BodyFontSize as their FontSize, so plain TextBlocks
-            // inherit it too.
-            HeaderFontSize = 18,
-            SubHeaderFontSize = 16,
-            TitleFontSize = 16,
-            SubTitleFontSize = 14,
-            BodyFontSize = 14,
-            BodyAltFontSize = 12,
-        });
+        SfSkinManager.RegisterThemeSettings(
+            "Windows11Light",
+            ThemeSettings(new SolidColorBrush((Color)Resources["LatteSkyColor"]), new SolidColorBrush((Color)Resources["LatteSkyInkColor"])));
 
         _host = CompositionRoot.CreateHostBuilder(e.Args).Build();
         _host.Start();
@@ -196,6 +185,25 @@ public partial class App : Application
         SfSkinManager.SetTheme(mainWindow, new Theme("Windows11Light"));
         mainWindow.Show();
     }
+
+    /// <summary>
+    /// The app's Windows11Light settings: its accent, and its text sizes. Tests that theme a window register the same, so
+    /// what they measure is what the app shows.
+    /// </summary>
+    public static Windows11LightThemeSettings ThemeSettings(Brush primaryBackground, Brush primaryForeground) => new()
+    {
+        PrimaryBackground = primaryBackground,
+        PrimaryForeground = primaryForeground,
+        // Each 2 above the theme's defaults (16/14/14/12/12/10), for readability (2026-09-27, at the
+        // user's request). The themed windows take BodyFontSize as their FontSize, so plain TextBlocks
+        // inherit it too.
+        HeaderFontSize = 18,
+        SubHeaderFontSize = 16,
+        TitleFontSize = 16,
+        SubTitleFontSize = 14,
+        BodyFontSize = 14,
+        BodyAltFontSize = 12,
+    };
 
     protected override void OnExit(ExitEventArgs e)
     {

@@ -32,9 +32,7 @@ public class ReportsViewModel : ReactiveObject
 {
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
     private readonly IProductRepository _productRepository;
-    private readonly IProductSubAssemblyUsageRepository _usageRepository;
-    private readonly IPackagingLineRepository _packagingLineRepository;
-    private readonly ICostingParametersRepository _costingParametersRepository;
+    private readonly SavedProductReader _savedProducts;
 
     // True while LoadCommand merges the material list, so re-pointing the selection doesn't also
     // start its own chart reload.
@@ -60,15 +58,11 @@ public class ReportsViewModel : ReactiveObject
         IRawMaterialPriceHistoryRepository priceHistoryRepository,
         IRawMaterialRepository rawMaterialRepository,
         IProductRepository productRepository,
-        IProductSubAssemblyUsageRepository usageRepository,
-        IPackagingLineRepository packagingLineRepository,
-        ICostingParametersRepository costingParametersRepository)
+        SavedProductReader savedProducts)
     {
         _priceHistoryRepository = priceHistoryRepository;
         _productRepository = productRepository;
-        _usageRepository = usageRepository;
-        _packagingLineRepository = packagingLineRepository;
-        _costingParametersRepository = costingParametersRepository;
+        _savedProducts = savedProducts;
 
         // Skips while LoadCommand merges, which reloads the chart itself once it's done.
         this.WhenAnyValue(x => x.SelectedRawMaterial)
@@ -122,6 +116,10 @@ public class ReportsViewModel : ReactiveObject
         }
     }
 
+    /// <summary>
+    /// Every product's base cost and selling price as it's saved, priced as the Products screen prices it once opened
+    /// (SavedProductReader, which the screen and Print read through too).
+    /// </summary>
     private async Task<List<MarginRow>> CalculateMarginRowsAsync()
     {
         var marginRows = new List<MarginRow>();
@@ -129,51 +127,8 @@ public class ReportsViewModel : ReactiveObject
         var products = await _productRepository.GetAllAsync(CancellationToken.None);
         foreach (var product in products)
         {
-            var usages = await _usageRepository.GetForProductAsync(product.Id, CancellationToken.None);
-
-            // A linked usage can carry this product's own extra ingredients. They go into the batch, so the
-            // piece size shares out the sub-assembly's lines plus these, and the cost follows.
-            var addInsByUsage = (await _usageRepository.GetAddInsForProductAsync(product.Id, CancellationToken.None))
-                .ToLookup(l => l.UsageId);
-
-            var usageCosts = usages
-                .Select(u =>
-                {
-                    var subAssembly = u.SubAssembly!;
-                    var (totalWeight, totalCost) = ProductRules.CalculateEffectiveBatch(
-                        subAssembly.TotalWeight,
-                        subAssembly.TotalCost,
-                        [.. addInsByUsage[u.Id].Select(l => (l.Grams, l.Ingredient!.BufferedCostPerBaseUnit))]);
-                    // The pieces come out of what the batch makes, so the batch's whole cost is spread over that.
-                    var finalWeight = ProductRules.CalculateFinalWeight(totalWeight, u.ShrinkagePercent);
-                    var (weightPerPiece, _) = ProductRules.ResolvePieceSize(u.AuthoredField, u.AuthoredValue, finalWeight);
-                    return finalWeight > 0 ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, finalWeight) : 0m;
-                })
-                .ToList();
-
-            var lines = await _packagingLineRepository.GetEffectiveForProductAsync(product.Id, CancellationToken.None);
-            var packagingCosts = lines
-                .Select(l => ProductRules.CalculatePackagingLineCost(
-                    l.PackagingMaterial!.BufferedCostPerBaseUnit, l.QtyPerUnit, l.Unit?.BaseUnitsPerUnit))
-                .ToList();
-
-            // Per sellable unit, as the Products screen prices it: the pieces that unit holds at the recipe's
-            // cost per piece, and the packaging that wraps the whole unit. The two stay apart because labor,
-            // overhead and administrative are percentages of the sub-assemblies alone.
-            var subAssemblyCost = usageCosts.Sum() * product.QuantityRequired;
-            var packagingCost = packagingCosts.Sum();
-
-            var costingParameters = await _costingParametersRepository.GetForProductAsync(product.Id, CancellationToken.None);
-            var (baseCost, _, sellingPrice) = CostingRules.CalculateSellingPrice(
-                subAssemblyCost,
-                packagingCost,
-                costingParameters?.LaborPercent ?? 0m,
-                costingParameters?.OverheadPercent ?? 0m,
-                costingParameters?.AdministrativePercent ?? 0m,
-                costingParameters?.MarginPercent ?? 0m,
-                costingParameters?.VatPercent ?? 0m);
-
-            marginRows.Add(new MarginRow(product.Name, baseCost, sellingPrice));
+            var costs = (await _savedProducts.ReadAsync(product, CancellationToken.None)).Costs;
+            marginRows.Add(new MarginRow(product.Name, costs.BaseCost, costs.SellingPrice));
         }
 
         return marginRows;

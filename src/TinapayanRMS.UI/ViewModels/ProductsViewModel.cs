@@ -62,6 +62,35 @@ public sealed class ProductUsageEdit : ReactiveObject
 
     private static int SavedOrder(ProductUsageEdit usage) => usage.SubAssemblyId > 0 ? usage.SubAssemblyId : int.MaxValue;
 
+    /// <summary>
+    /// A saved usage of <paramref name="productName"/>'s as its section: the sub-assembly's lines, this product's add-ins,
+    /// and the piece size, with the name it goes by beside <paramref name="role"/>. The screen hands over its own copies
+    /// of the ingredients (<paramref name="ingredientsById"/>), which its pickers share; without them, each line keeps the
+    /// ingredient it was read with.
+    /// </summary>
+    public static ProductUsageEdit FromSaved(
+        ProductSubAssemblyUsage usage,
+        IEnumerable<SubAssemblyLine> lines,
+        IEnumerable<UsageAddInLine> addIns,
+        SubAssemblyRole? role,
+        string productName,
+        IReadOnlyDictionary<int, RawMaterial>? ingredientsById = null)
+    {
+        var subAssembly = usage.SubAssembly!;
+        var isOwn = subAssembly.OwnerProductId == usage.ProductId;
+        RawMaterial IngredientOf(int id, RawMaterial? read) => ingredientsById?.GetValueOrDefault(id) ?? read!;
+        return new ProductUsageEdit(
+            subAssembly.Id,
+            role,
+            [.. lines.Select(l => new SubAssemblyLineEdit(IngredientOf(l.IngredientId, l.Ingredient), l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
+            usage.AuthoredField,
+            usage.AuthoredValue,
+            usage.ShrinkagePercent,
+            isOwn ? null : subAssembly.Name,
+            [.. addIns.Select(a => new SubAssemblyLineEdit(IngredientOf(a.IngredientId, a.Ingredient), a.Grams))],
+            SubAssemblyRules.SectionLabel(subAssembly.Name, productName, role?.Name ?? string.Empty));
+    }
+
     /// <param name="subAssemblyId">The sub-assembly's id, or 0 for a new section, not saved yet.</param>
     /// <param name="linkedName">The linked sub-assembly's name, e.g. "Cheese Roll Filling: Ube"; null for the product's own or a new section.</param>
     /// <param name="addIns">This product's own extra ingredients on top of a linked recipe; always empty for its own or a new section.</param>
@@ -541,6 +570,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private readonly IProductCloner _productCloner;
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
+
+    // Reads the product opened here, as Reports and Print read theirs, from the repositories above.
+    private readonly SavedProductReader _savedProducts;
     private readonly IValidator<Product> _productValidator;
     private readonly IValidator<CostingParameters> _costingParametersValidator;
     private readonly IProductCategoryRepository _categoryRepository;
@@ -872,7 +904,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>What the figures on this screen are for: "Per piece", or "Per unit of 8 pieces".</summary>
-    public string CostUnitCaption => EditingQuantityRequired <= 1 ? "Per piece" : $"Per unit of {EditingQuantityRequired} pieces";
+    public string CostUnitCaption => ProductPrintout.CostUnitCaptionFor(EditingQuantityRequired);
 
     private decimal? _editingCurrentPrice;
     /// <summary>What the shop charges for one sellable unit now, with VAT (Product.CurrentPrice); null when not entered.</summary>
@@ -1370,6 +1402,28 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ReactiveCommand<RxVoid, RxVoid> RevertCommand { get; }
 
     /// <summary>
+    /// Print: asks for the Print tab (<see cref="PrintRequests"/>), which shows the product's recipe and costing as the
+    /// screen shows them, unsaved edits included (<see cref="PreparePrintout"/>). A sub-assembly form left open is applied
+    /// first, as Save applies it, so a rule refusing it shows its message here and the tab doesn't open.
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
+
+    private readonly Subject<PrintScope> _printRequests = new();
+
+    /// <summary>
+    /// What a Print here asks to print: the header's, This product; a folder's menu, the folder; the list's, all products.
+    /// The main window, which owns the tabs, shows its Print tab with that choice (PrintTabViewModel.Pick), and the tab
+    /// asks <see cref="PreparePrintout"/> for This product each time it's shown.
+    /// </summary>
+    public IObservable<PrintScope> PrintRequests => _printRequests;
+
+    /// <summary>Print Folder, or Print Stage, on the list's folder: its products, as saved, on the Print tab.</summary>
+    public ReactiveCommand<ProductFolderNode, RxVoid> PrintFolderCommand { get; }
+
+    /// <summary>Print All Products on the list's empty space: every product, as saved, on the Print tab.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> PrintAllCommand { get; }
+
+    /// <summary>
     /// A linked standalone sub-assembly's badge clicked (a recipe section's, or linked packaging's for a packaging set):
     /// asks for the sub-assembly with this id to be opened, through <see cref="SubAssemblyOpenRequests"/>.
     /// </summary>
@@ -1526,6 +1580,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _productCloner = productCloner;
         _subAssemblyRepository = subAssemblyRepository;
         _subAssemblyLineRepository = subAssemblyLineRepository;
+        _savedProducts = new SavedProductReader(
+            packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository);
         _productValidator = productValidator;
         _costingParametersValidator = costingParametersValidator;
         _categoryRepository = categoryRepository;
@@ -1816,7 +1872,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // Linked packaging is kept elsewhere (another product, or a set on the Sub-Assemblies screen) and can
             // have changed there, so it's fetched again — but only while the form still shows the link as saved. The
             // product's own lines aren't, since they may hold unsaved edits, and nor is a link picked but not saved.
-            var savedLink = packagingLink is null ? null : ToLinkTarget(packagingLink);
+            var savedLink = packagingLink is null ? null : PackagingLinkTarget.From(packagingLink);
             var showsSavedLink = savedLink is not null && savedLink.Key == _savedPackagingLinkKey && _packagingLinkTarget?.Key == savedLink.Key;
             var linkedPackagingLines = showsSavedLink
                 ? await _packagingLineRepository.GetEffectiveForProductAsync(packagingLink!.ProductId, CancellationToken.None)
@@ -1912,6 +1968,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         RenameCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(RenameCategoryAsync);
         DeleteCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(DeleteCategoryAsync);
         ExpandAllCommand = ReactiveCommand.Create<ProductFolderNode?>(ProductTree.ExpandAll);
+        PrintFolderCommand = ReactiveCommand.Create<ProductFolderNode>(folder => _printRequests.OnNext(PrintScope.Folder(folder)));
+        PrintAllCommand = ReactiveCommand.Create(() => _printRequests.OnNext(PrintScope.AllProducts));
         CollapseAllCommand = ReactiveCommand.Create<ProductFolderNode?>(ProductTree.CollapseAll);
 
         OpenSubAssemblyCommand = ReactiveCommand.Create<int>(_subAssemblyOpenRequests.OnNext);
@@ -2015,6 +2073,23 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 await LoadProductDetailAsync(product, CancellationToken.None);
                 SuccessMessage = $"{product.Name} was put back as it was last saved.";
             }));
+
+        // Print shows the product as the screen does, unsaved edits and all (the user's choice, 2026-09-27). A form left
+        // open is part of that, as it's part of what Save writes, so it's applied first; a rule refusing it shows its
+        // message, and the Print tab doesn't open.
+        PrintCommand = ReactiveCommand.CreateFromTask(
+            () => RunSafelyAsync(() =>
+            {
+                if (!AreDetailsReady)
+                {
+                    return Task.CompletedTask;
+                }
+
+                ApplyOpenForm();
+                _printRequests.OnNext(PrintScope.ThisProduct);
+                return Task.CompletedTask;
+            }),
+            this.WhenAnyValue(x => x.AreDetailsReady));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
             () => DeleteProductAsync(SelectedProduct!),
@@ -2222,7 +2297,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>The Last Updated figure: the day and the time; "—" for a product never saved since it was added.</summary>
     private void ShowUpdatedAt(DateTime? updatedAt) =>
-        LastUpdatedText = updatedAt?.ToString("MMM d, yyyy, h:mm tt", CultureInfo.CurrentCulture) ?? "—";
+        LastUpdatedText = ProductPrintout.LastUpdatedTextFor(updatedAt);
 
     private void LoadIntoForm(Product product)
     {
@@ -2553,7 +2628,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ProductDetail detail;
         try
         {
-            detail = await Task.Run(() => ReadProductDetailAsync(product.Id, cancellationToken), cancellationToken);
+            detail = await Task.Run(() => _savedProducts.ReadDetailAsync(product.Id, cancellationToken), cancellationToken);
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested && product.Id != _detailProductId)
         {
@@ -2587,32 +2662,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         History.MarkClean();
     }
 
-    /// <summary>Everything a product's detail shows, as LoadProductDetailAsync reads it.</summary>
-    private sealed record ProductDetail(
-        PackagingLink? PackagingLink,
-        IReadOnlyList<ProductSubAssemblyUsage> Usages,
-        IReadOnlyList<PackagingLine> Lines,
-        CostingParameters? Costing,
-        IReadOnlyList<SubAssemblyLine> SubAssemblyLines,
-        IReadOnlyList<UsageAddInLine> AddIns);
-
-    /// <summary>Only the repositories: this runs off the UI thread.</summary>
-    private async Task<ProductDetail> ReadProductDetailAsync(int productId, CancellationToken cancellationToken)
-    {
-        var packagingLink = await _packagingLinkRepository.GetForProductAsync(productId, cancellationToken);
-        var usages = await _usageRepository.GetForProductAsync(productId, cancellationToken);
-        var lines = await _packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken);
-        var costing = await _costingParametersRepository.GetForProductAsync(productId, cancellationToken);
-        var subAssemblyLines = await _subAssemblyLineRepository.GetForSubAssembliesAsync(
-            [.. usages.Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
-        var addIns = await _usageRepository.GetAddInsForProductAsync(productId, cancellationToken);
-        return new ProductDetail(packagingLink, usages, lines, costing, subAssemblyLines, addIns);
-    }
-
     /// <summary>The saved packaging link, or none: what the Packaging tab shows, and what Save compares against.</summary>
     private void SetPackagingLink(PackagingLink? link)
     {
-        var target = link is null ? null : ToLinkTarget(link);
+        var target = link is null ? null : PackagingLinkTarget.From(link);
         _savedPackagingLinkKey = target?.Key;
         ShowPackagingLink(target);
     }
@@ -2627,11 +2680,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         this.RaisePropertyChanged(nameof(IsPackagingLinkedToSet));
         this.RaisePropertyChanged(nameof(IsPackagingLinkedToProduct));
     }
-
-    private static PackagingLinkTarget ToLinkTarget(PackagingLink link) =>
-        link.LinkedSubAssemblyId is { } setId
-            ? PackagingLinkTarget.ForSet(setId, link.LinkedSubAssembly?.Name ?? string.Empty)
-            : PackagingLinkTarget.ForProduct(link.LinkedProductId!.Value, link.LinkedProduct?.Name ?? string.Empty);
 
     /// <summary>The Packaging tab comes and goes with the packaging, always last, after the add form's tab.</summary>
     private void SetHasPackaging(bool hasPackaging)
@@ -3035,6 +3083,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }
     }
 
+    /// <summary>A saved usage as its section, with the screen's own copies of its role and ingredients (ProductUsageEdit.FromSaved).</summary>
     private ProductUsageEdit ToUsageEdit(
         ProductSubAssemblyUsage usage,
         IEnumerable<SubAssemblyLine> lines,
@@ -3043,17 +3092,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         var subAssembly = usage.SubAssembly!;
         var role = Roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role;
-        var isOwn = subAssembly.OwnerProductId == usage.ProductId;
-        return new ProductUsageEdit(
-            subAssembly.Id,
-            role,
-            [.. lines.Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
-            usage.AuthoredField,
-            usage.AuthoredValue,
-            usage.ShrinkagePercent,
-            isOwn ? null : subAssembly.Name,
-            [.. addIns.Select(a => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(a.IngredientId) ?? a.Ingredient!, a.Grams))],
-            SectionLabelOf(subAssembly.Name, role));
+        return ProductUsageEdit.FromSaved(usage, lines, addIns, role, EditingName, ingredientsById);
     }
 
     /// <summary>
@@ -3066,7 +3105,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The saved packaging lines in the Packaging tab's table; they're also what Save compares against.</summary>
     private void ReplaceLines(IReadOnlyList<PackagingLine> lines)
     {
-        ShowPackagingLines(lines.Select(ToPackagingRow));
+        ShowPackagingLines(lines.Select(PackagingLineRow.FromSaved));
         _savedLines = CurrentLines();
     }
 
@@ -3076,17 +3115,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         SelectedLineEdit = null;
         LineEdits.Clear();
         LineEdits.AddRange(rows);
-    }
-
-    /// <summary>
-    /// A packaging line as a table row, its quantity in the unit it was entered in. A line saved as pieces per unit
-    /// shows as the quantity it comes to, at the same cost, and is saved that way once the packaging changes.
-    /// </summary>
-    private static PackagingLineRow ToPackagingRow(PackagingLine line)
-    {
-        var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? line.QtyPerUnit : line.UnitsPerPackagingUnit;
-        var qtyPerUnit = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerUnit;
-        return new PackagingLineRow(line.PackagingMaterial!, qtyPerUnit, line.UnitId);
     }
 
     private void SetCosting(CostingParameters? costing)
@@ -3382,7 +3410,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             packagingRows = packaging.SubAssemblyId is { } setId
                 ? [.. (await _subAssemblyRepository.GetPackagingLinesAsync(setId, cancellationToken))
                     .Select(l => new PackagingLineRow(FindPackagingMaterial(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId))]
-                : [.. (await _packagingLineRepository.GetEffectiveForProductAsync(packaging.ProductId!.Value, cancellationToken)).Select(ToPackagingRow)];
+                : [.. (await _packagingLineRepository.GetEffectiveForProductAsync(packaging.ProductId!.Value, cancellationToken)).Select(PackagingLineRow.FromSaved)];
         }
         else if (source?.SubAssembly is { } subAssembly)
         {
@@ -3586,6 +3614,29 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             ErrorMessage = ex.Message;
             return false;
+        }
+        finally
+        {
+            History.End((before, now) => before.WithFormOf(now));
+        }
+    }
+
+    /// <summary>
+    /// Applies a form left open, as Save does, so what's typed into it is in the recipe, and shows its section's tab with
+    /// the form open on it again. One undo step, measured as leaving its tab measures one: by what it did to the recipe.
+    /// An add form nothing was entered in is left as it is. A rule refusing the form throws, and the form stays as typed.
+    /// </summary>
+    private void ApplyOpenForm()
+    {
+        if (!IsUsageFormOpen || IsUsageFormUntouched())
+        {
+            return;
+        }
+
+        History.Begin();
+        try
+        {
+            SelectRecipeTab(ApplyForm());
         }
         finally
         {
@@ -4343,6 +4394,51 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             EditingCurrentPrice);
     }
 
+    /// <summary>
+    /// The product the screen has open, as the Print tab shows it: asked for each time that tab is shown, so it follows
+    /// the edits made here since, and the product opened here since (the user's choice, 2026-09-27). A sub-assembly form
+    /// left open is applied first, as Print applies it. Null for the printout while the details are still arriving, or
+    /// when a rule refuses the form, with its message as the problem (and on this screen, for when it's next shown):
+    /// the tab then keeps what it had.
+    /// </summary>
+    public (ProductPrintout? Printout, string? Problem) PreparePrintout()
+    {
+        if (!AreDetailsReady)
+        {
+            return (null, null);
+        }
+
+        try
+        {
+            ApplyOpenForm();
+        }
+        catch (InvalidOperationException ex)
+        {
+            ErrorMessage = ex.Message;
+            return (null, ex.Message);
+        }
+
+        return (CurrentPrintout(), null);
+    }
+
+    /// <summary>
+    /// What Print puts on paper: the product as the screen shows it now, its details, every section in recipe order, its
+    /// packaging and its costing, with a note when that isn't what's saved.
+    /// </summary>
+    private ProductPrintout CurrentPrintout() => new(
+        string.IsNullOrWhiteSpace(EditingName) ? "New product" : EditingName.Trim(),
+        EditingCategory?.Name ?? "Uncategorized",
+        ProductFolderNode.StageTitle(SelectedProduct?.Stage ?? NewProductStage),
+        CostUnitCaption,
+        LastUpdatedText,
+        _detailProductId is null
+            ? ProductPrintout.NotSavedNote
+            : History.IsDirty ? ProductPrintout.UnsavedChangesNote : null,
+        DateTime.Now,
+        [.. UsageEdits.Select(PrintedSection.From)],
+        HasPackaging ? PrintedPackaging.From(LineEdits, IsPackagingLinked ? PackagingLinkedToText : null) : null,
+        Costs);
+
     // Segoe Fluent Icons glyphs for the list's menu, the ones the screen's buttons use where there's one.
     private const string AddGlyph = "";
     private const string NewFolderGlyph = "";
@@ -4353,6 +4449,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private const string CopyGlyph = "";
     private const string LinkGlyph = "";
     private const string DeleteGlyph = "";
+    private const string PrintGlyph = "";
 
     /// <summary>
     /// The menu a right-click opens on the list (ProductListCard): on <paramref name="node"/>'s row, which the View picks
@@ -4443,6 +4540,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         new("New Product Here", NewProductInCommand, stage) { Glyph = AddGlyph },
         new("New Category…", NewCategoryCommand, stage) { Glyph = NewFolderGlyph },
         TreeMenuItem.Separator,
+        new("Print Stage", PrintFolderCommand, stage) { Glyph = PrintGlyph },
+        TreeMenuItem.Separator,
         new("Expand All", ExpandAllCommand, stage),
         new("Collapse All", CollapseAllCommand, stage),
     ];
@@ -4457,6 +4556,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             items.Add(new("Promote All to Production", MoveProductsCommand, toProduction) { Glyph = PromoteGlyph });
         }
+
+        items.Add(new("Print Folder", PrintFolderCommand, folder) { Glyph = PrintGlyph });
 
         if (folder.IsCategory)
         {
@@ -4476,6 +4577,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     [
         new("New Product", NewProductInCommand) { Glyph = AddGlyph },
         new("New Category…", NewCategoryCommand) { Glyph = NewFolderGlyph },
+        TreeMenuItem.Separator,
+        new("Print All Products", PrintAllCommand) { Glyph = PrintGlyph },
         TreeMenuItem.Separator,
         new("Expand All", ExpandAllCommand),
         new("Collapse All", CollapseAllCommand),
@@ -4748,5 +4851,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _productCache.Dispose();
         _categoryCache.Dispose();
         _subAssemblyOpenRequests.Dispose();
+        _printRequests.Dispose();
     }
 }

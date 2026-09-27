@@ -329,6 +329,11 @@
                     <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
                     <syncfusion:TabItemExt x:Name="ProductsTab" Header="Products" />
                     <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" />
+                    <!--
+                        Print, opened by the Products header's Print and closed with its ✕ (hidden, as CloseMode says);
+                        not in the menu, since it prints what Products has open. Hidden until then.
+                    -->
+                    <syncfusion:TabItemExt x:Name="PrintTab" Header="Print" Visibility="Collapsed" />
                 </syncfusion:TabControlExt>
             </syncfusion:SfNavigationDrawer.ContentView>
         </syncfusion:SfNavigationDrawer>

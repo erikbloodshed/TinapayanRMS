@@ -89,6 +89,13 @@
                                       Command="{Binding RevertCommand}"
                                       ToolTip="Puts the product back as it was last saved: the details, recipe, packaging and costing, and any sub-assembly being added or edited."
                                       Margin="0,0,8,0" />
+
+                <!-- The product as the screen shows it, unsaved edits included, on the main window's Print tab (ProductPrintView). -->
+                <syncfusion:ButtonAdv Label="Print"
+                                      IconTemplate="{StaticResource PrintIconTemplate}"
+                                      Command="{Binding PrintCommand}"
+                                      ToolTip="Opens the Print tab, which previews and prints this product's recipe and costing as this screen shows them."
+                                      Margin="0,0,8,0" />
                 <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
             </StackPanel>
         </Grid>

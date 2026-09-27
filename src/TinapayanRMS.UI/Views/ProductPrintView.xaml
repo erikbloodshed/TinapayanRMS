@@ -1,0 +1,74 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.ProductPrintView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             mc:Ignorable="d"
+             Background="{StaticResource PageBackgroundBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Syncfusion's print pane (PrintPreview), put here in code: it takes its PrintManager in its constructor -->
+        <ContentControl x:Name="PreviewHost" Focusable="False" />
+
+        <!--
+            What to print, and which parts. The bar's DataContext is the PrintTabViewModel; the tick boxes' is the
+            ProductPrintManager, set in code once the pane is made, and the print pane keeps its own. Each tick box can be
+            cleared only while the other part is still ticked, so there's always something to print.
+            On the right, the set being read, or what the pages leave out, in the warning colour.
+        -->
+        <Border Grid.Row="1"
+                Background="{StaticResource CardBackgroundBrush}"
+                BorderBrush="{StaticResource CardBorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="16,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,28,0">
+                    <TextBlock Text="Print" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,0" />
+                    <syncfusion:ComboBoxAdv Width="240"
+                                            ItemsSource="{Binding Scopes}"
+                                            DisplayMemberPath="Label"
+                                            SelectedItem="{Binding SelectedScope, Mode=TwoWay}"
+                                            ToolTip="This product prints the product Products has open, unsaved edits included. A folder or all products print as they're saved, each on pages of its own after a contents page." />
+                </StackPanel>
+
+                <StackPanel x:Name="IncludeBar" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Include" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,0" />
+                    <CheckBox Content="Recipe"
+                              IsChecked="{Binding IncludeRecipe, Mode=TwoWay}"
+                              IsEnabled="{Binding IncludeCosting}"
+                              ToolTip="Each sub-assembly's ingredients and piece size, then the packaging."
+                              VerticalAlignment="Center"
+                              Margin="0,0,16,0" />
+                    <CheckBox Content="Costing"
+                              IsChecked="{Binding IncludeCosting, Mode=TwoWay}"
+                              IsEnabled="{Binding IncludeRecipe}"
+                              ToolTip="The Costing tab's breakdown, from the materials up to the selling price, with the current price and its markup. Without it the recipe shows no costs."
+                              VerticalAlignment="Center" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Margin="24,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Progress}"
+                               TextAlignment="Right"
+                               Foreground="{StaticResource MutedForegroundBrush}"
+                               Visibility="{Binding Progress, Converter={StaticResource NotNullToVisibilityConverter}}" />
+                    <TextBlock Text="{Binding Note}"
+                               TextAlignment="Right"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource WarningForegroundBrush}"
+                               Visibility="{Binding Note, Converter={StaticResource NotNullToVisibilityConverter}}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

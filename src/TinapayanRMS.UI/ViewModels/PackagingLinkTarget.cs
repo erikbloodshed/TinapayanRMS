@@ -1,3 +1,5 @@
+using TinapayanRMS.Domain.Entities;
+
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
@@ -15,4 +17,10 @@ public sealed record PackagingLinkTarget(int? ProductId, int? SubAssemblyId, str
     public static PackagingLinkTarget ForProduct(int productId, string name) => new(productId, null, name);
 
     public static PackagingLinkTarget ForSet(int subAssemblyId, string name) => new(null, subAssemblyId, name);
+
+    /// <summary>What a saved link links: a set's, or a product's, by the name it was read with.</summary>
+    public static PackagingLinkTarget From(PackagingLink link) =>
+        link.LinkedSubAssemblyId is { } setId
+            ? ForSet(setId, link.LinkedSubAssembly?.Name ?? string.Empty)
+            : ForProduct(link.LinkedProductId!.Value, link.LinkedProduct?.Name ?? string.Empty);
 }

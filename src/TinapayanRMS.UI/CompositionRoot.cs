@@ -62,6 +62,7 @@ public static class CompositionRoot
                 services.AddSingleton<ICostingDefaultsRepository, CostingDefaultsRepository>();
                 services.AddSingleton<IPackagingLinkRepository, PackagingLinkRepository>();
                 services.AddSingleton<IProductCloner, ProductCloner>();
+                services.AddSingleton<SavedProductReader>();
                 services.AddSingleton<IViewStateStore>(new JsonViewStateStore(JsonViewStateStore.DefaultFilePath));
 
                 services.AddSingleton(Log.Logger);
@@ -82,6 +83,7 @@ public static class CompositionRoot
                 services.AddSingleton<SubAssembliesViewModel>();
                 services.AddSingleton<ProductsViewModel>();
                 services.AddSingleton<ReportsViewModel>();
+                services.AddSingleton<PrintTabViewModel>();
                 services.AddSingleton<UnitsOfMeasureViewModel>();
                 services.AddSingleton<CategoriesViewModel>();
                 services.AddSingleton<ProductCategoriesViewModel>();

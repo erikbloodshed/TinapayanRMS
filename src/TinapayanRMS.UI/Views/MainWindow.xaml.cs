@@ -46,7 +46,8 @@ public partial class MainWindow : ChromelessWindow
         CategoriesViewModel categoriesViewModel,
         ProductCategoriesViewModel productCategoriesViewModel,
         SubAssemblyRolesViewModel rolesViewModel,
-        CostingDefaultsViewModel costingDefaultsViewModel)
+        CostingDefaultsViewModel costingDefaultsViewModel,
+        PrintTabViewModel printTabViewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
@@ -60,6 +61,9 @@ public partial class MainWindow : ChromelessWindow
         SubAssembliesTab.Content = new SubAssembliesView(subAssembliesViewModel);
         ProductsTab.Content = new ProductsView(productsViewModel);
         ReportsTab.Content = new ReportsView(reportsViewModel);
+        var printView = new ProductPrintView(printTabViewModel);
+        PrintTab.Content = printView;
+        Closed += (_, _) => printView.Dispose();
 
         RawMaterialsNavItem.Tag = RawMaterialsTab;
         SubAssembliesNavItem.Tag = SubAssembliesTab;
@@ -71,6 +75,10 @@ public partial class MainWindow : ChromelessWindow
         _loadCommands[ProductsTab] = productsViewModel.LoadCommand;
         _loadCommands[ReportsTab] = reportsViewModel.LoadCommand;
 
+        // Print's load prepares its pages again: This product as Products shows it now, so the tab follows the edits made
+        // there, and the product opened there, since it was last shown (the user's choice, 2026-09-27); a set as it's saved.
+        _loadCommands[PrintTab] = printTabViewModel.LoadCommand;
+
         _navigation = viewModel.Navigation;
         _historyScreens[RawMaterialsTab] = new(AppScreen.RawMaterials,
             () => rawMaterialsViewModel.SelectedRawMaterial?.Id, rawMaterialsViewModel.OpenRawMaterial, () => rawMaterialsViewModel.History.IsDirty);
@@ -79,6 +87,15 @@ public partial class MainWindow : ChromelessWindow
         _historyScreens[ProductsTab] = new(AppScreen.Products,
             () => productsViewModel.SelectedProduct?.Id, productsViewModel.OpenProduct, () => productsViewModel.History.IsDirty);
         _historyScreens[ReportsTab] = new(AppScreen.Reports, () => null, null, () => false);
+        _historyScreens[PrintTab] = new(AppScreen.Print, () => null, null, () => false);
+
+        // A Print on Products (the header's, its open form applied, or a folder's or the list's): the Print tab with that
+        // choice, which it prepares as it's shown.
+        productsViewModel.PrintRequests.Subscribe(scope =>
+        {
+            printTabViewModel.Pick(scope);
+            ShowTab(PrintTab);
+        });
 
         // A Used By tile on Sub-Assemblies or Raw Materials opens its product on Products. Picked before the tab shows, so a list
         // not loaded yet has the product waiting for the load that showing the tab starts.

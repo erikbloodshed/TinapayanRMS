@@ -9,6 +9,7 @@ public enum AppScreen
     SubAssemblies,
     Products,
     Reports,
+    Print,
 }
 
 /// <summary>
