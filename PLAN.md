@@ -26,6 +26,9 @@ Product recipe management & costing app for Tinapayan Festival Bakeshoppe. Track
 TinapayanRMS.slnx
 ├── Directory.Build.props             — shared compiler settings and target frameworks
 ├── Directory.Packages.props          — Central Package Management: every package version
+├── README.md                         — what the app is, and where the manual and these guides are
+├── docs/
+│   └── user-manual.md                 — the user manual, for the shop's staff: every screen, and how costs are worked out
 ├── src/
 │   ├── TinapayanRMS.Domain            — entities and enums (no external deps)
 │   │   ├── Entities/                  — the persisted domain types
@@ -967,6 +970,7 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 | 2026-09-26 | The two decisions left open by the tree's menus, settled by the user: New Product Here on a Production folder files the product there, and the header shows where an unsaved new product will go ("Goes in Production" / "Goes in Research and Development", `NewProductTag`); Rename and the moves on the product showing save only what they change and leave its other edits unsaved | Done |
 | 2026-09-27 | The Raw Materials list becomes a tree of folders, at the user's request, with everything the Products tree has: Ingredients and Packaging, a folder per category of each, drag or Move To another category of the type (`IRawMaterialRepository.MoveAsync`) with Undo on a notice, Rename (`RenameAsync`), Delete, New … Here, New / Rename / Delete Category (Delete greyed while the category holds materials), Expand All and Collapse All, several picked at once, F2 / Del / Enter, and the open folders remembered. `TreeMenuItem`, `Controls/TreeContextMenu` and `TreeRows` are shared with the Products tree; no schema change | Done |
 | 2026-09-27 | Print on the Products screen, at the user's request: the header's Print opens Syncfusion's print pane (`PrintPreview`, driven by `Printing/ProductPrintManager`) over the product's recipe and costing as the screen shows them, an open form applied first, with Recipe and Costing tick boxes and an unsaved-changes note in the footer; pages built in code and paginated with tables continued under their headings (`Printing/`); the window themed before the pane goes in (the other order crashes), jobs printed on the printer's own ticket (Syncfusion's leaves Microsoft Print to PDF's files empty) and failures reported; checked in the app, printing to PDF; later the same day a main Print tab in place of the dialog, following Products each time it's shown, the pane fitted to 14 px text (`PrintPaneFit`) and kept at its zoom through a re-layout; then a folder or all products printed as saved, with a contents page and a page per product (`PrintTabViewModel`, `SavedProductReader`, which Reports now prices through too); no schema change | Done |
+| 2026-09-27 | A user manual, at the user's request (the repo had no documentation of how the app works): `docs/user-manual.md`, for the shop's owner and staff, text only (no screenshots, the user's choice), covering the key ideas, every screen and Settings tab, printing, reports, how costs are worked out with a worked example, how-tos and troubleshooting; a root `README.md` pointing to it; a Conventions rule to keep it current | Done |
 
 ### Open items (for later phases)
 
@@ -993,6 +997,7 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 
 ## Conventions
 
+- **The user manual follows the app** (2026-09-27). `docs/user-manual.md` is written for the shop's staff: current behaviour only, labels in bold exactly as the screen shows them, amounts without a currency symbol, and no code names. A change users can see (a screen, button, field, menu item, rule or cost formula) updates it in the same change. PLAN.md keeps the history; the manual never mentions what used to be.
 - The layered architecture is fixed: `Domain` has no external dependencies, business and costing rules live in `ApplicationCore`, and EF Core and other I/O stay in `Infrastructure`.
 - The MVVM toolkit is **ReactiveUI**, not CommunityToolkit.Mvvm. Use `ReactiveObject`, `ReactiveCommand`, `WhenAnyValue`, etc.
 - **Every file goes in the folder for its kind, and the folder is its namespace** (see Solution Structure). A new View goes in `Views/` with its ViewModel in `ViewModels/`, a new repository in `Repositories/` with its interface in `ApplicationCore/Interfaces/`, a new rule in `Rules/` with its test in `tests/…/Rules/`, and so on. Nothing goes at a project root except app-startup plumbing.
