@@ -763,6 +763,61 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task Changing_a_link_relinks_the_section_keeping_its_piece_size_and_the_add_ins_the_new_recipe_lacks()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.2m);
+        var subAssemblies = new SubAssemblyRepository(CreateDbContextFactory());
+        var houseId = await subAssemblies.SaveStandaloneAsync(new SubAssembly { Name = "House Dough", RoleId = roleId }, [(flourId, 1000m)], Cancellation);
+        var richId = await subAssemblies.SaveStandaloneAsync(
+            new SubAssembly { Name = "Rich Dough", RoleId = roleId }, [(flourId, 1000m), (butterId, 200m)], Cancellation);
+        var productId = await AddProductAsync("Cream Loaf");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [], [new LinkedUsageDraft(houseId, UsageAuthoredField.WeightPerPiece, 30m) { AddIns = [(butterId, 100m), (ubeId, 50m)], ShrinkagePercent = 5m }]));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+        await viewModel.EditUsageCommand.Execute(viewModel.UsageEdits.Single());
+
+        await viewModel.StartChangingLinkCommand.Execute();
+
+        viewModel.IsChangingLink.Should().BeTrue();
+        viewModel.IsShowingLinkBadge.Should().BeFalse("the picker takes the badge's place");
+        viewModel.ChangeLinkOptions.Select(o => o.SubAssembly!.Id).Should().Equal([richId], "House Dough is the one linked already");
+
+        viewModel.ChangeLinkTarget = viewModel.ChangeLinkOptions.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Single().SubAssemblyId == richId, () => $"linked={viewModel.UsageEdits.Single().SubAssemblyId}");
+
+        var relinked = viewModel.UsageEdits.Single();
+        relinked.IsLinked.Should().BeTrue();
+        relinked.LinkedName.Should().Be("Rich Dough");
+        (relinked.AuthoredField, relinked.AuthoredValue, relinked.ShrinkagePercent).Should().Be((UsageAuthoredField.WeightPerPiece, 30m, 5m));
+        relinked.AddIns.Select(a => a.Ingredient.Id).Should().Equal([ubeId], "Rich Dough has butter already, so that add-in goes");
+        viewModel.SuccessMessage.Should().Be("Now linked to Rich Dough. Butter left the add-ins: Rich Dough already has it.");
+        viewModel.EditingUsage.Should().BeSameAs(relinked, "its tab's form follows it");
+        viewModel.IsChangingLink.Should().BeFalse();
+        viewModel.IsShowingLinkBadge.Should().BeTrue();
+
+        // One step back is the old link, add-ins and all.
+        viewModel.TryUndo().Should().BeTrue();
+        viewModel.UsageEdits.Single().SubAssemblyId.Should().Be(houseId);
+        viewModel.UsageEdits.Single().AddIns.Should().HaveCount(2);
+        viewModel.TryRedo().Should().BeTrue();
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        var usage = await dbContext.ProductSubAssemblyUsages.AsNoTracking().SingleAsync(u => u.ProductId == productId, Cancellation);
+        usage.SubAssemblyId.Should().Be(richId);
+        usage.AuthoredValue.Should().Be(30m);
+        (await dbContext.SubAssemblies.CountAsync(s => s.Id == houseId, Cancellation)).Should().Be(1, "the old one stays on the Sub-Assemblies screen");
+    }
+
+    [Fact]
     public async Task Unlink_makes_a_linked_section_the_products_own_in_a_role_that_isnt_product_owned()
     {
         var roleId = await AddRoleAsync("Dough");

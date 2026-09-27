@@ -87,6 +87,12 @@ public partial class App : Application
         EventManager.RegisterClassHandler(
             typeof(AddNewRowControl), FrameworkElement.LoadedEvent, new RoutedEventHandler(HideAddNewRowText));
 
+        // Keyboard focus in a grid sits on a cell: no dotted rectangle round the whole grid, and Tab lands on a row.
+        GridKeyboardFocus.Register();
+
+        // Every grid's header row tall enough for its text at the app's font size.
+        GridHeaderHeight.Register();
+
         // Ctrl+Z and Ctrl+Y for the screen the cursor is on. It goes here, on every window, because Syncfusion's
         // number boxes take both keys for their own per-character undo and mark them handled on the way down.
         UndoShortcuts.Register();

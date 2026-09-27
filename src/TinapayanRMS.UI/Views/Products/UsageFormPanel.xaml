@@ -2,7 +2,9 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
-             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
+             xmlns:skinManager="clr-namespace:Syncfusion.SfSkinManager;assembly=Syncfusion.SfSkinManager.WPF"
+             xmlns:sfTheme="clr-namespace:Syncfusion.Themes.Windows11Light.WPF;assembly=Syncfusion.Themes.Windows11Light.WPF">
     <!--
         Add a sub-assembly to the recipe: a new one of the product's own, a link to an existing one
         (another product's, or a standalone one from the Sub-Assemblies screen), or a copy of one — which of the three
@@ -150,12 +152,56 @@
                 </Border>
                 <!-- A linked one's badge is a link: it opens the sub-assembly on the Sub-Assemblies screen (MainWindow subscribes to SubAssemblyOpenRequests) -->
                 <Button Style="{StaticResource LinkedBadgeLinkStyle}"
-                        Margin="0,0,16,8"
+                        Margin="0,0,4,8"
                         Content="{Binding EditingUsage.LinkedFromText}"
                         Command="{Binding OpenSubAssemblyCommand}"
                         CommandParameter="{Binding EditingUsage.SubAssemblyId}"
                         ToolTip="It's kept on the Sub-Assemblies screen, and every product linking it uses its lines. Change them here or there: Save here writes them there. Click to open it there."
-                        Visibility="{Binding EditingUsage.IsLinked, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}" />
+                        Visibility="{Binding IsShowingLinkBadge, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <!--
+                    Edit beside the badge: links another sub-assembly in its place, keeping this product's piece size and
+                    add-ins. An icon only, in the theme's glyph-button style as the window's own icon buttons are
+                    (MainWindow), so it hovers as they do; the name lives in ToolTip and AutomationProperties.
+                -->
+                <Button Width="24"
+                        Height="24"
+                        Margin="0,0,16,8"
+                        VerticalAlignment="Center"
+                        Style="{DynamicResource {skinManager:ThemeKey Key=WPFGlyphButtonStyle, Theme={x:Type sfTheme:Windows11LightSkinHelper}}}"
+                        Command="{Binding StartChangingLinkCommand}"
+                        ToolTip="Link another sub-assembly in its place, keeping this product's piece size and add-ins. The one linked now stays on the Sub-Assemblies screen."
+                        AutomationProperties.Name="Change link"
+                        Visibility="{Binding IsShowingLinkBadge, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="&#xE70F;" Style="{StaticResource IconGlyphStyle}" />
+                </Button>
+
+                <!--
+                    The badge's place while its link is changed: what it could link instead, searchable as the add form's
+                    source picker is (IsEditable and AutoCompleteMode spelled out for the same reason), and a cancel
+                    glyph that puts the badge back. Picking one relinks the section.
+                -->
+                <syncfusion:ComboBoxAdv Width="360"
+                                        Margin="0,0,4,8"
+                                        VerticalAlignment="Center"
+                                        ItemsSource="{Binding ChangeLinkOptions}"
+                                        DisplayMemberPath="DisplayName"
+                                        IsEditable="True"
+                                        AutoCompleteMode="Suggest"
+                                        DefaultText="Link instead…"
+                                        SelectedItem="{Binding ChangeLinkTarget, Mode=TwoWay}"
+                                        ToolTip="A sub-assembly from the Sub-Assemblies screen to link in this one's place"
+                                        Visibility="{Binding IsChangingLink, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <Button Width="24"
+                        Height="24"
+                        Margin="0,0,16,8"
+                        VerticalAlignment="Center"
+                        Style="{DynamicResource {skinManager:ThemeKey Key=WPFGlyphButtonStyle, Theme={x:Type sfTheme:Windows11LightSkinHelper}}}"
+                        Command="{Binding CancelChangingLinkCommand}"
+                        ToolTip="Keep the link as it is"
+                        AutomationProperties.Name="Cancel changing link"
+                        Visibility="{Binding IsChangingLink, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="&#xE711;" Style="{StaticResource IconGlyphStyle}" />
+                </Button>
             </StackPanel>
 
             <Grid Grid.Column="1" Margin="0,0,0,8" VerticalAlignment="Center" Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}">

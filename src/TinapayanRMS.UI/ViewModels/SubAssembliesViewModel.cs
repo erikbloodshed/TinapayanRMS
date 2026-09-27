@@ -7,6 +7,7 @@ using DynamicData.Binding;
 using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
@@ -153,7 +154,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     }
 
     private string _headerTitle = "New sub-assembly";
-    /// <summary>The saved name of the sub-assembly the form shows, or "New sub-assembly".</summary>
+    /// <summary>The saved name of the sub-assembly the form shows, "New sub-assembly", or "Copy of …" for a copy not yet saved.</summary>
     public string HeaderTitle
     {
         get => _headerTitle;
@@ -229,6 +230,9 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
+
+    /// <summary>Starts a new sub-assembly from the one the form shows (<see cref="CopyForm"/>), saved by Save.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> CopyCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
@@ -428,6 +432,8 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         });
 
         NewCommand = ReactiveCommand.Create(ClearForm);
+
+        CopyCommand = ReactiveCommand.Create(CopyForm, this.WhenAnyValue(x => x.SelectedRow).Select(row => row is not null));
 
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
 
@@ -652,6 +658,25 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
         // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
         History.MarkClean();
+    }
+
+    /// <summary>
+    /// A new, unsaved sub-assembly holding what the form shows, edits not yet saved included: the same role and lines,
+    /// named "… Copy" (or "… Copy 2" and on, when that's taken), for Save to add beside the original. The original is
+    /// left as it was last saved. Like New, it's a fresh form with nothing to undo, measured against a blank one, so
+    /// Save is offered straight away.
+    /// </summary>
+    private void CopyForm()
+    {
+        var source = CaptureSnapshot();
+        var sourceName = HeaderTitle;
+        var name = SubAssemblyRules.UniqueStandaloneName($"{source.Name.Trim()} Copy", [.. Rows.Select(r => r.Name)]);
+
+        ClearForm();
+        RestoreSnapshot(source with { EditingId = 0, Name = name });
+        HeaderTitle = $"Copy of {sourceName}";
+        ShowUsedBy([]);
+        History.RefreshDirty();
     }
 
     /// <summary>

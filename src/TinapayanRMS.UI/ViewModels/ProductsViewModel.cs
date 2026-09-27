@@ -1001,6 +1001,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             this.RaisePropertyChanged(nameof(IsEditingLinkedUsage));
             this.RaisePropertyChanged(nameof(IsEditingOwnedUsage));
             this.RaisePropertyChanged(nameof(IsFormLinesEditable));
+
+            // A link being changed belongs to the section it was started on.
+            IsChangingLink = false;
+            this.RaisePropertyChanged(nameof(IsShowingLinkBadge));
         }
     }
 
@@ -1017,6 +1021,38 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// button would fall back to showing.
     /// </summary>
     public bool IsEditingLinkedUsage => EditingUsage?.IsLinked == true;
+
+    private bool _isChangingLink;
+    /// <summary>
+    /// The badge's Edit was pressed: a picker of the sub-assemblies it could link instead (ChangeLinkOptions) stands in
+    /// for the badge until one is picked or the change is cancelled.
+    /// </summary>
+    public bool IsChangingLink
+    {
+        get => _isChangingLink;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _isChangingLink, value);
+            this.RaisePropertyChanged(nameof(IsShowingLinkBadge));
+        }
+    }
+
+    /// <summary>A linked section's badge and its Edit show: the form edits one, and its link isn't being changed.</summary>
+    public bool IsShowingLinkBadge => IsEditingLinkedUsage && !IsChangingLink;
+
+    /// <summary>
+    /// What a linked section can link instead: the Sub-Assemblies screen's recipes the recipe doesn't use yet, whatever
+    /// their role. Packaging goes through the Packaging tab, and a product's own sub-assembly is never linked.
+    /// </summary>
+    public ObservableCollection<LinkableSubAssemblyOption> ChangeLinkOptions { get; } = [];
+
+    private LinkableSubAssemblyOption? _changeLinkTarget;
+    /// <summary>The sub-assembly picked to link instead: picking it relinks the section (ChangeLinkAsync).</summary>
+    public LinkableSubAssemblyOption? ChangeLinkTarget
+    {
+        get => _changeLinkTarget;
+        set => this.RaiseAndSetIfChanged(ref _changeLinkTarget, value);
+    }
 
     /// <summary>
     /// The form edits one of the product's own that isn't already on its way to the Sub-Assemblies screen, so Move to
@@ -1428,6 +1464,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>Unlink on a linked section: it becomes a copy of the product's own, in whatever role, and the link goes with Save.</summary>
     public ReactiveCommand<ProductUsageEdit, RxVoid> UnlinkCommand { get; }
 
+    /// <summary>The linked badge's Edit: shows the picker of what the section could link instead (IsChangingLink).</summary>
+    public ReactiveCommand<RxVoid, RxVoid> StartChangingLinkCommand { get; }
+
+    /// <summary>Puts the badge back without changing the link.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> CancelChangingLinkCommand { get; }
+
     /// <summary>
     /// Move to Sub-Assemblies on one of the product's own: Save puts it on the Sub-Assemblies screen, keeping its name and
     /// lines, and links it. Unlink the other way round.
@@ -1672,6 +1714,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .Skip(1)
             .Where(_ => !IsBusyApplying && IsUsageFormOpen && IsAddingUsage)
             .Select(source => Observable.FromAsync(cancellationToken => LoadUsageSourceAsync(source, cancellationToken)))
+            .Switch()
+            .Subscribe();
+
+        // A sub-assembly picked to link instead relinks the section once its lines are in; a later pick overtakes it.
+        this.WhenAnyValue(x => x.ChangeLinkTarget)
+            .Skip(1)
+            .Where(target => target is not null && IsChangingLink && !IsBusyApplying)
+            .Select(target => Observable.FromAsync(cancellationToken => ChangeLinkAsync(target!, cancellationToken)))
             .Switch()
             .Subscribe();
 
@@ -2020,6 +2070,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // The same copy, but the product's own whatever its role: Save keeps it with the product, off the
         // Sub-Assemblies screen, and the one it was linked to stays there as it is.
         UnlinkCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => AsUndoStep(() => ReplaceUsage(usage, CopyOfLinked(usage, isOwn: true))));
+
+        StartChangingLinkCommand = ReactiveCommand.Create(StartChangingLink, this.WhenAnyValue(x => x.IsEditingLinkedUsage));
+        CancelChangingLinkCommand = ReactiveCommand.Create(() => { IsChangingLink = false; });
 
         // Anything typed into its form goes in first, so what moves is what shows; a form a rule refuses stays as it
         // is, with the message. It's still edited here until Save, which moves it and links it.
@@ -3231,6 +3284,88 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         EditingUsageName = null;
         EditingUsageSource = null;
         SetPieceSize(UsageAuthoredField.WeightPerPiece, 0m, 0m);
+    }
+
+    /// <summary>The badge's Edit: the picker, holding what the section could link instead, in the badge's place.</summary>
+    private void StartChangingLink()
+    {
+        var usedIds = UsageEdits.Select(u => u.SubAssemblyId).ToHashSet();
+        ChangeLinkOptions.MergeFrom(
+            [.. _linkable
+                .Where(s => s.OwnerProductId is null && s.Role?.IsPackaging != true && !usedIds.Contains(s.Id))
+                .Select(s => new LinkableSubAssemblyOption(s))],
+            o => o.Key);
+
+        if (ChangeLinkOptions.Count == 0)
+        {
+            ErrorMessage = "There's no other sub-assembly to link: every one on the Sub-Assemblies screen is in this recipe already.";
+            return;
+        }
+
+        ErrorMessage = null;
+        ChangeLinkTarget = null;
+        IsChangingLink = true;
+    }
+
+    /// <summary>
+    /// Links <paramref name="target"/> in place of the linked section the form shows, as one undo step, keeping what's
+    /// this product's: the piece size and shrinkage as the form has them, and the add-ins, less any the new recipe
+    /// already has (a toast names them). Lines changed here but not saved go with the old link. The section keeps its
+    /// tab, which takes the new one's role and name; Save writes the new link.
+    /// </summary>
+    private async Task ChangeLinkAsync(LinkableSubAssemblyOption target, CancellationToken cancellationToken)
+    {
+        if (EditingUsage is not { IsLinked: true } linked || target.SubAssembly is not { } subAssembly)
+        {
+            return;
+        }
+
+        var saved = await _subAssemblyLineRepository.GetForSubAssembliesAsync([subAssembly.Id], cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // The form moved on while the lines loaded: another section, or the change was cancelled.
+        if (!IsChangingLink || !ReferenceEquals(EditingUsage, linked) || !ReferenceEquals(ChangeLinkTarget, target))
+        {
+            return;
+        }
+
+        var ingredientsById = Ingredients.ToDictionary(m => m.Id);
+        IReadOnlyList<SubAssemblyLineEdit> lines =
+            [.. saved.Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
+        var role = Roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role;
+        try
+        {
+            ErrorMessage = null;
+            if (lines.Count == 0)
+            {
+                throw new InvalidOperationException($"{subAssembly.Name} has no ingredients yet. Add them on the Sub-Assemblies screen first.");
+            }
+
+            var lineIngredientIds = lines.Select(l => l.Ingredient.Id).ToHashSet();
+            var addIns = IngredientLineRow.CompleteLines(FormAddIns, subAssembly.Name);
+            var dropped = addIns.Where(a => lineIngredientIds.Contains(a.Ingredient.Id)).Select(a => a.Ingredient.Name).ToList();
+            var replacement = new ProductUsageEdit(
+                subAssembly.Id,
+                role,
+                lines,
+                _usageAuthoredField,
+                CurrentAuthoredValue(),
+                CurrentShrinkagePercent(),
+                subAssembly.Name,
+                [.. addIns.Where(a => !lineIngredientIds.Contains(a.Ingredient.Id)).Select(a => new SubAssemblyLineEdit(a.Ingredient, a.Grams))],
+                SectionLabelOf(subAssembly.Name, role));
+            EnsureSectionsDistinct(replacement, linked);
+
+            AsUndoStep(() => ReplaceUsage(linked, replacement));
+            if (dropped.Count > 0)
+            {
+                SuccessMessage = $"Now linked to {subAssembly.Name}. {string.Join(", ", dropped)} left the add-ins: {subAssembly.Name} already has {(dropped.Count == 1 ? "it" : "them")}.";
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
     }
 
     /// <summary>

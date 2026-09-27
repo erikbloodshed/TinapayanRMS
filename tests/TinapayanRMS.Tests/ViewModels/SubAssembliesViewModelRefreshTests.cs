@@ -204,6 +204,112 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.UsedByText.Should().Contain("Add Sub-Assembly");
     }
 
+    [Fact]
+    public async Task Copy_starts_a_new_one_with_the_same_role_and_lines_and_Save_adds_it_beside_the_original()
+    {
+        await AddRoleAsync("Dough");
+        var glazeRoleId = await AddRoleAsync("Glaze", sortOrder: 2);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
+        var repository = new SubAssemblyRepository(CreateDbContextFactory());
+        var originalId = await repository.SaveStandaloneAsync(
+            new SubAssembly { Name = "House Glaze", RoleId = glazeRoleId },
+            [new RecipeLine(flourId, 100m, IsFormulaBase: true), (sugarId, 50m)],
+            Cancellation);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedRow = viewModel.Rows.Single();
+        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
+
+        await viewModel.CopyCommand.Execute();
+
+        viewModel.SelectedRow.Should().BeNull("the copy isn't in the list until it's saved");
+        viewModel.HeaderTitle.Should().Be("Copy of House Glaze");
+        viewModel.EditingName.Should().Be("House Glaze Copy");
+        viewModel.EditingRole!.Name.Should().Be("Glaze", "the copy keeps the original's role, not a new form's first one");
+        viewModel.Lines.Select(l => (l.IngredientId, l.Grams, l.IsFormulaBase)).Should().Equal((flourId, 100m, true), (sugarId, 50m, false));
+        viewModel.BatchCost.Should().Be(9.5m);
+        viewModel.UsedBy.Should().BeEmpty();
+        viewModel.History.IsDirty.Should().BeTrue("Save is offered straight away");
+        viewModel.History.CanUndo.Should().BeFalse();
+
+        viewModel.EditingName = "Ube Glaze";
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.Rows.Select(r => r.Name).Should().Equal("House Glaze", "Ube Glaze");
+        viewModel.SelectedRow!.Name.Should().Be("Ube Glaze");
+        viewModel.SelectedRow.Id.Should().NotBe(originalId);
+        await using var dbContext = CreateDbContext();
+        var lines = await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == originalId).CountAsync(Cancellation);
+        lines.Should().Be(2, "the original is left as it was");
+        (await dbContext.SubAssemblyLines.CountAsync(l => l.SubAssemblyId == viewModel.SelectedRow.Id, Cancellation)).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task A_copys_name_is_one_no_other_sub_assembly_has()
+    {
+        var roleId = await AddRoleAsync("Glaze");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var repository = new SubAssemblyRepository(CreateDbContextFactory());
+        await repository.SaveStandaloneAsync(new SubAssembly { Name = "Glaze", RoleId = roleId }, [(sugarId, 100m)], Cancellation);
+        await repository.SaveStandaloneAsync(new SubAssembly { Name = "Glaze Copy", RoleId = roleId }, [(sugarId, 100m)], Cancellation);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedRow = viewModel.Rows.Single(r => r.Name == "Glaze");
+        await WaitUntilSettledAsync(() => viewModel.EditingName == "Glaze" && viewModel.Lines.Count == 1, () => $"name={viewModel.EditingName}");
+
+        await viewModel.CopyCommand.Execute();
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.Rows.Select(r => r.Name).Should().Equal("Glaze", "Glaze Copy", "Glaze Copy 2");
+    }
+
+    [Fact]
+    public async Task Copying_a_packaging_set_copies_its_materials()
+    {
+        await AddRoleAsync("Glaze");
+        var packagingRoleId = await AddRoleAsync("Packaging", sortOrder: 2, isPackaging: true);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        int boxId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var box = new RawMaterial
+            {
+                Type = RawMaterialType.Packaging,
+                Name = "Gift Box",
+                Category = new RawMaterialCategory { Name = "Boxes" },
+                BaseUnitId = pieceId,
+                CostPerBaseUnit = 30m,
+                BufferedCostPerBaseUnit = 33m,
+            };
+            dbContext.RawMaterials.Add(box);
+            await dbContext.SaveChangesAsync(Cancellation);
+            boxId = box.Id;
+        }
+
+        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Gift Set", RoleId = packagingRoleId }, [(boxId, null, 2m)], Cancellation);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedRow = viewModel.Rows.Single();
+        await WaitUntilSettledAsync(() => viewModel.PackagingLines.Count == 1, () => $"packaging lines={viewModel.PackagingLines.Count}");
+
+        await viewModel.CopyCommand.Execute();
+
+        viewModel.IsPackaging.Should().BeTrue();
+        viewModel.EditingName.Should().Be("Gift Set Copy");
+        viewModel.PackagingLines.Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m);
+        viewModel.SetCost.Should().Be(66m);
+        viewModel.UsedByText.Should().Contain("Add Sub-Assembly", "a set's own hint, for nothing uses the copy yet");
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.Rows.Select(r => r.Name).Should().Equal("Gift Set", "Gift Set Copy");
+    }
+
     private SubAssembliesViewModel CreateViewModel()
     {
         ReactiveUIBootstrapper.EnsureInitialized();
