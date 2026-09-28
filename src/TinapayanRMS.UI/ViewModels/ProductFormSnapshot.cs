@@ -71,9 +71,6 @@ public sealed record ProductFormSnapshot
     public required bool IsFormEditingLines { get; init; }
     public required bool IsFormPickingSource { get; init; }
 
-    /// <summary>Restored, but left out of <see cref="ShowsSameAs"/>: opening the add-ins table isn't an edit.</summary>
-    public required bool IsFormAddInsExpanded { get; init; }
-
     /// <summary>Which section the form is editing, as an index into <see cref="Usages"/>; null while adding.</summary>
     public required int? EditingUsageIndex { get; init; }
     public required int? UsageRoleId { get; init; }
@@ -153,7 +150,6 @@ public sealed record ProductFormSnapshot
         UsageMode = form.UsageMode,
         IsFormEditingLines = form.IsFormEditingLines,
         IsFormPickingSource = form.IsFormPickingSource,
-        IsFormAddInsExpanded = form.IsFormAddInsExpanded,
         EditingUsageIndex = form.EditingUsageIndex,
         UsageRoleId = form.UsageRoleId,
         UsageName = form.UsageName,

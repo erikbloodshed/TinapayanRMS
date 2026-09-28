@@ -7,18 +7,19 @@
         What's typed in about the product itself, under the header's figures: its name, its category, how many pieces
         make one sellable unit, and the price the shop charges now. One row, each label on the left of its field
         (FormLabelStyle; 2026-09-24, at the user's request, though Raw Materials' header keeps its labels above).
-        Save writes them with the rest of the form.
+        Save writes them with the rest of the form. Quantity Required's box takes half the share it had, a number of a
+        few digits, and the half went to Product Name's (2026-09-28, at the user's request), so the other two keep theirs.
     -->
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="2*" />
+            <ColumnDefinition Width="2.5*" />
             <ColumnDefinition Width="16" />
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="16" />
             <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="0.5*" />
             <ColumnDefinition Width="16" />
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />

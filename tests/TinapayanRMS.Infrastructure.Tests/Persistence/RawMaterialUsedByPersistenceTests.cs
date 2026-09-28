@@ -1,0 +1,194 @@
+using AwesomeAssertions;
+using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Infrastructure.Tests.Fixtures;
+using TinapayanRMS.Tests.Common.Fixtures;
+
+namespace TinapayanRMS.Infrastructure.Tests.Persistence;
+
+/// <summary>
+/// Raw Materials' Used By (IRawMaterialRepository.GetUsedByAsync): every product a material's cost goes into, through a
+/// recipe or packaging, directly or through the made and linked ingredients, packaging sets and packaging links between.
+/// </summary>
+[Collection(DatabaseCollection.Name)]
+public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
+{
+    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
+
+    private PackagingLineRepository CreatePackagingLineRepository() => new(CreateDbContextFactory());
+
+    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory(), CreatePackagingLineRepository());
+
+    private async Task<IReadOnlyList<string>> UsedByNamesAsync(int rawMaterialId) =>
+        [.. (await CreateRepository().GetUsedByAsync(rawMaterialId, Cancellation)).Select(p => p.Name)];
+
+    /// <summary>A made ingredient whose BOM is <paramref name="bomLines"/>. Costs aren't cascaded: Used By doesn't read them.</summary>
+    private async Task<int> AddMadeIngredientAsync(string name, IReadOnlyList<(int ComponentIngredientId, decimal Grams)> bomLines)
+    {
+        await using var dbContext = CreateDbContext();
+        var category = await dbContext.RawMaterialCategories.FirstAsync(c => c.Name == "Ingredients", Cancellation);
+        var made = new RawMaterial { Name = name, Category = category, Source = RawMaterialSource.Made, WeightLossPercent = 0m };
+        dbContext.RawMaterials.Add(made);
+        await dbContext.SaveChangesAsync(Cancellation);
+        dbContext.IngredientBomLines.AddRange(bomLines.Select(l => new IngredientBomLine
+        {
+            IngredientId = made.Id,
+            ComponentIngredientId = l.ComponentIngredientId,
+            Grams = l.Grams,
+        }));
+        await dbContext.SaveChangesAsync(Cancellation);
+        return made.Id;
+    }
+
+    /// <summary>A linked ingredient taking a share of <paramref name="linkedToId"/>'s weight and cost.</summary>
+    private async Task<int> AddLinkedIngredientAsync(string name, int linkedToId)
+    {
+        await using var dbContext = CreateDbContext();
+        var category = await dbContext.RawMaterialCategories.FirstAsync(c => c.Name == "Ingredients", Cancellation);
+        var linked = new RawMaterial
+        {
+            Name = name,
+            Category = category,
+            Source = RawMaterialSource.Linked,
+            LinkedToId = linkedToId,
+            WeightSharePercent = 30m,
+            CostSharePercent = 70m,
+        };
+        dbContext.RawMaterials.Add(linked);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return linked.Id;
+    }
+
+    private async Task<int> AddBoxAsync(string name)
+    {
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        var categoryId = await AddPackagingCategoryAsync($"{name} Boxes");
+
+        await using var dbContext = CreateDbContext();
+        var box = new RawMaterial { Type = RawMaterialType.Packaging, Name = name, CategoryId = categoryId, BaseUnitId = pieceId };
+        dbContext.RawMaterials.Add(box);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return box.Id;
+    }
+
+    private Task SetOwnPackagingAsync(int productId, int boxId) =>
+        CreatePackagingLineRepository().SetLinesAsync(productId, [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
+
+    [Fact]
+    public async Task An_ingredient_is_used_by_every_product_whose_sub_assemblies_have_it_each_once_by_name()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
+        var flourId = await AddIngredientAsync("Flour");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var (pandesalId, _) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [(flourId, 1000m)]);
+        var ensaymadaId = await AddProductAsync("Ensaymada");
+        await SaveRecipeAsync(ensaymadaId, new RecipeDraft(
+            [
+                new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m), (sugarId, 100m)], UsageAuthoredField.WeightPerPiece, 10m),
+                new NewSubAssemblyDraft(fillingRoleId, [(flourId, 50m)], UsageAuthoredField.WeightPerPiece, 5m),
+            ],
+            []));
+        await using (var dbContext = CreateDbContext())
+        {
+            var breads = new ProductCategory { Name = "Breads" };
+            dbContext.ProductCategories.Add(breads);
+            await dbContext.SaveChangesAsync(Cancellation);
+            await dbContext.Products.Where(p => p.Id == pandesalId)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.CategoryId, breads.Id), Cancellation);
+        }
+
+        (await CreateRepository().GetUsedByAsync(flourId, Cancellation)).Should().Equal(
+            new LinkingProduct(ensaymadaId, "Ensaymada", null),
+            new LinkingProduct(pandesalId, "Pandesal", "Breads"));
+        (await UsedByNamesAsync(sugarId)).Should().Equal("Ensaymada");
+    }
+
+    [Fact]
+    public async Task An_unused_material_is_used_by_nothing()
+    {
+        var flourId = await AddIngredientAsync("Flour");
+        var boxId = await AddBoxAsync("Box");
+        await AddProductAsync("Pandesal");
+
+        (await UsedByNamesAsync(flourId)).Should().BeEmpty();
+        (await UsedByNamesAsync(boxId)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task An_ingredient_is_used_through_the_made_and_linked_ingredients_it_goes_into_however_deep()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling");
+        var eggId = await AddIngredientAsync("Egg");
+        var milkId = await AddIngredientAsync("Milk");
+        var yolkId = await AddLinkedIngredientAsync("Egg Yolk", eggId);
+        var custardBaseId = await AddMadeIngredientAsync("Custard Base", [(yolkId, 100m), (milkId, 400m)]);
+        var custardId = await AddMadeIngredientAsync("Custard", [(custardBaseId, 500m)]);
+        await AddProductWithSubAssemblyAsync("Custard Cake", fillingRoleId, [(custardId, 300m)]);
+        await AddProductWithSubAssemblyAsync("Leche Flan", fillingRoleId, [(eggId, 200m)]);
+
+        (await UsedByNamesAsync(eggId)).Should().Equal("Custard Cake", "Leche Flan");
+        (await UsedByNamesAsync(milkId)).Should().Equal("Custard Cake");
+        (await UsedByNamesAsync(custardId)).Should().Equal("Custard Cake");
+    }
+
+    [Fact]
+    public async Task An_add_in_on_a_linked_usage_counts_for_the_product_that_added_it_only()
+    {
+        var glazeRoleId = await AddRoleAsync("Glaze");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var ubeId = await AddIngredientAsync("Ube Flavour");
+        var (_, glazeId) = await AddProductWithSubAssemblyAsync("Cream Loaf", glazeRoleId, [(sugarId, 100m)]);
+        var ubeLoafId = await AddProductAsync("Ube Loaf");
+        await SaveRecipeAsync(ubeLoafId, new RecipeDraft(
+            [],
+            [new LinkedUsageDraft(glazeId, UsageAuthoredField.WeightPerPiece, 5m) { AddIns = [(ubeId, 20m)] }]));
+
+        (await UsedByNamesAsync(ubeId)).Should().Equal("Ube Loaf");
+        (await UsedByNamesAsync(sugarId)).Should().Equal("Cream Loaf", "Ube Loaf");
+    }
+
+    [Fact]
+    public async Task Packaging_is_used_through_own_lines_a_set_and_every_product_linking_them_down_the_chain()
+    {
+        var boxId = await AddBoxAsync("Box");
+        var ribbonId = await AddBoxAsync("Ribbon");
+        var setRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var giftSetId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Gift Set", RoleId = setRoleId }, [(ribbonId, null, 1m)], Cancellation);
+
+        var bigId = await AddProductAsync("Big");
+        var smallId = await AddProductAsync("Small");
+        var miniId = await AddProductAsync("Mini");
+        var giftId = await AddProductAsync("Gift");
+        var giftMiniId = await AddProductAsync("Gift Mini");
+        await SetOwnPackagingAsync(bigId, boxId);
+        var links = CreatePackagingLinkRepository();
+        await links.SetLinkAsync(smallId, bigId, Cancellation);        // Small -> Big
+        await links.SetLinkAsync(miniId, smallId, Cancellation);       // Mini -> Small -> Big
+        await links.SetSubAssemblyLinkAsync(giftId, giftSetId, Cancellation);
+        await links.SetLinkAsync(giftMiniId, giftId, Cancellation);    // Gift Mini -> Gift -> Gift Set
+
+        (await UsedByNamesAsync(boxId)).Should().Equal("Big", "Mini", "Small");
+        (await UsedByNamesAsync(ribbonId)).Should().Equal("Gift", "Gift Mini");
+    }
+
+    [Fact]
+    public async Task A_products_own_packaging_lines_dont_count_while_its_packaging_links_another()
+    {
+        var boxId = await AddBoxAsync("Box");
+        var ribbonId = await AddBoxAsync("Ribbon");
+        var bigId = await AddProductAsync("Big");
+        var smallId = await AddProductAsync("Small");
+        await SetOwnPackagingAsync(bigId, ribbonId);
+        await SetOwnPackagingAsync(smallId, boxId);
+
+        await CreatePackagingLinkRepository().SetLinkAsync(smallId, bigId, Cancellation);
+
+        (await UsedByNamesAsync(boxId)).Should().BeEmpty("Small's packaging reads through to Big's, which has no box");
+        (await UsedByNamesAsync(ribbonId)).Should().Equal("Big", "Small");
+    }
+}

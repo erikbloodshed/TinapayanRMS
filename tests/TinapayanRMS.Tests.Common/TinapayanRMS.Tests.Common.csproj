@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The database fixtures the Infrastructure and UI test projects share. A plain library, not a test project:
+       each test project defines its own DatabaseFixture (its own database) and DatabaseCollection, since xUnit
+       only finds a collection definition in the tests' own assembly. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Respawn" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- DatabaseFixtureBase reads the connection string from it. Copied on into each test project's output. -->
+    <Content Include="..\..\src\TinapayanRMS.UI\appsettings.json" Link="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

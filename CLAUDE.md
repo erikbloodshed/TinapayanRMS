@@ -13,8 +13,8 @@ Run everything from the repo root. The .NET 10 SDK is pinned in `global.json`, w
 ```sh
 dotnet build TinapayanRMS.slnx
 dotnet test --solution TinapayanRMS.slnx                                          # all tests
-dotnet test --project tests/TinapayanRMS.Tests --filter-class "*UnitConversionRulesTests"
-dotnet test --project tests/TinapayanRMS.Tests --filter-method "*SomeTestName"
+dotnet test --project tests/TinapayanRMS.ApplicationCore.Tests --filter-class "*UnitConversionRulesTests"
+dotnet test --project tests/TinapayanRMS.UI.Tests --filter-method "*SomeTestName"
 dotnet run --project src/TinapayanRMS.UI                                          # needs SYNCFUSION_LICENSE_KEY
 
 dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure
@@ -26,7 +26,7 @@ dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infras
 - **Work counts as done** when the solution builds, all tests pass, and any new migration applies cleanly to the local database. A change users can see (a screen, button, field, rule or cost formula) also updates the user manual, `docs/user-manual.md`, in the same change.
 - **The app needs the `SYNCFUSION_LICENSE_KEY` user environment variable.** `App`'s static constructor throws at startup without it. The build doesn't need it.
 - **The app, the tests and `dotnet ef` need the local SQL Server Express instance** (`.\SQLEXPRESS`, service `MSSQL$SQLEXPRESS`), reached with Windows authentication. Use `sqlcmd -S ".\SQLEXPRESS" -E` to query it. LocalDB is still installed but unused.
-- **Build settings are centralized.** `Directory.Build.props` sets the shared compiler settings, the .NET analyzers (`AnalysisLevel` `latest-recommended`, with per-folder exceptions in `.editorconfig`) and the target frameworks (`net10.0` by default; UI and Tests use `$(WindowsTargetFramework)`). `Directory.Packages.props` turns on Central Package Management, so a `PackageReference` never carries a `Version`: add or bump versions there.
+- **Build settings are centralized.** `Directory.Build.props` sets the shared compiler settings, the .NET analyzers (`AnalysisLevel` `latest-recommended`, with per-folder exceptions in `.editorconfig`) and the target frameworks (`net10.0` by default; UI and UI.Tests use `$(WindowsTargetFramework)`). `tests/Directory.Build.props` adds the xUnit and assertion packages to every `*.Tests` project. `Directory.Packages.props` turns on Central Package Management, so a `PackageReference` never carries a `Version`: add or bump versions there.
 - **Docker isn't used anywhere in this project.**
 - **`ilspycmd` (11.0, a global dotnet tool) is installed for decompiling and inspecting .NET assemblies.** Use it instead of writing reflection scripts. For example, `ilspycmd -l c <dll>` lists the classes in an assembly, `ilspycmd -t <Full.Type.Name> <dll>` decompiles one type, and `ilspycmd -m "M:Namespace.Type.Method(System.String)" <dll>` decompiles one member. The Syncfusion assemblies are in the NuGet cache under `~/.nuget/packages/syncfusion.*/<version>/lib/`.
 - **`dotnet-stack`, `dotnet-dump` and `dotnet-trace` (global dotnet tools) are installed for diagnosing the running app.** Use them instead of guessing or adding temporary logging. `dotnet-stack report -p <pid>` shows where a frozen UI thread is blocked. `dotnet-dump collect -p <pid>` followed by `dotnet-dump analyze <file>` covers crashes, deadlocks and memory growth. `dotnet-trace collect -p <pid>` covers slowness. Find the PID with `dotnet-trace ps`.
@@ -46,8 +46,9 @@ dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infras
 - **`TinapayanRMSDbContext` is registered with `AddDbContextFactory`.** ViewModels are DI singletons, so each operation creates its own short-lived context.
 - **ReactiveUI 24 has quirks.** It needs the builder bootstrap in `ReactiveUIBootstrapper.cs`. Its parameterless commands are `ReactiveCommand<RxVoid, RxVoid>`. Import that type with `using RxVoid = ReactiveUI.Primitives.RxVoid;` and never with `using ReactiveUI.Primitives;`, which causes CS0121 ambiguities with `System.Reactive.Linq`.
 - **Tests (xUnit v3, AwesomeAssertions) use a real database.**
-  - They run against `TinapayanRMS_Test` on SQL Server Express, never the dev `TinapayanRMS` database, and Respawn resets it before each test. Nothing is mocked.
-  - Persistence test classes inherit `Fixtures/PersistenceTestBase`. **Each concrete class must also carry `[Collection(DatabaseCollection.Name)]`.** The attribute is deliberately left off the base class.
+  - There is one test project per src layer: `ApplicationCore.Tests` (Rules and Validators, with no database), `Infrastructure.Tests` and `UI.Tests`. The last two share their database fixtures through `tests/TinapayanRMS.Tests.Common`, a plain library.
+  - Each database-backed project runs against its own database on SQL Server Express, `TinapayanRMS_Test_Infrastructure` or `TinapayanRMS_Test_UI`, never the dev `TinapayanRMS` database. `dotnet test --solution` runs the projects side by side, so they can't share one. Respawn resets it before each test. Nothing is mocked.
+  - Database test classes inherit `PersistenceTestBase` from `Tests.Common`. **Each concrete class must also carry `[Collection(DatabaseCollection.Name)]`.** The attribute is deliberately left off the base class. `DatabaseFixture` and `DatabaseCollection` are defined in each project's own `Fixtures/`, because xUnit only finds a collection definition in the tests' own assembly.
 - **Costs are `decimal` at full precision** (`decimal(18,4)` by convention in `ConfigureConventions`). Round only for display and for the final selling price.
 
 ## UI work

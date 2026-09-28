@@ -1020,7 +1020,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ProductCostSummary Costs
     {
         get => _costs;
-        private set => this.RaiseAndSetIfChanged(ref _costs, value);
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _costs, value);
+
+            // The metrics' value boxes read the amounts from here: a percentage, the recipe or another metric changed.
+            this.RaisePropertyChanged(nameof(EditingLaborAmount));
+            this.RaisePropertyChanged(nameof(EditingOverheadAmount));
+            this.RaisePropertyChanged(nameof(EditingAdministrativeAmount));
+            this.RaisePropertyChanged(nameof(EditingMarkupAmount));
+        }
     }
 
     // The add/edit sub-assembly form: the section it edits (null when it adds one), and its fields.
@@ -1138,8 +1147,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             this.RaiseAndSetIfChanged(ref _isFormEditingLines, value);
             this.RaisePropertyChanged(nameof(IsFormLinesEditable));
             this.RaisePropertyChanged(nameof(IsFormShowingLines));
-            this.RaisePropertyChanged(nameof(IsFormOfferingAddIns));
             this.RaisePropertyChanged(nameof(IsFormShowingAddIns));
+            this.RaisePropertyChanged(nameof(HasFormAddIns));
+            this.RaisePropertyChanged(nameof(IsFormShowingNoAddIns));
         }
     }
 
@@ -1156,35 +1166,30 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public bool IsFormLinesEditable => IsFormEditingLines || IsEditingLinkedUsage;
 
     /// <summary>
-    /// The form can take add-ins: only for a sub-assembly the product links, and only once the recipe it sits on
-    /// top of is there to sit on. A sub-assembly of the product's own has no add-ins — its extras just go in its
-    /// lines. Show Add-Ins is offered then.
+    /// The form's add-ins table shows, always, empty or not: only for a sub-assembly the product links, and only
+    /// once the recipe it sits on top of is there to sit on. A sub-assembly of the product's own has no add-ins —
+    /// its extras just go in its lines. There was a Show/Hide Add-Ins toggle before (until 2026-09-28): a shut
+    /// table hid that the batch had extras in it, so the table stays open and the badge above the lines says
+    /// whether it has any (FormAddInsBadgeText).
     /// </summary>
-    public bool IsFormOfferingAddIns => !IsFormEditingLines && IsFormShowingLines;
+    public bool IsFormShowingAddIns => !IsFormEditingLines && IsFormShowingLines;
 
-    private bool _isFormAddInsExpanded;
-    /// <summary>
-    /// Show Add-Ins opened the add-ins table. A linked sub-assembly's form opens with it open only when it has
-    /// add-ins: most links have none, and an empty table only took room. A refused add-in opens it, so the
-    /// message has its line to point at.
-    /// </summary>
-    public bool IsFormAddInsExpanded
+    /// <summary>The add-ins table's lines with an ingredient picked: the add row, or a line not yet picked, isn't one.</summary>
+    public int FormAddInCount => FormAddIns.Count(l => l.IngredientId is not null);
+
+    /// <summary>The add-ins badge beside a linked recipe's badge is a link: it has add-ins, and a click scrolls down to them.</summary>
+    public bool HasFormAddIns => IsFormShowingAddIns && FormAddInCount > 0;
+
+    /// <summary>The add-ins badge is a plain grey tag: a linked recipe with nothing added to it.</summary>
+    public bool IsFormShowingNoAddIns => IsFormShowingAddIns && FormAddInCount == 0;
+
+    /// <summary>The badge's text: "No add-ins", "1 add-in" or "3 add-ins".</summary>
+    public string FormAddInsBadgeText => FormAddInCount switch
     {
-        get => _isFormAddInsExpanded;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _isFormAddInsExpanded, value);
-            this.RaisePropertyChanged(nameof(IsFormShowingAddIns));
-            this.RaisePropertyChanged(nameof(FormAddInsToggleText));
-        }
-    }
-
-    /// <summary>The form's add-ins table shows: it can take add-ins, and Show Add-Ins has opened it.</summary>
-    public bool IsFormShowingAddIns => IsFormOfferingAddIns && IsFormAddInsExpanded;
-
-    /// <summary>The Show Add-Ins button: "Show Add-Ins", "Show Add-Ins (2)" while two are out of sight, or "Hide Add-Ins".</summary>
-    public string FormAddInsToggleText =>
-        IsFormAddInsExpanded ? "Hide Add-Ins" : FormAddIns.Count > 0 ? $"Show Add-Ins ({FormAddIns.Count})" : "Show Add-Ins";
+        0 => "No add-ins",
+        1 => "1 add-in",
+        var count => $"{count} add-ins",
+    };
 
     private bool _isFormPickingSource;
     /// <summary>The form links or copies an existing sub-assembly (another product's, or a standalone one): its picker shows.</summary>
@@ -1378,6 +1383,42 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         set => this.RaiseAndSetIfChanged(ref _editingVatPercent, value);
     }
 
+    // Each metric's value box on the Costing tab: its percentage as pesos for one sellable unit. Typing an amount sets
+    // the percentage that comes to it, which is what's saved; the amount is only ever worked out from it.
+    private TypedAmount? _typedLaborAmount;
+    private TypedAmount? _typedOverheadAmount;
+    private TypedAmount? _typedAdministrativeAmount;
+    private TypedAmount? _typedMarkupAmount;
+
+    /// <summary>Labor Metric's value: EditingLaborPercent of the sub-assemblies cost.</summary>
+    public decimal EditingLaborAmount
+    {
+        get => TypedAmount.Shown(_typedLaborAmount, EditingLaborPercent, Costs.SubAssemblies, Costs.Labor);
+        set => EditingLaborPercent = TypedAmount.PercentFor(ref _typedLaborAmount, value, Costs.SubAssemblies, EditingLaborPercent);
+    }
+
+    /// <summary>Overhead Metric's value: EditingOverheadPercent of the sub-assemblies cost.</summary>
+    public decimal EditingOverheadAmount
+    {
+        get => TypedAmount.Shown(_typedOverheadAmount, EditingOverheadPercent, Costs.SubAssemblies, Costs.Overhead);
+        set => EditingOverheadPercent = TypedAmount.PercentFor(ref _typedOverheadAmount, value, Costs.SubAssemblies, EditingOverheadPercent);
+    }
+
+    /// <summary>Admin Metric's value: EditingAdministrativePercent of the sub-assemblies cost.</summary>
+    public decimal EditingAdministrativeAmount
+    {
+        get => TypedAmount.Shown(_typedAdministrativeAmount, EditingAdministrativePercent, Costs.SubAssemblies, Costs.Administrative);
+        set => EditingAdministrativePercent = TypedAmount.PercentFor(
+            ref _typedAdministrativeAmount, value, Costs.SubAssemblies, EditingAdministrativePercent);
+    }
+
+    /// <summary>Markup Metric's value: EditingMarginPercent of the base cost.</summary>
+    public decimal EditingMarkupAmount
+    {
+        get => TypedAmount.Shown(_typedMarkupAmount, EditingMarginPercent, Costs.BaseCost, Costs.Markup);
+        set => EditingMarginPercent = TypedAmount.PercentFor(ref _typedMarkupAmount, value, Costs.BaseCost, EditingMarginPercent);
+    }
+
     private string _editingCloneName = string.Empty;
     public string EditingCloneName
     {
@@ -1540,9 +1581,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ReactiveCommand<RxVoid, RxVoid> RemoveUsageCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormLineCommand { get; }
 
-    /// <summary>Show Add-Ins / Hide Add-Ins, under a linked recipe.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ToggleFormAddInsCommand { get; }
-
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormAddInCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
 
@@ -1687,9 +1725,20 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // Every selection-driven subscription skips while LoadCommand merges in fresh data, which only
         // re-points a selection at its refreshed copy; the form, recipe and unsaved edits stay as-is.
+        // Another product's name and price land in the form ahead of its details, so its history goes first, as
+        // ClearDetailsForAnother would take it anyway: measured against the previous product's saved form, they read
+        // as unsaved changes, and Save lit up until the details arrived — a flicker on every pick.
         this.WhenAnyValue(x => x.SelectedProduct)
             .Where(product => product is not null && !IsBusyApplying)
-            .Subscribe(product => LoadIntoForm(product!));
+            .Subscribe(product =>
+            {
+                if (product!.Id != _detailProductId)
+                {
+                    History.Clear();
+                }
+
+                LoadIntoForm(product);
+            });
 
         this.WhenAnyValue(x => x.SelectedProduct)
             .Where(_ => !IsBusyApplying)
@@ -2099,7 +2148,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // Print shows the product as the screen does, unsaved edits and all (the user's choice, 2026-09-27). A form left
         // open is part of that, as it's part of what Save writes, so it's applied first; a rule refusing it shows its
-        // message, and the Print tab doesn't open.
+        // message, and the Print tab doesn't open. It stays enabled while a picked product's details are on their way,
+        // as Save does, and does nothing if clicked then: disabled for that moment, it flickered on every pick.
         PrintCommand = ReactiveCommand.CreateFromTask(
             () => RunSafelyAsync(() =>
             {
@@ -2111,8 +2161,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 ApplyOpenForm();
                 _printRequests.OnNext(PrintScope.ThisProduct);
                 return Task.CompletedTask;
-            }),
-            this.WhenAnyValue(x => x.AreDetailsReady));
+            }));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
             () => DeleteProductAsync(SelectedProduct!),
@@ -2239,8 +2288,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         RemoveFormLineCommand = ReactiveCommand.Create(
             () => AsUndoStep(() => FormLines.Remove(SelectedFormLine!)),
             this.WhenAnyValue(x => x.SelectedFormLine).Select(line => line is not null));
-
-        ToggleFormAddInsCommand = ReactiveCommand.Create(() => { IsFormAddInsExpanded = !IsFormAddInsExpanded; });
 
         RemoveFormPackagingLineCommand = ReactiveCommand.Create(
             () => AsUndoStep(() => FormPackagingLines.Remove(SelectedFormPackagingLine!)),
@@ -2874,7 +2921,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         UsageMode = EditingUsageMode,
         IsFormEditingLines = IsFormEditingLines,
         IsFormPickingSource = IsFormPickingSource,
-        IsFormAddInsExpanded = IsFormAddInsExpanded,
         EditingUsageIndex = EditingUsage is { } editing && UsageEdits.IndexOf(editing) is var i and >= 0 ? i : null,
         UsageRoleId = EditingUsageRole?.Id,
         UsageName = EditingUsageName,
@@ -2998,7 +3044,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             this.RaisePropertyChanged(nameof(EditingUsageMode));
             IsFormEditingLines = snapshot.IsFormEditingLines;
             IsFormPickingSource = snapshot.IsFormPickingSource;
-            IsFormAddInsExpanded = snapshot.IsFormAddInsExpanded;
 
             RefreshLinkableOptions();
             RefreshFormRoleOptions();
@@ -3340,7 +3385,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         FormLines.Clear();
         FormAddIns.Clear();
         FormPackagingLines.Clear();
-        IsFormAddInsExpanded = false;
         SelectedFormLine = null;
         SelectedFormAddIn = null;
         SelectedFormPackagingLine = null;
@@ -3687,26 +3731,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>
     /// The add-ins table as lines, refused if one is an ingredient <paramref name="baseLines"/> already has.
     /// The repository checks the same rule as it writes them; this is what puts the message on the screen
-    /// the moment Apply is pressed, or the tab is left. Refused, the table opens, if Hide Add-Ins had shut it,
-    /// so the line the message is about can be seen.
+    /// the moment Apply is pressed, or the tab is left.
     /// </summary>
     private IReadOnlyList<SubAssemblyLineEdit> CompleteAddIns(string subAssemblyName, IReadOnlyList<SubAssemblyLineEdit> baseLines)
     {
-        try
-        {
-            var addIns = IngredientLineRow.CompleteLines(FormAddIns, subAssemblyName);
-            ProductRules.EnsureValidAddIns(
-                [.. addIns.Select(a => (a.Ingredient.Id, a.Grams, a.Ingredient.Name))],
-                subAssemblyName,
-                [.. baseLines.Select(l => l.Ingredient.Id)]);
+        var addIns = IngredientLineRow.CompleteLines(FormAddIns, subAssemblyName);
+        ProductRules.EnsureValidAddIns(
+            [.. addIns.Select(a => (a.Ingredient.Id, a.Grams, a.Ingredient.Name))],
+            subAssemblyName,
+            [.. baseLines.Select(l => l.Ingredient.Id)]);
 
-            return [.. addIns.Select(a => new SubAssemblyLineEdit(a.Ingredient, a.Grams))];
-        }
-        catch (InvalidOperationException)
-        {
-            IsFormAddInsExpanded = true;
-            throw;
-        }
+        return [.. addIns.Select(a => new SubAssemblyLineEdit(a.Ingredient, a.Grams))];
     }
 
     /// <summary>
@@ -3780,7 +3815,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // size and its add-ins, which go in the table under them, open if there are any.
         ShowFormLines(usage.Lines);
         ShowFormAddIns(usage.AddIns);
-        IsFormAddInsExpanded = usage.AddIns.Count > 0;
         SelectedFormLine = null;
         SelectedFormAddIn = null;
         SetPieceSize(usage.AuthoredField, usage.AuthoredValue, usage.ShrinkagePercent);
@@ -3817,9 +3851,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private void FormLinesChanged()
     {
         this.RaisePropertyChanged(nameof(IsFormShowingLines));
-        this.RaisePropertyChanged(nameof(IsFormOfferingAddIns));
         this.RaisePropertyChanged(nameof(IsFormShowingAddIns));
-        this.RaisePropertyChanged(nameof(FormAddInsToggleText));
+        this.RaisePropertyChanged(nameof(FormAddInCount));
+        this.RaisePropertyChanged(nameof(HasFormAddIns));
+        this.RaisePropertyChanged(nameof(IsFormShowingNoAddIns));
+        this.RaisePropertyChanged(nameof(FormAddInsBadgeText));
         ResyncPieceSize();
     }
 

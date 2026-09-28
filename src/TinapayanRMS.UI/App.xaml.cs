@@ -72,14 +72,18 @@ public partial class App : Application
         // ButtonAdv 24px, or whatever its layout row stretched it to. A type default is the lowest
         // precedence, so a Height set in XAML still wins. IntegerTextBox and CurrencyTextBox (Products'
         // Quantity Required and Current Price) joined on 2026-09-24: with their labels moved beside them
-        // they stood shorter than the Product Name box next to them.
-        foreach (var type in new[] { typeof(SfTextBoxExt), typeof(DoubleTextBox), typeof(IntegerTextBox), typeof(CurrencyTextBox), typeof(ButtonAdv) })
+        // they stood shorter than the Product Name box next to them. PercentTextBox (the Costing tab's metrics) joined
+        // on 2026-09-28, beside the DoubleTextBox that holds each metric's value.
+        foreach (var type in new[] { typeof(SfTextBoxExt), typeof(DoubleTextBox), typeof(IntegerTextBox), typeof(CurrencyTextBox), typeof(PercentTextBox), typeof(ButtonAdv) })
         {
             FrameworkElement.HeightProperty.OverrideMetadata(type, new FrameworkPropertyMetadata(ControlHeight));
         }
 
         EventManager.RegisterClassHandler(
             typeof(SfTextBoxExt), FrameworkElement.LoadedEvent, new RoutedEventHandler(AlignTextBoxText));
+
+        EventManager.RegisterClassHandler(
+            typeof(EditorBase), FrameworkElement.LoadedEvent, new RoutedEventHandler(AlignNumberRight));
 
         EventManager.RegisterClassHandler(
             typeof(ComboBoxAdv), FrameworkElement.LoadedEvent, new RoutedEventHandler(ApplyPickerDefaults));
@@ -116,6 +120,23 @@ public partial class App : Application
         {
             var padding = box.Padding;
             box.Padding = new Thickness(-6, padding.Top, padding.Right, padding.Bottom);
+        }
+    }
+
+    /// <summary>
+    /// Right-aligns every number box's text (2026-09-28, at the user's request: "make textbox containing numeric values
+    /// like percentage and double be right aligned"), as figures line up in a column and as the grids show them.
+    /// EditorBase is what Syncfusion's DoubleTextBox, IntegerTextBox, CurrencyTextBox and PercentTextBox are built on,
+    /// a plain TextBox underneath. A local value, as AlignTextBoxText's is, so the theme's style can't outrank it; a box
+    /// whose XAML or grid already says where its text goes keeps that.
+    /// </summary>
+    private static void AlignNumberRight(object sender, RoutedEventArgs e)
+    {
+        var box = (EditorBase)sender;
+
+        if (box.ReadLocalValue(TextBox.TextAlignmentProperty) == DependencyProperty.UnsetValue)
+        {
+            box.TextAlignment = TextAlignment.Right;
         }
     }
 

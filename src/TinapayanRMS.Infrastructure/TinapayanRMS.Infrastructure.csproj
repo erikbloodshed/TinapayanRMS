@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <!-- ColumnsTests checks the Dapper column lists (Queries/Columns) against EF's model. -->
-    <InternalsVisibleTo Include="TinapayanRMS.Tests" />
+    <InternalsVisibleTo Include="TinapayanRMS.Infrastructure.Tests" />
   </ItemGroup>
 
   <ItemGroup>

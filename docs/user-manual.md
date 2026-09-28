@@ -446,7 +446,8 @@ A section's changes go into the recipe when you leave its tab, or when you press
 A linked section has a badge saying where it's from. Click the badge to open the sub-assembly on its own screen. The pencil beside the badge lets you **link another sub-assembly in its place**, keeping this product's piece size and add-ins.
 
 - **Editing the lines** of a linked section changes the sub-assembly itself. Save asks first when other products also use it, because their recipes and costs change too.
-- **Show Add-Ins** opens a second table for this product's own extras on top of the linked recipe, such as a colouring, a flavouring or an inclusion. Add-ins go into the batch but don't change the shared sub-assembly. An ingredient the linked recipe already has can't be added as an add-in.
+- **The Add-Ins table** under the linked recipe's lines holds this product's own extras on top of the linked recipe, such as a colouring, a flavouring or an inclusion. Add-ins go into the batch but don't change the shared sub-assembly. An ingredient the linked recipe already has can't be added as an add-in.
+- **The add-ins badge**, over the top right corner of the linked recipe's lines, level with the badge saying where the section is from, tells you whether the product has add-ins: it reads **No add-ins**, or the count, such as **2 add-ins**. When there are some, click the badge (or Tab to it and press Enter) to jump down to the Add-Ins table. The **Go to top** badge over the Add-Ins table's top right corner takes you back up to the linked recipe's lines.
 - **Copy** makes a copy for this product alone. Save keeps the copy named after this product and uses it instead. In a product-owned role the copy is the product's own. Otherwise it's saved on the Sub-Assemblies screen and linked.
 - **Unlink** makes the section this product's own copy, whatever its role. The original on the Sub-Assemblies screen stays as it is.
 
@@ -467,7 +468,16 @@ Packaging quantities are for one sellable unit. They aren't multiplied by Quanti
 
 ### Costing tab
 
-On the left are the product's five percentages: **Labor %**, **Overhead %**, **Administrative %**, **Markup %** and **VAT %**. A new product starts with the Costing Defaults. Each tile also shows what its percentage comes to in pesos, and its share of the price.
+On the left are the product's four metrics, **Labor Metric**, **Overhead Metric**, **Admin Metric** and **Markup Metric**, then **VAT %**. A new product starts with the Costing Defaults.
+
+Each metric has two boxes. The first is its percentage, shown to one decimal with its % sign. The second is what that percentage comes to in pesos for one sellable unit, shown to two decimals. Type in either box and the other one follows. For example, with ₱20.00 of sub-assemblies, typing **5.00** in Labor Metric's peso box sets its percentage to **25.0%**.
+
+- Labor, Overhead and Admin are a percentage of the **sub-assemblies (ingredients) cost**.
+- Markup is a percentage of the **base cost**.
+- Only the percentage is saved. If the recipe's cost changes later, the percentage stays and the peso amount changes with it.
+- A product with nothing in its recipe yet has no cost to take a percentage of, so its peso boxes stay at 0.00. Type the percentage instead.
+
+Under each metric is its share of the price. VAT has a percentage box only, with its amount in pesos and its share of the price under it.
 
 On the right, the **Costing Summary** lists each component with its amount and its **% of Price**:
 
@@ -638,7 +648,7 @@ The app keeps costs at full precision and rounds them only for display. So a tot
 
 ### Check whether a product's price still earns enough
 
-Open the product and compare the header's **Markup %**, which is what the current price earns, with the **Markup %** on the Costing tab, which is what you're aiming for. For an overview of all products, look at **Reports → Product Cost Summary** and sort by **Markup %**.
+Open the product and compare the header's **Markup %**, which is what the current price earns, with the **Markup Metric** on the Costing tab, which is what you're aiming for. For an overview of all products, look at **Reports → Product Cost Summary** and sort by **Markup %**.
 
 ### Move a product into production
 

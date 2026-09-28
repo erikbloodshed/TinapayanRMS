@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TinapayanRMS.UI\TinapayanRMS.UI.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.Tests.Common\TinapayanRMS.Tests.Common.csproj" />
+  </ItemGroup>
+
+</Project>

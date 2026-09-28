@@ -1,0 +1,8 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TinapayanRMS.Domain\TinapayanRMS.Domain.csproj" />
+    <ProjectReference Include="..\..\src\TinapayanRMS.ApplicationCore\TinapayanRMS.ApplicationCore.csproj" />
+  </ItemGroup>
+
+</Project>

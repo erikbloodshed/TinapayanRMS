@@ -21,6 +21,9 @@ TestResults/
 _ReSharper*/
 *.DotSettings.user
 
+# C# Dev Kit language-server caches
+*.lscache
+
 # Python bytecode — the ui-ux-pro-max skill's search script regenerates this on every run
 __pycache__/
 *.pyc

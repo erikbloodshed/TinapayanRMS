@@ -6,6 +6,9 @@
     <Project Path="src/TinapayanRMS.UI/TinapayanRMS.UI.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/TinapayanRMS.Tests/TinapayanRMS.Tests.csproj" />
+    <Project Path="tests/TinapayanRMS.ApplicationCore.Tests/TinapayanRMS.ApplicationCore.Tests.csproj" />
+    <Project Path="tests/TinapayanRMS.Infrastructure.Tests/TinapayanRMS.Infrastructure.Tests.csproj" />
+    <Project Path="tests/TinapayanRMS.Tests.Common/TinapayanRMS.Tests.Common.csproj" />
+    <Project Path="tests/TinapayanRMS.UI.Tests/TinapayanRMS.UI.Tests.csproj" />
   </Folder>
 </Solution>
