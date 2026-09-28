@@ -436,6 +436,36 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task Save_has_the_saved_product_showing_with_its_form_open_by_the_time_it_returns()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var milkId = await AddIngredientAsync("Milk", costPerGram: 0.1m);
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [new NewSubAssemblyDraft(fillingRoleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1 && viewModel.EditingUsage is not null, () => $"usage rows={viewModel.UsageEdits.Count}");
+        viewModel.FormLines.Add(new IngredientLineRow { IngredientId = milkId, Grams = 50m });
+
+        // The form closes while the product is picked again and opens on the reloaded section: in one pass, with nothing
+        // left to arrive afterwards, or the screen draws the form without its section in between (a flicker on Save).
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.AreDetailsReady.Should().BeTrue();
+        viewModel.IsUsageFormOpen.Should().BeTrue();
+        var saved = viewModel.UsageEdits.Should().ContainSingle().Subject;
+        saved.TotalWeight.Should().Be(150m, "the reloaded section, as saved");
+        viewModel.EditingUsage.Should().BeSameAs(saved);
+        viewModel.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>().Which.Usage.Should().BeSameAs(saved);
+        viewModel.FormLines.Select(l => l.Grams).Should().Equal(100m, 50m);
+        viewModel.History.IsDirty.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task A_new_section_in_a_product_owned_role_is_the_products_own_after_Save()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);

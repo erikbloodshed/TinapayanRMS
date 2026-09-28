@@ -25,6 +25,7 @@ dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infras
 - **Migrations come only from `dotnet ef migrations add`.** Never write or edit one by hand. `TinapayanRMSDbContextFactory` provides the design-time DbContext.
 - **Work counts as done** when the solution builds, all tests pass, and any new migration applies cleanly to the local database. A change users can see (a screen, button, field, rule or cost formula) also updates the user manual, `docs/user-manual.md`, in the same change.
 - **The app needs the `SYNCFUSION_LICENSE_KEY` user environment variable.** `App`'s static constructor throws at startup without it. The build doesn't need it.
+- **The app, the tests and `dotnet ef` need the local SQL Server Express instance** (`.\SQLEXPRESS`, service `MSSQL$SQLEXPRESS`), reached with Windows authentication. Use `sqlcmd -S ".\SQLEXPRESS" -E` to query it. LocalDB is still installed but unused.
 - **Build settings are centralized.** `Directory.Build.props` sets the shared compiler settings, the .NET analyzers (`AnalysisLevel` `latest-recommended`, with per-folder exceptions in `.editorconfig`) and the target frameworks (`net10.0` by default; UI and Tests use `$(WindowsTargetFramework)`). `Directory.Packages.props` turns on Central Package Management, so a `PackageReference` never carries a `Version`: add or bump versions there.
 - **Docker isn't used anywhere in this project.**
 - **`ilspycmd` (11.0, a global dotnet tool) is installed for decompiling and inspecting .NET assemblies.** Use it instead of writing reflection scripts. For example, `ilspycmd -l c <dll>` lists the classes in an assembly, `ilspycmd -t <Full.Type.Name> <dll>` decompiles one type, and `ilspycmd -m "M:Namespace.Type.Method(System.String)" <dll>` decompiles one member. The Syncfusion assemblies are in the NuGet cache under `~/.nuget/packages/syncfusion.*/<version>/lib/`.
@@ -45,7 +46,7 @@ dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infras
 - **`TinapayanRMSDbContext` is registered with `AddDbContextFactory`.** ViewModels are DI singletons, so each operation creates its own short-lived context.
 - **ReactiveUI 24 has quirks.** It needs the builder bootstrap in `ReactiveUIBootstrapper.cs`. Its parameterless commands are `ReactiveCommand<RxVoid, RxVoid>`. Import that type with `using RxVoid = ReactiveUI.Primitives.RxVoid;` and never with `using ReactiveUI.Primitives;`, which causes CS0121 ambiguities with `System.Reactive.Linq`.
 - **Tests (xUnit v3, AwesomeAssertions) use a real database.**
-  - They run against `TinapayanRMS_Test` on LocalDB, never the dev `TinapayanRMS` database, and Respawn resets it before each test. Nothing is mocked.
+  - They run against `TinapayanRMS_Test` on SQL Server Express, never the dev `TinapayanRMS` database, and Respawn resets it before each test. Nothing is mocked.
   - Persistence test classes inherit `Fixtures/PersistenceTestBase`. **Each concrete class must also carry `[Collection(DatabaseCollection.Name)]`.** The attribute is deliberately left off the base class.
 - **Costs are `decimal` at full precision** (`decimal(18,4)` by convention in `ConfigureConventions`). Round only for display and for the final selling price.
 

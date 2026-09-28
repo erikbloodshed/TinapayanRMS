@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Threading;
 using Syncfusion.UI.Xaml.Grid;
@@ -153,9 +154,31 @@ public static class GridAddNewRow
 /// HandlePointerOperation), an arrow key or Enter (this controller's key handling). So clicking into the add row and
 /// back onto a line added an empty line. Those paths all go through <see cref="CommitAddNew"/>, which now cancels an
 /// untouched row the way the grid's own Esc does. A row with anything typed in it is still added.
+/// <para>
+/// An add row still open when the screen changes the grid's lines itself is dropped as well, typed into or not
+/// (<see cref="ProcessSourceCollectionChanged"/>).
+/// </para>
 /// </summary>
 internal sealed class UntouchedAddRowSelectionController(SfDataGrid grid) : GridSelectionController(grid)
 {
+    /// <summary>
+    /// The grid's answer to its lines changing under an open add row is to commit the add row, which adds to the lines
+    /// while they're still raising CollectionChanged, and that throws "Cannot change ObservableCollection during a
+    /// CollectionChanged event" as soon as the screen listens to them too. Products' Save crashed that way when its
+    /// reload refilled the form's lines (2026-09-28). There's no committing the row from inside that event, so it's
+    /// cancelled the way Esc cancels it. The grid's own commit doesn't pass through here with the row open.
+    /// </summary>
+    protected override void ProcessSourceCollectionChanged(NotifyCollectionChangedEventArgs e, CollectionChangedReason reason)
+    {
+        if (reason == CollectionChangedReason.SourceCollectionChanged && DataGrid.View is { IsAddingNew: true })
+        {
+            CurrentCellManager.EndEdit(canCommit: false);
+            DataGrid.GetAddNewRowController().CancelAddNew();
+        }
+
+        base.ProcessSourceCollectionChanged(e, reason);
+    }
+
     protected override void CommitAddNew(bool changeState = true)
     {
         if (DataGrid.View is { IsAddingNew: true } view && GridAddNewRow.IsUntouched(DataGrid, view.CurrentAddItem))

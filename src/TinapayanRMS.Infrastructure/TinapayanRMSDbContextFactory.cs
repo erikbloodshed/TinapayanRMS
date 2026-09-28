@@ -13,7 +13,7 @@ public class TinapayanRMSDbContextFactory : IDesignTimeDbContextFactory<Tinapaya
     public TinapayanRMSDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<TinapayanRMSDbContext>();
-        optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=TinapayanRMS;Trusted_Connection=True;TrustServerCertificate=True;");
+        optionsBuilder.UseSqlServer("Server=.\\SQLEXPRESS;Database=TinapayanRMS;Trusted_Connection=True;TrustServerCertificate=True;");
 
         return new TinapayanRMSDbContext(optionsBuilder.Options);
     }

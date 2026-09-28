@@ -864,6 +864,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The product whose recipe, packaging, costing and links the form holds, or null for a new product.</summary>
     private int? _detailProductId;
 
+    /// <summary>
+    /// The detail Save's reload has read already, for the load its selection starts to show at once instead of reading
+    /// it again (ReloadSavedProductAsync).
+    /// </summary>
+    private (int ProductId, ProductDetail Detail)? _preloadedDetail;
+
     private bool _areDetailsReady = true;
     /// <summary>
     /// The details showing are the picked product's. False from picking another product until its details
@@ -1849,25 +1855,42 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // changed.
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            var roles = await subAssemblyRoleRepository.GetAllAsync(CancellationToken.None);
-            var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
-            var rawMaterials = await rawMaterialRepository.GetAllAsync(CancellationToken.None);
-            var products = await _productRepository.GetAllAsync(CancellationToken.None);
-            var linkable = await _subAssemblyRepository.GetLinkableAsync(CancellationToken.None);
-            var packagingSets = (await _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None)).Where(s => s.Role?.IsPackaging == true).ToList();
-            var costingDefaults = await _costingDefaultsRepository.GetAsync(CancellationToken.None);
-
             // A linked section reads a sub-assembly kept on the Sub-Assemblies screen, which can change there (its
             // lines, name or role), so those are fetched again; the product's own and new sections only need their
             // ingredients' new costs. Every saved one is fetched: a role made product-owned, or no longer, in Settings
             // turns a linked one into the product's own, or back.
             var detailProductId = _detailProductId;
             HashSet<int> linkedIds = [.. UsageEdits.Where(u => u.SubAssemblyId > 0).Select(u => u.SubAssemblyId)];
-            var linkedSubAssemblies = await _subAssemblyRepository.GetByIdsAsync(linkedIds, CancellationToken.None);
-            var linkedLines = await _subAssemblyLineRepository.GetForSubAssembliesAsync(linkedIds, CancellationToken.None);
-            var packagingLink = detailProductId is { } linkProductId
-                ? await _packagingLinkRepository.GetForProductAsync(linkProductId, CancellationToken.None)
-                : null;
+
+            // All at once, on the thread pool: each read is mostly a round trip's wait, so one after another they took
+            // several times as long as the slowest of them, and the UI thread came back after each to start the next.
+            // Each has its own context (AddDbContextFactory), and none touches ViewModel state.
+            var rolesRead = Task.Run(() => subAssemblyRoleRepository.GetAllAsync(CancellationToken.None));
+            var categoriesRead = Task.Run(() => _categoryRepository.GetAllAsync(CancellationToken.None));
+            var rawMaterialsRead = Task.Run(() => rawMaterialRepository.GetAllAsync(CancellationToken.None));
+            var productsRead = Task.Run(() => _productRepository.GetAllAsync(CancellationToken.None));
+            var linkableRead = Task.Run(() => _subAssemblyRepository.GetLinkableAsync(CancellationToken.None));
+            var standaloneRead = Task.Run(() => _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None));
+            var costingDefaultsRead = Task.Run(() => _costingDefaultsRepository.GetAsync(CancellationToken.None));
+            var linkedSubAssembliesRead = Task.Run(() => _subAssemblyRepository.GetByIdsAsync(linkedIds, CancellationToken.None));
+            var linkedLinesRead = Task.Run(() => _subAssemblyLineRepository.GetForSubAssembliesAsync(linkedIds, CancellationToken.None));
+            var packagingLinkRead = detailProductId is { } linkProductId
+                ? Task.Run(() => _packagingLinkRepository.GetForProductAsync(linkProductId, CancellationToken.None))
+                : Task.FromResult<PackagingLink?>(null);
+            await Task.WhenAll(
+                rolesRead, categoriesRead, rawMaterialsRead, productsRead, linkableRead, standaloneRead, costingDefaultsRead,
+                linkedSubAssembliesRead, linkedLinesRead, packagingLinkRead);
+
+            var roles = await rolesRead;
+            var categories = await categoriesRead;
+            var rawMaterials = await rawMaterialsRead;
+            var products = await productsRead;
+            var linkable = await linkableRead;
+            var packagingSets = (await standaloneRead).Where(s => s.Role?.IsPackaging == true).ToList();
+            var costingDefaults = await costingDefaultsRead;
+            var linkedSubAssemblies = await linkedSubAssembliesRead;
+            var linkedLines = await linkedLinesRead;
+            var packagingLink = await packagingLinkRead;
 
             // Linked packaging is kept elsewhere (another product, or a set on the Sub-Assemblies screen) and can
             // have changed there, so it's fetched again — but only while the form still shows the link as saved. The
@@ -2625,10 +2648,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // Read on the thread pool, so the UI thread comes back once, when all of it has arrived, instead of
         // after each read to start the next. The reads touch no ViewModel state; everything below them does.
+        // Save's reload has read it already: then this runs through without awaiting, in the pass that
+        // picked the product, so the form isn't drawn closed (ResetDetails) before it opens again.
         ProductDetail detail;
         try
         {
-            detail = await Task.Run(() => _savedProducts.ReadDetailAsync(product.Id, cancellationToken), cancellationToken);
+            detail = _preloadedDetail is { } preloaded && preloaded.ProductId == product.Id
+                ? preloaded.Detail
+                : await Task.Run(() => _savedProducts.ReadDetailAsync(product.Id, cancellationToken), cancellationToken);
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested && product.Id != _detailProductId)
         {
@@ -3263,20 +3290,33 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// Loads the saved product again and selects the fresh copy, so the form shows (and compares against) what was
     /// saved. A new product, saved for the first time, is still the recipe showing, not another product's: it keeps
     /// the tab it showed, as an existing one does.
+    ///
+    /// The product and its detail are both read first, off the UI thread, and the selection then shows them in one
+    /// pass. Picked with the detail still to read, the same product closed its form (ResetDetails) and drew the
+    /// screen that way until the read came back and opened it again: a flicker on every Save.
     /// </summary>
     private async Task ReloadSavedProductAsync(int id)
     {
-        var saved = await _productRepository.GetByIdAsync(id, CancellationToken.None);
-        if (saved is not null)
+        var savedRead = Task.Run(() => _productRepository.GetByIdAsync(id, CancellationToken.None));
+        var detailRead = Task.Run(() => _savedProducts.ReadDetailAsync(id, CancellationToken.None));
+        await Task.WhenAll(savedRead, detailRead);
+        var saved = await savedRead;
+        var detail = await detailRead;
+        if (saved is null)
         {
-            _productCache.AddOrUpdate(saved);
-            _detailProductId = id;
-            SelectedProduct = saved;
+            return;
+        }
 
-            // Until the reload arrives the form still shows its new sections as new, though Save has just kept each on
-            // the Sub-Assemblies screen: saved again from here, each would be kept a second time. So Save waits, and the
-            // tabs ignore the mouse, as they do while another product's details are on their way; the reload readies them.
-            AreDetailsReady = false;
+        _productCache.AddOrUpdate(saved);
+        _detailProductId = id;
+        _preloadedDetail = (id, detail);
+        try
+        {
+            SelectedProduct = saved;
+        }
+        finally
+        {
+            _preloadedDetail = null;
         }
     }
 

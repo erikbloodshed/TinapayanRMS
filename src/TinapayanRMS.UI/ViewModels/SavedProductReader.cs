@@ -54,15 +54,24 @@ public sealed class SavedProductReader(
     /// <summary>The product's saved detail: its packaging link and lines, its recipe with its sections' lines and add-ins, and its costing.</summary>
     public async Task<ProductDetail> ReadDetailAsync(int productId, CancellationToken cancellationToken)
     {
-        var packagingLink = await packagingLinkRepository.GetForProductAsync(productId, cancellationToken);
-        var usages = await usageRepository.GetForProductAsync(productId, cancellationToken);
-        var lines = await packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken);
-        var costing = await costingParametersRepository.GetForProductAsync(productId, cancellationToken);
-        var subAssemblyLines = await subAssemblyLineRepository.GetForSubAssembliesAsync(
-            [.. usages.Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
-        var addIns = await usageRepository.GetAddInsForProductAsync(productId, cancellationToken);
-        return new ProductDetail(packagingLink, usages, lines, costing, subAssemblyLines, addIns);
+        // At once, each on its own context: a read is mostly a round trip's wait. Only the sections' lines wait, for
+        // the sections. Reports reads several products this way at a time (ProductsReadAtOnce).
+        var packagingLinkRead = packagingLinkRepository.GetForProductAsync(productId, cancellationToken);
+        var linesRead = packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken);
+        var costingRead = costingParametersRepository.GetForProductAsync(productId, cancellationToken);
+        var addInsRead = usageRepository.GetAddInsForProductAsync(productId, cancellationToken);
+        var usagesRead = usageRepository.GetForProductAsync(productId, cancellationToken);
+        var subAssemblyLinesRead = ReadSectionLinesAsync(usagesRead, cancellationToken);
+        await Task.WhenAll(packagingLinkRead, linesRead, costingRead, addInsRead, usagesRead, subAssemblyLinesRead);
+
+        return new ProductDetail(
+            await packagingLinkRead, await usagesRead, await linesRead, await costingRead, await subAssemblyLinesRead, await addInsRead);
     }
+
+    private async Task<IReadOnlyList<SubAssemblyLine>> ReadSectionLinesAsync(
+        Task<IReadOnlyList<ProductSubAssemblyUsage>> usagesRead, CancellationToken cancellationToken) =>
+        await subAssemblyLineRepository.GetForSubAssembliesAsync(
+            [.. (await usagesRead).Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
 
     /// <summary><paramref name="product"/> as it's saved, read and priced.</summary>
     public async Task<SavedProduct> ReadAsync(Product product, CancellationToken cancellationToken) =>

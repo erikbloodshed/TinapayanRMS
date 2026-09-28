@@ -10,6 +10,7 @@ using TinapayanRMS.UI.Controls;
 namespace TinapayanRMS.Tests.Controls;
 
 /// <summary>GridHeaderHeight: a grid's header row fits its text at the app's font size, where the theme's 24px cut off descenders.</summary>
+[Collection(OffscreenGridCollection.Name)]
 public class GridHeaderHeightTests
 {
     public sealed class Line

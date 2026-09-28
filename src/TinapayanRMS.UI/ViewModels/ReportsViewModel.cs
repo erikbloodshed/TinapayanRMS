@@ -96,7 +96,10 @@ public sealed class RawMaterialPriceSummaryRow
 /// <summary>The Reports screen: summaries across every product and every purchased raw material, each on a tab of its own.</summary>
 public sealed class ReportsViewModel : ReactiveObject, IDisposable
 {
-    /// <summary>How many products the Product Cost Summary reads at a time: well inside SqlClient's pool of 100 connections.</summary>
+    /// <summary>
+    /// How many products the Product Cost Summary reads at a time. Each makes up to five reads at once
+    /// (SavedProductReader.ReadDetailAsync), so 40 connections at most: well inside SqlClient's pool of 100.
+    /// </summary>
     private const int ProductsReadAtOnce = 8;
 
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;

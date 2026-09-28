@@ -13,6 +13,7 @@ namespace TinapayanRMS.Tests.Controls;
 /// GridKeyboardFocus: no dotted focus rectangle round a whole grid, and a grid tabbed into gets a current cell on a row
 /// (PlaceCurrentCell), so the keyboard is on a cell, never on the bare grid.
 /// </summary>
+[Collection(OffscreenGridCollection.Name)]
 public class GridKeyboardFocusTests
 {
     public sealed class Line

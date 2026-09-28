@@ -21,6 +21,7 @@ namespace TinapayanRMS.Tests.Controls;
 /// GroupDisplayElements.GetItemAt during layout closed the app (2026-09-16). Fuzzing the list reproduced it only
 /// after filler rows had been left overflowing, and never with them kept to what fits.
 /// </summary>
+[Collection(OffscreenGridCollection.Name)]
 public class GridFillerRowsGroupedTests
 {
     [Fact]

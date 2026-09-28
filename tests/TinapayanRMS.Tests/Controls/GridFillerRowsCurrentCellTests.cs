@@ -15,6 +15,7 @@ namespace TinapayanRMS.Tests.Controls;
 /// the grid's current cell somewhere it can't be. Moving it back to a cell that no longer existed threw "InValid
 /// RowColumnIndex" from a dispatcher callback, which closed the app (twice on the Products screen, 2026-09-16).
 /// </summary>
+[Collection(OffscreenGridCollection.Name)]
 public class GridFillerRowsCurrentCellTests
 {
     public sealed class Line

@@ -13,6 +13,7 @@ namespace TinapayanRMS.Tests.Controls;
 /// (UsageFormPanel.xaml). The grid left its current cell on the add row, a fresh one once the line was added, so the
 /// outline jumped to the row under the line being typed (Products' sub-assembly lines, 2026-09-27).
 /// </summary>
+[Collection(OffscreenGridCollection.Name)]
 public class GridEditCommitTests
 {
     public sealed class Line

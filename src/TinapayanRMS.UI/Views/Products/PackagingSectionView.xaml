@@ -109,7 +109,7 @@
                                                SelectedValuePath="Key"
                                                IsEditable="True" />
                 <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" AllowEditing="False" />
-                <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Unit" Width="104" NumberDecimalDigits="4" AllowEditing="False" />
+                <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Unit" Width="104" NumberDecimalDigits="2" AllowEditing="False" />
             </syncfusion:SfDataGrid.Columns>
         </syncfusion:SfDataGrid>
 
