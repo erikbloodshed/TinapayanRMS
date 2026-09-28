@@ -22,7 +22,7 @@ public class ProductPrintLayoutTests
         layout.PageCount.Should().BeGreaterThan(1);
         var body = Body(layout.BuildPage(2));
         Texts(body[0]).Single().Should().StartWith("Dough (continued)");
-        Texts(body[1]).Should().Equal("Ingredient", "Grams", "Baker's %", "Cost per Gram", "Cost", "Base");
+        Texts(body[1]).Should().Equal("Ingredient", "Grams", "Baker's %", "Cost/g", "Cost", "Base");
     });
 
     [Fact]

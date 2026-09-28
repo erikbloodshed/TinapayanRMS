@@ -375,7 +375,7 @@
                                     <syncfusion:Columns>
                                         <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
                                         <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
-                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per g" Width="88" NumberDecimalDigits="4" />
+                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost/g" Width="88" NumberDecimalDigits="4" />
                                     </syncfusion:Columns>
                                 </syncfusion:GridMultiColumnDropDownList.Columns>
                             </syncfusion:GridMultiColumnDropDownList>
@@ -386,7 +386,7 @@
                                                     NumberDecimalDigits="1"
                                                     AllowNullValue="True"
                                                     controls:GridCellEditing.AllowWhen="CanTypeBakersPercent" />
-                            <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost per g" Width="120" NumberDecimalDigits="4" AllowEditing="False" />
+                            <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost/g" Width="120" NumberDecimalDigits="4" AllowEditing="False" />
                             <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="120" NumberDecimalDigits="2" AllowEditing="False" />
                             <!-- The formula's 100% base for baker's percentage, usually the flour; more than one can be ticked. -->
                             <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"

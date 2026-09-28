@@ -291,8 +291,8 @@ List the ingredients the made ingredient is made from:
 |---|---|
 | **Component** | An ingredient: purchased, made or linked. It can't be the ingredient itself. |
 | **Grams** | How much of it goes into one batch. |
-| **Cost per g** | The component's buffered cost per gram. |
-| **Cost** | Grams × Cost per g. |
+| **Cost/g** | The component's buffered cost per gram. |
+| **Cost** | Grams × Cost/g. |
 
 The header's **Total Weight** is the batch's grams less the **Weight Loss %**. The **Total Cost** is the sum of the Cost column. Its buffered cost per gram is Total Cost ÷ Total Weight.
 
@@ -353,7 +353,7 @@ At the top are the name and **New**, **Copy**, **Save**, **Undo**, **Redo** and 
 
 - **Name** and **Role**.
 - **Batch Weight**, **Batch Cost** and **Cost per g**, worked out from the lines as you type.
-- **Lines**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost per g**, **Cost** and **Base** (tick it for baker's percentages).
+- **Lines**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base** (tick it for baker's percentages).
 - **Used By**: a tile for each product that links this sub-assembly. Click one to open it.
 
 **Copy** starts a new, unsaved sub-assembly with the same role and lines, named "… Copy". Rename it if you like, then press Save. The original stays as it was.
@@ -429,7 +429,7 @@ Each section's tab shows its form:
 
 - **Role**, and an optional **Name**. The name tells apart two sections in the same role, such as *Filling: Ube* and *Filling: Cheese*.
 - **Existing Sub-Assembly or Packaging** picker, when you're linking or copying.
-- **The lines table**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost per g**, **Cost** and **Base**. Under it are **Remove Line** and the section's cost per piece.
+- **The lines table**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base**. Under it are **Remove Line** and the section's cost per piece.
 - **Batch parameters**:
   - **Total weight**: the batch that goes in, including add-ins
   - **Shrinkage %**

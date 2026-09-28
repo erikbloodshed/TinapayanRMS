@@ -115,7 +115,7 @@ public sealed record PrintedSection(
 
 /// <summary>One ingredient of a section, or one of the product's add-ins on a linked one.</summary>
 /// <param name="Percent">Its share of the formula, in the section's <see cref="PrintedSection.PercentHeader"/>; null for an empty batch.</param>
-/// <param name="CostPerGram">The ingredient's buffered cost per gram, as the recipe form's Cost per Gram column shows it.</param>
+/// <param name="CostPerGram">The ingredient's buffered cost per gram, as the recipe form's Cost/g column shows it.</param>
 /// <param name="Cost">What it adds to the batch's cost, at <paramref name="CostPerGram"/>.</param>
 /// <param name="IsFormulaBase">Part of the formula's 100% base, usually the flour.</param>
 public sealed record PrintedLine(string Ingredient, decimal Grams, decimal? Percent, decimal CostPerGram, decimal Cost, bool IsFormulaBase);

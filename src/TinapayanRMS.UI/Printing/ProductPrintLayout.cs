@@ -263,7 +263,7 @@ public sealed class ProductPrintLayout
     {
         Add(repeat => SectionHeading(section.Name, section.Source, repeat), keepWithNext: true, table: table, repeats: true);
         Add(
-            _ => HeaderRow(RecipeTable, RecipeCells("Ingredient", "Grams", section.PercentHeader, "Cost per Gram", "Cost", "Base"), isLastCentred: true),
+            _ => HeaderRow(RecipeTable, RecipeCells("Ingredient", "Grams", section.PercentHeader, "Cost/g", "Cost", "Base"), isLastCentred: true),
             keepWithNext: true,
             table: table,
             repeats: true);

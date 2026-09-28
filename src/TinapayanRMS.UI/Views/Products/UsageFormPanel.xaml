@@ -473,11 +473,11 @@
                                     <syncfusion:Columns>
                                         <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
                                         <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
-                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per g" Width="88" NumberDecimalDigits="4" />
+                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost/g" Width="88" NumberDecimalDigits="4" />
                                     </syncfusion:Columns>
                                 </syncfusion:GridMultiColumnDropDownList.Columns>
                             </syncfusion:GridMultiColumnDropDownList>
-                            <!-- The four figure columns are one width, the widest header's (Cost per Gram), so they read as a row of equals. -->
+                            <!-- The four figure columns are one width, so they read as a row of equals. -->
                             <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
                             <controls:NumericColumn MappingName="Percent"
                                                     HeaderTemplate="{StaticResource PercentHeaderTemplate}"
@@ -486,7 +486,7 @@
                                                     AllowNullValue="True"
                                                     controls:GridCellEditing.AllowWhen="CanTypeBakersPercent" />
                             <!-- The ingredient's buffered cost per gram, as the picker's own column shows it: the rate this line's Cost comes from. -->
-                            <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost per Gram" Width="96" NumberDecimalDigits="4" AllowEditing="False" />
+                            <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost/g" Width="96" NumberDecimalDigits="4" AllowEditing="False" />
                             <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="96" NumberDecimalDigits="2" AllowEditing="False" />
                             <!-- The formula's 100% base for baker's percentage, usually the flour. -->
                             <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"
@@ -584,11 +584,11 @@
                                     <syncfusion:Columns>
                                         <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
                                         <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
-                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per g" Width="88" NumberDecimalDigits="4" />
+                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost/g" Width="88" NumberDecimalDigits="4" />
                                     </syncfusion:Columns>
                                 </syncfusion:GridMultiColumnDropDownList.Columns>
                             </syncfusion:GridMultiColumnDropDownList>
-                            <!-- The figure columns one width, as above (2026-09-28, with Cost per Gram added at the user's request), so they line up under the recipe's. -->
+                            <!-- The figure columns one width, as above (2026-09-28, with Cost/g added at the user's request), so they line up under the recipe's. -->
                             <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
                             <controls:NumericColumn MappingName="Percent"
                                                     HeaderTemplate="{StaticResource PercentHeaderTemplate}"
@@ -596,7 +596,7 @@
                                                     NumberDecimalDigits="1"
                                                     AllowNullValue="True"
                                                     controls:GridCellEditing.AllowWhen="CanTypeBakersPercent" />
-                            <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost per Gram" Width="96" NumberDecimalDigits="4" AllowEditing="False" />
+                            <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost/g" Width="96" NumberDecimalDigits="4" AllowEditing="False" />
                             <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="96" NumberDecimalDigits="2" AllowEditing="False" />
                         </syncfusion:SfDataGrid.Columns>
                     </syncfusion:SfDataGrid>
