@@ -98,6 +98,17 @@ Other terms you'll see on a product:
 - **Stage**: every product is either in **Research and Development** (still being worked out) or in **Production** (made and sold). New products start in Research and Development.
 - **Clone** and **Create Variant** start a new product from an existing one. See [Clone tab](#clone-tab).
 
+### Composite products
+
+A **composite product** is made of two or more other products, such as a *Pasalubong Box* of 6 Ensaymada and 4 Cheese Rolls. Its recipe is a list of products and how many of each go in. It has its own packaging and its own costing.
+
+- Each product in it brings its **recipe cost**: what its sub-assemblies (ingredients) cost for one of it, as that product's own Costing tab shows.
+- A product's packaging stays out. The composite's own packaging covers the box and anything wrapping the pieces in it.
+- It can also have sub-assemblies of its own, such as icing over a whole party box, but only in **product-owned** roles (see [Roles](#roles)). With the usual roles that's Topping, Filling and Pan Greasing, never Dough or Sponge. Its sections are sized for one whole composite.
+- A composite can hold another composite, but it can never end up holding itself.
+- A composite is always one sellable unit, so it has no **Quantity Required**.
+- You choose whether a product is a composite when you make it. That can't change once it's saved.
+
 ### Piece size: weight per piece, yield and shrinkage
 
 For each sub-assembly in a product you say how much of the batch one piece takes. Type **either** figure, and the app works out the other:
@@ -200,6 +211,7 @@ Each role has:
 - **Name**: what the section is called in a recipe, such as Dough or Filling.
 - **Order**: where the role's sections go in a recipe. Lower numbers come first.
 - **Product-owned**: a section made in a product in this role stays that product's own. It's edited in the product's recipe instead of on the Sub-Assemblies screen, and other products can copy it but not link it. Turning this on or off for a role that's already used asks first, and says how many sub-assemblies will move.
+  - These are also the only roles a composite product can have sections in. So Product-owned can't be turned off while a composite has a section in the role; the message names the composites. Take the section out there first.
 
 The **Packaging** role is special. Sub-assemblies in it are packaging sets. It can be renamed but not deleted, and it can't be product-owned.
 
@@ -327,7 +339,7 @@ This tab is a calculator. Type a **Use Quantity**, pick a unit and press **Calcu
 
 ### Used By tab
 
-This tab lists every product the material ends up in as tiles, including products that use it indirectly, such as through a made ingredient, a linked part or a packaging set. Click a tile to open that product.
+This tab lists every product the material ends up in as tiles, including products that use it indirectly, such as through a made ingredient, a linked part or a packaging set. An ingredient's list includes every composite product holding a product that uses it. Click a tile to open that product.
 
 ### Price History tab
 
@@ -388,17 +400,19 @@ Right-click menus:
   - **Delete** (Del)
 
   With several products picked, the menu offers to promote or move them all.
-- **A stage's folder**: **New Product Here**, **New Category…**, **Print Stage**, **Expand All** and **Collapse All**.
-- **A category's folder**: **New Product Here**, **Promote All to Production**, **Print Folder**, **New Category…**, **Rename Category…** and **Delete Category**.
-- **The empty space**: **New Product**, **New Category…**, **Print All Products**, **Expand All** and **Collapse All**.
+- **A stage's folder**: **New Product Here**, **New Composite Product Here**, **New Category…**, **Print Stage**, **Expand All** and **Collapse All**.
+- **A category's folder**: **New Product Here**, **New Composite Product Here**, **Promote All to Production**, **Print Folder**, **New Category…**, **Rename Category…** and **Delete Category**.
+- **The empty space**: **New Product**, **New Composite Product**, **New Category…**, **Print All Products**, **Expand All** and **Collapse All**.
 
-**New Product Here** files the new product in that folder when you save it. **New** from the header puts it in Research and Development.
+**New Product Here** and **New Composite Product Here** file the new product in that folder when you save it. **New** from the header puts it in Research and Development.
+
+A composite product shows a small icon after its name.
 
 ### The header
 
-The header has the product's name and **New**, **Save**, **Undo**, **Redo**, **Revert**, **Print** and **Delete**. Below them are these figures, all **per sellable unit**:
+The header has the product's name and **New**, **Save**, **Undo**, **Redo**, **Revert**, **Print** and **Delete**. **New** starts a product. The arrow beside it also offers **New composite product**. Below them are these figures, all **per sellable unit**:
 
-- **Material Cost**: sub-assemblies plus packaging.
+- **Material Cost**: sub-assemblies plus packaging. For a composite product, its products' recipe cost and its own sub-assemblies, plus its own packaging.
 - **Base Cost**: materials plus labour, overhead and administrative.
 - **Current Price**: what the shop charges now.
 - **Markup %**: what the current price actually earns on the base cost, with VAT taken out. Compare it with the markup you set on the Costing tab.
@@ -408,10 +422,10 @@ Below the header are the fields you fill in:
 
 - **Product Name**.
 - **Category**: pick one, or type a new name to add it.
-- **Quantity Required**: how many finished pieces make one sellable unit.
+- **Quantity Required**: how many finished pieces make one sellable unit. A composite product doesn't have one.
 - **Current Price**: the price the shop charges now, per sellable unit, VAT included. It's for comparison only and doesn't change the computed selling price.
 
-Deleting a product asks first. Its linked sub-assemblies stay on the Sub-Assemblies screen, and its own sub-assemblies are deleted with it. A product can't be deleted while another product's packaging links it.
+Deleting a product asks first. Its linked sub-assemblies stay on the Sub-Assemblies screen, and its own sub-assemblies are deleted with it. Deleting a composite product leaves the products it holds as they are. A product can't be deleted while another product's packaging links it, or while a composite product holds it.
 
 ### Recipe tab: Recipe Structure
 
@@ -466,6 +480,23 @@ The Packaging tab's table is typed into. Its columns are **Material**, **Qty**, 
 
 Packaging quantities are for one sellable unit. They aren't multiplied by Quantity Required. If you change Quantity Required, check the packaging yourself.
 
+#### A composite product's Products tab
+
+A composite product's recipe opens on its **Products** tab. After it come its own sections, such as a Topping, then **Packaging** when it has packaging.
+
+The **Products** table is typed into, like the Packaging table:
+
+- **Product**: type part of a name and pick it. The list leaves out the product itself, and any composite that holds it.
+- **Qty**: how many of that product go in, as a whole number. It counts the product's sellable units: pieces for a product sold by the piece, and whole boxes for one like *Ensaymada Box of 8*. To put in loose pieces, pick the product sold by the piece.
+- **Recipe Cost**: what one of that product brings, which is its recipe (ingredients) cost for one sellable unit.
+- **Cost**: Qty × Recipe Cost.
+
+Each product goes on one line. Drag lines into order, and use **Remove Line** to take one out. The figure at the top right is what the products come to together, without the composite's own sections.
+
+**Add Sub-Assembly** works as it does for any product, but a composite is offered only the **product-owned** roles and **Packaging**. A section's piece size is for one whole composite: a Topping with a **Weight/piece** of 100 g puts 100 g on each box. **Delete Sub-Assembly** takes the section showing out, or the packaging on the Packaging tab.
+
+Save needs at least **two different products** in a composite.
+
 ### Costing tab
 
 On the left are the product's four metrics, **Labor Metric**, **Overhead Metric**, **Admin Metric** and **Markup Metric**, then **VAT %**. A new product starts with the Costing Defaults.
@@ -481,7 +512,7 @@ Under each metric is its share of the price. VAT has a percentage box only, with
 
 On the right, the **Costing Summary** lists each component with its amount and its **% of Price**:
 
-- **Sub-assemblies (ingredients)**, with each sub-assembly listed under it
+- **Sub-assemblies (ingredients)**, with each sub-assembly listed under it. For a composite product this row is **Products (ingredients)**, with each product and its quantity listed under it, such as *Ensaymada × 6*. When the composite has sections of its own, the row is **Products and sub-assemblies (ingredients)** and lists them after the products. Its Labor, Overhead and Admin are a percentage of that row.
 - **Packaging**
 - **Labor**, **Overhead** and **Administrative**, each labelled with its percentage
 - **Subtotal (base cost)**
@@ -500,13 +531,15 @@ The Clone tab is shown for saved products only. Type a **New Product Name**, the
 
 With both, the product's own sub-assemblies are copied to the new product. The category, Quantity Required, Current Price and costing percentages are copied too. The new product starts in Research and Development, and you can change its piece sizes.
 
+A composite product's clone or variant is a composite too, holding the same products at the same quantities. Its own sections are copied as any product's are.
+
 ---
 
 ## 8. Printing recipes and costings
 
 Press **Print** in the Products header to open the **Print** tab. It shows a preview of the product's recipe and costing as the screen shows them, including changes you haven't saved yet.
 
-- **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen.
+- **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
 - **Print**: the drop-down chooses **This product**, the folder last asked for, or **All products**.
 - The preview's own controls set the printer, paper, orientation and margins.
 
@@ -529,7 +562,7 @@ Reports has two tabs along the bottom. Each is a table you can read but not edit
 One row for every product, as it's saved:
 
 - **Product**, its **Stage** (Production or Research and Development) and its **Category**.
-- **Pieces**: how many pieces make one sellable unit (1 for a product sold by the piece). Every amount after it is for one sellable unit.
+- **Pieces**: how many pieces make one sellable unit (1 for a product sold by the piece). Every amount after it is for one sellable unit. Blank for a composite product, which is one unit made of other products.
 - **Base Cost** and **Selling Price**: as the product's Costing tab works them out.
 - **Current Price**: what the shop charges now, as entered on the product. Blank if none is entered.
 - **Markup %**: what the current price earns on the base cost, as the product's header shows it. Blank without a current price.
@@ -562,6 +595,7 @@ A purchased ingredient's price changes
   → every made or linked ingredient that uses it (all the way up the chain)
     → every sub-assembly with those ingredients in its lines
       → every product that uses those sub-assemblies
+        → every composite product that holds those products
 
 A packaging material's price changes
   → every product and packaging set that uses it
@@ -619,6 +653,34 @@ If the shop actually charges **45.00**, the header's Markup % is (45.00 ÷ 1.12 
 
 A **section's cost per piece**, for comparison: a 1,000 g dough costing 50.00, with 10% shrinkage, has a final weight of 900 g. At 30 g a piece it yields 30 pieces, and each piece costs 50.00 × 30 ÷ 900 = **1.6667**.
 
+### A composite product
+
+A composite product is priced like any other product, with its products in place of sub-assemblies:
+
+1. **Products** = the sum of its lines. Each line is its Qty × the product's recipe cost for one sellable unit, which is the **Sub-assemblies** figure on that product's own Costing tab. The products' packaging isn't included. The composite's own sections, such as a Topping, are added at their cost per piece, since one piece is one whole composite.
+2. **Packaging** = the composite's own packaging.
+3. **Labor**, **Overhead** and **Administrative** = their percentage of step 1: its products, and its own sections if it has any.
+4. Then the base cost, markup, VAT and selling price, as above.
+
+For example, a *Pasalubong Box* holds 6 Ensaymada, whose recipe costs **2.50** each, and 4 Cheese Rolls at **5.00** each. It has a gift box costing **12.00**, and the same percentages as the worked example above.
+
+| Step | Working | Amount |
+|---|---|---|
+| Products | 6 × 2.50 + 4 × 5.00 | 35.00 |
+| Packaging | the gift box | 12.00 |
+| Labor | 25% of 35.00 | 8.75 |
+| Overhead | 10% of 35.00 | 3.50 |
+| Administrative | 5% of 35.00 | 1.75 |
+| **Base cost** | 35 + 12 + 8.75 + 3.50 + 1.75 | **61.00** |
+| Markup | 30% of 61.00 | 18.30 |
+| Price before VAT | | 79.30 |
+| VAT | 12% of 79.30 | 9.52 |
+| **Selling price** | | **88.82** |
+
+With the same percentages as its products and no packaging or sections of its own, a composite is priced at exactly what its products are priced at together.
+
+Give the same box an icing topping that costs **5.00** for one box, and step 1 becomes 35.00 + 5.00 = **40.00**. Labor, Overhead and Administrative are then taken of 40.00. A composite held in another composite brings its whole step 1, topping included.
+
 ### Rounding
 
 The app keeps costs at full precision and rounds them only for display. So a total can differ from the sum of the rounded figures above it by a cent.
@@ -658,6 +720,15 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 
 Right-click the category's folder in the Products list and choose **Print Folder**. Untick **Costing** for kitchen copies.
 
+### Make a composite product, such as a gift box of several products
+
+1. In the Products header, press the arrow beside **New** and choose **New composite product**. Or right-click a folder in the list and choose **New Composite Product Here**.
+2. Type its **Product Name**.
+3. On the **Products** tab, add a line for each product: pick the product, then type how many go in under **Qty**.
+4. Use **Add Sub-Assembly** with the **Packaging** role for the box, and for anything wrapping the pieces inside it. The products' own packaging isn't included.
+5. For a topping or filling over the whole composite, use **Add Sub-Assembly** in that role. Its **Weight/piece** is what one whole composite takes.
+6. Check the **Costing** tab, then press **Save**. A composite needs at least two different products.
+
 ### Give a product a box for a pack of several pieces
 
 1. On **Sub-Assemblies**, press **New**, pick the **Packaging** role, and list the box and the bags one pack takes. Save.
@@ -674,8 +745,18 @@ It's still in use. The message says where. For example:
 - An ingredient used in another's bill of materials, or linked by a part.
 - A sub-assembly a product links.
 - A product whose packaging another product links.
+- A product that a composite product holds.
 
 Move or remove what uses it first.
+
+**"A composite product needs at least two different products."**
+A composite is made of two or more different products. For more of one product, give that line a bigger **Qty**. For a pack of one product, use **Quantity Required** on a product of its own instead.
+
+**"… can only have sections in product-owned roles …"**
+A composite product's own sections can only be in a role with **Product-owned** ticked in Settings ▸ Roles, such as Topping or Filling. Pick one of those, or tick Product-owned for the role. Settings also won't untick Product-owned, nor the Sub-Assemblies screen move a sub-assembly out of such a role, while a composite has a section there: the message names it.
+
+**A product can't go into a composite.**
+The product picker leaves out the composite itself, and any composite that already holds it. Otherwise the composite would end up holding itself.
 
 **"The name is already taken."**
 Names must be unique within each list: raw materials, sub-assemblies, products, categories, roles and units. A unit's abbreviation must be unique too. Upper and lower case count as the same.

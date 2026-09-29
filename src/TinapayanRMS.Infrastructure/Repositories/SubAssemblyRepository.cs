@@ -201,6 +201,16 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
                 await EnsureDistinctWhereLinkedAsync(dbContext, stored.Id, subAssembly.RoleId, name, cancellationToken);
             }
 
+            // A composite that links it can only have sections in product-owned roles.
+            if (stored.RoleId != subAssembly.RoleId
+                && !role.IsProductOwned
+                && await ProductComponentRepository.CompositesUsingRoleAsync(dbContext, stored.RoleId, stored.Id, cancellationToken) is [_, ..] composites)
+            {
+                throw new InvalidOperationException(
+                    $"{ProductComponentRepository.NamesHave(composites)} {stored.Name} as a section, and a composite product can only "
+                    + $"have sections in product-owned roles, which {role.Name} isn't. Take it out there first, or pick a product-owned role.");
+            }
+
             stored.Name = name;
             stored.RoleId = subAssembly.RoleId;
         }

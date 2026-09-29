@@ -94,7 +94,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Text="Labor Metric" Style="{StaticResource FormLabelStyle}" ToolTip="{Binding CostUnitCaption, StringFormat='Of the sub-assemblies (ingredients) cost, packaging not included. {0}.'}" />
+                        <TextBlock Text="Labor Metric" Style="{StaticResource FormLabelStyle}" ToolTip="{Binding MetricBaseTooltip}" />
                         <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingLaborPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
                         <syncfusion:DoubleTextBox Grid.Column="3"
                                                   NumberDecimalDigits="2"
@@ -118,7 +118,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Text="Overhead Metric" Style="{StaticResource FormLabelStyle}" ToolTip="{Binding CostUnitCaption, StringFormat='Of the sub-assemblies (ingredients) cost, packaging not included. {0}.'}" />
+                        <TextBlock Text="Overhead Metric" Style="{StaticResource FormLabelStyle}" ToolTip="{Binding MetricBaseTooltip}" />
                         <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingOverheadPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
                         <syncfusion:DoubleTextBox Grid.Column="3"
                                                   NumberDecimalDigits="2"
@@ -142,7 +142,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Text="Admin Metric" Style="{StaticResource FormLabelStyle}" ToolTip="{Binding CostUnitCaption, StringFormat='Administrative: office, permits, bookkeeping. Of the sub-assemblies (ingredients) cost, packaging not included. {0}.'}" />
+                        <TextBlock Text="Admin Metric" Style="{StaticResource FormLabelStyle}" ToolTip="{Binding MetricBaseTooltip, StringFormat='Administrative: office, permits, bookkeeping. {0}'}" />
                         <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingAdministrativePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
                         <syncfusion:DoubleTextBox Grid.Column="3"
                                                   NumberDecimalDigits="2"
@@ -227,7 +227,7 @@
                 <TextBlock Grid.Column="1" Text="{Binding CostUnitCaption}" Style="{StaticResource HeaderCellStyle}" HorizontalAlignment="Right" />
                 <TextBlock Grid.Column="2" Text="% of Price" Style="{StaticResource HeaderCellStyle}" HorizontalAlignment="Right" />
 
-                <TextBlock Grid.Row="1" Text="Sub-assemblies (ingredients)" Style="{StaticResource LabelCellStyle}" />
+                <TextBlock Grid.Row="1" Text="{Binding Costs.PartsTitle}" Style="{StaticResource LabelCellStyle}" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Costs.SubAssemblies, StringFormat='{}{0:N2}'}" Style="{StaticResource AmountCellStyle}" />
                 <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Costs.SubAssembliesShare, StringFormat='{}{0:N1}%'}" Style="{StaticResource ShareCellStyle}" />
 
@@ -261,21 +261,21 @@
 
                 <Border Grid.Row="4" Style="{StaticResource RowRuleStyle}" />
                 <TextBlock Grid.Row="4" Style="{StaticResource LabelCellStyle}">
-                    <Run Text="Labor (" /><Run Text="{Binding Costs.LaborPercent, StringFormat='{}{0:0.##}', Mode=OneWay}" /><Run Text="% of sub-assemblies)" />
+                    <Run Text="Labor (" /><Run Text="{Binding Costs.LaborPercent, StringFormat='{}{0:0.##}', Mode=OneWay}" /><Run Text="{Binding Costs.PartsBase, StringFormat='% of {0})', Mode=OneWay}" />
                 </TextBlock>
                 <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Costs.Labor, StringFormat='{}{0:N2}'}" Style="{StaticResource AmountCellStyle}" />
                 <TextBlock Grid.Row="4" Grid.Column="2" Text="{Binding Costs.LaborShare, StringFormat='{}{0:N1}%'}" Style="{StaticResource ShareCellStyle}" />
 
                 <Border Grid.Row="5" Style="{StaticResource RowRuleStyle}" />
                 <TextBlock Grid.Row="5" Style="{StaticResource LabelCellStyle}">
-                    <Run Text="Overhead (" /><Run Text="{Binding Costs.OverheadPercent, StringFormat='{}{0:0.##}', Mode=OneWay}" /><Run Text="% of sub-assemblies)" />
+                    <Run Text="Overhead (" /><Run Text="{Binding Costs.OverheadPercent, StringFormat='{}{0:0.##}', Mode=OneWay}" /><Run Text="{Binding Costs.PartsBase, StringFormat='% of {0})', Mode=OneWay}" />
                 </TextBlock>
                 <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Costs.Overhead, StringFormat='{}{0:N2}'}" Style="{StaticResource AmountCellStyle}" />
                 <TextBlock Grid.Row="5" Grid.Column="2" Text="{Binding Costs.OverheadShare, StringFormat='{}{0:N1}%'}" Style="{StaticResource ShareCellStyle}" />
 
                 <Border Grid.Row="6" Style="{StaticResource RowRuleStyle}" />
                 <TextBlock Grid.Row="6" Style="{StaticResource LabelCellStyle}">
-                    <Run Text="Administrative (" /><Run Text="{Binding Costs.AdministrativePercent, StringFormat='{}{0:0.##}', Mode=OneWay}" /><Run Text="% of sub-assemblies)" />
+                    <Run Text="Administrative (" /><Run Text="{Binding Costs.AdministrativePercent, StringFormat='{}{0:0.##}', Mode=OneWay}" /><Run Text="{Binding Costs.PartsBase, StringFormat='% of {0})', Mode=OneWay}" />
                 </TextBlock>
                 <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding Costs.Administrative, StringFormat='{}{0:N2}'}" Style="{StaticResource AmountCellStyle}" />
                 <TextBlock Grid.Row="6" Grid.Column="2" Text="{Binding Costs.AdministrativeShare, StringFormat='{}{0:N1}%'}" Style="{StaticResource ShareCellStyle}" />

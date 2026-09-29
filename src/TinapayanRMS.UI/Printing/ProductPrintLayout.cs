@@ -39,6 +39,8 @@ public sealed class ProductPrintLayout
     private static readonly GridLength[] RecipeColumnsWithoutCosts = [new(1, GridUnitType.Star), new(90), new(80), new(44)];
     private static readonly GridLength[] PackagingColumns = [new(1, GridUnitType.Star), new(70), new(64), new(90), new(90)];
     private static readonly GridLength[] PackagingColumnsWithoutCosts = [new(1, GridUnitType.Star), new(70), new(64)];
+    private static readonly GridLength[] ComponentColumns = [new(1, GridUnitType.Star), new(70), new(100), new(90)];
+    private static readonly GridLength[] ComponentColumnsWithoutCosts = [new(1, GridUnitType.Star), new(70)];
     private static readonly GridLength[] CostingColumns = [new(1, GridUnitType.Star), new(140), new(90)];
     private static readonly GridLength[] ContentsColumns = [new(1, GridUnitType.Star), new(240), new(56)];
 
@@ -225,7 +227,13 @@ public sealed class ProductPrintLayout
         if (_includeRecipe)
         {
             Add(_ => PartHeading("Recipe"), keepWithNext: true);
-            if (printout.Sections.Count == 0)
+
+            // A composite's recipe is the products it holds, then any sections of its own.
+            if (printout.Components is { } components)
+            {
+                AddComponents(components, ++table);
+            }
+            else if (printout.Sections.Count == 0)
             {
                 Add(_ => Caption("No sub-assemblies yet."));
             }
@@ -255,9 +263,49 @@ public sealed class ProductPrintLayout
     private T[] PackagingCells<T>(T material, T qty, T unit, T unitCost, T cost) =>
         _includeCosting ? [material, qty, unit, unitCost, cost] : [material, qty, unit];
 
+    /// <summary>A composite's Products table's cells: a product's recipe cost and its line's cost only while the costing is printed.</summary>
+    private T[] ComponentCells<T>(T product, T qty, T recipeCost, T cost) =>
+        _includeCosting ? [product, qty, recipeCost, cost] : [product, qty];
+
     private GridLength[] RecipeTable => _includeCosting ? RecipeColumns : RecipeColumnsWithoutCosts;
 
     private GridLength[] PackagingTable => _includeCosting ? PackagingColumns : PackagingColumnsWithoutCosts;
+
+    private GridLength[] ComponentTable => _includeCosting ? ComponentColumns : ComponentColumnsWithoutCosts;
+
+    /// <summary>
+    /// A composite's products, as its Products tab shows them: each product, how many go in, and with the costing what one
+    /// of it brings and what the line comes to, then their total: the costing's Products (ingredients), less any sections.
+    /// </summary>
+    private void AddComponents(IReadOnlyList<PrintedComponent> components, int table)
+    {
+        if (components.Count == 0)
+        {
+            Add(_ => Caption("No products yet."));
+            return;
+        }
+
+        Add(repeat => SectionHeading("Products", null, repeat), keepWithNext: true, table: table, repeats: true);
+        Add(_ => HeaderRow(ComponentTable, ComponentCells("Product", "Qty", "Recipe Cost", "Cost")), keepWithNext: true, table: table, repeats: true);
+        for (var i = 0; i < components.Count; i++)
+        {
+            var line = components[i];
+            Add(
+                _ => Row(ComponentTable, ComponentCells(
+                    Label(line.Product),
+                    Figure(line.Quantity is { } qty ? qty.ToString("N0", CultureInfo.CurrentCulture) : "—"),
+                    Figure(Money(line.RecipeCost)),
+                    Figure(Money(line.Cost)))),
+                keepWithNext: _includeCosting && i == components.Count - 1,
+                table: table);
+        }
+
+        // The total is only a cost, so without the costing the table ends at its last line.
+        if (_includeCosting)
+        {
+            Add(_ => TotalRow(ComponentTable, "Total", string.Empty, string.Empty, Money(components.Sum(c => c.Cost))), table: table);
+        }
+    }
 
     private void AddSection(PrintedSection section, int table)
     {
@@ -329,9 +377,10 @@ public sealed class ProductPrintLayout
         Add(_ => Figures(costs), keepWithNext: true, keepTogether: CostingGroup);
         Add(_ => HeaderRow(CostingColumns, ["Component", unit, "% of Price"]), keepWithNext: true, table: table, repeats: true, keepTogether: CostingGroup);
 
-        AddCost("Sub-assemblies (ingredients)", costs.SubAssemblies, costs.SubAssembliesShare, isFollowedByParts: costs.SubAssemblyLines.Count > 0);
+        AddCost(costs.PartsTitle, costs.SubAssemblies, costs.SubAssembliesShare, isFollowedByParts: costs.SubAssemblyLines.Count > 0);
 
-        // What each sub-assembly comes to, indented and muted under their total, as the Costing tab shows them.
+        // What each sub-assembly (a composite's each product) comes to, indented and muted under their total, as the Costing
+        // tab shows them.
         for (var i = 0; i < costs.SubAssemblyLines.Count; i++)
         {
             var line = costs.SubAssemblyLines[i];
@@ -340,9 +389,9 @@ public sealed class ProductPrintLayout
         }
 
         AddCost("Packaging", costs.Packaging, costs.PackagingShare);
-        AddCost($"Labor ({costs.LaborPercent:0.##}% of sub-assemblies)", costs.Labor, costs.LaborShare);
-        AddCost($"Overhead ({costs.OverheadPercent:0.##}% of sub-assemblies)", costs.Overhead, costs.OverheadShare);
-        AddCost($"Administrative ({costs.AdministrativePercent:0.##}% of sub-assemblies)", costs.Administrative, costs.AdministrativeShare);
+        AddCost($"Labor ({costs.LaborPercent:0.##}% of {costs.PartsBase})", costs.Labor, costs.LaborShare);
+        AddCost($"Overhead ({costs.OverheadPercent:0.##}% of {costs.PartsBase})", costs.Overhead, costs.OverheadShare);
+        AddCost($"Administrative ({costs.AdministrativePercent:0.##}% of {costs.PartsBase})", costs.Administrative, costs.AdministrativeShare);
         Add(_ => BandRow("Subtotal (base cost)", Money(costs.BaseCost), Share(costs.BaseCostShare), isTotal: false), table: table, keepTogether: CostingGroup);
         AddCost($"Markup ({costs.MarginPercent:0.##}%)", costs.Markup, costs.MarkupShare);
         AddCost($"VAT ({costs.VatPercent:0.##}%)", costs.Vat, costs.VatShare);

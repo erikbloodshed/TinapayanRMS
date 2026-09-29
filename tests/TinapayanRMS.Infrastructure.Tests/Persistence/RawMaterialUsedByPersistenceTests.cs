@@ -177,6 +177,59 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task An_ingredient_is_used_by_every_composite_holding_a_product_it_goes_into_but_a_products_packaging_isnt()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var bagId = await AddBoxAsync("Bag");
+        var giftBoxId = await AddBoxAsync("Gift Box");
+        var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)]);
+        var (rollId, _) = await AddProductWithSubAssemblyAsync("Cheese Roll", doughRoleId, [(sugarId, 1000m)]);
+        await SetOwnPackagingAsync(ensaymadaId, bagId);
+        var products = new ProductRepository(CreateDbContextFactory());
+        var boxId = await products.SaveAsync(
+            new Product { Name = "Pasalubong Box", IsComposite = true },
+            new RecipeDraft([], []) { Components = [(ensaymadaId, 6), (rollId, 4)] },
+            null, null, null, Cancellation);
+        await SetOwnPackagingAsync(boxId, giftBoxId);
+        await products.SaveAsync(
+            new Product { Name = "Party Package", IsComposite = true },
+            new RecipeDraft([], []) { Components = [(boxId, 2), (rollId, 6)] },
+            null, null, null, Cancellation);
+
+        (await UsedByNamesAsync(flourId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
+        (await UsedByNamesAsync(sugarId)).Should().Equal("Cheese Roll", "Party Package", "Pasalubong Box");
+
+        // A product brings its recipe into a composite, not its packaging: the composite's packaging is its own.
+        (await UsedByNamesAsync(bagId)).Should().Equal("Ensaymada");
+        (await UsedByNamesAsync(giftBoxId)).Should().Equal("Pasalubong Box");
+    }
+
+    [Fact]
+    public async Task An_ingredient_in_a_composites_own_topping_is_used_by_it_and_by_every_composite_holding_it()
+    {
+        var toppingRoleId = await AddRoleAsync("Topping", isProductOwned: true);
+        var icingId = await AddIngredientAsync("Icing");
+        var ensaymadaId = await AddProductAsync("Ensaymada");
+        var rollId = await AddProductAsync("Cheese Roll");
+        var products = new ProductRepository(CreateDbContextFactory());
+        var boxId = await products.SaveAsync(
+            new Product { Name = "Pasalubong Box", IsComposite = true },
+            new RecipeDraft([new NewSubAssemblyDraft(toppingRoleId, [(icingId, 500m)], UsageAuthoredField.WeightPerPiece, 100m)], [])
+            {
+                Components = [(ensaymadaId, 6), (rollId, 4)],
+            },
+            null, null, null, Cancellation);
+        await products.SaveAsync(
+            new Product { Name = "Party Package", IsComposite = true },
+            new RecipeDraft([], []) { Components = [(boxId, 2), (rollId, 6)] },
+            null, null, null, Cancellation);
+
+        (await UsedByNamesAsync(icingId)).Should().Equal("Party Package", "Pasalubong Box");
+    }
+
+    [Fact]
     public async Task A_products_own_packaging_lines_dont_count_while_its_packaging_links_another()
     {
         var boxId = await AddBoxAsync("Box");

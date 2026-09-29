@@ -46,6 +46,53 @@ public class ProductPrintLayoutTests
         texts.Should().NotContain([Figure(0.05m, "N4"), Figure(5m, "N2"), Figure(10m, "N2"), Figure(30m, "N4"), Figure(30m, "N2")], "no line's, batch's or box's cost");
     });
 
+    [Fact]
+    public void A_composites_recipe_is_its_products_table_and_its_costing_calls_them_products() => StaThread.Run(() =>
+    {
+        var texts = AllTexts(new ProductPrintLayout(SamplePrintouts.Composite(), includeRecipe: true, includeCosting: true, A4));
+
+        texts.Should().ContainInConsecutiveOrder("Products", "Product", "Qty", "Recipe Cost", "Cost");
+        texts.Should().ContainInConsecutiveOrder("Ensaymada", Figure(6m, "N0"), Figure(2.50m, "N2"), Figure(15m, "N2"));
+        texts.Should().ContainInConsecutiveOrder("Cheese Roll", Figure(4m, "N0"), Figure(5m, "N2"), Figure(20m, "N2"));
+        texts.Should().ContainInConsecutiveOrder("Total", string.Empty, string.Empty, Figure(35m, "N2"));
+        texts.Should().Contain("Products (ingredients)");
+        texts.Should().Contain(t => t.StartsWith("Labor (25% of products)", StringComparison.Ordinal));
+        texts.Should().NotContain("No sub-assemblies yet.");
+        texts.Should().NotContain("Sub-assemblies (ingredients)");
+    });
+
+    [Fact]
+    public void A_composites_own_topping_prints_after_its_products_and_its_costing_names_both() => StaThread.Run(() =>
+    {
+        var composite = SamplePrintouts.Composite();
+        var topping = SamplePrintouts.WithLines(1).Sections.Single() with { Name = "Topping", Source = null };
+        var printout = composite with
+        {
+            Sections = [topping],
+            Costs = new ProductCostSummary(
+                [("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m), ("Topping", 2.5m)], 1, [30m], 25m, 10m, 5m, 30m, 12m, 120m, isComposite: true, hasSections: true),
+        };
+
+        var texts = AllTexts(new ProductPrintLayout(printout, includeRecipe: true, includeCosting: true, A4));
+
+        texts.IndexOf("Topping").Should().BeGreaterThan(texts.IndexOf("Cheese Roll"), "the products come first, then its own sections");
+        texts.Should().Contain("Products and sub-assemblies (ingredients)");
+        texts.Should().Contain(t => t.StartsWith("Labor (25% of products and sub-assemblies)", StringComparison.Ordinal));
+    });
+
+    [Fact]
+    public void Without_the_costing_a_composites_products_table_has_no_costs_and_an_empty_one_says_so() => StaThread.Run(() =>
+    {
+        var texts = AllTexts(new ProductPrintLayout(SamplePrintouts.Composite(), includeRecipe: true, includeCosting: false, A4));
+
+        texts.Should().ContainInConsecutiveOrder("Product", "Qty", "Ensaymada", Figure(6m, "N0"), "Cheese Roll", Figure(4m, "N0"));
+        texts.Should().NotContain("Recipe Cost");
+        texts.Should().NotContain(Figure(15m, "N2"));
+
+        var empty = AllTexts(new ProductPrintLayout(SamplePrintouts.Composite() with { Components = [] }, includeRecipe: true, includeCosting: true, A4));
+        empty.Should().Contain("No products yet.");
+    });
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

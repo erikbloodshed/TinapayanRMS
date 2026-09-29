@@ -39,6 +39,19 @@ internal static class SamplePrintouts
         new PrintedPackaging(null, [new PrintedPackagingLine("Gift Box", 1m, "pc", 30m, 30m)], 30m),
         new ProductCostSummary([("Dough", 2.5m)], 1, [30m], 25m, 10m, 5m, 30m, 12m, 60m));
 
+    /// <summary>
+    /// A composite, Pasalubong Box: 6 Ensaymada at 2.50 of recipe each and 4 Cheese Rolls at 5.00, 35.00 between them, and
+    /// its gift box.
+    /// </summary>
+    public static ProductPrintout Composite() => WithLines(0) with
+    {
+        ProductName = "Pasalubong Box",
+        CostUnitCaption = "Per unit",
+        Sections = [],
+        Components = [new PrintedComponent("Ensaymada", 6, 2.50m, 15m), new PrintedComponent("Cheese Roll", 4, 5m, 20m)],
+        Costs = new ProductCostSummary([("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m)], 1, [30m], 25m, 10m, 5m, 30m, 12m, 120m, isComposite: true),
+    };
+
     /// <summary>A titled set of products, each named and with as many Dough lines as given, as a folder or All products prints them.</summary>
     public static ProductPrintSet Set(string title, params (string Name, int Lines)[] products) => new(
         title,

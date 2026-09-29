@@ -18,9 +18,10 @@ public interface IRawMaterialRepository
     /// <summary>
     /// The products whose cost the material goes into, alphabetically, each once. An ingredient counts through the
     /// sub-assemblies a product uses (its own and linked ones) and the add-ins on its linked usages, and so does every
-    /// made ingredient it's in and linked ingredient cut from it, however deep. Packaging counts through a product's own
-    /// packaging lines and a packaging set its packaging links, and so does every product whose packaging links that
-    /// product's, down the chain.
+    /// made ingredient it's in and linked ingredient cut from it, however deep, and every composite holding such a product,
+    /// directly or through another composite. Packaging counts through a product's own packaging lines and a packaging set
+    /// its packaging links, and so does every product whose packaging links that product's, down the chain; a composite's
+    /// products bring no packaging into it.
     /// </summary>
     Task<IReadOnlyList<LinkingProduct>> GetUsedByAsync(int id, CancellationToken cancellationToken);
 

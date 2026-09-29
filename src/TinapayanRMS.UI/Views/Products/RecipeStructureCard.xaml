@@ -7,7 +7,8 @@
              xmlns:local="clr-namespace:TinapayanRMS.UI.Views.Products">
     <!--
         What goes into one piece, in tabs (RecipeTabs): a sub-assembly's for each one in the recipe, in role
-        order, then New Sub-Assembly while Add Sub-Assembly's form is open, then Packaging while the product has any.
+        order (a composite's Products instead), then New Sub-Assembly while Add Sub-Assembly's (a composite's Add
+        Packaging's) form is open, then Packaging while the product has any.
         Add Sub-Assembly and Delete Sub-Assembly sit in the header, Add Sub-Assembly as a drop-down of the three
         ways in: a new sub-assembly, or an existing one linked or copied (UsageFormMode).
         The tabs only pick what shows under them; they have no content of their own. Every sub-assembly's tab and
@@ -87,6 +88,7 @@
                                               Click="AddSubAssemblyItem_Click" />
                     </StackPanel>
                 </syncfusion:DropDownButtonAdv>
+
                 <syncfusion:ButtonAdv Label="Delete Sub-Assembly"
                                       ToolTip="Take the sub-assembly showing out of the recipe, with Save. One of this product's own is deleted; a linked one stays on the Sub-Assemblies screen."
                                       IconTemplate="{StaticResource DeleteIconTemplate}"
@@ -179,6 +181,9 @@
 
                     <!-- The packaging, inset as the tab control inset it as a tab's content -->
                     <local:PackagingSectionView Margin="2,-2,2,2" Visibility="{Binding IsPackagingShowing, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                    <!-- A composite's products, inset as the packaging is -->
+                    <local:ComponentsSectionView Margin="2,-2,2,2" Visibility="{Binding IsComponentsShowing, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </Grid>
             </ScrollViewer>
         </Grid>

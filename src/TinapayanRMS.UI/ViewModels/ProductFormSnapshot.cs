@@ -9,6 +9,7 @@ public enum RecipeTabKind
     Usage,
     AddSubAssembly,
     Packaging,
+    Components,
 }
 
 /// <param name="UsageIndex">Which sub-assembly's tab, for <see cref="RecipeTabKind.Usage"/>; -1 otherwise.</param>
@@ -23,6 +24,12 @@ public readonly record struct IngredientLineState(int? IngredientId, decimal? Gr
 
 /// <summary>One packaging line, by material id for the same reason, and by unit id for the unit it's entered in.</summary>
 public readonly record struct PackagingLineState(int? PackagingMaterialId, int? UnitId, decimal? QtyPerUnit);
+
+/// <summary>
+/// One line of a composite's Products table, by product id for the same reason: a refresh swaps in fresh products and
+/// recipe costs, which a repriced line isn't an edit of.
+/// </summary>
+public readonly record struct ComponentLineState(int? ProductId, int? Quantity);
 
 /// <summary>
 /// The Products screen's editable state at one instant: everything one undo step puts back, and nothing else.
@@ -62,6 +69,9 @@ public sealed record ProductFormSnapshot
     public required bool HasPackaging { get; init; }
     public required PackagingLinkTarget? PackagingLink { get; init; }
     public required IReadOnlyList<PackagingLineState> Lines { get; init; }
+
+    /// <summary>A composite's Products table; empty for a product made of sub-assemblies, which has no such table.</summary>
+    public required IReadOnlyList<ComponentLineState> Components { get; init; }
 
     // The sub-assembly form
     public required bool IsUsageFormOpen { get; init; }
@@ -106,6 +116,7 @@ public sealed record ProductFormSnapshot
         && HasPackaging == other.HasPackaging
         && Equals(PackagingLink, other.PackagingLink)
         && Lines.SequenceEqual(other.Lines)
+        && Components.SequenceEqual(other.Components)
         && IsUsageFormOpen == other.IsUsageFormOpen
         && IsAddingUsage == other.IsAddingUsage
         && UsageFormTitle == other.UsageFormTitle

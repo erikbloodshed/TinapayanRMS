@@ -30,8 +30,11 @@ public partial class ProductsView : UserControl
             interaction.SetOutput(TextPromptWindow.Prompt(request.Title, request.Label, request.InitialValue, Window.GetWindow(this), request.Message));
         });
 
-        // New clears the form, as New Product Here does; put the cursor in the name so typing can start straight away.
+        // New clears the form, as New Product Here does, and their composite ones; put the cursor in the name so typing can
+        // start straight away.
         viewModel.NewCommand.Subscribe(_ => Details.FocusName());
         viewModel.NewProductInCommand.Subscribe(_ => Details.FocusName());
+        viewModel.NewCompositeCommand.Subscribe(_ => Details.FocusName());
+        viewModel.NewCompositeProductInCommand.Subscribe(_ => Details.FocusName());
     }
 }

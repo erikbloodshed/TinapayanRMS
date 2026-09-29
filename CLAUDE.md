@@ -41,7 +41,7 @@ dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infras
   - **Each folder is its own namespace, and files are grouped by kind.** Only app-startup plumbing and the DbContext pair sit at a project root.
 - **Some costs are stored, others are computed on read.**
   - Stored: `RawMaterial.CostPerBaseUnit` and `BufferedCostPerBaseUnit`, and `SubAssembly.TotalWeight` and `TotalCost`. When a price, BOM or line changes, `IngredientCostPropagator` updates the made ingredients in dependency order (using `IngredientCostGraph`), then `SubAssemblyCostPropagator` updates the sub-assemblies.
-  - Computed on read by `ProductRules` and `CostingRules`: product usages, packaging lines, and product cost and price.
+  - Computed on read by `ProductRules` and `CostingRules`: product usages, packaging lines, and product cost and price. A composite product's lines bring each held product's recipe cost, which `SavedProductReader` also works out on read.
   - Before changing any cost path, read PLAN.md's "Reactive Costing Cascade" section.
 - **`TinapayanRMSDbContext` is registered with `AddDbContextFactory`.** ViewModels are DI singletons, so each operation creates its own short-lived context.
 - **ReactiveUI 24 has quirks.** It needs the builder bootstrap in `ReactiveUIBootstrapper.cs`. Its parameterless commands are `ReactiveCommand<RxVoid, RxVoid>`. Import that type with `using RxVoid = ReactiveUI.Primitives.RxVoid;` and never with `using ReactiveUI.Primitives;`, which causes CS0121 ambiguities with `System.Reactive.Linq`.

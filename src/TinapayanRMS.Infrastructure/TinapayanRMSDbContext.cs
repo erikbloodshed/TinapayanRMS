@@ -36,6 +36,8 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<Product> Products => Set<Product>();
 
+    public DbSet<ProductComponent> ProductComponents => Set<ProductComponent>();
+
     public DbSet<ProductSubAssemblyUsage> ProductSubAssemblyUsages => Set<ProductSubAssemblyUsage>();
 
     public DbSet<UsageAddInLine> UsageAddInLines => Set<UsageAddInLine>();

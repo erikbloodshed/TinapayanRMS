@@ -427,13 +427,20 @@ public sealed record SubAssemblyCostLine(string Name, decimal Cost, decimal Shar
 /// A product's cost for one sellable unit, from its materials to its selling price (cost-plus,
 /// CostingRules), with each part's share of the selling price. The recipe is authored per piece, so the
 /// usages are multiplied by <c>quantityRequired</c>; the packaging lines already wrap one whole unit.
-/// Worked out from the form, so unsaved edits show at once.
+/// Worked out from the form, so unsaved edits show at once. A composite's "usages" are the products it holds, each
+/// line what its quantity of that product brings in recipe cost (CompositeProductRules.CalculateComponentCost), then its
+/// own sections, at a quantity of 1: its Sub-assemblies figure is its recipe cost, and every formula after that is the same.
 /// </summary>
 public sealed class ProductCostSummary
 {
     public static ProductCostSummary Empty { get; } = new([], 1, [], 0m, 0m, 0m, 0m, 0m, null);
 
-    /// <param name="usages">Each sub-assembly in the recipe, in recipe order: its name and its cost per piece.</param>
+    /// <param name="usages">
+    /// Each sub-assembly in the recipe, in recipe order: its name and its cost per piece. For a composite, each product it
+    /// holds: "Ensaymada × 6", and what the six bring in recipe cost, then its own sections.
+    /// </param>
+    /// <param name="isComposite">The product is a composite, whose recipe is the products it holds.</param>
+    /// <param name="hasSections">A composite also has sections of its own (a topping, a filling), which its labels name too.</param>
     public ProductCostSummary(
         IReadOnlyList<(string Name, decimal CostPerPiece)> usages,
         int quantityRequired,
@@ -443,9 +450,13 @@ public sealed class ProductCostSummary
         decimal administrativePercent,
         decimal marginPercent,
         decimal vatPercent,
-        decimal? currentPrice)
+        decimal? currentPrice,
+        bool isComposite = false,
+        bool hasSections = false)
     {
         IReadOnlyList<decimal> usageCostsPerPiece = [.. usages.Select(u => u.CostPerPiece)];
+        IsComposite = isComposite;
+        HasSections = hasSections;
         QuantityRequired = quantityRequired;
         SubAssemblies = usageCostsPerPiece.Sum() * quantityRequired;
         Packaging = packagingCosts.Sum();
@@ -474,6 +485,27 @@ public sealed class ProductCostSummary
     /// <summary>How many finished pieces this unit holds: 1 for a product sold by the piece.</summary>
     public int QuantityRequired { get; }
 
+    /// <summary>A composite's costs: its <see cref="SubAssemblies"/> are the recipe cost of the products it holds.</summary>
+    public bool IsComposite { get; }
+
+    /// <summary>A composite that also has sections of its own: a topping, a filling.</summary>
+    public bool HasSections { get; }
+
+    /// <summary>
+    /// What <see cref="SubAssemblies"/> is called in the breakdown: "Sub-assemblies (ingredients)", or a composite's
+    /// "Products (ingredients)", "Products and sub-assemblies (ingredients)" once it has sections of its own.
+    /// </summary>
+    public string PartsTitle => $"{char.ToUpperInvariant(PartsBase[0])}{PartsBase[1..]} (ingredients)";
+
+    /// <summary>What labor, overhead and administrative are a percentage of, in their labels: "sub-assemblies", or a composite's "products" (and "sub-assemblies").</summary>
+    public string PartsBase => (IsComposite, HasSections) switch
+    {
+        (true, true) => "products and sub-assemblies",
+        (true, false) => "products",
+        _ => "sub-assemblies",
+    };
+
+    /// <summary>The recipe cost: every sub-assembly's cost per piece times the pieces a unit holds, or the products a composite holds.</summary>
     public decimal SubAssemblies { get; }
 
     /// <summary>SubAssemblies broken down: each sub-assembly in the recipe, in recipe order, adding up to it.</summary>
@@ -550,7 +582,8 @@ public sealed class ProductCostSummary
 /// The Products screen: a product's recipe (the sub-assemblies it links and new ones not saved yet, each at its own
 /// piece size, and its packaging), its costing, its packaging link, and cloning it or making a variant of it. The name, description,
 /// recipe, packaging and costing are edited in memory, and Save writes them together
-/// (IProductRepository.SaveAsync).
+/// (IProductRepository.SaveAsync). A composite product's recipe is the products it holds instead, in its Products tab
+/// (<see cref="ComponentEdits"/>), each bringing its recipe cost.
 /// </summary>
 public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen
 {
@@ -696,10 +729,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ObservableCollection<ProductUsageEdit> UsageEdits { get; } = [];
 
     /// <summary>
-    /// The Recipe Structure's tabs: a sub-assembly's for each of UsageEdits, at the same index (MirrorUsageTabs),
-    /// then AddSubAssemblyTab while a sub-assembly is being added, then PackagingTab while the product has packaging
-    /// (HasPackaging). A new product has none. Only this screen changes them: the tab strip can't drag them into
-    /// another order (RecipeStructureCard).
+    /// The Recipe Structure's tabs: a composite's ComponentsTab first, then a sub-assembly's for each of UsageEdits, in
+    /// the same order (MirrorUsageTabs, SectionTabOffset), then AddSubAssemblyTab while a sub-assembly is being added,
+    /// then PackagingTab while the product has packaging (HasPackaging). A new product has none, and a new composite
+    /// only its Products. Only this screen changes them: the tab strip can't drag them into another order
+    /// (RecipeStructureCard).
     /// </summary>
     public ObservableCollection<RecipeTab> RecipeTabs { get; } = [];
 
@@ -710,6 +744,96 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public AddSubAssemblyRecipeTab AddSubAssemblyTab { get; } = new();
 
     public PackagingRecipeTab PackagingTab { get; } = new();
+
+    /// <summary>A composite's Products tab, in RecipeTabs only while the product showing is a composite (SetComposite).</summary>
+    public ComponentsRecipeTab ComponentsTab { get; } = new();
+
+    private bool _isEditingComposite;
+    /// <summary>
+    /// The product showing is a composite: made of other products (its Products tab), its own packaging, and sections only
+    /// in product-owned roles (a topping, a filling), with no Quantity Required of its own. Picked by New composite product, and fixed once it's saved.
+    /// </summary>
+    public bool IsEditingComposite
+    {
+        get => _isEditingComposite;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _isEditingComposite, value);
+            this.RaisePropertyChanged(nameof(IsEditingSingle));
+        }
+    }
+
+    /// <summary>The product showing is made of sub-assemblies, as every product that isn't a composite is.</summary>
+    public bool IsEditingSingle => !IsEditingComposite;
+
+    private readonly ObservableAsPropertyHelper<bool> _isComponentsShowing;
+    /// <summary>A composite's Products table shows under the Recipe Structure's tabs: on its Products tab.</summary>
+    public bool IsComponentsShowing => _isComponentsShowing.Value;
+
+    /// <summary>A composite's lines, typed straight into its Products table: each a product and how many of it go in.</summary>
+    public ObservableCollection<ProductComponentRow> ComponentEdits { get; } = [];
+
+    private decimal _componentsCost;
+    /// <summary>What a composite's products bring together, for its Products tab: its recipe cost less its own sections.</summary>
+    public decimal ComponentsCost
+    {
+        get => _componentsCost;
+        private set => this.RaiseAndSetIfChanged(ref _componentsCost, value);
+    }
+
+    /// <summary>
+    /// The line the Products table's add row edits: it finds its product, and its recipe cost once that's read, before
+    /// it's committed. Kept, so a cost read for it can price it while it's still being typed (FetchComponentCostsAsync).
+    /// </summary>
+    public Func<ProductComponentRow> NewComponentRow => () => _addingComponentRow = new ProductComponentRow(FindComponentProduct, FindRecipeCost);
+
+    private ProductComponentRow? _addingComponentRow;
+
+    private ProductComponentRow? _selectedComponentEdit;
+    public ProductComponentRow? SelectedComponentEdit
+    {
+        get => _selectedComponentEdit;
+        set => this.RaiseAndSetIfChanged(ref _selectedComponentEdit, value);
+    }
+
+    /// <summary>
+    /// What the Products table's product cell offers: every product but the one showing and the composites that hold it,
+    /// directly or through another, which would end up holding themselves (CompositeProductRules.Contains).
+    /// </summary>
+    public ObservableCollection<Product> ComponentProductOptions { get; } = [];
+
+    /// <summary>Every composite's lines as saved, without their products: which composites hold which products, for the picker.</summary>
+    private IReadOnlyList<ProductComponent> _componentLinks = [];
+
+    /// <summary>
+    /// What one of each product in the Products table brings, by product id: its recipe cost as saved, read with the
+    /// composite, when one is picked, and again with every LoadCommand. Kept for the product showing only.
+    /// </summary>
+    private readonly Dictionary<int, decimal> _componentCosts = [];
+
+    /// <summary>The products whose recipe cost is being read, so a second pick of one doesn't read it twice.</summary>
+    private readonly HashSet<int> _fetchingComponentCosts = [];
+
+    private Product? FindComponentProduct(int id) => Products.FirstOrDefault(p => p.Id == id);
+
+    /// <summary>
+    /// What one of a product brings, as the screen has read it; null while it hasn't, and the read starts, so the add row
+    /// prices itself once it arrives, before the line is committed.
+    /// </summary>
+    private decimal? FindRecipeCost(int id)
+    {
+        if (_componentCosts.TryGetValue(id, out var cost))
+        {
+            return cost;
+        }
+
+        if (_fetchingComponentCosts.Add(id))
+        {
+            _ = FetchComponentCostsAsync([id]);
+        }
+
+        return null;
+    }
 
     private RecipeTab? _selectedRecipeTab;
     /// <summary>The Recipe Structure tab showing. Showing New Sub-Assembly opens the form that adds one.</summary>
@@ -910,7 +1034,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>What the figures on this screen are for: "Per piece", or "Per unit of 8 pieces".</summary>
-    public string CostUnitCaption => ProductPrintout.CostUnitCaptionFor(EditingQuantityRequired);
+    public string CostUnitCaption => ProductPrintout.CostUnitCaptionFor(EditingQuantityRequired, IsEditingComposite);
+
+    /// <summary>The header's Material Cost tooltip: what goes into it, which for a composite is what its products bring.</summary>
+    public string MaterialCostTooltip => IsEditingComposite
+        ? $"{CostUnitCaption}: the recipe cost of the products it holds and its own sub-assemblies, plus its own packaging"
+        : $"{CostUnitCaption}: the share of every sub-assembly it holds, plus its packaging";
+
+    /// <summary>What the Costing tab's labor, overhead and admin metrics are a percentage of, for their tooltips.</summary>
+    public string MetricBaseTooltip => IsEditingComposite
+        ? $"Of the recipe (ingredients) cost of the products it holds and its own sub-assemblies, packaging not included. {CostUnitCaption}."
+        : $"Of the sub-assemblies (ingredients) cost, packaging not included. {CostUnitCaption}.";
 
     private decimal? _editingCurrentPrice;
     /// <summary>What the shop charges for one sellable unit now, with VAT (Product.CurrentPrice); null when not entered.</summary>
@@ -1517,6 +1651,15 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     public ReactiveCommand<ProductFolderNode?, RxVoid> NewProductInCommand { get; }
 
+    /// <summary>New's New composite product: a new product made of other products, with its own packaging and toppings or fillings.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> NewCompositeCommand { get; }
+
+    /// <summary>New Composite Product Here on a folder of the list, as New Product Here; null, from the list's empty space, is New composite product itself.</summary>
+    public ReactiveCommand<ProductFolderNode?, RxVoid> NewCompositeProductInCommand { get; }
+
+    /// <summary>The Products table's Remove Line: takes out the line selected.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> RemoveComponentCommand { get; }
+
     /// <summary>Rename on a product of the list: saves the new name at once, like a move (IProductRepository.RenameAsync).</summary>
     public ReactiveCommand<ProductLeafNode, RxVoid> RenameProductCommand { get; }
 
@@ -1625,7 +1768,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _subAssemblyRepository = subAssemblyRepository;
         _subAssemblyLineRepository = subAssemblyLineRepository;
         _savedProducts = new SavedProductReader(
-            packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository);
+            packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository);
         _productValidator = productValidator;
         _costingParametersValidator = costingParametersValidator;
         _categoryRepository = categoryRepository;
@@ -1683,8 +1826,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         this.WhenAnyValue(x => x.SelectedProduct)
             .Subscribe(_ => SyncTreeSelection());
 
-        _headerTitle = this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingName, (product, name) =>
-                product is null && string.IsNullOrWhiteSpace(name) ? "New product" : name)
+        _headerTitle = this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingName, x => x.IsEditingComposite, (product, name, isComposite) =>
+                product is null && string.IsNullOrWhiteSpace(name) ? (isComposite ? "New composite product" : "New product") : name)
             .ToProperty(this, x => x.HeaderTitle, "New product");
 
         _newProductTag = this.WhenAnyValue(x => x.SelectedProduct, x => x.NewProductStage, (product, stage) =>
@@ -1711,6 +1854,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _isPackagingShowing = this.WhenAnyValue(x => x.SelectedRecipeTab)
             .Select(tab => tab is PackagingRecipeTab)
             .ToProperty(this, x => x.IsPackagingShowing);
+
+        _isComponentsShowing = this.WhenAnyValue(x => x.SelectedRecipeTab)
+            .Select(tab => tab is ComponentsRecipeTab)
+            .ToProperty(this, x => x.IsComponentsShowing);
 
         // Nothing is recorded until a product's details have arrived, or while the screen is being written to
         // wholesale: a load merging in fresh data and a restore putting a form back are neither of them edits.
@@ -1754,11 +1901,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         this.WhenAnyValue(x => x.SelectedRecipeTab)
             .Subscribe(RecipeTabPicked);
 
-        // The sub-assembly form: where its sub-assembly comes from, then the one it links or copies.
+        // The sub-assembly form: where its sub-assembly comes from, then the one it links or copies. The form starts
+        // again empty in its new way, which is nothing to save yet, as StartAddingUsage's fresh form isn't.
         this.WhenAnyValue(x => x.EditingUsageMode)
             .Skip(1)
             .Where(_ => !IsBusyApplying && IsUsageFormOpen && IsAddingUsage)
-            .Subscribe(_ => StartUsageFormMode());
+            .Subscribe(_ =>
+            {
+                StartUsageFormMode();
+                RebaseSettledForm();
+            });
 
         // A line picked, typed or deleted in the form's table: it's priced, and the batch and preview follow.
         FormLines.ToObservableChangeSet()
@@ -1869,6 +2021,24 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 RecomputeCosts();
             });
 
+        // A composite's line picked, typed or deleted in its Products table: it's priced once its product's recipe cost
+        // has been read (a new pick's is read then), and the composite's costs follow.
+        ComponentEdits.ToObservableChangeSet()
+            .AutoRefresh(r => r.ComponentProductId)
+            .AutoRefresh(r => r.Quantity)
+            .AutoRefresh(r => r.RecipeCost)
+            .Subscribe(_ =>
+            {
+                if (IsRestoring)
+                {
+                    return;
+                }
+
+                ProductComponentRow.Resolve(ComponentEdits, Products.ToDictionary(p => p.Id), _componentCosts);
+                ReadMissingComponentCosts();
+                RecomputeCosts();
+            });
+
         this.WhenAnyValue(
                 x => x.EditingLaborPercent,
                 x => x.EditingOverheadPercent,
@@ -1880,9 +2050,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .Where(_ => !IsRestoring)
             .Subscribe(_ => RecomputeCosts());
 
-        // The caption on every figure names what it's for, so it follows the quantity.
-        this.WhenAnyValue(x => x.EditingQuantityRequired)
-            .Subscribe(_ => this.RaisePropertyChanged(nameof(CostUnitCaption)));
+        // The caption on every figure names what it's for, so it follows the quantity, and a composite's is always one unit.
+        this.WhenAnyValue(x => x.EditingQuantityRequired, x => x.IsEditingComposite)
+            .Subscribe(_ =>
+            {
+                this.RaisePropertyChanged(nameof(CostUnitCaption));
+                this.RaisePropertyChanged(nameof(MaterialCostTooltip));
+                this.RaisePropertyChanged(nameof(MetricBaseTooltip));
+            });
 
         UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, History.WhenAnyValue(h => h.CanUndo));
         RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, History.WhenAnyValue(h => h.CanRedo));
@@ -1893,6 +2068,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         this.Changed.Subscribe(_ => History.RefreshDirty());
         WatchForSave(UsageEdits);
         WatchForSave(LineEdits);
+        WatchForSave(ComponentEdits);
         WatchForSave(FormLines);
         WatchForSave(FormAddIns);
         WatchForSave(FormPackagingLines);
@@ -1911,6 +2087,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             var detailProductId = _detailProductId;
             HashSet<int> linkedIds = [.. UsageEdits.Where(u => u.SubAssemblyId > 0).Select(u => u.SubAssemblyId)];
 
+            // A composite's products can have changed elsewhere since they were read (a recipe, an ingredient's price, a
+            // quantity required), so what each brings is read again; its lines may hold unsaved edits and stay as they are.
+            List<int> componentIds = [.. ComponentEdits.Select(r => r.ComponentProductId).OfType<int>().Distinct()];
+
             // All at once, on the thread pool: each read is mostly a round trip's wait, so one after another they took
             // several times as long as the slowest of them, and the UI thread came back after each to start the next.
             // Each has its own context (AddDbContextFactory), and none touches ViewModel state.
@@ -1926,9 +2106,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             var packagingLinkRead = detailProductId is { } linkProductId
                 ? Task.Run(() => _packagingLinkRepository.GetForProductAsync(linkProductId, CancellationToken.None))
                 : Task.FromResult<PackagingLink?>(null);
+            var componentLinksRead = Task.Run(() => _productRepository.GetAllComponentsAsync(CancellationToken.None));
+            var componentCostsRead = Task.Run(() => _savedProducts.ReadRecipeCostsAsync(componentIds, CancellationToken.None));
             await Task.WhenAll(
                 rolesRead, categoriesRead, rawMaterialsRead, productsRead, linkableRead, standaloneRead, costingDefaultsRead,
-                linkedSubAssembliesRead, linkedLinesRead, packagingLinkRead);
+                linkedSubAssembliesRead, linkedLinesRead, packagingLinkRead, componentLinksRead, componentCostsRead);
 
             var roles = await rolesRead;
             var categories = await categoriesRead;
@@ -1940,6 +2122,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             var linkedSubAssemblies = await linkedSubAssembliesRead;
             var linkedLines = await linkedLinesRead;
             var packagingLink = await packagingLinkRead;
+            var componentLinks = await componentLinksRead;
+            var componentCosts = await componentCostsRead;
 
             // Linked packaging is kept elsewhere (another product, or a set on the Sub-Assemblies screen) and can
             // have changed there, so it's fetched again — but only while the form still shows the link as saved. The
@@ -1975,6 +2159,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 _linkable = linkable;
                 _packagingSets = packagingSets;
                 RefreshCostingDefaults(costingDefaults);
+
+                // A composite's lines point at the fresh products (a rename shows) at their fresh recipe costs.
+                _componentLinks = componentLinks;
+                foreach (var (productId, cost) in componentCosts)
+                {
+                    _componentCosts[productId] = cost;
+                }
+
+                ProductComponentRow.Resolve(ComponentEdits, Products.ToDictionary(p => p.Id), _componentCosts);
+                RefreshComponentOptions();
 
                 SelectedProduct = Products.FirstOrDefault(p => p.Id == selectedId);
                 if (SelectedProduct is not null)
@@ -2017,6 +2211,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         });
 
         NewCommand = ReactiveCommand.Create(() => StartNewProduct());
+        NewCompositeCommand = ReactiveCommand.Create(() => StartNewProduct(isComposite: true));
+        NewCompositeProductInCommand = ReactiveCommand.Create<ProductFolderNode?>(folder => StartNewProduct(
+            folder?.Stage ?? ProductStage.ResearchAndDevelopment, folder?.CategoryId, isComposite: true));
+        RemoveComponentCommand = ReactiveCommand.Create(
+            () => AsUndoStep(() => ComponentEdits.Remove(SelectedComponentEdit!)),
+            this.WhenAnyValue(x => x.SelectedComponentEdit).Select(row => row is not null));
 
         // The list's commands, each run on the folder or product its menu was opened on (TreeMenuFor).
         MoveProductsCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<ProductMove>>(
@@ -2074,6 +2274,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
                 // Only a new product's is written: a saved one's changes by moving it in the list.
                 Stage = NewProductStage,
+
+                // A new one's to say; a saved one's is the kind it was saved as, which the form never changes.
+                IsComposite = IsEditingComposite,
             };
 
             var validation = _productValidator.Validate(product);
@@ -2133,7 +2336,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             {
                 if (SelectedProduct is not { } product)
                 {
-                    StartNewProduct(NewProductStage, _newProductCategoryId);
+                    StartNewProduct(NewProductStage, _newProductCategoryId, IsEditingComposite);
                     History.Clear();
                     return;
                 }
@@ -2196,11 +2399,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
                 AsUndoStep(() =>
                 {
-                    if (!RecipeTabs.Contains(AddSubAssemblyTab))
-                    {
-                        RecipeTabs.Insert(UsageEdits.Count, AddSubAssemblyTab);
-                    }
-
+                    InsertAddSubAssemblyTab();
                     SelectRecipeTab(AddSubAssemblyTab);
                     EditingUsageMode = mode;
                 });
@@ -2271,10 +2470,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                         CloseUsageForm();
                     }
 
-                    // Its neighbour's tab shows instead: the next sub-assembly's, else the one before, else Packaging.
+                    // Its neighbour's tab shows instead: the next sub-assembly's, else the one before, else a composite's
+                    // Products, else Packaging.
                     var index = UsageEdits.IndexOf(usage);
                     var neighbour = index + 1 < UsageEdits.Count ? UsageEdits[index + 1] : index > 0 ? UsageEdits[index - 1] : null;
-                    SelectRecipeTab(neighbour is null ? PackagingTabIfShown : TabFor(neighbour));
+                    SelectRecipeTab(neighbour is null ? ComponentsTabIfShown ?? PackagingTabIfShown : TabFor(neighbour));
 
                     UsageEdits.Remove(usage);
                     RefreshLinkableOptions();
@@ -2353,7 +2553,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private Task DeleteProductAsync(Product product) =>
         RunWithConfirmationAsync(
-            $"Delete '{product.Name}'? Its own sub-assemblies go with it; the ones it links stay on the Sub-Assemblies screen. This can't be undone.",
+            product.IsComposite
+                ? $"Delete '{product.Name}'? The products it holds stay. This can't be undone."
+                : $"Delete '{product.Name}'? Its own sub-assemblies go with it; the ones it links stay on the Sub-Assemblies screen. This can't be undone.",
             async () =>
             {
                 await _productRepository.DeleteAsync(product.Id, CancellationToken.None);
@@ -2611,8 +2813,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>
     /// A new product: no name, recipe, packaging or links, its costing at the defaults, and nothing selected. Save files it
     /// in <paramref name="stage"/> and <paramref name="categoryId"/>, which its Category picker starts on.
+    /// <paramref name="isComposite"/> makes it a composite, which opens on its empty Products table.
     /// </summary>
-    private void StartNewProduct(ProductStage stage = ProductStage.ResearchAndDevelopment, int? categoryId = null)
+    private void StartNewProduct(ProductStage stage = ProductStage.ResearchAndDevelopment, int? categoryId = null, bool isComposite = false)
     {
         NewProductStage = stage;
         _newProductCategoryId = categoryId;
@@ -2626,10 +2829,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ShowUpdatedAt(null);
         EditingCloneName = string.Empty;
 
-        // After an unsaved new product nothing was selected, so the selection subscriptions don't run.
+        // After an unsaved new product nothing was selected, so the selection subscriptions don't run. The kind goes
+        // first, so the tab ClearDetails picks is the new kind's.
         CloseUsageForm();
         SelectedLineEdit = null;
+        SetComposite(isComposite);
         ClearDetails();
+        RefreshComponentOptions();
         ApplyCostingDefaults();
 
         // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
@@ -2670,6 +2876,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             SetHasPackaging(false);
         }
         SetPackagingLink(null);
+
+        // A composite's lines, and what its products were read to bring, are that composite's.
+        SelectedComponentEdit = null;
+        ComponentEdits.Clear();
+        _componentCosts.Clear();
         _savedRecipe = new RecipeDraft([], []);
         _savedLines = [];
         SetCosting(null);
@@ -2725,6 +2936,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         AreDetailsReady = true;
         _detailProductId = product.Id;
 
+        // A composite's Products tab (or none) goes in before the tabs are rebuilt, and its lines before ReplaceUsages
+        // settles what Save compares the recipe against, which they're part of.
+        SetComposite(product.IsComposite);
+        ReplaceComponents(detail.Components);
+
         // The packaging first, so the recipe's tabs, rebuilt next, can reselect the Packaging tab if it showed.
         SetPackagingLink(detail.PackagingLink);
         ReplaceLines(detail.Lines);
@@ -2732,8 +2948,151 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ReplaceUsages(detail.Usages, detail.SubAssemblyLines, detail.AddIns);
         SetCosting(detail.Costing);
         RefreshLinkableOptions();
+        RefreshComponentOptions();
         RecomputeCosts();
         History.MarkClean();
+    }
+
+    /// <summary>
+    /// Makes the form a composite's, with its Products tab first, before its sections' tabs, or a product of
+    /// sub-assemblies', without it. The tab strip's own pick as the tab goes is ignored.
+    /// </summary>
+    private void SetComposite(bool isComposite)
+    {
+        IsEditingComposite = isComposite;
+        if (isComposite == RecipeTabs.Contains(ComponentsTab))
+        {
+            return;
+        }
+
+        _arrangingRecipeTabs = true;
+        try
+        {
+            if (isComposite)
+            {
+                RecipeTabs.Insert(0, ComponentsTab);
+            }
+            else
+            {
+                RecipeTabs.Remove(ComponentsTab);
+            }
+        }
+        finally
+        {
+            _arrangingRecipeTabs = false;
+        }
+    }
+
+    /// <summary>A composite's Products tab, or null for a product made of sub-assemblies: the tab to fall back on before Packaging.</summary>
+    private RecipeTab? ComponentsTabIfShown => RecipeTabs.Contains(ComponentsTab) ? ComponentsTab : null;
+
+    /// <summary>Where the sections' tabs start in RecipeTabs: after a composite's Products tab, which comes first.</summary>
+    private int SectionTabOffset => RecipeTabs.Count > 0 && RecipeTabs[0] == ComponentsTab ? 1 : 0;
+
+    /// <summary>New Sub-Assembly's tab, after a composite's Products and the sections', before Packaging; nothing if it's there.</summary>
+    private void InsertAddSubAssemblyTab()
+    {
+        if (!RecipeTabs.Contains(AddSubAssemblyTab))
+        {
+            RecipeTabs.Insert(SectionTabOffset + UsageEdits.Count, AddSubAssemblyTab);
+        }
+    }
+
+    /// <summary>
+    /// A saved composite's lines in its Products table, and what each product was read to bring. They're also part of what
+    /// Save compares the recipe against, which ReplaceUsages settles after this.
+    /// </summary>
+    private void ReplaceComponents(IReadOnlyList<SavedComponent> components)
+    {
+        foreach (var component in components)
+        {
+            _componentCosts[component.Component.ComponentProductId] = component.RecipeCost;
+        }
+
+        SelectedComponentEdit = null;
+        ComponentEdits.Clear();
+        ComponentEdits.AddRange(components.Select(c => new ProductComponentRow(FindComponentProduct, FindRecipeCost)
+        {
+            ComponentProductId = c.Component.ComponentProductId,
+            Quantity = c.Component.Quantity,
+        }));
+
+        // A product the list doesn't hold yet shows as it was read with the composite.
+        var productsById = Products.ToDictionary(p => p.Id);
+        foreach (var component in components)
+        {
+            productsById.TryAdd(component.Component.ComponentProductId, component.Component.ComponentProduct!);
+        }
+
+        ProductComponentRow.Resolve(ComponentEdits, productsById, _componentCosts);
+    }
+
+    /// <summary>
+    /// What the Products table's product cell offers: every product but the one showing and the composites holding it,
+    /// directly or through another, as saved. A new composite can hold any: nothing holds it yet.
+    /// </summary>
+    private void RefreshComponentOptions()
+    {
+        var productId = _detailProductId ?? 0;
+        var held = _componentLinks
+            .GroupBy(c => c.ProductId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<int>)[.. g.Select(c => c.ComponentProductId)]);
+        ComponentProductOptions.MergeFrom(
+            [.. Products.Where(p => productId == 0 || (p.Id != productId && !CompositeProductRules.Contains(p.Id, productId, held)))],
+            p => p.Id);
+    }
+
+    /// <summary>
+    /// Reads what each product picked in the Products table brings, when the screen hasn't read it yet: off the UI thread,
+    /// once per product however often it's picked. The line, and the add row still being typed into, are priced when it
+    /// arrives, and the composite's costs follow.
+    /// </summary>
+    private void ReadMissingComponentCosts()
+    {
+        List<int> missing =
+        [
+            .. ComponentEdits
+                .Select(r => r.ComponentProductId)
+                .OfType<int>()
+                .Distinct()
+                .Where(id => !_componentCosts.ContainsKey(id) && _fetchingComponentCosts.Add(id)),
+        ];
+        if (missing.Count > 0)
+        {
+            _ = FetchComponentCostsAsync(missing);
+        }
+    }
+
+    private async Task FetchComponentCostsAsync(IReadOnlyList<int> productIds)
+    {
+        try
+        {
+            var costs = await Task.Run(() => _savedProducts.ReadRecipeCostsAsync(productIds, CancellationToken.None));
+            foreach (var (productId, cost) in costs)
+            {
+                _componentCosts[productId] = cost;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Nothing awaits this read, so what went wrong is shown rather than lost. The line stays unpriced, and the
+            // next LoadCommand reads it again.
+            ErrorMessage = $"Couldn't read what a product in the Products table costs: {ex.Message}";
+        }
+        finally
+        {
+            foreach (var productId in productIds)
+            {
+                _fetchingComponentCosts.Remove(productId);
+            }
+        }
+
+        var productsById = Products.ToDictionary(p => p.Id);
+        ProductComponentRow.Resolve(ComponentEdits, productsById, _componentCosts);
+        if (_addingComponentRow is { } adding)
+        {
+            ProductComponentRow.Resolve([adding], productsById, _componentCosts);
+        }
     }
 
     /// <summary>The saved packaging link, or none: what the Packaging tab shows, and what Save compares against.</summary>
@@ -2791,7 +3150,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private void RemovePackaging()
     {
-        SelectRecipeTab(RecipeTabs.OfType<SubAssemblyRecipeTab>().LastOrDefault());
+        SelectRecipeTab(RecipeTabs.OfType<SubAssemblyRecipeTab>().LastOrDefault() ?? ComponentsTabIfShown);
         SelectedLineEdit = null;
         LineEdits.Clear();
         ShowPackagingLink(null);
@@ -2915,6 +3274,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         HasPackaging = HasPackaging,
         PackagingLink = _packagingLinkTarget,
         Lines = [.. LineEdits.Select(CaptureLine)],
+        Components = [.. ComponentEdits.Select(r => new ComponentLineState(r.ComponentProductId, r.Quantity))],
         IsUsageFormOpen = IsUsageFormOpen,
         IsAddingUsage = IsAddingUsage,
         UsageFormTitle = UsageFormTitle,
@@ -2945,6 +3305,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         SubAssemblyRecipeTab tab => new RecipeTabChoice(RecipeTabKind.Usage, RecipeTabs.OfType<SubAssemblyRecipeTab>().ToList().IndexOf(tab)),
         AddSubAssemblyRecipeTab => new RecipeTabChoice(RecipeTabKind.AddSubAssembly, -1),
         PackagingRecipeTab => new RecipeTabChoice(RecipeTabKind.Packaging, -1),
+        ComponentsRecipeTab => new RecipeTabChoice(RecipeTabKind.Components, -1),
         _ => new RecipeTabChoice(RecipeTabKind.None, -1),
     };
 
@@ -2968,6 +3329,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             SelectedFormAddIn = null;
             SelectedFormPackagingLine = null;
             SelectedLineEdit = null;
+            SelectedComponentEdit = null;
 
             // 2. The product's own fields. The category goes back by id, as the reloaded list's own copy.
             _editingId = snapshot.EditingId;
@@ -2993,6 +3355,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
             SetHasPackaging(snapshot.HasPackaging);
 
+            // A composite's lines, each finding its product and the recipe cost read for it again (a cost not read yet is
+            // read now, and prices the line when it arrives).
+            ComponentEdits.Clear();
+            foreach (var line in snapshot.Components)
+            {
+                ComponentEdits.Add(new ProductComponentRow(FindComponentProduct, FindRecipeCost)
+                {
+                    ComponentProductId = line.ProductId,
+                    Quantity = line.Quantity,
+                });
+            }
+
             // 5. The sections and their tabs, under _arrangingRecipeTabs so RecipeTabShown short-circuits: without
             //    it, moving the tab back would apply the form the tab is being moved off, which is the very change
             //    being undone.
@@ -3003,10 +3377,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
                 if (snapshot.HasAddSubAssemblyTab)
                 {
-                    if (!RecipeTabs.Contains(AddSubAssemblyTab))
-                    {
-                        RecipeTabs.Insert(UsageEdits.Count, AddSubAssemblyTab);
-                    }
+                    InsertAddSubAssemblyTab();
                 }
                 else
                 {
@@ -3019,6 +3390,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                         RecipeTabs.OfType<SubAssemblyRecipeTab>().ElementAtOrDefault(index),
                     { Kind: RecipeTabKind.AddSubAssembly } => RecipeTabs.Contains(AddSubAssemblyTab) ? AddSubAssemblyTab : null,
                     { Kind: RecipeTabKind.Packaging } => PackagingTabIfShown,
+                    { Kind: RecipeTabKind.Components } => ComponentsTabIfShown,
                     _ => null,
                 };
             }
@@ -3259,7 +3631,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             $"Save changes the lines of {string.Join("; and ", shared)}. Their recipes and costs change with it. Save anyway?");
     }
 
-    /// <summary>The recipe as Save writes it: the new sections with their lines, and the sub-assemblies it links.</summary>
+    /// <summary>
+    /// The recipe as Save writes it: the new sections with their lines, and the sub-assemblies it links; and a composite's
+    /// products, each with how many go in (a line half filled in is refused: ProductComponentRow.CompleteLines).
+    /// </summary>
     private RecipeDraft CurrentRecipe() =>
         new(
             [.. UsageEdits.Where(u => u.IsEditable).Select(u => new NewSubAssemblyDraft(
@@ -3281,16 +3656,20 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 Lines = u.AreLinkedLinesEdited
                     ? [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))]
                     : null,
-            })]);
+            })])
+        {
+            Components = IsEditingComposite ? [.. ProductComponentRow.CompleteLines(ComponentEdits).Select(c => (c.Product.Id, c.Quantity))] : [],
+        };
 
     /// <summary>
     /// Whether two recipes would save the same: the same sub-assemblies, roles, lines, add-ins and piece
-    /// sizes, in the same order. A linked draft is compared field by field rather than as a record,
-    /// as a new one already is: a record's own Equals compares its AddIns list by reference, which no
-    /// two recipes built separately ever share, so Save would write the recipe every time.
+    /// sizes, and the same products at the same quantities, in the same order. A linked draft is compared field by
+    /// field rather than as a record, as a new one already is: a record's own Equals compares its AddIns list by
+    /// reference, which no two recipes built separately ever share, so Save would write the recipe every time.
     /// </summary>
     private static bool IsSameRecipe(RecipeDraft a, RecipeDraft b) =>
-        a.Linked.Count == b.Linked.Count
+        a.Components.SequenceEqual(b.Components)
+        && a.Linked.Count == b.Linked.Count
         && a.Linked.Zip(b.Linked).All(pair =>
             pair.First.SubAssemblyId == pair.Second.SubAssemblyId
             && pair.First.AuthoredField == pair.Second.AuthoredField
@@ -4055,18 +4434,20 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>
-    /// Keeps RecipeTabs' sub-assembly tabs in step with UsageEdits, index for index. A replaced section keeps
+    /// Keeps RecipeTabs' sub-assembly tabs in step with UsageEdits, index for index after a composite's Products tab
+    /// (SectionTabOffset). A replaced section keeps
     /// its tab, and the form follows it when it was the one being edited (a refresh swaps in a copy with new
     /// costs), so neither a refresh nor an Apply moves the tab showing or loses the form's place.
     /// </summary>
     private void MirrorUsageTabs(NotifyCollectionChangedEventArgs e)
     {
+        var offset = SectionTabOffset;
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add:
                 for (var i = 0; i < e.NewItems!.Count; i++)
                 {
-                    RecipeTabs.Insert(e.NewStartingIndex + i, new SubAssemblyRecipeTab((ProductUsageEdit)e.NewItems[i]!));
+                    RecipeTabs.Insert(offset + e.NewStartingIndex + i, new SubAssemblyRecipeTab((ProductUsageEdit)e.NewItems[i]!));
                 }
 
                 break;
@@ -4074,7 +4455,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             case NotifyCollectionChangedAction.Remove:
                 for (var i = 0; i < e.OldItems!.Count; i++)
                 {
-                    RecipeTabs.RemoveAt(e.OldStartingIndex);
+                    RecipeTabs.RemoveAt(offset + e.OldStartingIndex);
                 }
 
                 break;
@@ -4083,7 +4464,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             {
                 var replacement = (ProductUsageEdit)e.NewItems![0]!;
                 var previous = (ProductUsageEdit)e.OldItems![0]!;
-                ((SubAssemblyRecipeTab)RecipeTabs[e.NewStartingIndex]).Usage = replacement;
+                ((SubAssemblyRecipeTab)RecipeTabs[offset + e.NewStartingIndex]).Usage = replacement;
                 if (ReferenceEquals(previous, EditingUsage))
                 {
                     if (replacement.IsEditable != previous.IsEditable)
@@ -4109,13 +4490,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             }
 
             case NotifyCollectionChangedAction.Move:
-                RecipeTabs.Move(e.OldStartingIndex, e.NewStartingIndex);
+                RecipeTabs.Move(offset + e.OldStartingIndex, offset + e.NewStartingIndex);
                 break;
 
             default:
-                while (RecipeTabs.Count > 0 && RecipeTabs[0] is SubAssemblyRecipeTab)
+                while (RecipeTabs.Count > offset && RecipeTabs[offset] is SubAssemblyRecipeTab)
                 {
-                    RecipeTabs.RemoveAt(0);
+                    RecipeTabs.RemoveAt(offset);
                 }
 
                 break;
@@ -4259,14 +4640,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>
     /// After the sections were rebuilt (a product loaded, reloaded after Save, or cleared for a new one): the
-    /// tab that showed if it's still there (the same sub-assembly's, or Packaging), else the first
-    /// sub-assembly's, which is the first in role order, else Packaging. Another product's recipe has no tab
-    /// that showed (<paramref name="previous"/> is null), so it opens on its first.
+    /// tab that showed if it's still there (the same sub-assembly's, a composite's Products, or Packaging), else the first
+    /// tab: a composite's Products, else the first sub-assembly's, which is the first in role order, else Packaging. Another product's
+    /// recipe has no tab that showed (<paramref name="previous"/> is null), so it opens on its first.
     /// </summary>
     /// <param name="previousIds">The sub-assemblies the recipe used before, which a new section saved since isn't among.</param>
     private void ReselectRecipeTab(RecipeTab? previous, ProductUsageEdit? previousUsage, HashSet<int> previousIds)
     {
-        RecipeTab? tab = previous is PackagingRecipeTab ? PackagingTabIfShown : null;
+        RecipeTab? tab = previous switch
+        {
+            PackagingRecipeTab => PackagingTabIfShown,
+            ComponentsRecipeTab => ComponentsTabIfShown,
+            _ => null,
+        };
         if (previousUsage is not null)
         {
             var tabs = RecipeTabs.OfType<SubAssemblyRecipeTab>();
@@ -4280,8 +4666,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     .FirstOrDefault();
         }
 
-        // A product with neither has no tab to show: the card says how to start.
-        SelectRecipeTab(tab ?? RecipeTabs.OfType<SubAssemblyRecipeTab>().FirstOrDefault() ?? PackagingTabIfShown);
+        // A product with neither has no tab to show: the card says how to start. A composite always has its Products.
+        SelectRecipeTab(tab ?? ComponentsTabIfShown ?? RecipeTabs.OfType<SubAssemblyRecipeTab>().FirstOrDefault() ?? PackagingTabIfShown);
     }
 
     /// <summary>
@@ -4296,13 +4682,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var usedIds = UsageEdits.Select(u => u.SubAssemblyId).ToHashSet();
 
         // Packaging comes after the recipes, while the product has none: the packaging sets, then (to copy only) every
-        // other product's packaging.
+        // other product's packaging. A composite's own sections are only in product-owned roles, so it's offered those.
         LinkableSubAssemblies.MergeFrom(
             [
                 .. _linkable
-                    .Where(s => linking
+                    .Where(s => (!IsEditingComposite || s.Role?.IsProductOwned == true) && (linking
                         ? s.OwnerProductId is null && !usedIds.Contains(s.Id)
-                        : s.OwnerProductId is null || s.OwnerProductId != _detailProductId)
+                        : s.OwnerProductId is null || s.OwnerProductId != _detailProductId))
                     .Select(s => new LinkableSubAssemblyOption(s)),
                 .. HasPackaging ? [] : _packagingSets.Select(s => new LinkableSubAssemblyOption(s)),
                 .. HasPackaging || linking ? [] : Products.Where(p => p.Id != _detailProductId).Select(p => new LinkableSubAssemblyOption(p)),
@@ -4326,9 +4712,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         var pickedRoleId = EditingUsageRole?.Id;
         // The Packaging role adds the product's packaging, which isn't a recipe section: offered only to add, and only
-        // while there's none. A section already in the recipe can't turn into packaging.
+        // while there's none. A section already in the recipe can't turn into packaging. A composite's sections are only
+        // in product-owned roles (CompositeProductRules.EnsureSectionRoles).
         FormRoleOptions.MergeFrom(
-            [.. Roles.Where(r => !r.IsPackaging || (IsAddingUsage && !HasPackaging))],
+            [.. Roles.Where(r => r.IsPackaging ? IsAddingUsage && !HasPackaging : !IsEditingComposite || r.IsProductOwned)],
             r => r.Id);
         EditingUsageRole = FormRoleOptions.FirstOrDefault(r => r.Id == pickedRoleId);
     }
@@ -4458,8 +4845,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The cost summary, from the recipe and packaging as they are now and the costing fields.</summary>
     private void RecomputeCosts()
     {
+        // A composite's recipe cost is what its products bring, each line its quantity at the product's recipe cost (a
+        // line still being filled in brings nothing yet), then its own sections, each per whole composite.
+        List<(string Name, decimal Cost)> components = IsEditingComposite
+            ? [.. ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0).Select(r => (r.LineName, r.Cost))]
+            : [];
+        ComponentsCost = components.Sum(c => c.Cost);
         Costs = new ProductCostSummary(
-            [.. UsageEdits.Select(u => (u.SectionName, u.CostPerPiece))],
+            [.. components, .. UsageEdits.Select(u => (u.SectionName, u.CostPerPiece))],
             EditingQuantityRequired,
             [.. LineEdits.Select(l => l.CostPerUnit)],
             EditingLaborPercent,
@@ -4467,7 +4860,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             EditingAdministrativePercent,
             EditingMarginPercent,
             EditingVatPercent,
-            EditingCurrentPrice);
+            EditingCurrentPrice,
+            IsEditingComposite,
+            IsEditingComposite && UsageEdits.Count > 0);
     }
 
     /// <summary>
@@ -4502,7 +4897,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// packaging and its costing, with a note when that isn't what's saved.
     /// </summary>
     private ProductPrintout CurrentPrintout() => new(
-        string.IsNullOrWhiteSpace(EditingName) ? "New product" : EditingName.Trim(),
+        string.IsNullOrWhiteSpace(EditingName) ? (IsEditingComposite ? "New composite product" : "New product") : EditingName.Trim(),
         EditingCategory?.Name ?? "Uncategorized",
         ProductFolderNode.StageTitle(SelectedProduct?.Stage ?? NewProductStage),
         CostUnitCaption,
@@ -4513,9 +4908,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         DateTime.Now,
         [.. UsageEdits.Select(PrintedSection.From)],
         HasPackaging ? PrintedPackaging.From(LineEdits, IsPackagingLinked ? PackagingLinkedToText : null) : null,
-        Costs);
+        Costs,
+        IsEditingComposite ? PrintedComponent.From(ComponentEdits) : null);
 
     // Segoe Fluent Icons glyphs for the list's menu, the ones the screen's buttons use where there's one.
+    private const string CompositeGlyph = "";
     private const string AddGlyph = "";
     private const string NewFolderGlyph = "";
     private const string MoveGlyph = "";
@@ -4614,6 +5011,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private List<TreeMenuItem> StageMenu(ProductFolderNode stage) =>
     [
         new("New Product Here", NewProductInCommand, stage) { Glyph = AddGlyph },
+        new("New Composite Product Here", NewCompositeProductInCommand, stage) { Glyph = CompositeGlyph },
         new("New Category…", NewCategoryCommand, stage) { Glyph = NewFolderGlyph },
         TreeMenuItem.Separator,
         new("Print Stage", PrintFolderCommand, stage) { Glyph = PrintGlyph },
@@ -4624,7 +5022,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     private List<TreeMenuItem> FolderMenu(ProductFolderNode folder)
     {
-        List<TreeMenuItem> items = [new("New Product Here", NewProductInCommand, folder) { Glyph = AddGlyph }];
+        List<TreeMenuItem> items =
+        [
+            new("New Product Here", NewProductInCommand, folder) { Glyph = AddGlyph },
+            new("New Composite Product Here", NewCompositeProductInCommand, folder) { Glyph = CompositeGlyph },
+        ];
 
         // What the folder shows: with a search on, its matches.
         var toProduction = ProductTree.MovesTo(ProductStage.Production, null, keepCategory: true, folder.Products.Select(l => l.Product));
@@ -4652,6 +5054,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private List<TreeMenuItem> EmptySpaceMenu() =>
     [
         new("New Product", NewProductInCommand) { Glyph = AddGlyph },
+        new("New Composite Product", NewCompositeProductInCommand) { Glyph = CompositeGlyph },
         new("New Category…", NewCategoryCommand) { Glyph = NewFolderGlyph },
         TreeMenuItem.Separator,
         new("Print All Products", PrintAllCommand) { Glyph = PrintGlyph },

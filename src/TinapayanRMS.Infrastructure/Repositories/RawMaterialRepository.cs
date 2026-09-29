@@ -30,9 +30,11 @@ public class RawMaterialRepository(
     /// <summary>
     /// GetUsedByAsync's products. Feeds is the material and every ingredient whose cost it feeds: a made one with it in its
     /// BOM, a linked one cut from it, and on up (both kinds are rejected when they'd close a loop). A recipe takes an
-    /// ingredient through a sub-assembly's lines or a usage's add-ins. Packaging is read as a product sees it: its own
-    /// lines unless its packaging links, a set's lines when it links a set, and another product's packaging when it
-    /// links that product, followed down the chain (PackagingLineRepository.ResolveEffectiveAsync).
+    /// ingredient through a sub-assembly's lines or a usage's add-ins, and a composite through the products it holds, and
+    /// on up (a composite can't end up containing itself). Packaging is read as a product sees it: its own lines unless
+    /// its packaging links, a set's lines when it links a set, and another product's packaging when it links that
+    /// product, followed down the chain (PackagingLineRepository.ResolveEffectiveAsync). A composite's products bring
+    /// only their recipe cost, so their packaging doesn't count for it.
     /// </summary>
     private const string UsedBySql = """
         WITH Feeds AS (
@@ -42,7 +44,7 @@ public class RawMaterialRepository(
             UNION ALL
             SELECT m.Id FROM RawMaterials m JOIN Feeds f ON f.Id = m.LinkedToId
         ),
-        RecipeUsers AS (
+        SectionUsers AS (
             SELECT u.ProductId
             FROM ProductSubAssemblyUsages u
             JOIN SubAssemblyLines l ON l.SubAssemblyId = u.SubAssemblyId
@@ -52,6 +54,11 @@ public class RawMaterialRepository(
             FROM ProductSubAssemblyUsages u
             JOIN UsageAddInLines a ON a.UsageId = u.Id
             WHERE a.IngredientId IN (SELECT Id FROM Feeds)
+        ),
+        RecipeUsers AS (
+            SELECT ProductId FROM SectionUsers
+            UNION ALL
+            SELECT c.ProductId FROM ProductComponents c JOIN RecipeUsers r ON r.ProductId = c.ComponentProductId
         ),
         PackagingUsers AS (
             SELECT l.ProductId

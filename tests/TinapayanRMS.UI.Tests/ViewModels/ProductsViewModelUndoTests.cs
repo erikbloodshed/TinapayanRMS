@@ -477,6 +477,36 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(UsageFormMode.New)]
+    [InlineData(UsageFormMode.Link)]
+    [InlineData(UsageFormMode.Copy)]
+    public async Task Opening_the_add_form_is_not_something_to_save(UsageFormMode mode)
+    {
+        // Link and Copy start the form again in their way after the tab opens it in New (the EditingUsageMode
+        // subscription); that fresh form is what Save measures against too, until something is picked or typed.
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var cheeseRollId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(cheeseRollId, new RecipeDraft(
+            [new NewSubAssemblyDraft(fillingRoleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
+        var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
+
+        await viewModel.AddUsageCommand.Execute(mode);
+        viewModel.EditingUsageMode.Should().Be(mode);
+        (await CanSave(viewModel)).Should().BeFalse("nothing has been entered in the add form");
+
+        // Another way picked on the drop-down over the untouched form only changes its way.
+        var other = mode == UsageFormMode.Link ? UsageFormMode.Copy : UsageFormMode.Link;
+        await viewModel.AddUsageCommand.Execute(other);
+        viewModel.EditingUsageMode.Should().Be(other);
+        (await CanSave(viewModel)).Should().BeFalse("the form is still empty");
+
+        // Picking what to link or copy is an entry, though.
+        Edit(viewModel, () => viewModel.EditingUsageSource = viewModel.LinkableSubAssemblies.First());
+        (await CanSave(viewModel)).Should().BeTrue();
+    }
+
     [Fact]
     public async Task Save_stops_being_offered_once_the_change_is_taken_back()
     {

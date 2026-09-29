@@ -117,11 +117,11 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         var menu = viewModel.TreeMenuFor(TreeFolder(viewModel, ProductStage.ResearchAndDevelopment, "Breads"));
 
-        Headers(menu).Should().Equal("New Product Here", "Promote All to Production", "Print Folder", "New Category…", "Rename Category…", "Delete Category");
+        Headers(menu).Should().Equal("New Product Here", "New Composite Product Here", "Promote All to Production", "Print Folder", "New Category…", "Rename Category…", "Delete Category");
         Headers(viewModel.TreeMenuFor(TreeFolder(viewModel, ProductStage.ResearchAndDevelopment, "Uncategorized")))
-            .Should().Equal("New Product Here", "Promote All to Production", "Print Folder");
+            .Should().Equal("New Product Here", "New Composite Product Here", "Promote All to Production", "Print Folder");
         Headers(viewModel.TreeMenuFor(TreeFolder(viewModel, ProductStage.Production, "Uncategorized")))
-            .Should().Equal(["New Product Here", "Print Folder"], "there's nothing in it to promote, and no category to rename");
+            .Should().Equal(["New Product Here", "New Composite Product Here", "Print Folder"], "there's nothing in it to promote, and no category to rename");
 
         await RunAsync(menu.Single(i => i.Header == "Promote All to Production"));
 
@@ -139,8 +139,8 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         var viewModel = await LoadedViewModelAsync();
         var production = viewModel.ProductTree.StageFolder(ProductStage.Production);
 
-        Headers(viewModel.TreeMenuFor(production)).Should().Equal("New Product Here", "New Category…", "Print Stage", "Expand All", "Collapse All");
-        Headers(viewModel.TreeMenuFor(null)).Should().Equal("New Product", "New Category…", "Print All Products", "Expand All", "Collapse All");
+        Headers(viewModel.TreeMenuFor(production)).Should().Equal("New Product Here", "New Composite Product Here", "New Category…", "Print Stage", "Expand All", "Collapse All");
+        Headers(viewModel.TreeMenuFor(null)).Should().Equal("New Product", "New Composite Product", "New Category…", "Print All Products", "Expand All", "Collapse All");
 
         await RunAsync(viewModel.TreeMenuFor(production).Single(i => i.Header == "Expand All"));
         production.Children.Cast<ProductFolderNode>().Should().OnlyContain(f => f.IsExpanded);

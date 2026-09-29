@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Controls;
 
 namespace TinapayanRMS.UI.Views.Products;
@@ -13,4 +14,10 @@ public partial class ProductHeaderCard : UserControl
     {
         InitializeComponent();
     }
+
+    /// <summary>
+    /// Shuts New's drop-down after one of its items was clicked, as Add Sub-Assembly's does: a SplitButtonAdv closes it
+    /// only from its own mouse-up, which the ButtonAdv clicked has already handled. The item's Command runs the rest.
+    /// </summary>
+    private void NewItem_Click(object sender, RoutedEventArgs e) => NewButton.IsDropDownOpen = false;
 }

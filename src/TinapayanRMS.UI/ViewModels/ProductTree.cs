@@ -24,6 +24,9 @@ public abstract class ProductTreeNode : ReactiveObject
 
     /// <summary>How many products a folder holds, shown after its title; always 0 for a product, which shows none.</summary>
     public virtual int ProductCount => 0;
+
+    /// <summary>A composite product's row, made of other products, which says so with a glyph after its name; never a folder.</summary>
+    public virtual bool IsComposite => false;
 }
 
 /// <summary>
@@ -148,6 +151,7 @@ public sealed class ProductLeafNode(Product product) : ProductTreeNode
                 _product = value;
                 this.RaisePropertyChanged();
                 this.RaisePropertyChanged(nameof(Title));
+                this.RaisePropertyChanged(nameof(IsComposite));
             }
         }
     }
@@ -155,6 +159,8 @@ public sealed class ProductLeafNode(Product product) : ProductTreeNode
     public override string Title => Product.Name;
 
     public override string Glyph => string.Empty;
+
+    public override bool IsComposite => Product.IsComposite;
 
     public override bool IsFolder => false;
 

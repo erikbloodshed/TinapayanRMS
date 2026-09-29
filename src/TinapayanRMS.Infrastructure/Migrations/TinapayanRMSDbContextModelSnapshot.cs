@@ -219,6 +219,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("IsComposite")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -248,6 +251,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     b.ToTable("Products", t =>
                         {
+                            t.HasCheckConstraint("CK_Products_CompositeIsOneUnit", "[IsComposite] = 0 OR [QuantityRequired] = 1");
+
                             t.HasCheckConstraint("CK_Products_QuantityRequired", "[QuantityRequired] > 0");
                         });
                 });
@@ -271,6 +276,41 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ProductCategories");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductComponent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ComponentProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComponentProductId");
+
+                    b.HasIndex("ProductId", "ComponentProductId")
+                        .IsUnique();
+
+                    b.ToTable("ProductComponents", t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductComponents_NotItself", "[ProductId] <> [ComponentProductId]");
+
+                            t.HasCheckConstraint("CK_ProductComponents_Quantity", "[Quantity] > 0");
+                        });
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", b =>
@@ -871,6 +911,25 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductComponent", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "ComponentProduct")
+                        .WithMany()
+                        .HasForeignKey("ComponentProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ComponentProduct");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", b =>

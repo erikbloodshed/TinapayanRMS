@@ -17,8 +17,9 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
 
     /// <summary>
     /// A clone and a variant differ only in their packaging: a clone copies it, a variant links it. Both link the
-    /// sub-assemblies the source's recipe links, and have their own copy of each of the source's own. The product row —
-    /// its quantity required among the rest — and its costing are copied alike.
+    /// sub-assemblies the source's recipe links, and have their own copy of each of the source's own; a composite's copy
+    /// holds the same products, at the same quantities. The product row — its quantity required and whether it's a
+    /// composite among the rest — and its costing are copied alike.
     /// </summary>
     private async Task<int> CreateFromAsync(int sourceProductId, string newProductName, bool asVariant, CancellationToken cancellationToken)
     {
@@ -71,10 +72,21 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
             CategoryId = source.CategoryId,
             QuantityRequired = source.QuantityRequired,
             CurrentPrice = source.CurrentPrice,
+            IsComposite = source.IsComposite,
         };
         await ProductRepository.AddAsync(dbContext, newProduct, cancellationToken);
 
-        await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, newProduct.Id, DerivedRecipe(source.Name, usages, ownLines, addInsByUsage), cancellationToken);
+        // A composite's products are products in their own right whichever way it's copied: the new one holds the same
+        // ones. Its own sections (a topping, a filling) are copied or linked as any product's are.
+        if (source.IsComposite)
+        {
+            var components = await ProductComponentRepository.GetForProductAsync(dbContext, sourceProductId, cancellationToken);
+            await ProductComponentRepository.SetComponentsAsync(
+                dbContext, newProduct, [.. components.Select(c => (c.ComponentProductId, c.Quantity))], cancellationToken);
+        }
+
+        await ProductSubAssemblyUsageRepository.SetRecipeAsync(
+            dbContext, newProduct.Id, DerivedRecipe(source.Name, usages, ownLines, addInsByUsage), cancellationToken);
 
         if (asVariant)
         {

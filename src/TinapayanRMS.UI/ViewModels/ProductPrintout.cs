@@ -15,8 +15,9 @@ namespace TinapayanRMS.UI.ViewModels;
 /// <param name="LastUpdatedText">When it was last saved, "Sep 14, 2026, 6:27 PM", or "—".</param>
 /// <param name="SaveNote"><see cref="NotSavedNote"/>, <see cref="UnsavedChangesNote"/>, or null when it's the product as saved.</param>
 /// <param name="PrintedAt">When Print was pressed, for the footer.</param>
-/// <param name="Sections">The recipe's sub-assemblies, in recipe order.</param>
+/// <param name="Sections">The recipe's sub-assemblies, in recipe order; none for a composite.</param>
 /// <param name="Packaging">Its packaging, or null when it has none.</param>
+/// <param name="Components">A composite's products, in its Products table's order; null for a product made of sub-assemblies.</param>
 public sealed record ProductPrintout(
     string ProductName,
     string CategoryName,
@@ -27,7 +28,8 @@ public sealed record ProductPrintout(
     DateTime PrintedAt,
     IReadOnlyList<PrintedSection> Sections,
     PrintedPackaging? Packaging,
-    ProductCostSummary Costs)
+    ProductCostSummary Costs,
+    IReadOnlyList<PrintedComponent>? Components = null)
 {
     /// <summary>The footer's note for a product that has never been saved.</summary>
     public const string NotSavedNote = "Not saved yet";
@@ -35,9 +37,15 @@ public sealed record ProductPrintout(
     /// <summary>The footer's note for a saved product with changes Save hasn't written yet.</summary>
     public const string UnsavedChangesNote = "Includes unsaved changes";
 
-    /// <summary>What a product's figures are for, as its header says it: "Per piece", or "Per unit of 8 pieces".</summary>
-    public static string CostUnitCaptionFor(int quantityRequired) =>
-        quantityRequired <= 1 ? "Per piece" : $"Per unit of {quantityRequired} pieces";
+    /// <summary>A composite: its recipe is the products it holds (<see cref="Components"/>).</summary>
+    public bool IsComposite => Components is not null;
+
+    /// <summary>
+    /// What a product's figures are for, as its header says it: "Per piece", or "Per unit of 8 pieces"; a composite's are
+    /// "Per unit", the one sellable unit it always is.
+    /// </summary>
+    public static string CostUnitCaptionFor(int quantityRequired, bool isComposite = false) =>
+        isComposite ? "Per unit" : quantityRequired <= 1 ? "Per piece" : $"Per unit of {quantityRequired} pieces";
 
     /// <summary>When a product was last saved, as its header says it: "Sep 14, 2026, 6:27 PM", or "—" for never since it was added.</summary>
     public static string LastUpdatedTextFor(DateTime? updatedAt) =>
@@ -142,6 +150,21 @@ public sealed record PrintedPackaging(string? LinkedTo, IReadOnlyList<PrintedPac
 
         return new(linkedTo, lines, lines.Sum(l => l.Cost));
     }
+}
+
+/// <summary>One product in a composite, as its Products table shows it.</summary>
+/// <param name="Quantity">How many of the product's sellable units go in; null while nothing is typed for it.</param>
+/// <param name="RecipeCost">What one of it brings: its recipe (ingredients) cost for one sellable unit, its packaging left out.</param>
+/// <param name="Cost">What the line brings into the composite's cost: <paramref name="Quantity"/> at <paramref name="RecipeCost"/>.</param>
+public sealed record PrintedComponent(string Product, int? Quantity, decimal RecipeCost, decimal Cost)
+{
+    /// <summary>The Products table's rows, leaving out any without a product, which isn't a line yet.</summary>
+    public static IReadOnlyList<PrintedComponent> From(IEnumerable<ProductComponentRow> rows) =>
+    [
+        .. rows
+            .Where(r => r.Product is not null)
+            .Select(r => new PrintedComponent(r.Product!.Name, r.Quantity, r.RecipeCost ?? 0m, r.Cost)),
+    ];
 }
 
 /// <summary>One packaging line: how much of a material one sellable unit takes, in the unit it's typed in.</summary>

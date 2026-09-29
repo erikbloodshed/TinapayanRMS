@@ -52,7 +52,7 @@
                                     <syncfusion:GridTextColumn MappingName="ProductName" HeaderText="Product" Width="280" />
                                     <syncfusion:GridTextColumn MappingName="Stage" HeaderText="Stage" Width="210" />
                                     <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" />
-                                    <controls:NumericColumn MappingName="Pieces" HeaderText="Pieces" NumberDecimalDigits="0" Width="80" />
+                                    <controls:NumericColumn MappingName="Pieces" HeaderText="Pieces" NumberDecimalDigits="0" Width="80" AllowNullValue="True" />
                                     <controls:NumericColumn MappingName="BaseCost" HeaderText="Base Cost" NumberDecimalDigits="2" />
                                     <controls:NumericColumn MappingName="SellingPrice" HeaderText="Selling Price" NumberDecimalDigits="2" />
                                     <controls:NumericColumn MappingName="CurrentPrice" HeaderText="Current Price" NumberDecimalDigits="2" AllowNullValue="True" />

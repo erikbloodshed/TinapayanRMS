@@ -33,7 +33,8 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
                 new ProductSubAssemblyUsageRepository(factory),
                 packagingLineRepository,
                 new CostingParametersRepository(factory),
-                new SubAssemblyLineRepository(factory)));
+                new SubAssemblyLineRepository(factory),
+                new ProductRepository(factory)));
     }
 
     [Fact]

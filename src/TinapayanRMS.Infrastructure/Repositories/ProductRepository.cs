@@ -27,6 +27,15 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             ? []
             : await GetWithCategoryAsync($"WHERE p.Id IN ({DapperReads.IdsTable})\nORDER BY p.Name", new { ids = DapperReads.IdList(ids) }, cancellationToken);
 
+    public Task<IReadOnlyList<ProductComponent>> GetComponentsAsync(int productId, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync(dbContext => ProductComponentRepository.GetForProductAsync(dbContext, productId, cancellationToken), cancellationToken);
+
+    public Task<IReadOnlyList<ProductComponent>> GetAllComponentsAsync(CancellationToken cancellationToken) =>
+        dbContextFactory.QueryAsync<ProductComponent>(
+            $"SELECT {Columns.Of<ProductComponent>("pc")} FROM ProductComponents pc ORDER BY pc.ProductId, pc.SortOrder, pc.Id",
+            null,
+            cancellationToken);
+
     private Task<IReadOnlyList<Product>> GetWithCategoryAsync(string filterAndOrder, object? parameters, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<Product>>(
             async dbContext => (await dbContext.Connection().QueryAsync<Product, ProductCategory?, Product>(
@@ -41,6 +50,12 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 
     public async Task AddAsync(Product product, CancellationToken cancellationToken)
     {
+        // A composite holds at least two products from the moment it's saved, and only SaveAsync writes them with it.
+        if (product.IsComposite)
+        {
+            throw new InvalidOperationException("A composite product is saved with its products (SaveAsync).");
+        }
+
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await AddAsync(dbContext, product, cancellationToken);
     }
@@ -120,7 +135,8 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         // A copy of the form's fields: the caller's entity is never attached, and never given an id by
-        // a save that then rolls back. The stage is only a new product's: a saved one's changes by moving it.
+        // a save that then rolls back. The stage is only a new product's: a saved one's changes by moving it. So is
+        // whether it's a composite, which a saved one keeps (UpdateAsync refuses another).
         var fields = new Product
         {
             Id = product.Id,
@@ -130,18 +146,31 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             QuantityRequired = product.QuantityRequired,
             CurrentPrice = product.CurrentPrice,
             Stage = product.Stage,
+            IsComposite = product.IsComposite,
         };
-        if (fields.Id == 0)
-        {
-            await AddAsync(dbContext, fields, cancellationToken);
-        }
-        else
-        {
-            await UpdateAsync(dbContext, fields, cancellationToken);
-        }
+        var stored = fields.Id == 0
+            ? await AddAsync(dbContext, fields, cancellationToken)
+            : await UpdateAsync(dbContext, fields, cancellationToken);
 
-        if (recipe is not null)
+        // A composite's recipe is its products, and a new one saved with none still has to hold two; its own sections are
+        // only in product-owned roles, a topping or a filling.
+        if (stored.IsComposite)
         {
+            if (recipe is not null || product.Id == 0)
+            {
+                await ProductComponentRepository.SetComponentsAsync(dbContext, stored, recipe?.Components ?? [], cancellationToken);
+            }
+
+            if (recipe is not null)
+            {
+                await ProductComponentRepository.EnsureSectionRolesAsync(dbContext, stored.Name, recipe, cancellationToken);
+                await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, fields.Id, recipe, cancellationToken);
+            }
+        }
+        else if (recipe is not null)
+        {
+            // Refuses products in a recipe of sub-assemblies.
+            await ProductComponentRepository.SetComponentsAsync(dbContext, stored, recipe.Components, cancellationToken);
             await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, fields.Id, recipe, cancellationToken);
         }
 
@@ -191,29 +220,55 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
                 + $"{(packagingLinkedBy.Count == 1 ? "links" : "link")} this product's packaging. Unlink it there first.");
         }
 
+        // Checked rather than left to the foreign key, whose refusal would read as something else, and so the message can
+        // name the composites.
+        var heldBy = await dbContext.ProductComponents
+            .Where(c => c.ComponentProductId == id)
+            .Select(c => c.Product!.Name)
+            .ToListAsync(cancellationToken);
+        if (heldBy.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"{string.Join(", ", heldBy.Order(StringComparer.CurrentCultureIgnoreCase))} "
+                + $"{(heldBy.Count == 1 ? "holds" : "hold")} this product. Take it out there first.");
+        }
+
         // Its own sub-assemblies go with it (Cascade). Nothing else can link one, but should another product's recipe
         // somehow use it, say so rather than let the database refuse.
         await SubAssemblyRepository.EnsureNoneLinkedElsewhereAsync(
             dbContext, u => u.SubAssembly!.OwnerProductId == id && u.ProductId != id, cancellationToken);
 
-        // The product's cascades take its own sub-assemblies, its packaging lines, its usages with their add-ins, and
-        // its costing parameters with it. The ones it links from the Sub-Assemblies screen stay there.
+        // The product's cascades take its own sub-assemblies, its packaging lines, its usages with their add-ins, a
+        // composite's lines, and its costing parameters with it. The ones it links from the Sub-Assemblies screen stay
+        // there, and so do the products a composite holds.
         await dbContext.Products.Where(p => p.Id == id).ExecuteDeleteAsync(cancellationToken);
     }
 
-    /// <summary>Adds <paramref name="product"/>, stamped as saved now, and saves it: the product gets its id.</summary>
-    internal static async Task AddAsync(TinapayanRMSDbContext dbContext, Product product, CancellationToken cancellationToken)
+    /// <summary>
+    /// Adds <paramref name="product"/>, stamped as saved now, and saves it: the product gets its id. Returns it, tracked.
+    /// A composite is one sellable unit.
+    /// </summary>
+    internal static async Task<Product> AddAsync(TinapayanRMSDbContext dbContext, Product product, CancellationToken cancellationToken)
     {
+        CompositeProductRules.EnsureOneUnit(product.IsComposite, product.QuantityRequired);
         product.UpdatedAt = DateTime.Now;
         dbContext.Products.Add(product);
         await dbContext.SaveChangesAsync(cancellationToken);
+        return product;
     }
 
-    /// <summary>Copies the name, description, category, quantity required and current price onto the stored product, stamps it as saved now, and saves it.</summary>
-    internal static async Task UpdateAsync(TinapayanRMSDbContext dbContext, Product product, CancellationToken cancellationToken)
+    /// <summary>
+    /// Copies the name, description, category, quantity required and current price onto the stored product, stamps it as
+    /// saved now, and saves it. Returns the stored product, tracked. Whether it's a composite can't change, and a composite
+    /// stays one sellable unit.
+    /// </summary>
+    internal static async Task<Product> UpdateAsync(TinapayanRMSDbContext dbContext, Product product, CancellationToken cancellationToken)
     {
         var existing = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == product.Id, cancellationToken)
             ?? throw new InvalidOperationException($"Product {product.Id} does not exist.");
+
+        CompositeProductRules.EnsureKindUnchanged(existing.IsComposite, product.IsComposite);
+        CompositeProductRules.EnsureOneUnit(existing.IsComposite, product.QuantityRequired);
 
         var oldName = existing.Name;
         existing.Name = product.Name;
@@ -225,6 +280,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await ResyncOwnedNamesAsync(dbContext, existing.Id, oldName, existing.Name, cancellationToken);
+        return existing;
     }
 
     /// <summary>

@@ -21,7 +21,13 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         // would take it to be: a product explicitly saved as 0 pieces has to reach the check constraint and
         // be refused, on an insert as on an update, rather than being quietly stored as 1.
         builder.Property(p => p.QuantityRequired).HasDefaultValue(1).HasSentinel(-1);
-        builder.ToTable(t => t.HasCheckConstraint("CK_Products_QuantityRequired", "[QuantityRequired] > 0"));
+
+        // A composite is one sellable unit: its products say how many of each go in (CompositeProductRules.EnsureOneUnit).
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("CK_Products_QuantityRequired", "[QuantityRequired] > 0");
+            t.HasCheckConstraint("CK_Products_CompositeIsOneUnit", "[IsComposite] = 0 OR [QuantityRequired] = 1");
+        });
 
         // The database default is only for the products there before stages were: the column is added to them as
         // Production. A new one is Research and Development, the CLR default, so HasSentinel moves the "leave it to

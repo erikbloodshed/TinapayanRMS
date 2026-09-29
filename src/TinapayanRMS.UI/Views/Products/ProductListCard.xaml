@@ -125,11 +125,27 @@
                                            Foreground="{StaticResource MutedForegroundBrush}"
                                            VerticalAlignment="Center"
                                            Margin="6,0,0,0" />
+                                <!--
+                                    A composite product, made of other products, muted after its name where a folder has its
+                                    count, so the product names still line up: AllApps, as its Products tab shows it
+                                -->
+                                <TextBlock x:Name="CompositeMark"
+                                           Text="&#xE71D;"
+                                           Style="{StaticResource IconGlyphStyle}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource MutedForegroundBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="6,1,0,0"
+                                           ToolTip="A composite product, made of other products"
+                                           Visibility="Collapsed" />
                             </StackPanel>
                             <DataTemplate.Triggers>
                                 <DataTrigger Binding="{Binding IsFolder}" Value="False">
                                     <Setter TargetName="Glyph" Property="Visibility" Value="Collapsed" />
                                     <Setter TargetName="Count" Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsComposite}" Value="True">
+                                    <Setter TargetName="CompositeMark" Property="Visibility" Value="Visible" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsStage}" Value="True">
                                     <Setter TargetName="Title" Property="FontWeight" Value="SemiBold" />

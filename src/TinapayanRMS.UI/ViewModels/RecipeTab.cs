@@ -4,7 +4,8 @@ namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// A tab of the Products screen's Recipe Structure (ProductsViewModel.RecipeTabs): one per sub-assembly, in
-/// recipe order, then New Sub-Assembly while one is being added, then Packaging, which is always there.
+/// recipe order (after a composite's Products), then New Sub-Assembly while one is being added, then Packaging while
+/// the product has any.
 /// </summary>
 public abstract class RecipeTab : ReactiveObject
 {
@@ -52,6 +53,18 @@ public sealed class AddSubAssemblyRecipeTab : RecipeTab
     public override string Header => "New Sub-Assembly";
 
     public override string Glyph => "";
+}
+
+/// <summary>
+/// A composite product's Products tab, its table of the products it holds and how many of each: first, before its own
+/// sections' tabs (a topping, a filling). Only a composite has it.
+/// </summary>
+public sealed class ComponentsRecipeTab : RecipeTab
+{
+    public override string Header => "Products";
+
+    /// <summary>Segoe Fluent Icons' AllApps: several things together.</summary>
+    public override string Glyph => "";
 }
 
 /// <summary>The packaging's tab, with its lines and form. There's always exactly one.</summary>

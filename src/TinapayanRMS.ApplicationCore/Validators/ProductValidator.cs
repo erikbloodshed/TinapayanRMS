@@ -17,6 +17,10 @@ public class ProductValidator : AbstractValidator<Product>
         RuleFor(p => p.QuantityRequired)
             .GreaterThanOrEqualTo(1)
             .WithMessage("A product has to hold at least one piece. Enter 1 for one sold by the piece.");
+        RuleFor(p => p.QuantityRequired)
+            .Equal(1)
+            .When(p => p.IsComposite)
+            .WithMessage("A composite product is one sellable unit. Say how many of each product go in on its Products table instead.");
         RuleFor(p => p.CurrentPrice)
             .GreaterThanOrEqualTo(0m)
             .When(p => p.CurrentPrice is not null)

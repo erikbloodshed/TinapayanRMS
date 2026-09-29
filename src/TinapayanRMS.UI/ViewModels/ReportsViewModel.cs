@@ -24,8 +24,11 @@ public sealed class ProductCostRow(Product product, ProductCostSummary costs)
 
     public string Category => product.Category?.Name ?? ProductFolderNode.UncategorizedTitle;
 
-    /// <summary>How many pieces the sellable unit holds, which every figure after it is for.</summary>
-    public int Pieces => product.QuantityRequired;
+    /// <summary>
+    /// How many pieces the sellable unit holds, which every figure after it is for; none for a composite, which is one unit
+    /// of other products, however many pieces those hold.
+    /// </summary>
+    public int? Pieces => product.IsComposite ? null : product.QuantityRequired;
 
     public decimal BaseCost => costs.BaseCost;
 

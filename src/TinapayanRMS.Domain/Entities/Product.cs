@@ -23,6 +23,14 @@ public class Product
     public ProductStage Stage { get; set; }
 
     /// <summary>
+    /// Made of other products (<see cref="ProductComponent"/>, at least two different ones) and its own packaging, and
+    /// sub-assemblies only in product-owned roles (a topping, a filling): a Pasalubong Box of 6 Ensaymada and 4 Cheese Rolls. Each product in it brings its recipe cost,
+    /// not its packaging. Picked when the product is made and fixed once it's saved; a composite is always one sellable
+    /// unit (<see cref="QuantityRequired"/> 1).
+    /// </summary>
+    public bool IsComposite { get; set; }
+
+    /// <summary>
     /// How many finished pieces make one sellable unit: 1 for a product sold by the piece, 8 for a "Box of 8".
     /// The recipe is authored per piece whatever this is; the costing multiplies by it, and the packaging lines
     /// are for one whole sellable unit. Always at least 1 (CK_Products_QuantityRequired).

@@ -73,9 +73,19 @@ public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField Auth
 /// <summary>
 /// A product's whole recipe of sub-assemblies: the sections whose lines it edits (its own, and new ones), and the ones
 /// it links. Saving it replaces the product's usages; one of its own it no longer lists is deleted, and one on the
-/// Sub-Assemblies screen is kept.
+/// Sub-Assemblies screen is kept. A composite product's recipe is its <see cref="Components"/>, and any sections it has
+/// are in product-owned roles (CompositeProductRules.EnsureSectionRoles).
 /// </summary>
-public sealed record RecipeDraft(IReadOnlyList<NewSubAssemblyDraft> New, IReadOnlyList<LinkedUsageDraft> Linked);
+public sealed record RecipeDraft(IReadOnlyList<NewSubAssemblyDraft> New, IReadOnlyList<LinkedUsageDraft> Linked)
+{
+    /// <summary>
+    /// A composite product's products, in its Products table's order, each with how many of its sellable units go in: at
+    /// least two different ones (CompositeProductRules.EnsureValidComponents). Empty for a product made of sub-assemblies,
+    /// whose <see cref="New"/> and <see cref="Linked"/> are then its recipe; a composite's are only its toppings, fillings
+    /// and the like, in product-owned roles.
+    /// </summary>
+    public IReadOnlyList<(int ComponentProductId, int Quantity)> Components { get; init; } = [];
+}
 
 /// <summary>
 /// What a product's packaging links, as Save writes it: another product's packaging, a standalone packaging
@@ -102,10 +112,22 @@ public interface IProductRepository
     /// <summary>The products with these ids, by name; an id with no product is left out.</summary>
     Task<IReadOnlyList<Product>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// A composite product's lines, in its Products table's order, each with its product (and that product's category);
+    /// none for a product made of sub-assemblies.
+    /// </summary>
+    Task<IReadOnlyList<ProductComponent>> GetComponentsAsync(int productId, CancellationToken cancellationToken);
+
+    /// <summary>Every composite's lines, without their products: which product goes into which, for the loop check.</summary>
+    Task<IReadOnlyList<ProductComponent>> GetAllComponentsAsync(CancellationToken cancellationToken);
+
     /// <summary>Adds the product and stamps its UpdatedAt.</summary>
     Task AddAsync(Product product, CancellationToken cancellationToken);
 
-    /// <summary>Changes the name, description, category, quantity required and current price, and stamps UpdatedAt. The stage stays as it is.</summary>
+    /// <summary>
+    /// Changes the name, description, category, quantity required and current price, and stamps UpdatedAt. The stage stays
+    /// as it is; whether it's a composite can't change (a different IsComposite is refused).
+    /// </summary>
     Task UpdateAsync(Product product, CancellationToken cancellationToken);
 
     /// <summary>
@@ -127,13 +149,15 @@ public interface IProductRepository
     /// check them. Returns the product's id.
     /// </summary>
     /// <param name="product">
-    /// Only its Id, Name, Description, CategoryId, QuantityRequired and CurrentPrice are read, and a new one's Stage;
-    /// it's never given an id. A new product goes in the stage it holds (Research and Development unless it's set), and
-    /// a saved one keeps its stage.
+    /// Only its Id, Name, Description, CategoryId, QuantityRequired, CurrentPrice and IsComposite are read, and a new one's
+    /// Stage; it's never given an id. A new product goes in the stage it holds (Research and Development unless it's set),
+    /// and a saved one keeps its stage. Whether it's a composite is a new one's to say; a saved one's can't change.
     /// </param>
     /// <param name="recipe">
     /// The product's complete recipe of sub-assemblies, or null to leave it as it is. One of its own it no longer lists is
-    /// deleted; one from the Sub-Assemblies screen stays there.
+    /// deleted; one from the Sub-Assemblies screen stays there. A composite's recipe is its products (RecipeDraft.Components)
+    /// and its sections in product-owned roles; a new composite saved with none is refused, as one with fewer than two
+    /// different products is, and so is a section in another role.
     /// </param>
     /// <param name="packagingLink">
     /// What the packaging links from now on, or null to leave the link as it is. Written before the lines, so
@@ -151,8 +175,9 @@ public interface IProductRepository
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Deletes the product with its own sub-assemblies, usages, packaging and costing; the ones it links from the
-    /// Sub-Assemblies screen stay there. Refused while another product links its packaging.
+    /// Deletes the product with its own sub-assemblies, usages, packaging, costing and, for a composite, its lines; the
+    /// sub-assemblies it links from the Sub-Assemblies screen, and the products a composite holds, stay. Refused while
+    /// another product links its packaging, or while a composite holds it.
     /// </summary>
     Task DeleteAsync(int id, CancellationToken cancellationToken);
 }

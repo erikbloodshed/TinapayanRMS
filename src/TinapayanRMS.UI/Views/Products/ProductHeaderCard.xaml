@@ -26,7 +26,7 @@
     </UserControl.Resources>
 
     <!--
-        The product's title (with, for one not saved yet, where Save will file it) and New/Save/Delete, a line under them, then a row of figures, nothing typed into: the material cost and
+        The product's title (with, for one not saved yet, where Save will file it) and New (a product, or a composite one)/Save/Delete, a line under them, then a row of figures, nothing typed into: the material cost and
         base cost for one sellable unit, the price the shop charges now with the markup it earns, and when it was
         last saved. The name, category, quantity required and current price are typed in under the header
         (ProductDetailsCard).
@@ -65,7 +65,40 @@
             </DockPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
-                <syncfusion:ButtonAdv Label="New" IconTemplate="{StaticResource AddIconTemplate}" Command="{Binding NewCommand}" Margin="0,0,8,0" />
+                <!--
+                    New starts a product made of sub-assemblies; its arrow offers a composite product, made of other
+                    products, too. A SplitButtonAdv is a DropDownButtonAdv with a button of its own, so its drop-down is
+                    built as Add Sub-Assembly's is: flattened ButtonAdv items, each closing the drop-down on its click
+                    (NewItem_Click), properties only so the theme's templates stay intact.
+                -->
+                <syncfusion:SplitButtonAdv x:Name="NewButton"
+                                           Label="New"
+                                           IconTemplate="{StaticResource AddIconTemplate}"
+                                           Command="{Binding NewCommand}"
+                                           ToolTip="A new product. The arrow offers a composite product, made of other products, too."
+                                           Margin="0,0,8,0">
+                    <StackPanel MinWidth="190" Margin="2">
+                        <syncfusion:ButtonAdv Label="New product"
+                                              ToolTip="A product made of sub-assemblies: its recipe, its packaging and its costing."
+                                              IconTemplate="{StaticResource AddIconTemplate}"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Left"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Command="{Binding NewCommand}"
+                                              Click="NewItem_Click" />
+                        <syncfusion:ButtonAdv Label="New composite product"
+                                              ToolTip="A product made of two or more other products, such as a Pasalubong Box, with its own packaging and any topping or filling over the whole. Each product brings its recipe cost."
+                                              IconTemplate="{StaticResource CompositeIconTemplate}"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Left"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Margin="0,2,0,0"
+                                              Command="{Binding NewCompositeCommand}"
+                                              Click="NewItem_Click" />
+                    </StackPanel>
+                </syncfusion:SplitButtonAdv>
                 <syncfusion:ButtonAdv Label="Save"
                                       IconTemplate="{StaticResource SaveIconTemplate}"
                                       Command="{Binding SaveCommand}"
@@ -142,7 +175,7 @@
 
             <TextBlock Text="Material Cost"
                        Style="{StaticResource FigureTileLabelStyle}"
-                       ToolTip="{Binding CostUnitCaption, StringFormat='{}{0}: the share of every sub-assembly it holds, plus its packaging'}" />
+                       ToolTip="{Binding MaterialCostTooltip}" />
             <TextBlock Grid.Row="1" Text="{Binding Costs.Material, StringFormat='{}{0:N2}'}" Style="{StaticResource FigureAmountStyle}" />
 
             <TextBlock Grid.Column="2"

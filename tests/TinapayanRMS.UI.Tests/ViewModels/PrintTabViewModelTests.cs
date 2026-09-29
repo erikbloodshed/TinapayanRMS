@@ -128,6 +128,33 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         saved.Costs.SellingPrice.Should().BePositive();
     }
 
+    [Fact]
+    public async Task A_saved_composite_reads_as_the_Products_screen_shows_it_once_opened()
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m);
+        var (cheeseRollId, _) = await AddProductWithSubAssemblyAsync("Cheese Roll", doughRoleId, [(flourId, 1000m)], weightPerPiece: 100m);
+        var boxId = await new ProductRepository(CreateDbContextFactory()).SaveAsync(
+            new Product { Name = "Pasalubong Box", IsComposite = true },
+            new RecipeDraft([], []) { Components = [(ensaymadaId, 6), (cheeseRollId, 4)] },
+            null,
+            null,
+            null,
+            Cancellation);
+        await AddBoxAsync(boxId);
+        await SetCostingAsync(boxId);
+        var products = await OpenProductsAsync("Pasalubong Box", vm => vm.ComponentEdits.Count == 2 && vm.HasPackaging);
+
+        var screen = products.PreparePrintout().Printout!;
+        var saved = (await CreateReader().ReadAsync(products.SelectedProduct!, Cancellation)).ToPrintout(screen.PrintedAt);
+
+        saved.Should().BeEquivalentTo(screen);
+        saved.Components.Should().HaveCount(2);
+        saved.Costs.SubAssemblies.Should().Be(35m);
+        saved.Costs.Packaging.Should().Be(30m);
+    }
+
     /// <summary>
     /// Two categories and five products: Production's Breads (Pan de Coco, Cheese Roll), Cakes (Mocha Roll) and Uncategorized
     /// (Loaf), and Research and Development's Breads (Test Bread). Named out of order, so the list's order is the test's.
@@ -193,7 +220,8 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             new ProductSubAssemblyUsageRepository(factory),
             packagingLineRepository,
             new CostingParametersRepository(factory),
-            new SubAssemblyLineRepository(factory));
+            new SubAssemblyLineRepository(factory),
+            new ProductRepository(factory));
     }
 
     /// <summary>The Products screen, loaded, with <paramref name="productName"/> open when one is given.</summary>

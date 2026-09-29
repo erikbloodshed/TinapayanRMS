@@ -39,6 +39,13 @@ public class ProductValidatorTests
     }
 
     [Fact]
+    public void A_composite_product_is_one_sellable_unit()
+    {
+        _validator.Validate(new Product { Name = "Pasalubong Box", IsComposite = true }).IsValid.Should().BeTrue();
+        _validator.Validate(new Product { Name = "Pasalubong Box", IsComposite = true, QuantityRequired = 2 }).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
     public void Accepts_a_description_at_the_limit()
     {
         var product = new Product { Name = "Ensaymada", Description = new string('a', ProductValidator.MaxDescriptionLength) };
