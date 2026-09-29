@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
@@ -15,7 +16,8 @@ namespace TinapayanRMS.UI.ViewModels;
 /// The Settings dialog's Roles tab: the sections a product's recipe is split into (Dough, Filling, …),
 /// in their order, and which of them are product-owned (a section made in a product stays that product's own).
 /// Picking a role loads it for editing; New, or finishing a Save or Delete, clears the form, so the next Save
-/// always adds a role rather than renaming the last one touched.
+/// always adds a role rather than renaming the last one touched. A new role goes last; Move Up and Move Down change
+/// the picked one's place (2026-09-29, at the user's request, in place of an Order box on the form).
 /// </summary>
 public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
 {
@@ -41,13 +43,6 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
     {
         get => _editingName;
         set => this.RaiseAndSetIfChanged(ref _editingName, value);
-    }
-
-    private decimal _editingSortOrder;
-    public decimal EditingSortOrder
-    {
-        get => _editingSortOrder;
-        set => this.RaiseAndSetIfChanged(ref _editingSortOrder, value);
     }
 
     private bool _editingIsProductOwned;
@@ -78,6 +73,12 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
 
+    /// <summary>Swaps the picked role with the one above it; off for the first.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> MoveUpCommand { get; }
+
+    /// <summary>Swaps the picked role with the one below it; off for the last.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> MoveDownCommand { get; }
+
     public SubAssemblyRolesViewModel(ISubAssemblyRoleRepository roleRepository, IValidator<SubAssemblyRole> roleValidator, ILogger logger)
         : base(logger)
     {
@@ -99,7 +100,6 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
             {
                 _editingId = role!.Id;
                 EditingName = role.Name;
-                EditingSortOrder = role.SortOrder;
                 EditingIsProductOwned = role.IsProductOwned;
                 CanEditProductOwned = !role.IsPackaging;
             });
@@ -115,12 +115,6 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
             {
                 _roleCache.MergeFrom(roles);
                 SelectedRole = Roles.FirstOrDefault(r => r.Id == selectedId);
-
-                // A form nobody has touched yet offers the next place in the order, as New does.
-                if (_editingId == 0 && string.IsNullOrWhiteSpace(EditingName) && EditingSortOrder == 0)
-                {
-                    EditingSortOrder = NextSortOrder();
-                }
             });
         });
 
@@ -133,7 +127,7 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
             {
                 Id = _editingId,
                 Name = EditingName.Trim(),
-                SortOrder = (int)EditingSortOrder,
+                SortOrder = stored?.SortOrder ?? 0,
                 IsPackaging = stored?.IsPackaging ?? false,
                 IsProductOwned = EditingIsProductOwned,
             };
@@ -177,7 +171,27 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
                 await LoadCommand.Execute();
             }),
             this.WhenAnyValue(x => x.SelectedRole).Select(role => role is not null));
+
+        // Re-checked when the pick changes and when the list does, since a move or a new role changes what's first and last.
+        var placeChanged = this.WhenAnyValue(x => x.SelectedRole).Select(_ => RxVoid.Default)
+            .Merge(ObservableCollectionEx.ObserveCollectionChanges((INotifyCollectionChanged)_roles).Select(_ => RxVoid.Default));
+        MoveUpCommand = ReactiveCommand.CreateFromTask(
+            () => MoveAsync(up: true),
+            placeChanged.Select(_ => SelectedRole is { } role && Roles.IndexOf(role) > 0));
+        MoveDownCommand = ReactiveCommand.CreateFromTask(
+            () => MoveAsync(up: false),
+            placeChanged.Select(_ => SelectedRole is { } role && Roles.IndexOf(role) is var index && index >= 0 && index < Roles.Count - 1));
     }
+
+    /// <summary>
+    /// Moves the picked role, then reloads. The form is left as it is, unsaved edits and all: a move only changes the
+    /// role's place, which the form doesn't show.
+    /// </summary>
+    private Task MoveAsync(bool up) => RunSafelyAsync(async () =>
+    {
+        await _roleRepository.MoveAsync(SelectedRole!.Id, up, CancellationToken.None);
+        await LoadCommand.Execute();
+    });
 
     private async Task FinishSaveAsync()
     {
@@ -201,18 +215,15 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
             : $"Stop making {role.Name} product-owned? The {them} products own in it will move to the Sub-Assemblies screen, still used by the same products, which will link them. Add-ins merged into their lines stay merged.";
     }
 
-    /// <summary>An empty form for a new role, which goes after the others unless its order is changed.</summary>
+    /// <summary>An empty form for a new role, which goes after the others.</summary>
     private void ClearForm()
     {
         SelectedRole = null;
         _editingId = 0;
         EditingName = string.Empty;
-        EditingSortOrder = NextSortOrder();
         EditingIsProductOwned = false;
         CanEditProductOwned = true;
     }
-
-    private int NextSortOrder() => Roles.Count == 0 ? 1 : Roles.Max(r => r.SortOrder) + 1;
 
     public void Dispose() => _roleCache.Dispose();
 }

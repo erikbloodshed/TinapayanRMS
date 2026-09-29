@@ -26,7 +26,8 @@
     </UserControl.Resources>
 
     <!--
-        The product's title (with, for one not saved yet, where Save will file it) and New (a product, or a composite one)/Save/Delete, a line under them, then a row of figures, nothing typed into: the material cost and
+        The product's title (with, for one not saved yet, where Save will file it, and while the costs are unbuffered, a
+        badge saying so) and New (a product, or a composite one)/Save/Undo/Redo/Revert/Print/Unbuffered (Buffered while unbuffered)/Delete, a line under them, then a row of figures, nothing typed into: the material cost and
         base cost for one sellable unit, the price the shop charges now with the markup it earns, and when it was
         last saved. The name, category, quantity required and current price are typed in under the header
         (ProductDetailsCard).
@@ -50,6 +51,13 @@
                 the name and a long name trims while the tag stays in sight.
             -->
             <DockPanel HorizontalAlignment="Left" Margin="0,0,12,0">
+                <!-- While the costs are unbuffered, so no figure on the screen is taken for the usual, buffered one -->
+                <Border DockPanel.Dock="Right"
+                        Style="{StaticResource LinkedBadgeStyle}"
+                        ToolTip="Every cost on this screen is at the materials' true costs, without their cost buffers. Buffered switches back."
+                        Visibility="{Binding IsUnbuffered, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="Unbuffered costs" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
+                </Border>
                 <Border DockPanel.Dock="Right"
                         Style="{StaticResource LinkedBadgeStyle}"
                         ToolTip="Where Save files this new product in the Products list: Research and Development after New, or the folder New Product Here was picked on."
@@ -128,6 +136,15 @@
                                       IconTemplate="{StaticResource PrintIconTemplate}"
                                       Command="{Binding PrintCommand}"
                                       ToolTip="Opens the Print tab, which previews and prints this product's recipe and costing as this screen shows them."
+                                      Margin="0,0,8,0" />
+                <!--
+                    Switches every cost on the screen between the materials' buffered and true costs, named for the costs
+                    it switches to: Unbuffered, then Buffered. The badge beside the title says which are showing.
+                -->
+                <syncfusion:ButtonAdv Label="{Binding CostBasisButtonLabel}"
+                                      IconTemplate="{StaticResource CalculateIconTemplate}"
+                                      Command="{Binding ToggleCostBasisCommand}"
+                                      ToolTip="{Binding CostBasisButtonTooltip}"
                                       Margin="0,0,8,0" />
                 <syncfusion:ButtonAdv Label="Delete" IconTemplate="{StaticResource DeleteIconTemplate}" Command="{Binding DeleteCommand}" />
             </StackPanel>

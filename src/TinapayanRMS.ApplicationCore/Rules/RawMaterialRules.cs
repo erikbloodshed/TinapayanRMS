@@ -273,6 +273,10 @@ public static class RawMaterialRules
         }
     }
 
+    /// <summary>What one base unit of <paramref name="material"/> costs at <paramref name="basis"/>: its buffered cost, or its true cost.</summary>
+    public static decimal CostPerBaseUnitAt(RawMaterial material, CostBasis basis) =>
+        basis == CostBasis.Unbuffered ? material.CostPerBaseUnit : material.BufferedCostPerBaseUnit;
+
     /// <summary>A cost with a buffer on top: ₱0.05 with a 5% buffer is ₱0.0525.</summary>
     public static decimal BufferedCost(decimal cost, decimal bufferPercent) =>
         cost * (1 + bufferPercent / 100m);

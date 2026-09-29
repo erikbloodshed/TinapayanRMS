@@ -18,7 +18,7 @@ namespace TinapayanRMS.UI.Views;
 /// opens, over the same long-lived ViewModels, so a tab keeps its selection and unsaved edits between
 /// visits.
 /// </summary>
-public partial class SettingsWindow : Window
+public partial class SettingsWindow : AppWindow
 {
     public SettingsWindow(
         UnitsOfMeasureViewModel unitsOfMeasureViewModel,

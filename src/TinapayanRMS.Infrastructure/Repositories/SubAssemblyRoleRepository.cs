@@ -10,13 +10,14 @@ public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> 
 {
     public Task<IReadOnlyList<SubAssemblyRole>> GetAllAsync(CancellationToken cancellationToken) =>
         dbContextFactory.QueryAsync<SubAssemblyRole>(
-            $"SELECT {Columns.Of<SubAssemblyRole>("r")} FROM SubAssemblyRoles r ORDER BY r.SortOrder", null, cancellationToken);
+            $"SELECT {Columns.Of<SubAssemblyRole>("r")} FROM SubAssemblyRoles r ORDER BY r.SortOrder, r.Name", null, cancellationToken);
 
     public async Task AddAsync(SubAssemblyRole role, CancellationToken cancellationToken)
     {
         SubAssemblyRules.EnsureProductOwnedAllowed(role);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        role.SortOrder = (await dbContext.SubAssemblyRoles.MaxAsync(r => (int?)r.SortOrder, cancellationToken) ?? 0) + 1;
         dbContext.SubAssemblyRoles.Add(role);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -44,7 +45,6 @@ public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> 
         var oldName = existing.Name;
         var wasProductOwned = existing.IsProductOwned;
         existing.Name = role.Name;
-        existing.SortOrder = role.SortOrder;
         existing.IsProductOwned = role.IsProductOwned;
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -94,6 +94,43 @@ public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> 
             throw new InvalidOperationException("The Packaging role holds the packaging sets, so it can't be deleted. It can be renamed.");
         }
 
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         await dbContext.SubAssemblyRoles.Where(r => r.Id == id).ExecuteDeleteAsync(cancellationToken);
+        Renumber(await InOrderAsync(dbContext, cancellationToken));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task MoveAsync(int id, bool up, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var roles = await InOrderAsync(dbContext, cancellationToken);
+
+        var index = roles.FindIndex(r => r.Id == id);
+        if (index < 0)
+        {
+            throw new InvalidOperationException($"Sub-assembly role {id} does not exist.");
+        }
+
+        var other = up ? index - 1 : index + 1;
+        if (other >= 0 && other < roles.Count)
+        {
+            (roles[index], roles[other]) = (roles[other], roles[index]);
+        }
+
+        Renumber(roles);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Every role in its order, ties by name, as the Roles tab lists them.</summary>
+    private static Task<List<SubAssemblyRole>> InOrderAsync(TinapayanRMSDbContext dbContext, CancellationToken cancellationToken) =>
+        dbContext.SubAssemblyRoles.OrderBy(r => r.SortOrder).ThenBy(r => r.Name).ToListAsync(cancellationToken);
+
+    private static void Renumber(List<SubAssemblyRole> roles)
+    {
+        for (var i = 0; i < roles.Count; i++)
+        {
+            roles[i].SortOrder = i + 1;
+        }
     }
 }

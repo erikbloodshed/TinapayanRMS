@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Tests.ViewModels;
@@ -12,6 +13,22 @@ public class IngredientLineRowTests
     private static readonly RawMaterial Sugar = new() { Id = 2, Name = "Sugar", BufferedCostPerBaseUnit = 0.09m };
 
     private static readonly Dictionary<int, RawMaterial> IngredientsById = new() { [Flour.Id] = Flour, [Sugar.Id] = Sugar };
+
+    [Fact]
+    public void Switched_to_unbuffered_a_row_is_priced_at_its_ingredients_true_cost()
+    {
+        var butter = new RawMaterial { Id = 3, Name = "Butter", CostPerBaseUnit = 0.40m, BufferedCostPerBaseUnit = 0.44m };
+        var row = new IngredientLineRow(butter, 100m);
+        row.CostBasis.Should().Be(CostBasis.Buffered);
+        (row.CostPerGram, row.Cost).Should().Be((0.44m, 44m));
+        List<string?> changed = [];
+        row.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        row.CostBasis = CostBasis.Unbuffered;
+
+        (row.CostPerGram, row.Cost).Should().Be((0.40m, 40m));
+        changed.Should().Contain([nameof(IngredientLineRow.CostPerGram), nameof(IngredientLineRow.Cost)]);
+    }
 
     [Fact]
     public void Resolve_points_a_picked_row_at_its_ingredient_which_prices_it()

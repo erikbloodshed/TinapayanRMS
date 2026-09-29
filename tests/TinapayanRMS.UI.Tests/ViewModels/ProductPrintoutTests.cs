@@ -35,7 +35,7 @@ public class ProductPrintoutTests
             0m,
             linkedName: null);
 
-        var section = PrintedSection.From(usage);
+        var section = PrintedSection.From(usage, CostBasis.Buffered);
 
         section.Name.Should().Be("Dough");
         section.Source.Should().BeNull("the section is the product's own");
@@ -65,7 +65,7 @@ public class ProductPrintoutTests
             linkedName: "Variety Bread Dough",
             addIns: [new SubAssemblyLineEdit(Ingredient("Ube Flavouring", 0.5m), 20m)]);
 
-        var section = PrintedSection.From(usage);
+        var section = PrintedSection.From(usage, CostBasis.Buffered);
 
         section.Source.Should().Be("Variety Bread Dough, from Sub-Assemblies");
         section.AddIns.Should().Equal(new PrintedLine("Ube Flavouring", 20m, 2m, CostPerGram: 0.5m, 10m, IsFormulaBase: false));
@@ -88,7 +88,7 @@ public class ProductPrintoutTests
             linkedName: "Butter Glaze",
             addIns: [new SubAssemblyLineEdit(Ingredient("Cream", 0.3m), 500m)]);
 
-        var section = PrintedSection.From(usage);
+        var section = PrintedSection.From(usage, CostBasis.Buffered);
 
         section.PercentHeader.Should().Be("Absolute %");
         section.Lines.Select(l => l.Percent).Should().Equal(30m, 20m);
@@ -111,13 +111,13 @@ public class ProductPrintoutTests
             10m,
             linkedName: null);
 
-        var section = PrintedSection.From(usage);
+        var section = PrintedSection.From(usage, CostBasis.Buffered);
 
         section.HasPieceSize.Should().BeTrue();
         (section.TotalWeight, section.BatchCost).Should().Be((1700m, 50m));
         (section.ShrinkagePercent, section.FinalWeight).Should().Be((10m, 1530m), "a tenth of the 1,700 g batch bakes off");
         (section.WeightPerPiece, section.Yield).Should().Be((60m, 25.5m), "the pieces are cut from the 1,530 g it makes");
-        section.CostPerPiece.Should().Be(usage.CostPerPiece).And.BeGreaterThan(0m);
+        section.CostPerPiece.Should().Be(usage.CostPerPieceAt(CostBasis.Buffered)).And.BeGreaterThan(0m);
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public class ProductPrintoutTests
             0m,
             linkedName: null);
 
-        var section = PrintedSection.From(usage);
+        var section = PrintedSection.From(usage, CostBasis.Buffered);
 
         section.HasPieceSize.Should().BeFalse();
         section.CostPerPiece.Should().Be(0m);

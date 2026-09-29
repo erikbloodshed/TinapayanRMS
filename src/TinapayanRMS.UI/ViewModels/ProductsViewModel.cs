@@ -18,7 +18,7 @@ using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI.ViewModels;
 
-/// <summary>One ingredient line of a sub-assembly, saved or not: grams of an ingredient, costed at its buffered cost per gram.</summary>
+/// <summary>One ingredient line of a sub-assembly, saved or not: grams of an ingredient, costed at its buffered (or true) cost per gram.</summary>
 public sealed class SubAssemblyLineEdit(RawMaterial ingredient, decimal grams, bool isFormulaBase = false, decimal? authoredBakersPercent = null)
 {
     public RawMaterial Ingredient { get; } = ingredient;
@@ -31,8 +31,11 @@ public sealed class SubAssemblyLineEdit(RawMaterial ingredient, decimal grams, b
     /// <summary>The percentage typed for the line, or null when its grams were: whichever was typed is what stays put.</summary>
     public decimal? AuthoredBakersPercent { get; } = authoredBakersPercent;
 
-    /// <summary>What this line adds to the batch's cost, at the ingredient's buffered cost per gram.</summary>
-    public decimal Cost => Grams * Ingredient.BufferedCostPerBaseUnit;
+    /// <summary>What a gram of the ingredient costs at <paramref name="basis"/>.</summary>
+    public decimal CostPerGramAt(CostBasis basis) => RawMaterialRules.CostPerBaseUnitAt(Ingredient, basis);
+
+    /// <summary>What this line adds to the batch's cost, at the ingredient's cost per gram at <paramref name="basis"/>.</summary>
+    public decimal CostAt(CostBasis basis) => Grams * CostPerGramAt(basis);
 }
 
 /// <summary>
@@ -136,10 +139,14 @@ public sealed class ProductUsageEdit : ReactiveObject
         AddIns = addIns ?? [];
 
         // The sub-assembly's own batch, then this product's on top of it: add-ins go into the batch, so a
-        // piece takes its weight-per-piece share of the two together.
-        (BaseTotalWeight, var baseCost) = SubAssemblyRules.CalculateTotals([.. lines.Select(l => (l.Grams, l.Ingredient.BufferedCostPerBaseUnit))]);
-        (TotalWeight, TotalCost) = ProductRules.CalculateEffectiveBatch(
-            BaseTotalWeight, baseCost, [.. AddIns.Select(a => (a.Grams, a.Ingredient.BufferedCostPerBaseUnit))]);
+        // piece takes its weight-per-piece share of the two together. Worked out at both costs, buffered and
+        // true, so the screen can switch between them without building its sections again.
+        (BaseTotalWeight, var baseCost) = SubAssemblyRules.CalculateTotals([.. lines.Select(l => (l.Grams, l.CostPerGramAt(CostBasis.Buffered)))]);
+        var baseUnbufferedCost = SubAssemblyRules.CalculateTotals([.. lines.Select(l => (l.Grams, l.CostPerGramAt(CostBasis.Unbuffered)))]).TotalCost;
+        (TotalWeight, _totalCost) = ProductRules.CalculateEffectiveBatch(
+            BaseTotalWeight, baseCost, [.. AddIns.Select(a => (a.Grams, a.CostPerGramAt(CostBasis.Buffered)))]);
+        _unbufferedTotalCost = ProductRules.CalculateEffectiveBatch(
+            BaseTotalWeight, baseUnbufferedCost, [.. AddIns.Select(a => (a.Grams, a.CostPerGramAt(CostBasis.Unbuffered)))]).TotalCost;
 
         // The pieces come out of what the batch makes, not out of what went into it: the batch keeps its whole
         // cost, so shrinking it leaves fewer, dearer pieces.
@@ -149,7 +156,8 @@ public sealed class ProductUsageEdit : ReactiveObject
         // A batch that weighs nothing has nothing to share out per piece.
         if (FinalWeight > 0 && WeightPerPiece > 0)
         {
-            CostPerPiece = ProductRules.CalculateUsageCostPerPiece(TotalCost, WeightPerPiece, FinalWeight);
+            _costPerPiece = ProductRules.CalculateUsageCostPerPiece(_totalCost, WeightPerPiece, FinalWeight);
+            _unbufferedCostPerPiece = ProductRules.CalculateUsageCostPerPiece(_unbufferedTotalCost, WeightPerPiece, FinalWeight);
         }
     }
 
@@ -271,7 +279,11 @@ public sealed class ProductUsageEdit : ReactiveObject
     /// <summary>The batch a piece is cut from: the sub-assembly's own plus this product's add-ins.</summary>
     public decimal TotalWeight { get; }
 
-    public decimal TotalCost { get; }
+    private readonly decimal _totalCost;
+    private readonly decimal _unbufferedTotalCost;
+
+    /// <summary>What the whole batch costs, add-ins included, at <paramref name="basis"/>.</summary>
+    public decimal TotalCostAt(CostBasis basis) => basis == CostBasis.Unbuffered ? _unbufferedTotalCost : _totalCost;
 
     /// <summary>What the batch weighs once it's made: TotalWeight less its shrinkage. The pieces are cut from this.</summary>
     public decimal FinalWeight { get; }
@@ -286,7 +298,11 @@ public sealed class ProductUsageEdit : ReactiveObject
 
     public bool IsWeightAuthored => AuthoredField == UsageAuthoredField.WeightPerPiece;
 
-    public decimal CostPerPiece { get; }
+    private readonly decimal _costPerPiece;
+    private readonly decimal _unbufferedCostPerPiece;
+
+    /// <summary>What one piece costs at <paramref name="basis"/>; 0 while the batch weighs nothing or has no piece size.</summary>
+    public decimal CostPerPieceAt(CostBasis basis) => basis == CostBasis.Unbuffered ? _unbufferedCostPerPiece : _costPerPiece;
 
     /// <summary>E.g. "1,700 g batch".</summary>
     public string BatchText => $"{TotalWeight:#,0.##} g batch";
@@ -809,7 +825,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// What one of each product in the Products table brings, by product id: its recipe cost as saved, read with the
     /// composite, when one is picked, and again with every LoadCommand. Kept for the product showing only.
     /// </summary>
-    private readonly Dictionary<int, decimal> _componentCosts = [];
+    private readonly Dictionary<int, RecipeCosts> _componentCosts = [];
 
     /// <summary>The products whose recipe cost is being read, so a second pick of one doesn't read it twice.</summary>
     private readonly HashSet<int> _fetchingComponentCosts = [];
@@ -822,9 +838,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private decimal? FindRecipeCost(int id)
     {
-        if (_componentCosts.TryGetValue(id, out var cost))
+        if (_componentCosts.TryGetValue(id, out var costs))
         {
-            return cost;
+            return costs.At(CostBasis);
         }
 
         if (_fetchingComponentCosts.Add(id))
@@ -886,7 +902,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ObservableCollection<PackagingLineRow> LineEdits { get; } = [];
 
     /// <summary>The line the packaging table's add row edits: it offers its material's units and prices itself before it's committed.</summary>
-    public Func<PackagingLineRow> NewLineEdit => () => new PackagingLineRow(FindPackagingMaterial);
+    public Func<PackagingLineRow> NewLineEdit => () => new PackagingLineRow(FindPackagingMaterial) { CostBasis = CostBasis };
 
     /// <summary>A packaging material as the screen last loaded it, for a row that prices itself.</summary>
     private RawMaterial? FindPackagingMaterial(int id) => PackagingMaterials.FirstOrDefault(m => m.Id == id);
@@ -910,7 +926,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ObservableCollection<PackagingLineRow> FormPackagingLines { get; } = [];
 
     /// <summary>The line the form's packaging table's add row edits, priced as its material is picked.</summary>
-    public Func<PackagingLineRow> NewFormPackagingLine => () => new PackagingLineRow(FindPackagingMaterial);
+    public Func<PackagingLineRow> NewFormPackagingLine => () => new PackagingLineRow(FindPackagingMaterial) { CostBasis = CostBasis };
 
     private PackagingLineRow? _selectedFormPackagingLine;
     public PackagingLineRow? SelectedFormPackagingLine
@@ -952,7 +968,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ObservableCollection<IngredientLineRow> FormLines { get; } = [];
 
     /// <summary>The line the form table's add row edits: it prices itself as its ingredient is picked, before it's committed.</summary>
-    public Func<IngredientLineRow> NewFormLine => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id), _formFormulaBase);
+    public Func<IngredientLineRow> NewFormLine => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id), _formFormulaBase) { CostBasis = CostBasis };
 
     /// <summary>
     /// The form's add-ins, for a sub-assembly the product links: its own extras on top of the owner's
@@ -961,7 +977,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ObservableCollection<IngredientLineRow> FormAddIns { get; } = [];
 
     /// <summary>The add-in the form table's add row edits, priced as its ingredient is picked.</summary>
-    public Func<IngredientLineRow> NewFormAddIn => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id), _formFormulaBase);
+    public Func<IngredientLineRow> NewFormAddIn => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id), _formFormulaBase) { CostBasis = CostBasis };
 
     /// <summary>The form's formula base as last worked out, for a line started in either table's add row.</summary>
     private decimal _formFormulaBase;
@@ -1037,9 +1053,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public string CostUnitCaption => ProductPrintout.CostUnitCaptionFor(EditingQuantityRequired, IsEditingComposite);
 
     /// <summary>The header's Material Cost tooltip: what goes into it, which for a composite is what its products bring.</summary>
-    public string MaterialCostTooltip => IsEditingComposite
+    public string MaterialCostTooltip => (IsEditingComposite
         ? $"{CostUnitCaption}: the recipe cost of the products it holds and its own sub-assemblies, plus its own packaging"
-        : $"{CostUnitCaption}: the share of every sub-assembly it holds, plus its packaging";
+        : $"{CostUnitCaption}: the share of every sub-assembly it holds, plus its packaging")
+        + (IsUnbuffered ? ", at the materials' true costs, without their cost buffers" : ", at the materials' buffered costs");
 
     /// <summary>What the Costing tab's labor, overhead and admin metrics are a percentage of, for their tooltips.</summary>
     public string MetricBaseTooltip => IsEditingComposite
@@ -1089,6 +1106,39 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// Production" or "Goes in Research and Development". Null while a saved product is showing.
     /// </summary>
     public string? NewProductTag => _newProductTag.Value;
+
+    private CostBasis _costBasis;
+    /// <summary>
+    /// Which of the materials' costs every figure on the screen is at: buffered, as always, until the header's Unbuffered
+    /// button (<see cref="ToggleCostBasisCommand"/>) switches it to their true costs for a look without the buffer. It isn't part
+    /// of the product, so it's no edit: nothing to undo or save, and it stays as it is from one product to the next until
+    /// the app closes. Print prints at it too.
+    /// </summary>
+    public CostBasis CostBasis
+    {
+        get => _costBasis;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _costBasis, value);
+            this.RaisePropertyChanged(nameof(IsUnbuffered));
+            this.RaisePropertyChanged(nameof(CostBasisButtonLabel));
+            this.RaisePropertyChanged(nameof(CostBasisButtonTooltip));
+        }
+    }
+
+    /// <summary>The screen shows its unbuffered costs: the header's badge says so.</summary>
+    public bool IsUnbuffered => CostBasis == CostBasis.Unbuffered;
+
+    /// <summary>
+    /// The header's switch, named for the costs a click switches to (the user's request, 2026-09-29): "Unbuffered" while
+    /// the screen is buffered, "Buffered" while it isn't.
+    /// </summary>
+    public string CostBasisButtonLabel => IsUnbuffered ? "Buffered" : "Unbuffered";
+
+    /// <summary>What the header's switch does from here.</summary>
+    public string CostBasisButtonTooltip => IsUnbuffered
+        ? "Shows every cost on this screen, and prints it, at the materials' buffered costs again. Nothing is saved."
+        : "Shows every cost on this screen, and prints it, at the materials' true costs, without their cost buffers. Nothing is saved.";
 
     /// <summary>When the product was last saved, e.g. "Sep 14, 2026, 6:27 PM", or "—".</summary>
     private string _lastUpdatedText = "—";
@@ -1589,6 +1639,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
 
+    /// <summary>Unbuffered: switches every cost on the screen between the materials' buffered costs and their true ones (<see cref="CostBasis"/>).</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ToggleCostBasisCommand { get; }
+
     private readonly Subject<PrintScope> _printRequests = new();
 
     /// <summary>
@@ -1912,6 +1965,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 RebaseSettledForm();
             });
 
+        // Every row put in a lines table, however it got there (a product read, an undo, a form opened), is priced at the
+        // screen's costs, buffered or not; the add rows' factories see to a row still being typed.
+        FormLines.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
+        FormAddIns.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
+        FormPackagingLines.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
+        LineEdits.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
+
         // A line picked, typed or deleted in the form's table: it's priced, and the batch and preview follow.
         FormLines.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
@@ -2034,7 +2094,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     return;
                 }
 
-                ProductComponentRow.Resolve(ComponentEdits, Products.ToDictionary(p => p.Id), _componentCosts);
+                ProductComponentRow.Resolve(ComponentEdits, Products.ToDictionary(p => p.Id), ComponentCostsAtBasis());
                 ReadMissingComponentCosts();
                 RecomputeCosts();
             });
@@ -2167,7 +2227,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     _componentCosts[productId] = cost;
                 }
 
-                ProductComponentRow.Resolve(ComponentEdits, Products.ToDictionary(p => p.Id), _componentCosts);
+                ProductComponentRow.Resolve(ComponentEdits, Products.ToDictionary(p => p.Id), ComponentCostsAtBasis());
                 RefreshComponentOptions();
 
                 SelectedProduct = Products.FirstOrDefault(p => p.Id == selectedId);
@@ -2365,6 +2425,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 _printRequests.OnNext(PrintScope.ThisProduct);
                 return Task.CompletedTask;
             }));
+
+        ToggleCostBasisCommand = ReactiveCommand.Create(ToggleCostBasis);
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
             () => DeleteProductAsync(SelectedProduct!),
@@ -3006,7 +3068,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         foreach (var component in components)
         {
-            _componentCosts[component.Component.ComponentProductId] = component.RecipeCost;
+            _componentCosts[component.Component.ComponentProductId] = component.RecipeCosts;
         }
 
         SelectedComponentEdit = null;
@@ -3024,7 +3086,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             productsById.TryAdd(component.Component.ComponentProductId, component.Component.ComponentProduct!);
         }
 
-        ProductComponentRow.Resolve(ComponentEdits, productsById, _componentCosts);
+        ProductComponentRow.Resolve(ComponentEdits, productsById, ComponentCostsAtBasis());
     }
 
     /// <summary>
@@ -3041,6 +3103,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             [.. Products.Where(p => productId == 0 || (p.Id != productId && !CompositeProductRules.Contains(p.Id, productId, held)))],
             p => p.Id);
     }
+
+    /// <summary>What each product read so far brings at the screen's costs, buffered or not, for the Products table's rows.</summary>
+    private Dictionary<int, decimal> ComponentCostsAtBasis() => _componentCosts.ToDictionary(c => c.Key, c => c.Value.At(CostBasis));
 
     /// <summary>
     /// Reads what each product picked in the Products table brings, when the screen hasn't read it yet: off the UI thread,
@@ -3088,10 +3153,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }
 
         var productsById = Products.ToDictionary(p => p.Id);
-        ProductComponentRow.Resolve(ComponentEdits, productsById, _componentCosts);
+        ProductComponentRow.Resolve(ComponentEdits, productsById, ComponentCostsAtBasis());
         if (_addingComponentRow is { } adding)
         {
-            ProductComponentRow.Resolve([adding], productsById, _componentCosts);
+            ProductComponentRow.Resolve([adding], productsById, ComponentCostsAtBasis());
         }
     }
 
@@ -4314,13 +4379,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private decimal CurrentShrinkagePercent() => Math.Clamp(EditingUsageShrinkagePercent, 0m, 99.99m);
 
     /// <summary>
-    /// The form's batch, as each line's grams and buffered cost per gram: both its tables, the recipe and
+    /// The form's batch, as each line's grams and cost per gram (buffered, unless the screen isn't): both its tables, the recipe and
     /// this product's add-ins on top of it, leaving out any row with no ingredient picked yet. Everything
     /// the form works out from the batch — the total weight, the other piece-size figure, the caption and
     /// the cost preview — reads it here, so add-ins reach all of them at once.
     /// </summary>
     private IReadOnlyList<(decimal Grams, decimal CostPerGram)> UsageFormBatch() =>
-        [.. FormLines.Concat(FormAddIns).Where(l => l.Ingredient is not null).Select(l => (l.Grams ?? 0m, l.Ingredient!.BufferedCostPerBaseUnit))];
+        [.. FormLines.Concat(FormAddIns).Where(l => l.Ingredient is not null).Select(l => (l.Grams ?? 0m, l.CostPerGram))];
 
     /// <summary>The form's batch weight, which figure stays put, and what a piece costs.</summary>
     private void RecomputeUsageForm()
@@ -4842,6 +4907,36 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             ? new SubAssemblyLineEdit(fresh, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)
             : l)];
 
+    /// <summary>
+    /// Unbuffered or Buffered, pressed: every figure moves to the other of the materials' costs. The lines tables' rows are priced
+    /// again, the composite's products from what's already been read of them, and the sections from the costs they
+    /// already hold, so nothing is read again, and nothing about the product changes.
+    /// </summary>
+    private void ToggleCostBasis()
+    {
+        CostBasis = CostBasis == CostBasis.Buffered ? CostBasis.Unbuffered : CostBasis.Buffered;
+        this.RaisePropertyChanged(nameof(MaterialCostTooltip));
+        foreach (var row in FormLines.Concat(FormAddIns))
+        {
+            row.CostBasis = CostBasis;
+        }
+
+        foreach (var row in FormPackagingLines.Concat(LineEdits))
+        {
+            row.CostBasis = CostBasis;
+        }
+
+        var productsById = Products.ToDictionary(p => p.Id);
+        ProductComponentRow.Resolve(ComponentEdits, productsById, ComponentCostsAtBasis());
+        if (_addingComponentRow is { } adding)
+        {
+            ProductComponentRow.Resolve([adding], productsById, ComponentCostsAtBasis());
+        }
+
+        RecomputeCosts();
+        RecomputeUsageForm();
+    }
+
     /// <summary>The cost summary, from the recipe and packaging as they are now and the costing fields.</summary>
     private void RecomputeCosts()
     {
@@ -4852,7 +4947,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             : [];
         ComponentsCost = components.Sum(c => c.Cost);
         Costs = new ProductCostSummary(
-            [.. components, .. UsageEdits.Select(u => (u.SectionName, u.CostPerPiece))],
+            [.. components, .. UsageEdits.Select(u => (u.SectionName, u.CostPerPieceAt(CostBasis)))],
             EditingQuantityRequired,
             [.. LineEdits.Select(l => l.CostPerUnit)],
             EditingLaborPercent,
@@ -4906,10 +5001,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             ? ProductPrintout.NotSavedNote
             : History.IsDirty ? ProductPrintout.UnsavedChangesNote : null,
         DateTime.Now,
-        [.. UsageEdits.Select(PrintedSection.From)],
+        [.. UsageEdits.Select(u => PrintedSection.From(u, CostBasis))],
         HasPackaging ? PrintedPackaging.From(LineEdits, IsPackagingLinked ? PackagingLinkedToText : null) : null,
         Costs,
-        IsEditingComposite ? PrintedComponent.From(ComponentEdits) : null);
+        IsEditingComposite ? PrintedComponent.From(ComponentEdits) : null)
+    {
+        CostBasis = CostBasis,
+    };
 
     // Segoe Fluent Icons glyphs for the list's menu, the ones the screen's buttons use where there's one.
     private const string CompositeGlyph = "";

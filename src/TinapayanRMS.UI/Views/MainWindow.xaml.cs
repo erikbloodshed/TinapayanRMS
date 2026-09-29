@@ -1,13 +1,10 @@
 ﻿using System.Reactive.Linq;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Threading;
 using ReactiveUI;
 using Syncfusion.SfSkinManager;
-using Syncfusion.Windows.Shared;
 using Syncfusion.Windows.Tools.Controls;
 using TinapayanRMS.UI.Controls;
 using TinapayanRMS.UI.ViewModels;
@@ -15,7 +12,7 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.UI.Views;
 
-public partial class MainWindow : ChromelessWindow
+public partial class MainWindow : AppWindow
 {
     // Each tab's screen LoadCommand, run whenever that tab is shown (see LoadSelectedTab).
     private readonly Dictionary<TabItemExt, ReactiveCommand<RxVoid, RxVoid>> _loadCommands = [];
@@ -127,82 +124,6 @@ public partial class MainWindow : ChromelessWindow
             LoadSelectedTab();
         };
     }
-
-    /// <summary>
-    /// UseNativeChrome (MainWindow.xaml) gives the window a WindowChrome whose resize band ChromelessWindow binds to its
-    /// own ResizeBorderThickness. That's 0 here, since it's also the width of the border the theme draws. A local value
-    /// replaces the binding, so Windows resizes from a band as wide as a normal window's frame while no border is drawn.
-    /// </summary>
-    protected override void OnSourceInitialized(EventArgs e)
-    {
-        // Before base, which adds ChromelessWindow's own hook: HwndSource calls the newest hook first, so this one runs
-        // after it and gets the last word on the region.
-        if (PresentationSource.FromVisual(this) is HwndSource source)
-        {
-            source.AddHook(DropWindowRegion);
-        }
-
-        base.OnSourceInitialized(e);
-
-        ChromelessWindowDpi.LetWpfHandleDpiChanges(this);
-
-        if (System.Windows.Shell.WindowChrome.GetWindowChrome(this) is { } chrome)
-        {
-            chrome.ResizeBorderThickness = SystemParameters.WindowResizeBorderThickness;
-        }
-
-        // Windows 11 rounds a window like this one only when asked: it stopped doing it by itself once ChromelessWindow
-        // had given the window a region (below), even after the region was gone again. Windows 10 has no such attribute
-        // and returns an error, which leaves its square corners as they are.
-        var hwnd = new WindowInteropHelper(this).Handle;
-        var round = DwmCornerRound;
-        _ = DwmSetWindowAttribute(hwnd, DwmWindowCornerPreference, ref round, sizeof(int));
-        _ = SetWindowRgn(hwnd, IntPtr.Zero, true);
-    }
-
-    private const int DwmWindowCornerPreference = 33;
-    private const int DwmCornerRound = 2;
-
-    private const int WmSize = 0x0005;
-    private const int WmSizing = 0x0214;
-    private const int WmExitSizeMove = 0x0232;
-
-    // Set while a deferred DropWindowRegion clear is queued, so a live resize's burst of messages queues just one.
-    private bool _regionClearQueued;
-
-    /// <summary>
-    /// Keeps Windows 11's rounded corners. Whenever the window is sized, finishes a move or changes state, ChromelessWindow
-    /// gives it a square window region: a leftover of its own mode, which cuts its corners with one. Windows doesn't round a
-    /// window that has a region, so the corners went square after any drag, such as onto the secondary monitor, and after
-    /// a restore. ChromelessWindow sets it from two places: its own hook (WM_SIZE, WM_SIZING, WM_EXITSIZEMOVE), which has
-    /// just run when this one does, and its StateChanged handler, which WPF raises from WM_SIZE after every hook. So the
-    /// region comes off now and again once this message has been dealt with.
-    /// </summary>
-    private IntPtr DropWindowRegion(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-    {
-        if (msg is WmSize or WmSizing or WmExitSizeMove)
-        {
-            _ = SetWindowRgn(hwnd, IntPtr.Zero, true);
-
-            if (!_regionClearQueued)
-            {
-                _regionClearQueued = true;
-                Dispatcher.BeginInvoke(() =>
-                {
-                    _regionClearQueued = false;
-                    _ = SetWindowRgn(hwnd, IntPtr.Zero, true);
-                });
-            }
-        }
-
-        return IntPtr.Zero;
-    }
-
-    [DllImport("user32.dll")]
-    private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, [MarshalAs(UnmanagedType.Bool)] bool redraw);
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
     private void BackButton_Click(object sender, RoutedEventArgs e) => NavigateHistory(back: true);
 

@@ -446,7 +446,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
     }
 
     [Fact]
-    public async Task SubAssemblyRoleRepository_UpdateAsync_renames_a_role_and_changes_its_sort_order()
+    public async Task SubAssemblyRoleRepository_UpdateAsync_renames_a_role_and_keeps_its_place()
     {
         var roleId = await AddRoleAsync("Dough", sortOrder: 1);
         var roleRepository = CreateRoleRepository();
@@ -455,17 +455,72 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         var updated = (await roleRepository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
         updated.Name.Should().Be("Sourdough");
-        updated.SortOrder.Should().Be(9);
+        updated.SortOrder.Should().Be(1, "only Move Up and Move Down change a role's place");
     }
 
     [Fact]
-    public async Task SubAssemblyRoleRepository_AddAsync_persists_a_new_role()
+    public async Task SubAssemblyRoleRepository_AddAsync_puts_a_new_role_last()
     {
+        await AddRoleAsync("Dough", sortOrder: 1);
+        await AddRoleAsync("Filling", sortOrder: 4);
         var roleRepository = CreateRoleRepository();
 
-        await roleRepository.AddAsync(new SubAssemblyRole { Name = "Glaze", SortOrder = 5 }, Cancellation);
+        await roleRepository.AddAsync(new SubAssemblyRole { Name = "Glaze", SortOrder = 2 }, Cancellation);
 
         var all = await roleRepository.GetAllAsync(Cancellation);
-        all.Should().ContainSingle(r => r.Name == "Glaze" && r.SortOrder == 5);
+        all.Select(r => (r.Name, r.SortOrder)).Should().Equal(("Dough", 1), ("Filling", 4), ("Glaze", 5));
+    }
+
+    [Fact]
+    public async Task SubAssemblyRoleRepository_AddAsync_numbers_the_first_role_1()
+    {
+        await CreateRoleRepository().AddAsync(new SubAssemblyRole { Name = "Glaze" }, Cancellation);
+
+        (await CreateRoleRepository().GetAllAsync(Cancellation)).Should().ContainSingle().Which.SortOrder.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task SubAssemblyRoleRepository_MoveAsync_swaps_a_role_with_its_neighbour_and_numbers_them_all_again()
+    {
+        await AddRoleAsync("Dough", sortOrder: 2);
+        var fillingId = await AddRoleAsync("Filling", sortOrder: 5);
+        await AddRoleAsync("Topping", sortOrder: 9);
+        var roleRepository = CreateRoleRepository();
+
+        await roleRepository.MoveAsync(fillingId, up: true, Cancellation);
+        (await roleRepository.GetAllAsync(Cancellation)).Select(r => (r.Name, r.SortOrder))
+            .Should().Equal(("Filling", 1), ("Dough", 2), ("Topping", 3));
+
+        await roleRepository.MoveAsync(fillingId, up: false, Cancellation);
+        await roleRepository.MoveAsync(fillingId, up: false, Cancellation);
+        (await roleRepository.GetAllAsync(Cancellation)).Select(r => (r.Name, r.SortOrder))
+            .Should().Equal(("Dough", 1), ("Topping", 2), ("Filling", 3));
+    }
+
+    [Fact]
+    public async Task SubAssemblyRoleRepository_MoveAsync_leaves_the_first_and_last_where_they_are()
+    {
+        var doughId = await AddRoleAsync("Dough", sortOrder: 1);
+        var fillingId = await AddRoleAsync("Filling", sortOrder: 2);
+        var roleRepository = CreateRoleRepository();
+
+        await roleRepository.MoveAsync(doughId, up: true, Cancellation);
+        await roleRepository.MoveAsync(fillingId, up: false, Cancellation);
+
+        (await roleRepository.GetAllAsync(Cancellation)).Select(r => r.Name).Should().Equal("Dough", "Filling");
+    }
+
+    [Fact]
+    public async Task Deleting_a_role_numbers_the_rest_again_without_a_gap()
+    {
+        await AddRoleAsync("Dough", sortOrder: 1);
+        var fillingId = await AddRoleAsync("Filling", sortOrder: 2);
+        await AddRoleAsync("Topping", sortOrder: 3);
+        var roleRepository = CreateRoleRepository();
+
+        await roleRepository.DeleteAsync(fillingId, Cancellation);
+
+        (await roleRepository.GetAllAsync(Cancellation)).Select(r => (r.Name, r.SortOrder))
+            .Should().Equal(("Dough", 1), ("Topping", 2));
     }
 }

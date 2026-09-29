@@ -92,6 +92,14 @@
                 <TextBlock Text="&#xE8C6;" Style="{StaticResource IconGlyphStyle}" />
             </DataTemplate>
 
+            <DataTemplate x:Key="MoveUpIconTemplate">
+                <TextBlock Text="&#xE74A;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="MoveDownIconTemplate">
+                <TextBlock Text="&#xE74B;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
+
             <DataTemplate x:Key="SettingsIconTemplate">
                 <TextBlock Text="&#xE713;" Style="{StaticResource IconGlyphStyle}" />
             </DataTemplate>

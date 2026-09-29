@@ -129,6 +129,32 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
     }
 
     [Fact]
+    public async Task Unbuffered_a_set_prints_at_the_true_costs_as_This_product_does_and_says_so()
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.04m, bufferedCostPerGram: 0.05m);
+        var (productId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m);
+        await AddBoxAsync(productId, unbufferedCost: 25m);
+        await SetCostingAsync(productId);
+        var products = await OpenProductsAsync("Ensaymada", vm => vm.UsageEdits.Count == 1 && vm.HasPackaging);
+        await products.ToggleCostBasisCommand.Execute();
+        var tab = CreatePrintTab(products);
+
+        tab.Pick(PrintScope.ThisProduct);
+        await tab.LoadCommand.Execute();
+        var screen = tab.PrintSet!.Products.Single();
+
+        tab.Pick(PrintScope.AllProducts);
+        await tab.LoadCommand.Execute();
+        var saved = tab.PrintSet!.Products.Single();
+
+        saved.CostBasis.Should().Be(CostBasis.Unbuffered);
+        (saved.Costs.SubAssemblies, saved.Costs.Packaging).Should().Be((2.00m, 25m));
+        saved.Should().BeEquivalentTo(screen, o => o.Excluding(p => p.PrintedAt));
+        tab.Note.Should().BeNull("the open product has no edits: the switch isn't one");
+    }
+
+    [Fact]
     public async Task A_saved_composite_reads_as_the_Products_screen_shows_it_once_opened()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -175,15 +201,15 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         return (breads, cakes);
     }
 
-    /// <summary>A box a piece, saved straight to the product.</summary>
-    private async Task AddBoxAsync(int productId)
+    /// <summary>A box a piece, 30 buffered and <paramref name="unbufferedCost"/> (30 unless given) true, saved straight to the product.</summary>
+    private async Task AddBoxAsync(int productId, decimal unbufferedCost = 30m)
     {
         await using var dbContext = CreateDbContext();
         var box = new RawMaterial
         {
             Name = "Gift Box", Type = RawMaterialType.Packaging, Category = new RawMaterialCategory { Name = "Boxes" },
             BaseUnit = new UnitOfMeasure { Name = "piece", Abbreviation = "pc" },
-            CostPerBaseUnit = 30m, BufferedCostPerBaseUnit = 30m,
+            CostPerBaseUnit = unbufferedCost, BufferedCostPerBaseUnit = 30m,
         };
         dbContext.RawMaterials.Add(box);
         await dbContext.SaveChangesAsync(Cancellation);

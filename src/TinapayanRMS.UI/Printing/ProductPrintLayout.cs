@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Printing;
@@ -373,7 +374,7 @@ public sealed class ProductPrintLayout
         var costs = printout.Costs;
         var unit = printout.CostUnitCaption;
 
-        Add(_ => PartHeading($"Costing ({unit})"), keepWithNext: true, keepTogether: CostingGroup);
+        Add(_ => PartHeading($"Costing ({unit}{BasisSuffix(printout)})"), keepWithNext: true, keepTogether: CostingGroup);
         Add(_ => Figures(costs), keepWithNext: true, keepTogether: CostingGroup);
         Add(_ => HeaderRow(CostingColumns, ["Component", unit, "% of Price"]), keepWithNext: true, table: table, repeats: true, keepTogether: CostingGroup);
 
@@ -422,10 +423,14 @@ public sealed class ProductPrintLayout
     {
         var title = new StackPanel { Margin = new Thickness(0, 0, 0, 2) };
         title.Children.Add(Text(printout.ProductName, TitleSize, weight: FontWeights.SemiBold, wrap: true));
-        title.Children.Add(Text($"{printout.CategoryName} · {printout.StageTitle} · {printout.CostUnitCaption}", BodySize, _muted, wrap: true));
+        title.Children.Add(Text($"{printout.CategoryName} · {printout.StageTitle} · {printout.CostUnitCaption}{BasisSuffix(printout)}", BodySize, _muted, wrap: true));
         title.Children.Add(Text($"Last updated {printout.LastUpdatedText}", SmallSize, _muted));
         return title;
     }
+
+    /// <summary>" · Unbuffered costs" after the cost caption when the figures leave out the cost buffer; nothing when they're buffered, as usual.</summary>
+    private static string BasisSuffix(ProductPrintout printout) =>
+        printout.CostBasis == CostBasis.Unbuffered ? $" · {ProductPrintout.UnbufferedNote}" : string.Empty;
 
     /// <summary>A set's title over its contents: "All Products", then how many and when they were printed.</summary>
     private StackPanel SetTitle(string title, int count)

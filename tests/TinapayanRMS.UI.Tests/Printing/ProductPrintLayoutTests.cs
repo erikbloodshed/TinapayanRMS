@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using AwesomeAssertions;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.UI.Printing;
 using TinapayanRMS.UI.Tests.Fixtures;
 using TinapayanRMS.UI.ViewModels;
@@ -32,6 +33,18 @@ public class ProductPrintLayoutTests
 
         texts.Should().ContainInConsecutiveOrder("Ingredient 1", Figure(100m, "N1"), Figure(10m, "N1"), Figure(0.05m, "N4"), Figure(5m, "N2"));
         texts.Should().ContainInConsecutiveOrder("Material", "Qty", "Unit", "Unit Cost", "Cost");
+    });
+
+    [Fact]
+    public void An_unbuffered_printout_says_so_under_its_title_and_over_its_costing_and_a_buffered_one_doesnt() => StaThread.Run(() =>
+    {
+        var buffered = AllTexts(new ProductPrintLayout(SamplePrintouts.WithLines(1), includeRecipe: true, includeCosting: true, A4));
+        var unbuffered = AllTexts(new ProductPrintLayout(
+            SamplePrintouts.WithLines(1) with { CostBasis = CostBasis.Unbuffered }, includeRecipe: true, includeCosting: true, A4));
+
+        buffered.Should().NotContain(t => t.Contains(ProductPrintout.UnbufferedNote, StringComparison.Ordinal));
+        unbuffered.Should().Contain(t => t.EndsWith($" · {ProductPrintout.UnbufferedNote}", StringComparison.Ordinal) && t.Contains("Per piece", StringComparison.Ordinal));
+        unbuffered.Should().Contain(t => t.StartsWith("Costing (", StringComparison.Ordinal) && t.Contains(ProductPrintout.UnbufferedNote, StringComparison.Ordinal));
     });
 
     [Fact]

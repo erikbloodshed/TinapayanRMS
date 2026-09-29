@@ -110,6 +110,61 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
     }
 
     [Fact]
+    public async Task A_new_role_goes_last()
+    {
+        await AddRoleAsync("Dough", sortOrder: 1);
+        await AddRoleAsync("Filling", sortOrder: 2);
+        var viewModel = CreateViewModel(confirm: true);
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Glaze";
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.Roles.Select(r => (r.Name, r.SortOrder)).Should().Equal(("Dough", 1), ("Filling", 2), ("Glaze", 3));
+    }
+
+    [Fact]
+    public async Task Move_Up_and_Move_Down_move_the_picked_role_and_keep_it_picked()
+    {
+        await AddRoleAsync("Dough", sortOrder: 1);
+        var fillingId = await AddRoleAsync("Filling", sortOrder: 2);
+        await AddRoleAsync("Topping", sortOrder: 3);
+        var viewModel = CreateViewModel(confirm: true);
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedRole = viewModel.Roles.Single(r => r.Id == fillingId);
+        viewModel.EditingName = "Stuffing";
+
+        await viewModel.MoveUpCommand.Execute();
+
+        viewModel.Roles.Select(r => r.Name).Should().Equal("Filling", "Dough", "Topping");
+        viewModel.SelectedRole!.Id.Should().Be(fillingId);
+        viewModel.EditingName.Should().Be("Stuffing", "a move leaves the form's unsaved edits alone");
+        (await viewModel.MoveUpCommand.CanExecute.FirstAsync()).Should().BeFalse("it's first now");
+        (await viewModel.MoveDownCommand.CanExecute.FirstAsync()).Should().BeTrue();
+
+        await viewModel.MoveDownCommand.Execute();
+        await viewModel.MoveDownCommand.Execute();
+
+        viewModel.Roles.Select(r => (r.Name, r.SortOrder)).Should().Equal(("Dough", 1), ("Topping", 2), ("Filling", 3));
+        (await viewModel.MoveDownCommand.CanExecute.FirstAsync()).Should().BeFalse("it's last now");
+        (await viewModel.MoveUpCommand.CanExecute.FirstAsync()).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Nothing_moves_with_no_role_picked()
+    {
+        await AddRoleAsync("Dough", sortOrder: 1);
+        await AddRoleAsync("Filling", sortOrder: 2);
+        var viewModel = CreateViewModel(confirm: true);
+        await viewModel.LoadCommand.Execute();
+
+        (await viewModel.MoveUpCommand.CanExecute.FirstAsync()).Should().BeFalse();
+        (await viewModel.MoveDownCommand.CanExecute.FirstAsync()).Should().BeFalse();
+    }
+
+    [Fact]
     public void The_question_says_what_turning_it_off_does()
     {
         SubAssemblyRolesViewModel.OwnershipChangeMessage(new SubAssemblyRole { Name = "Topping", IsProductOwned = false }, 3)

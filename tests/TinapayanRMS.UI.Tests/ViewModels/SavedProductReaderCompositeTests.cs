@@ -23,13 +23,13 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
     };
 
     /// <summary>
-    /// Ensaymada, 2.50 of recipe a piece (a 1,000 g dough of flour at 0.05 a gram, 50 g a piece), and Cheese Roll, 5.00
-    /// (100 g a piece), each at <see cref="Costing"/>.
+    /// Ensaymada, 2.50 of recipe a piece (a 1,000 g dough of flour at 0.05 a gram buffered, 50 g a piece), and Cheese Roll,
+    /// 5.00 (100 g a piece), each at <see cref="Costing"/>. Unbuffered, the flour is 0.04 a gram: 2.00 and 4.00.
     /// </summary>
     private async Task<(Product Ensaymada, Product CheeseRoll)> AddTwoProductsAsync()
     {
         var doughRoleId = await AddRoleAsync("Dough");
-        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.04m, bufferedCostPerGram: 0.05m);
         var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m);
         var (cheeseRollId, _) = await AddProductWithSubAssemblyAsync("Cheese Roll", doughRoleId, [(flourId, 1000m)], weightPerPiece: 100m);
         var products = new ProductRepository(CreateDbContextFactory());
@@ -87,7 +87,7 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         var roll = await reader.ReadAsync(cheeseRoll, Cancellation);
         var composite = await reader.ReadAsync(box, Cancellation);
 
-        composite.Components.Select(c => (c.LineName, c.RecipeCost, c.Cost)).Should().Equal(
+        composite.Components.Select(c => (c.LineName, c.RecipeCostAt(CostBasis.Buffered), c.CostAt(CostBasis.Buffered))).Should().Equal(
             ("Ensaymada × 1", 2.50m, 2.50m), ("Cheese Roll × 2", 5m, 10m));
         composite.Costs.SubAssemblies.Should().Be(single.Costs.SubAssemblies + 2 * roll.Costs.SubAssemblies);
 
@@ -165,7 +165,41 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
 
         var costs = await CreateReader().ReadRecipeCostsAsync([ensaymada.Id, box.Id, 999_999], Cancellation);
 
-        costs.Should().BeEquivalentTo(new Dictionary<int, decimal> { [ensaymada.Id] = 2.50m, [box.Id] = 10m });
+        costs.Should().BeEquivalentTo(new Dictionary<int, RecipeCosts>
+        {
+            [ensaymada.Id] = new(2.50m, 2.00m),
+            [box.Id] = new(10m, 8m),
+        });
+    }
+
+    [Fact]
+    public async Task A_composite_read_unbuffered_brings_its_products_at_their_true_costs_and_its_printout_says_so()
+    {
+        var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
+        var box = await AddCompositeAsync("Pasalubong Box", (ensaymada.Id, 1), (cheeseRoll.Id, 2));
+
+        var composite = await CreateReader().ReadAsync(box, CostBasis.Unbuffered, Cancellation);
+
+        composite.Components.Select(c => (c.LineName, c.RecipeCostAt(CostBasis.Unbuffered), c.CostAt(CostBasis.Unbuffered))).Should().Equal(
+            ("Ensaymada × 1", 2.00m, 2.00m), ("Cheese Roll × 2", 4m, 8m));
+        composite.Costs.SubAssemblies.Should().Be(10m, "2.00 + 2 × 4.00, the flour at 0.04 a gram");
+
+        var printout = composite.ToPrintout(new DateTime(2026, 9, 29, 9, 0, 0));
+        printout.CostBasis.Should().Be(CostBasis.Unbuffered);
+        printout.Components!.Select(c => c.Cost).Should().Equal(2.00m, 8m);
+    }
+
+    [Fact]
+    public async Task A_product_read_unbuffered_prices_its_sections_at_their_true_costs()
+    {
+        var (ensaymada, _) = await AddTwoProductsAsync();
+
+        var buffered = await CreateReader().ReadAsync(ensaymada, Cancellation);
+        var unbuffered = await CreateReader().ReadAsync(ensaymada, CostBasis.Unbuffered, Cancellation);
+
+        buffered.Costs.SubAssemblies.Should().Be(2.50m);
+        unbuffered.Costs.SubAssemblies.Should().Be(2.00m, "50 g of a 1,000 g batch of flour at 0.04 a gram");
+        unbuffered.ToPrintout(new DateTime(2026, 9, 29, 9, 0, 0)).Sections.Single().CostPerPiece.Should().Be(2.00m);
     }
 
     private SavedProductReader CreateReader()

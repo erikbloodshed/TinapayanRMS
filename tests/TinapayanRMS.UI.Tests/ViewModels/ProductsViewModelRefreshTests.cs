@@ -40,7 +40,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await WaitUntilSettledAsync(
             () => viewModel.UsageEdits.Count == 1,
             () => $"usage rows={viewModel.UsageEdits.Count}, roles={viewModel.Roles.Count}");
-        viewModel.UsageEdits.Single().CostPerPiece.Should().Be(2.4m);
+        viewModel.UsageEdits.Single().CostPerPieceAt(CostBasis.Buffered).Should().Be(2.4m);
         var selected = viewModel.SelectedProduct;
         viewModel.EditingLaborPercent = 5m;
 
@@ -59,7 +59,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedProduct.Should().BeSameAs(selected);
         viewModel.SelectedProduct!.Id.Should().Be(productId);
         viewModel.EditingLaborPercent.Should().Be(5m, "an unsaved costing field must survive the refresh");
-        viewModel.UsageEdits.Should().ContainSingle().Which.CostPerPiece.Should().Be(3.6m);
+        viewModel.UsageEdits.Should().ContainSingle().Which.CostPerPieceAt(CostBasis.Buffered).Should().Be(3.6m);
         viewModel.Costs.Material.Should().Be(3.6m);
         var (expectedBaseCost, _, _) = CostingRules.CalculateSellingPrice(3.6m, 0m, 5m, 0m, 0m, 0m, 0m);
         viewModel.Costs.BaseCost.Should().Be(expectedBaseCost);
@@ -141,7 +141,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.IsLinked.Should().BeTrue("Save keeps it on the Sub-Assemblies screen, and the product links it");
         usage.LinkedFromText.Should().Be("Ube pandesal Filling, from Sub-Assemblies");
         viewModel.IsFormEditingLines.Should().BeFalse("its lines are edited on the Sub-Assemblies screen from now on");
-        usage.CostPerPiece.Should().Be(2.4m);
+        usage.CostPerPieceAt(CostBasis.Buffered).Should().Be(2.4m);
         viewModel.Costs.Labor.Should().Be(1.2m, "labor is 50% of the ₱2.40 material cost");
         viewModel.Costs.Administrative.Should().Be(0.3m, "administrative is 12.5% of the ₱2.40 material cost");
         viewModel.Costs.BaseCost.Should().Be(3.9m, "₱2.40 of filling, ₱1.20 labor and ₱0.30 administrative");
@@ -605,7 +605,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.AuthoredValue.Should().Be(60m, "shrinkage is its own figure, not a piece size");
 
         // The batch still costs ₱85 (1,700 g of flour at ₱0.05), now spread over 25.5 pieces instead of 28.33.
-        viewModel.UsageEdits.Single().CostPerPiece.Should().BeApproximately(85m / 25.5m, 0.0001m);
+        viewModel.UsageEdits.Single().CostPerPieceAt(CostBasis.Buffered).Should().BeApproximately(85m / 25.5m, 0.0001m);
     }
 
     /// <summary>
@@ -694,7 +694,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var linked = viewModel.UsageEdits.Single();
         linked.IsLinked.Should().BeTrue();
         linked.LinkedFromText.Should().Be("Cream Loaf Dough, from Sub-Assemblies");
-        linked.CostPerPiece.Should().Be(1.5m, "30 g of a ₱50, 1,000 g batch");
+        linked.CostPerPieceAt(CostBasis.Buffered).Should().Be(1.5m, "30 g of a ₱50, 1,000 g batch");
 
         // Its tab shows its form, with its lines in it to look at but not to change.
         viewModel.EditingUsage.Should().BeSameAs(linked);
@@ -707,7 +707,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             new SubAssembly { Id = doughId, Name = "Cream Loaf Dough", RoleId = roleId }, [(flourId, 1000m), (butterId, 250m)], Cancellation);
         await viewModel.LoadCommand.Execute();
         viewModel.UsageEdits.Single().TotalWeight.Should().Be(1250m);
-        viewModel.UsageEdits.Single().CostPerPiece.Should().Be(3.6m, "30 g of a ₱150, 1,250 g batch");
+        viewModel.UsageEdits.Single().CostPerPieceAt(CostBasis.Buffered).Should().Be(3.6m, "30 g of a ₱150, 1,250 g batch");
         viewModel.FormLines.Select(l => (l.Ingredient!.Name, l.Grams)).Should()
             .Equal([("Flour", 1000m), ("Butter", 250m)], "the read-only lines show the sub-assembly's, as they now are");
 
@@ -781,7 +781,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var saved = viewModel.UsageEdits.Single();
         saved.IsLinked.Should().BeTrue("it's still the one kept on the Sub-Assemblies screen, not a copy");
         saved.SubAssemblyId.Should().Be(doughId);
-        saved.CostPerPiece.Should().Be(3.6m, "30 g of a ₱150, 1,250 g batch");
+        saved.CostPerPieceAt(CostBasis.Buffered).Should().Be(3.6m, "30 g of a ₱150, 1,250 g batch");
         viewModel.History.IsDirty.Should().BeFalse("what was saved is the new starting point");
         await using (var dbContext = CreateDbContext())
         {
@@ -1167,7 +1167,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
         var usage = viewModel.UsageEdits.Single();
         usage.TotalWeight.Should().Be(1000m, "the batch is its lines, sized or not");
-        usage.CostPerPiece.Should().Be(0m);
+        usage.CostPerPieceAt(CostBasis.Buffered).Should().Be(0m);
         viewModel.Costs.Material.Should().Be(0m, "an unsized section costs the product nothing per piece");
 
         await using (var dbContext = CreateDbContext())
@@ -1184,7 +1184,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Single().CostPerPiece == 2.5m, () => $"cost per piece={viewModel.UsageEdits.Single().CostPerPiece}");
+        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Single().CostPerPieceAt(CostBasis.Buffered) == 2.5m, () => $"cost per piece={viewModel.UsageEdits.Single().CostPerPieceAt(CostBasis.Buffered)}");
     }
 
     [Fact]
@@ -1415,7 +1415,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         }
 
         await viewModel.LoadCommand.Execute();
-        tab.Usage.CostPerPiece.Should().Be(3.6m);
+        tab.Usage.CostPerPieceAt(CostBasis.Buffered).Should().Be(3.6m);
         viewModel.EditingUsage.Should().BeSameAs(tab.Usage, "the form follows the repriced copy that took its place");
 
         await viewModel.SaveCommand.Execute();
@@ -1430,7 +1430,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var savedTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Should().ContainSingle().Subject;
         viewModel.SelectedRecipeTab.Should().BeSameAs(savedTab);
         viewModel.EditingUsage.Should().BeSameAs(savedTab.Usage, "the tab has nothing else to show, so its form is open on it");
-        savedTab.Usage.CostPerPiece.Should().Be(5.4m, "15 g a piece of a 100 g, ₱36 batch");
+        savedTab.Usage.CostPerPieceAt(CostBasis.Buffered).Should().Be(5.4m, "15 g a piece of a 100 g, ₱36 batch");
         savedTab.Header.Should().Be("Filling");
     }
 
@@ -1507,7 +1507,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.IsLinked.Should().BeTrue();
         usage.LinkedFromText.Should().Be("Chocolate Glaze, from Sub-Assemblies", "a standalone one keeps its name, which its tab doesn't show");
         usage.RoleName.Should().Be("Glaze");
-        usage.CostPerPiece.Should().Be(0.45m, "5 g of a 100 g, ₱9 batch");
+        usage.CostPerPieceAt(CostBasis.Buffered).Should().Be(0.45m, "5 g of a 100 g, ₱9 batch");
 
         await viewModel.SaveCommand.Execute();
 
@@ -2140,8 +2140,8 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.IsLinked.Should().BeTrue();
         usage.BaseTotalWeight.Should().Be(1000m, "the dough itself is still the dough");
         usage.TotalWeight.Should().Be(1020m, "the 20 g of ube goes into the batch");
-        usage.TotalCost.Should().Be(66m, "1000*0.05 + 20*0.80");
-        usage.CostPerPiece.Should().Be(66m * 30m / 1020m);
+        usage.TotalCostAt(CostBasis.Buffered).Should().Be(66m, "1000*0.05 + 20*0.80");
+        usage.CostPerPieceAt(CostBasis.Buffered).Should().Be(66m * 30m / 1020m);
 
         // The form is showing it, and its two tables add up to the batch the piece is cut from.
         viewModel.IsFormShowingAddIns.Should().BeTrue();
@@ -2333,7 +2333,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         copy.AddIns.Should().BeEmpty("a new section has no add-ins; its lines are its own");
         copy.Lines.Select(l => (l.Ingredient.Id, l.Grams)).Should().Equal([(flourId, 1000m), (ubeId, 20m)]);
         copy.TotalWeight.Should().Be(1020m, "the batch it was showing is the batch it keeps");
-        copy.CostPerPiece.Should().Be(66m * 30m / 1020m);
+        copy.CostPerPieceAt(CostBasis.Buffered).Should().Be(66m * 30m / 1020m);
     }
 
     [Fact]
@@ -2373,7 +2373,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await LinkWithUbeAsync(viewModel, ubeId, addInGrams: 20m, weightPerPiece: 30m);
         await viewModel.SaveCommand.Execute();
         await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
-        viewModel.UsageEdits.Single().TotalCost.Should().Be(66m);
+        viewModel.UsageEdits.Single().TotalCostAt(CostBasis.Buffered).Should().Be(66m);
 
         // The ube doubles on the Raw Materials screen; coming back to Products re-reads it.
         await using (var dbContext = CreateDbContext())
@@ -2387,8 +2387,8 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
 
         var usage = viewModel.UsageEdits.Single();
-        usage.TotalCost.Should().Be(82m, "1000*0.05 + 20*1.60 — the add-in is repriced like any other line");
-        usage.CostPerPiece.Should().Be(82m * 30m / 1020m);
+        usage.TotalCostAt(CostBasis.Buffered).Should().Be(82m, "1000*0.05 + 20*1.60 — the add-in is repriced like any other line");
+        usage.CostPerPieceAt(CostBasis.Buffered).Should().Be(82m * 30m / 1020m);
         viewModel.FormAddIns.Single().Cost.Should().Be(32m, "the form's own table is repriced in place, not refilled");
     }
 

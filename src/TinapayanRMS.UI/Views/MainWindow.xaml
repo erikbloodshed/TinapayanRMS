@@ -7,37 +7,28 @@
     the card colour the strip had. No TitleBarTemplate: a Syncfusion control's template stays the theme's (App.xaml).
     The bar is still a title bar: drag it to move the window, double-click it to maximize.
 
-    UseNativeChrome, CornerRadius 0 and ResizeBorderThickness 0 fix two bugs in the plain chromeless mode (2026-09-25,
-    found by the user). There, every point of the window hit-tested as client area, and ChromelessWindow resized the
-    window from its own mouse handling, which only caught the outermost pixel of the left and right edges. The bottom
-    edge and all four corners couldn't be dragged at all. It also cut its 8px rounded corners out of an opaque window,
-    so the corners and a 1px ring around it drew black. With UseNativeChrome, a WPF WindowChrome does the hit-testing,
-    so Windows resizes from every edge and corner (OnSourceInitialized widens its resize band to the system's), and
-    Windows 11 draws the rounded corners, shadow and 1px border itself. So the theme's own rounding (CornerRadius 8)
-    and 1px border (ResizeBorderThickness) are switched off; they only drew black corners and a dark ring when maximized.
+    The native chrome and the fixes that make it behave like a normal window are AppWindow's (Controls/AppWindow.cs).
 -->
-<syncfusion:ChromelessWindow x:Class="TinapayanRMS.UI.Views.MainWindow"
+<controls:AppWindow x:Class="TinapayanRMS.UI.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+        xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
         xmlns:skinManager="clr-namespace:Syncfusion.SfSkinManager;assembly=Syncfusion.SfSkinManager.WPF"
         xmlns:sfTheme="clr-namespace:Syncfusion.Themes.Windows11Light.WPF;assembly=Syncfusion.Themes.Windows11Light.WPF"
         xmlns:collections="clr-namespace:System.Collections;assembly=System.Runtime"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="800" Width="1400"
-        UseNativeChrome="True"
-        CornerRadius="0"
-        ResizeBorderThickness="0"
         ShowTitle="False"
         ShowIcon="False"
-        TitleBarHeight="40"
+        TitleBarHeight="30"
         TitleBarBackground="{StaticResource CardBackgroundBrush}"
         TitleBarForeground="{StaticResource HeadingForegroundBrush}"
         skinManager:SfSkinManager.SizeMode="Default"
         PreviewKeyDown="Window_PreviewKeyDown">
-    <syncfusion:ChromelessWindow.Resources>
+    <controls:AppWindow.Resources>
         <!-- A menu row's glyph, in a fixed box so the labels line up whatever the glyph's width -->
         <Style x:Key="DrawerIconStyle" TargetType="TextBlock" BasedOn="{StaticResource IconGlyphStyle}">
             <Setter Property="Width" Value="20" />
@@ -93,14 +84,14 @@
                 </Setter.Value>
             </Setter>
         </Style>
-    </syncfusion:ChromelessWindow.Resources>
+    </controls:AppWindow.Resources>
 
     <!--
         The header strip, in the title bar (see the note at the top). Its items keep the window's DataContext and
         names, so the bindings and Click handlers are as they were in the Border this strip used to be. Back and
         Forward were here too until they moved to the tab strip's right end (MainTabControl's TabPanelItem).
     -->
-    <syncfusion:ChromelessWindow.LeftHeaderItemsSource>
+    <controls:AppWindow.LeftHeaderItemsSource>
         <collections:ArrayList>
             <!--
                 The drawer lives in the window's content, so its scrim covers the tabs but not the title bar: the toggle
@@ -133,7 +124,7 @@
             </Button>
             <TextBlock Text="{Binding Heading}" Style="{StaticResource AppTitleStyle}" VerticalAlignment="Center" />
         </collections:ArrayList>
-    </syncfusion:ChromelessWindow.LeftHeaderItemsSource>
+    </controls:AppWindow.LeftHeaderItemsSource>
 
     <Grid Background="{StaticResource PageBackgroundBrush}">
         <!--
@@ -338,4 +329,4 @@
             </syncfusion:SfNavigationDrawer.ContentView>
         </syncfusion:SfNavigationDrawer>
     </Grid>
-</syncfusion:ChromelessWindow>
+</controls:AppWindow>

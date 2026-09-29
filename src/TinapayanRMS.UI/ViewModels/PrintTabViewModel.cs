@@ -212,11 +212,13 @@ public sealed class PrintTabViewModel : ViewModelBase
         var products = ProductTree.InListOrder((await _productRepository.GetAllAsync(cancellationToken)).Where(scope.Holds));
         var printedAt = DateTime.Now;
 
+        // At the costs the Products screen shows: buffered, unless it's been switched to unbuffered.
+        var costBasis = _products.CostBasis;
         List<ProductPrintout> printouts = [];
         for (var i = 0; i < products.Count; i++)
         {
             Progress = $"Preparing {i + 1} of {products.Count}…";
-            printouts.Add((await _savedProducts.ReadAsync(products[i], cancellationToken)).ToPrintout(printedAt));
+            printouts.Add((await _savedProducts.ReadAsync(products[i], costBasis, cancellationToken)).ToPrintout(printedAt));
         }
 
         cancellationToken.ThrowIfCancellationRequested();

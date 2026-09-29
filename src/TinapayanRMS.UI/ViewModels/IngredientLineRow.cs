@@ -1,6 +1,7 @@
 ﻿using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.UI.ViewModels;
 
@@ -94,8 +95,29 @@ public sealed class IngredientLineRow : ReactiveObject
         }
     }
 
-    /// <summary>What a gram of this line's ingredient costs, buffered; 0 until one is picked.</summary>
-    public decimal CostPerGram => Ingredient?.BufferedCostPerBaseUnit ?? 0m;
+    private CostBasis _costBasis;
+    /// <summary>
+    /// Which of the ingredient's costs the row is priced at: buffered, as every screen prices a recipe, unless the
+    /// Products screen has been switched to its unbuffered costs.
+    /// </summary>
+    public CostBasis CostBasis
+    {
+        get => _costBasis;
+        set
+        {
+            if (_costBasis == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _costBasis, value);
+            this.RaisePropertyChanged(nameof(CostPerGram));
+            this.RaisePropertyChanged(nameof(Cost));
+        }
+    }
+
+    /// <summary>What a gram of this line's ingredient costs at <see cref="CostBasis"/>, buffered unless switched; 0 until one is picked.</summary>
+    public decimal CostPerGram => Ingredient is { } ingredient ? RawMaterialRules.CostPerBaseUnitAt(ingredient, CostBasis) : 0m;
 
     private decimal? _grams;
     /// <summary>
@@ -238,8 +260,8 @@ public sealed class IngredientLineRow : ReactiveObject
         }
     }
 
-    /// <summary>What this line adds to the batch's cost, at the ingredient's buffered cost per gram.</summary>
-    public decimal Cost => (Grams ?? 0m) * (Ingredient?.BufferedCostPerBaseUnit ?? 0m);
+    /// <summary>What this line adds to the batch's cost, at <see cref="CostPerGram"/>.</summary>
+    public decimal Cost => (Grams ?? 0m) * CostPerGram;
 
     /// <summary>Nothing typed into it: the grid's add row left as it was, which isn't a line at all.</summary>
     private bool IsBlank => IngredientId is null && Grams is null or 0m;

@@ -15,7 +15,7 @@ public class PackagingLineRowTests
 
     private static UnitOfMeasure Unit(string abbreviation) => new() { Name = abbreviation, Abbreviation = abbreviation };
 
-    /// <summary>Ribbon at ₱0.05 a cm, also bought by the 1,000 cm roll (RawMaterialUnit 7).</summary>
+    /// <summary>Ribbon at ₱0.05 a cm buffered (₱0.04 unbuffered), also bought by the 1,000 cm roll (RawMaterialUnit 7).</summary>
     private static RawMaterial Ribbon() => new()
     {
         Id = 1,
@@ -23,6 +23,7 @@ public class PackagingLineRowTests
         Type = RawMaterialType.Packaging,
         BaseUnitId = 10,
         BaseUnit = Unit("cm"),
+        CostPerBaseUnit = 0.04m,
         BufferedCostPerBaseUnit = 0.05m,
         Units = [new RawMaterialUnit { Id = 7, UnitOfMeasureId = 11, UnitOfMeasure = Unit("roll"), BaseUnitsPerUnit = 1000m }],
     };
@@ -37,6 +38,27 @@ public class PackagingLineRowTests
         BaseUnit = Unit("pc"),
         BufferedCostPerBaseUnit = 30m,
     };
+
+    [Fact]
+    public void Switched_to_unbuffered_a_row_reprices_its_units_and_its_line_and_keeps_its_unit()
+    {
+        var row = new PackagingLineRow(Ribbon(), 2m, unitId: 7);
+        row.CostBasis.Should().Be(CostBasis.Buffered);
+        (row.UnitCost, row.CostPerUnit).Should().Be((50m, 100m));
+        List<string?> changed = [];
+        row.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        row.CostBasis = CostBasis.Unbuffered;
+
+        row.UnitOptions.Select(o => o.UnitCost).Should().Equal(0.04m, 40m);
+        row.UnitKey.Should().Be(7);
+        (row.UnitCost, row.CostPerUnit).Should().Be((40m, 80m), "2 rolls of 1,000 cm at ₱0.04 a cm");
+        changed.Should().Contain([nameof(PackagingLineRow.UnitCost), nameof(PackagingLineRow.CostPerUnit)]);
+
+        row.CostBasis = CostBasis.Buffered;
+
+        (row.UnitCost, row.CostPerUnit).Should().Be((50m, 100m));
+    }
 
     [Fact]
     public void A_row_offers_its_materials_base_unit_first_then_its_alternative_units()

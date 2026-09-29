@@ -393,6 +393,16 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("Buffered cost can't be negative.");
     }
 
+    [Theory]
+    [InlineData(CostBasis.Buffered, 0.0525)]
+    [InlineData(CostBasis.Unbuffered, 0.05)]
+    public void CostPerBaseUnitAt_reads_the_buffered_or_the_true_cost(CostBasis basis, double expected)
+    {
+        var flour = new RawMaterial { CostPerBaseUnit = 0.05m, BufferedCostPerBaseUnit = 0.0525m };
+
+        RawMaterialRules.CostPerBaseUnitAt(flour, basis).Should().Be((decimal)expected);
+    }
+
     [Fact]
     public void FindDearestBrandPrice_takes_the_first_on_a_tie()
     {

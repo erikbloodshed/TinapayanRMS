@@ -311,6 +311,7 @@
         <StackPanel Visibility="{Binding IsFormPackaging, Converter={StaticResource BooleanToVisibilityConverter}}">
             <syncfusion:SfDataGrid ItemsSource="{Binding FormPackagingLines}"
                                    controls:GridUndoSteps.Recorder="{Binding}"
+                                   controls:CostBasisColumns.Basis="{Binding CostBasis}"
                                    controls:GridRowReordering.IsEnabled="True"
                                    controls:NumericEditing.IsEnabled="True"
                                    SelectedItem="{Binding SelectedFormPackagingLine, Mode=TwoWay}"
@@ -352,7 +353,8 @@
                                 <syncfusion:GridTextColumn MappingName="Name" HeaderText="Material" />
                                 <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
                                 <syncfusion:GridTextColumn MappingName="BaseUnit.Abbreviation" HeaderText="Unit" Width="52" />
-                                <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per Unit" Width="96" NumberDecimalDigits="4" />
+                                <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per Unit" Width="96" NumberDecimalDigits="4" controls:CostBasisColumns.Shows="Buffered" />
+                                <controls:NumericColumn MappingName="CostPerBaseUnit" HeaderText="Cost per Unit" Width="96" NumberDecimalDigits="4" IsHidden="True" controls:CostBasisColumns.Shows="Unbuffered" />
                             </syncfusion:Columns>
                         </syncfusion:GridMultiColumnDropDownList.Columns>
                     </syncfusion:GridMultiColumnDropDownList>
@@ -431,6 +433,7 @@
                     <syncfusion:SfDataGrid x:Name="LinesGrid"
                                            ItemsSource="{Binding FormLines}"
                                            controls:GridUndoSteps.Recorder="{Binding}"
+                                           controls:CostBasisColumns.Basis="{Binding CostBasis}"
                                            controls:GridRowReordering.IsEnabled="True"
                                            controls:NumericEditing.IsEnabled="True"
                                            controls:GridAddNewRow.HideCheckBoxes="True"
@@ -473,7 +476,8 @@
                                     <syncfusion:Columns>
                                         <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
                                         <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
-                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost/g" Width="88" NumberDecimalDigits="4" />
+                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost/g" Width="88" NumberDecimalDigits="4" controls:CostBasisColumns.Shows="Buffered" />
+                                        <controls:NumericColumn MappingName="CostPerBaseUnit" HeaderText="Cost/g" Width="88" NumberDecimalDigits="4" IsHidden="True" controls:CostBasisColumns.Shows="Unbuffered" />
                                     </syncfusion:Columns>
                                 </syncfusion:GridMultiColumnDropDownList.Columns>
                             </syncfusion:GridMultiColumnDropDownList>
@@ -543,6 +547,7 @@
                     <syncfusion:SfDataGrid x:Name="AddInsGrid"
                                            ItemsSource="{Binding FormAddIns}"
                                            controls:GridUndoSteps.Recorder="{Binding}"
+                                           controls:CostBasisColumns.Basis="{Binding CostBasis}"
                                            controls:GridRowReordering.IsEnabled="True"
                                            controls:NumericEditing.IsEnabled="True"
                                            controls:GridCellEditing.IsEnabled="True"
@@ -584,7 +589,8 @@
                                     <syncfusion:Columns>
                                         <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
                                         <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
-                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost/g" Width="88" NumberDecimalDigits="4" />
+                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost/g" Width="88" NumberDecimalDigits="4" controls:CostBasisColumns.Shows="Buffered" />
+                                        <controls:NumericColumn MappingName="CostPerBaseUnit" HeaderText="Cost/g" Width="88" NumberDecimalDigits="4" IsHidden="True" controls:CostBasisColumns.Shows="Unbuffered" />
                                     </syncfusion:Columns>
                                 </syncfusion:GridMultiColumnDropDownList.Columns>
                             </syncfusion:GridMultiColumnDropDownList>

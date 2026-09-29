@@ -161,8 +161,11 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
         return category.Id;
     }
 
-    /// <summary>A purchased ingredient, in a shared "Ingredients" category, costing <paramref name="costPerGram"/> a gram with no buffer.</summary>
-    protected async Task<int> AddIngredientAsync(string name, decimal costPerGram = 0m)
+    /// <summary>
+    /// A purchased ingredient, in a shared "Ingredients" category, costing <paramref name="costPerGram"/> a gram, and
+    /// <paramref name="bufferedCostPerGram"/> buffered, or the same with no buffer.
+    /// </summary>
+    protected async Task<int> AddIngredientAsync(string name, decimal costPerGram = 0m, decimal? bufferedCostPerGram = null)
     {
         await using var dbContext = CreateDbContext();
         var category = await dbContext.RawMaterialCategories.FirstOrDefaultAsync(c => c.Name == "Ingredients", Cancellation)
@@ -173,7 +176,7 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
             Category = category,
             Source = RawMaterialSource.Purchased,
             CostPerBaseUnit = costPerGram,
-            BufferedCostPerBaseUnit = costPerGram,
+            BufferedCostPerBaseUnit = bufferedCostPerGram ?? costPerGram,
         };
         dbContext.RawMaterials.Add(ingredient);
         await dbContext.SaveChangesAsync(Cancellation);

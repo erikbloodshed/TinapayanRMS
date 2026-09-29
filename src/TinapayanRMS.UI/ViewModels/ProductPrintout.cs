@@ -1,5 +1,6 @@
 using System.Globalization;
 using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.UI.ViewModels;
 
@@ -39,6 +40,15 @@ public sealed record ProductPrintout(
 
     /// <summary>A composite: its recipe is the products it holds (<see cref="Components"/>).</summary>
     public bool IsComposite => Components is not null;
+
+    /// <summary>
+    /// Which of the materials' costs its figures are at: buffered, unless the Products screen was switched to unbuffered
+    /// when Print was pressed, which the page then says (<see cref="UnbufferedNote"/>).
+    /// </summary>
+    public CostBasis CostBasis { get; init; }
+
+    /// <summary>What the page says beside the cost caption when its figures leave out the cost buffer.</summary>
+    public const string UnbufferedNote = "Unbuffered costs";
 
     /// <summary>
     /// What a product's figures are for, as its header says it: "Per piece", or "Per unit of 8 pieces"; a composite's are
@@ -90,8 +100,8 @@ public sealed record PrintedSection(
     decimal CostPerPiece,
     bool HasPieceSize)
 {
-    /// <summary>The section as its recipe tab shows it.</summary>
-    public static PrintedSection From(ProductUsageEdit usage)
+    /// <summary>The section as its recipe tab shows it, at <paramref name="basis"/>.</summary>
+    public static PrintedSection From(ProductUsageEdit usage, CostBasis basis)
     {
         // Read as the recipe form reads them (ProductsViewModel.RecomputeUsageForm): against the formula's base while a
         // line is ticked, add-ins included, since an add-in is read against the recipe's base; with nothing ticked, every
@@ -101,7 +111,7 @@ public sealed record PrintedSection(
             ? SubAssemblyRules.CalculateBakersPercent(grams, formulaBase)
             : SubAssemblyRules.CalculateAbsolutePercent(grams, usage.TotalWeight);
         PrintedLine Line(SubAssemblyLineEdit line) =>
-            new(line.Ingredient.Name, line.Grams, PercentOf(line.Grams), line.Ingredient.BufferedCostPerBaseUnit, line.Cost, line.IsFormulaBase);
+            new(line.Ingredient.Name, line.Grams, PercentOf(line.Grams), line.CostPerGramAt(basis), line.CostAt(basis), line.IsFormulaBase);
 
         return new(
             usage.SectionName,
@@ -111,19 +121,19 @@ public sealed record PrintedSection(
             [.. usage.AddIns.Select(Line)],
             usage.TotalWeight,
             PercentOf(usage.TotalWeight),
-            usage.TotalCost,
+            usage.TotalCostAt(basis),
             usage.ShrinkagePercent,
             usage.FinalWeight,
             usage.WeightPerPiece,
             usage.Yield,
-            usage.CostPerPiece,
+            usage.CostPerPieceAt(basis),
             usage.AuthoredValue > 0);
     }
 }
 
 /// <summary>One ingredient of a section, or one of the product's add-ins on a linked one.</summary>
 /// <param name="Percent">Its share of the formula, in the section's <see cref="PrintedSection.PercentHeader"/>; null for an empty batch.</param>
-/// <param name="CostPerGram">The ingredient's buffered cost per gram, as the recipe form's Cost/g column shows it.</param>
+/// <param name="CostPerGram">The ingredient's cost per gram (buffered, unless the printout isn't), as the recipe form's Cost/g column shows it.</param>
 /// <param name="Cost">What it adds to the batch's cost, at <paramref name="CostPerGram"/>.</param>
 /// <param name="IsFormulaBase">Part of the formula's 100% base, usually the flour.</param>
 public sealed record PrintedLine(string Ingredient, decimal Grams, decimal? Percent, decimal CostPerGram, decimal Cost, bool IsFormulaBase);
@@ -169,6 +179,6 @@ public sealed record PrintedComponent(string Product, int? Quantity, decimal Rec
 
 /// <summary>One packaging line: how much of a material one sellable unit takes, in the unit it's typed in.</summary>
 /// <param name="Qty">Null while nothing is typed for it.</param>
-/// <param name="UnitCost">What one of <paramref name="Unit"/> costs, buffered.</param>
+/// <param name="UnitCost">What one of <paramref name="Unit"/> costs, buffered unless the printout isn't.</param>
 /// <param name="Cost">What the line costs for one sellable unit.</param>
 public sealed record PrintedPackagingLine(string Material, decimal? Qty, string Unit, decimal UnitCost, decimal Cost);

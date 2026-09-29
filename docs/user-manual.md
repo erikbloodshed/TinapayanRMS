@@ -67,7 +67,7 @@ Every ingredient has a **source**, which is set when it's created and can't be c
 
 A **cost buffer %** is a cushion on top of what a purchased material really costs. It covers price swings, waste and variation in yield.
 
-The **buffered cost** is the cost with that cushion on top. **Recipes and products are always costed at buffered costs.**
+The **buffered cost** is the cost with that cushion on top. **Recipes and products are always costed at buffered costs.** To see what a product costs without the cushion, press **Unbuffered** in the Products header (see [The header](#the-header-1)).
 
 For a purchased material, the buffered cost is a **fixed amount**. A new brand price doesn't move it on its own. See [Cost buffer](#cost-buffer) for how to update it.
 
@@ -186,7 +186,7 @@ You don't have to finish each list before moving on. You can add a category or u
 
 ## 4. Settings
 
-Open **Settings** from the bottom of the navigation menu. It has five tabs. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Press **Close** or **Esc** to close Settings.
+Open **Settings** from the bottom of the navigation menu. It has five tabs. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Press **Close**, the **✕** at its top right, or **Esc** to close Settings. The button beside the ✕ makes the window fill the screen, and pressing it again returns the window to its normal size. You can also drag the title bar to move the window.
 
 ### Units of Measure
 
@@ -209,7 +209,7 @@ Each category has a **Name**. Products don't need a category, and those without 
 Each role has:
 
 - **Name**: what the section is called in a recipe, such as Dough or Filling.
-- **Order**: where the role's sections go in a recipe. Lower numbers come first.
+- **Order**: where the role's sections go in a recipe. Lower numbers come first. A new role goes last. To change a role's place, pick it in the list and press **Move Up** or **Move Down** above the list. The roles are numbered 1, 2, 3… again after a move or a delete, so there are no gaps.
 - **Product-owned**: a section made in a product in this role stays that product's own. It's edited in the product's recipe instead of on the Sub-Assemblies screen, and other products can copy it but not link it. Turning this on or off for a role that's already used asks first, and says how many sub-assemblies will move.
   - These are also the only roles a composite product can have sections in. So Product-owned can't be turned off while a composite has a section in the role; the message names the composites. Take the section out there first.
 
@@ -410,7 +410,7 @@ A composite product shows a small icon after its name.
 
 ### The header
 
-The header has the product's name and **New**, **Save**, **Undo**, **Redo**, **Revert**, **Print** and **Delete**. **New** starts a product. The arrow beside it also offers **New composite product**. Below them are these figures, all **per sellable unit**:
+The header has the product's name and **New**, **Save**, **Undo**, **Redo**, **Revert**, **Print**, **Unbuffered** and **Delete**. **New** starts a product. The arrow beside it also offers **New composite product**. Below them are these figures, all **per sellable unit**:
 
 - **Material Cost**: sub-assemblies plus packaging. For a composite product, its products' recipe cost and its own sub-assemblies, plus its own packaging.
 - **Base Cost**: materials plus labour, overhead and administrative.
@@ -424,6 +424,12 @@ Below the header are the fields you fill in:
 - **Category**: pick one, or type a new name to add it.
 - **Quantity Required**: how many finished pieces make one sellable unit. A composite product doesn't have one.
 - **Current Price**: the price the shop charges now, per sellable unit, VAT included. It's for comparison only and doesn't change the computed selling price.
+
+**Unbuffered** switches every cost on the Products screen to the materials' true costs, without their cost buffers. That covers the figures above, the Cost/g and cost columns, the batch cost and cost per piece, packaging, the Costing tab, the recipe cost of a composite product's products, and the cost column in the ingredient and packaging pickers. While it's on, the button reads **Buffered** and an **Unbuffered costs** badge shows beside the product's name. Press **Buffered** to go back to buffered costs.
+
+- It only changes what you see. Nothing is saved, **Save** and **Undo** aren't affected, and **Reports** still use buffered costs.
+- It stays on when you open another product, until you switch it off or close the app. The app always starts on buffered costs.
+- **Print** uses whichever costs the screen shows (see [Printing](#8-printing-recipes-and-costings)).
 
 Deleting a product asks first. Its linked sub-assemblies stay on the Sub-Assemblies screen, and its own sub-assemblies are deleted with it. Deleting a composite product leaves the products it holds as they are. A product can't be deleted while another product's packaging links it, or while a composite product holds it.
 
@@ -548,6 +554,8 @@ To print a set of products, right-click in the Products list and choose **Print 
 A set prints each product **as saved**, with a contents page and each product starting on a new page. If the product open on the Products screen has unsaved changes, the Print tab warns you that it's printed as saved.
 
 The footer on each page shows the product, when it was printed, whether it includes unsaved changes, and the page number.
+
+While the Products screen shows unbuffered costs, everything printed, a single product or a set, is at the materials' true costs. Each product's page says **Unbuffered costs** under its title and over its costing.
 
 Close the Print tab with its ✕.
 

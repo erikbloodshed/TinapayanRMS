@@ -25,7 +25,14 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Roles" Style="{StaticResource SectionHeaderStyle}" />
+                <!-- The picked role's place in the order: a new role goes last, and these move it (the form has no Order box) -->
+                <DockPanel Grid.Row="0">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                        <syncfusion:ButtonAdv Label="Move Up" IconTemplate="{StaticResource MoveUpIconTemplate}" Command="{Binding MoveUpCommand}" Margin="0,0,8,0" />
+                        <syncfusion:ButtonAdv Label="Move Down" IconTemplate="{StaticResource MoveDownIconTemplate}" Command="{Binding MoveDownCommand}" />
+                    </StackPanel>
+                    <TextBlock Text="Roles" Style="{StaticResource SectionHeaderStyle}" />
+                </DockPanel>
 
                 <syncfusion:SfDataGrid Grid.Row="1"
                                        ItemsSource="{Binding Roles}"
@@ -63,18 +70,6 @@
                     <syncfusion:SfTextBoxExt x:Name="NameTextBox"
                                              Grid.Column="1"
                                              Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                </Grid>
-
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" SharedSizeGroup="FormLabel" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="Order" Style="{StaticResource FormLabelStyle}" />
-                    <syncfusion:DoubleTextBox Grid.Column="1"
-                                              Value="{Binding EditingSortOrder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                              NumberDecimalDigits="0"
-                                              ToolTip="Where the role's section goes in a recipe: lower comes first." />
                 </Grid>
 
                 <Grid Margin="0,0,0,12">
