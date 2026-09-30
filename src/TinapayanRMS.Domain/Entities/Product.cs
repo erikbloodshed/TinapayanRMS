@@ -25,10 +25,17 @@ public class Product
     /// <summary>
     /// Made of other products (<see cref="ProductComponent"/>, at least two different ones) and its own packaging, and
     /// sub-assemblies only in product-owned roles (a topping, a filling): a Pasalubong Box of 6 Ensaymada and 4 Cheese Rolls. Each product in it brings its recipe cost,
-    /// not its packaging. Picked when the product is made and fixed once it's saved; a composite is always one sellable
-    /// unit (<see cref="QuantityRequired"/> 1).
+    /// and its packaging only with <see cref="IncludesComponentPackaging"/>. Picked when the product is made and fixed once
+    /// it's saved; a composite is always one sellable unit (<see cref="QuantityRequired"/> 1).
     /// </summary>
     public bool IsComposite { get; set; }
+
+    /// <summary>
+    /// A composite's products each bring their own packaging too, beside the composite's: the wrapper each Ensaymada is
+    /// sold in, for a box that holds them wrapped. It joins the composite's packaging cost, so labor, overhead and
+    /// administrative don't go on it. Only a composite can have it (CK_Products_ComponentPackagingOnComposite).
+    /// </summary>
+    public bool IncludesComponentPackaging { get; set; }
 
     /// <summary>
     /// How many finished pieces make one sellable unit: 1 for a product sold by the piece, 8 for a "Box of 8".

@@ -255,7 +255,7 @@
                 </ItemsControl>
 
                 <Border Grid.Row="3" Style="{StaticResource RowRuleStyle}" />
-                <TextBlock Grid.Row="3" Text="Packaging" Style="{StaticResource LabelCellStyle}" />
+                <TextBlock Grid.Row="3" Text="{Binding Costs.PackagingTitle}" Style="{StaticResource LabelCellStyle}" />
                 <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Costs.Packaging, StringFormat='{}{0:N2}'}" Style="{StaticResource AmountCellStyle}" />
                 <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding Costs.PackagingShare, StringFormat='{}{0:N1}%'}" Style="{StaticResource ShareCellStyle}" />
 

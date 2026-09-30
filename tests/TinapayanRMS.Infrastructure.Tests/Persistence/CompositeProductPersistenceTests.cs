@@ -242,6 +242,34 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
     }
 
     [Fact]
+    public async Task Including_the_products_packaging_saves_with_a_composite_is_copied_by_Clone_and_is_refused_for_any_other_product()
+    {
+        var ensaymadaId = await AddProductAsync("Ensaymada");
+        var cheeseRollId = await AddProductAsync("Cheese Roll");
+        var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
+
+        var box = (await CreateRepository().GetByIdAsync(boxId, Cancellation))!;
+        box.IncludesComponentPackaging.Should().BeFalse("a new composite leaves its products' packaging out");
+        box.IncludesComponentPackaging = true;
+        await CreateRepository().SaveAsync(box, null, null, null, null, Cancellation);
+
+        (await CreateRepository().GetByIdAsync(boxId, Cancellation))!.IncludesComponentPackaging.Should().BeTrue();
+        var cloneId = await CreateCloner().CloneAsync(boxId, "Pasalubong Box Copy", Cancellation);
+        (await CreateRepository().GetByIdAsync(cloneId, Cancellation))!.IncludesComponentPackaging.Should().BeTrue();
+
+        var single = () => CreateRepository().SaveAsync(
+            new Product { Id = ensaymadaId, Name = "Ensaymada", IncludesComponentPackaging = true }, null, null, null, null, Cancellation);
+        await single.Should().ThrowAsync<InvalidOperationException>().WithMessage("Only a composite product can include*");
+
+        // The database holds to it too.
+        await using var dbContext = CreateDbContext();
+        var ensaymada = await dbContext.Products.SingleAsync(p => p.Id == ensaymadaId, Cancellation);
+        ensaymada.IncludesComponentPackaging = true;
+        var direct = () => dbContext.SaveChangesAsync(Cancellation);
+        await direct.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    [Fact]
     public async Task A_product_a_composite_holds_cant_be_deleted_until_its_taken_out_and_deleting_the_composite_keeps_its_products()
     {
         var ensaymadaId = await AddProductAsync("Ensaymada");

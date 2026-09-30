@@ -455,8 +455,13 @@ public sealed class ProductCostSummary
     /// Each sub-assembly in the recipe, in recipe order: its name and its cost per piece. For a composite, each product it
     /// holds: "Ensaymada × 6", and what the six bring in recipe cost, then its own sections.
     /// </param>
+    /// <param name="packagingCosts">Its own packaging lines, each for one whole sellable unit.</param>
     /// <param name="isComposite">The product is a composite, whose recipe is the products it holds.</param>
     /// <param name="hasSections">A composite also has sections of its own (a topping, a filling), which its labels name too.</param>
+    /// <param name="componentPackaging">
+    /// What a composite's products bring in packaging, when it includes theirs (Product.IncludesComponentPackaging): it
+    /// joins the packaging, so labor, overhead and administrative don't go on it. Null when it doesn't include them.
+    /// </param>
     public ProductCostSummary(
         IReadOnlyList<(string Name, decimal CostPerPiece)> usages,
         int quantityRequired,
@@ -468,15 +473,18 @@ public sealed class ProductCostSummary
         decimal vatPercent,
         decimal? currentPrice,
         bool isComposite = false,
-        bool hasSections = false)
+        bool hasSections = false,
+        decimal? componentPackaging = null)
     {
         IReadOnlyList<decimal> usageCostsPerPiece = [.. usages.Select(u => u.CostPerPiece)];
         IsComposite = isComposite;
         HasSections = hasSections;
         QuantityRequired = quantityRequired;
         SubAssemblies = usageCostsPerPiece.Sum() * quantityRequired;
-        Packaging = packagingCosts.Sum();
-        Material = ProductRules.CalculateMaterialCost(usageCostsPerPiece, quantityRequired, packagingCosts);
+        OwnPackaging = packagingCosts.Sum();
+        ComponentPackaging = componentPackaging;
+        Packaging = OwnPackaging + (componentPackaging ?? 0m);
+        Material = ProductRules.CalculateMaterialCost(usageCostsPerPiece, quantityRequired, [.. packagingCosts, componentPackaging ?? 0m]);
         LaborPercent = laborPercent;
         OverheadPercent = overheadPercent;
         AdministrativePercent = administrativePercent;
@@ -527,7 +535,17 @@ public sealed class ProductCostSummary
     /// <summary>SubAssemblies broken down: each sub-assembly in the recipe, in recipe order, adding up to it.</summary>
     public IReadOnlyList<SubAssemblyCostLine> SubAssemblyLines { get; }
 
+    /// <summary>All of the packaging for one sellable unit: its own, and a composite's products' when it includes theirs.</summary>
     public decimal Packaging { get; }
+
+    /// <summary>Its own packaging lines alone, what its Packaging tab lists.</summary>
+    public decimal OwnPackaging { get; }
+
+    /// <summary>What a composite's products bring in packaging, when it includes theirs; null when it doesn't.</summary>
+    public decimal? ComponentPackaging { get; }
+
+    /// <summary>What <see cref="Packaging"/> is called in the breakdown: "Packaging", or "Packaging (own and products')" when a composite includes its products'.</summary>
+    public string PackagingTitle => ComponentPackaging is null ? "Packaging" : "Packaging (own and products')";
 
     public decimal Material { get; }
 
@@ -790,18 +808,67 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ObservableCollection<ProductComponentRow> ComponentEdits { get; } = [];
 
     private decimal _componentsCost;
-    /// <summary>What a composite's products bring together, for its Products tab: its recipe cost less its own sections.</summary>
+    /// <summary>
+    /// What a composite's products bring together, for its Products tab: the sum of its Cost column, so its recipe cost less
+    /// its own sections, and its products' packaging too while it includes theirs.
+    /// </summary>
     public decimal ComponentsCost
     {
         get => _componentsCost;
         private set => this.RaiseAndSetIfChanged(ref _componentsCost, value);
     }
 
+    private bool _editingIncludesComponentPackaging;
+    /// <summary>
+    /// A composite's products each bring their own packaging too (Product.IncludesComponentPackaging), the checkbox beside
+    /// its Products table's Remove Line: it joins the composite's packaging, not its recipe cost.
+    /// </summary>
+    public bool EditingIncludesComponentPackaging
+    {
+        get => _editingIncludesComponentPackaging;
+        set
+        {
+            // Each line's Cost, and the add row's, take the products' packaging in or leave it out: first, since the change
+            // recomputes the costs from the rows as it's raised.
+            foreach (var row in _addingComponentRow is { } adding ? ComponentEdits.Append(adding) : ComponentEdits)
+            {
+                row.IncludesPackaging = value;
+            }
+
+            this.RaiseAndSetIfChanged(ref _editingIncludesComponentPackaging, value);
+            this.RaisePropertyChanged(nameof(IsComponentPackagingTicked));
+            this.RaisePropertyChanged(nameof(ComponentsCaption));
+            this.RaisePropertyChanged(nameof(MaterialCostTooltip));
+        }
+    }
+
+    /// <summary>
+    /// The Include each product's packaging checkbox's side of <see cref="EditingIncludesComponentPackaging"/>: a tick or
+    /// an untick from the screen is one undo step, whether it came by mouse, key or UI Automation. A step around the box's
+    /// focus couldn't give that, since the box keeps the cursor from one click to the next.
+    /// </summary>
+    public bool IsComponentPackagingTicked
+    {
+        get => EditingIncludesComponentPackaging;
+        set
+        {
+            if (value != EditingIncludesComponentPackaging)
+            {
+                AsUndoStep(() => EditingIncludesComponentPackaging = value);
+            }
+        }
+    }
+
+    /// <summary>The Products tab's caption: what each line brings, and where the products' own packaging goes.</summary>
+    public string ComponentsCaption => EditingIncludesComponentPackaging
+        ? "Each product brings its recipe (ingredients) cost and its own packaging for how many of it go in: Cost is both. On the Costing tab the packaging joins this product's Packaging. A topping or filling over the whole goes on a tab of its own, with Add Sub-Assembly."
+        : "Each product brings its recipe (ingredients) cost for how many of it go in. Its own packaging stays out: this product's Packaging covers the box and anything wrapping the pieces. A topping or filling over the whole goes on a tab of its own, with Add Sub-Assembly.";
+
     /// <summary>
     /// The line the Products table's add row edits: it finds its product, and its recipe cost once that's read, before
     /// it's committed. Kept, so a cost read for it can price it while it's still being typed (FetchComponentCostsAsync).
     /// </summary>
-    public Func<ProductComponentRow> NewComponentRow => () => _addingComponentRow = new ProductComponentRow(FindComponentProduct, FindRecipeCost);
+    public Func<ProductComponentRow> NewComponentRow => () => _addingComponentRow = NewComponentRowFor(null, null);
 
     private ProductComponentRow? _addingComponentRow;
 
@@ -822,10 +889,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private IReadOnlyList<ProductComponent> _componentLinks = [];
 
     /// <summary>
-    /// What one of each product in the Products table brings, by product id: its recipe cost as saved, read with the
-    /// composite, when one is picked, and again with every LoadCommand. Kept for the product showing only.
+    /// What one of each product in the Products table brings, by product id: its recipe and packaging costs as saved, read
+    /// with the composite, when one is picked, and again with every LoadCommand. Kept for the product showing only.
     /// </summary>
-    private readonly Dictionary<int, RecipeCosts> _componentCosts = [];
+    private readonly Dictionary<int, ComponentCosts> _componentCosts = [];
 
     /// <summary>The products whose recipe cost is being read, so a second pick of one doesn't read it twice.</summary>
     private readonly HashSet<int> _fetchingComponentCosts = [];
@@ -836,11 +903,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// What one of a product brings, as the screen has read it; null while it hasn't, and the read starts, so the add row
     /// prices itself once it arrives, before the line is committed.
     /// </summary>
-    private decimal? FindRecipeCost(int id)
+    private ProductComponentRow.UnitCosts? FindComponentCosts(int id)
     {
         if (_componentCosts.TryGetValue(id, out var costs))
         {
-            return costs.At(CostBasis);
+            return AtBasis(costs);
         }
 
         if (_fetchingComponentCosts.Add(id))
@@ -1055,6 +1122,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The header's Material Cost tooltip: what goes into it, which for a composite is what its products bring.</summary>
     public string MaterialCostTooltip => (IsEditingComposite
         ? $"{CostUnitCaption}: the recipe cost of the products it holds and its own sub-assemblies, plus its own packaging"
+            + (EditingIncludesComponentPackaging ? " and theirs" : string.Empty)
         : $"{CostUnitCaption}: the share of every sub-assembly it holds, plus its packaging")
         + (IsUnbuffered ? ", at the materials' true costs, without their cost buffers" : ", at the materials' buffered costs");
 
@@ -2087,6 +2155,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .AutoRefresh(r => r.ComponentProductId)
             .AutoRefresh(r => r.Quantity)
             .AutoRefresh(r => r.RecipeCost)
+            .AutoRefresh(r => r.PackagingCost)
             .Subscribe(_ =>
             {
                 if (IsRestoring)
@@ -2107,6 +2176,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 x => x.EditingVatPercent,
                 x => x.EditingCurrentPrice,
                 x => x.EditingQuantityRequired)
+            .Where(_ => !IsRestoring)
+            .Subscribe(_ => RecomputeCosts());
+
+        // A composite's products' packaging joining its own, or leaving it.
+        this.WhenAnyValue(x => x.EditingIncludesComponentPackaging)
             .Where(_ => !IsRestoring)
             .Subscribe(_ => RecomputeCosts());
 
@@ -2167,7 +2241,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 ? Task.Run(() => _packagingLinkRepository.GetForProductAsync(linkProductId, CancellationToken.None))
                 : Task.FromResult<PackagingLink?>(null);
             var componentLinksRead = Task.Run(() => _productRepository.GetAllComponentsAsync(CancellationToken.None));
-            var componentCostsRead = Task.Run(() => _savedProducts.ReadRecipeCostsAsync(componentIds, CancellationToken.None));
+            var componentCostsRead = Task.Run(() => _savedProducts.ReadComponentCostsAsync(componentIds, CancellationToken.None));
             await Task.WhenAll(
                 rolesRead, categoriesRead, rawMaterialsRead, productsRead, linkableRead, standaloneRead, costingDefaultsRead,
                 linkedSubAssembliesRead, linkedLinesRead, packagingLinkRead, componentLinksRead, componentCostsRead);
@@ -2337,6 +2411,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
                 // A new one's to say; a saved one's is the kind it was saved as, which the form never changes.
                 IsComposite = IsEditingComposite,
+                IncludesComponentPackaging = IsEditingComposite && EditingIncludesComponentPackaging,
             };
 
             var validation = _productValidator.Validate(product);
@@ -2640,6 +2715,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         EditingDescription = product.Description ?? string.Empty;
         EditingCategory = Categories.FirstOrDefault(c => c.Id == product.CategoryId);
         EditingQuantityRequired = product.QuantityRequired;
+        EditingIncludesComponentPackaging = product.IncludesComponentPackaging;
         EditingCurrentPrice = product.CurrentPrice;
         ShowUpdatedAt(product.UpdatedAt);
         EditingCloneName = $"{product.Name} Copy";
@@ -2887,6 +2963,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         EditingDescription = string.Empty;
         EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId);
         EditingQuantityRequired = 1;
+        EditingIncludesComponentPackaging = false;
         EditingCurrentPrice = null;
         ShowUpdatedAt(null);
         EditingCloneName = string.Empty;
@@ -3068,16 +3145,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         foreach (var component in components)
         {
-            _componentCosts[component.Component.ComponentProductId] = component.RecipeCosts;
+            _componentCosts[component.Component.ComponentProductId] = component.Costs;
         }
 
         SelectedComponentEdit = null;
         ComponentEdits.Clear();
-        ComponentEdits.AddRange(components.Select(c => new ProductComponentRow(FindComponentProduct, FindRecipeCost)
-        {
-            ComponentProductId = c.Component.ComponentProductId,
-            Quantity = c.Component.Quantity,
-        }));
+        ComponentEdits.AddRange(components.Select(c => NewComponentRowFor(c.Component.ComponentProductId, c.Component.Quantity)));
 
         // A product the list doesn't hold yet shows as it was read with the composite.
         var productsById = Products.ToDictionary(p => p.Id);
@@ -3105,7 +3178,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>What each product read so far brings at the screen's costs, buffered or not, for the Products table's rows.</summary>
-    private Dictionary<int, decimal> ComponentCostsAtBasis() => _componentCosts.ToDictionary(c => c.Key, c => c.Value.At(CostBasis));
+    private Dictionary<int, ProductComponentRow.UnitCosts> ComponentCostsAtBasis() => _componentCosts.ToDictionary(c => c.Key, c => AtBasis(c.Value));
+
+    private ProductComponentRow.UnitCosts AtBasis(ComponentCosts costs) => new(costs.RecipeAt(CostBasis), costs.PackagingAt(CostBasis));
+
+    /// <summary>A row for the Products table, finding its product and costs, its Cost following the checkbox as it stands.</summary>
+    private ProductComponentRow NewComponentRowFor(int? productId, int? quantity) =>
+        new(FindComponentProduct, FindComponentCosts)
+        {
+            IncludesPackaging = EditingIncludesComponentPackaging,
+            ComponentProductId = productId,
+            Quantity = quantity,
+        };
 
     /// <summary>
     /// Reads what each product picked in the Products table brings, when the screen hasn't read it yet: off the UI thread,
@@ -3132,7 +3216,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         try
         {
-            var costs = await Task.Run(() => _savedProducts.ReadRecipeCostsAsync(productIds, CancellationToken.None));
+            var costs = await Task.Run(() => _savedProducts.ReadComponentCostsAsync(productIds, CancellationToken.None));
             foreach (var (productId, cost) in costs)
             {
                 _componentCosts[productId] = cost;
@@ -3330,6 +3414,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         Description = EditingDescription,
         CurrentPrice = EditingCurrentPrice,
         QuantityRequired = EditingQuantityRequired,
+        IncludesComponentPackaging = EditingIncludesComponentPackaging,
         CategoryId = EditingCategory?.Id,
         CloneName = EditingCloneName,
         Costing = (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent),
@@ -3402,6 +3487,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             EditingDescription = snapshot.Description;
             EditingCurrentPrice = snapshot.CurrentPrice;
             EditingQuantityRequired = snapshot.QuantityRequired;
+            EditingIncludesComponentPackaging = snapshot.IncludesComponentPackaging;
             EditingCloneName = snapshot.CloneName;
             _editingCategory = snapshot.CategoryId is { } categoryId ? Categories.FirstOrDefault(c => c.Id == categoryId) : null;
             this.RaisePropertyChanged(nameof(EditingCategory));
@@ -3425,11 +3511,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             ComponentEdits.Clear();
             foreach (var line in snapshot.Components)
             {
-                ComponentEdits.Add(new ProductComponentRow(FindComponentProduct, FindRecipeCost)
-                {
-                    ComponentProductId = line.ProductId,
-                    Quantity = line.Quantity,
-                });
+                ComponentEdits.Add(NewComponentRowFor(line.ProductId, line.Quantity));
             }
 
             // 5. The sections and their tabs, under _arrangingRecipeTabs so RecipeTabShown short-circuits: without
@@ -4942,10 +5024,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         // A composite's recipe cost is what its products bring, each line its quantity at the product's recipe cost (a
         // line still being filled in brings nothing yet), then its own sections, each per whole composite.
-        List<(string Name, decimal Cost)> components = IsEditingComposite
-            ? [.. ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0).Select(r => (r.LineName, r.Cost))]
+        List<ProductComponentRow> lines = IsEditingComposite
+            ? [.. ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0)]
             : [];
-        ComponentsCost = components.Sum(c => c.Cost);
+        List<(string Name, decimal Cost)> components = [.. lines.Select(r => (r.LineName, r.RecipeCostTotal))];
+
+        // The Products table's figure adds up its Cost column: the products' packaging is in it while the box is ticked.
+        ComponentsCost = lines.Sum(r => r.Cost);
+
+        // With the box ticked, each product's own packaging for one sellable unit, times its quantity, joins the
+        // composite's packaging, not its recipe cost (a product whose costs haven't been read yet brings none until they are).
+        decimal? componentPackaging = IsEditingComposite && EditingIncludesComponentPackaging
+            ? lines.Sum(r => r.PackagingCostTotal)
+            : null;
         Costs = new ProductCostSummary(
             [.. components, .. UsageEdits.Select(u => (u.SectionName, u.CostPerPieceAt(CostBasis)))],
             EditingQuantityRequired,
@@ -4957,7 +5048,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             EditingVatPercent,
             EditingCurrentPrice,
             IsEditingComposite,
-            IsEditingComposite && UsageEdits.Count > 0);
+            IsEditingComposite && UsageEdits.Count > 0,
+            componentPackaging);
     }
 
     /// <summary>

@@ -34,7 +34,9 @@ public class RawMaterialRepository(
     /// on up (a composite can't end up containing itself). Packaging is read as a product sees it: its own lines unless
     /// its packaging links, a set's lines when it links a set, and another product's packaging when it links that
     /// product, followed down the chain (PackagingLineRepository.ResolveEffectiveAsync). A composite's products bring
-    /// only their recipe cost, so their packaging doesn't count for it.
+    /// their packaging only when it includes theirs (Products.IncludesComponentPackaging), and then all of it, so
+    /// PackagingCosts climbs from every product whose packaging cost the material is in to each composite like that
+    /// holding it, and on up. A packaging link takes only the lines, so PackagingUsers doesn't climb through composites.
     /// </summary>
     private const string UsedBySql = """
         WITH Feeds AS (
@@ -71,11 +73,20 @@ public class RawMaterialRepository(
             WHERE EXISTS (SELECT 1 FROM SubAssemblyPackagingLines s WHERE s.SubAssemblyId = k.LinkedSubAssemblyId AND s.PackagingMaterialId = @id)
             UNION ALL
             SELECT k.ProductId FROM PackagingLinks k JOIN PackagingUsers p ON p.ProductId = k.LinkedProductId
+        ),
+        PackagingCosts AS (
+            SELECT ProductId FROM PackagingUsers
+            UNION ALL
+            SELECT c.ProductId
+            FROM ProductComponents c
+            JOIN PackagingCosts p ON p.ProductId = c.ComponentProductId
+            JOIN Products h ON h.Id = c.ProductId
+            WHERE h.IncludesComponentPackaging = 1
         )
         SELECT p.Id, p.Name, c.Name AS CategoryName
         FROM Products p
         LEFT JOIN ProductCategories c ON c.Id = p.CategoryId
-        WHERE p.Id IN (SELECT ProductId FROM RecipeUsers) OR p.Id IN (SELECT ProductId FROM PackagingUsers)
+        WHERE p.Id IN (SELECT ProductId FROM RecipeUsers) OR p.Id IN (SELECT ProductId FROM PackagingCosts)
         """;
 
     public async Task AddAsync(RawMaterial material, CancellationToken cancellationToken)

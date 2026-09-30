@@ -165,15 +165,23 @@ public sealed record PrintedPackaging(string? LinkedTo, IReadOnlyList<PrintedPac
 /// <summary>One product in a composite, as its Products table shows it.</summary>
 /// <param name="Quantity">How many of the product's sellable units go in; null while nothing is typed for it.</param>
 /// <param name="RecipeCost">What one of it brings: its recipe (ingredients) cost for one sellable unit, its packaging left out.</param>
-/// <param name="Cost">What the line brings into the composite's cost: <paramref name="Quantity"/> at <paramref name="RecipeCost"/>.</param>
-public sealed record PrintedComponent(string Product, int? Quantity, decimal RecipeCost, decimal Cost)
+/// <param name="Cost">
+/// What the line brings into the composite's cost: <paramref name="Quantity"/> at <paramref name="RecipeCost"/>, and at
+/// <paramref name="PackagingCost"/> too when there's one.
+/// </param>
+/// <param name="PackagingCost">
+/// The product's own packaging for one sellable unit, when the composite includes its products' packaging; null when it
+/// doesn't, and the table then has no Packaging Cost column.
+/// </param>
+public sealed record PrintedComponent(string Product, int? Quantity, decimal RecipeCost, decimal Cost, decimal? PackagingCost = null)
 {
     /// <summary>The Products table's rows, leaving out any without a product, which isn't a line yet.</summary>
     public static IReadOnlyList<PrintedComponent> From(IEnumerable<ProductComponentRow> rows) =>
     [
         .. rows
             .Where(r => r.Product is not null)
-            .Select(r => new PrintedComponent(r.Product!.Name, r.Quantity, r.RecipeCost ?? 0m, r.Cost)),
+            .Select(r => new PrintedComponent(
+                r.Product!.Name, r.Quantity, r.RecipeCost ?? 0m, r.Cost, r.IncludesPackaging ? r.PackagingCost ?? 0m : null)),
     ];
 }
 

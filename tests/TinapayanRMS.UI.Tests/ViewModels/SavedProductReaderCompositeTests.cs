@@ -41,11 +41,14 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         return ((await products.GetByIdAsync(ensaymadaId, Cancellation))!, (await products.GetByIdAsync(cheeseRollId, Cancellation))!);
     }
 
-    private async Task<Product> AddCompositeAsync(string name, params (int ProductId, int Quantity)[] components)
+    private Task<Product> AddCompositeAsync(string name, params (int ProductId, int Quantity)[] components) =>
+        AddCompositeAsync(name, includesComponentPackaging: false, components);
+
+    private async Task<Product> AddCompositeAsync(string name, bool includesComponentPackaging, params (int ProductId, int Quantity)[] components)
     {
         var products = new ProductRepository(CreateDbContextFactory());
         var id = await products.SaveAsync(
-            new Product { Name = name, IsComposite = true },
+            new Product { Name = name, IsComposite = true, IncludesComponentPackaging = includesComponentPackaging },
             new RecipeDraft([], []) { Components = components },
             null,
             null,
@@ -163,13 +166,66 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         var box = await AddCompositeAsync("Pasalubong Box", (ensaymada.Id, 2), (cheeseRoll.Id, 1));
 
-        var costs = await CreateReader().ReadRecipeCostsAsync([ensaymada.Id, box.Id, 999_999], Cancellation);
+        await AddPackagingAsync(box.Id, "Gift Box", 12m);
 
-        costs.Should().BeEquivalentTo(new Dictionary<int, RecipeCosts>
+        var costs = await CreateReader().ReadComponentCostsAsync([ensaymada.Id, box.Id, 999_999], Cancellation);
+
+        costs.Should().BeEquivalentTo(new Dictionary<int, ComponentCosts>
         {
-            [ensaymada.Id] = new(2.50m, 2.00m),
-            [box.Id] = new(10m, 8m),
+            [ensaymada.Id] = new(2.50m, 2.00m, 0m, 0m),
+            [box.Id] = new(10m, 8m, 12m, 12m),
         });
+    }
+
+    [Fact]
+    public async Task A_composite_including_its_products_packaging_adds_it_to_its_own_and_to_a_composite_holding_it()
+    {
+        var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
+        await AddPackagingAsync(ensaymada.Id, "Ensaymada Bag", 1.50m);
+        var box = await AddCompositeAsync("Pasalubong Box", includesComponentPackaging: true, (ensaymada.Id, 2), (cheeseRoll.Id, 1));
+        await AddPackagingAsync(box.Id, "Gift Box", 12m);
+        var party = await AddCompositeAsync("Party Package", includesComponentPackaging: true, (box.Id, 2), (ensaymada.Id, 1));
+        var reader = CreateReader();
+
+        var boxed = await reader.ReadAsync(box, Cancellation);
+        var partied = await reader.ReadAsync(party, Cancellation);
+
+        boxed.Costs.SubAssemblies.Should().Be(10m, "the recipe is the same either way");
+        boxed.Costs.OwnPackaging.Should().Be(12m);
+        boxed.Costs.ComponentPackaging.Should().Be(3m, "2 bags of 1.50; Cheese Roll has none");
+        boxed.Costs.Packaging.Should().Be(15m);
+        boxed.Costs.PackagingTitle.Should().Be("Packaging (own and products')");
+        boxed.Components.Select(c => c.PackagingCostAt(CostBasis.Buffered)).Should().Equal(3m, 0m);
+
+        // Printed as the Products tab shows it: a Packaging Cost column, and each line's Cost with its packaging in.
+        boxed.ToPrintout(new DateTime(2026, 9, 30, 9, 0, 0)).Components.Should().Equal(
+            new PrintedComponent("Ensaymada", 2, 2.50m, 8m, 1.50m),
+            new PrintedComponent("Cheese Roll", 1, 5m, 5m, 0m));
+
+        // Labor, overhead and administrative stay percentages of the recipe alone.
+        boxed.Costs.Labor.Should().Be(2.50m, "25% of 10.00, the packaging left out");
+
+        // A box brings all of its packaging, its own and its products', and the loose Ensaymada its bag.
+        partied.Costs.ComponentPackaging.Should().Be(31.50m, "2 boxes of 15.00, and 1.50");
+        partied.Costs.OwnPackaging.Should().Be(0m);
+        partied.ToPrintout(new DateTime(2026, 9, 30, 9, 0, 0)).Costs.Packaging.Should().Be(31.50m);
+    }
+
+    [Fact]
+    public async Task A_composite_including_its_products_packaging_at_their_percentages_prices_at_exactly_what_they_do()
+    {
+        var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
+        await AddPackagingAsync(ensaymada.Id, "Ensaymada Bag", 1.50m);
+        var box = await AddCompositeAsync("Pasalubong Box", includesComponentPackaging: true, (ensaymada.Id, 1), (cheeseRoll.Id, 2));
+        var reader = CreateReader();
+
+        var single = await reader.ReadAsync(ensaymada, Cancellation);
+        var roll = await reader.ReadAsync(cheeseRoll, Cancellation);
+        var composite = await reader.ReadAsync(box, Cancellation);
+
+        // Packaging passes straight through in both, so the products' prices, bag and all, add up to the composite's.
+        composite.Costs.SellingPrice.Should().Be(single.Costs.SellingPrice + 2 * roll.Costs.SellingPrice);
+        composite.Costs.Packaging.Should().Be(1.50m);
     }
 
     [Fact]

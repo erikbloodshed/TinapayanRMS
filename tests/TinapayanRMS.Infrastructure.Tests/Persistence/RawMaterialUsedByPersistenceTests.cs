@@ -207,6 +207,37 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task A_products_packaging_is_used_by_every_composite_including_its_products_packaging_however_deep()
+    {
+        var bagId = await AddBoxAsync("Bag");
+        var giftBoxId = await AddBoxAsync("Gift Box");
+        var ensaymadaId = await AddProductAsync("Ensaymada");
+        var rollId = await AddProductAsync("Cheese Roll");
+        await SetOwnPackagingAsync(ensaymadaId, bagId);
+        var products = new ProductRepository(CreateDbContextFactory());
+        var boxId = await products.SaveAsync(
+            new Product { Name = "Pasalubong Box", IsComposite = true, IncludesComponentPackaging = true },
+            new RecipeDraft([], []) { Components = [(ensaymadaId, 6), (rollId, 4)] },
+            null, null, null, Cancellation);
+        await SetOwnPackagingAsync(boxId, giftBoxId);
+        await products.SaveAsync(
+            new Product { Name = "Party Package", IsComposite = true, IncludesComponentPackaging = true },
+            new RecipeDraft([], []) { Components = [(boxId, 2), (rollId, 6)] },
+            null, null, null, Cancellation);
+        await products.SaveAsync(
+            new Product { Name = "Merienda Set", IsComposite = true },
+            new RecipeDraft([], []) { Components = [(ensaymadaId, 2), (rollId, 2)] },
+            null, null, null, Cancellation);
+
+        // A product linking the box's packaging takes its lines, not what its products bring.
+        var giftSetId = await AddProductAsync("Gift Set");
+        await CreatePackagingLinkRepository().SetLinkAsync(giftSetId, boxId, Cancellation);
+
+        (await UsedByNamesAsync(bagId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
+        (await UsedByNamesAsync(giftBoxId)).Should().Equal("Gift Set", "Party Package", "Pasalubong Box");
+    }
+
+    [Fact]
     public async Task An_ingredient_in_a_composites_own_topping_is_used_by_it_and_by_every_composite_holding_it()
     {
         var toppingRoleId = await AddRoleAsync("Topping", isProductOwned: true);

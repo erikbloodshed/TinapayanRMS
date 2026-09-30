@@ -73,6 +73,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
             QuantityRequired = source.QuantityRequired,
             CurrentPrice = source.CurrentPrice,
             IsComposite = source.IsComposite,
+            IncludesComponentPackaging = source.IncludesComponentPackaging,
         };
         await ProductRepository.AddAsync(dbContext, newProduct, cancellationToken);
 

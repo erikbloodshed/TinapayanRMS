@@ -219,6 +219,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("IncludesComponentPackaging")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsComposite")
                         .HasColumnType("bit");
 
@@ -251,6 +254,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     b.ToTable("Products", t =>
                         {
+                            t.HasCheckConstraint("CK_Products_ComponentPackagingOnComposite", "[IsComposite] = 1 OR [IncludesComponentPackaging] = 0");
+
                             t.HasCheckConstraint("CK_Products_CompositeIsOneUnit", "[IsComposite] = 0 OR [QuantityRequired] = 1");
 
                             t.HasCheckConstraint("CK_Products_QuantityRequired", "[QuantityRequired] > 0");

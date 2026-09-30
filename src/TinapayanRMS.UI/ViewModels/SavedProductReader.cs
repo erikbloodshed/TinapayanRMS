@@ -15,24 +15,34 @@ public sealed record ProductDetail(
     IReadOnlyList<SubAssemblyLine> SubAssemblyLines,
     IReadOnlyList<UsageAddInLine> AddIns)
 {
-    /// <summary>A composite's products, in its Products table's order, each with its recipe cost as saved; none for a product made of sub-assemblies.</summary>
+    /// <summary>A composite's products, in its Products table's order, each with its recipe and packaging costs as saved; none for a product made of sub-assemblies.</summary>
     public IReadOnlyList<SavedComponent> Components { get; init; } = [];
 }
 
-/// <summary>A product's recipe cost for one sellable unit at each basis: its ingredients at their buffered costs, and at their true ones.</summary>
-public sealed record RecipeCosts(decimal Buffered, decimal Unbuffered)
+/// <summary>
+/// What one sellable unit of a product brings into a composite at each basis, its materials at their buffered costs and at
+/// their true ones: its recipe cost (the Sub-assemblies figure on its Costing tab), and its packaging cost (the Packaging
+/// figure there), which the composite takes only when it includes its products' packaging.
+/// </summary>
+public sealed record ComponentCosts(decimal RecipeBuffered, decimal RecipeUnbuffered, decimal PackagingBuffered, decimal PackagingUnbuffered)
 {
-    public decimal At(CostBasis basis) => basis == CostBasis.Unbuffered ? Unbuffered : Buffered;
+    public decimal RecipeAt(CostBasis basis) => basis == CostBasis.Unbuffered ? RecipeUnbuffered : RecipeBuffered;
+
+    public decimal PackagingAt(CostBasis basis) => basis == CostBasis.Unbuffered ? PackagingUnbuffered : PackagingBuffered;
 }
 
-/// <summary>One product in a saved composite, with what one of it brings: its recipe cost for one sellable unit, as saved.</summary>
-public sealed record SavedComponent(ProductComponent Component, RecipeCosts RecipeCosts)
+/// <summary>One product in a saved composite, with what one of it brings: its recipe and packaging costs for one sellable unit, as saved.</summary>
+public sealed record SavedComponent(ProductComponent Component, ComponentCosts Costs)
 {
     /// <summary>What one of the product brings at <paramref name="basis"/>.</summary>
-    public decimal RecipeCostAt(CostBasis basis) => RecipeCosts.At(basis);
+    public decimal RecipeCostAt(CostBasis basis) => Costs.RecipeAt(basis);
 
     /// <summary>What the line brings into the composite's cost at <paramref name="basis"/>.</summary>
     public decimal CostAt(CostBasis basis) => CompositeProductRules.CalculateComponentCost(RecipeCostAt(basis), Component.Quantity);
+
+    /// <summary>What the line brings into the composite's packaging at <paramref name="basis"/>, when it includes its products'.</summary>
+    public decimal PackagingCostAt(CostBasis basis) =>
+        CompositeProductRules.CalculateComponentPackagingCost(Costs.PackagingAt(basis), Component.Quantity);
 
     /// <summary>"Ensaymada × 6", what the Costing tab calls the line.</summary>
     public string LineName => ProductComponentRow.LineNameFor(Component.ComponentProduct!.Name, Component.Quantity);
@@ -69,7 +79,14 @@ public sealed record SavedProduct(
         HasPackaging ? PrintedPackaging.From(PackagingLines, PackagingLinkedTo) : null,
         Costs,
         Product.IsComposite
-            ? [.. Components.Select(c => new PrintedComponent(c.Component.ComponentProduct!.Name, c.Component.Quantity, c.RecipeCostAt(CostBasis), c.CostAt(CostBasis)))]
+            ? [.. Components.Select(c => Product.IncludesComponentPackaging
+                ? new PrintedComponent(
+                    c.Component.ComponentProduct!.Name,
+                    c.Component.Quantity,
+                    c.RecipeCostAt(CostBasis),
+                    c.CostAt(CostBasis) + c.PackagingCostAt(CostBasis),
+                    c.Costs.PackagingAt(CostBasis))
+                : new PrintedComponent(c.Component.ComponentProduct!.Name, c.Component.Quantity, c.RecipeCostAt(CostBasis), c.CostAt(CostBasis)))]
             : null)
     {
         CostBasis = CostBasis,
@@ -130,7 +147,7 @@ public sealed class SavedProductReader(
         await subAssemblyLineRepository.GetForSubAssembliesAsync(
             [.. (await usagesRead).Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
 
-    /// <summary>A composite's lines, each with its product's recipe cost as saved, read at once; none for any other product.</summary>
+    /// <summary>A composite's lines, each with its product's recipe and packaging costs as saved, read at once; none for any other product.</summary>
     private async Task<IReadOnlyList<SavedComponent>> ReadComponentsAsync(
         int productId, ImmutableHashSet<int> holders, CancellationToken cancellationToken)
     {
@@ -143,36 +160,36 @@ public sealed class SavedProductReader(
         var costs = await Task.WhenAll(components
             .Select(c => c.ComponentProduct!)
             .DistinctBy(p => p.Id)
-            .Select(async p => (p.Id, Cost: await ReadRecipeCostAsync(p, holders, cancellationToken))));
+            .Select(async p => (p.Id, Cost: await ReadComponentCostsAsync(p, holders, cancellationToken))));
         var costById = costs.ToDictionary(c => c.Id, c => c.Cost);
         return [.. components.Select(c => new SavedComponent(c, costById[c.ComponentProductId]))];
     }
 
     /// <summary>
     /// What one of each product brings into a composite, as it's saved: its recipe (sub-assemblies, ingredients) cost for
-    /// one sellable unit, which is the Sub-assemblies figure on its Costing tab, buffered and unbuffered. A product that's
-    /// gone is left out.
+    /// one sellable unit, which is the Sub-assemblies figure on its Costing tab, and its packaging cost, the Packaging figure
+    /// there, buffered and unbuffered. A product that's gone is left out.
     /// </summary>
-    public async Task<IReadOnlyDictionary<int, RecipeCosts>> ReadRecipeCostsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
+    public async Task<IReadOnlyDictionary<int, ComponentCosts>> ReadComponentCostsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
     {
         if (productIds.Count == 0)
         {
-            return new Dictionary<int, RecipeCosts>();
+            return new Dictionary<int, ComponentCosts>();
         }
 
         // Read again rather than taken from the screen's list, which may be older than a quantity required saved since.
         var products = await productRepository.GetByIdsAsync(productIds, cancellationToken);
-        var costs = await Task.WhenAll(products.Select(async p => (p.Id, Cost: await ReadRecipeCostAsync(p, [], cancellationToken))));
+        var costs = await Task.WhenAll(products.Select(async p => (p.Id, Cost: await ReadComponentCostsAsync(p, [], cancellationToken))));
         return costs.ToDictionary(c => c.Id, c => c.Cost);
     }
 
-    /// <summary>Its recipe cost at both bases, from one read: pricing it twice is only arithmetic.</summary>
-    private async Task<RecipeCosts> ReadRecipeCostAsync(Product product, ImmutableHashSet<int> holders, CancellationToken cancellationToken)
+    /// <summary>Its recipe and packaging costs at both bases, from one read: pricing it twice is only arithmetic.</summary>
+    private async Task<ComponentCosts> ReadComponentCostsAsync(Product product, ImmutableHashSet<int> holders, CancellationToken cancellationToken)
     {
         var detail = await ReadDetailAsync(product.Id, holders, cancellationToken);
-        return new(
-            Build(product, detail, CostBasis.Buffered).Costs.SubAssemblies,
-            Build(product, detail, CostBasis.Unbuffered).Costs.SubAssemblies);
+        var buffered = Build(product, detail, CostBasis.Buffered).Costs;
+        var unbuffered = Build(product, detail, CostBasis.Unbuffered).Costs;
+        return new(buffered.SubAssemblies, unbuffered.SubAssemblies, buffered.Packaging, unbuffered.Packaging);
     }
 
     /// <summary><paramref name="product"/> as it's saved, read and priced at its buffered costs.</summary>
@@ -186,7 +203,8 @@ public sealed class SavedProductReader(
     /// <summary>
     /// <paramref name="detail"/> as the screen shows it: each section with the ingredients and role it was read with,
     /// and the costing from the saved costing, the product's quantity per unit and its current price, as RecomputeCosts
-    /// works it out from the form. A composite's recipe cost is its products', then its own sections'.
+    /// works it out from the form. A composite's recipe cost is its products', then its own sections'; its packaging is its
+    /// own, and its products' too when it includes theirs.
     /// </summary>
     public static SavedProduct Build(Product product, ProductDetail detail) => Build(product, detail, CostBasis.Buffered);
 
@@ -218,7 +236,8 @@ public sealed class SavedProductReader(
             costing?.VatPercent ?? 0m,
             product.CurrentPrice,
             product.IsComposite,
-            product.IsComposite && sections.Count > 0);
+            product.IsComposite && sections.Count > 0,
+            product.IncludesComponentPackaging ? detail.Components.Sum(c => c.PackagingCostAt(basis)) : null);
 
         return new SavedProduct(
             product,

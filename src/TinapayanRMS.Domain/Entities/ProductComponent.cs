@@ -3,8 +3,9 @@ namespace TinapayanRMS.Domain.Entities;
 /// <summary>
 /// One product in a composite product (<see cref="Product.IsComposite"/>), and how many of it go in: 6 Ensaymada in a
 /// Pasalubong Box. The quantity counts the component's sellable units, so 1 of "Ensaymada Box of 8" is the whole box.
-/// The component brings its recipe (ingredient) cost, worked out on read like every product cost; its own packaging stays
-/// out, since the composite's packaging covers the box and anything wrapping the pieces. A component can itself be a
+/// The component brings its recipe (ingredient) cost, worked out on read like every product cost. Its own packaging stays
+/// out, since the composite's packaging covers the box and anything wrapping the pieces, unless the composite includes its
+/// products' packaging (Product.IncludesComponentPackaging), which then joins the composite's. A component can itself be a
 /// composite, as long as no composite ends up containing itself.
 /// </summary>
 public class ProductComponent

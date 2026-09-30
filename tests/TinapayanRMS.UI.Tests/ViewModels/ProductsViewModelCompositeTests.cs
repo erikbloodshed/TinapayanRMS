@@ -290,6 +290,97 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
     }
 
     [Fact]
+    public async Task Including_each_products_packaging_adds_it_to_the_composites_packaging_as_one_undo_step_and_Save_keeps_it()
+    {
+        var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
+        await AddOwnPackagingAsync(ensaymadaId, "Ensaymada Bag", 1.50m);
+        var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
+        var viewModel = await CreateLoadedViewModelAsync();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentEdits.Count}");
+
+        viewModel.EditingIncludesComponentPackaging.Should().BeFalse();
+        viewModel.Costs.Packaging.Should().Be(0m, "a product's own packaging stays out until the box is ticked");
+        viewModel.Costs.PackagingTitle.Should().Be("Packaging");
+        viewModel.ComponentsCaption.Should().Contain("Its own packaging stays out");
+        viewModel.ComponentEdits.Select(r => (r.PackagingCost, r.Cost)).Should().Equal((1.50m, 15m), (0m, 20m));
+        viewModel.ComponentsCost.Should().Be(35m);
+
+        // What ticking the box does.
+        viewModel.IsComponentPackagingTicked = true;
+
+        // The Products table: each line's Cost is its recipe and its packaging, and the figure above adds them up.
+        viewModel.ComponentEdits.Select(r => (r.RecipeCost, r.PackagingCost, r.Cost)).Should().Equal((2.50m, 1.50m, 24m), (5m, 0m, 20m));
+        viewModel.ComponentsCost.Should().Be(44m);
+        PrintedComponent.From(viewModel.ComponentEdits).Should().Equal(
+            new PrintedComponent("Ensaymada", 6, 2.50m, 24m, 1.50m), new PrintedComponent("Cheese Roll", 4, 5m, 20m, 0m));
+
+        // The costing still keeps them apart: the products' lines are their recipe, and their packaging is packaging.
+        viewModel.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m));
+
+        viewModel.EditingIncludesComponentPackaging.Should().BeTrue();
+        viewModel.Costs.ComponentPackaging.Should().Be(9m, "6 bags of 1.50; Cheese Roll has none");
+        viewModel.Costs.Packaging.Should().Be(9m);
+        viewModel.Costs.OwnPackaging.Should().Be(0m, "the Packaging tab lists the composite's own lines only");
+        viewModel.Costs.PackagingTitle.Should().Be("Packaging (own and products')");
+        viewModel.Costs.SubAssemblies.Should().Be(35m, "the recipe cost is unchanged");
+        viewModel.Costs.Material.Should().Be(44m);
+        viewModel.ComponentsCaption.Should().Contain("and its own packaging");
+        (await CanSave(viewModel)).Should().BeTrue();
+
+        await viewModel.UndoCommand.Execute();
+
+        viewModel.EditingIncludesComponentPackaging.Should().BeFalse();
+        viewModel.Costs.Packaging.Should().Be(0m);
+        viewModel.ComponentEdits.Select(r => r.Cost).Should().Equal(15m, 20m);
+        viewModel.ComponentsCost.Should().Be(35m);
+        (await CanSave(viewModel)).Should().BeFalse();
+
+        await viewModel.RedoCommand.Execute();
+        viewModel.Costs.Packaging.Should().Be(9m);
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using (var dbContext = CreateDbContext())
+        {
+            (await dbContext.Products.SingleAsync(p => p.Id == boxId, Cancellation)).IncludesComponentPackaging.Should().BeTrue();
+        }
+
+        viewModel.EditingIncludesComponentPackaging.Should().BeTrue();
+        viewModel.Costs.Packaging.Should().Be(9m);
+        // The rows reloaded after Save follow the box too.
+        viewModel.ComponentEdits.Select(r => r.Cost).Should().Equal(24m, 20m);
+        (await CanSave(viewModel)).Should().BeFalse();
+
+        // A new composite starts with its products' packaging left out.
+        await viewModel.NewCompositeCommand.Execute();
+        viewModel.EditingIncludesComponentPackaging.Should().BeFalse();
+    }
+
+    /// <summary>A packaging material of one piece, costing <paramref name="cost"/>, as <paramref name="productId"/>'s own packaging line.</summary>
+    private async Task AddOwnPackagingAsync(int productId, string name, decimal cost)
+    {
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        var categoryId = await AddPackagingCategoryAsync($"{name} Boxes");
+        int materialId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var material = new RawMaterial
+            {
+                Type = RawMaterialType.Packaging, Name = name, CategoryId = categoryId, BaseUnitId = pieceId,
+                CostPerBaseUnit = cost, BufferedCostPerBaseUnit = cost,
+            };
+            dbContext.RawMaterials.Add(material);
+            await dbContext.SaveChangesAsync(Cancellation);
+            materialId = material.Id;
+        }
+
+        await new PackagingLineRepository(CreateDbContextFactory())
+            .SetLinesAsync(productId, [(materialId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
+    }
+
+    [Fact]
     public async Task A_refresh_reprices_the_lines_as_their_products_now_are_without_counting_as_an_edit()
     {
         var (ensaymadaId, cheeseRollId, doughRoleId) = await AddTwoProductsAsync();

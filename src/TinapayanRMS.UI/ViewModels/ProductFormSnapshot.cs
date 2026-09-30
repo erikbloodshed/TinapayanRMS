@@ -49,6 +49,9 @@ public sealed record ProductFormSnapshot
     /// <summary>How many finished pieces one sellable unit holds (Product.QuantityRequired); 1 by the piece.</summary>
     public required int QuantityRequired { get; init; }
 
+    /// <summary>A composite's products bring their own packaging too (Product.IncludesComponentPackaging).</summary>
+    public required bool IncludesComponentPackaging { get; init; }
+
     /// <summary>By id: assigning the category object runs the picker's "add new category" sentinel.</summary>
     public required int? CategoryId { get; init; }
     public required string CloneName { get; init; }
@@ -108,6 +111,7 @@ public sealed record ProductFormSnapshot
         && Description == other.Description
         && CurrentPrice == other.CurrentPrice
         && QuantityRequired == other.QuantityRequired
+        && IncludesComponentPackaging == other.IncludesComponentPackaging
         && CategoryId == other.CategoryId
         && CloneName == other.CloneName
         && Costing == other.Costing

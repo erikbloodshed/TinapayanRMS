@@ -135,9 +135,26 @@ public static class CompositeProductRules
         }
     }
 
+    /// <summary>Only a composite's products can bring their packaging: a product of sub-assemblies holds no products.</summary>
+    public static void EnsureComponentPackagingOnComposite(bool isComposite, bool includesComponentPackaging)
+    {
+        if (!isComposite && includesComponentPackaging)
+        {
+            throw new InvalidOperationException(
+                "Only a composite product can include the packaging of the products in it.");
+        }
+    }
+
     /// <summary>
     /// What one line brings into its composite's cost: <paramref name="quantity"/> of the product's sellable units at its
     /// recipe (sub-assemblies, ingredients) cost for one, its packaging left out.
     /// </summary>
     public static decimal CalculateComponentCost(decimal recipeCostPerUnit, int quantity) => recipeCostPerUnit * quantity;
+
+    /// <summary>
+    /// What one line brings into its composite's packaging when the composite includes its products' packaging
+    /// (Product.IncludesComponentPackaging): <paramref name="quantity"/> of the product's sellable units at its packaging
+    /// cost for one.
+    /// </summary>
+    public static decimal CalculateComponentPackagingCost(decimal packagingCostPerUnit, int quantity) => packagingCostPerUnit * quantity;
 }

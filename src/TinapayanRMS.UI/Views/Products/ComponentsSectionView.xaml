@@ -7,7 +7,8 @@
         A composite product's Products tab: the products it holds, and how many of each, typed straight into the table as
         the Packaging tab's lines are. The add row at the bottom starts a line, Delete removes the selected one, and lines
         are dragged into order. Each line brings its product's recipe cost (Recipe Cost, for one of its sellable units)
-        times its Qty; the product's own packaging stays out.
+        times its Qty; the product's own packaging stays out unless Include each product's packaging is ticked. Then the
+        Packaging Cost column shows and each line's Cost adds it in, though the costing still counts it as packaging.
     -->
     <StackPanel Margin="8">
         <!-- What a line brings, and what the products come to at the far right, as the Packaging tab has its cost -->
@@ -19,7 +20,7 @@
             <TextBlock Style="{StaticResource CaptionStyle}"
                        VerticalAlignment="Center"
                        Margin="0,0,12,10"
-                       Text="Each product brings its recipe (ingredients) cost for how many of it go in. Its own packaging stays out: this product's Packaging covers the box and anything wrapping the pieces. A topping or filling over the whole goes on a tab of its own, with Add Sub-Assembly." />
+                       Text="{Binding ComponentsCaption}" />
             <TextBlock Grid.Column="1"
                        Style="{StaticResource CaptionStyle}"
                        VerticalAlignment="Center"
@@ -52,6 +53,7 @@
                                controls:GridAddNewRow.DropWhenUntouched="True"
                                controls:AutoCompleteDropDown.IsEnabled="True"
                                controls:GridAddNewRow.ItemFactory="{Binding NewComponentRow}"
+                               controls:OptionalColumns.Show="{Binding EditingIncludesComponentPackaging}"
                                Height="200">
             <syncfusion:SfDataGrid.Columns>
                 <!--
@@ -86,15 +88,31 @@
                                         NumberDecimalDigits="2"
                                         AllowNullValue="True"
                                         AllowEditing="False" />
+                <!-- The product's own packaging for one of it: shown only while Include each product's packaging is ticked -->
+                <controls:NumericColumn MappingName="PackagingCost"
+                                        HeaderText="Packaging Cost"
+                                        Width="120"
+                                        NumberDecimalDigits="2"
+                                        AllowNullValue="True"
+                                        AllowEditing="False"
+                                        IsHidden="True"
+                                        controls:OptionalColumns.IsOptional="True" />
+                <!-- Qty × Recipe Cost, plus Qty × Packaging Cost while the products' packaging is included -->
                 <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="104" NumberDecimalDigits="2" AllowEditing="False" />
             </syncfusion:SfDataGrid.Columns>
         </syncfusion:SfDataGrid>
+
+        <!-- Whether each product brings its own packaging too, on Remove Line's row: each tick is one undo step -->
 
         <Grid Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
+            <CheckBox VerticalAlignment="Center"
+                      Content="Include each product's packaging"
+                      ToolTip="Each product's own packaging, times how many of it go in, joins this product's Packaging on the Costing tab. Labor, overhead and administrative aren't charged on it."
+                      IsChecked="{Binding IsComponentPackagingTicked}" />
             <syncfusion:ButtonAdv Grid.Column="1"
                                   Label="Remove Line"
                                   IconTemplate="{StaticResource RemoveIconTemplate}"

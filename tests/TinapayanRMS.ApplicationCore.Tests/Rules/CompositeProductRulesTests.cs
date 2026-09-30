@@ -169,4 +169,21 @@ public class CompositeProductRulesTests
     {
         CompositeProductRules.CalculateComponentCost(12.40m, 6).Should().Be(74.40m);
     }
+
+    [Fact]
+    public void A_lines_packaging_is_its_quantity_at_the_products_packaging_cost()
+    {
+        CompositeProductRules.CalculateComponentPackagingCost(1.50m, 6).Should().Be(9m);
+    }
+
+    [Fact]
+    public void EnsureComponentPackagingOnComposite_refuses_it_for_a_product_of_sub_assemblies_only()
+    {
+        var single = () => CompositeProductRules.EnsureComponentPackagingOnComposite(isComposite: false, includesComponentPackaging: true);
+
+        single.Should().Throw<InvalidOperationException>().WithMessage("Only a composite product can include the packaging of the products in it.");
+        CompositeProductRules.EnsureComponentPackagingOnComposite(isComposite: true, includesComponentPackaging: true);
+        CompositeProductRules.EnsureComponentPackagingOnComposite(isComposite: true, includesComponentPackaging: false);
+        CompositeProductRules.EnsureComponentPackagingOnComposite(isComposite: false, includesComponentPackaging: false);
+    }
 }

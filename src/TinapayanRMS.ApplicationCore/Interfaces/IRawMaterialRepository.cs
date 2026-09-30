@@ -21,7 +21,7 @@ public interface IRawMaterialRepository
     /// made ingredient it's in and linked ingredient cut from it, however deep, and every composite holding such a product,
     /// directly or through another composite. Packaging counts through a product's own packaging lines and a packaging set
     /// its packaging links, and so does every product whose packaging links that product's, down the chain; a composite's
-    /// products bring no packaging into it.
+    /// products bring their packaging into it only when it includes theirs, however deep.
     /// </summary>
     Task<IReadOnlyList<LinkingProduct>> GetUsedByAsync(int id, CancellationToken cancellationToken);
 

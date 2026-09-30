@@ -16,23 +16,26 @@ public sealed class ProductComponentRow : ReactiveObject
     /// <summary>Looks up a product by id as the screen has it.</summary>
     private readonly Func<int, Product?>? _findProduct;
 
-    /// <summary>Looks up a product's recipe cost by id, as the screen last read it; null while it hasn't been.</summary>
-    private readonly Func<int, decimal?>? _findRecipeCost;
+    /// <summary>Looks up a product's recipe and packaging costs by id, as the screen last read them; null while it hasn't.</summary>
+    private readonly Func<int, UnitCosts?>? _findCosts;
 
     public ProductComponentRow()
     {
     }
 
     /// <summary>
-    /// A row that finds its product, and the product's recipe cost if the screen has read it, as soon as one is picked.
+    /// A row that finds its product, and the product's costs if the screen has read them, as soon as one is picked.
     /// The grid's add row edits one of these (controls:GridAddNewRow.ItemFactory): until it's committed it isn't in the
     /// screen's rows, so the screen can't resolve it.
     /// </summary>
-    public ProductComponentRow(Func<int, Product?> findProduct, Func<int, decimal?> findRecipeCost)
+    public ProductComponentRow(Func<int, Product?> findProduct, Func<int, UnitCosts?> findCosts)
     {
         _findProduct = findProduct;
-        _findRecipeCost = findRecipeCost;
+        _findCosts = findCosts;
     }
+
+    /// <summary>What one sellable unit of a product brings, at the screen's cost basis: its recipe cost and its packaging cost.</summary>
+    public readonly record struct UnitCosts(decimal Recipe, decimal Packaging);
 
     private int? _componentProductId;
     public int? ComponentProductId
@@ -44,7 +47,7 @@ public sealed class ProductComponentRow : ReactiveObject
             if (_findProduct is not null)
             {
                 Product = value is { } id ? _findProduct(id) : null;
-                RecipeCost = value is { } costId ? _findRecipeCost!(costId) : null;
+                SetCosts(value is { } costId ? _findCosts!(costId) : null);
             }
         }
     }
@@ -72,7 +75,7 @@ public sealed class ProductComponentRow : ReactiveObject
         set
         {
             this.RaiseAndSetIfChanged(ref _quantity, value);
-            this.RaisePropertyChanged(nameof(Cost));
+            RaiseCostsChanged();
             this.RaisePropertyChanged(nameof(LineName));
         }
     }
@@ -88,12 +91,61 @@ public sealed class ProductComponentRow : ReactiveObject
         set
         {
             this.RaiseAndSetIfChanged(ref _recipeCost, value);
+            RaiseCostsChanged();
+        }
+    }
+
+    private decimal? _packagingCost;
+    /// <summary>
+    /// The product's own packaging for one sellable unit, as it's saved (the Packaging figure on its Costing tab), which
+    /// the line brings only while the composite includes its products' packaging. Null until the screen has read it.
+    /// </summary>
+    public decimal? PackagingCost
+    {
+        get => _packagingCost;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _packagingCost, value);
+            RaiseCostsChanged();
+        }
+    }
+
+    private bool _includesPackaging;
+    /// <summary>The composite includes its products' packaging (its Products tab's checkbox): <see cref="Cost"/> adds it in.</summary>
+    public bool IncludesPackaging
+    {
+        get => _includesPackaging;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _includesPackaging, value);
             this.RaisePropertyChanged(nameof(Cost));
         }
     }
 
-    /// <summary>What the line brings into the composite's cost: its quantity at the product's recipe cost.</summary>
-    public decimal Cost => CompositeProductRules.CalculateComponentCost(RecipeCost ?? 0m, Quantity ?? 0);
+    /// <summary>What the line brings into the composite's recipe cost: its quantity at the product's recipe cost.</summary>
+    public decimal RecipeCostTotal => CompositeProductRules.CalculateComponentCost(RecipeCost ?? 0m, Quantity ?? 0);
+
+    /// <summary>What the line's products' packaging comes to: its quantity at the product's packaging cost.</summary>
+    public decimal PackagingCostTotal => CompositeProductRules.CalculateComponentPackagingCost(PackagingCost ?? 0m, Quantity ?? 0);
+
+    /// <summary>
+    /// The line's Cost column: its quantity at the product's recipe cost, and at its packaging cost too while the composite
+    /// includes its products' packaging. The two still go to different rows of the costing (recipe, packaging).
+    /// </summary>
+    public decimal Cost => RecipeCostTotal + (IncludesPackaging ? PackagingCostTotal : 0m);
+
+    private void SetCosts(UnitCosts? costs)
+    {
+        RecipeCost = costs?.Recipe;
+        PackagingCost = costs?.Packaging;
+    }
+
+    private void RaiseCostsChanged()
+    {
+        this.RaisePropertyChanged(nameof(RecipeCostTotal));
+        this.RaisePropertyChanged(nameof(PackagingCostTotal));
+        this.RaisePropertyChanged(nameof(Cost));
+    }
 
     /// <summary>What the Costing tab and the printout call the line: "Ensaymada × 6".</summary>
     public string LineName => LineNameFor(Product?.Name ?? string.Empty, Quantity ?? 0);
@@ -106,23 +158,23 @@ public sealed class ProductComponentRow : ReactiveObject
 
     /// <summary>
     /// Points each row at its product in <paramref name="productsById"/> (the screen's current copies, so a renamed
-    /// product shows its new name) and at its recipe cost in <paramref name="costsById"/>, or none while it hasn't been
+    /// product shows its new name) and at its costs in <paramref name="costsById"/>, or none while they haven't been
     /// read. A row whose product isn't there keeps the one it has, if it's the same.
     /// </summary>
     public static void Resolve(
-        IEnumerable<ProductComponentRow> rows, IReadOnlyDictionary<int, Product> productsById, IReadOnlyDictionary<int, decimal> costsById)
+        IEnumerable<ProductComponentRow> rows, IReadOnlyDictionary<int, Product> productsById, IReadOnlyDictionary<int, UnitCosts> costsById)
     {
         foreach (var row in rows)
         {
             if (row.ComponentProductId is not { } id)
             {
                 row.Product = null;
-                row.RecipeCost = null;
+                row.SetCosts(null);
                 continue;
             }
 
             row.Product = productsById.GetValueOrDefault(id) ?? (row.Product?.Id == id ? row.Product : null);
-            row.RecipeCost = costsById.TryGetValue(id, out var cost) ? cost : null;
+            row.SetCosts(costsById.TryGetValue(id, out var costs) ? costs : null);
         }
     }
 

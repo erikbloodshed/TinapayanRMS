@@ -103,7 +103,7 @@ Other terms you'll see on a product:
 A **composite product** is made of two or more other products, such as a *Pasalubong Box* of 6 Ensaymada and 4 Cheese Rolls. Its recipe is a list of products and how many of each go in. It has its own packaging and its own costing.
 
 - Each product in it brings its **recipe cost**: what its sub-assemblies (ingredients) cost for one of it, as that product's own Costing tab shows.
-- A product's packaging stays out. The composite's own packaging covers the box and anything wrapping the pieces in it.
+- A product's packaging stays out. The composite's own packaging covers the box and anything wrapping the pieces in it. If the pieces go into the box already in their own packaging, tick **Include each product's packaging** on the composite's Products tab. Each product's packaging then joins the composite's.
 - It can also have sub-assemblies of its own, such as icing over a whole party box, but only in **product-owned** roles (see [Roles](#roles)). With the usual roles that's Topping, Filling and Pan Greasing, never Dough or Sponge. Its sections are sized for one whole composite.
 - A composite can hold another composite, but it can never end up holding itself.
 - A composite is always one sellable unit, so it has no **Quantity Required**.
@@ -340,7 +340,7 @@ This tab is a calculator. Type a **Use Quantity**, pick a unit and press **Calcu
 
 ### Used By tab
 
-This tab lists every product the material ends up in as tiles, including products that use it indirectly, such as through a made ingredient, a linked part or a packaging set. An ingredient's list includes every composite product holding a product that uses it. Click a tile to open that product.
+This tab lists every product the material ends up in as tiles, including products that use it indirectly, such as through a made ingredient, a linked part or a packaging set. An ingredient's list includes every composite product holding a product that uses it. A packaging material's list includes every composite product that holds such a product and has **Include each product's packaging** ticked. Click a tile to open that product.
 
 ### Price History tab
 
@@ -413,7 +413,7 @@ A composite product shows a small icon after its name.
 
 The header has the product's name and **New**, **Save**, **Undo**, **Redo**, **Revert**, **Print**, **Unbuffered** and **Delete**. **New** starts a product. The arrow beside it also offers **New composite product**. Below them are these figures, all **per sellable unit**:
 
-- **Material Cost**: sub-assemblies plus packaging. For a composite product, its products' recipe cost and its own sub-assemblies, plus its own packaging.
+- **Material Cost**: sub-assemblies plus packaging. For a composite product, its products' recipe cost and its own sub-assemblies, plus its own packaging, and its products' packaging too when it includes theirs.
 - **Base Cost**: materials plus labour, overhead and administrative.
 - **Current Price**: what the shop charges now.
 - **Markup %**: what the current price actually earns on the base cost, with VAT taken out. Compare it with the markup you set on the Costing tab.
@@ -496,9 +496,12 @@ The **Products** table is typed into, like the Packaging table:
 - **Product**: type part of a name and pick it. The list leaves out the product itself, and any composite that holds it.
 - **Qty**: how many of that product go in, as a whole number. It counts the product's sellable units: pieces for a product sold by the piece, and whole boxes for one like *Ensaymada Box of 8*. To put in loose pieces, pick the product sold by the piece.
 - **Recipe Cost**: what one of that product brings, which is its recipe (ingredients) cost for one sellable unit.
-- **Cost**: Qty × Recipe Cost.
+- **Packaging Cost**: shown only while **Include each product's packaging** is ticked. It's that product's own packaging for one sellable unit, the **Packaging** figure on its Costing tab.
+- **Cost**: Qty × Recipe Cost. While **Include each product's packaging** is ticked, it's Qty × (Recipe Cost + Packaging Cost).
 
-Each product goes on one line. Drag lines into order, and use **Remove Line** to take one out. The figure at the top right is what the products come to together, without the composite's own sections.
+Each product goes on one line. Drag lines into order, and use **Remove Line** to take one out. The figure at the top right is the total of the Cost column, without the composite's own sections.
+
+**Include each product's packaging**, on the same row as Remove Line, is off for a new composite. Tick it when the products go into the composite already in their own packaging, such as an Ensaymada in its bag. The **Packaging Cost** column then appears, and each line's **Cost** adds its packaging in. On the Costing tab, that packaging goes into the composite's **Packaging** row, not into its products' recipe cost, so Labor, Overhead and Admin aren't taken of it. The products listed under **Products (ingredients)** there still show their recipe cost only. The Packaging tab still shows only the composite's own packaging. Ticking or unticking the box is one step for **Undo**, and **Save** keeps it. A printed composite's Products table has the Packaging Cost column too while the box is ticked.
 
 **Add Sub-Assembly** works as it does for any product, but a composite is offered only the **product-owned** roles and **Packaging**. A section's piece size is for one whole composite: a Topping with a **Weight/piece** of 100 g puts 100 g on each box. **Delete Sub-Assembly** takes the section showing out, or the packaging on the Packaging tab.
 
@@ -520,7 +523,7 @@ Under each metric is its share of the price. VAT has a percentage box only, with
 On the right, the **Costing Summary** lists each component with its amount and its **% of Price**:
 
 - **Sub-assemblies (ingredients)**, with each sub-assembly listed under it. For a composite product this row is **Products (ingredients)**, with each product and its quantity listed under it, such as *Ensaymada × 6*. When the composite has sections of its own, the row is **Products and sub-assemblies (ingredients)** and lists them after the products. Its Labor, Overhead and Admin are a percentage of that row.
-- **Packaging**
+- **Packaging**. For a composite product that includes its products' packaging, this row is **Packaging (own and products')**.
 - **Labor**, **Overhead** and **Administrative**, each labelled with its percentage
 - **Subtotal (base cost)**
 - **Markup**
@@ -608,6 +611,7 @@ A purchased ingredient's price changes
 
 A packaging material's price changes
   → every product and packaging set that uses it
+    → every composite product that includes those products' packaging
 ```
 
 This happens as soon as you save. A product already open on another tab shows the new figures when you switch back to it.
@@ -666,8 +670,8 @@ A **section's cost per piece**, for comparison: a 1,000 g dough costing 50.00, w
 
 A composite product is priced like any other product, with its products in place of sub-assemblies:
 
-1. **Products** = the sum of its lines. Each line is its Qty × the product's recipe cost for one sellable unit, which is the **Sub-assemblies** figure on that product's own Costing tab. The products' packaging isn't included. The composite's own sections, such as a Topping, are added at their cost per piece, since one piece is one whole composite.
-2. **Packaging** = the composite's own packaging.
+1. **Products** = the sum of its lines. Each line is its Qty × the product's recipe cost for one sellable unit, which is the **Sub-assemblies** figure on that product's own Costing tab. The products' packaging isn't included here. The composite's own sections, such as a Topping, are added at their cost per piece, since one piece is one whole composite.
+2. **Packaging** = the composite's own packaging. With **Include each product's packaging** ticked, add each line's Qty × the product's **Packaging** figure on its own Costing tab. A composite held in another brings all of its packaging this way, its products' included if it includes theirs.
 3. **Labor**, **Overhead** and **Administrative** = their percentage of step 1: its products, and its own sections if it has any.
 4. Then the base cost, markup, VAT and selling price, as above.
 
@@ -686,7 +690,9 @@ For example, a *Pasalubong Box* holds 6 Ensaymada, whose recipe costs **2.50** e
 | VAT | 12% of 79.30 | 9.52 |
 | **Selling price** | | **88.82** |
 
-With the same percentages as its products and no packaging or sections of its own, a composite is priced at exactly what its products are priced at together.
+With the same percentages as its products and no packaging or sections of its own, a composite is priced at exactly what its products are priced at together. If its products have packaging of their own, that holds only with **Include each product's packaging** ticked.
+
+Now suppose each Ensaymada goes into the box in its own bag, costing **1.50**, and **Include each product's packaging** is ticked. Packaging becomes 12.00 + 6 × 1.50 = **21.00**. Labor, Overhead and Administrative stay at 8.75, 3.50 and 1.75, since packaging isn't part of step 1. So the base cost is 35 + 21 + 8.75 + 3.50 + 1.75 = **70.00**, the price before VAT is 70.00 × 1.30 = 91.00, and the selling price is 91.00 × 1.12 = **101.92**.
 
 Give the same box an icing topping that costs **5.00** for one box, and step 1 becomes 35.00 + 5.00 = **40.00**. Labor, Overhead and Administrative are then taken of 40.00. A composite held in another composite brings its whole step 1, topping included.
 
@@ -734,7 +740,7 @@ Right-click the category's folder in the Products list and choose **Print Folder
 1. In the Products header, press the arrow beside **New** and choose **New composite product**. Or right-click a folder in the list and choose **New Composite Product Here**.
 2. Type its **Product Name**.
 3. On the **Products** tab, add a line for each product: pick the product, then type how many go in under **Qty**.
-4. Use **Add Sub-Assembly** with the **Packaging** role for the box, and for anything wrapping the pieces inside it. The products' own packaging isn't included.
+4. Use **Add Sub-Assembly** with the **Packaging** role for the box, and for anything wrapping the pieces inside it. The products' own packaging isn't included. If the pieces go in already in their own packaging, tick **Include each product's packaging** under the Products table instead of listing it again.
 5. For a topping or filling over the whole composite, use **Add Sub-Assembly** in that role. Its **Weight/piece** is what one whole composite takes.
 6. Check the **Costing** tab, then press **Save**. A composite needs at least two different products.
 

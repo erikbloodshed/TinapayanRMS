@@ -75,6 +75,28 @@ public class ProductPrintLayoutTests
     });
 
     [Fact]
+    public void A_composite_including_its_products_packaging_prints_a_Packaging_Cost_column_and_names_its_packaging_row() => StaThread.Run(() =>
+    {
+        var printout = SamplePrintouts.Composite() with
+        {
+            Components = [new PrintedComponent("Ensaymada", 6, 2.50m, 24m, 1.50m), new PrintedComponent("Cheese Roll", 4, 5m, 20m, 0m)],
+            Costs = new ProductCostSummary(
+                [("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m)], 1, [30m], 25m, 10m, 5m, 30m, 12m, 120m, isComposite: true, componentPackaging: 9m),
+        };
+
+        var texts = AllTexts(new ProductPrintLayout(printout, includeRecipe: true, includeCosting: true, A4));
+
+        texts.Should().ContainInConsecutiveOrder("Products", "Product", "Qty", "Recipe Cost", "Packaging Cost", "Cost");
+        texts.Should().ContainInConsecutiveOrder("Ensaymada", Figure(6m, "N0"), Figure(2.50m, "N2"), Figure(1.50m, "N2"), Figure(24m, "N2"));
+        texts.Should().ContainInConsecutiveOrder("Total", string.Empty, string.Empty, string.Empty, Figure(44m, "N2"));
+        texts.Should().Contain("Packaging (own and products')");
+
+        // Without the costing, neither cost column prints.
+        var kitchen = AllTexts(new ProductPrintLayout(printout, includeRecipe: true, includeCosting: false, A4));
+        kitchen.Should().NotContain("Packaging Cost");
+    });
+
+    [Fact]
     public void A_composites_own_topping_prints_after_its_products_and_its_costing_names_both() => StaThread.Run(() =>
     {
         var composite = SamplePrintouts.Composite();

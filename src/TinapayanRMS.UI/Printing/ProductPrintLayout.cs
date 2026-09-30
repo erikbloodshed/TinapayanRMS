@@ -41,6 +41,7 @@ public sealed class ProductPrintLayout
     private static readonly GridLength[] PackagingColumns = [new(1, GridUnitType.Star), new(70), new(64), new(90), new(90)];
     private static readonly GridLength[] PackagingColumnsWithoutCosts = [new(1, GridUnitType.Star), new(70), new(64)];
     private static readonly GridLength[] ComponentColumns = [new(1, GridUnitType.Star), new(70), new(100), new(90)];
+    private static readonly GridLength[] ComponentColumnsWithPackaging = [new(1, GridUnitType.Star), new(70), new(100), new(110), new(90)];
     private static readonly GridLength[] ComponentColumnsWithoutCosts = [new(1, GridUnitType.Star), new(70)];
     private static readonly GridLength[] CostingColumns = [new(1, GridUnitType.Star), new(140), new(90)];
     private static readonly GridLength[] ContentsColumns = [new(1, GridUnitType.Star), new(240), new(56)];
@@ -264,19 +265,24 @@ public sealed class ProductPrintLayout
     private T[] PackagingCells<T>(T material, T qty, T unit, T unitCost, T cost) =>
         _includeCosting ? [material, qty, unit, unitCost, cost] : [material, qty, unit];
 
-    /// <summary>A composite's Products table's cells: a product's recipe cost and its line's cost only while the costing is printed.</summary>
-    private T[] ComponentCells<T>(T product, T qty, T recipeCost, T cost) =>
-        _includeCosting ? [product, qty, recipeCost, cost] : [product, qty];
+    /// <summary>
+    /// A composite's Products table's cells: a product's recipe cost and its line's cost only while the costing is printed,
+    /// and its packaging cost between them when the composite includes its products' packaging.
+    /// </summary>
+    private T[] ComponentCells<T>(bool withPackaging, T product, T qty, T recipeCost, T packagingCost, T cost) =>
+        !_includeCosting ? [product, qty] : withPackaging ? [product, qty, recipeCost, packagingCost, cost] : [product, qty, recipeCost, cost];
 
     private GridLength[] RecipeTable => _includeCosting ? RecipeColumns : RecipeColumnsWithoutCosts;
 
     private GridLength[] PackagingTable => _includeCosting ? PackagingColumns : PackagingColumnsWithoutCosts;
 
-    private GridLength[] ComponentTable => _includeCosting ? ComponentColumns : ComponentColumnsWithoutCosts;
+    private GridLength[] ComponentTable(bool withPackaging) =>
+        !_includeCosting ? ComponentColumnsWithoutCosts : withPackaging ? ComponentColumnsWithPackaging : ComponentColumns;
 
     /// <summary>
     /// A composite's products, as its Products tab shows them: each product, how many go in, and with the costing what one
-    /// of it brings and what the line comes to, then their total: the costing's Products (ingredients), less any sections.
+    /// of it brings and what the line comes to, then their total: the costing's Products (ingredients), less any sections,
+    /// and with the products' packaging when the composite includes it, which then has a column of its own.
     /// </summary>
     private void AddComponents(IReadOnlyList<PrintedComponent> components, int table)
     {
@@ -287,15 +293,20 @@ public sealed class ProductPrintLayout
         }
 
         Add(repeat => SectionHeading("Products", null, repeat), keepWithNext: true, table: table, repeats: true);
-        Add(_ => HeaderRow(ComponentTable, ComponentCells("Product", "Qty", "Recipe Cost", "Cost")), keepWithNext: true, table: table, repeats: true);
+        // Every line has a packaging cost, or none does: the composite includes its products' packaging or it doesn't.
+        var withPackaging = components.Any(c => c.PackagingCost is not null);
+        var columns = ComponentTable(withPackaging);
+        Add(_ => HeaderRow(columns, ComponentCells(withPackaging, "Product", "Qty", "Recipe Cost", "Packaging Cost", "Cost")), keepWithNext: true, table: table, repeats: true);
         for (var i = 0; i < components.Count; i++)
         {
             var line = components[i];
             Add(
-                _ => Row(ComponentTable, ComponentCells(
+                _ => Row(columns, ComponentCells(
+                    withPackaging,
                     Label(line.Product),
                     Figure(line.Quantity is { } qty ? qty.ToString("N0", CultureInfo.CurrentCulture) : "—"),
                     Figure(Money(line.RecipeCost)),
+                    Figure(Money(line.PackagingCost ?? 0m)),
                     Figure(Money(line.Cost)))),
                 keepWithNext: _includeCosting && i == components.Count - 1,
                 table: table);
@@ -304,7 +315,12 @@ public sealed class ProductPrintLayout
         // The total is only a cost, so without the costing the table ends at its last line.
         if (_includeCosting)
         {
-            Add(_ => TotalRow(ComponentTable, "Total", string.Empty, string.Empty, Money(components.Sum(c => c.Cost))), table: table);
+            var total = Money(components.Sum(c => c.Cost));
+            Add(
+                _ => withPackaging
+                    ? TotalRow(columns, "Total", string.Empty, string.Empty, string.Empty, total)
+                    : TotalRow(columns, "Total", string.Empty, string.Empty, total),
+                table: table);
         }
     }
 
@@ -389,7 +405,7 @@ public sealed class ProductPrintLayout
             Add(_ => PartRow(line.Name, line.Cost, line.Share, isLast), table: table, keepTogether: CostingGroup);
         }
 
-        AddCost("Packaging", costs.Packaging, costs.PackagingShare);
+        AddCost(costs.PackagingTitle, costs.Packaging, costs.PackagingShare);
         AddCost($"Labor ({costs.LaborPercent:0.##}% of {costs.PartsBase})", costs.Labor, costs.LaborShare);
         AddCost($"Overhead ({costs.OverheadPercent:0.##}% of {costs.PartsBase})", costs.Overhead, costs.OverheadShare);
         AddCost($"Administrative ({costs.AdministrativePercent:0.##}% of {costs.PartsBase})", costs.Administrative, costs.AdministrativeShare);

@@ -147,6 +147,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             CurrentPrice = product.CurrentPrice,
             Stage = product.Stage,
             IsComposite = product.IsComposite,
+            IncludesComponentPackaging = product.IncludesComponentPackaging,
         };
         var stored = fields.Id == 0
             ? await AddAsync(dbContext, fields, cancellationToken)
@@ -251,6 +252,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     internal static async Task<Product> AddAsync(TinapayanRMSDbContext dbContext, Product product, CancellationToken cancellationToken)
     {
         CompositeProductRules.EnsureOneUnit(product.IsComposite, product.QuantityRequired);
+        CompositeProductRules.EnsureComponentPackagingOnComposite(product.IsComposite, product.IncludesComponentPackaging);
         product.UpdatedAt = DateTime.Now;
         dbContext.Products.Add(product);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -258,9 +260,9 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     }
 
     /// <summary>
-    /// Copies the name, description, category, quantity required and current price onto the stored product, stamps it as
-    /// saved now, and saves it. Returns the stored product, tracked. Whether it's a composite can't change, and a composite
-    /// stays one sellable unit.
+    /// Copies the name, description, category, quantity required, current price and whether a composite's products bring
+    /// their packaging onto the stored product, stamps it as saved now, and saves it. Returns the stored product, tracked.
+    /// Whether it's a composite can't change, and a composite stays one sellable unit.
     /// </summary>
     internal static async Task<Product> UpdateAsync(TinapayanRMSDbContext dbContext, Product product, CancellationToken cancellationToken)
     {
@@ -269,6 +271,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 
         CompositeProductRules.EnsureKindUnchanged(existing.IsComposite, product.IsComposite);
         CompositeProductRules.EnsureOneUnit(existing.IsComposite, product.QuantityRequired);
+        CompositeProductRules.EnsureComponentPackagingOnComposite(existing.IsComposite, product.IncludesComponentPackaging);
 
         var oldName = existing.Name;
         existing.Name = product.Name;
@@ -276,6 +279,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         existing.CategoryId = product.CategoryId;
         existing.QuantityRequired = product.QuantityRequired;
         existing.CurrentPrice = product.CurrentPrice;
+        existing.IncludesComponentPackaging = product.IncludesComponentPackaging;
         existing.UpdatedAt = DateTime.Now;
 
         await dbContext.SaveChangesAsync(cancellationToken);
