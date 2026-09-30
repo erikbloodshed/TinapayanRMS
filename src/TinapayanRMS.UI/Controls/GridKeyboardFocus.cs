@@ -4,6 +4,7 @@ using System.Windows.Threading;
 using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.UI.Xaml.Grid.Helpers;
 using Syncfusion.UI.Xaml.ScrollAxis;
+using Syncfusion.UI.Xaml.TreeGrid;
 
 namespace TinapayanRMS.UI.Controls;
 
@@ -33,13 +34,16 @@ public static class GridKeyboardFocus
 
         _registered = true;
         EventManager.RegisterClassHandler(typeof(SfDataGrid), FrameworkElement.LoadedEvent, new RoutedEventHandler(HideFocusRectangle));
+
+        // The read-only tree grids (Products' Scaling tab) lose the rectangle too; they have no current cell to place.
+        EventManager.RegisterClassHandler(typeof(SfTreeGrid), FrameworkElement.LoadedEvent, new RoutedEventHandler(HideFocusRectangle));
         EventManager.RegisterClassHandler(
             typeof(SfDataGrid), UIElement.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(EnterOnCell));
     }
 
     private static void HideFocusRectangle(object sender, RoutedEventArgs e)
     {
-        var grid = (SfDataGrid)sender;
+        var grid = (FrameworkElement)sender;
         if (grid.ReadLocalValue(FrameworkElement.FocusVisualStyleProperty) == DependencyProperty.UnsetValue)
         {
             grid.FocusVisualStyle = null;

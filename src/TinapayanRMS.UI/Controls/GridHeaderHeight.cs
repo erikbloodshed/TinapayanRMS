@@ -1,11 +1,13 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Controls;
 using Syncfusion.UI.Xaml.Grid;
+using Syncfusion.UI.Xaml.TreeGrid;
 
 namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
-/// Every SfDataGrid's header row is as tall as its text needs (2026-09-27, at the user's request). The Windows11Light
+/// Every SfDataGrid's and SfTreeGrid's header row is as tall as its text needs (2026-09-27, at the user's request). The Windows11Light
 /// theme's grid style fixes it at 24px, sized for its own 12px body text; since the fonts went up to 14px (App's theme
 /// settings), a header's text needs 19px plus the header cell's 3px padding above and below and its 1px bottom border,
 /// so descenders were cut off ("Ingredient" read "Inqredient").
@@ -36,8 +38,11 @@ public static class GridHeaderHeight
         }
 
         _registered = true;
-        EventManager.RegisterClassHandler(typeof(SfDataGrid), FrameworkElement.LoadedEvent, new RoutedEventHandler(FitHeader));
-        EventManager.RegisterClassHandler(typeof(SfDataGrid), FrameworkElement.SizeChangedEvent, new SizeChangedEventHandler(FitHeader));
+        foreach (var gridType in (Type[])[typeof(SfDataGrid), typeof(SfTreeGrid)])
+        {
+            EventManager.RegisterClassHandler(gridType, FrameworkElement.LoadedEvent, new RoutedEventHandler(FitHeader));
+            EventManager.RegisterClassHandler(gridType, FrameworkElement.SizeChangedEvent, new SizeChangedEventHandler(FitHeader));
+        }
     }
 
     /// <summary>
@@ -49,7 +54,7 @@ public static class GridHeaderHeight
 
     private static void FitHeader(object sender, RoutedEventArgs e)
     {
-        var grid = (SfDataGrid)sender;
+        var grid = (SfGridBase)sender;
         if ((bool)grid.GetValue(IsFittedProperty)
             || grid.ReadLocalValue(SfGridBase.HeaderRowHeightProperty) != DependencyProperty.UnsetValue
             || FirstHeaderCell(grid) is not { } cell)
@@ -61,12 +66,13 @@ public static class GridHeaderHeight
         grid.HeaderRowHeight = HeightFor(cell.FontFamily, cell.FontSize, cell.Padding, cell.BorderThickness);
     }
 
-    private static GridHeaderCellControl? FirstHeaderCell(DependencyObject node)
+    /// <summary>A data grid's header cell, or a tree grid's (a TreeGridHeaderCell, which isn't a GridHeaderCellControl).</summary>
+    private static Control? FirstHeaderCell(DependencyObject node)
     {
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
         {
             var child = VisualTreeHelper.GetChild(node, i);
-            if ((child as GridHeaderCellControl ?? FirstHeaderCell(child)) is { } cell)
+            if ((child is GridHeaderCellControl or TreeGridHeaderCell ? (Control)child : FirstHeaderCell(child)) is { } cell)
             {
                 return cell;
             }

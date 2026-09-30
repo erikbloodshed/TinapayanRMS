@@ -34,6 +34,19 @@ public class IngredientBomLineRepository(
                 splitOn: "Id")).AsList(),
             cancellationToken);
 
+    public Task<IReadOnlyList<IngredientBomLine>> GetAllAsync(CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync<IReadOnlyList<IngredientBomLine>>(
+            async dbContext => (await dbContext.Connection().QueryAsync<IngredientBomLine>(
+                dbContext.Command(
+                    $"""
+                    SELECT {Columns.Of<IngredientBomLine>("l")}
+                    FROM IngredientBomLines l
+                    ORDER BY l.IngredientId, l.SortOrder, l.Id
+                    """,
+                    null,
+                    cancellationToken))).AsList(),
+            cancellationToken);
+
     public async Task SetLinesAsync(
         int ingredientId, IReadOnlyList<(int ComponentIngredientId, decimal Grams)> lines, CancellationToken cancellationToken)
     {

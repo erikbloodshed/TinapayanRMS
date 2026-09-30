@@ -59,8 +59,8 @@
 
             <Border Grid.Row="1" Margin="0,4,0,0" Style="{StaticResource CardStyle}" Padding="4">
                 <!--
-                    Every tab but Clone is part of the one form Save writes, so a new product shows them
-                    too. Fixed tabs, like Raw Materials': nothing to close or reopen, and nothing to drag into
+                    Every tab but Scaling and Clone is part of the one form Save writes, so a new product shows them
+                    too (Scaling only works the recipe out). Fixed tabs, like Raw Materials': nothing to close or reopen, and nothing to drag into
                     another order (AllowDragDrop, which TabControlExt defaults to true). The strip sits along the
                     bottom, and each tab scrolls on its own, so the strip stays put. Clone only applies to a
                     saved product; while it's hidden the ViewModel moves the selection off it (SelectedDetailsTab).
@@ -99,6 +99,16 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,14,12">
                             <p:CostingCard />
                         </ScrollViewer>
+                    </syncfusion:TabItemExt>
+
+                    <!--
+                        The recipe scaled to a number of sellable units (ScalingCard). No ScrollViewer, as on Recipe: the
+                        tree grid scrolls itself, and the quantity above it stays put.
+                    -->
+                    <syncfusion:TabItemExt Header="Scaling" CanClose="False">
+                        <Border Padding="12">
+                            <p:ScalingCard />
+                        </Border>
                     </syncfusion:TabItemExt>
 
                     <!-- Linking the packaging moved into the Recipe Structure's Add Sub-Assembly, so this tab only clones: a copy, or a variant that links the recipe and packaging. -->

@@ -114,6 +114,26 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task GetAllAsync_returns_every_boms_lines_in_their_order()
+    {
+        var categoryId = await SeedCategoryAsync("Fillings");
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
+        var waterId = await SeedPurchasedIngredientAsync("Water", categoryId);
+        var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId);
+        var caramelId = await SeedMadeIngredientAsync("Caramel", categoryId);
+
+        await CreateBomRepository().SetLinesAsync(syrupId, [(waterId, 500m), (sugarId, 1000m)], Cancellation);
+        await CreateBomRepository().SetLinesAsync(caramelId, [(syrupId, 800m)], Cancellation);
+
+        var lines = await CreateBomRepository().GetAllAsync(Cancellation);
+
+        lines.Where(l => l.IngredientId == syrupId).Select(l => (l.ComponentIngredientId, l.Grams))
+            .Should().Equal((waterId, 500m), (sugarId, 1000m));
+        lines.Where(l => l.IngredientId == caramelId).Select(l => (l.ComponentIngredientId, l.Grams))
+            .Should().Equal((syrupId, 800m));
+    }
+
+    [Fact]
     public async Task A_price_change_ripples_through_a_three_level_chain()
     {
         // sugar -> syrup -> caramel. Changing sugar's price should recompute both

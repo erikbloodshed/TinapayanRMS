@@ -78,6 +78,10 @@ public static class IngredientBomRules
         return false;
     }
 
+    /// <summary>What a made ingredient's BOM makes: what goes in, less its weight loss. 1,500 g at 20% makes 1,200 g.</summary>
+    public static decimal CalculateOutputGrams(decimal totalGrams, decimal weightLossPercent) =>
+        totalGrams * (1 - weightLossPercent / 100m);
+
     /// <summary>
     /// Output grams = Σ line grams × (1 − weightLossPercent / 100); cost per gram = Σ (line
     /// grams × component cost per gram) / output grams. lines carry each component's CURRENT
@@ -90,7 +94,7 @@ public static class IngredientBomRules
     {
         var totalGrams = lines.Sum(l => l.Grams);
         var totalCost = lines.Sum(l => l.Grams * l.ComponentCostPerGram);
-        var outputGrams = totalGrams * (1 - weightLossPercent / 100m);
+        var outputGrams = CalculateOutputGrams(totalGrams, weightLossPercent);
         var costPerGram = outputGrams > 0 ? totalCost / outputGrams : 0m;
         return (outputGrams, costPerGram);
     }

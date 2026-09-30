@@ -97,6 +97,7 @@ Other terms you'll see on a product:
 - **Quantity Required** is how many finished pieces make one sellable unit. It's 1 for a product sold by the piece, and 8 for a "Box of 8". The recipe is always written per piece. The costing is per sellable unit.
 - **Stage**: every product is either in **Research and Development** (still being worked out) or in **Production** (made and sold). New products start in Research and Development.
 - **Clone** and **Create Variant** start a new product from an existing one. See [Clone tab](#clone-tab).
+- **Scaling** works out the ingredients and packaging for any number of sellable units. See [Scaling tab](#scaling-tab).
 
 ### Composite products
 
@@ -385,7 +386,7 @@ A sub-assembly can't be switched between a recipe role and the Packaging role on
 
 ## 7. Products
 
-The Products screen has the product list on the left. On the right are the selected product's header, its details, and three tabs: **Recipe**, **Costing** and **Clone**.
+The Products screen has the product list on the left. On the right are the selected product's header, its details, and four tabs: **Recipe**, **Costing**, **Scaling** and **Clone**.
 
 ### The list
 
@@ -531,6 +532,19 @@ On the right, the **Costing Summary** lists each component with its amount and i
 - **Total Selling Price**
 
 Everything updates as you type, before you save. See [How costs are worked out](#10-how-costs-are-worked-out).
+
+### Scaling tab
+
+The Scaling tab works out how much of everything a production run takes. Type how many to make in **Sellable Units**: boxes for a product like *Ensaymada Box of 8*, pieces for a product sold by the piece. When a unit holds more than one piece, the pieces it comes to show beside the box, such as **= 160 pieces**. The number isn't saved, and it stays when you open another product.
+
+The table below it lists, with each row's **Amount** and **Cost**:
+
+- **Each section**, such as *Dough*, made in **whole batches**. Beside its name is how many batches that is and how many pieces they make, with the pieces to spare: *2 batches · 200 pcs (40 extra)*. Its amount is the weight of those batches. Under it are its ingredients, then its add-ins, each for that many batches. A section with no piece size yet has nothing to scale, and says so.
+- **A made ingredient** opens into what it's made from, for the grams the recipe takes, allowing for its weight loss. A made ingredient inside it opens in turn.
+- **Packaging**: each material for that many sellable units, in the unit it's typed in on the Packaging tab.
+- **A composite product** lists each of its products first, such as *Ensaymada × 6*, with how many of it that comes to. Under each is that product's own recipe scaled the same way, as it's saved. Its packaging is included only when the composite includes its products' packaging. The composite's own sections and packaging come after its products.
+
+**Total Cost**, at the top right, adds up the table. Because each section is made in whole batches, it includes the extra pieces, so it can be more than the Costing tab's figures times the number of units. Costs follow **Unbuffered**, and the table follows changes to the recipe, packaging and Quantity Required as you make them, before you save.
 
 ### Clone tab
 

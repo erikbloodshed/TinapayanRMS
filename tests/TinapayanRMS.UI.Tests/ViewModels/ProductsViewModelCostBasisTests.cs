@@ -199,6 +199,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory, CreateCostPropagator()),
+            new IngredientBomLineRepository(factory, CreateCostPropagator()),
             new ProductCategoryRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),
