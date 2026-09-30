@@ -97,6 +97,9 @@ public partial class App : Application
         // Every grid's header row tall enough for its text at the app's font size.
         GridHeaderHeight.Register();
 
+        // Every picker that filters as you type highlights the name its text matches, for Enter or Tab to pick.
+        PickerMatchHighlight.Register();
+
         // Ctrl+Z and Ctrl+Y for the screen the cursor is on. It goes here, on every window, because Syncfusion's
         // number boxes take both keys for their own per-character undo and mark them handled on the way down.
         UndoShortcuts.Register();

@@ -154,6 +154,7 @@ The **Raw Materials** and **Products** lists are trees of folders, like File Exp
 - **One Save saves the whole record**, including everything on its tabs. Until you press **Save**, nothing you type is stored.
 - **Undo** (**Ctrl+Z**) and **Redo** (**Ctrl+Y**) step back and forth through the changes you've made since opening the record.
 - **Revert**, on the Products screen only, puts the whole product back as it was last saved.
+- **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly or Packaging) can be typed into. Typing narrows the list to matching names and highlights the best match: the name you typed in full, or else the first name that starts with what you typed, or else the first that contains it. **Enter** or **Tab** picks the highlighted name, so "marg" and Enter picks Margarine. **Down** and **Up** move the highlight to the other names.
 - **New** starts a blank record. **Delete** asks before deleting anything.
 - A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use.
 
