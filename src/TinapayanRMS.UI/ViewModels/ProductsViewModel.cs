@@ -2151,11 +2151,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // A composite's line picked, typed or deleted in its Products table: it's priced once its product's recipe cost
         // has been read (a new pick's is read then), and the composite's costs follow.
+        //
+        // One refresh operator for all four properties, not an AutoRefresh each: each operator takes its own lock, and the
+        // subscriber sets the rows' costs (Resolve), so with a chain a cost set on one thread held one operator's lock
+        // while waiting for the next, and a cost set on another thread the other way round. A cost read arriving off the
+        // UI thread while a LoadCommand's applied (as in the tests, which have no UI thread) deadlocked there.
         ComponentEdits.ToObservableChangeSet()
-            .AutoRefresh(r => r.ComponentProductId)
-            .AutoRefresh(r => r.Quantity)
-            .AutoRefresh(r => r.RecipeCost)
-            .AutoRefresh(r => r.PackagingCost)
+            .AutoRefreshOnObservable(r => r.WhenAnyPropertyChanged(
+                nameof(ProductComponentRow.ComponentProductId),
+                nameof(ProductComponentRow.Quantity),
+                nameof(ProductComponentRow.RecipeCost),
+                nameof(ProductComponentRow.PackagingCost)))
             .Subscribe(_ =>
             {
                 if (IsRestoring)
