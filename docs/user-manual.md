@@ -407,7 +407,7 @@ Right-click menus:
 
 **New Product Here** and **New Composite Product Here** file the new product in that folder when you save it. **New** from the header puts it in Research and Development.
 
-A composite product shows a small icon after its name.
+Each product's name starts with a small coloured picture of what it is: a baguette 🥖 for **Breads**, a loaf 🍞 for **Loaves**, a shortcake 🍰 for **Cakes** and a moon cake 🥮 for **Pastries**. A composite product always has a wrapped present 🎁, whatever its category. A product in any other category, or in none, has no picture.
 
 ### The header
 

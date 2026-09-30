@@ -25,8 +25,34 @@ public abstract class ProductTreeNode : ReactiveObject
     /// <summary>How many products a folder holds, shown after its title; always 0 for a product, which shows none.</summary>
     public virtual int ProductCount => 0;
 
-    /// <summary>A composite product's row, made of other products, which says so with a glyph after its name; never a folder.</summary>
-    public virtual bool IsComposite => false;
+    /// <summary>Which emoji goes before a product's name, which the list also colours it by; always none for a folder.</summary>
+    public virtual ProductEmoji EmojiKind => ProductEmoji.None;
+
+    /// <summary>The emoji before a product's name, or empty for none.</summary>
+    public string Emoji => EmojiKind switch
+    {
+        ProductEmoji.Breads => "\U0001F956",
+        ProductEmoji.Loaves => "\U0001F35E",
+        ProductEmoji.Cakes => "\U0001F370",
+        ProductEmoji.Pastries => "\U0001F96E",
+        ProductEmoji.Composite => "\U0001F381",
+        _ => string.Empty,
+    };
+}
+
+/// <summary>
+/// The emoji the Products list puts before a product's name (the user's choice, 2026-09-30): a baguette for Breads, a
+/// loaf for Loaves, a shortcake for Cakes, a moon cake for Pastries, and a wrapped present for a composite whatever its
+/// category. Each has its own Catppuccin colour in the list (App.xaml's *EmojiBrush tokens).
+/// </summary>
+public enum ProductEmoji
+{
+    None,
+    Breads,
+    Loaves,
+    Cakes,
+    Pastries,
+    Composite,
 }
 
 /// <summary>
@@ -151,7 +177,8 @@ public sealed class ProductLeafNode(Product product) : ProductTreeNode
                 _product = value;
                 this.RaisePropertyChanged();
                 this.RaisePropertyChanged(nameof(Title));
-                this.RaisePropertyChanged(nameof(IsComposite));
+                this.RaisePropertyChanged(nameof(EmojiKind));
+                this.RaisePropertyChanged(nameof(Emoji));
             }
         }
     }
@@ -160,7 +187,21 @@ public sealed class ProductLeafNode(Product product) : ProductTreeNode
 
     public override string Glyph => string.Empty;
 
-    public override bool IsComposite => Product.IsComposite;
+    /// <summary>
+    /// A composite's present, whatever its category, else its category's, matched by name whatever the case; none for
+    /// any other category, or no category.
+    /// </summary>
+    public override ProductEmoji EmojiKind =>
+        Product.IsComposite
+            ? ProductEmoji.Composite
+            : Product.Category?.Name.Trim().ToUpperInvariant() switch
+            {
+                "BREADS" => ProductEmoji.Breads,
+                "LOAVES" => ProductEmoji.Loaves,
+                "CAKES" => ProductEmoji.Cakes,
+                "PASTRIES" => ProductEmoji.Pastries,
+                _ => ProductEmoji.None,
+            };
 
     public override bool IsFolder => false;
 

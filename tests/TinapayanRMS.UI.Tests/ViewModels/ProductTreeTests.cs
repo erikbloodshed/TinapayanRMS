@@ -23,6 +23,44 @@ public class ProductTreeTests
 
     private static IEnumerable<string> TitlesIn(ProductFolderNode folder) => folder.Children.Select(c => c.Title);
 
+    [Theory]
+    [InlineData("Breads", "\U0001F956")]
+    [InlineData("Loaves", "\U0001F35E")]
+    [InlineData("Cakes", "\U0001F370")]
+    [InlineData("Pastries", "\U0001F96E")]
+    [InlineData(" pastries ", "\U0001F96E")]
+    [InlineData("Cookies", "")]
+    public void A_products_emoji_is_its_categorys(string category, string emoji)
+    {
+        var leaf = new ProductLeafNode(ProductOf(1, "Pandesal", ProductStage.Production, new ProductCategory { Id = 9, Name = category }));
+
+        leaf.Emoji.Should().Be(emoji);
+        leaf.EmojiKind.Should().Be(emoji == string.Empty ? ProductEmoji.None : Enum.Parse<ProductEmoji>(category.Trim(), ignoreCase: true));
+    }
+
+    [Fact]
+    public void A_composite_is_a_present_whatever_its_category_one_without_a_category_has_none_and_a_folder_never_does()
+    {
+        var composite = ProductOf(1, "Pasalubong Box", ProductStage.Production, Breads);
+        composite.IsComposite = true;
+        var uncategorized = new ProductLeafNode(ProductOf(2, "Pandesal", ProductStage.Production, null));
+
+        new ProductLeafNode(composite).Emoji.Should().Be("\U0001F381");
+        new ProductLeafNode(composite).EmojiKind.Should().Be(ProductEmoji.Composite, "the list colours it by its kind");
+        uncategorized.Emoji.Should().BeEmpty();
+        ProductFolderNode.ForStage(ProductStage.Production).Emoji.Should().BeEmpty();
+
+        // A refresh with the product recategorized keeps its row, which takes its new category's emoji.
+        var tree = new ProductTree();
+        tree.Refresh([Cakes], [ProductOf(2, "Pandesal", ProductStage.Production, null)], isFiltered: false);
+        var leaf = Folder(tree, ProductStage.Production, ProductFolderNode.UncategorizedTitle).Children.OfType<ProductLeafNode>().Single();
+
+        tree.Refresh([Cakes], [ProductOf(2, "Pandesal", ProductStage.Production, Cakes)], isFiltered: false);
+
+        Folder(tree, ProductStage.Production, "Cakes").Children.Should().ContainSingle().Which.Should().BeSameAs(leaf);
+        leaf.Emoji.Should().Be("\U0001F370");
+    }
+
     [Fact]
     public void The_stages_are_the_top_level_folders_Production_first()
     {

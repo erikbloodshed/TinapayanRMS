@@ -209,6 +209,17 @@
             <SolidColorBrush x:Key="WarningBackgroundBrush" Color="{StaticResource LatteYellowTintColor}" />
             <SolidColorBrush x:Key="WarningForegroundBrush" Color="{StaticResource LatteYellowDeepColor}" />
 
+            <!--
+                The Products list's emoji, drawn in outline (WPF draws no colour fonts) and coloured by what they show:
+                a baguette's crust Peach, a loaf's golden-brown Yellow (Deep: plain Yellow is too pale for thin lines),
+                a shortcake Pink, a moon cake Maroon, and a composite's present Mauve.
+            -->
+            <SolidColorBrush x:Key="BreadsEmojiBrush" Color="{StaticResource LattePeachColor}" />
+            <SolidColorBrush x:Key="LoavesEmojiBrush" Color="{StaticResource LatteYellowDeepColor}" />
+            <SolidColorBrush x:Key="CakesEmojiBrush" Color="{StaticResource LattePinkColor}" />
+            <SolidColorBrush x:Key="PastriesEmojiBrush" Color="{StaticResource LatteMaroonColor}" />
+            <SolidColorBrush x:Key="CompositeEmojiBrush" Color="{StaticResource LatteMauveColor}" />
+
             <!-- The toasts' close button (Controls/ErrorToast, Controls/SuccessToast): just the glyph, with a soft highlight under the mouse -->
             <Style x:Key="ToastCloseButtonStyle" TargetType="Button">
                 <Setter Property="Foreground" Value="{StaticResource MutedForegroundBrush}" />

@@ -116,6 +116,12 @@
                                            Foreground="{StaticResource MutedForegroundBrush}"
                                            VerticalAlignment="Center"
                                            Margin="0,0,8,0" />
+                                <!-- A product's emoji, by its category or for a composite (ProductLeafNode.Emoji); a folder has none -->
+                                <TextBlock x:Name="Emoji"
+                                           Text="{Binding Emoji}"
+                                           FontFamily="Segoe UI Emoji"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,6,0" />
                                 <TextBlock x:Name="Title"
                                            Text="{Binding Title}"
                                            VerticalAlignment="Center" />
@@ -125,27 +131,31 @@
                                            Foreground="{StaticResource MutedForegroundBrush}"
                                            VerticalAlignment="Center"
                                            Margin="6,0,0,0" />
-                                <!--
-                                    A composite product, made of other products, muted after its name where a folder has its
-                                    count, so the product names still line up: AllApps, as its Products tab shows it
-                                -->
-                                <TextBlock x:Name="CompositeMark"
-                                           Text="&#xE71D;"
-                                           Style="{StaticResource IconGlyphStyle}"
-                                           FontSize="11"
-                                           Foreground="{StaticResource MutedForegroundBrush}"
-                                           VerticalAlignment="Center"
-                                           Margin="6,1,0,0"
-                                           ToolTip="A composite product, made of other products"
-                                           Visibility="Collapsed" />
                             </StackPanel>
                             <DataTemplate.Triggers>
                                 <DataTrigger Binding="{Binding IsFolder}" Value="False">
                                     <Setter TargetName="Glyph" Property="Visibility" Value="Collapsed" />
                                     <Setter TargetName="Count" Property="Visibility" Value="Collapsed" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding IsComposite}" Value="True">
-                                    <Setter TargetName="CompositeMark" Property="Visibility" Value="Visible" />
+                                <!-- No emoji, no gap: a folder, or a product in a category without one -->
+                                <DataTrigger Binding="{Binding EmojiKind}" Value="None">
+                                    <Setter TargetName="Emoji" Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                                <!-- Each emoji in its Catppuccin colour (App.xaml's *EmojiBrush tokens) -->
+                                <DataTrigger Binding="{Binding EmojiKind}" Value="Breads">
+                                    <Setter TargetName="Emoji" Property="Foreground" Value="{StaticResource BreadsEmojiBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding EmojiKind}" Value="Loaves">
+                                    <Setter TargetName="Emoji" Property="Foreground" Value="{StaticResource LoavesEmojiBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding EmojiKind}" Value="Cakes">
+                                    <Setter TargetName="Emoji" Property="Foreground" Value="{StaticResource CakesEmojiBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding EmojiKind}" Value="Pastries">
+                                    <Setter TargetName="Emoji" Property="Foreground" Value="{StaticResource PastriesEmojiBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding EmojiKind}" Value="Composite">
+                                    <Setter TargetName="Emoji" Property="Foreground" Value="{StaticResource CompositeEmojiBrush}" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsStage}" Value="True">
                                     <Setter TargetName="Title" Property="FontWeight" Value="SemiBold" />
