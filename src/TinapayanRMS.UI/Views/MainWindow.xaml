@@ -89,7 +89,7 @@
     <!--
         The header strip, in the title bar (see the note at the top). Its items keep the window's DataContext and
         names, so the bindings and Click handlers are as they were in the Border this strip used to be. Back and
-        Forward were here too until they moved to the tab strip's right end (MainTabControl's TabPanelItem).
+        Forward are on the bar's right side (RightHeaderItemsSource, below).
     -->
     <controls:AppWindow.LeftHeaderItemsSource>
         <collections:ArrayList>
@@ -99,7 +99,8 @@
                 menu away. Icon only, so the name lives in ToolTip/AutomationProperties.
                 It hovers like the title bar's minimise and maximise buttons (2026-09-26, at the user's request),
                 because it's built the way they are: the theme's WPFGlyphButtonStyle, fetched by ThemeKey as a
-                DynamicResource (see the Back button for why not {sfskin:ThemeResource}), with the template
+                DynamicResource (the Sample Browser's {sfskin:ThemeResource} form looks the style up once, before
+                OnStartup's SetTheme has merged the theme's dictionaries into this window, and never again), with the template
                 ChromelessWindow gives them, WPFGlyphWindowButtonTemplate. That's the style's own hover (the faint
                 ContentBackgroundHovered wash, the glyph darkening to IconColorHovered) with square corners.
                 The template isn't published under a ThemeKey, so it's looked up by its plain key in the theme
@@ -125,6 +126,47 @@
             <TextBlock Text="{Binding Heading}" Style="{StaticResource AppTitleStyle}" VerticalAlignment="Center" />
         </collections:ArrayList>
     </controls:AppWindow.LeftHeaderItemsSource>
+
+    <!--
+        Back and Forward between screens, as a browser has them (NavigationHistory): a step is a change of screen, and
+        going back reopens the record that screen had open. Alt+Left and Alt+Right do the same (MainWindow.xaml.cs).
+        On the title bar's right, just before Minimize (2026-10-01, at the user's request; they were at the tab strip's
+        right end before, and after the menu toggle before that). Built like the toggle and the bar's own caption buttons:
+        40×32, WPFGlyphButtonStyle with WPFGlyphWindowButtonTemplate, and IsHitTestVisibleInChrome, so they hover, press
+        and grey out the way Minimize does. Not focusable, like the caption buttons: a focused glyph button keeps its
+        hover wash, so it would stay lit after a click. The title bar sits above the drawer's scrim, so they work while
+        the menu is open.
+    -->
+    <controls:AppWindow.RightHeaderItemsSource>
+        <collections:ArrayList>
+            <Button x:Name="BackButton"
+                    Width="40"
+                    Height="32"
+                    Focusable="False"
+                    WindowChrome.IsHitTestVisibleInChrome="True"
+                    Style="{DynamicResource {skinManager:ThemeKey Key=WPFGlyphButtonStyle, Theme={x:Type sfTheme:Windows11LightSkinHelper}}}"
+                    Template="{DynamicResource WPFGlyphWindowButtonTemplate}"
+                    IsEnabled="{Binding Navigation.CanGoBack}"
+                    ToolTip="Back (Alt+Left)"
+                    AutomationProperties.Name="Back"
+                    Click="BackButton_Click">
+                <TextBlock Text="&#xE72B;" Style="{StaticResource IconGlyphStyle}" FontSize="12" />
+            </Button>
+            <Button x:Name="ForwardButton"
+                    Width="40"
+                    Height="32"
+                    Focusable="False"
+                    WindowChrome.IsHitTestVisibleInChrome="True"
+                    Style="{DynamicResource {skinManager:ThemeKey Key=WPFGlyphButtonStyle, Theme={x:Type sfTheme:Windows11LightSkinHelper}}}"
+                    Template="{DynamicResource WPFGlyphWindowButtonTemplate}"
+                    IsEnabled="{Binding Navigation.CanGoForward}"
+                    ToolTip="Forward (Alt+Right)"
+                    AutomationProperties.Name="Forward"
+                    Click="ForwardButton_Click">
+                <TextBlock Text="&#xE72A;" Style="{StaticResource IconGlyphStyle}" FontSize="12" />
+            </Button>
+        </collections:ArrayList>
+    </controls:AppWindow.RightHeaderItemsSource>
 
     <Grid Background="{StaticResource PageBackgroundBrush}">
         <!--
@@ -264,58 +306,6 @@
                                           IsDisableUnloadTabItemExtContent="True"
                                           EnableLabelEdit="False"
                                           SelectionChanged="MainTabControl_SelectionChanged">
-                    <!--
-                        Back and Forward between screens, as a browser has them (NavigationHistory): a step is a change
-                        of screen, and going back reopens the record that screen had open. Alt+Left and Alt+Right do the
-                        same (MainWindow.xaml.cs). At the strip's right end (2026-09-25, at the user's request; they were
-                        in the title bar before): TabPanelItem is the one slot the theme's tab strip has for content of
-                        its own, docked right after the strip's tab-list and close buttons. The control's own scroll
-                        buttons (TabScrollButtonVisibility) only scroll an overflowing strip, so they can't do this.
-                        While the menu is open they're under the drawer's scrim, so a first click puts the menu away; the
-                        keys still work.
-                        Built like the strip's own close (✕) and tab-list (˅) buttons, so they look and behave like them
-                        (2026-09-26, at the user's request): a plain WPF Button, 16×16 with an 8px margin after it, in the
-                        theme's WPFGlyphButtonStyle, fetched by its ThemeKey as a DynamicResource. The Sample Browser's
-                        {sfskin:ThemeResource} form doesn't work here: it looks the style up once, before OnStartup's
-                        SetTheme has merged the theme's dictionaries into this window, and never again.
-                        The template's TabPanelCaptionButtonsStyle is based on that style and has the same rounded hover
-                        wash, pressed state and plain disabled glyph. A ButtonAdv can't match them: it has the theme's 24px
-                        minimum height (and App.xaml.cs's 24px default), and an opaque hover and disabled fill that
-                        Background="Transparent" doesn't reach. Not focusable, like the ✕: a focused glyph button keeps
-                        its hover wash, so it would stay lit after a click.
-                        The arrows are 10px Segoe Fluent glyphs, which draw about 8px, the size of the ✕ and ˅ paths.
-                        They take the Button's Foreground, which the style's triggers change on hover, press and disable.
-                    -->
-                    <syncfusion:TabControlExt.TabPanelItem>
-                        <StackPanel Orientation="Horizontal">
-                            <Button x:Name="BackButton"
-                                    Width="16"
-                                    Height="16"
-                                    Margin="0,0,8,0"
-                                    VerticalAlignment="Center"
-                                    Focusable="False"
-                                    Style="{DynamicResource {skinManager:ThemeKey Key=WPFGlyphButtonStyle, Theme={x:Type sfTheme:Windows11LightSkinHelper}}}"
-                                    IsEnabled="{Binding Navigation.CanGoBack}"
-                                    ToolTip="Back (Alt+Left)"
-                                    AutomationProperties.Name="Back"
-                                    Click="BackButton_Click">
-                                <TextBlock Text="&#xE72B;" Style="{StaticResource IconGlyphStyle}" FontSize="10" />
-                            </Button>
-                            <Button x:Name="ForwardButton"
-                                    Width="16"
-                                    Height="16"
-                                    Margin="0,0,8,0"
-                                    VerticalAlignment="Center"
-                                    Focusable="False"
-                                    Style="{DynamicResource {skinManager:ThemeKey Key=WPFGlyphButtonStyle, Theme={x:Type sfTheme:Windows11LightSkinHelper}}}"
-                                    IsEnabled="{Binding Navigation.CanGoForward}"
-                                    ToolTip="Forward (Alt+Right)"
-                                    AutomationProperties.Name="Forward"
-                                    Click="ForwardButton_Click">
-                                <TextBlock Text="&#xE72A;" Style="{StaticResource IconGlyphStyle}" FontSize="10" />
-                            </Button>
-                        </StackPanel>
-                    </syncfusion:TabControlExt.TabPanelItem>
                     <syncfusion:TabItemExt x:Name="RawMaterialsTab" Header="Raw Materials" />
                     <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
                     <syncfusion:TabItemExt x:Name="ProductsTab" Header="Products" />

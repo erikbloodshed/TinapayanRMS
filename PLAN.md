@@ -495,7 +495,7 @@ The app is styled with **Syncfusion Essential Studio for WPF 34.2.7**, licensed 
   - **Save, Delete and the lookup panels call the same `LoadCommand`**, so an existing record stays selected after saving, and renaming a category or role updates the grid.
   - Covered by `tests/TinapayanRMS.UI.Tests/ViewModels/`: `CollectionMergeTests`, plus Ingredients and Products refresh tests that build the ViewModel on real repositories.
   - **Back and Forward between screens** (2026-09-23, at the user's request).
-    - **What they do.** ← → buttons in the header, after the menu toggle, and Alt+Left / Alt+Right.
+    - **What they do.** ← → buttons on the title bar's right, just before Minimize (`RightHeaderItemsSource`, since 2026-10-01; after the menu toggle, then at the tab strip's right end, before that), and Alt+Left / Alt+Right.
     - **What a step is.** A change of screen, however it happens: the menu, the tab strip, a tab closed, or a link from one screen to another (a Used By tile, a linked badge). Picking another record in a list isn't a step. The user chose this over "every record opened" and "screens only".
     - **Where it lives.** `NavigationHistory` (`ViewModels/NavigationHistory.cs`, on `MainWindowViewModel.Navigation`) holds the back and forward stacks of `ScreenVisit(AppScreen, RecordId)`, capped at 50. It knows nothing of tabs.
     - **Recording.** `MainWindow.MainTabControl_SelectionChanged` records each step, with the record the screen had open *as it was left*. Each tab maps to a `HistoryScreen`: the selected product, sub-assembly or raw material id; the screen's `Open*` method (`OpenProduct`, `OpenSubAssembly`, `OpenRawMaterial`); and its form's `History.IsDirty`. Reports has no record.
@@ -1104,6 +1104,7 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 | 2026-09-30 | The Products list no longer marks a composite with a glyph after its name, at the user's request; `ProductTreeNode.IsComposite` went with it | Done |
 | 2026-09-30 | The Products list starts each product's name with an emoji for its category (🥖 Breads, 🍞 Loaves, 🍰 Cakes, 🥮 Pastries) or 🎁 for a composite, at the user's request, in outline (WPF draws no colour fonts) coloured from the Catppuccin Latte palette | Done |
 | 2026-09-30 | Move to Sub-Assemblies on a product's own packaging, at the user's request: the Packaging tab's button (top right, after the cost) marks it, and Save makes its lines a packaging set named after the product ("Ensaymada Packaging") and links it (`PackagingLinkDraft.NewSet`, `PackagingLinkRepository.LinkNewSetAsync`). No migration | Done |
+| 2026-10-01 | Back and Forward moved to the title bar's right, just before Minimize (`RightHeaderItemsSource`), at the user's request, built like the caption buttons | Done |
 
 ### Open items (for later phases)
 

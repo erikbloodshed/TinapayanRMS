@@ -138,7 +138,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 
 - **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products** and **Reports**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
 - **Tabs**: each screen opens in a tab along the top. A tab you close can be opened again from the menu. Each tab keeps its place, such as the record you were looking at and anything you haven't saved, until you close the app.
-- **Back and Forward** (the arrows at the top, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, like a web browser.
+- **Back and Forward** (the arrows at the top right, next to the minimize button, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, like a web browser.
 - Changes made on one tab show up on another tab the next time you switch to it.
 
 ### Lists as folder trees
