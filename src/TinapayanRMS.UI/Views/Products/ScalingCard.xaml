@@ -50,6 +50,9 @@
             row styles are the ones the SfDataGrid dictionary themes. Inherited, it joined the window's theme dictionaries
             after SfDataGrid's, so its unthemed styles won and every data grid in the app lost the theme (2026-09-30).
             Set here, its dictionaries go into this grid's own resources instead.
+
+            FontSize is the app's 14px body text: the theme's cell style is one the generic ones outrank, so the cells
+            inherit the grid's own FontSize (12) where the header cells take the app's theme settings.
         -->
         <syncfusion:SfTreeGrid skinManager:SfSkinManager.Theme="{skinManager:SkinManagerExtension ThemeName=Windows11Light}"
                                skinManager:SfSkinManager.SizeMode="Default"
@@ -65,7 +68,8 @@
                                GridLinesVisibility="Both"
                                CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                CurrentCellBorderThickness="1"
-                               ColumnSizer="Star">
+                               ColumnSizer="Star"
+                               FontSize="14">
             <syncfusion:SfTreeGrid.Columns>
                 <syncfusion:TreeGridTemplateColumn MappingName="Name" HeaderText="Item">
                     <syncfusion:TreeGridTemplateColumn.CellTemplate>

@@ -31,6 +31,53 @@ public class TreeGridThemeScopeTests
         DataGridCellBorder(TreeGrid(themedOnItsOwn: false)).Should().NotBe(themed, "the generic cell style it brings wins in the window");
     });
 
+    /// <summary>
+    /// The theme's cell style is one of those the generic ones outrank, so a tree grid's cells don't take the app's 14px
+    /// body text (App.ThemeSettings) as its header cells do: they inherit the grid's own FontSize, which is 12. ScalingCard
+    /// sets its grid's FontSize to 14.
+    /// </summary>
+    [Fact]
+    public void A_tree_grid_themed_on_its_own_sizes_its_cells_text_by_its_own_font_size() => StaThread.RunThemed(() =>
+    {
+        CellFontSizes(gridFontSize: null).Should().Be((Cell: 12d, Header: 14d), "only the header cells take the theme's text size");
+        CellFontSizes(gridFontSize: 14).Should().Be((Cell: 14d, Header: 14d));
+    });
+
+    /// <summary>The font sizes of a tree grid's first cell and first header cell, themed on its own in a themed window.</summary>
+    private static (double Cell, double Header) CellFontSizes(double? gridFontSize)
+    {
+        var treeGrid = TreeGrid(themedOnItsOwn: true);
+        if (gridFontSize is { } size)
+        {
+            treeGrid.FontSize = size;
+        }
+
+        var window = new Window
+        {
+            Content = treeGrid,
+            Width = 600,
+            Height = 400,
+            Left = -20000,
+            Top = -20000,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            ShowActivated = false,
+            ShowInTaskbar = false,
+        };
+        try
+        {
+            SfSkinManager.SetTheme(window, new Theme("Windows11Light"));
+            window.Show();
+            OffscreenGrid.Pump();
+
+            return (Descendants(treeGrid).OfType<TreeGridCell>().First().FontSize,
+                    Descendants(treeGrid).OfType<TreeGridHeaderCell>().First().FontSize);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     private static SfTreeGrid TreeGrid(bool themedOnItsOwn)
     {
         var treeGrid = new SfTreeGrid { ItemsSource = new[] { new Row("Dough") }, Height = 120 };
