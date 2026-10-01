@@ -39,8 +39,13 @@ public class TreeGridThemeScopeTests
     [Fact]
     public void A_tree_grid_themed_on_its_own_sizes_its_cells_text_by_its_own_font_size() => StaThread.RunThemed(() =>
     {
-        CellFontSizes(gridFontSize: null).Should().Be((Cell: 12d, Header: 14d), "only the header cells take the theme's text size");
-        CellFontSizes(gridFontSize: 14).Should().Be((Cell: 14d, Header: 14d));
+        var (cell, header) = CellFontSizes(gridFontSize: null);
+        cell.Should().Be(12, "only the header cells take the theme's text size");
+        header.Should().Be(14);
+
+        (cell, header) = CellFontSizes(gridFontSize: 14);
+        cell.Should().Be(14);
+        header.Should().Be(14);
     });
 
     /// <summary>The font sizes of a tree grid's first cell and first header cell, themed on its own in a themed window.</summary>
