@@ -1,6 +1,5 @@
 using System.Collections.Specialized;
 using System.Windows;
-using System.Windows.Threading;
 using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.UI.Xaml.Grid.Cells;
 using Syncfusion.UI.Xaml.Grid.Helpers;
@@ -21,11 +20,6 @@ namespace TinapayanRMS.UI.Controls;
 /// <item><c>controls:GridAddNewRow.HideCheckBoxes="True"</c> leaves a <c>GridCheckBoxColumn</c>'s cell blank in the add row, so
 /// the row stays the plain empty row the other grids show, instead of offering a tick for a line that doesn't exist yet
 /// (<see cref="AddRowHiddenCheckBoxRenderer"/>). The tick appears once the line is committed.</item>
-/// <item><c>controls:GridAddNewRow.ShowWhen="{Binding CanAddUnit}"</c> shows the add row at the bottom while the bound flag is
-/// true and hides it while it's false, for a table with a limit on its lines. Unlike binding <c>AddNewRowPosition</c>, it
-/// changes the position once the grid has finished what it's doing: a flag that turns false because the add row was just
-/// committed changes while the grid is still adding that line to the collection, and hiding the add row then makes the
-/// grid commit it a second time, which throws "Cannot change ObservableCollection during a CollectionChanged event".</item>
 /// </list>
 /// </summary>
 public static class GridAddNewRow
@@ -39,9 +33,6 @@ public static class GridAddNewRow
     public static readonly DependencyProperty HideCheckBoxesProperty = DependencyProperty.RegisterAttached(
         "HideCheckBoxes", typeof(bool), typeof(GridAddNewRow), new PropertyMetadata(false, OnHideCheckBoxesChanged));
 
-    public static readonly DependencyProperty ShowWhenProperty = DependencyProperty.RegisterAttached(
-        "ShowWhen", typeof(bool), typeof(GridAddNewRow), new PropertyMetadata(false, OnShowWhenChanged));
-
     public static Func<object>? GetItemFactory(DependencyObject element) => (Func<object>?)element.GetValue(ItemFactoryProperty);
 
     public static void SetItemFactory(DependencyObject element, Func<object>? value) => element.SetValue(ItemFactoryProperty, value);
@@ -53,31 +44,6 @@ public static class GridAddNewRow
     public static bool GetHideCheckBoxes(DependencyObject element) => (bool)element.GetValue(HideCheckBoxesProperty);
 
     public static void SetHideCheckBoxes(DependencyObject element, bool value) => element.SetValue(HideCheckBoxesProperty, value);
-
-    public static bool GetShowWhen(DependencyObject element) => (bool)element.GetValue(ShowWhenProperty);
-
-    public static void SetShowWhen(DependencyObject element, bool value) => element.SetValue(ShowWhenProperty, value);
-
-    private static void OnShowWhenChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is not SfDataGrid grid)
-        {
-            return;
-        }
-
-        // Before the grid is shown nothing is being edited, so the position can be set straight away; after, it waits
-        // for whatever the grid is in the middle of, and reads the flag then, so only its latest value counts.
-        if (!grid.IsLoaded)
-        {
-            ApplyShowWhen(grid);
-            return;
-        }
-
-        grid.Dispatcher.BeginInvoke(DispatcherPriority.Background, () => ApplyShowWhen(grid));
-    }
-
-    private static void ApplyShowWhen(SfDataGrid grid) =>
-        grid.AddNewRowPosition = GetShowWhen(grid) ? AddNewRowPosition.Bottom : AddNewRowPosition.None;
 
     private static void OnHideCheckBoxesChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {

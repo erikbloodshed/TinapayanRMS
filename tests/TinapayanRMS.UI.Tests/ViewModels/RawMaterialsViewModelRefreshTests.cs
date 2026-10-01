@@ -33,7 +33,6 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         viewModel.EditingName = "Flour (unsaved rename)";
-        viewModel.CanAddUnit.Should().BeTrue("one alternative unit is below the limit of two");
         var selected = viewModel.SelectedRawMaterial;
         var pickedUnit = viewModel.UnitRows.Single().Unit.UnitOfMeasure;
 
@@ -192,6 +191,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         var packId = await SeedUnitOfMeasureAsync("pack", "pack");
+        var trayId = await SeedUnitOfMeasureAsync("tray", "tray");
         await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -204,7 +204,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         AddBrandPrice(viewModel, "Gold Medal", "bag", 1250m);
 
         await AddUnitAsync(viewModel, packId, 1000m);
-        viewModel.CanAddUnit.Should().BeFalse("two alternative units is the limit, so the grid's add row goes");
+        await AddUnitAsync(viewModel, trayId, 500m);
         await viewModel.SaveCommand.Execute();
 
         await WaitUntilSettledAsync(() => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 1,
@@ -212,7 +212,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("Flour was saved.", "a toast says so");
         viewModel.SelectedRawMaterial!.Name.Should().Be("Flour", "saving a new material selects it");
-        viewModel.UnitRows.Select(r => (r.UnitName, r.Unit.Id > 0)).Should().Equal(("bag", true), ("pack", true));
+        viewModel.UnitRows.Select(r => (r.UnitName, r.Unit.Id > 0)).Should().Equal(
+            [("bag", true), ("pack", true), ("tray", true)], "a material can have any number of alternative units");
         viewModel.PriceHistory.Single().Entry.UnitId.Should().Be(viewModel.UnitRows[0].Unit.Id);
         viewModel.PriceHistory.Single().Brand.Should().Be("Gold Medal");
         var brand = viewModel.BrandPriceRows.Single();
@@ -320,7 +321,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
 
     [Fact]
-    public async Task A_saved_units_quantity_is_read_only_and_new_units_are_added_while_there_is_room_for_one()
+    public async Task A_saved_units_quantity_is_read_only_and_each_new_unit_picked_on_a_brand_is_added()
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         var packId = await SeedUnitOfMeasureAsync("pack", "pack");
@@ -336,13 +337,13 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         var pack = AddBrandPrice(viewModel, "Wellington", "pack", 40m);
         viewModel.UnitRows.Select(r => r.UnitName).Should().Equal("bag", "pack");
-        viewModel.CanAddUnit.Should().BeFalse("that's the two alternative units allowed");
 
         var sack = viewModel.NewBrandPriceRow();
         sack.UnitKey = sackId;
-        viewModel.ErrorMessage.Should().StartWith("A material can have at most 2 alternative units.");
-        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal(["bag", "pack"], "there's no room for a third");
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal(["bag", "pack", "sack"], "there's no limit on alternative units");
 
+        sack.UnitKey = PurchaseUnitChoice.BaseUnitKey;
         pack.UnitKey = sackId;
         viewModel.UnitRows.Select(r => r.UnitName).Should().Equal(["bag", "sack"], "the unit added for a brand can still be swapped for another");
     }
@@ -498,8 +499,6 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         await SelectAsync(viewModel, viewModel.RawMaterials.Single());
-        viewModel.CanAddUnit.Should().BeFalse("the ingredient already has the two alternative units allowed");
-
         AddBrandPrice(viewModel, null, "pack", 60m);
         viewModel.PurchaseCostText.Should().Be("0.0600", "the cost per gram is worked out as the price is typed");
         await viewModel.SaveCommand.Execute();
@@ -834,7 +833,6 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.NewCommand.Execute();
 
         viewModel.UnitRows.Should().BeEmpty();
-        viewModel.CanAddUnit.Should().BeTrue();
         viewModel.PurchaseUnitOptions.Select(o => o.Name).Should().Equal("gram", "bag");
         viewModel.BrandPriceRows.Should().BeEmpty();
         viewModel.PurchaseCostText.Should().Be("—");

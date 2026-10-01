@@ -129,7 +129,7 @@ public sealed class PackagingLineRow : ReactiveObject
     private IReadOnlyList<PackagingUnitChoice> _unitOptions = [];
     /// <summary>
     /// The units this row's quantity can be entered in: the material's base unit first, then its alternative units
-    /// (at most two, <see cref="UnitConversionRules.MaxAlternativeUnits"/>). The grid's unit cell reads them per row
+    /// (any number of them). The grid's unit cell reads them per row
     /// through <c>PackagingUnitSelector</c>, since each row has its own material.
     /// </summary>
     public IReadOnlyList<PackagingUnitChoice> UnitOptions

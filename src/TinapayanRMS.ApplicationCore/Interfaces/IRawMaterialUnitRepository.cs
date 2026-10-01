@@ -8,8 +8,8 @@ public interface IRawMaterialUnitRepository
     Task<IReadOnlyList<RawMaterialUnit>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Rejects a non-positive multiplier, a packaging material's own base unit, a unit the material
-    /// already has, and a third unit (UnitConversionRules.MaxAlternativeUnits).
+    /// Rejects a non-positive multiplier, a packaging material's own base unit, and a unit the material
+    /// already has. There's no limit on how many alternative units a material has.
     /// </summary>
     Task AddAsync(RawMaterialUnit unit, CancellationToken cancellationToken);
 

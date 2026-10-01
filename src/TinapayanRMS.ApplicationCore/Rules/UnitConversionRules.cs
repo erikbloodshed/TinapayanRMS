@@ -6,18 +6,6 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 /// </summary>
 public static class UnitConversionRules
 {
-    /// <summary>The most alternative units one raw material can have, besides its base unit.</summary>
-    public const int MaxAlternativeUnits = 2;
-
-    /// <summary>An item already holding <see cref="MaxAlternativeUnits"/> alternative units can't take another.</summary>
-    public static void EnsureCanAddAlternativeUnit(int existingUnitCount)
-    {
-        if (existingUnitCount >= MaxAlternativeUnits)
-        {
-            throw new InvalidOperationException($"An item can have at most {MaxAlternativeUnits} alternative units. Remove one before adding another.");
-        }
-    }
-
     /// <summary>A quantity in an alternative unit, in base units: 2 bags of 25,000 g are 50,000 g.</summary>
     public static decimal ToBaseQuantity(decimal quantity, decimal? baseUnitsPerUnit) =>
         quantity * (baseUnitsPerUnit ?? 1m);

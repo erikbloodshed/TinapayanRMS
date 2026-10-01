@@ -424,8 +424,7 @@ public class RawMaterialRepository(
     /// <summary>
     /// Makes the material's alternative units match <paramref name="units"/>: removes the saved ones
     /// missing from it, then updates those with an id, then adds those without. Removing first lets a
-    /// replacement fit within the limit of two, and lets a removed unit of measure come back as a new
-    /// row. Returns whether a corrected multiplier changed an ingredient's cost.
+    /// removed unit of measure come back as a new row. Returns whether a corrected multiplier changed an ingredient's cost.
     /// </summary>
     private static async Task<bool> SaveUnitsAsync(
         TinapayanRMSDbContext dbContext, int rawMaterialId, IReadOnlyList<RawMaterialUnit> units, CancellationToken cancellationToken)

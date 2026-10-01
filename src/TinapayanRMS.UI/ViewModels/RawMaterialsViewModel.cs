@@ -715,14 +715,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         set => this.RaiseAndSetIfChanged(ref _selectedUnitRow, value);
     }
 
-    /// <summary>Whether the form can take another alternative unit (UnitConversionRules.MaxAlternativeUnits); the grid's add row shows while it can.</summary>
-    private bool _canAddUnit = true;
-    public bool CanAddUnit
-    {
-        get => _canAddUnit;
-        private set => this.RaiseAndSetIfChanged(ref _canAddUnit, value);
-    }
-
     /// <summary>
     /// The row the grid's add row edits (controls:GridAddNewRow.ItemFactory): one that names its unit as soon as it's
     /// picked and shows the current base unit, which a row the grid made itself couldn't.
@@ -1643,7 +1635,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                         StandardMultiplierOf));
                 }
             });
-            CanAddUnit = UnitRows.Count < UnitConversionRules.MaxAlternativeUnits;
 
             BrandPriceRows.Clear();
             foreach (var price in snapshot.BrandPrices)
@@ -1920,7 +1911,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             UnitRows.AddRange(units.Select(u => new RawMaterialUnitRow(u, baseUnitAbbreviation, FindUnitOfMeasure, StandardMultiplierOf)));
             SelectedUnitRow = UnitRows.FirstOrDefault(r => ReferenceEquals(r.Unit, selectedUnit));
         });
-        CanAddUnit = UnitRows.Count < UnitConversionRules.MaxAlternativeUnits;
     }
 
     /// <summary>Changes the unit rows for the user without that counting as their edit (OnUnitRowsEdited).</summary>
@@ -1944,18 +1934,17 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
     /// <summary>
     /// What an edit in the Alternative Units grid does: a brand bought in a unit whose multiplier changed there is repriced
-    /// straight away, and the add row goes once there are two units.
+    /// straight away.
     /// </summary>
     private void OnUnitRowsEdited()
     {
-        CanAddUnit = UnitRows.Count < UnitConversionRules.MaxAlternativeUnits;
         RefreshBrandPriceRows();
         UpdatePurchaseCostTexts();
     }
 
     /// <summary>
     /// The checks the Alternative Units form's Apply used to make, now that units are typed straight into the grid: every row has a
-    /// unit and a positive multiplier, none is the base unit or repeats another's unit, and there are at most two. Throws
+    /// unit and a positive multiplier, none is the base unit or repeats another's unit. Throws
     /// InvalidOperationException for the first problem, which RunSafelyAsync shows.
     /// </summary>
     private void EnsureValidUnitRows()
@@ -1983,11 +1972,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
             RawMaterialRules.EnsureNotTheBaseUnit(EditingType == RawMaterialType.Packaging ? EditingBaseUnit?.Id : null, unit.UnitOfMeasureId);
             RawMaterialRules.EnsureUnitNotAlreadyAdded(units.Any(u => !ReferenceEquals(u, unit) && u.UnitOfMeasureId == unit.UnitOfMeasureId));
-        }
-
-        if (units.Count > UnitConversionRules.MaxAlternativeUnits)
-        {
-            UnitConversionRules.EnsureCanAddAlternativeUnit(units.Count - 1);
         }
     }
 
@@ -2058,7 +2042,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
     /// <summary>
     /// What picking a unit on a brand row does: one the material doesn't have yet is added as an alternative unit, with its
-    /// multiplier typed as the row's quantity, while there's room for another; and one added that way that no row is in
+    /// multiplier typed as the row's quantity; and one added that way that no row is in
     /// any more goes. <paramref name="row"/> may still be the grid's add row, which isn't in BrandPriceRows yet.
     /// </summary>
     void IBrandPriceRowHost.OnUnitPicked(BrandPriceRow row)
@@ -2067,13 +2051,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         if (row.UnitKey is not { } key || key == PurchaseUnitChoice.BaseUnitKey || ((IBrandPriceRowHost)this).FindUnit(key) is not null)
         {
-            return;
-        }
-
-        if (UnitRows.Count >= UnitConversionRules.MaxAlternativeUnits)
-        {
-            ErrorMessage = $"A material can have at most {UnitConversionRules.MaxAlternativeUnits} alternative units. "
-                + "Pick one it already has, or remove one in Alternative Units first.";
             return;
         }
 

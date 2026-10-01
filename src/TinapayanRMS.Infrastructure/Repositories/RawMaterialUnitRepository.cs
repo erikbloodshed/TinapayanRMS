@@ -49,7 +49,7 @@ public class RawMaterialUnitRepository(
 
     /// <summary>
     /// Adds the unit and saves it, rejecting a non-positive multiplier, a packaging material's own base
-    /// unit, a unit the material already has, and a third unit. A standard unit takes its fixed multiplier.
+    /// unit, and a unit the material already has. A standard unit takes its fixed multiplier.
     /// </summary>
     internal static async Task AddAsync(TinapayanRMSDbContext dbContext, RawMaterialUnit unit, CancellationToken cancellationToken)
     {
@@ -64,8 +64,6 @@ public class RawMaterialUnitRepository(
 
         RawMaterialRules.EnsureNotTheBaseUnit(material.BaseUnitId, unit.UnitOfMeasureId);
         await EnsureNotAlreadyAddedAsync(dbContext, unit.RawMaterialId, unit.UnitOfMeasureId, excludeId: 0, cancellationToken);
-        UnitConversionRules.EnsureCanAddAlternativeUnit(
-            await dbContext.RawMaterialUnits.CountAsync(u => u.RawMaterialId == unit.RawMaterialId, cancellationToken));
 
         dbContext.RawMaterialUnits.Add(new RawMaterialUnit
         {

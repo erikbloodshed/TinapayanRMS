@@ -48,24 +48,4 @@ public class UnitConversionRulesTests
 
         act.Should().Throw<InvalidOperationException>();
     }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    public void EnsureCanAddAlternativeUnit_accepts_an_item_with_fewer_than_two_units(int existingUnitCount)
-    {
-        var act = () => UnitConversionRules.EnsureCanAddAlternativeUnit(existingUnitCount);
-
-        act.Should().NotThrow();
-    }
-
-    [Theory]
-    [InlineData(2)]
-    [InlineData(3)]
-    public void EnsureCanAddAlternativeUnit_rejects_an_item_that_already_has_two_units(int existingUnitCount)
-    {
-        var act = () => UnitConversionRules.EnsureCanAddAlternativeUnit(existingUnitCount);
-
-        act.Should().Throw<InvalidOperationException>().WithMessage("*at most 2*");
-    }
 }

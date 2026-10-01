@@ -109,7 +109,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
     }
 
     [Fact]
-    public async Task AddAsync_rejects_a_third_unit()
+    public async Task AddAsync_accepts_a_third_unit()
     {
         var (ribbonId, _) = await SeedRibbonAsync();
         var meterId = await SeedUnitOfMeasureAsync("meter", "m");
@@ -119,10 +119,10 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = ribbonId, UnitOfMeasureId = meterId, BaseUnitsPerUnit = 100m }, Cancellation);
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = ribbonId, UnitOfMeasureId = rollId, BaseUnitsPerUnit = 1000m }, Cancellation);
 
-        var act = () => repository.AddAsync(new RawMaterialUnit { RawMaterialId = ribbonId, UnitOfMeasureId = inchId, BaseUnitsPerUnit = 2.54m }, Cancellation);
+        await repository.AddAsync(new RawMaterialUnit { RawMaterialId = ribbonId, UnitOfMeasureId = inchId, BaseUnitsPerUnit = 2.54m }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*at most 2*");
-        (await repository.GetForRawMaterialAsync(ribbonId, Cancellation)).Should().HaveCount(2);
+        (await repository.GetForRawMaterialAsync(ribbonId, Cancellation)).Select(u => u.UnitOfMeasureId)
+            .Should().BeEquivalentTo([meterId, rollId, inchId], "there's no limit on alternative units");
     }
 
     [Theory]

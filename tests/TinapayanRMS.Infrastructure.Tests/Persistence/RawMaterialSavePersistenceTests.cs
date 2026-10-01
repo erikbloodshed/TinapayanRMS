@@ -174,15 +174,12 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         var cupId = await SeedUnitOfMeasureAsync("cup", "cup");
         var repository = CreateRepository();
 
-        var threeUnits = () => repository.SaveAsync(
+        // Any number of alternative units.
+        var flourId = await repository.SaveAsync(
             PurchasedIngredient("Flour", categoryId), [Unit(bagId, 25000m), Unit(packId, 1000m), Unit(cupId, 120m)], brandPrices: null, bomLines: null, Cancellation);
-        await threeUnits.Should().ThrowAsync<InvalidOperationException>().WithMessage("*at most 2*");
+        (await repository.GetByIdAsync(flourId, Cancellation))!.Units.Should().HaveCount(3);
 
-        // The rejected save left no "Flour" behind to clash with.
-        var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [Unit(bagId, 25000m), Unit(packId, 1000m)], brandPrices: null, bomLines: null, Cancellation);
-
-        // Both saved units replaced, the bag by a new row: removals go first, so neither the limit of
-        // two nor the one-row-per-unit check trips.
+        // Saved units replaced, the bag by a new row: removals go first, so the one-row-per-unit check doesn't trip.
         await repository.SaveAsync(PurchasedIngredient("Flour", categoryId, flourId), [Unit(bagId, 50000m), Unit(cupId, 120m)], brandPrices: null, bomLines: null, Cancellation);
 
         (await repository.GetByIdAsync(flourId, Cancellation))!.Units.Select(u => (u.UnitOfMeasureId, u.BaseUnitsPerUnit))

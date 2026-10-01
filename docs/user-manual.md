@@ -40,7 +40,7 @@ A material's type can't be changed after it's saved.
 
 Every material's quantities and costs are tracked in its **base unit**: the gram for an ingredient, or the unit you chose for a packaging material.
 
-You can also give a material up to **two alternative units**. Each one is a multiple of the base unit. Examples:
+You can also give a material any number of **alternative units**. Each one is a multiple of the base unit. Examples:
 
 - a *bag* of flour = 25,000 g
 - a *tray* of eggs = 1,500 g
@@ -329,7 +329,7 @@ The parts of one ingredient can't add up to more than 100% of its weight or 100%
 
 ### Alternative Units tab
 
-Add up to two alternative units. Pick the **Alternative Unit** and type its **Multiplier**, which is how many base units it holds. The multiplier of a standard unit is filled in and can't be changed.
+Add as many alternative units as you need. Pick the **Alternative Unit** and type its **Multiplier**, which is how many base units it holds. The multiplier of a standard unit is filled in and can't be changed.
 
 The **Unit Conversion Overview** beside the table shows how each unit converts to the base unit.
 

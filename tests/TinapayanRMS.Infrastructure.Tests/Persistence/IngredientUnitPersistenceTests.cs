@@ -94,7 +94,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
     }
 
     [Fact]
-    public async Task AddAsync_rejects_a_third_unit()
+    public async Task AddAsync_accepts_a_third_unit()
     {
         var flourId = await SeedIngredientAsync("Flour");
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
@@ -104,10 +104,10 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = flourId, UnitOfMeasureId = bagId, BaseUnitsPerUnit = 25000m }, Cancellation);
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = flourId, UnitOfMeasureId = packId, BaseUnitsPerUnit = 1000m }, Cancellation);
 
-        var act = () => repository.AddAsync(new RawMaterialUnit { RawMaterialId = flourId, UnitOfMeasureId = cupId, BaseUnitsPerUnit = 120m }, Cancellation);
+        await repository.AddAsync(new RawMaterialUnit { RawMaterialId = flourId, UnitOfMeasureId = cupId, BaseUnitsPerUnit = 120m }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*at most 2*");
-        (await repository.GetForRawMaterialAsync(flourId, Cancellation)).Should().HaveCount(2);
+        (await repository.GetForRawMaterialAsync(flourId, Cancellation)).Select(u => u.UnitOfMeasureId)
+            .Should().Equal([bagId, packId, cupId], "there's no limit on alternative units, and they're listed largest first");
     }
 
     [Fact]
