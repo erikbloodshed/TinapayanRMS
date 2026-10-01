@@ -486,6 +486,8 @@ To add packaging, use **Add Sub-Assembly** and pick the **Packaging** role:
 
 The Packaging tab's table is typed into. Its columns are **Material**, **Qty**, **Unit** (the base unit or one of the material's alternative units), **Unit Cost** and **Cost per Unit**.
 
+**Move to Sub-Assemblies**, at the top right of the Packaging tab while the packaging is this product's own lines, works as it does for the product's own sections. Save puts the lines on the Sub-Assemblies screen as a packaging set named after the product, such as *Ensaymada Packaging*, and this product links it there. The cost doesn't change. Until you save, a **Moves to Sub-Assemblies on Save** badge shows and you can still change the lines; Undo or Revert keeps them the product's own. Afterwards other products can link the set too, its lines are changed on the Sub-Assemblies screen, and **Make a Copy** makes them this product's own again.
+
 Packaging quantities are for one sellable unit. They aren't multiplied by Quantity Required. If you change Quantity Required, check the packaging yourself.
 
 #### A composite product's Products tab
@@ -763,6 +765,8 @@ Right-click the category's folder in the Products list and choose **Print Folder
 1. On **Sub-Assemblies**, press **New**, pick the **Packaging** role, and list the box and the bags one pack takes. Save.
 2. Make the pack product. For example, use **Create Variant** of the single and set **Quantity Required** to 8.
 3. In its recipe, use **Add Sub-Assembly → Link an existing one** with the **Packaging** role, and pick the set. Save.
+
+Or type the packaging straight into the pack product's Packaging tab, then press **Move to Sub-Assemblies** and Save. The set is made from those lines and linked for you.
 
 ---
 

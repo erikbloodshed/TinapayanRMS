@@ -99,6 +99,23 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
+        var id = await SavePackagingSetAsync(dbContext, subAssembly, lines, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return id;
+    }
+
+    /// <summary>
+    /// Saves a packaging set, new or saved, with its lines on the caller's context, which should hold a transaction,
+    /// after every check SaveStandalonePackagingAsync makes. Returns its id. Also how a product's packaging lines move to
+    /// the Sub-Assemblies screen (PackagingLinkRepository.LinkNewSetAsync).
+    /// </summary>
+    internal static async Task<int> SavePackagingSetAsync(
+        TinapayanRMSDbContext dbContext,
+        SubAssembly subAssembly,
+        IReadOnlyList<(int PackagingMaterialId, int? UnitId, decimal QtyPerSet)> lines,
+        CancellationToken cancellationToken)
+    {
         var stored = await StageStandaloneAsync(dbContext, subAssembly, isPackaging: true, cancellationToken);
 
         SubAssemblyRules.EnsureValidPackagingLines(lines);
@@ -140,8 +157,6 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             SortOrder = index,
         }));
         await dbContext.SaveChangesAsync(cancellationToken);
-
-        await transaction.CommitAsync(cancellationToken);
         return stored.Id;
     }
 

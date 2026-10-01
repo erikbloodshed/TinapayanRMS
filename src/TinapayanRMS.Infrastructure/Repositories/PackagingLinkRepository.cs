@@ -94,6 +94,43 @@ public class PackagingLinkRepository(
         }
     }
 
+    /// <summary>
+    /// Move to Sub-Assemblies on the Products screen's Packaging tab (<see cref="PackagingLinkDraft.NewSet"/>), on the
+    /// caller's context, which should hold a transaction: <paramref name="lines"/> become a new packaging set on the
+    /// Sub-Assemblies screen, named after the product and the Packaging role as a recipe section moved there is
+    /// ("Ensaymada Packaging", numbered when taken), and the product's packaging links it in place of lines of its own.
+    /// One set per sellable unit, so each line's quantity for one unit is its quantity for one set, and the product's
+    /// packaging reads and costs as it did.
+    /// </summary>
+    internal static async Task LinkNewSetAsync(
+        TinapayanRMSDbContext dbContext,
+        int productId,
+        IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
+        CancellationToken cancellationToken)
+    {
+        // Read in the caller's transaction, so a product added or renamed by the same save is named as it now is.
+        var productName = await dbContext.Products
+            .Where(p => p.Id == productId)
+            .Select(p => p.Name)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new InvalidOperationException($"Product {productId} does not exist.");
+
+        // Known by its flag, never its name: the role can be renamed.
+        var role = await dbContext.SubAssemblyRoles.AsNoTracking().FirstOrDefaultAsync(r => r.IsPackaging, cancellationToken)
+            ?? throw new InvalidOperationException("There's no Packaging role to keep a packaging set in.");
+        var takenNames = await dbContext.SubAssemblies.Select(s => s.Name).ToListAsync(cancellationToken);
+        var name = SubAssemblyRules.UniqueStandaloneName(SubAssemblyRules.StandaloneNameFor(productName, role.Name, null), takenNames);
+
+        var setId = await SubAssemblyRepository.SavePackagingSetAsync(
+            dbContext,
+            new SubAssembly { Name = name, RoleId = role.Id },
+            [.. lines.Select(l => (l.PackagingMaterialId, l.UnitId, ProductRules.ReconcileReciprocal(l.AuthoredField, l.AuthoredValue).QtyPerUnit))],
+            cancellationToken);
+
+        await dbContext.PackagingLines.Where(l => l.ProductId == productId).ExecuteDeleteAsync(cancellationToken);
+        await SetSetLinkAsync(dbContext, productId, setId, cancellationToken);
+    }
+
     /// <summary>Links the product's packaging to another product's, after the self-link, existence and cycle checks.</summary>
     private static async Task SetProductLinkAsync(TinapayanRMSDbContext dbContext, int productId, int linkedProductId, CancellationToken cancellationToken)
     {

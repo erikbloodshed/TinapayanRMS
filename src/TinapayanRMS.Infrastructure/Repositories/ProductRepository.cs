@@ -175,15 +175,24 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             await ProductSubAssemblyUsageRepository.SetRecipeAsync(dbContext, fields.Id, recipe, cancellationToken);
         }
 
-        // Before the lines: SetLinesAsync refuses a linked product's, so an unlink has to land first.
-        if (packagingLink is not null)
+        // Move to Sub-Assemblies: the lines go to a new packaging set, which the packaging links in their place. After
+        // the recipe, so the set's name is kept apart from the sub-assemblies this save has just made.
+        if (packagingLink is { IsNewSet: true })
         {
-            await PackagingLinkRepository.SetAsync(dbContext, fields.Id, packagingLink, cancellationToken);
+            await PackagingLinkRepository.LinkNewSetAsync(dbContext, fields.Id, packagingLines ?? [], cancellationToken);
         }
-
-        if (packagingLines is not null)
+        else
         {
-            await PackagingLineRepository.SetLinesAsync(dbContext, fields.Id, packagingLines, cancellationToken);
+            // Before the lines: SetLinesAsync refuses a linked product's, so an unlink has to land first.
+            if (packagingLink is not null)
+            {
+                await PackagingLinkRepository.SetAsync(dbContext, fields.Id, packagingLink, cancellationToken);
+            }
+
+            if (packagingLines is not null)
+            {
+                await PackagingLineRepository.SetLinesAsync(dbContext, fields.Id, packagingLines, cancellationToken);
+            }
         }
 
         if (costing is not null)

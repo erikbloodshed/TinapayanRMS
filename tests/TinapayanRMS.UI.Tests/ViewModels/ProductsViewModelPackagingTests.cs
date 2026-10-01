@@ -195,6 +195,83 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
     }
 
     [Fact]
+    public async Task Move_to_Sub_Assemblies_on_the_Packaging_tab_saves_its_lines_as_a_set_and_links_it()
+    {
+        await AddRoleAsync("Packaging", isPackaging: true);
+        var boxId = await AddPackagingAsync("Gift Box", 30m);
+        var viewModel = await OpenWithOwnPackagingAsync(boxId);
+        viewModel.CanMovePackaging.Should().BeTrue("the lines are the product's own");
+
+        await viewModel.MovePackagingToSubAssembliesCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.IsPackagingMoving.Should().BeTrue("the badge says Save moves it");
+        viewModel.CanMovePackaging.Should().BeFalse("it's on its way already");
+        viewModel.IsPackagingEditable.Should().BeTrue("its lines are still typed into here until Save");
+        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeTrue();
+
+        // Typed after the press: the set takes it along.
+        viewModel.LineEdits.Single().QtyPerUnit = 2m;
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await WaitUntilSettledAsync(() => viewModel.IsPackagingLinked && viewModel.LineEdits.Count == 1, () => $"linked={viewModel.IsPackagingLinked}");
+        viewModel.IsPackagingMoving.Should().BeFalse();
+        viewModel.IsPackagingLinkedToSet.Should().BeTrue();
+        viewModel.PackagingLinkedToText.Should().Be("Linked to Ensaymada Packaging (Sub-Assemblies)");
+        viewModel.IsPackagingEditable.Should().BeFalse("a linked set's lines are kept on the Sub-Assemblies screen");
+        viewModel.CanMovePackaging.Should().BeFalse();
+        viewModel.Costs.Packaging.Should().Be(60m, "one set per piece, as the lines were: two ₱30 boxes");
+
+        await using var dbContext = CreateDbContext();
+        var set = await dbContext.SubAssemblies.SingleAsync(Cancellation);
+        (set.Name, set.OwnerProductId).Should().Be(("Ensaymada Packaging", (int?)null));
+        (await dbContext.SubAssemblyPackagingLines.SingleAsync(Cancellation)).QtyPerSet.Should().Be(2m);
+        (await dbContext.PackagingLinks.SingleAsync(Cancellation)).LinkedSubAssemblyId.Should().Be(set.Id);
+        (await dbContext.PackagingLines.CountAsync(Cancellation)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Undoing_Move_to_Sub_Assemblies_on_the_Packaging_tab_keeps_its_lines_the_products_own_and_stops_offering_Save()
+    {
+        await AddRoleAsync("Packaging", isPackaging: true);
+        var boxId = await AddPackagingAsync("Gift Box", 30m);
+        var viewModel = await OpenWithOwnPackagingAsync(boxId);
+
+        await viewModel.MovePackagingToSubAssembliesCommand.Execute();
+        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeTrue();
+
+        viewModel.TryUndo().Should().BeTrue();
+        viewModel.IsPackagingMoving.Should().BeFalse();
+        viewModel.CanMovePackaging.Should().BeTrue();
+        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeFalse();
+
+        viewModel.TryRedo().Should().BeTrue();
+        viewModel.IsPackagingMoving.Should().BeTrue();
+        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeTrue();
+
+        // Taking the packaging out takes the move with it.
+        await viewModel.RemoveUsageCommand.Execute();
+        viewModel.IsPackagingMoving.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Move_to_Sub_Assemblies_with_no_packaging_lines_is_refused_with_a_message()
+    {
+        await AddRoleAsync("Packaging", isPackaging: true);
+        var boxId = await AddPackagingAsync("Gift Box", 30m);
+        var viewModel = await OpenWithOwnPackagingAsync(boxId);
+        viewModel.SelectedLineEdit = viewModel.LineEdits.Single();
+        await viewModel.RemoveLineCommand.Execute();
+
+        await viewModel.MovePackagingToSubAssembliesCommand.Execute();
+
+        viewModel.ErrorMessage.Should().Contain("at least one");
+        viewModel.IsPackagingMoving.Should().BeFalse();
+        viewModel.CanMovePackaging.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Delete_Sub_Assembly_on_the_Packaging_tab_takes_out_the_lines_or_the_link()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -260,6 +337,19 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
         viewModel.LinkableSubAssemblies.Should().NotContain(o => o.IsPackaging);
         viewModel.FormRoleOptions.Should().NotContain(r => r.IsPackaging);
+    }
+
+    /// <summary>Ensaymada, with one <paramref name="boxId"/> a piece as its own packaging, open on its Packaging tab.</summary>
+    private async Task<ProductsViewModel> OpenWithOwnPackagingAsync(int boxId)
+    {
+        var productId = await AddProductAsync("Ensaymada");
+        await new PackagingLineRepository(CreateDbContextFactory())
+            .SetLinesAsync(productId, [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
+        var viewModel = await CreateLoadedViewModelAsync();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
+        await WaitUntilSettledAsync(
+            () => viewModel.SelectedRecipeTab is PackagingRecipeTab && viewModel.LineEdits.Count == 1, () => $"tab={viewModel.SelectedRecipeTab?.Header}");
+        return viewModel;
     }
 
     private PackagingLinkRepository CreatePackagingLinkRepository() =>

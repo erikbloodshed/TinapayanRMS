@@ -71,6 +71,9 @@ public sealed record ProductFormSnapshot
     // Packaging
     public required bool HasPackaging { get; init; }
     public required PackagingLinkTarget? PackagingLink { get; init; }
+
+    /// <summary>Move to Sub-Assemblies was pressed on the Packaging tab: Save makes its lines a packaging set, and links it.</summary>
+    public required bool IsPackagingMoving { get; init; }
     public required IReadOnlyList<PackagingLineState> Lines { get; init; }
 
     /// <summary>A composite's Products table; empty for a product made of sub-assemblies, which has no such table.</summary>
@@ -119,6 +122,7 @@ public sealed record ProductFormSnapshot
         && HasAddSubAssemblyTab == other.HasAddSubAssemblyTab
         && HasPackaging == other.HasPackaging
         && Equals(PackagingLink, other.PackagingLink)
+        && IsPackagingMoving == other.IsPackagingMoving
         && Lines.SequenceEqual(other.Lines)
         && Components.SequenceEqual(other.Components)
         && IsUsageFormOpen == other.IsUsageFormOpen

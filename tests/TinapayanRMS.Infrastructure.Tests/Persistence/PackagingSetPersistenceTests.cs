@@ -102,6 +102,79 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
     }
 
     [Fact]
+    public async Task Product_Save_with_NewSet_moves_the_products_lines_to_a_set_named_after_it_and_links_it()
+    {
+        await AddRoleAsync("Packaging", isPackaging: true);
+        var boxId = await AddPackagingAsync("Gift Box", 30m);
+        var ribbonId = await AddPackagingAsync("Ribbon", 0.05m, "cm");
+        var rollId = await AddAlternativeUnitAsync(ribbonId, "roll", 1000m);
+        var productId = await AddProductAsync("Ensaymada");
+        await CreatePackagingLineRepository().SetLinesAsync(
+            productId,
+            [(ribbonId, rollId, PackagingLineAuthoredField.QtyPerUnit, 0.03m), (boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)],
+            Cancellation);
+        var before = await CreatePackagingLineRepository().GetEffectiveForProductAsync(productId, Cancellation);
+
+        await new ProductRepository(CreateDbContextFactory()).SaveAsync(
+            new Product { Id = productId, Name = "Ensaymada" },
+            recipe: null,
+            PackagingLinkDraft.NewSet,
+            [(ribbonId, rollId, PackagingLineAuthoredField.QtyPerUnit, 0.03m), (boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)],
+            costing: null,
+            Cancellation);
+
+        var set = (await CreateRepository().GetStandaloneAsync(Cancellation)).Should().ContainSingle().Subject;
+        set.Name.Should().Be("Ensaymada Packaging");
+        set.Role!.IsPackaging.Should().BeTrue();
+        set.OwnerProductId.Should().BeNull("it's kept on the Sub-Assemblies screen, for any product to link");
+        (await CreateRepository().GetPackagingLinesAsync(set.Id, Cancellation)).Select(l => (l.PackagingMaterialId, l.UnitId, l.QtyPerSet)).Should()
+            .Equal([(ribbonId, rollId, 0.03m), (boxId, null, 1m)], "the lines as they were, in their units and order, one set per sellable unit");
+
+        (await CreatePackagingLinkRepository().GetForProductAsync(productId, Cancellation))!.LinkedSubAssemblyId.Should().Be(set.Id);
+        (await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation)).Should().BeEmpty("the product keeps no lines of its own");
+        (await CreatePackagingLineRepository().GetEffectiveForProductAsync(productId, Cancellation))
+            .Select(l => (l.PackagingMaterialId, l.UnitId, l.QtyPerUnit)).Should()
+            .Equal(before.Select(l => (l.PackagingMaterialId, l.UnitId, l.QtyPerUnit)), "its packaging reads, and so costs, as it did");
+    }
+
+    [Fact]
+    public async Task Product_Save_with_NewSet_moves_a_new_products_lines_on_its_first_save_and_a_taken_name_gets_the_next_number()
+    {
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var boxId = await AddPackagingAsync("Gift Box", 30m);
+        await SaveSetAsync("Ensaymada Packaging", packagingRoleId, [(boxId, 1m)]);
+
+        var id = await new ProductRepository(CreateDbContextFactory()).SaveAsync(
+            new Product { Name = "Ensaymada" },
+            recipe: null,
+            PackagingLinkDraft.NewSet,
+            [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 2m)],
+            costing: null,
+            Cancellation);
+
+        var link = await CreatePackagingLinkRepository().GetForProductAsync(id, Cancellation);
+        link!.LinkedSubAssembly!.Name.Should().Be("Ensaymada Packaging 2");
+        (await CreateRepository().GetPackagingLinesAsync(link.LinkedSubAssemblyId!.Value, Cancellation)).Should().ContainSingle()
+            .Which.QtyPerSet.Should().Be(2m);
+    }
+
+    [Fact]
+    public async Task Product_Save_with_NewSet_and_no_lines_is_refused_and_saves_nothing()
+    {
+        await AddRoleAsync("Packaging", isPackaging: true);
+        var productId = await AddProductAsync("Ensaymada");
+
+        var act = () => new ProductRepository(CreateDbContextFactory()).SaveAsync(
+            new Product { Id = productId, Name = "Ensaymada Big" }, recipe: null, PackagingLinkDraft.NewSet, [], costing: null, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*at least one line*");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.Products.SingleAsync(p => p.Id == productId, Cancellation)).Name.Should().Be("Ensaymada", "nothing is left half saved");
+        (await dbContext.SubAssemblies.CountAsync(Cancellation)).Should().Be(0);
+        (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
+    }
+
+    [Fact]
     public async Task Product_Save_refuses_a_circular_packaging_link_and_saves_nothing()
     {
         var aId = await AddProductAsync("A");

@@ -7,16 +7,22 @@
         The recipe's packaging, the content of its Recipe Structure tab, which Add Sub-Assembly adds in the Packaging
         role: its lines, typed straight into the table as a sub-assembly's are. The add row at the bottom starts a line,
         Delete removes the selected one. Linked packaging (another product's, or a packaging set) is kept where it's
-        from, so it only shows: AllowEditing is off and the add row goes with it.
+        from, so it only shows: AllowEditing is off and the add row goes with it. The product's own can move to the
+        Sub-Assemblies screen as a packaging set, which it then links.
     -->
     <StackPanel Margin="8">
         <!--
-            No title: its tab already says Packaging. A badge when it's linked, and what a piece of it costs at the far
-            right of the same row, as the recipe's other sub-assemblies have them (UsageFormPanel's badge row).
+            No title: its tab already says Packaging. On the left, a badge: where linked packaging is from, or "Moves to
+            Sub-Assemblies on Save". At the right, what a piece of it costs; after it, while the lines are the product's
+            own, Move to Sub-Assemblies, at the far right of the row as a recipe section's form has it (UsageFormPanel's
+            badge row). The button and the badges never show together. The row is always as tall as the button and its
+            margin (a badge is shorter), so the table stays put as the button gives way to "Moves to Sub-Assemblies on
+            Save", and sits where it does for linked packaging too.
         -->
-        <Grid>
+        <Grid MinHeight="34">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Border HorizontalAlignment="Left"
@@ -34,12 +40,28 @@
                     CommandParameter="{Binding PackagingLinkedSetId}"
                     ToolTip="Open the packaging set on the Sub-Assemblies screen"
                     Visibility="{Binding IsPackagingLinkedToSet, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <!-- Move to Sub-Assemblies was pressed: Save makes the lines a packaging set there and links it -->
+            <Border HorizontalAlignment="Left"
+                    Style="{StaticResource LinkedBadgeStyle}"
+                    Margin="0,0,0,10"
+                    ToolTip="Save puts these lines on the Sub-Assemblies screen as a packaging set named after this product, and this product links it there. Undo or Revert to keep them this product's own."
+                    Visibility="{Binding IsPackagingMoving, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="Moves to Sub-Assemblies on Save" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
+            </Border>
             <TextBlock Grid.Column="1"
                        Style="{StaticResource CaptionStyle}"
                        VerticalAlignment="Center"
                        Margin="12,0,0,10">
                 <Run Text="{Binding CostUnitCaption, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Costs.OwnPackaging, StringFormat='{}{0:N2}', Mode=OneWay}" />
             </TextBlock>
+            <syncfusion:ButtonAdv Grid.Column="2"
+                                  VerticalAlignment="Center"
+                                  Margin="12,0,0,10"
+                                  Label="Move to Sub-Assemblies"
+                                  ToolTip="Save puts these lines on the Sub-Assemblies screen as a packaging set, named after this product, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen."
+                                  IconTemplate="{StaticResource LinkIconTemplate}"
+                                  Command="{Binding MovePackagingToSubAssembliesCommand}"
+                                  Visibility="{Binding CanMovePackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
 
         <!--

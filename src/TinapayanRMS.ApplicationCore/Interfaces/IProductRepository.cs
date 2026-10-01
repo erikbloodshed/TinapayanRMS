@@ -89,12 +89,23 @@ public sealed record RecipeDraft(IReadOnlyList<NewSubAssemblyDraft> New, IReadOn
 
 /// <summary>
 /// What a product's packaging links, as Save writes it: another product's packaging, a standalone packaging
-/// set (one set per sellable unit), or neither (<see cref="None"/>), when the product owns its packaging lines.
+/// set (one set per sellable unit), or neither (<see cref="None"/>), when the product owns its packaging lines; or a
+/// new set made of its lines (<see cref="NewSet"/>).
 /// </summary>
 public sealed record PackagingLinkDraft(int? LinkedProductId, int? LinkedSubAssemblyId)
 {
     /// <summary>No link: the product's packaging is its own lines.</summary>
     public static PackagingLinkDraft None { get; } = new(null, null);
+
+    /// <summary>
+    /// Move to Sub-Assemblies on the Products screen's Packaging tab: the packaging lines saved with it become a new
+    /// packaging set on the Sub-Assemblies screen, named after the product and the Packaging role, and the product links
+    /// it in their place.
+    /// </summary>
+    public static PackagingLinkDraft NewSet { get; } = new(null, null) { IsNewSet = true };
+
+    /// <summary>This is <see cref="NewSet"/>: the link is to a set Save makes of the product's lines.</summary>
+    public bool IsNewSet { get; init; }
 }
 
 /// <summary>
@@ -162,7 +173,9 @@ public interface IProductRepository
     /// <param name="packagingLink">
     /// What the packaging links from now on, or null to leave the link as it is. Written before the lines, so
     /// a product unlinked here can be given its own lines in the same save. Removing a link doesn't copy the lines it
-    /// showed: pass them as <paramref name="packagingLines"/>.
+    /// showed: pass them as <paramref name="packagingLines"/>. <see cref="PackagingLinkDraft.NewSet"/> makes
+    /// <paramref name="packagingLines"/> a new packaging set on the Sub-Assemblies screen, named after the product
+    /// ("Ensaymada Packaging", numbered when taken), and links it: the product keeps no lines of its own.
     /// </param>
     /// <param name="packagingLines">The new packaging lines, as IPackagingLineRepository.SetLinesAsync takes them, or null to leave them as they are.</param>
     /// <param name="costing">The new costing parameters (only their cost and percentage fields are read), or null to leave them as they are.</param>

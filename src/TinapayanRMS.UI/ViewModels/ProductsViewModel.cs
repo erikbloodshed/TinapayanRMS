@@ -1240,11 +1240,31 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             this.RaiseAndSetIfChanged(ref _isPackagingLinked, value);
             this.RaisePropertyChanged(nameof(IsPackagingEditable));
+            this.RaisePropertyChanged(nameof(CanMovePackaging));
         }
     }
 
     /// <summary>The packaging is the product's own, so its table can be typed into; linked packaging is kept where it's from.</summary>
     public bool IsPackagingEditable => !IsPackagingLinked;
+
+    private bool _isPackagingMoving;
+    /// <summary>
+    /// Move to Sub-Assemblies was pressed on the Packaging tab: Save puts the product's own lines on the Sub-Assemblies
+    /// screen as a packaging set, and links it. They're still typed into here until then, and the tab's "Moves to
+    /// Sub-Assemblies on Save" badge says so. Whatever changes what the packaging links ends it (ShowPackagingLink).
+    /// </summary>
+    public bool IsPackagingMoving
+    {
+        get => _isPackagingMoving;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _isPackagingMoving, value);
+            this.RaisePropertyChanged(nameof(CanMovePackaging));
+        }
+    }
+
+    /// <summary>The packaging is the product's own lines, not on their way already: the Packaging tab offers Move to Sub-Assemblies.</summary>
+    public bool CanMovePackaging => IsPackagingEditable && !IsPackagingMoving;
 
     private string _packagingLinkedToText = string.Empty;
     /// <summary>"Linked to Cream Loaf" or "Linked to Gift Box Set (Sub-Assemblies)", or empty while the product has its own packaging.</summary>
@@ -1905,6 +1925,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>Make a Copy on a linked Packaging tab: the lines it shows become the product's own, and the link goes with Save.</summary>
     public ReactiveCommand<RxVoid, RxVoid> CopyPackagingCommand { get; }
+
+    /// <summary>
+    /// Move to Sub-Assemblies on the Packaging tab, while its lines are the product's own: Save puts them on the
+    /// Sub-Assemblies screen as a packaging set named after the product, and links it (PackagingLinkDraft.NewSet). Make a
+    /// Copy the other way round.
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> MovePackagingToSubAssembliesCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> CloneCommand { get; }
 
     /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductCloner.CreateVariantAsync).</summary>
@@ -2712,6 +2739,35 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             }),
             this.WhenAnyValue(x => x.IsPackagingLinked));
 
+        // The product's own packaging lines go to the Sub-Assemblies screen as a packaging set on Save, which it links.
+        // They're typed straight into the tab rather than through a form, so they're checked now instead: a line half
+        // filled in, or none at all, is refused with the message, as a recipe section's form a rule refuses is. They're
+        // still typed into until Save.
+        MovePackagingToSubAssembliesCommand = ReactiveCommand.Create(
+            () => AsUndoStep(() =>
+            {
+                ErrorMessage = null;
+                int lineCount;
+                try
+                {
+                    lineCount = CurrentLines().Count;
+                }
+                catch (InvalidOperationException ex)
+                {
+                    ErrorMessage = ex.Message;
+                    return;
+                }
+
+                if (lineCount == 0)
+                {
+                    ErrorMessage = "Add the packaging materials one piece takes first: a packaging set needs at least one.";
+                    return;
+                }
+
+                IsPackagingMoving = true;
+            }),
+            this.WhenAnyValue(x => x.CanMovePackaging));
+
         RemoveFormAddInCommand = ReactiveCommand.Create(
             () => AsUndoStep(() => FormAddIns.Remove(SelectedFormAddIn!)),
             this.WhenAnyValue(x => x.SelectedFormAddIn).Select(line => line is not null));
@@ -3326,10 +3382,15 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ShowPackagingLink(target);
     }
 
-    /// <summary>What the per-piece packaging links as the form stands, saved or not, and the Packaging tab's banner.</summary>
+    /// <summary>
+    /// What the per-piece packaging links as the form stands, saved or not, and the Packaging tab's banner. A load, Delete
+    /// Sub-Assembly, Make a Copy and an add all come through here, so a Move to Sub-Assemblies waiting for Save ends here
+    /// too; an undo puts it back afterwards (RestoreSnapshot).
+    /// </summary>
     private void ShowPackagingLink(PackagingLinkTarget? target)
     {
         _packagingLinkTarget = target;
+        IsPackagingMoving = false;
         IsPackagingLinked = target is not null;
         PackagingLinkedToText = target?.LinkedToText ?? string.Empty;
         this.RaisePropertyChanged(nameof(PackagingLinkedSetId));
@@ -3497,6 +3558,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         HasAddSubAssemblyTab = RecipeTabs.Contains(AddSubAssemblyTab),
         HasPackaging = HasPackaging,
         PackagingLink = _packagingLinkTarget,
+        IsPackagingMoving = IsPackagingMoving,
         Lines = [.. LineEdits.Select(CaptureLine)],
         Components = [.. ComponentEdits.Select(r => new ComponentLineState(r.ComponentProductId, r.Quantity))],
         IsUsageFormOpen = IsUsageFormOpen,
@@ -3570,8 +3632,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent) =
                 snapshot.Costing;
 
-            // 4. Packaging. _savedPackagingLinkKey is deliberately left alone: it's what Save compares against.
+            // 4. Packaging. _savedPackagingLinkKey is deliberately left alone: it's what Save compares against. Showing the
+            //    link ends a Move to Sub-Assemblies, so the move goes back after it.
             ShowPackagingLink(snapshot.PackagingLink);
+            IsPackagingMoving = snapshot.IsPackagingMoving;
             LineEdits.Clear();
             foreach (var line in snapshot.Lines)
             {
@@ -3911,7 +3975,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             && pair.First.ShrinkagePercent == pair.Second.ShrinkagePercent
             && pair.First.Lines.SequenceEqual(pair.Second.Lines));
 
-    /// <summary>The packaging lines when they differ from those last loaded, else null. Linked packaging is never saved here.</summary>
+    /// <summary>
+    /// The packaging lines when they differ from those last loaded, else null. Linked packaging is never saved here. Lines
+    /// moving to the Sub-Assemblies screen always go, since they're what the new packaging set is made of.
+    /// </summary>
     private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? ChangedLines()
     {
         if (IsPackagingLinked)
@@ -3922,14 +3989,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // Packaging that was linked when loaded, and is the product's own now (Make a Copy, or a new or copied one in its
         // place), is written even when its lines match what the link showed: the product had none of its own.
         var current = CurrentLines();
-        return current.SequenceEqual(_savedLines) && _savedPackagingLinkKey is null ? null : current;
+        return current.SequenceEqual(_savedLines) && _savedPackagingLinkKey is null && !IsPackagingMoving ? null : current;
     }
 
-    /// <summary>What the packaging links when it differs from the link last loaded, else null; no link is PackagingLinkDraft.None.</summary>
+    /// <summary>
+    /// What the packaging links when it differs from the link last loaded, else null; no link is PackagingLinkDraft.None, and
+    /// a set made of its own lines (Move to Sub-Assemblies) is PackagingLinkDraft.NewSet.
+    /// </summary>
     private PackagingLinkDraft? ChangedPackagingLink() =>
-        _packagingLinkTarget?.Key == _savedPackagingLinkKey
-            ? null
-            : _packagingLinkTarget is { } target ? new PackagingLinkDraft(target.ProductId, target.SubAssemblyId) : PackagingLinkDraft.None;
+        IsPackagingMoving ? PackagingLinkDraft.NewSet
+        : _packagingLinkTarget?.Key == _savedPackagingLinkKey ? null
+        : _packagingLinkTarget is { } target ? new PackagingLinkDraft(target.ProductId, target.SubAssemblyId)
+        : PackagingLinkDraft.None;
 
     /// <summary>
     /// Loads the saved product again and selects the fresh copy, so the form shows (and compares against) what was
