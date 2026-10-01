@@ -36,10 +36,12 @@
                                    controls:AutoCompleteDropDown.IsEnabled="True"
                                    Height="180">
                 <syncfusion:SfDataGrid.Columns>
+                    <!-- The only column without a fixed width, so the Star sizer gives it all the room the others leave -->
                     <syncfusion:GridTextColumn MappingName="Brand" HeaderText="Brand" />
                     <!-- Typing opens the list of units containing the text and picks one: the first starting with it, else the first containing it -->
                     <syncfusion:GridMultiColumnDropDownList MappingName="UnitKey"
                                                             HeaderText="Purchase Unit"
+                                                            Width="120"
                                                             ItemsSource="{Binding PurchaseUnitOptions}"
                                                             DisplayMember="Name"
                                                             ValueMember="Key"
@@ -61,13 +63,14 @@
                     </syncfusion:GridMultiColumnDropDownList>
                     <controls:NumericColumn MappingName="Quantity"
                                             HeaderText="Qty per Purchase Unit"
+                                            Width="150"
                                             NumberDecimalDigits="1"
                                             TypedDecimalDigits="4"
                                             AllowNullValue="True"
                                             controls:GridCellEditing.AllowWhen="CanTypeQuantity" />
-                    <controls:NumericColumn MappingName="Price" HeaderText="Purchase Price" NumberDecimalDigits="2" AllowNullValue="True" />
+                    <controls:NumericColumn MappingName="Price" HeaderText="Purchase Price" Width="110" NumberDecimalDigits="2" AllowNullValue="True" />
                     <!-- How far the buffered cost is over this brand's price -->
-                    <controls:NumericColumn MappingName="BufferPercent" HeaderText="Buffer %" NumberDecimalDigits="2" AllowNullValue="True" AllowEditing="False" />
+                    <controls:NumericColumn MappingName="BufferPercent" HeaderText="Buffer %" Width="80" NumberDecimalDigits="2" AllowNullValue="True" AllowEditing="False" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
 
