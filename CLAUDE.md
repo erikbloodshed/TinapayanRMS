@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**`PLAN.md` is the project guide and the source of truth** for the tech stack, domain model, application architecture, build phases and conventions. This file only covers what you need before you open it, and it doesn't repeat PLAN.md. PLAN.md is about 530 lines of very long bullets (roughly 75k tokens), so it can't be read in one go. List its sections with `grep -n "^#" PLAN.md`, then read the ones the task touches. Keep PLAN.md up to date when a decision changes.
+**`PLAN.md` is the project guide and the source of truth** for the tech stack, domain model, application architecture, build phases and conventions. This file only covers what you need before you open it, and it doesn't repeat PLAN.md. PLAN.md is about 1,150 lines of very long bullets (roughly 150k tokens), so it can't be read in one go. List its sections with `grep -n "^#" PLAN.md`, then read the ones the task touches. Keep PLAN.md up to date when a decision changes.
 
 TinapayanRMS is a WPF desktop app for a bakeshop. It tracks raw material prices and cascades cost changes up through made ingredients and sub-assemblies to each finished product's cost and selling price.
 
@@ -23,7 +23,7 @@ dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infras
 ```
 
 - **Migrations come only from `dotnet ef migrations add`.** Never write or edit one by hand. `TinapayanRMSDbContextFactory` provides the design-time DbContext.
-- **Work counts as done** when the solution builds, all tests pass, and any new migration applies cleanly to the local database. A change users can see (a screen, button, field, rule or cost formula) also updates the user manual, `docs/user-manual.md`, in the same change.
+- **Work counts as done** when the solution builds, all tests pass, and any new migration applies cleanly to the local database. A change users can see (a screen, button, field, rule or cost formula) also updates the user manual, `docs/user-manual.md`, in the same change. A change to anything the developer manual, `docs/developer-manual.md`, describes (the setup, commands, solution layout, architecture, a pattern or convention, or a type or file it names) also updates it in the same change.
 - **The app needs the `SYNCFUSION_LICENSE_KEY` user environment variable.** `App`'s static constructor throws at startup without it. The build doesn't need it.
 - **The app, the tests and `dotnet ef` need the local SQL Server Express instance** (`.\SQLEXPRESS`, service `MSSQL$SQLEXPRESS`), reached with Windows authentication. Use `sqlcmd -S ".\SQLEXPRESS" -E` to query it. LocalDB is still installed but unused.
 - **Build settings are centralized.** `Directory.Build.props` sets the shared compiler settings, the .NET analyzers (`AnalysisLevel` `latest-recommended`, with per-folder exceptions in `.editorconfig`) and the target frameworks (`net10.0` by default; UI and UI.Tests use `$(WindowsTargetFramework)`). `tests/Directory.Build.props` adds the xUnit and assertion packages to every `*.Tests` project. `Directory.Packages.props` turns on Central Package Management, so a `PackageReference` never carries a `Version`: add or bump versions there.

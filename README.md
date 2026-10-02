@@ -10,6 +10,8 @@ Read the **[User Manual](docs/user-manual.md)**. It explains every screen, how t
 
 TinapayanRMS is a Windows desktop app built with WPF, Syncfusion and ReactiveUI on .NET 10, with SQL Server through EF Core.
 
+Read the **[Developer Manual](docs/developer-manual.md)**. It covers what you need to know and install, how to set up and run the app, the architecture and the patterns the code follows, and how to test and make common changes.
+
 - [CLAUDE.md](CLAUDE.md): commands, and what to know before changing code.
 - [PLAN.md](PLAN.md): the project guide. It covers the tech stack, domain model, architecture, costing cascade and conventions.
 
