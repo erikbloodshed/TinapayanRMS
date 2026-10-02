@@ -548,6 +548,8 @@ The table below it lists, with each row's **Amount** and **Cost**:
 
 **Total Cost**, at the top right, adds up the table. Because each section is made in whole batches, it includes the extra pieces, so it can be more than the Costing tab's figures times the number of units. Costs follow **Unbuffered**, and the table follows changes to the recipe, packaging and Quantity Required as you make them, before you save.
 
+Press **Print** while this tab is showing to print the scaled recipe instead of the recipe and costing. See [Printing](#8-printing-recipes-and-costings).
+
 ### Clone tab
 
 The Clone tab is shown for saved products only. Type a **New Product Name**, then choose:
@@ -563,7 +565,7 @@ A composite product's clone or variant is a composite too, holding the same prod
 
 ## 8. Printing recipes and costings
 
-Press **Print** in the Products header to open the **Print** tab. It shows a preview of the product's recipe and costing as the screen shows them, including changes you haven't saved yet.
+Press **Print** in the Products header to open the **Print** tab. It shows a preview of the product's recipe and costing as the screen shows them, including changes you haven't saved yet. On the Scaling tab, it prints the scaled recipe instead (see [Printing a scaled recipe](#printing-a-scaled-recipe)).
 
 - **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
 - **Print**: the drop-down chooses **This product**, the folder last asked for, or **All products**.
@@ -578,6 +580,14 @@ The footer on each page shows the product, when it was printed, whether it inclu
 While the Products screen shows unbuffered costs, everything printed, a single product or a set, is at the materials' true costs. Each product's page says **Unbuffered costs** under its title and over its costing.
 
 Close the Print tab with its ✕.
+
+### Printing a scaled recipe
+
+If the Products screen is showing the [Scaling tab](#scaling-tab) when you press **Print**, the Print tab shows the **scaled recipe** instead of the recipe and costing. It has the **Sellable Units**, the pieces they come to and the **Total Cost**, then the tab's table: each section in whole batches, with its ingredients indented under it, made ingredients opened into what they're made from, and the packaging. Each row has its **Amount** and **Cost**.
+
+**Include** then has a single tick box, **Costs**. Clear it to print only the amounts, for example for the kitchen.
+
+The Print tab always follows the Products screen. If you go back to Products, change to another tab and show the Print tab again, it shows the recipe and costing again.
 
 ---
 

@@ -11,8 +11,9 @@ namespace TinapayanRMS.UI.Printing;
 
 /// <summary>
 /// A product's printout laid out on pages of one printable size: its title, then its recipe (each sub-assembly's table and
-/// piece size, then its packaging) and its costing, whichever are included. The page is built in code as blocks, each
-/// measured at the page's width and paginated by <see cref="PrintPagination"/>, with a footer on every page.
+/// piece size, then its packaging) and its costing, whichever are included, or its recipe scaled (the Products screen's
+/// Scaling tab), with or without its costs. The page is built in code as blocks, each measured at the page's width and
+/// paginated by <see cref="PrintPagination"/>, with a footer on every page.
 /// <see cref="BuildPage"/> builds new elements on every call: the print pane and the printer each put a page in a tree of
 /// their own, and an element can only have one parent.
 /// </summary>
@@ -45,9 +46,18 @@ public sealed class ProductPrintLayout
     private static readonly GridLength[] ComponentColumnsWithoutCosts = [new(1, GridUnitType.Star), new(70)];
     private static readonly GridLength[] CostingColumns = [new(1, GridUnitType.Star), new(140), new(90)];
     private static readonly GridLength[] ContentsColumns = [new(1, GridUnitType.Star), new(240), new(56)];
+    private static readonly GridLength[] ScalingColumns = [new(1, GridUnitType.Star), new(130), new(90)];
+    private static readonly GridLength[] ScalingColumnsWithoutCosts = [new(1, GridUnitType.Star), new(130)];
+
+    /// <summary>How far a scaled recipe's row sits in from the one it's part of, as the Scaling tab's tree indents it.</summary>
+    private const double ScalingIndent = 16;
 
     // The costing's blocks, kept on one page when they fit on one.
     private const int CostingGroup = 1;
+
+    // A scaled recipe's sections, products and packaging, each kept on one page when it fits on one: the first is this
+    // group, the next this plus one, and so on.
+    private const int ScalingGroups = 2;
 
     // What a block belongs to (Owner): a product of the set, by its index, or the contents.
     private const int ContentsOwner = -1;
@@ -131,11 +141,12 @@ public sealed class ProductPrintLayout
 
     /// <summary>
     /// What the printout is, naming only the parts included: "Ube Roll — Recipe and Costing" for one product, "All
-    /// Products — Recipe" for a set. The print job's name.
+    /// Products — Recipe" for a set, "Ube Roll — Scaling" for the Scaling tab. The print job's name.
     /// </summary>
     public string DocumentName => $"{_set.Title ?? (_set.Products.Count > 0 ? _set.Products[0].ProductName : null)} — {Parts}";
 
-    private string Parts => (_includeRecipe, _includeCosting) switch
+    // The Scaling tab is printed in place of both parts, whichever are ticked.
+    private string Parts => _set.IsScaling ? "Scaling" : (_includeRecipe, _includeCosting) switch
     {
         (true, true) => "Recipe and Costing",
         (true, false) => "Recipe",
@@ -221,10 +232,16 @@ public sealed class ProductPrintLayout
     private string ContentsPage(int index) =>
         _startPages is { } pages ? pages[index].ToString(CultureInfo.CurrentCulture) : "888";
 
-    /// <summary>One product's blocks: its title, then the recipe and the costing, whichever are included.</summary>
+    /// <summary>One product's blocks: its title, then the recipe and the costing, whichever are included, or its recipe scaled.</summary>
     private void AddProduct(ProductPrintout printout, bool startsPage, ref int table)
     {
         Add(_ => Title(printout), startsPage: startsPage);
+
+        if (printout.Scaling is { } scaling)
+        {
+            AddScaling(scaling, ++table);
+            return;
+        }
 
         if (_includeRecipe)
         {
@@ -424,6 +441,72 @@ public sealed class ProductPrintLayout
                 keepTogether: CostingGroup);
     }
 
+    /// <summary>A scaled recipe's table's cells: its cost only while costs are printed.</summary>
+    private T[] ScalingCells<T>(T item, T amount, T cost) => _includeCosting ? [item, amount, cost] : [item, amount];
+
+    private GridLength[] ScalingTable => _includeCosting ? ScalingColumns : ScalingColumnsWithoutCosts;
+
+    /// <summary>
+    /// The Scaling tab on paper, in place of the recipe and the costing: the sellable units, the pieces they come to and,
+    /// with the costs, the total cost, as the tab's top line has them; then its tree as one table, each row indented under
+    /// the one it's part of, with its amount and, with the costs, its cost. The total is only the figure at the top, as on
+    /// the tab. Without the costs there's no figure of one anywhere, as for the recipe.
+    /// </summary>
+    private void AddScaling(PrintedScaling scaling, int table)
+    {
+        Add(repeat => PartHeading(repeat ? "Scaling (continued)" : "Scaling"), keepWithNext: true, table: table, repeats: true);
+
+        List<(string Label, string Value, Brush? Foreground)> figures =
+            [("Sellable Units", scaling.Units.ToString("N0", CultureInfo.CurrentCulture), null)];
+        if (scaling.Pieces is { } pieces)
+        {
+            figures.Add(("Pieces", pieces.ToString("#,0.##", CultureInfo.CurrentCulture), null));
+        }
+
+        if (_includeCosting)
+        {
+            figures.Add(("Total Cost", Money(scaling.TotalCost), null));
+        }
+
+        Add(_ => Figures(figures), keepWithNext: true);
+
+        if (scaling.Rows.Count == 0)
+        {
+            Add(_ => Caption("Nothing to scale yet."));
+            return;
+        }
+
+        Add(
+            _ =>
+            {
+                var caption = Caption(_includeCosting
+                    ? "Each section is made in whole batches, so the amounts and the total cost include the extra pieces. A made ingredient's own ingredients are listed under it."
+                    : "Each section is made in whole batches, so the amounts include the extra pieces. A made ingredient's own ingredients are listed under it.");
+                caption.Margin = caption.Margin with { Bottom = 6 };
+                return caption;
+            },
+            keepWithNext: true);
+        Add(_ => HeaderRow(ScalingTable, ScalingCells("Item", "Amount", "Cost")), keepWithNext: true, table: table, repeats: true);
+
+        // Each section, product or the packaging starts a page of its own when it doesn't fit what's left of one but fits a
+        // page, as the costing does, so a page the table runs on to starts with the row that says what it's part of. Within
+        // one too long for a page, a row with rows under it stays with the first of them.
+        for (var top = 0; top < scaling.Rows.Count; top++)
+        {
+            foreach (var (row, depth) in Flatten(scaling.Rows[top], 0))
+            {
+                Add(
+                    _ => Row(ScalingTable, ScalingCells(ScalingItem(row, depth), Figure(row.AmountText), Figure(Money(row.Cost)))),
+                    keepWithNext: row.Children.Count > 0,
+                    table: table,
+                    keepTogether: ScalingGroups + top);
+            }
+        }
+
+        static IEnumerable<(ScalingRow Row, int Depth)> Flatten(ScalingRow row, int depth) =>
+            row.Children.SelectMany(child => Flatten(child, depth + 1)).Prepend((row, depth));
+    }
+
     private void Add(
         Func<bool, FrameworkElement> create,
         bool keepWithNext = false,
@@ -551,24 +634,29 @@ public sealed class ProductPrintLayout
     /// The costing's headline figures, labels over values, as the product header has them. The header's Markup % is named
     /// for what it is here, the markup the current price earns, since the breakdown below has a Markup row of its own.
     /// </summary>
-    private Grid Figures(ProductCostSummary costs)
-    {
-        (string Label, string Value, Brush? Foreground)[] figures =
-        [
-            ("Material Cost", Money(costs.Material), null),
-            ("Base Cost", Money(costs.BaseCost), null),
-            ("Current Price", costs.CurrentPrice is { } price ? Money(price) : "—", null),
-            (
-                "Markup at Current Price",
-                costs.CurrentMarkupPercent is { } markup ? markup.ToString("N2", CultureInfo.CurrentCulture) + "%" : "—",
-                costs.IsCurrentPriceBelowCost ? _error : null
-            ),
-        ];
+    private Grid Figures(ProductCostSummary costs) => Figures(
+    [
+        ("Material Cost", Money(costs.Material), null),
+        ("Base Cost", Money(costs.BaseCost), null),
+        ("Current Price", costs.CurrentPrice is { } price ? Money(price) : "—", null),
+        (
+            "Markup at Current Price",
+            costs.CurrentMarkupPercent is { } markup ? markup.ToString("N2", CultureInfo.CurrentCulture) + "%" : "—",
+            costs.IsCurrentPriceBelowCost ? _error : null
+        ),
+    ]);
 
+    /// <summary>Figures, labels over values, in a row of at least four columns, so fewer line up as the costing's four do.</summary>
+    private Grid Figures(List<(string Label, string Value, Brush? Foreground)> figures)
+    {
         var grid = new Grid { Margin = new Thickness(0, 6, 0, 8) };
-        for (var i = 0; i < figures.Length; i++)
+        for (var i = 0; i < Math.Max(figures.Count, 4); i++)
         {
             grid.ColumnDefinitions.Add(new ColumnDefinition());
+        }
+
+        for (var i = 0; i < figures.Count; i++)
+        {
             var figure = new StackPanel { Margin = new Thickness(CellPadding.Left, 0, CellPadding.Right, 0) };
             figure.Children.Add(Text(figures[i].Label, SmallSize, _muted));
             figure.Children.Add(Text(figures[i].Value, BodySize + 1, figures[i].Foreground, FontWeights.SemiBold));
@@ -651,6 +739,24 @@ public sealed class ProductPrintLayout
         var label = Text(text, size, foreground, weight, wrap: true);
         label.Margin = CellPadding;
         return label;
+    }
+
+    /// <summary>
+    /// A scaled recipe's row's name, as the Scaling tab's tree has it: indented <paramref name="depth"/> steps under the row
+    /// it's part of, a section's, a product's or the packaging's in bold, and what it comes to beside it, muted ("2 batches
+    /// · 200 pcs (40 extra)").
+    /// </summary>
+    private TextBlock ScalingItem(ScalingRow row, int depth)
+    {
+        var item = Label(string.Empty);
+        item.Margin = new Thickness(CellPadding.Left + (depth * ScalingIndent), CellPadding.Top, CellPadding.Right, CellPadding.Bottom);
+        item.Inlines.Add(new Run(row.Name) { FontWeight = row.IsGroup ? FontWeights.SemiBold : FontWeights.Normal });
+        if (row.Detail.Length > 0)
+        {
+            item.Inlines.Add(new Run($"   {row.Detail}") { FontSize = SmallSize, Foreground = _muted });
+        }
+
+        return item;
     }
 
     /// <summary>A figure, right-aligned in its column.</summary>

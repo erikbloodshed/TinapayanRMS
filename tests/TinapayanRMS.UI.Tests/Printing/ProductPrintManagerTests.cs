@@ -8,6 +8,7 @@ using AwesomeAssertions;
 using Syncfusion.Windows.Shared.Printing;
 using TinapayanRMS.UI.Printing;
 using TinapayanRMS.UI.Tests.Fixtures;
+using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Tests.Printing;
 
@@ -79,5 +80,24 @@ public class ProductPrintManagerTests
 
         changed.Should().Contain(nameof(ProductPrintManager.IncludeCosting), "the Costing tick box follows it");
         manager.GetPrintDocument().Pages.Should().ContainSingle();
+    });
+
+    [Fact]
+    public void A_scaled_recipe_offers_only_its_costs_and_clearing_them_keeps_the_recipe_ticked_for_the_next_printout() => StaThread.RunLicensed(() =>
+    {
+        using var manager = new ProductPrintManager(SamplePrintouts.WithLines(3)) { IncludeRecipe = false };
+        List<string?> changed = [];
+        manager.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        manager.IsScaling.Should().BeFalse();
+
+        manager.PrintSet = ProductPrintSet.Of(SamplePrintouts.Scaled());
+        changed.Should().Contain(nameof(ProductPrintManager.IsScaling), "the Include bar swaps Recipe and Costing for Costs");
+        manager.IsScaling.Should().BeTrue();
+
+        // The Costs box, cleared while Recipe was: the recipe and costing printed next must still have a part.
+        manager.IncludeCosting = false;
+
+        manager.IncludeRecipe.Should().BeTrue();
+        changed.Should().Contain(nameof(ProductPrintManager.IncludeRecipe), "the Recipe tick box follows it");
     });
 }

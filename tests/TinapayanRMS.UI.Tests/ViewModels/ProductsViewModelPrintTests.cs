@@ -54,6 +54,29 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         printout.Packaging.Should().NotBeNull();
         printout.Packaging!.Lines.Should().Equal(new PrintedPackagingLine("Gift Box", 1m, "pc", 30m, 30m));
         printout.Costs.Should().BeSameAs(viewModel.Costs, "the costing is the Costing tab's");
+        printout.Scaling.Should().BeNull("the Recipe tab was showing");
+    }
+
+    [Fact]
+    public async Task Print_on_the_Scaling_tab_prints_the_recipe_scaled_and_on_another_tab_its_recipe_and_costing_again()
+    {
+        var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
+        viewModel.EditingQuantityRequired = 8;
+        viewModel.ScalingUnits = 5;
+        viewModel.SelectedDetailsTab = ProductsViewModel.ScalingTab;
+
+        var printout = await PrintAsync(viewModel);
+
+        // 5 boxes of 8 are 40 pieces: 2 batches of the 20 50 g pieces a 1,000 g Dough makes.
+        printout.Scaling.Should().NotBeNull();
+        var scaling = printout.Scaling!;
+        (scaling.Units, scaling.Pieces, scaling.TotalCost).Should().Be((5, 40m, 100m));
+        scaling.Rows.Should().Equal(viewModel.ScalingRows, "the pages are the tab as it shows");
+        scaling.Rows.Single().Detail.Should().Be("2 batches · 40 pcs");
+
+        // The Print tab, shown again with the Recipe tab showing on Products, follows it.
+        viewModel.SelectedDetailsTab = ProductsViewModel.RecipeTab;
+        viewModel.PreparePrintout().Printout!.Scaling.Should().BeNull();
     }
 
     [Fact]

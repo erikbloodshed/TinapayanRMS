@@ -11,10 +11,11 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Printing;
 
 /// <summary>
-/// What Syncfusion's print pane (<see cref="PrintPreview"/>, in Syncfusion.Shared.WPF) prints: a product's printout, or a
-/// set of products', laid out again (<see cref="ProductPrintLayout"/>) whenever the pane's paper, margins or orientation
-/// change or a part is ticked in or out, each page handed over newly built. The pane asks for its pages one at a time as it
-/// scrolls (PrintPreviewPanel), and printing asks for every page again for page controls of its own.
+/// What Syncfusion's print pane (<see cref="PrintPreview"/>, in Syncfusion.Shared.WPF) prints: a product's printout, its
+/// recipe scaled, or a set of products', laid out again (<see cref="ProductPrintLayout"/>) whenever the pane's paper,
+/// margins or orientation change or a part is ticked in or out, each page handed over newly built. The pane asks for its
+/// pages one at a time as it scrolls (PrintPreviewPanel), and printing asks for every page again for page controls of its
+/// own.
 /// </summary>
 public sealed class ProductPrintManager(ProductPrintSet printSet) : PrintManager(new PrintSettingsBase())
 {
@@ -38,12 +39,24 @@ public sealed class ProductPrintManager(ProductPrintSet printSet) : PrintManager
         {
             if (!ReferenceEquals(_printSet, value))
             {
+                var wasScaling = _printSet.IsScaling;
                 _printSet = value;
                 OnPropertyChanged(nameof(PrintSet));
+                if (value.IsScaling != wasScaling)
+                {
+                    OnPropertyChanged(nameof(IsScaling));
+                }
+
                 OnPrintPropertyChanged();
             }
         }
     }
+
+    /// <summary>
+    /// The pages are the Products screen's Scaling tab, in place of the recipe and the costing: the Include bar then offers
+    /// only its costs (<see cref="IncludeCosting"/>).
+    /// </summary>
+    public bool IsScaling => PrintSet.IsScaling;
 
     private bool _includeRecipe = true;
     /// <summary>Print the recipe: each sub-assembly's table and piece size, then the packaging.</summary>
@@ -62,7 +75,10 @@ public sealed class ProductPrintManager(ProductPrintSet printSet) : PrintManager
     }
 
     private bool _includeCosting = true;
-    /// <summary>Print the costing: the headline figures and the breakdown to the selling price.</summary>
+    /// <summary>
+    /// Print the costing: the headline figures and the breakdown to the selling price. Without it nothing printed is a
+    /// cost: the recipe leaves out its costs, and so does the Scaling tab, which this is the only choice for.
+    /// </summary>
     public bool IncludeCosting
     {
         get => _includeCosting;
@@ -72,6 +88,15 @@ public sealed class ProductPrintManager(ProductPrintSet printSet) : PrintManager
             {
                 _includeCosting = value;
                 OnPropertyChanged(nameof(IncludeCosting));
+
+                // Something always prints. The Scaling tab's Costs can be cleared while Recipe is cleared too, which would
+                // leave the next recipe and costing with neither part, so Recipe is ticked again.
+                if (!value && !_includeRecipe)
+                {
+                    _includeRecipe = true;
+                    OnPropertyChanged(nameof(IncludeRecipe));
+                }
+
                 OnPrintPropertyChanged();
             }
         }

@@ -52,6 +52,49 @@ internal static class SamplePrintouts
         Costs = new ProductCostSummary([("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m)], 1, [30m], 25m, 10m, 5m, 30m, 12m, 120m, isComposite: true),
     };
 
+    /// <summary>
+    /// Ube Roll's Scaling tab at 20 boxes of 8, 160 pieces: a Dough of 2 batches, with flour and as many more lines as
+    /// given, and syrup, which opens into the sugar it's made of; then a box for each unit.
+    /// </summary>
+    public static ProductPrintout Scaled(int extraLines = 0)
+    {
+        ScalingRow[] doughLines =
+        [
+            ScalingRow.Line("Flour", string.Empty, "1,800 g", 90m),
+            new("Syrup", string.Empty, "200 g", 18m, false, [ScalingRow.Line("Sugar", string.Empty, "200 g", 18m)]),
+            .. Enumerable.Range(1, extraLines).Select(i => ScalingRow.Line($"Ingredient {i}", string.Empty, "10 g", 1m)),
+        ];
+        ScalingRow[] rows =
+        [
+            new("Dough", "2 batches · 200 pcs (40 extra)", "2,000 g", doughLines.Sum(r => r.Cost), true, doughLines),
+            new("Packaging", string.Empty, string.Empty, 600m, true, [ScalingRow.Line("Gift Box", string.Empty, "20 pc", 600m)]),
+        ];
+
+        return WithLines(1) with
+        {
+            CostUnitCaption = "Per unit of 8 pieces",
+            Scaling = new PrintedScaling(20, 160m, rows, rows.Sum(r => r.Cost)),
+        };
+    }
+
+    /// <summary>Ube Roll's Scaling tab with the sections given, each one batch of as many 10 g lines as given, named after it.</summary>
+    public static ProductPrintout ScaledSections(params (string Name, int Lines)[] sections)
+    {
+        ScalingRow[] rows =
+        [
+            .. sections.Select(section =>
+            {
+                ScalingRow[] lines =
+                [
+                    .. Enumerable.Range(1, section.Lines).Select(i => ScalingRow.Line($"{section.Name} Ingredient {i}", string.Empty, "10 g", 1m)),
+                ];
+                return new ScalingRow(section.Name, "1 batch · 20 pcs", $"{10 * section.Lines:#,0} g", lines.Sum(l => l.Cost), true, lines);
+            }),
+        ];
+
+        return Scaled() with { Scaling = new PrintedScaling(20, 160m, rows, rows.Sum(r => r.Cost)) };
+    }
+
     /// <summary>A titled set of products, each named and with as many Dough lines as given, as a folder or All products prints them.</summary>
     public static ProductPrintSet Set(string title, params (string Name, int Lines)[] products) => new(
         title,

@@ -228,6 +228,90 @@ public class ProductPrintLayoutTests
         costing.Should().Contain("Costing (Per piece)").And.Contain("Total Selling Price (Per piece)").And.NotContain("Recipe").And.NotContain("Ingredient 1");
     });
 
+    [Fact]
+    public void A_scaled_recipe_prints_the_Scaling_tabs_rows_in_place_of_the_recipe_and_the_costing() => StaThread.Run(() =>
+    {
+        // Both parts ticked: the Scaling tab prints in place of them whatever is ticked.
+        var layout = new ProductPrintLayout(SamplePrintouts.Scaled(), includeRecipe: true, includeCosting: true, A4);
+        var texts = AllTexts(layout);
+
+        texts.Should().ContainInConsecutiveOrder("Scaling", "Sellable Units", "20", "Pieces", "160", "Total Cost", Figure(708m, "N2"));
+        texts.Should().ContainInConsecutiveOrder("Item", "Amount", "Cost");
+        texts.Should().ContainInConsecutiveOrder("Dough   2 batches · 200 pcs (40 extra)", "2,000 g", Figure(108m, "N2"));
+        texts.Should().ContainInConsecutiveOrder("Syrup", "200 g", Figure(18m, "N2"), "Sugar", "200 g", Figure(18m, "N2"));
+        texts.Should().ContainInConsecutiveOrder("Gift Box", "20 pc", Figure(600m, "N2"));
+        texts.Count(t => t == Figure(708m, "N2")).Should().Be(1, "the total is the figure at the top, as on the tab, with no total row repeating it");
+        texts.Should().NotContain("Recipe").And.NotContain(t => t.StartsWith("Costing", StringComparison.Ordinal)).And.NotContain("Ingredient 1");
+        layout.DocumentName.Should().Be("Ube Roll — Scaling");
+        Texts(Footer((Grid)layout.BuildPage(1))).First().Should().StartWith("Ube Roll — Scaling · Printed ");
+    });
+
+    [Fact]
+    public void A_scaled_recipes_rows_sit_in_under_the_row_theyre_part_of() => StaThread.Run(() =>
+    {
+        var body = Body(new ProductPrintLayout(SamplePrintouts.Scaled(), includeRecipe: true, includeCosting: true, A4).BuildPage(1));
+
+        double IndentOf(string name) =>
+            body.Select(block => block is Border { Child: Grid row } ? row.Children.OfType<TextBlock>().FirstOrDefault() : null)
+                .Single(item => item is not null && new TextRange(item.ContentStart, item.ContentEnd).Text.StartsWith(name, StringComparison.Ordinal))!
+                .Margin.Left;
+
+        IndentOf("Flour").Should().BeGreaterThan(IndentOf("Dough"));
+        IndentOf("Sugar").Should().BeGreaterThan(IndentOf("Syrup"), "a made ingredient opens into what it's made from");
+        IndentOf("Syrup").Should().Be(IndentOf("Flour"));
+        IndentOf("Packaging").Should().Be(IndentOf("Dough"));
+    });
+
+    [Fact]
+    public void Without_its_costs_a_scaled_recipe_prints_only_the_amounts() => StaThread.Run(() =>
+    {
+        var texts = AllTexts(new ProductPrintLayout(SamplePrintouts.Scaled(), includeRecipe: true, includeCosting: false, A4));
+
+        texts.Should().ContainInConsecutiveOrder("Sellable Units", "20", "Pieces", "160");
+        texts.Should().ContainInConsecutiveOrder("Item", "Amount", "Dough   2 batches · 200 pcs (40 extra)", "2,000 g", "Flour", "1,800 g");
+        texts.Should().NotContain(t => t.Contains("Cost", StringComparison.Ordinal), "no Cost column and no Total Cost figure");
+        texts.Should().NotContain([Figure(90m, "N2"), Figure(108m, "N2"), Figure(708m, "N2")]);
+    });
+
+    [Fact]
+    public void A_scaled_recipe_too_long_for_a_page_runs_on_under_its_heading_and_header_row_again() => StaThread.Run(() =>
+    {
+        var layout = new ProductPrintLayout(SamplePrintouts.Scaled(extraLines: 80), includeRecipe: true, includeCosting: true, A4);
+
+        layout.PageCount.Should().BeGreaterThan(1);
+        var body = Body(layout.BuildPage(2));
+        Texts(body[0]).Single().Should().Be("Scaling (continued)");
+        Texts(body[1]).Should().Equal("Item", "Amount", "Cost");
+        EveryPageShouldFitAboveItsFooter(layout, A4);
+    });
+
+    [Fact]
+    public void A_scaled_section_that_doesnt_fit_whats_left_of_a_page_starts_the_next_with_the_row_naming_it() => StaThread.Run(() =>
+    {
+        // Each fits a page, but not both on one: the Filling goes over whole rather than starting at the foot of the first.
+        var layout = new ProductPrintLayout(
+            SamplePrintouts.ScaledSections(("Dough", 25), ("Filling", 25)), includeRecipe: true, includeCosting: true, A4);
+
+        layout.PageCount.Should().Be(2);
+        AllTexts(layout, 1).Should().NotContain(t => t.StartsWith("Filling", StringComparison.Ordinal));
+        var body = Body(layout.BuildPage(2));
+        Texts(body[0]).Single().Should().Be("Scaling (continued)");
+        Texts(body[1]).Should().Equal("Item", "Amount", "Cost");
+        Texts(body[2]).First().Should().Be("Filling   1 batch · 20 pcs");
+        EveryPageShouldFitAboveItsFooter(layout, A4);
+    });
+
+    [Fact]
+    public void A_product_sold_by_the_piece_has_no_pieces_figure_and_one_with_nothing_to_scale_says_so() => StaThread.Run(() =>
+    {
+        var texts = AllTexts(new ProductPrintLayout(
+            SamplePrintouts.Scaled() with { Scaling = new PrintedScaling(120, null, [], 0m) }, includeRecipe: true, includeCosting: true, A4));
+
+        texts.Should().ContainInConsecutiveOrder("Sellable Units", "120", "Total Cost", Figure(0m, "N2"));
+        texts.Should().NotContain("Pieces").And.NotContain("Item");
+        texts.Should().Contain("Nothing to scale yet.");
+    });
+
     /// <summary>Lays every page out at <paramref name="size"/>, as the pane does, and checks its blocks end above its footer.</summary>
     private static void EveryPageShouldFitAboveItsFooter(ProductPrintLayout layout, Size size)
     {

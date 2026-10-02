@@ -13,9 +13,9 @@ namespace TinapayanRMS.UI.Views;
 /// The main window's Print tab: Syncfusion's print pane (PrintPreview) over what <see cref="PrintTabViewModel"/> prepared,
 /// the product the Products screen has open or a set of products, with the printer, copies, pages, orientation, paper
 /// and margins on its left and the pages as they'll print on its right, and under it what to print and the parts to
-/// include, Recipe and Costing. The pane's own Print button prints straight to the printer picked there. The pane is
-/// made once, with the first pages, and each later set is laid out in it, so the paper, orientation and parts picked
-/// stay as they were.
+/// include, Recipe and Costing (for the Scaling tab, its Costs). The pane's own Print button prints straight to the
+/// printer picked there. The pane is made once, with the first pages, and each later set is laid out in it, so the
+/// paper, orientation and parts picked stay as they were.
 /// </summary>
 public sealed partial class ProductPrintView : UserControl, IDisposable
 {
@@ -35,7 +35,8 @@ public sealed partial class ProductPrintView : UserControl, IDisposable
         if (_manager is not null)
         {
             var isAnother = _manager.PrintSet.Title != set.Title
-                || (set.Title is null && _manager.PrintSet.Products[0].ProductName != set.Products[0].ProductName);
+                || (set.Title is null && _manager.PrintSet.Products[0].ProductName != set.Products[0].ProductName)
+                || _manager.PrintSet.IsScaling != set.IsScaling;
             _manager.PrintSet = set;
 
             // Other pages start at their first, as the pane's own First button takes them, once they're laid out: the pane

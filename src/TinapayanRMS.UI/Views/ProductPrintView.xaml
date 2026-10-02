@@ -18,7 +18,8 @@
         <!--
             What to print, and which parts. The bar's DataContext is the PrintTabViewModel; the tick boxes' is the
             ProductPrintManager, set in code once the pane is made, and the print pane keeps its own. Each tick box can be
-            cleared only while the other part is still ticked, so there's always something to print.
+            cleared only while the other part is still ticked, so there's always something to print. The Scaling tab
+            prints in place of both, and offers only its costs.
             On the right, the set being read, or what the pages leave out, in the warning colour.
         -->
         <Border Grid.Row="1"
@@ -39,21 +40,38 @@
                                             ItemsSource="{Binding Scopes}"
                                             DisplayMemberPath="Label"
                                             SelectedItem="{Binding SelectedScope, Mode=TwoWay}"
-                                            ToolTip="This product prints the product Products has open, unsaved edits included. A folder or all products print as they're saved, each on pages of its own after a contents page." />
+                                            ToolTip="This product prints the product Products has open, unsaved edits included, or its recipe scaled while Products shows its Scaling tab. A folder or all products print as they're saved, each on pages of its own after a contents page." />
                 </StackPanel>
 
                 <StackPanel x:Name="IncludeBar" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="Include" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,0" />
-                    <CheckBox Content="Recipe"
-                              IsChecked="{Binding IncludeRecipe, Mode=TwoWay}"
-                              IsEnabled="{Binding IncludeCosting}"
-                              ToolTip="Each sub-assembly's ingredients and piece size, then the packaging."
-                              VerticalAlignment="Center"
-                              Margin="0,0,16,0" />
-                    <CheckBox Content="Costing"
+                    <StackPanel Orientation="Horizontal">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsScaling}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <CheckBox Content="Recipe"
+                                  IsChecked="{Binding IncludeRecipe, Mode=TwoWay}"
+                                  IsEnabled="{Binding IncludeCosting}"
+                                  ToolTip="Each sub-assembly's ingredients and piece size, then the packaging."
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,16,0" />
+                        <CheckBox Content="Costing"
+                                  IsChecked="{Binding IncludeCosting, Mode=TwoWay}"
+                                  IsEnabled="{Binding IncludeRecipe}"
+                                  ToolTip="The Costing tab's breakdown, from the materials up to the selling price, with the current price and its markup. Without it the recipe shows no costs."
+                                  VerticalAlignment="Center" />
+                    </StackPanel>
+                    <!-- The Scaling tab, printed in place of the recipe and the costing, has only its costs to leave out -->
+                    <CheckBox Content="Costs"
                               IsChecked="{Binding IncludeCosting, Mode=TwoWay}"
-                              IsEnabled="{Binding IncludeRecipe}"
-                              ToolTip="The Costing tab's breakdown, from the materials up to the selling price, with the current price and its markup. Without it the recipe shows no costs."
+                              Visibility="{Binding IsScaling, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}"
+                              ToolTip="Each row's cost, and the total cost. Without them the scaled recipe shows only the amounts."
                               VerticalAlignment="Center" />
                 </StackPanel>
 

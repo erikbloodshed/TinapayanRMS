@@ -1774,8 +1774,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>
     /// Print: asks for the Print tab (<see cref="PrintRequests"/>), which shows the product's recipe and costing as the
-    /// screen shows them, unsaved edits included (<see cref="PreparePrintout"/>). A sub-assembly form left open is applied
-    /// first, as Save applies it, so a rule refusing it shows its message here and the tab doesn't open.
+    /// screen shows them, unsaved edits included, or its recipe scaled while the Scaling tab shows
+    /// (<see cref="PreparePrintout"/>). A sub-assembly form left open is applied first, as Save applies it, so a rule
+    /// refusing it shows its message here and the tab doesn't open.
     /// </summary>
     public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
 
@@ -5318,7 +5319,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>
     /// What Print puts on paper: the product as the screen shows it now, its details, every section in recipe order, its
-    /// packaging and its costing, with a note when that isn't what's saved.
+    /// packaging and its costing, with a note when that isn't what's saved. With the Scaling tab showing, the pages are
+    /// that tab instead, the recipe scaled (the user's request, 2026-10-02: "If the view is scaling, clicking print will
+    /// print the scaling"). Its rows are already worked out: the tab is worked out again on every change while it shows.
     /// </summary>
     private ProductPrintout CurrentPrintout() => new(
         string.IsNullOrWhiteSpace(EditingName) ? (IsEditingComposite ? "New composite product" : "New product") : EditingName.Trim(),
@@ -5336,6 +5339,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         IsEditingComposite ? PrintedComponent.From(ComponentEdits) : null)
     {
         CostBasis = CostBasis,
+        Scaling = SelectedDetailsTab == ScalingTab
+            ? new PrintedScaling(
+                ScalingUnits,
+                EditingQuantityRequired > 1 ? RecipeScalingRules.PiecesFor(ScalingUnits, EditingQuantityRequired) : null,
+                ScalingRows,
+                ScalingTotalCost)
+            : null,
     };
 
     // Segoe Fluent Icons glyphs for the list's menu, the ones the screen's buttons use where there's one.
