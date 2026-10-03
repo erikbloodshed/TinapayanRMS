@@ -78,6 +78,21 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task OpenByName_opens_the_material_a_name_means_best_as_the_Vim_command_line_asks()
+    {
+        await AddIngredientAsync("Brown Sugar");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.OpenByName("SUGAR").Should().BeTrue();
+
+        viewModel.SelectedRawMaterial!.Id.Should().Be(sugarId, "the name typed in full beats one that only holds it");
+        viewModel.OpenByName("salt").Should().BeFalse();
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "Sugar's details never arrived");
+    }
+
+    [Fact]
     public async Task Reloading_shows_a_unit_renamed_on_another_tab_without_reloading_the_form()
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");

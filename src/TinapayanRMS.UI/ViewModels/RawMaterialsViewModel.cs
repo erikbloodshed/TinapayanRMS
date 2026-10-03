@@ -181,7 +181,7 @@ public sealed record UsageExampleResult(
 /// packaging material has a base unit of its own and is always purchased. Its details, alternative
 /// units, brand prices and BOM are all edited in memory, and Save writes them together.
 /// </summary>
-public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen
+public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen, IRecordScreen
 {
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
@@ -1182,10 +1182,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         // A newer selection cancels an older one still loading (Switch disposes it, which cancels its token), so a quick
         // second pick never gets the first one's details added to its own.
-        this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Where(_ => !IsBusyApplying)
-            .Select(material => Observable.FromAsync(cancellationToken => LoadDetailsAsync(material, cancellationToken)))
-            .Switch()
+        Observable.Switch(this.WhenAnyValue(x => x.SelectedRawMaterial)
+                .Where(_ => !IsBusyApplying)
+                .Select(material => Observable.FromAsync(cancellationToken => LoadDetailsAsync(material, cancellationToken))))
             .Subscribe();
 
         // A unit's multiplier changed in the Alternative Units grid reprices the brands bought in it straight away,
@@ -2330,13 +2329,26 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     /// <summary>
-    /// Opens a material as picking it in the list would, for another screen (the main window's Back and Forward). A
-    /// search hiding it is cleared, so the list shows the row picked. A list that doesn't hold it yet (the screen not
-    /// loaded since, or ever) opens it at the end of the next LoadCommand, which showing the screen runs.
+    /// Opens a material as picking it in the list would, for another screen (the main window's Back and Forward, and a
+    /// double-clicked row of Reports' Raw Materials Price Summary). A search hiding it is cleared, so the list shows the
+    /// row picked. A list that doesn't hold it yet (the screen not loaded since, or ever) opens it at the end of the next
+    /// LoadCommand, which showing the screen runs.
     /// </summary>
     public void OpenRawMaterial(int rawMaterialId)
     {
         _rawMaterialToOpen = TrySelectRawMaterial(rawMaterialId) ? null : rawMaterialId;
+    }
+
+    /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the material the name means best.</summary>
+    public bool OpenByName(string text)
+    {
+        if (RecordNameMatch.Best(RawMaterials, material => material.Name, text) is not { } material)
+        {
+            return false;
+        }
+
+        OpenRawMaterial(material.Id);
+        return true;
     }
 
     private bool TrySelectRawMaterial(int rawMaterialId)

@@ -1,6 +1,7 @@
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Tests.Common.Fixtures;
@@ -66,6 +67,47 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
     }
 
     [Fact]
+    public async Task The_product_cost_summary_breaks_the_base_cost_into_its_parts()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+
+        // A 1,000 g / ₱50 dough at 50 g a piece, a ₱30 gift box a piece, and 25% labor, 10% overhead and 5% admin.
+        var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", roleId, [(flourId, 1000m)], weightPerPiece: 50m);
+        await using (var dbContext = CreateDbContext())
+        {
+            var box = new RawMaterial
+            {
+                Name = "Gift Box", Type = RawMaterialType.Packaging, Category = new RawMaterialCategory { Name = "Boxes" },
+                BaseUnit = new UnitOfMeasure { Name = "piece", Abbreviation = "pc" },
+                CostPerBaseUnit = 30m, BufferedCostPerBaseUnit = 30m,
+            };
+            dbContext.RawMaterials.Add(box);
+            await dbContext.SaveChangesAsync(Cancellation);
+            dbContext.PackagingLines.Add(new PackagingLine
+            {
+                ProductId = ensaymadaId, PackagingMaterialId = box.Id, AuthoredField = PackagingLineAuthoredField.QtyPerUnit, QtyPerUnit = 1m,
+            });
+            dbContext.CostingParameters.Add(new CostingParameters
+            {
+                ProductId = ensaymadaId, LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 30m, VatPercent = 12m,
+            });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        var ensaymada = viewModel.ProductCosts.Should().ContainSingle(r => r.ProductName == "Ensaymada").Subject;
+        ensaymada.IngredientsCost.Should().Be(2.5m, "50 g of a ₱50, 1,000 g dough");
+        ensaymada.PackagingCost.Should().Be(30m, "one gift box");
+        ensaymada.LaborCost.Should().Be(0.625m, "25% of the ingredients");
+        ensaymada.OverheadCost.Should().Be(0.25m, "10% of the ingredients, not the packaging");
+        ensaymada.AdministrativeCost.Should().Be(0.125m, "5% of the ingredients");
+        ensaymada.BaseCost.Should().Be(33.5m, "the five parts added up");
+    }
+
+    [Fact]
     public async Task The_price_summary_shows_each_purchased_materials_latest_price_and_its_change_per_gram()
     {
         var flourId = await AddIngredientAsync("Flour");
@@ -105,5 +147,24 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         }
 
         opened.Should().Equal(pandesalId);
+    }
+
+    [Fact]
+    public async Task A_price_summary_row_asks_for_its_own_raw_material_to_be_opened()
+    {
+        await AddIngredientAsync("Flour");
+        var sugarId = await AddIngredientAsync("Sugar");
+
+        using var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        var row = viewModel.RawMaterialPrices.Should().ContainSingle(r => r.Name == "Sugar").Subject;
+
+        var opened = new List<int>();
+        using (viewModel.RawMaterialOpenRequests.Subscribe(opened.Add))
+        {
+            await viewModel.OpenRawMaterialCommand.Execute(row.RawMaterialId);
+        }
+
+        opened.Should().Equal(sugarId);
     }
 }

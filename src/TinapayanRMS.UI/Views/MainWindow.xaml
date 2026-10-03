@@ -19,6 +19,7 @@
         xmlns:skinManager="clr-namespace:Syncfusion.SfSkinManager;assembly=Syncfusion.SfSkinManager.WPF"
         xmlns:sfTheme="clr-namespace:Syncfusion.Themes.Windows11Light.WPF;assembly=Syncfusion.Themes.Windows11Light.WPF"
         xmlns:collections="clr-namespace:System.Collections;assembly=System.Runtime"
+        xmlns:vim="clr-namespace:TinapayanRMS.UI.Vim"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="800" Width="1400"
         ShowTitle="False"
@@ -136,9 +137,11 @@
         and grey out the way Minimize does. Not focusable, like the caption buttons: a focused glyph button keeps its
         hover wash, so it would stay lit after a click. The title bar sits above the drawer's scrim, so they work while
         the menu is open.
+        Before them, the Vim keys' mode ("NORMAL", "INSERT"), there only while the keys are on (Settings, Keyboard).
     -->
     <controls:AppWindow.RightHeaderItemsSource>
         <collections:ArrayList>
+            <vim:VimModeIndicator />
             <Button x:Name="BackButton"
                     Width="40"
                     Height="32"
@@ -274,7 +277,7 @@
                                               HorizontalContentAlignment="Left"
                                               Background="Transparent"
                                               BorderThickness="0"
-                                              ToolTip="Units of measure, categories, roles and costing defaults"
+                                              ToolTip="Units of measure, categories, roles, costing defaults and the keyboard"
                                               Click="SettingsNavButton_Click" />
                     </Grid>
                 </Border>

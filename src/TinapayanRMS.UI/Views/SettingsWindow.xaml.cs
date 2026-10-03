@@ -8,24 +8,26 @@ using Syncfusion.Windows.Controls.Input;
 using Syncfusion.Windows.Tools.Controls;
 using TinapayanRMS.UI.Controls;
 using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.UI.Vim;
 
 namespace TinapayanRMS.UI.Views;
 
 /// <summary>
 /// The lookups every screen picks from, opened from the navigation drawer's Settings item: units of
 /// measure, raw material categories, product categories, sub-assembly roles and the costing a new product starts
-/// with, one tab each. Built afresh each time it
+/// with, one tab each, and the Keyboard tab's Vim keys. Built afresh each time it
 /// opens, over the same long-lived ViewModels, so a tab keeps its selection and unsaved edits between
 /// visits.
 /// </summary>
-public partial class SettingsWindow : AppWindow
+public partial class SettingsWindow : AppWindow, IVimHost
 {
     public SettingsWindow(
         UnitsOfMeasureViewModel unitsOfMeasureViewModel,
         CategoriesViewModel categoriesViewModel,
         ProductCategoriesViewModel productCategoriesViewModel,
         SubAssemblyRolesViewModel rolesViewModel,
-        CostingDefaultsViewModel costingDefaultsViewModel)
+        CostingDefaultsViewModel costingDefaultsViewModel,
+        KeyboardSettingsViewModel keyboardSettingsViewModel)
     {
         InitializeComponent();
 
@@ -34,6 +36,7 @@ public partial class SettingsWindow : AppWindow
         ProductCategoriesTab.Content = new ProductCategoriesView(productCategoriesViewModel);
         RolesTab.Content = new SubAssemblyRolesView(rolesViewModel);
         CostingDefaultsTab.Content = new CostingDefaultsView(costingDefaultsViewModel);
+        KeyboardTab.Content = new KeyboardSettingsView(keyboardSettingsViewModel);
 
         // The ViewModels and the main window outlive this window, so their delete confirmations are removed with it, and
         // so is everything that ties its controls to them.
@@ -60,6 +63,9 @@ public partial class SettingsWindow : AppWindow
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>The Vim keys' <c>gt</c> and <c>gT</c>: the next tab or the one before, round from the last to the first.</summary>
+    public void StepTab(int step) => VimTabs.Step(SettingsTabs, step);
 
     /// <summary>
     /// Unties this window's controls from what outlives it. Each of these kept every closed Settings in memory:

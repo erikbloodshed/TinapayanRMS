@@ -30,9 +30,26 @@ public sealed class ProductCostRow(Product product, ProductCostSummary costs)
     /// </summary>
     public int? Pieces => product.IsComposite ? null : product.QuantityRequired;
 
+    /// <summary>The recipe cost, the Costing tab's Sub-assemblies (ingredients) row: a composite's is what its products bring.</summary>
+    public decimal IngredientsCost => costs.SubAssemblies;
+
+    /// <summary>All of the packaging, the Costing tab's Packaging row: a composite's products' too when it includes theirs.</summary>
+    public decimal PackagingCost => costs.Packaging;
+
+    /// <summary>The Labor Metric's percentage of the ingredients cost, in pesos.</summary>
+    public decimal LaborCost => costs.Labor;
+
+    /// <summary>The Overhead Metric's percentage of the ingredients cost, in pesos.</summary>
+    public decimal OverheadCost => costs.Overhead;
+
+    /// <summary>The Admin Metric's percentage of the ingredients cost, in pesos.</summary>
+    public decimal AdministrativeCost => costs.Administrative;
+
+    /// <summary>The five costs before it added up: ingredients, packaging, labor, overhead and administrative.</summary>
     public decimal BaseCost => costs.BaseCost;
 
-    public decimal SellingPrice => costs.SellingPrice;
+    /// <summary>The selling price the costing works out, the Costing tab's Total Selling Price: a suggestion beside <see cref="CurrentPrice"/>.</summary>
+    public decimal SuggestedPrice => costs.SellingPrice;
 
     /// <summary>Null when no current price is entered.</summary>
     public decimal? CurrentPrice => costs.CurrentPrice;
@@ -50,6 +67,7 @@ public sealed class RawMaterialPriceSummaryRow
     /// <param name="history">The material's price entries, newest first.</param>
     public RawMaterialPriceSummaryRow(RawMaterial material, IReadOnlyList<RawMaterialPriceHistory> history)
     {
+        RawMaterialId = material.Id;
         Name = material.Name;
         Type = material.Type == RawMaterialType.Ingredient ? "Ingredient" : "Packaging";
         Category = material.Category?.Name ?? string.Empty;
@@ -73,6 +91,8 @@ public sealed class RawMaterialPriceSummaryRow
             ChangePercent = CostingRules.PercentOf(costNow - costBefore, costBefore);
         }
     }
+
+    public int RawMaterialId { get; }
 
     public string Name { get; }
 
@@ -125,6 +145,14 @@ public sealed class ReportsViewModel : ReactiveObject, IDisposable
     /// </summary>
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
 
+    /// <summary>A Raw Materials Price Summary row's double-click: asks for the material with this id to be opened, through <see cref="RawMaterialOpenRequests"/>.</summary>
+    public ReactiveCommand<int, RxVoid> OpenRawMaterialCommand { get; }
+
+    private readonly Subject<int> _rawMaterialOpenRequests = new();
+
+    /// <summary>The raw materials the Raw Materials Price Summary asks to open, by id, which the main window opens on Raw Materials.</summary>
+    public IObservable<int> RawMaterialOpenRequests => _rawMaterialOpenRequests;
+
     /// <summary>Runs whenever the tab is shown (MainWindow), so both summaries are from current prices.</summary>
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
 
@@ -140,6 +168,7 @@ public sealed class ReportsViewModel : ReactiveObject, IDisposable
         _savedProducts = savedProducts;
 
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
+        OpenRawMaterialCommand = ReactiveCommand.Create<int>(_rawMaterialOpenRequests.OnNext);
 
         LoadCommand = ReactiveCommand.CreateFromTask(async () =>
         {
@@ -193,5 +222,6 @@ public sealed class ReportsViewModel : ReactiveObject, IDisposable
     public void Dispose()
     {
         _productOpenRequests.Dispose();
+        _rawMaterialOpenRequests.Dispose();
     }
 }

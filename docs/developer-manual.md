@@ -54,7 +54,7 @@ It's a single-user desktop app. There's no server, no login and no network servi
 | Products | `ProductsView`, with its cards in `Views/Products/` | `ProductsViewModel` |
 | Reports | `ReportsView` | `ReportsViewModel` |
 | Print (opened from Products) | `ProductPrintView` | `PrintTabViewModel` |
-| Settings dialog: Units of Measure, Categories, Product Categories, Roles, Costing Defaults | `SettingsWindow`, and one view per tab | `UnitsOfMeasureViewModel`, `CategoriesViewModel`, `ProductCategoriesViewModel`, `SubAssemblyRolesViewModel`, `CostingDefaultsViewModel` |
+| Settings dialog: Units of Measure, Categories, Product Categories, Roles, Costing Defaults, Keyboard | `SettingsWindow`, and one view per tab | `UnitsOfMeasureViewModel`, `CategoriesViewModel`, `ProductCategoriesViewModel`, `SubAssemblyRolesViewModel`, `CostingDefaultsViewModel`, `KeyboardSettingsViewModel` |
 
 The [user manual](user-manual.md) describes every screen. Read its [Key ideas](user-manual.md#1-key-ideas) chapter before you read the code, because the code uses the same words.
 
@@ -94,7 +94,7 @@ You'll be productive sooner if you're comfortable with the following.
 |---|---|---|
 | C# 14 and .NET 10 | Primary constructors, records and `record struct`, `required` members, collection expressions, pattern matching, nullable reference types, `async`/`await` | Everywhere |
 | WPF and XAML | Data binding and `DataContext` inheritance, dependency and attached properties, resources, styles and templates, routed events, the `Dispatcher` and STA threads | `src/TinapayanRMS.UI` |
-| MVVM with ReactiveUI 24 and Rx | `ReactiveObject`, `RaiseAndSetIfChanged`, `WhenAnyValue`, `ToProperty` (`ObservableAsPropertyHelper`), `ReactiveCommand`, `Interaction`, `Subject`, Rx operators | `ViewModels/` |
+| MVVM with ReactiveUI 25 and Rx | `ReactiveObject`, `RaiseAndSetIfChanged`, `WhenAnyValue`, `ToProperty` (`ObservableAsPropertyHelper`), `ReactiveCommand`, `Interaction`, `Subject`, Rx operators | `ViewModels/` |
 | DynamicData | `SourceCache<T, TKey>`, `Connect().SortAndBind(...)` | List ViewModels |
 | EF Core 10 | `DbContext`, `IEntityTypeConfiguration<T>`, migrations, change tracking, transactions, `ExecuteDeleteAsync` | Writes and the schema, in `Infrastructure` |
 | Dapper and T-SQL | Multi-mapped joins (`splitOn`), CTEs, `STRING_SPLIT` | Reads, in `Infrastructure` |
@@ -117,7 +117,7 @@ You'll be productive sooner if you're comfortable with the following.
 | .NET SDK | 10.0.401, or a later 10.0 feature band | Pinned in [global.json](../global.json) with `rollForward: latestFeature`. |
 | SQL Server Express | Instance `.\SQLEXPRESS` (service `MSSQL$SQLEXPRESS`) | Reached with Windows authentication. Your Windows account must be able to create databases, because the tests create their own. `sqlcmd` is useful. LocalDB isn't used. |
 | `dotnet-ef` | 10.0.x, matching EF Core 10.0.12 | `dotnet tool install --global dotnet-ef --version 10.0.12` |
-| Syncfusion licence key | Essential Studio 34.2.x | Set as the `SYNCFUSION_LICENSE_KEY` user environment variable. The app won't start without it, and the UI tests that build Syncfusion controls are skipped without it. The build doesn't need it. |
+| Syncfusion licence key | Essential Studio 35.x | Set as the `SYNCFUSION_LICENSE_KEY` user environment variable. The app won't start without it, and the UI tests that build Syncfusion controls are skipped without it. The build doesn't need it. A key covers one major version, so moving `SyncfusionVersion` to a new major version needs a new key. A program started before the variable changed, such as the IDE and its terminals, keeps the old value until it's restarted. |
 | An IDE | Any with .NET 10 support | Visual Studio, VS Code with the C# Dev Kit, or Rider. Git ignores `.vs/`, `.vscode/` and `.idea/`. |
 | Optional tools | | `ilspycmd` (decompiles Syncfusion's assemblies), and `dotnet-stack`, `dotnet-dump` and `dotnet-trace` (diagnose the running app). Syncfusion's Essential Studio installer puts the demo source of every control in `C:\Users\Public\Documents\Syncfusion\WPF\<version>\SampleBrowser\`. |
 
@@ -166,7 +166,7 @@ If your SQL Server instance isn't `.\SQLEXPRESS`, change the first two.
 ### Where the app writes
 
 - **Logs**: `logs/tinapayanrms-<date>.log` beside the executable. In a debug build that's `src/TinapayanRMS.UI/bin/Debug/net10.0-windows10.0.19041.0/logs/`. There's one file a day, and the last 31 are kept.
-- **View state**: `%LocalAppData%\TinapayanRMS\view-state.json` remembers which tree folders were left open. It's safe to delete.
+- **View state**: `%LocalAppData%\TinapayanRMS\view-state.json` remembers which tree folders were left open, and whether the Vim keys are on (`"vim-keys": ["on"]`). It's safe to delete.
 
 ### Command reference
 
@@ -210,10 +210,10 @@ A change is done when:
 | `src/TinapayanRMS.Domain` | `net10.0` | Nothing | `Entities/`, `Enums/` |
 | `src/TinapayanRMS.ApplicationCore` | `net10.0` | Domain; FluentValidation | `Interfaces/`, `Rules/`, `Validators/` |
 | `src/TinapayanRMS.Infrastructure` | `net10.0` | Domain, ApplicationCore; EF Core (SQL Server), Dapper | `TinapayanRMSDbContext` and its design-time factory at the root; `Configurations/`, `Migrations/`, `Queries/`, `Repositories/`, `Services/` |
-| `src/TinapayanRMS.UI` | `net10.0-windows10.0.19041.0` | All three; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion | App startup at the root; `Views/`, `ViewModels/`, `Controls/`, `Converters/`, `Printing/`, `Themes/` |
+| `src/TinapayanRMS.UI` | `net10.0-windows10.0.19041.0` | All three; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion | App startup at the root; `Views/`, `ViewModels/`, `Controls/`, `Converters/`, `Printing/`, `Vim/`, `Themes/` |
 | `tests/TinapayanRMS.ApplicationCore.Tests` | `net10.0` | Domain, ApplicationCore | Rule and validator tests, with no database |
 | `tests/TinapayanRMS.Infrastructure.Tests` | `net10.0` | Infrastructure, Tests.Common | Persistence tests against the project's own database |
-| `tests/TinapayanRMS.UI.Tests` | `net10.0-windows10.0.19041.0` | UI, Tests.Common | ViewModel, control, printing and converter tests |
+| `tests/TinapayanRMS.UI.Tests` | `net10.0-windows10.0.19041.0` | UI, Tests.Common | ViewModel, control, printing, converter and Vim-key tests |
 | `tests/TinapayanRMS.Tests.Common` | `net10.0` | Infrastructure; Respawn | The shared database fixtures. It's a plain library, not a test project. |
 
 The two UI projects target Windows SDK 10.0.19041 because ReactiveUI.WPF needs it. The bare `net10.0-windows` moniker resolves to `windows7.0`, which is too low.
@@ -234,6 +234,7 @@ Every folder in a project is a sub-namespace: `src/TinapayanRMS.UI/ViewModels/` 
 | Card of a large screen | `UI/Views/<Screen>/` | — |
 | Reusable control or behaviour | `UI/Controls/` | `UI.Tests/Controls/` |
 | Value converter | `UI/Converters/` | `UI.Tests/Converters/` |
+| Part of the Vim keys | `UI/Vim/` | `UI.Tests/Vim/` |
 
 A ViewModel file can also hold the small row and edit types that only its screen uses. For example, `ProductsViewModel.cs` defines `ProductUsageEdit` and `ProductCostSummary`.
 
@@ -309,7 +310,7 @@ Business and costing rules go in ApplicationCore, and EF Core and other I/O stay
 4. **`MainWindow`'s constructor** ([MainWindow.xaml.cs](../src/TinapayanRMS.UI/Views/MainWindow.xaml.cs)) creates each screen's view around its ViewModel. It maps each tab to its screen's `LoadCommand` and to its Back and Forward handling, and wires up the requests that one screen makes of another. When the window has loaded, it loads the tab on show.
 5. **`App.OnExit`** disposes the host, which disposes the singleton ViewModels, and flushes the log.
 
-ReactiveUI 24 must be initialised exactly once per process, before any `ReactiveObject` exists. [ReactiveUIBootstrapper](../src/TinapayanRMS.UI/ReactiveUIBootstrapper.cs) does it with `RxAppBuilder.CreateReactiveUIBuilder().WithCoreServices().WithWpf().BuildApp()`, and tests that build ViewModels call `ReactiveUIBootstrapper.EnsureInitialized()` themselves.
+ReactiveUI 25 must be initialised exactly once per process, before any `ReactiveObject` exists. [ReactiveUIBootstrapper](../src/TinapayanRMS.UI/ReactiveUIBootstrapper.cs) does it with `RxAppBuilder.CreateReactiveUIBuilder().WithCoreServices().WithWpf().BuildApp()`, and tests that build ViewModels call `ReactiveUIBootstrapper.EnsureInitialized()` themselves.
 
 ### Dependency injection and lifetimes
 
@@ -740,10 +741,11 @@ The rules for ViewModels:
 - **Properties** use `RaiseAndSetIfChanged`.
 - **A derived property** uses `WhenAnyValue(...).Select(...).ToProperty(...)`, but only when every input is itself an observable property. If the real input is a collection the code changes directly, use a plain property and recompute it explicitly at each place the collection changes. Calling `RaisePropertyChanged` on a `ToProperty` property doesn't recompute it.
 - **Commands without a parameter** are `ReactiveCommand<RxVoid, RxVoid>`. Import the type with `using RxVoid = ReactiveUI.Primitives.RxVoid;`. Never write `using ReactiveUI.Primitives;`: its own `Select`, `Where` and `Subscribe` clash with `System.Reactive.Linq`'s (error CS0121). `System.Reactive` is referenced directly for the Rx operators.
+- **Switching to the latest inner observable** is written `Observable.Switch(source)`, never `source.Switch()`. ReactiveUI imports `ReactiveUI.Binding` into every file, and that namespace has a `Switch` of its own that clashes with Rx's (error CS0121). The ViewModels use it to load a selection's details, so a newer pick cancels an older load that is still running.
 - **Lists** are a DynamicData `SourceCache<T, int>` bound with `Connect().SortAndBind(out collection, comparer).Subscribe()`, or an `ObservableCollection<T>` of editable rows.
 - **Several reads at once** start in parallel with `Task.Run`, are awaited together with `Task.WhenAll`, and are applied in one step on the UI thread. Code inside `Task.Run` calls repositories only and never touches ViewModel state. (`ProductsViewModel`'s `LoadCommand` starts about a dozen reads at once this way.)
 - **Dialogs and prompts** are `Interaction`s that the view handles: `ConfirmDelete` (a Yes/No `MessageBox`, through `RegisterNativeMessageBoxHandler`), and `PromptForName` and `PromptForNewCategory` (`TextPromptWindow.Prompt`). Tests register handlers of their own.
-- **One screen asks another for something** through an `IObservable<T>` backed by a `Subject<T>`: `ProductOpenRequests` (from Raw Materials, Sub-Assemblies and Reports), `SubAssemblyOpenRequests` and `PrintRequests` (from Products). `MainWindow` subscribes to them, calls the target screen's `Open*` method and shows its tab, so the ViewModels never know about each other.
+- **One screen asks another for something** through an `IObservable<T>` backed by a `Subject<T>`: `ProductOpenRequests` (from Raw Materials, Sub-Assemblies and Reports), `RawMaterialOpenRequests` (from Reports), `SubAssemblyOpenRequests` and `PrintRequests` (from Products). `MainWindow` subscribes to them, calls the target screen's `Open*` method and shows its tab, so the ViewModels never know about each other.
 
 ### Loading and refreshing
 
@@ -769,6 +771,44 @@ Undo and redo follow the Memento pattern:
 
 [NavigationHistory](../src/TinapayanRMS.UI/ViewModels/NavigationHistory.cs) holds the Back and Forward stacks of `ScreenVisit(AppScreen, RecordId)`. Back keeps up to 50 stops. A step is any change of screen: the menu, the tab strip, a closed tab, or a link from one screen to another. Picking another record in a list isn't a step. `MainWindow` records each step with the record the screen had open as it was left. Going back reopens that record through the screen's `Open*` method, unless the screen's form holds unsaved changes. Alt+Left and Alt+Right work too: they're handled on the window's `PreviewKeyDown`, which checks `SystemKey` because WPF reports a key pressed with Alt as `Key.System`.
 
+### Vim keys
+
+[Vim/](../src/TinapayanRMS.UI/Vim/) holds an optional layer of Vim-style keys over the whole app, in the manner of Vimium. The user turns it on in Settings → Keyboard. `KeyboardSettingsViewModel` keeps the choice in the view state (`vim-keys`), and `App.OnStartup` applies it. While it's off, each handler returns after a single `bool` check.
+
+- **Where keys are caught.** `VimKeys.Register()`, called from `App`'s static constructor, adds class handlers on `Window` for `PreviewKeyDown`, `PreviewTextInput` and `GotKeyboardFocus` (with `handledEventsToo`).
+  - Letters come from `PreviewTextInput`. `SfDataGrid` starts a cell edit for a letter in `OnTextInput`, which this handler runs before, and `e.Text` is already the keyboard layout's character.
+  - Keys that type nothing (Esc, Ctrl+R) come from `PreviewKeyDown`.
+- **Modes.**
+  - Insert is the app as it always was. It applies when focus is in a `TextBoxBase` (a field, or a picker's text) or in a grid cell being edited.
+  - Normal applies everywhere else. It also applies to a field reached with `j`/`k` or left with Esc. In Normal, every printable character is handled, so none types or starts an edit.
+  - Esc in a cell commits it through `GridEditCommit.Commit(grid, keepCurrentCell: true)` instead of cancelling it. Esc is handled only when it has something to do, so otherwise a dialog's Cancel still gets it.
+- **Speed.** Where the keyboard is (a `Place`: field, grid, tree, table, other or overlay) is worked out once per focus change and cached. A key is then a `FrozenDictionary` lookup (`VimKeySequence`, built from `VimKeymap`) plus the action.
+- **Keys stand for the keys they replace.**
+  - In grids, trees and lists, `j` is raised as Down and `dd` as Delete. In a tree, `o` is raised as Enter and `r` as F2.
+  - Each is raised on the element that has the keyboard, as WPF's `KeyboardDevice` raises a real key: `PreviewKeyDown`, then `KeyDown` unless the first was handled. So the controls' own handling and the app's behaviours (`GridFillerRows`, `GridUndoSteps`, the trees' `Tree_KeyDown`) apply unchanged.
+  - A raised key reads Ctrl and Shift from the physical keyboard (`KeyboardDevice.Modifiers`), so only keys typed without a modifier are raised. `gg`, `G`, `0` and `$` use the grid's `MoveCurrentCell`, with `GetFirstDataRowIndex`, `GetLastDataRowIndex` (which skips the filler rows and the add row) and the column helpers. The trees pick their row through `SelectedItems`.
+  - In a form, `j`/`k` call `MoveFocus` (Next or Previous), because an arrow key would step a number box's value.
+- **`SfTreeView` in Extended mode** (the Products and Raw Materials lists) has three behaviours to work around:
+  - its Home only moves the focus border, without picking the row;
+  - its arrow keys do nothing while the current row is hidden, for example by a search;
+  - a `SelectedItem` set from outside is inserted in front of the rows already picked, rather than replacing them.
+
+  So `gg`, `G`, and `j`/`k` from a hidden row pick their row by replacing `SelectedItems`: clear it, then add the row, as the screens' `SelectedTreeNode` setters do.
+- **Windows** take part through `IVimHost`, which `MainWindow` and `SettingsWindow` implement. It provides `gt`/`gT` (`VimTabs.Step`), Back and Forward, the screens the command line names, and Settings.
+- **The command line** (`:`) is parsed by `VimCommandLine` and run by `VimCommands`. A command runs on the screen found by walking `DataContext` up from the keyboard, through `IRecordScreen` (New, Save, Delete, `OpenByName`) and `IRevertScreen`. It goes through `ICommand.Execute`, as a button does, so its errors end up where they always do.
+- **Overlays.** `VimOverlay` is one adorner per window, on the content's adorner layer. It holds:
+  - the hint labels (`HintTargets`, `HintLabels`), all drawn in a single `OnRender`;
+  - the command bar;
+  - the cheat sheet, built from `VimKeymap` so it lists what the keys actually do.
+
+  A hint clicks a `ButtonBase` or `SplitButtonAdv` through its protected `OnClick`, by reflection, because `ButtonAdv`'s automation peer has no Invoke pattern.
+- **To add a key**, add a `VimKeyBinding` to `VimKeymap` (keys, action, contexts, description). Then handle its `VimAction` in `VimKeys.Perform`, or in the `In*` method for its place. The cheat sheet picks it up.
+- **Slow keys.** Debug builds log any key the layer takes more than 4 ms to handle (`The Vim key … took … ms`). Most of that time is the screen's own response, such as a picked row loading its form.
+- **Tests** are in `UI.Tests/Vim/`.
+  - The parser, keymap, command line and labels are tested without WPF.
+  - `VimKeysGridTests` raises text input and key presses on a real off-screen grid.
+  - These tests switch the static `VimKeys.State` on and off, so they run in `OffscreenGridCollection`.
+
 ### Controls and behaviours
 
 The app extends Syncfusion's controls with **attached behaviours** in `Controls/` rather than subclassing them. You turn a behaviour on in XAML, and it hooks the control's events. Behaviours that apply everywhere are registered once, in `App`'s static constructor.
@@ -781,13 +821,14 @@ The app extends Syncfusion's controls with **attached behaviours** in `Controls/
 | `GridEditCommit` | An editable grid | Commits an open cell edit when focus leaves the grid, so Save sees it |
 | `GridCellEditing.IsEnabled` | A grid | Makes a column editable on some rows and not others |
 | `GridUndoSteps.Recorder`, `FieldUndoStep.Recorder` | A grid; a field | Undo steps (see above) |
+| `CheckboxFilterFill.IsEnabled` | A grid that filters | Widens a filter pop-up's list of values to the pop-up. The theme fixes it at 188px, which cut long names off. |
 | `AutoCompleteDropDown.IsEnabled` | A grid with a drop-down column that's typed into | Fixes Syncfusion's drop-down cell. Pair it with `AllowNullInput="True"` on the column. |
 | `OptionalColumns.IsOptional`, `CostBasisColumns` | Grid columns | Show or hide columns from the screen's state. A grid's columns aren't in the visual tree, so they can't bind to it themselves. |
 | `NumericColumn`, `NumericEditing.IsEnabled` | Number columns; their grid | Thousands separators and right alignment. `TypedDecimalDigits` accepts more decimals than the column shows. |
 | `MouseWheelForwarding`, `FocusScrolling` | Stacked grids; tall pages | Keep the page scrolling under the mouse, and stop a click from scrolling the page |
 | `CategoryTextCommit.Screen` | A Category picker | Offers to add a typed name that isn't a category yet |
 | `ReadOnlyText.IsGreyed` | A `DoubleTextBox` | Greys out a number that can't be typed |
-| `GridKeyboardFocus`, `GridHeaderHeight`, `PickerMatchHighlight`, `UndoShortcuts` | Every grid, picker or window (registered in `App`) | Focus sits on a cell, never the whole grid; header rows fit their text; a picker highlights its best match for Enter or Tab; Ctrl+Z and Ctrl+Y |
+| `GridKeyboardFocus`, `GridHeaderHeight`, `PickerMatchHighlight`, `UndoShortcuts` | Every grid, picker or window (registered in `App`) | Focus sits on a cell, never the whole grid; header rows fit their text (two lines for a grid whose headings wrap, `GridHeaderHeight.Lines`); a picker highlights its best match for Enter or Tab; Ctrl+Z and Ctrl+Y |
 | `AppWindow`, `ChromelessWindowDpi`, `ChromelessWindowMask`, `RestoreRendering` | Windows | The chromeless title bar, and fixes for its DPI changes, content mask and restore-from-taskbar flicker |
 | `ErrorToast`, `SuccessToast` | Each screen | Show `ErrorMessage` and `SuccessMessage` |
 
@@ -806,7 +847,7 @@ The app extends Syncfusion's controls with **attached behaviours** in `Controls/
 
 - **Prefer a Syncfusion control** to its native WPF equivalent (`ButtonAdv` over `Button`, `TabControlExt` over `TabControl`, `ComboBoxAdv`, `SfDataGrid`, `SfTextBoxExt`, `DoubleTextBox`), so the whole UI picks up the theme. Use a native control only when Syncfusion has none that fits.
 - **To add a control**, add its package's `PackageReference` (with no version) to the UI project, and a `PackageVersion` at `$(SyncfusionVersion)` in `Directory.Packages.props` if it's a new package. The theme package already styles every control.
-- **To learn how a control is meant to be used**, start with its `syncfusion-wpf-*` skill in `.claude/skills/`. Then read the Sample Browser source in `C:\Users\Public\Documents\Syncfusion\WPF\34.2.2\SampleBrowser\`, and grep file contents there, because the demo file names often don't name the control. Only then decompile the assembly with `ilspycmd`: the packages are in `%UserProfile%\.nuget\packages\syncfusion.*\<version>\lib\`.
+- **To learn how a control is meant to be used**, start with its `syncfusion-wpf-*` skill in `.claude/skills/`. Then read the Sample Browser source in `C:\Users\Public\Documents\Syncfusion\WPF\34.2.2\SampleBrowser\` (a v34 install, older than the packages), and grep file contents there, because the demo file names often don't name the control. Only then decompile the assembly with `ilspycmd`: the packages are in `%UserProfile%\.nuget\packages\syncfusion.*\<version>\lib\`.
 - **Known traps:**
   - Bind an editable `DoubleTextBox`'s `Value` with `UpdateSourceTrigger=PropertyChanged`. Otherwise the ViewModel only sees the value when the box loses focus, and the buttons and figures that depend on it lag behind.
   - A `DoubleTextBox` bound to a `decimal?` needs `TargetNullValue={x:Null}` on its binding.
@@ -1086,6 +1127,7 @@ Off-screen harnesses and UI-automation scripts have pitfalls that PLAN.md record
 - Find the main window by its class and title. `Process.MainWindowHandle` can pick one of the app's hidden windows.
 - Syncfusion's buttons, pickers and number boxes need real clicks: `ButtonAdv` has no Invoke pattern, and `ValuePattern.SetValue` doesn't commit a `DoubleTextBox`.
 - Bring the app to the foreground before you send keystrokes, and check it's still there, or the keys go to whatever window is in front.
+- UI Automation's `FocusedElement` reports the window, not the grid, while an `SfDataGrid` has the keyboard. Judge a grid's focus from the screen instead, for example by whether the current cell's border moves with the keys.
 - `new App()` posts WPF's startup to the dispatcher, so a harness that runs the dispatcher also runs `OnStartup`, which shows the real main window. Collect what it posts and abort it first.
 
 ---

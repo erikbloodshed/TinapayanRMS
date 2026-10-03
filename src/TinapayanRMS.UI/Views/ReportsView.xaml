@@ -29,15 +29,62 @@
                 <syncfusion:TabItemExt Header="Product Cost Summary" CanClose="False">
                     <Border Padding="12">
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Product Cost Summary" Style="{StaticResource SectionHeaderStyle}" />
+                            <Grid DockPanel.Dock="Top">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Product Cost Summary" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                                <!--
+                                    Which columns show: a tick box for each but Product, ticked while it shows, bound to the
+                                    column's IsHidden (ColumnChoices, filled from the grid's columns in ReportsView). A
+                                    DropDownButtonAdv stays open while its tick boxes are clicked, so several can be changed in
+                                    one go. The choice lasts while the app is open, as the filters do; a hidden column's filter
+                                    still applies.
+                                -->
+                                <syncfusion:DropDownButtonAdv Grid.Column="1"
+                                                              Label="Columns"
+                                                              ToolTip="Choose which columns show. Product always does."
+                                                              IconTemplate="{StaticResource ColumnsIconTemplate}"
+                                                              VerticalAlignment="Center">
+                                    <ItemsControl x:Name="ColumnChoices" Margin="8,6" MinWidth="170">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Content="{Binding HeaderText}"
+                                                          IsChecked="{Binding IsHidden, Converter={StaticResource InverseBooleanConverter}}"
+                                                          Margin="0,3" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </syncfusion:DropDownButtonAdv>
+                            </Grid>
                             <TextBlock DockPanel.Dock="Top"
-                                       Text="Every product as it's saved, costed at today's prices. Each figure is for one sellable unit of the pieces shown; Markup % is what the current price earns on the base cost. Double-click a product to open it."
+                                       Text="Every product as it's saved, costed at today's prices. Each figure is for one sellable unit of the pieces shown; Markup % is what the current price earns on the base cost. Filter by product, stage or category from the funnel in its heading, and double-click a product to open it."
                                        Style="{StaticResource CaptionStyle}"
                                        TextWrapping="Wrap"
                                        Margin="0,0,0,12" />
-                            <!-- Double-clicking a product opens it on Products (CellDoubleTapped, which a header cell doesn't raise) -->
-                            <syncfusion:SfDataGrid ItemsSource="{Binding ProductCosts}"
+                            <!--
+                                Double-clicking a product opens it on Products (CellDoubleTapped, which a header cell doesn't raise).
+                                Thirteen columns don't fit a laptop's screen with their headings on one line, so the headings wrap
+                                onto two, right-aligned like the figures' (Product, Stage and Category are single words, which
+                                never wrap). Each column is kept wide enough for its widest heading word with the sort arrow beside
+                                it, so a word never breaks, sorted or not: the word at 14px, 11 for the cell's padding and border,
+                                and 25 for the arrow (Syncfusion's GridColumnSizer.SortIconWidth), and Category another 28 for its
+                                filter's funnel (FilterIconWidth). Base Cost's is a four-digit figure's instead, which is wider
+                                than "Base". They all fit a 1536px window (1920 at 125%); a narrower one, such as 1366px, scrolls
+                                the figures sideways under the frozen Product column.
+
+                                Product, Stage and Category filter, each from a funnel in its heading: a list of its values to tick,
+                                with a search box (CheckboxFilter alone, without the Text Filters conditions, and without the pop-up's
+                                own Sort A to Z and Z to A, which a click on the heading does). The pop-up is 340px wide, for the
+                                longest product name, and its list fills it (CheckboxFilterFill).
+                            -->
+                            <syncfusion:SfDataGrid x:Name="ProductCostsGrid"
+                                                   ItemsSource="{Binding ProductCosts}"
                                                    CellDoubleTapped="ProductCosts_CellDoubleTapped"
+                                                   controls:GridHeaderHeight.Lines="2"
+                                                   controls:CheckboxFilterFill.IsEnabled="True"
+                                                   FrozenColumnCount="1"
                                                    GridLinesVisibility="Both"
                                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                                    CurrentCellBorderThickness="1"
@@ -48,15 +95,32 @@
                                                    SelectionMode="Single"
                                                    NavigationMode="Row"
                                                    ColumnSizer="Star">
+                                <syncfusion:SfDataGrid.FilterPopupStyle>
+                                    <Style TargetType="syncfusion:GridFilterControl">
+                                        <Setter Property="FilterMode" Value="CheckboxFilter" />
+                                        <Setter Property="SortOptionVisibility" Value="Collapsed" />
+                                        <Setter Property="FilterPopupWidth" Value="340" />
+                                    </Style>
+                                </syncfusion:SfDataGrid.FilterPopupStyle>
+                                <syncfusion:SfDataGrid.HeaderTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" TextAlignment="Right" />
+                                    </DataTemplate>
+                                </syncfusion:SfDataGrid.HeaderTemplate>
                                 <syncfusion:SfDataGrid.Columns>
-                                    <syncfusion:GridTextColumn MappingName="ProductName" HeaderText="Product" Width="280" />
-                                    <syncfusion:GridTextColumn MappingName="Stage" HeaderText="Stage" Width="210" />
-                                    <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" />
-                                    <controls:NumericColumn MappingName="Pieces" HeaderText="Pieces" NumberDecimalDigits="0" Width="80" AllowNullValue="True" />
-                                    <controls:NumericColumn MappingName="BaseCost" HeaderText="Base Cost" NumberDecimalDigits="2" />
-                                    <controls:NumericColumn MappingName="SellingPrice" HeaderText="Selling Price" NumberDecimalDigits="2" />
-                                    <controls:NumericColumn MappingName="CurrentPrice" HeaderText="Current Price" NumberDecimalDigits="2" AllowNullValue="True" />
-                                    <controls:NumericColumn MappingName="MarkupPercent" HeaderText="Markup %" NumberDecimalDigits="2" AllowNullValue="True" />
+                                    <syncfusion:GridTextColumn MappingName="ProductName" HeaderText="Product" Width="280" AllowFiltering="True" />
+                                    <syncfusion:GridTextColumn MappingName="Stage" HeaderText="Stage" Width="190" AllowFiltering="True" />
+                                    <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" MinimumWidth="120" AllowFiltering="True" />
+                                    <controls:NumericColumn MappingName="Pieces" HeaderText="Pieces" NumberDecimalDigits="0" Width="76" AllowNullValue="True" />
+                                    <controls:NumericColumn MappingName="IngredientsCost" HeaderText="Ingredients Cost" NumberDecimalDigits="2" MinimumWidth="106" />
+                                    <controls:NumericColumn MappingName="PackagingCost" HeaderText="Packaging Cost" NumberDecimalDigits="2" MinimumWidth="100" />
+                                    <controls:NumericColumn MappingName="LaborCost" HeaderText="Labor Cost" NumberDecimalDigits="2" MinimumWidth="72" />
+                                    <controls:NumericColumn MappingName="OverheadCost" HeaderText="Overhead Cost" NumberDecimalDigits="2" MinimumWidth="98" />
+                                    <controls:NumericColumn MappingName="AdministrativeCost" HeaderText="Admin Cost" NumberDecimalDigits="2" MinimumWidth="78" />
+                                    <controls:NumericColumn MappingName="BaseCost" HeaderText="Base Cost" NumberDecimalDigits="2" MinimumWidth="66" />
+                                    <controls:NumericColumn MappingName="SuggestedPrice" HeaderText="Suggested Price" NumberDecimalDigits="2" MinimumWidth="102" />
+                                    <controls:NumericColumn MappingName="CurrentPrice" HeaderText="Current Price" NumberDecimalDigits="2" AllowNullValue="True" MinimumWidth="84" />
+                                    <controls:NumericColumn MappingName="MarkupPercent" HeaderText="Markup %" NumberDecimalDigits="2" AllowNullValue="True" MinimumWidth="84" />
                                 </syncfusion:SfDataGrid.Columns>
                             </syncfusion:SfDataGrid>
                         </DockPanel>
@@ -68,11 +132,13 @@
                         <DockPanel>
                             <TextBlock DockPanel.Dock="Top" Text="Raw Materials Price Summary" Style="{StaticResource SectionHeaderStyle}" />
                             <TextBlock DockPanel.Dock="Top"
-                                       Text="Every purchased material's latest price, from its price history. Change % is how far that price moved its cost from the price before it."
+                                       Text="Every purchased material's latest price, from its price history. Change % is how far that price moved its cost from the price before it. Double-click a material to open it."
                                        Style="{StaticResource CaptionStyle}"
                                        TextWrapping="Wrap"
                                        Margin="0,0,0,12" />
+                            <!-- Double-clicking a material opens it on Raw Materials, as a product opens on Products above -->
                             <syncfusion:SfDataGrid ItemsSource="{Binding RawMaterialPrices}"
+                                                   CellDoubleTapped="RawMaterialPrices_CellDoubleTapped"
                                                    GridLinesVisibility="Both"
                                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                                    CurrentCellBorderThickness="1"

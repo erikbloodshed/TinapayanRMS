@@ -11,6 +11,11 @@ public partial class ReportsView : UserControl
     {
         InitializeComponent();
         DataContext = viewModel;
+
+        // Every column can be hidden but Product, which says what a row is.
+        ColumnChoices.ItemsSource = ProductCostsGrid.Columns
+            .Where(column => column.MappingName != nameof(ProductCostRow.ProductName))
+            .ToList();
     }
 
     /// <summary>
@@ -24,6 +29,15 @@ public partial class ReportsView : UserControl
         if (e.Record is ProductCostRow row && DataContext is ReportsViewModel viewModel)
         {
             Dispatcher.BeginInvoke(() => viewModel.OpenProductCommand.Execute(row.ProductId).Subscribe(), DispatcherPriority.Input);
+        }
+    }
+
+    /// <summary>Opens the double-clicked raw material on Raw Materials, once the press is over, as a product opens on Products.</summary>
+    private void RawMaterialPrices_CellDoubleTapped(object? sender, GridCellDoubleTappedEventArgs e)
+    {
+        if (e.Record is RawMaterialPriceSummaryRow row && DataContext is ReportsViewModel viewModel)
+        {
+            Dispatcher.BeginInvoke(() => viewModel.OpenRawMaterialCommand.Execute(row.RawMaterialId).Subscribe(), DispatcherPriority.Input);
         }
     }
 }

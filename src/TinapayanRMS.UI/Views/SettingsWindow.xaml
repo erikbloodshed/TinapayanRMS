@@ -14,6 +14,7 @@
         xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
         xmlns:skinManager="clr-namespace:Syncfusion.SfSkinManager;assembly=Syncfusion.SfSkinManager.WPF"
         xmlns:collections="clr-namespace:System.Collections;assembly=System.Runtime"
+        xmlns:vim="clr-namespace:TinapayanRMS.UI.Vim"
         mc:Ignorable="d"
         Title="Settings"
         Width="1000"
@@ -36,6 +37,13 @@
         </collections:ArrayList>
     </controls:AppWindow.LeftHeaderItemsSource>
 
+    <!-- The Vim keys' mode, as the main window shows it, while they're on -->
+    <controls:AppWindow.RightHeaderItemsSource>
+        <collections:ArrayList>
+            <vim:VimModeIndicator />
+        </collections:ArrayList>
+    </controls:AppWindow.RightHeaderItemsSource>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
@@ -43,7 +51,8 @@
         </Grid.RowDefinitions>
 
         <!-- Fixed tabs, like Products' sub-tabs: nothing here to close or reopen. -->
-        <syncfusion:TabControlExt Grid.Row="0"
+        <syncfusion:TabControlExt x:Name="SettingsTabs"
+                                  Grid.Row="0"
                                   Margin="8,8,8,0"
                                   Background="{StaticResource PageBackgroundBrush}"
                                   TabPanelBackground="{StaticResource PageTabStripBrush}"
@@ -58,6 +67,7 @@
             <syncfusion:TabItemExt x:Name="ProductCategoriesTab" Header="Product Categories" CanClose="False" />
             <syncfusion:TabItemExt x:Name="RolesTab" Header="Roles" CanClose="False" />
             <syncfusion:TabItemExt x:Name="CostingDefaultsTab" Header="Costing Defaults" CanClose="False" />
+            <syncfusion:TabItemExt x:Name="KeyboardTab" Header="Keyboard" CanClose="False" />
         </syncfusion:TabControlExt>
 
         <Border Grid.Row="1"

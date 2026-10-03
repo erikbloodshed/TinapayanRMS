@@ -46,7 +46,7 @@ public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyL
 /// follow every change saved here) or copy them, from their recipe on the Products screen. One Save writes
 /// the name, the role and the lines together.
 /// </summary>
-public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDisposable
+public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDisposable, IRecordScreen
 {
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _lineRepository;
@@ -306,10 +306,9 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
         // Picking a sub-assembly loads it into the form; a refresh only re-points the selection at its
         // refreshed copy, so it leaves the form and its unsaved edits alone.
-        this.WhenAnyValue(x => x.SelectedRow)
-            .Where(_ => !IsBusyApplying)
-            .Select(row => Observable.FromAsync(() => LoadIntoFormAsync(row)))
-            .Switch()
+        Observable.Switch(this.WhenAnyValue(x => x.SelectedRow)
+                .Where(_ => !IsBusyApplying)
+                .Select(row => Observable.FromAsync(() => LoadIntoFormAsync(row))))
             .Subscribe();
 
         // An ingredient picked in the table is pointed at the screen's copy of it, which prices the line.
@@ -757,6 +756,18 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     public void OpenSubAssembly(int subAssemblyId)
     {
         _subAssemblyToOpen = TrySelectSubAssembly(subAssemblyId) ? null : subAssemblyId;
+    }
+
+    /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the sub-assembly the name means best.</summary>
+    public bool OpenByName(string text)
+    {
+        if (RecordNameMatch.Best(Rows, row => row.Name, text) is not { } row)
+        {
+            return false;
+        }
+
+        OpenSubAssembly(row.Id);
+        return true;
     }
 
     private bool TrySelectSubAssembly(int subAssemblyId)

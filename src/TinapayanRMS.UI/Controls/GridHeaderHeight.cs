@@ -17,7 +17,9 @@ namespace TinapayanRMS.UI.Controls;
 /// header cells only once it's laid out visibly, so a hidden one (a table behind another, a drop-down's list) is fitted
 /// the first time it's sized, and each grid once. A local value, since the theme sets the height through a Style, which
 /// outranks a type default; a HeaderRowHeight set in XAML still wins. Registered once for the whole app, from App's
-/// static constructor, so the grids inside the multi-column drop-downs get it too.
+/// static constructor, so the grids inside the multi-column drop-downs get it too. A grid whose headings wrap (a
+/// HeaderTemplate with TextWrapping, as Reports' Product Cost Summary has) sets <see cref="LinesProperty"/> to the lines
+/// they can take.
 /// </summary>
 public static class GridHeaderHeight
 {
@@ -28,7 +30,15 @@ public static class GridHeaderHeight
     private static readonly DependencyProperty IsFittedProperty = DependencyProperty.RegisterAttached(
         "IsFitted", typeof(bool), typeof(GridHeaderHeight), new PropertyMetadata(false));
 
+    /// <summary>How many lines of heading the header row fits: 1 unless a grid's headings wrap.</summary>
+    public static readonly DependencyProperty LinesProperty = DependencyProperty.RegisterAttached(
+        "Lines", typeof(int), typeof(GridHeaderHeight), new PropertyMetadata(1));
+
     private static bool _registered;
+
+    public static int GetLines(DependencyObject element) => (int)element.GetValue(LinesProperty);
+
+    public static void SetLines(DependencyObject element, int value) => element.SetValue(LinesProperty, value);
 
     public static void Register()
     {
@@ -46,11 +56,11 @@ public static class GridHeaderHeight
     }
 
     /// <summary>
-    /// A header row that fits one line of <paramref name="fontFamily"/> at <paramref name="fontSize"/> inside a cell with
-    /// <paramref name="padding"/> and <paramref name="border"/>, never shorter than the theme's 24px.
+    /// A header row that fits <paramref name="lines"/> lines of <paramref name="fontFamily"/> at <paramref name="fontSize"/>
+    /// inside a cell with <paramref name="padding"/> and <paramref name="border"/>, never shorter than the theme's 24px.
     /// </summary>
-    public static double HeightFor(FontFamily fontFamily, double fontSize, Thickness padding, Thickness border) =>
-        Math.Max(ThemeHeight, Math.Ceiling(fontSize * fontFamily.LineSpacing) + padding.Top + padding.Bottom + border.Top + border.Bottom);
+    public static double HeightFor(FontFamily fontFamily, double fontSize, Thickness padding, Thickness border, int lines = 1) =>
+        Math.Max(ThemeHeight, Math.Ceiling(fontSize * fontFamily.LineSpacing * lines) + padding.Top + padding.Bottom + border.Top + border.Bottom);
 
     private static void FitHeader(object sender, RoutedEventArgs e)
     {
@@ -63,7 +73,7 @@ public static class GridHeaderHeight
         }
 
         grid.SetValue(IsFittedProperty, true);
-        grid.HeaderRowHeight = HeightFor(cell.FontFamily, cell.FontSize, cell.Padding, cell.BorderThickness);
+        grid.HeaderRowHeight = HeightFor(cell.FontFamily, cell.FontSize, cell.Padding, cell.BorderThickness, GetLines(grid));
     }
 
     /// <summary>A data grid's header cell, or a tree grid's (a TreeGridHeaderCell, which isn't a GridHeaderCellControl).</summary>

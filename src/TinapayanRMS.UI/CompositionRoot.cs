@@ -11,6 +11,7 @@ using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.UI.Vim;
 using TinapayanRMS.UI.Views;
 
 namespace TinapayanRMS.UI;
@@ -89,6 +90,10 @@ public static class CompositionRoot
                 services.AddSingleton<ProductCategoriesViewModel>();
                 services.AddSingleton<SubAssemblyRolesViewModel>();
                 services.AddSingleton<CostingDefaultsViewModel>();
+
+                // Ticking the box turns the keys on in the running app as well as keeping the choice.
+                services.AddSingleton(provider => new KeyboardSettingsViewModel(
+                    provider.GetRequiredService<IViewStateStore>(), on => VimKeys.State.IsEnabled = on));
             });
     }
 }

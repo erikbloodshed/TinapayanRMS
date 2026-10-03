@@ -45,10 +45,21 @@ public static class UndoShortcuts
             return;
         }
 
-        var focused = Keyboard.FocusedElement as DependencyObject;
+        if (Undo(Keyboard.FocusedElement as DependencyObject, redo))
+        {
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Undoes (or redoes) one step on the screen <paramref name="focused"/> is on: Ctrl+Z and Ctrl+Y, and the Vim keys'
+    /// <c>u</c> and Ctrl+R. False when it's on no screen that records steps.
+    /// </summary>
+    public static bool Undo(DependencyObject? focused, bool redo)
+    {
         if (ScreenOf(focused) is not { } screen)
         {
-            return;
+            return false;
         }
 
         // A cell still being typed into is committed first, not thrown away. Everywhere else on these screens —
@@ -75,7 +86,7 @@ public static class UndoShortcuts
 
         // Focus hasn't moved, so the field that has it would never reopen a step of its own for what's typed next.
         screen.BeginUndoStep();
-        e.Handled = true;
+        return true;
     }
 
     /// <summary>The screen the cursor is on, or null when it's on one that doesn't record undo steps.</summary>

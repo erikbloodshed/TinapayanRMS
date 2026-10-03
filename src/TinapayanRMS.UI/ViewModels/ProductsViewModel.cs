@@ -619,7 +619,7 @@ public sealed class ProductCostSummary
 /// (IProductRepository.SaveAsync). A composite product's recipe is the products it holds instead, in its Products tab
 /// (<see cref="ComponentEdits"/>), each bringing its recipe cost.
 /// </summary>
-public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen
+public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen, IRecordScreen, IRevertScreen
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Scaling, then Clone.</summary>
     public const int RecipeTab = 0;
@@ -2101,10 +2101,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .Subscribe(ResetDetails);
 
         // A newer selection cancels an older one still loading (Switch disposes it, which cancels its token).
-        this.WhenAnyValue(x => x.SelectedProduct)
-            .Where(_ => !IsBusyApplying)
-            .Select(product => Observable.FromAsync(cancellationToken => LoadProductDetailAsync(product, cancellationToken)))
-            .Switch()
+        Observable.Switch(this.WhenAnyValue(x => x.SelectedProduct)
+                .Where(_ => !IsBusyApplying)
+                .Select(product => Observable.FromAsync(cancellationToken => LoadProductDetailAsync(product, cancellationToken))))
             .Subscribe();
 
         this.WhenAnyValue(x => x.SelectedRecipeTab)
@@ -2189,19 +2188,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 RecomputeUsageForm();
             });
 
-        this.WhenAnyValue(x => x.EditingUsageSource)
-            .Skip(1)
-            .Where(_ => !IsBusyApplying && IsUsageFormOpen && IsAddingUsage)
-            .Select(source => Observable.FromAsync(cancellationToken => LoadUsageSourceAsync(source, cancellationToken)))
-            .Switch()
+        Observable.Switch(this.WhenAnyValue(x => x.EditingUsageSource)
+                .Skip(1)
+                .Where(_ => !IsBusyApplying && IsUsageFormOpen && IsAddingUsage)
+                .Select(source => Observable.FromAsync(cancellationToken => LoadUsageSourceAsync(source, cancellationToken))))
             .Subscribe();
 
         // A sub-assembly picked to link instead relinks the section once its lines are in; a later pick overtakes it.
-        this.WhenAnyValue(x => x.ChangeLinkTarget)
-            .Skip(1)
-            .Where(target => target is not null && IsChangingLink && !IsBusyApplying)
-            .Select(target => Observable.FromAsync(cancellationToken => ChangeLinkAsync(target!, cancellationToken)))
-            .Switch()
+        Observable.Switch(this.WhenAnyValue(x => x.ChangeLinkTarget)
+                .Skip(1)
+                .Where(target => target is not null && IsChangingLink && !IsBusyApplying)
+                .Select(target => Observable.FromAsync(cancellationToken => ChangeLinkAsync(target!, cancellationToken))))
             .Subscribe();
 
         // Typing one figure of the piece size works out the other, and makes it the one that's kept.
@@ -2896,6 +2893,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public void OpenProduct(int productId)
     {
         _productToOpen = TrySelectProduct(productId) ? null : productId;
+    }
+
+    /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the product the name means best.</summary>
+    public bool OpenByName(string text)
+    {
+        if (RecordNameMatch.Best(Products, product => product.Name, text) is not { } product)
+        {
+            return false;
+        }
+
+        OpenProduct(product.Id);
+        return true;
     }
 
     private bool TrySelectProduct(int productId)

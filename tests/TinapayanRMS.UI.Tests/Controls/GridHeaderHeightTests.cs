@@ -27,6 +27,7 @@ public class GridHeaderHeightTests
 
         GridHeaderHeight.HeightFor(new FontFamily("Segoe UI"), 14, padding, border).Should().Be(26, "19px of text, 6 of padding, 1 of border");
         GridHeaderHeight.HeightFor(new FontFamily("Segoe UI"), 12, padding, border).Should().Be(24, "the theme's own height already fits its 12px text");
+        GridHeaderHeight.HeightFor(new FontFamily("Segoe UI"), 14, padding, border, lines: 2).Should().Be(45, "38px for two lines of text, 6 of padding, 1 of border");
     }
 
     [Fact]
@@ -42,6 +43,19 @@ public class GridHeaderHeightTests
             // The header's text, descenders and all, fits inside its cell.
             var text = Descendants(header).OfType<TextBlock>().First(t => t.Text == "Ingredient");
             text.TranslatePoint(new Point(0, text.ActualHeight), header).Y.Should().BeLessThanOrEqualTo(header.ActualHeight);
+        });
+    }
+
+    [Fact]
+    public void A_grid_whose_headings_wrap_has_a_header_tall_enough_for_two_lines()
+    {
+        GridHeaderHeight.Register();
+
+        OffscreenGrid.Run(() => Grid(lines: 2), grid =>
+        {
+            var header = HeaderCells(grid).First(c => c.IsVisible);
+            grid.HeaderRowHeight.Should().Be(GridHeaderHeight.HeightFor(header.FontFamily, header.FontSize, header.Padding, header.BorderThickness, lines: 2))
+                .And.BeGreaterThan(GridHeaderHeight.HeightFor(header.FontFamily, header.FontSize, header.Padding, header.BorderThickness));
         });
     }
 
@@ -71,8 +85,11 @@ public class GridHeaderHeightTests
         OffscreenGrid.Run(() => Grid(headerRowHeight: 40), grid => grid.HeaderRowHeight.Should().Be(40));
     }
 
-    /// <summary>A one-line grid whose header cells are <paramref name="fontSize"/> (the theme sets theirs apart from the grid's).</summary>
-    private static SfDataGrid Grid(double fontSize = 14, Visibility visibility = Visibility.Visible, double? headerRowHeight = null)
+    /// <summary>
+    /// A one-line grid whose header cells are <paramref name="fontSize"/> (the theme sets theirs apart from the grid's), with
+    /// a header row for <paramref name="lines"/> lines of heading.
+    /// </summary>
+    private static SfDataGrid Grid(double fontSize = 14, Visibility visibility = Visibility.Visible, double? headerRowHeight = null, int lines = 1)
     {
         var headerStyle = new Style(typeof(GridHeaderCellControl));
         headerStyle.Setters.Add(new Setter(Control.FontSizeProperty, fontSize));
@@ -90,6 +107,8 @@ public class GridHeaderHeightTests
         {
             grid.HeaderRowHeight = height;
         }
+
+        GridHeaderHeight.SetLines(grid, lines);
 
         return grid;
     }

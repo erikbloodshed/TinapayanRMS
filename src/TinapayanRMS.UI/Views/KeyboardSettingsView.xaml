@@ -1,0 +1,23 @@
+<UserControl x:Class="TinapayanRMS.UI.Views.KeyboardSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="500" d:DesignWidth="900">
+    <Grid Background="{StaticResource PageBackgroundBrush}" Margin="16">
+        <!-- One setting, so one card, sized as the Costing Defaults tab's -->
+        <Border Style="{StaticResource CardStyle}" Width="420" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <StackPanel>
+                <TextBlock Text="Keyboard" Style="{StaticResource SectionHeaderStyle}" />
+                <!-- Syncfusion has no check box of its own outside its grids and ribbon; its samples use WPF's, as the Roles tab does -->
+                <CheckBox Content="Vim keys"
+                          IsChecked="{Binding IsVimKeysOn, Mode=TwoWay}"
+                          ToolTip="Move round the app and run its commands from the keyboard, as the Vim editor does" />
+                <TextBlock Style="{StaticResource CaptionStyle}"
+                           Margin="0,8,0,0"
+                           Text="Letters move and act instead of typing, until you start typing in a field or cell (i, or a click) and Esc stops it again: j and k go down and up, f labels what can be clicked, : runs a command such as :w to save, and ? lists every key. The title bar shows which mode the keys are in. Kept for you on this computer." />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

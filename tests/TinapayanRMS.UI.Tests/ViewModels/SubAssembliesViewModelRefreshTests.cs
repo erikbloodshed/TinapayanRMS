@@ -160,6 +160,24 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
     }
 
     [Fact]
+    public async Task OpenByName_opens_the_sub_assembly_a_name_means_best_as_the_Vim_command_line_asks()
+    {
+        var roleId = await AddRoleAsync("Glaze");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var repository = new SubAssemblyRepository(CreateDbContextFactory());
+        await repository.SaveStandaloneAsync(new SubAssembly { Name = "Chocolate Glaze", RoleId = roleId }, [(sugarId, 100m)], Cancellation);
+        var ubeId = await repository.SaveStandaloneAsync(new SubAssembly { Name = "Ube Glaze", RoleId = roleId }, [(sugarId, 200m)], Cancellation);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.OpenByName("ube").Should().BeTrue();
+
+        viewModel.SelectedRow!.Id.Should().Be(ubeId);
+        viewModel.OpenByName("fondant").Should().BeFalse();
+        await WaitUntilSettledAsync(() => viewModel.EditingName == "Ube Glaze", () => $"name={viewModel.EditingName}");
+    }
+
+    [Fact]
     public async Task In_the_packaging_role_the_form_saves_and_reloads_a_packaging_set()
     {
         await AddRoleAsync("Glaze");

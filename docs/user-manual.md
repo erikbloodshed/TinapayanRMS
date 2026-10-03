@@ -167,6 +167,58 @@ The **Raw Materials** and **Products** lists are trees of folders, like File Exp
 - **Remove Line** removes the selected line.
 - Figures shown in grey are worked out by the app, so they can't be typed into.
 
+### Vim keys
+
+If you'd rather keep your hands on the keyboard, the app can be driven with keys like those of the Vim text editor. They're off until you turn them on in **Settings → Keyboard**, and the setting is only for you, on this computer.
+
+With them on, the keys work in two modes. The mode shows at the top right of the window, before the Back arrow:
+
+- **NORMAL**: letters move around the app and run commands. They don't type.
+- **INSERT**: what you type goes into the field or table cell, as usual.
+
+Clicking a field or cell, tabbing into it, or picking it by its label (**f**, below) puts you in INSERT, ready to type. **Esc** stops typing and goes back to NORMAL.
+
+- In a table cell, Esc keeps what you typed. Without Vim keys, Esc in a cell throws the typing away.
+- In Settings, or a small window that asks for a name, the first Esc stops typing, and a second Esc closes the window.
+
+**Moving around**
+
+- **j** and **k**: down and up. In a list or table that's a row. In a form, it's the next or previous field, like Tab and Shift+Tab.
+- **h** and **l**: left and right. In a table that's a cell. In the Raw Materials and Products lists, **h** closes a folder and **l** opens it. In a field, they move the cursor.
+- **gg** and **G**: the first and last row.
+- **0** and **$**: the first and last column of a table, or the start and end of a field.
+- **J** and **K**: leave the list or table, for the control after it or before it.
+- **gt** and **gT**: the next and previous tab.
+- **H** and **L**: Back and Forward, like Alt+Left and Alt+Right.
+- **/**: the search box of the list on screen.
+- **f**: puts a small yellow label on everything you can click. Type a label to click its item. Esc takes the labels away.
+
+**Typing and changing**
+
+- **i** or **a**: start typing in the field or cell. **I** and **A** start at the beginning or end of a field. In a table, they start in the row's first or last column.
+- **cc**: type over a field or cell. Its text is selected, so what you type replaces it.
+- **o**: start a new line in a table, in the empty row at the bottom.
+- **dd**: delete the table line under the cursor. In the Raw Materials and Products lists, it deletes the row, as the row's menu does, and asks first.
+- **r**: rename the list row, as the row's menu does.
+- **u**: undo. **Ctrl+R**: redo.
+
+**Commands**
+
+Type **:**, then a command, then **Enter**. A bar opens at the bottom of the window for it, and Esc closes it.
+
+- **:w** saves.
+- **:new** starts a new one.
+- **:delete** deletes the one open, asking first.
+- **:e** and a name opens the one whose name matches. For example, **:e pandesal** opens Pandesal on the Products screen.
+- **:revert** throws away a product's changes since the last Save.
+- **:raw**, **:sub**, **:products**, **:reports** and **:print** switch screens.
+- **:settings** opens Settings.
+- **:help** lists every key.
+
+A command can be shortened as long as it stays clear, as in **:del**, **:pro** and **:rep**.
+
+**?** shows the keys for wherever you are. **Esc**, **q** or **?** closes the list.
+
 ---
 
 ## 3. First-time setup
@@ -188,7 +240,7 @@ You don't have to finish each list before moving on. You can add a category or u
 
 ## 4. Settings
 
-Open **Settings** from the bottom of the navigation menu. It has five tabs. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Press **Close**, the **✕** at its top right, or **Esc** to close Settings. The button beside the ✕ makes the window fill the screen, and pressing it again returns the window to its normal size. You can also drag the title bar to move the window.
+Open **Settings** from the bottom of the navigation menu. It has six tabs. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Press **Close**, the **✕** at its top right, or **Esc** to close Settings. The button beside the ✕ makes the window fill the screen, and pressing it again returns the window to its normal size. You can also drag the title bar to move the window.
 
 ### Units of Measure
 
@@ -228,6 +280,12 @@ These are the five percentages a **new** product's costing starts with:
 - **VAT %**: added on top of the marked-up price.
 
 Each product keeps its own percentages from its first Save. Changing the defaults doesn't change any saved product.
+
+### Keyboard
+
+**Vim keys** turns on the keys described in [Vim keys](#vim-keys). The change takes effect at once.
+
+The setting is kept for you on this computer, not in the bakeshop's data. Turning it on doesn't change the app for anyone else, or for you on another computer.
 
 ---
 
@@ -601,11 +659,20 @@ One row for every product, as it's saved:
 
 - **Product**, its **Stage** (Production or Research and Development) and its **Category**.
 - **Pieces**: how many pieces make one sellable unit (1 for a product sold by the piece). Every amount after it is for one sellable unit. Blank for a composite product, which is one unit made of other products.
-- **Base Cost** and **Selling Price**: as the product's Costing tab works them out.
+- **Ingredients Cost**: the recipe's cost, the **Sub-assemblies (ingredients)** row of the product's Costing tab. For a composite product, it's what its products bring (and its own sub-assemblies).
+- **Packaging Cost**: the **Packaging** row of the Costing tab. For a composite product that includes its products' packaging, theirs is counted too.
+- **Labor Cost**, **Overhead Cost** and **Admin Cost**: the Costing tab's Labor, Overhead and Admin metrics in pesos, each a percentage of the ingredients cost.
+- **Base Cost** and **Suggested Price**: as the product's Costing tab works them out. The base cost is the five costs before it added up, and the suggested price is the Costing tab's **Total Selling Price**.
 - **Current Price**: what the shop charges now, as entered on the product. Blank if none is entered.
 - **Markup %**: what the current price earns on the base cost, as the product's header shows it. Blank without a current price.
 
 Sort by **Markup %** to see which products earn the least.
+
+To show only some products, click the funnel in the **Product**, **Stage** or **Category** heading. Untick what you don't want to see, or untick **(Select All)** and tick only what you do, then click **OK**. The search box at the top finds a name in a long list. A funnel with a dot shows that its column is filtered, and filters in more than one column work together: **Stage** set to Production and **Category** set to Breads shows only the breads in production. **Clear Filter** at the top of the list shows everything in that column again. The filters stay as you set them while the app is open, even when you go to another screen and come back, and they're gone the next time you open the app.
+
+To choose which columns show, click **Columns** at the top right and untick the ones you don't need, such as **Labor Cost**, **Overhead Cost** and **Admin Cost**. Tick one again to bring it back. The list stays open while you tick, and closes when you click anywhere else. **Product** is always shown, so it isn't in the list. A hidden column's filter still applies: you can filter **Stage** to Production and then hide the Stage column. Like the filters, your choice of columns lasts until you close the app.
+
+The headings wrap onto two lines to leave room for all the columns. On a smaller screen, such as a 1366-pixel laptop, the table scrolls sideways, and the **Product** column stays in place.
 
 Double-click a product to open it on the **Products** screen.
 
@@ -619,6 +686,8 @@ One row for every purchased raw material, ingredients and packaging alike. Made 
 - **Since**: the day the latest price started.
 
 A material that has never been priced shows blank figures.
+
+Double-click a material to open it on the **Raw Materials** screen.
 
 ---
 
@@ -803,6 +872,9 @@ The product picker leaves out the composite itself, and any composite that alrea
 
 **"The name is already taken."**
 Names must be unique within each list: raw materials, sub-assemblies, products, categories, roles and units. A unit's abbreviation must be unique too. Upper and lower case count as the same.
+
+**Letters don't type, or a table cell won't start an edit when I type.**
+The Vim keys are on, and the top right of the window says NORMAL. Click the field or cell, or press **i**, to type. Turn them off in Settings → Keyboard. See [Vim keys](#vim-keys).
 
 **A figure is grey and can't be typed into.**
 It's worked out by the app, or fixed by a rule. Examples are a standard unit's multiplier, the Absolute %, or a linked ingredient's buffer.

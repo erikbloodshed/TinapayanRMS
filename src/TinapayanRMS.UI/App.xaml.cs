@@ -15,7 +15,10 @@ using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.Windows.Controls.Input;
 using Syncfusion.Windows.Shared;
 using Syncfusion.Windows.Tools.Controls;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.UI.Controls;
+using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.UI.Vim;
 using TinapayanRMS.UI.Views;
 
 namespace TinapayanRMS.UI;
@@ -103,6 +106,9 @@ public partial class App : Application
         // Ctrl+Z and Ctrl+Y for the screen the cursor is on. It goes here, on every window, because Syncfusion's
         // number boxes take both keys for their own per-character undo and mark them handled on the way down.
         UndoShortcuts.Register();
+
+        // The Vim keys, on every window for the same reason; they do nothing until turned on (OnStartup, Settings).
+        VimKeys.Register();
     }
 
     /// <summary>
@@ -204,6 +210,9 @@ public partial class App : Application
 
         _host = CompositionRoot.CreateHostBuilder(e.Args).Build();
         _host.Start();
+
+        // On if this Windows user turned them on in Settings' Keyboard tab.
+        VimKeys.State.IsEnabled = KeyboardSettingsViewModel.IsVimKeysSaved(_host.Services.GetRequiredService<IViewStateStore>());
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         SfSkinManager.SetTheme(mainWindow, new Theme("Windows11Light"));

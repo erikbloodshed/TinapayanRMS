@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:vim="clr-namespace:TinapayanRMS.UI.Vim"
              xmlns:viewModels="clr-namespace:TinapayanRMS.UI.ViewModels">
     <!-- The screen's first region: its title with the search box beside it, then the products in their folders filling the rest. -->
     <Border Style="{StaticResource CardStyle}">
@@ -11,6 +12,7 @@
                 <syncfusion:SfTextBoxExt DockPanel.Dock="Right"
                                          Width="190"
                                          Watermark="Search products"
+                                         vim:VimKeys.IsSearchBox="True"
                                          WatermarkTemplate="{StaticResource AlignedWatermarkTemplate}"
                                          Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 <TextBlock Text="Products"

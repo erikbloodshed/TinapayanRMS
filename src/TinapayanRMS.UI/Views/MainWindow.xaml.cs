@@ -8,11 +8,12 @@ using Syncfusion.SfSkinManager;
 using Syncfusion.Windows.Tools.Controls;
 using TinapayanRMS.UI.Controls;
 using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.UI.Vim;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.UI.Views;
 
-public partial class MainWindow : AppWindow
+public partial class MainWindow : AppWindow, IVimHost
 {
     // Each tab's screen LoadCommand, run whenever that tab is shown (see LoadSelectedTab).
     private readonly Dictionary<TabItemExt, ReactiveCommand<RxVoid, RxVoid>> _loadCommands = [];
@@ -32,6 +33,7 @@ public partial class MainWindow : AppWindow
     private readonly ProductCategoriesViewModel _productCategoriesViewModel;
     private readonly SubAssemblyRolesViewModel _rolesViewModel;
     private readonly CostingDefaultsViewModel _costingDefaultsViewModel;
+    private readonly KeyboardSettingsViewModel _keyboardSettingsViewModel;
 
     public MainWindow(
         MainWindowViewModel viewModel,
@@ -44,6 +46,7 @@ public partial class MainWindow : AppWindow
         ProductCategoriesViewModel productCategoriesViewModel,
         SubAssemblyRolesViewModel rolesViewModel,
         CostingDefaultsViewModel costingDefaultsViewModel,
+        KeyboardSettingsViewModel keyboardSettingsViewModel,
         PrintTabViewModel printTabViewModel)
     {
         InitializeComponent();
@@ -53,6 +56,7 @@ public partial class MainWindow : AppWindow
         _productCategoriesViewModel = productCategoriesViewModel;
         _rolesViewModel = rolesViewModel;
         _costingDefaultsViewModel = costingDefaultsViewModel;
+        _keyboardSettingsViewModel = keyboardSettingsViewModel;
 
         RawMaterialsTab.Content = new RawMaterialsView(rawMaterialsViewModel);
         SubAssembliesTab.Content = new SubAssembliesView(subAssembliesViewModel);
@@ -106,6 +110,13 @@ public partial class MainWindow : AppWindow
                 ShowTab(ProductsTab);
             });
 
+        // A double-clicked row of Reports' Raw Materials Price Summary opens its material on Raw Materials, the same way.
+        reportsViewModel.RawMaterialOpenRequests.Subscribe(rawMaterialId =>
+        {
+            rawMaterialsViewModel.OpenRawMaterial(rawMaterialId);
+            ShowTab(RawMaterialsTab);
+        });
+
         // And the other way: a linked badge on Products opens its standalone sub-assembly on Sub-Assemblies.
         productsViewModel.SubAssemblyOpenRequests.Subscribe(subAssemblyId =>
         {
@@ -124,6 +135,38 @@ public partial class MainWindow : AppWindow
             LoadSelectedTab();
         };
     }
+
+    /// <summary>The Vim keys' <c>gt</c> and <c>gT</c>: the next screen's tab or the one before.</summary>
+    public void StepTab(int step) => VimTabs.Step(MainTabControl, step);
+
+    /// <summary>The Vim keys' <c>H</c>, as Alt+Left.</summary>
+    public bool GoBack() => NavigateHistory(back: true);
+
+    /// <summary>The Vim keys' <c>L</c>, as Alt+Right.</summary>
+    public bool GoForward() => NavigateHistory(back: false);
+
+    /// <summary>The command line's <c>:raw</c>, <c>:products</c> and the rest: the screen, with the keyboard on its tab.</summary>
+    public bool ShowScreen(AppScreen screen)
+    {
+        if (_historyScreens.FirstOrDefault(pair => pair.Value.Screen == screen).Key is not { } tab)
+        {
+            return false;
+        }
+
+        ShowTab(tab);
+        tab.Focus();
+        return true;
+    }
+
+    /// <summary>The command line's <c>:settings</c>.</summary>
+    bool IVimHost.OpenSettings()
+    {
+        OpenSettings();
+        return true;
+    }
+
+    /// <summary>The screen on show, for a command given from the tab strip.</summary>
+    public FrameworkElement? CurrentScreen => (MainTabControl.SelectedItem as TabItemExt)?.Content as FrameworkElement;
 
     private void BackButton_Click(object sender, RoutedEventArgs e) => NavigateHistory(back: true);
 
@@ -307,7 +350,7 @@ public partial class MainWindow : AppWindow
     }
 
     /// <summary>
-    /// Units of measure, categories, roles and costing defaults, edited in a dialog over the current screen. Once it
+    /// Units of measure, categories, roles, costing defaults and the keyboard, edited in a dialog over the current screen. Once it
     /// closes, the screen on show refreshes so its pickers include anything added or renamed; the other
     /// tabs pick the changes up when they're next shown, as they do for any change.
     /// </summary>
@@ -316,7 +359,8 @@ public partial class MainWindow : AppWindow
         CloseDrawer();
 
         var settings = new SettingsWindow(
-            _unitsOfMeasureViewModel, _categoriesViewModel, _productCategoriesViewModel, _rolesViewModel, _costingDefaultsViewModel) { Owner = this };
+            _unitsOfMeasureViewModel, _categoriesViewModel, _productCategoriesViewModel, _rolesViewModel, _costingDefaultsViewModel,
+            _keyboardSettingsViewModel) { Owner = this };
         SfSkinManager.SetTheme(settings, SfSkinManager.GetTheme(this));
         settings.ShowDialog();
 

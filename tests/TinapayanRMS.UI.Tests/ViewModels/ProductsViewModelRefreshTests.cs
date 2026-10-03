@@ -1109,6 +1109,21 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task OpenByName_opens_the_product_a_name_means_best_as_the_Vim_command_line_asks()
+    {
+        await AddProductAsync("Ube Cheese Pandesal");
+        var pandesalId = await AddProductAsync("Pandesal");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.OpenByName("pandesal").Should().BeTrue();
+
+        viewModel.SelectedProduct!.Id.Should().Be(pandesalId, "the name typed in full beats one that only holds it");
+        viewModel.OpenByName("croissant").Should().BeFalse();
+        viewModel.SelectedProduct!.Id.Should().Be(pandesalId, "nothing matching leaves the product open");
+    }
+
+    [Fact]
     public async Task A_role_changed_on_the_Sub_Assemblies_screen_moves_its_tab_to_where_the_new_role_sorts()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);

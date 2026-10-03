@@ -18,6 +18,7 @@
             <converters:BooleanToStarWidthConverter x:Key="BooleanToStarWidthConverter" />
             <converters:EmptyStateVisibilityConverter x:Key="EmptyStateVisibilityConverter" />
             <converters:NotNullToVisibilityConverter x:Key="NotNullToVisibilityConverter" />
+            <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
 
             <!--
                 The Unit cell of every packaging grid (a product's Packaging tab, the Add Sub-Assembly form, and a
@@ -102,6 +103,11 @@
 
             <DataTemplate x:Key="SettingsIconTemplate">
                 <TextBlock Text="&#xE713;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
+
+            <!-- Which columns show: View, the eye -->
+            <DataTemplate x:Key="ColumnsIconTemplate">
+                <TextBlock Text="&#xE890;" Style="{StaticResource IconGlyphStyle}" />
             </DataTemplate>
 
             <DataTemplate x:Key="PrintIconTemplate">
