@@ -38,6 +38,9 @@ public partial class App : Application
     // Set while an unhandled exception's message is up, so another arriving meanwhile is only logged.
     private bool _isShowingError;
 
+    // Set by RestartAfterExit: the app starts again once this one has closed.
+    private bool _restartOnExit;
+
     static App()
     {
         Log.Logger = new LoggerConfiguration()
@@ -228,6 +231,39 @@ public partial class App : Application
         mainWindow.Show();
 
         _ = WarnOfPendingMigrationsAsync(_host.Services.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>());
+        _ = BackUpDailyAsync(_host.Services.GetRequiredService<IDatabaseBackups>());
+    }
+
+    /// <summary>
+    /// The day's automatic backup, the first time the app starts each day (Settings → Database), off the UI thread once
+    /// the window shows, so the app starts no later. It says nothing on screen: a backup that couldn't be taken is logged,
+    /// and the next start tries again, since none was taken that day.
+    /// </summary>
+    private static async Task BackUpDailyAsync(IDatabaseBackups backups)
+    {
+        try
+        {
+            var backup = await Task.Run(() => backups.BackUpDailyIfDueAsync(DateTime.Now, CancellationToken.None));
+            if (backup is not null)
+            {
+                Log.Information("Took the day's automatic backup: {Path}", backup.Path);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Couldn't take the day's automatic backup");
+        }
+    }
+
+    /// <summary>
+    /// Says <paramref name="message"/>, then closes the app and starts it again: after a restore, which replaces everything
+    /// every screen holds. The new copy starts once this one has finished closing (OnExit), with its log written and closed.
+    /// </summary>
+    public void RestartAfterExit(string message)
+    {
+        ShowError(message, MessageBoxImage.Information);
+        _restartOnExit = true;
+        Shutdown();
     }
 
     /// <summary>
@@ -291,6 +327,11 @@ public partial class App : Application
         _host?.Dispose();
         Log.CloseAndFlush();
         base.OnExit(e);
+
+        if (_restartOnExit && Environment.ProcessPath is { } path)
+        {
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = false, WorkingDirectory = AppContext.BaseDirectory })?.Dispose();
+        }
     }
 
     /// <summary>

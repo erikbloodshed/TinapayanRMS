@@ -68,6 +68,7 @@
             <syncfusion:TabItemExt x:Name="RolesTab" Header="Roles" CanClose="False" />
             <syncfusion:TabItemExt x:Name="CostingDefaultsTab" Header="Costing Defaults" CanClose="False" />
             <syncfusion:TabItemExt x:Name="KeyboardTab" Header="Keyboard" CanClose="False" />
+            <syncfusion:TabItemExt x:Name="DatabaseTab" Header="Database" CanClose="False" />
         </syncfusion:TabControlExt>
 
         <Border Grid.Row="1"

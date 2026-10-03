@@ -1,3 +1,4 @@
+using System.Windows;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -62,6 +63,8 @@ public static class CompositionRoot
                 services.AddSingleton<IPackagingLinkRepository, PackagingLinkRepository>();
                 services.AddSingleton<IProductCloner, ProductCloner>();
                 services.AddSingleton<ICostRecalculator, CostRecalculator>();
+                services.AddSingleton<IDatabaseBackups>(provider => new DatabaseBackups(
+                    provider.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>(), DatabaseBackups.DefaultFolder));
                 services.AddSingleton<SavedProductReader>();
                 services.AddSingleton<IViewStateStore>(new JsonViewStateStore(JsonViewStateStore.DefaultFilePath));
 
@@ -93,6 +96,10 @@ public static class CompositionRoot
                 // Ticking the box turns the keys on in the running app as well as keeping the choice.
                 services.AddSingleton(provider => new KeyboardSettingsViewModel(
                     provider.GetRequiredService<IViewStateStore>(), on => VimKeys.State.IsEnabled = on));
+
+                // A restore replaces everything every screen holds, so the app starts again after one (App.RestartAfterExit).
+                services.AddSingleton(provider => new DatabaseBackupsViewModel(
+                    provider.GetRequiredService<IDatabaseBackups>(), message => ((App)Application.Current).RestartAfterExit(message), provider.GetRequiredService<ILogger>()));
             });
     }
 }

@@ -277,7 +277,7 @@
                                               HorizontalContentAlignment="Left"
                                               Background="Transparent"
                                               BorderThickness="0"
-                                              ToolTip="Units of measure, categories, roles, costing defaults and the keyboard"
+                                              ToolTip="Units of measure, categories, roles, costing defaults, the keyboard and database backups"
                                               Click="SettingsNavButton_Click" />
                     </Grid>
                 </Border>

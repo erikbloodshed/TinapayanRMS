@@ -114,6 +114,16 @@
                 <TextBlock Text="&#xE749;" Style="{StaticResource IconGlyphStyle}" />
             </DataTemplate>
 
+            <!-- A backup put back over the data: UpdateRestore, an arrow turning back -->
+            <DataTemplate x:Key="RestoreIconTemplate">
+                <TextBlock Text="&#xE777;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
+
+            <!-- A folder opened in File Explorer, or a file picked from one: FolderOpen -->
+            <DataTemplate x:Key="FolderIconTemplate">
+                <TextBlock Text="&#xE838;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
+
             <!-- A table to an Excel workbook: Export, an arrow leaving a box -->
             <DataTemplate x:Key="ExportIconTemplate">
                 <TextBlock Text="&#xEDE1;" Style="{StaticResource IconGlyphStyle}" />

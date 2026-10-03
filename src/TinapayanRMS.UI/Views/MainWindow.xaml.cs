@@ -34,6 +34,7 @@ public partial class MainWindow : AppWindow, IVimHost
     private readonly SubAssemblyRolesViewModel _rolesViewModel;
     private readonly CostingDefaultsViewModel _costingDefaultsViewModel;
     private readonly KeyboardSettingsViewModel _keyboardSettingsViewModel;
+    private readonly DatabaseBackupsViewModel _databaseBackupsViewModel;
 
     public MainWindow(
         MainWindowViewModel viewModel,
@@ -47,6 +48,7 @@ public partial class MainWindow : AppWindow, IVimHost
         SubAssemblyRolesViewModel rolesViewModel,
         CostingDefaultsViewModel costingDefaultsViewModel,
         KeyboardSettingsViewModel keyboardSettingsViewModel,
+        DatabaseBackupsViewModel databaseBackupsViewModel,
         PrintTabViewModel printTabViewModel)
     {
         InitializeComponent();
@@ -57,6 +59,7 @@ public partial class MainWindow : AppWindow, IVimHost
         _rolesViewModel = rolesViewModel;
         _costingDefaultsViewModel = costingDefaultsViewModel;
         _keyboardSettingsViewModel = keyboardSettingsViewModel;
+        _databaseBackupsViewModel = databaseBackupsViewModel;
 
         RawMaterialsTab.Content = new RawMaterialsView(rawMaterialsViewModel);
         SubAssembliesTab.Content = new SubAssembliesView(subAssembliesViewModel);
@@ -360,7 +363,7 @@ public partial class MainWindow : AppWindow, IVimHost
 
         var settings = new SettingsWindow(
             _unitsOfMeasureViewModel, _categoriesViewModel, _productCategoriesViewModel, _rolesViewModel, _costingDefaultsViewModel,
-            _keyboardSettingsViewModel) { Owner = this };
+            _keyboardSettingsViewModel, _databaseBackupsViewModel) { Owner = this };
         SfSkinManager.SetTheme(settings, SfSkinManager.GetTheme(this));
         settings.ShowDialog();
 

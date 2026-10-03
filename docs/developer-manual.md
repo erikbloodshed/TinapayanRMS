@@ -167,6 +167,7 @@ If your SQL Server instance isn't `.\SQLEXPRESS`, change the first two.
 
 - **Logs**: `logs/tinapayanrms-<date>.log` beside the executable. In a debug build that's `src/TinapayanRMS.UI/bin/Debug/net10.0-windows10.0.19041.0/logs/`. There's one file a day, and the last 31 are kept.
 - **View state**: `%LocalAppData%\TinapayanRMS\view-state.json` remembers which tree folders were left open, and whether the Vim keys are on (`"vim-keys": ["on"]`). It's safe to delete.
+- **Backups**: `%ProgramData%\TinapayanRMS\Backups`, one folder for every Windows user of the computer. SQL Server writes the `.bak` files itself, as its service account (`NT SERVICE\MSSQL$SQLEXPRESS`), which can't write into a user's profile. So the app creates this folder and, as its owner, gives the service account and `BUILTIN\Users` Modify on it, inherited by every file ([BackupFolder](../src/TinapayanRMS.Infrastructure/Services/BackupFolder.cs)). The tests use `%ProgramData%\TinapayanRMS\Test Backups\<guid>` and delete it afterwards.
 
 ### Command reference
 
@@ -309,7 +310,8 @@ Business and costing rules go in ApplicationCore, and EF Core and other I/O stay
 2. **`App.OnStartup`** hooks unhandled-exception logging and registers the Windows11Light theme settings, with the accent recoloured to the app's Sky and every text size 2 px larger than the theme's default. It then builds and starts the host from `CompositionRoot.CreateHostBuilder`, resolves `MainWindow`, themes it with `SfSkinManager.SetTheme` and shows it.
 3. **`CompositionRoot.CreateHostBuilder`** ([CompositionRoot.cs](../src/TinapayanRMS.UI/CompositionRoot.cs)) initialises ReactiveUI, reads `appsettings.json` and registers everything: the DbContext factory, the propagators, the repositories, `SavedProductReader`, the view-state store, the logger, the validators, the ViewModels and `MainWindow`.
 4. **`MainWindow`'s constructor** ([MainWindow.xaml.cs](../src/TinapayanRMS.UI/Views/MainWindow.xaml.cs)) creates each screen's view around its ViewModel. It maps each tab to its screen's `LoadCommand` and to its Back and Forward handling, and wires up the requests that one screen makes of another. When the window has loaded, it loads the tab on show.
-5. **`App.OnExit`** disposes the host, which disposes the singleton ViewModels, and flushes the log.
+5. Once the window shows, **`App`** starts two things off the UI thread: a check for migrations the database doesn't have yet, and the day's automatic backup (`IDatabaseBackups.BackUpDailyIfDueAsync`), taken the first time the app starts each day. A backup that fails is only logged.
+6. **`App.OnExit`** disposes the host, which disposes the singleton ViewModels, and flushes the log. After a restore, `App.RestartAfterExit` has set it to start the app again, once the log is closed.
 
 ReactiveUI 25 must be initialised exactly once per process, before any `ReactiveObject` exists. [ReactiveUIBootstrapper](../src/TinapayanRMS.UI/ReactiveUIBootstrapper.cs) does it with `RxAppBuilder.CreateReactiveUIBuilder().WithCoreServices().WithWpf().BuildApp()`, and tests that build ViewModels call `ReactiveUIBootstrapper.EnsureInitialized()` themselves.
 
@@ -599,6 +601,7 @@ await using (var transaction = await dbContext.Database.BeginTransactionAsync(ca
 - **`IngredientDependencies`**: loads the ingredient dependency graph, made of BOM edges and link edges, for the cycle checks.
 - **`ProductCloner`** (`IProductCloner`): Clone and Create Variant. Both link the sub-assemblies the source links and copy the source's own ones. A clone copies the packaging; a variant links it.
 - **`JsonViewStateStore`** (`IViewStateStore`): the view-state file. A missing or broken file reads as empty, and a failed write is dropped.
+- **`DatabaseBackups`** (`IDatabaseBackups`): Settings' Database tab and the daily automatic backup. It runs `BACKUP DATABASE … COPY_ONLY, CHECKSUM` and `RESTORE DATABASE … REPLACE` on its own non-pooled connections to `master`, one at a time (a `SemaphoreSlim`, since SQL Server refuses two backups of a database at once). A restore checks the file first (`RESTORE HEADERONLY`, `FILELISTONLY`, `VERIFYONLY`), takes a safety backup, puts everyone out of the database (`SINGLE_USER WITH ROLLBACK IMMEDIATE`), restores with its files moved onto the database's own, and brings an older backup up to date with `MigrateAsync`. A backup from a later version, or of another database, is refused (`BackupRules.UpdatesNeeded`). Whatever fails after the safety backup puts the safety backup back. The app then restarts, since every singleton ViewModel holds data from before. `Failure` puts SQL Server's backup errors plainly, looking at every error in the exception, since 3013 follows the real one.
 
 ### Schema conventions
 
@@ -925,6 +928,7 @@ Reports' tables go to an Excel workbook with **Export to Excel**. The parts, in 
 - **[DatabaseFixtureBase](../tests/TinapayanRMS.Tests.Common/Fixtures/DatabaseFixtureBase.cs)** (in Tests.Common) reads the app's connection string, swaps in the project's database name, migrates the database, and resets it with Respawn.
 - **`DatabaseFixture`** and **`DatabaseCollection`** are defined in each project's own `Fixtures/` folder, because xUnit only finds a collection definition in the tests' own assembly. Each `DatabaseFixture` is one line that names its database.
 - **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`.
+- **[ThrowawayDatabase](../tests/TinapayanRMS.Tests.Common/Fixtures/ThrowawayDatabase.cs)** is a migrated database of one test's own on the same server, dropped when the test is done. The backup tests restore over it, which would put every other test out of the shared database.
 - **Every concrete test class must carry `[Collection(DatabaseCollection.Name)]`.** It's deliberately left off the base class: xUnit isn't guaranteed to honour it there, and without it tests could run in parallel against the one database.
 
 ### Writing tests
@@ -1111,7 +1115,7 @@ Respawn picks up the new table by itself.
 ### Add a Settings tab
 
 1. Write the ViewModel and view as for a screen, and register the ViewModel.
-2. Add the tab to `SettingsWindow.xaml`. In `SettingsWindow`'s constructor, set its content, add its `RegisterNativeMessageBoxHandler()` to the disposables, and run its `LoadCommand` on `Loaded`.
+2. Add the tab to `SettingsWindow.xaml`. In `SettingsWindow`'s constructor, set its content, add its `RegisterNativeMessageBoxHandler()` to the disposables, and run its `LoadCommand` on `Loaded`. A view that answers interactions of its own (file dialogs, as the Database tab's does) registers them in its constructor and is `IDisposable`; add the view itself to the disposables, so its handlers go when Settings closes.
 3. Pass the ViewModel through `MainWindow` to `OpenSettings`.
 
 ### Export a grid to Excel

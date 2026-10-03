@@ -241,7 +241,7 @@ You don't have to finish each list before moving on. You can add a category or u
 
 ## 4. Settings
 
-Open **Settings** from the bottom of the navigation menu. It has six tabs. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Press **Close**, the **✕** at its top right, or **Esc** to close Settings. The button beside the ✕ makes the window fill the screen, and pressing it again returns the window to its normal size. You can also drag the title bar to move the window.
+Open **Settings** from the bottom of the navigation menu. It has seven tabs. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Press **Close**, the **✕** at its top right, or **Esc** to close Settings. The button beside the ✕ makes the window fill the screen, and pressing it again returns the window to its normal size. You can also drag the title bar to move the window.
 
 ### Units of Measure
 
@@ -289,6 +289,27 @@ Each product keeps its own percentages from its first Save. Changing the default
 **Vim keys** turns on the keys described in [Vim keys](#vim-keys). The change takes effect at once.
 
 The setting is kept for you on this computer, not in the bakeshop's data. Turning it on doesn't change the app for anyone else, or for you on another computer.
+
+### Database
+
+Backups of all of the app's data: every raw material, price, sub-assembly, product and setting.
+
+- **Folder** shows where the backups are kept, *C:\ProgramData\TinapayanRMS\Backups*. **Open Folder** shows it in File Explorer. Everyone who uses the app on this computer shares the folder.
+- The list shows every backup, newest first: when it was **Taken**, its **Kind** and its **Size (MB)**.
+  - **Manual**: taken with **Back Up Now**.
+  - **Automatic**: the app takes one by itself the first time it's opened each day. The newest 14 are kept, and older automatic ones are deleted.
+  - **Before restore**: the safety backup a restore takes of the data it replaces.
+  - **Copied in**: a backup brought in with **Restore from File…**.
+  - Only automatic backups are ever deleted by the app. Delete others in File Explorer when you no longer need them.
+- **Back Up Now** takes a backup straight away.
+- **Copy to…** copies the backup picked in the list somewhere else, such as a USB stick. Do this now and then: backups kept only on this computer are lost with it if it breaks.
+- **Restore** puts the backup picked in the list back, in place of all of the app's data. It asks first, saying when the backup was taken. Then it takes a safety backup of the data as it is, puts the backup back, and the app closes and opens again. Anything saved since the backup was taken is lost, and so is anything not yet saved on another screen.
+  - A backup from an earlier version of TinapayanRMS is brought up to date as it's restored.
+  - A backup from a later version is refused, and nothing changes. Update the app first.
+  - If anything goes wrong part-way, the safety backup is put back, so the data is as it was.
+- **Restore from File…** restores a backup file from elsewhere, such as a USB stick or another computer. Pick the file, and it's copied into the folder and restored as above.
+
+A backup or a restore can take a little while. The tab says what it's doing until it's done.
 
 ---
 
@@ -845,6 +866,22 @@ Open the product and compare the header's **Markup %**, which is what the curren
 
 Right-click it in the Products list and choose **Promote to Production**, or drag it into a Production folder. Right-click a category folder and choose **Promote All to Production** to promote every product in that folder.
 
+### Back up to a USB stick
+
+1. Put in the USB stick.
+2. Open **Settings**, then the **Database** tab.
+3. Press **Back Up Now**. The new backup is picked in the list.
+4. Press **Copy to…**, choose the USB stick, and press **Save**.
+
+### Restore a backup
+
+1. Open **Settings**, then the **Database** tab.
+2. Pick the backup in the list. For a backup on a USB stick, press **Restore from File…** and pick the file instead.
+3. Press **Restore**, read the message, and press **Yes**.
+4. Wait while it restores. The app closes and opens again with the backup's data.
+
+If the data restored wasn't the one you wanted, the **Before restore** backup holds what was there just before. Restore that one to undo it.
+
 ### Send a report to Excel
 
 1. Open **Reports** and pick the tab.
@@ -909,6 +946,18 @@ The file you're saving over is open, usually in Excel. Close it there and try ag
 
 **"Windows didn't allow the app to use that file or folder. Pick another one."**
 The folder is protected, such as a system folder. Save in Documents, on the Desktop or on a USB stick instead.
+
+**"Your Windows account isn't allowed to back up or restore the database."**
+Backups are taken by SQL Server, which checks the Windows account using the app. Ask whoever set up SQL Server to give your account the dbcreator role.
+
+**"That file isn't a backup SQL Server can read, or it's damaged."** or **"That file isn't a backup of a whole database, so it can't be restored."**
+The file picked isn't one of the app's backups, or it was damaged, for example by a USB stick pulled out while copying. Nothing was changed. Try another backup.
+
+**"That backup was made by a later version of TinapayanRMS, so this version can't use it."**
+Update the app on this computer to the version the backup came from, then restore it again. Nothing was changed.
+
+**"The backups folder … was made by another Windows user, without the access SQL Server needs."**
+Ask whoever looks after the computer to give the two accounts the message names **Modify** on that folder, in the folder's **Properties**, **Security** tab.
 
 **"A number is too large to save."**
 A figure has more digits than the app keeps, for example a price typed with too many zeros. Check what you typed.

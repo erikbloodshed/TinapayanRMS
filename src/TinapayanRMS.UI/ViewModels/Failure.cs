@@ -34,7 +34,9 @@ public readonly record struct Failure(string Text, bool IsRejection)
 
     public const string FileInUseText = "Couldn't write the file. If it's open in another program, such as Excel, close it there and try again.";
 
-    public const string NoAccessText = "Windows didn't allow the app to use that file or folder. Pick another one.";
+    public const string NotABackupText = "That file isn't a backup SQL Server can read, or it's damaged.";
+
+    public const string NoAccessText ="Windows didn't allow the app to use that file or folder. Pick another one.";
 
     public static Failure Of(Exception exception) => exception switch
     {
@@ -62,7 +64,7 @@ public readonly record struct Failure(string Text, bool IsRejection)
     /// large for its column, 8152 and 2628 text too long, 1205 a deadlock, -2 a timeout, 207 and 208 a column or table the
     /// database doesn't have yet.
     /// </summary>
-    private static Failure Of(SqlException sql) => sql.Number switch
+    private static Failure Of(SqlException sql) => BackupFailureOf(sql) ?? sql.Number switch
     {
         2601 or 2627 => new(DuplicateText(sql.Message), IsRejection: true),
         547 when sql.Message.Contains("DELETE statement", StringComparison.OrdinalIgnoreCase) => new(InUseText, IsRejection: true),
@@ -78,6 +80,39 @@ public readonly record struct Failure(string Text, bool IsRejection)
         _ when IsConnectionFailure(sql) => new(UnreachableText, IsRejection: false),
         _ => new($"The database reported a problem: {FirstLine(sql.Message)}", IsRejection: false),
     };
+
+    /// <summary>
+    /// What a BACKUP or RESTORE refused (Settings → Database). SQL Server reports the reason, then 3013 "BACKUP DATABASE is
+    /// terminating abnormally", so every error in the exception is looked at, not only the first: 3201 a file or folder it
+    /// can't open, 262/3110/15247 an account without the right, 3101 a database another program has open, 3241/3242/3243/3254/
+    /// 3183/3189/3203 a file that isn't a readable backup, 3169 a backup from a newer SQL Server, 3023 another backup
+    /// running. Null for anything else.
+    /// </summary>
+    private static Failure? BackupFailureOf(SqlException sql)
+    {
+        foreach (SqlError error in sql.Errors)
+        {
+            switch (error.Number)
+            {
+                case 3201:
+                    return new("SQL Server couldn't open the backup file or its folder. Check the file is still there, then try again.", IsRejection: false);
+                case 262 or 3110 or 15247:
+                    return new(
+                        "Your Windows account isn't allowed to back up or restore the database. Ask whoever set up SQL Server to give it the dbcreator role.",
+                        IsRejection: true);
+                case 3101:
+                    return new("Another program is using the database, so it couldn't be restored. Close it, then try again.", IsRejection: true);
+                case 3241 or 3242 or 3243 or 3254 or 3183 or 3189 or 3203:
+                    return new(NotABackupText, IsRejection: true);
+                case 3169:
+                    return new("That backup was made by a newer version of SQL Server than this computer has, so it can't be restored here.", IsRejection: true);
+                case 3023:
+                    return new("Another backup was being taken. Try again in a moment.", IsRejection: false);
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// A server not found or not running (-1, 2, 53, and the network's own numbers), a database it won't open (4060, 4064), a

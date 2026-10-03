@@ -15,7 +15,7 @@ namespace TinapayanRMS.UI.Views;
 /// <summary>
 /// The lookups every screen picks from, opened from the navigation drawer's Settings item: units of
 /// measure, raw material categories, product categories, sub-assembly roles and the costing a new product starts
-/// with, one tab each, and the Keyboard tab's Vim keys. Built afresh each time it
+/// with, one tab each, the Keyboard tab's Vim keys, and the Database tab's backups. Built afresh each time it
 /// opens, over the same long-lived ViewModels, so a tab keeps its selection and unsaved edits between
 /// visits.
 /// </summary>
@@ -27,7 +27,8 @@ public partial class SettingsWindow : AppWindow, IVimHost
         ProductCategoriesViewModel productCategoriesViewModel,
         SubAssemblyRolesViewModel rolesViewModel,
         CostingDefaultsViewModel costingDefaultsViewModel,
-        KeyboardSettingsViewModel keyboardSettingsViewModel)
+        KeyboardSettingsViewModel keyboardSettingsViewModel,
+        DatabaseBackupsViewModel databaseBackupsViewModel)
     {
         InitializeComponent();
 
@@ -37,6 +38,8 @@ public partial class SettingsWindow : AppWindow, IVimHost
         RolesTab.Content = new SubAssemblyRolesView(rolesViewModel);
         CostingDefaultsTab.Content = new CostingDefaultsView(costingDefaultsViewModel);
         KeyboardTab.Content = new KeyboardSettingsView(keyboardSettingsViewModel);
+        var databaseView = new DatabaseBackupsView(databaseBackupsViewModel);
+        DatabaseTab.Content = databaseView;
 
         // The ViewModels and the main window outlive this window, so their delete confirmations are removed with it, and
         // so is everything that ties its controls to them.
@@ -44,7 +47,8 @@ public partial class SettingsWindow : AppWindow, IVimHost
             unitsOfMeasureViewModel.RegisterNativeMessageBoxHandler(),
             categoriesViewModel.RegisterNativeMessageBoxHandler(),
             productCategoriesViewModel.RegisterNativeMessageBoxHandler(),
-            rolesViewModel.RegisterNativeMessageBoxHandler());
+            rolesViewModel.RegisterNativeMessageBoxHandler(),
+            databaseView);
         Closed += (_, _) =>
         {
             confirmDeletes.Dispose();
@@ -60,6 +64,7 @@ public partial class SettingsWindow : AppWindow, IVimHost
             productCategoriesViewModel.LoadCommand.Execute().Subscribe(_ => { }, _ => { });
             rolesViewModel.LoadCommand.Execute().Subscribe(_ => { }, _ => { });
             costingDefaultsViewModel.LoadCommand.Execute().Subscribe(_ => { }, _ => { });
+            databaseBackupsViewModel.LoadCommand.Execute().Subscribe(_ => { }, _ => { });
         };
     }
 
