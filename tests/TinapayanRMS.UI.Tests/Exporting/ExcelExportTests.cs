@@ -72,6 +72,17 @@ public class ExcelExportTests
     }
 
     [Fact]
+    public void A_picker_column_is_written_as_the_name_it_shows_not_its_id()
+    {
+        OffscreenGrid.Run(PickerGrid, grid => WithSavedWorkbook([new ExcelSheet("Changes", grid)], workbook =>
+        {
+            var sheet = workbook.Worksheets[0];
+            CellsOf(sheet, 1).Should().Equal("Raw Material", "New Price");
+            CellsOf(sheet, 2).Should().Equal("Bread Flour", "1,375.00");
+        }));
+    }
+
+    [Fact]
     public void Each_sheet_is_named_as_asked()
     {
         OffscreenGrid.Run(CostsGrid, grid => WithSavedWorkbook(
@@ -140,6 +151,36 @@ public class ExcelExportTests
         grid.Columns.Add(new NumericColumn { MappingName = nameof(Row.Pieces), HeaderText = "Pieces", NumberDecimalDigits = 0, AllowNullValue = true });
         grid.Columns.Add(new GridTextColumn { MappingName = nameof(Row.Note), HeaderText = "Note" });
         GridFillerRows.SetIsEnabled(grid, true);
+        return grid;
+    }
+
+    public sealed record Material(int Id, string Name);
+
+    public sealed class Change
+    {
+        public int? MaterialId { get; init; }
+
+        public decimal NewPrice { get; init; }
+    }
+
+    /// <summary>A table like What-If's Price Changes: a material picked by id, shown by name.</summary>
+    private static SfDataGrid PickerGrid()
+    {
+        var grid = new SfDataGrid
+        {
+            ItemsSource = new ObservableCollection<Change> { new() { MaterialId = 7, NewPrice = 1375m } },
+            AutoGenerateColumns = false,
+            Height = 200,
+        };
+        grid.Columns.Add(new GridMultiColumnDropDownList
+        {
+            MappingName = nameof(Change.MaterialId),
+            HeaderText = "Raw Material",
+            ItemsSource = new[] { new Material(3, "Sugar"), new Material(7, "Bread Flour") },
+            DisplayMember = nameof(Material.Name),
+            ValueMember = nameof(Material.Id),
+        });
+        grid.Columns.Add(new NumericColumn { MappingName = nameof(Change.NewPrice), HeaderText = "New Price", NumberDecimalDigits = 2 });
         return grid;
     }
 

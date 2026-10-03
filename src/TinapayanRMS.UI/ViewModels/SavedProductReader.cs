@@ -239,12 +239,65 @@ public sealed class SavedProductReader(
         return (await productsRead).ToDictionary(p => p.Id, p => ComponentCostsOf(p, details[p.Id]));
     }
 
-    /// <summary>Its recipe and packaging costs at both bases, from one read: pricing it twice is only arithmetic.</summary>
-    private static ComponentCosts ComponentCostsOf(Product product, ProductDetail detail)
+    /// <summary>
+    /// Its recipe and packaging costs at both bases, from one read: pricing it twice is only arithmetic. With
+    /// <paramref name="materialsById"/>, its materials at those costs instead (the What-If screen's).
+    /// </summary>
+    private static ComponentCosts ComponentCostsOf(Product product, ProductDetail detail, IReadOnlyDictionary<int, RawMaterial>? materialsById = null)
     {
-        var buffered = Build(product, detail, CostBasis.Buffered).Costs;
-        var unbuffered = Build(product, detail, CostBasis.Unbuffered).Costs;
+        var buffered = Build(product, detail, CostBasis.Buffered, materialsById).Costs;
+        var unbuffered = Build(product, detail, CostBasis.Unbuffered, materialsById).Costs;
         return new(buffered.SubAssemblies, unbuffered.SubAssemblies, buffered.Packaging, unbuffered.Packaging);
+    }
+
+    /// <summary>
+    /// <paramref name="details"/> with every composite's products priced again with <paramref name="materialsById"/> in place
+    /// of the materials they were read with (the What-If screen, 2026-10-03): what a composite's products bring is worked out
+    /// when they're read, so a different cost for one of their materials has to reach them here, however deeply they're held.
+    /// A product holding none comes back as it was, since <see cref="Build"/> takes the materials for its own sections.
+    /// </summary>
+    public static IReadOnlyDictionary<int, ProductDetail> PricedAt(
+        IReadOnlyDictionary<int, ProductDetail> details, IReadOnlyDictionary<int, RawMaterial> materialsById)
+    {
+        Dictionary<int, ProductDetail> priced = [];
+
+        ProductDetail Priced(int productId, ImmutableHashSet<int> holding)
+        {
+            if (holding.Contains(productId))
+            {
+                throw new BusinessRuleException("A composite product holds itself, through the products in it. Take it out of one of them.");
+            }
+
+            if (priced.TryGetValue(productId, out var done))
+            {
+                return done;
+            }
+
+            var detail = details[productId];
+            if (detail.Components.Count > 0)
+            {
+                detail = detail with
+                {
+                    Components =
+                    [
+                        .. detail.Components.Select(c => c with
+                        {
+                            Costs = ComponentCostsOf(c.Component.ComponentProduct!, Priced(c.Component.ComponentProductId, holding.Add(productId)), materialsById),
+                        }),
+                    ],
+                };
+            }
+
+            priced[productId] = detail;
+            return detail;
+        }
+
+        foreach (var productId in details.Keys)
+        {
+            Priced(productId, []);
+        }
+
+        return priced;
     }
 
     /// <summary><paramref name="product"/> as it's saved, read and priced at its buffered costs.</summary>
@@ -279,17 +332,28 @@ public sealed class SavedProductReader(
     public static SavedProduct Build(Product product, ProductDetail detail) => Build(product, detail, CostBasis.Buffered);
 
     /// <summary>The same, priced at <paramref name="basis"/>: its materials' buffered costs, or their true ones.</summary>
-    public static SavedProduct Build(Product product, ProductDetail detail, CostBasis basis)
+    public static SavedProduct Build(Product product, ProductDetail detail, CostBasis basis) => Build(product, detail, basis, null);
+
+    /// <summary>
+    /// The same, with <paramref name="materialsById"/> in place of the materials its sections and packaging were read with,
+    /// where it has them: the What-If screen's materials at costs that aren't real. A composite's products are priced as
+    /// <paramref name="detail"/> has them, so give it a detail from <see cref="PricedAt"/>.
+    /// </summary>
+    public static SavedProduct Build(Product product, ProductDetail detail, CostBasis basis, IReadOnlyDictionary<int, RawMaterial>? materialsById)
     {
         var linesBySubAssembly = detail.SubAssemblyLines.ToLookup(l => l.SubAssemblyId);
         var addInsByUsage = detail.AddIns.ToLookup(a => a.UsageId);
         List<ProductUsageEdit> sections =
         [
             .. detail.Usages
-                .Select(u => ProductUsageEdit.FromSaved(u, linesBySubAssembly[u.SubAssemblyId], addInsByUsage[u.Id], u.SubAssembly!.Role, product.Name))
+                .Select(u => ProductUsageEdit.FromSaved(u, linesBySubAssembly[u.SubAssemblyId], addInsByUsage[u.Id], u.SubAssembly!.Role, product.Name, materialsById))
                 .Order(ProductUsageEdit.RecipeOrder),
         ];
         List<PackagingLineRow> packagingLines = [.. detail.Lines.Select(l => PackagingLineRow.FromSaved(l, basis))];
+        if (materialsById is not null)
+        {
+            PackagingLineRow.Resolve(packagingLines, materialsById);
+        }
 
         var costing = detail.Costing;
         var costs = new ProductCostSummary(

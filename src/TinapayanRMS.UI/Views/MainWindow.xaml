@@ -258,6 +258,13 @@
                                     <TextBlock Text="Reports" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ListBoxItem>
+                            <!-- What-If Prices: Lightbulb, an idea tried before it's real -->
+                            <ListBoxItem x:Name="WhatIfNavItem" AutomationProperties.Name="What-If Prices">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xEA80;" Style="{StaticResource DrawerIconStyle}" />
+                                    <TextBlock Text="What-If Prices" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ListBoxItem>
                         </ListBox>
 
                         <!--
@@ -313,6 +320,7 @@
                     <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
                     <syncfusion:TabItemExt x:Name="ProductsTab" Header="Products" />
                     <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" />
+                    <syncfusion:TabItemExt x:Name="WhatIfTab" Header="What-If Prices" />
                     <!--
                         Print, opened by the Products header's Print and closed with its ✕ (hidden, as CloseMode says);
                         not in the menu, since it prints what Products has open. Hidden until then.

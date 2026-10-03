@@ -97,13 +97,7 @@ internal static class IngredientCostPropagator
             var bomLines = await dbContext.IngredientBomLines.ToListAsync(cancellationToken);
 
             // BOM components and links, from the ingredients and lines already loaded.
-            var dependencyIdsByIngredientId = bomLines
-                .Select(l => (l.IngredientId, DependencyId: l.ComponentIngredientId))
-                .Concat(ingredients.Values
-                    .Where(m => m is { Source: RawMaterialSource.Linked, LinkedToId: not null })
-                    .Select(m => (IngredientId: m.Id, DependencyId: m.LinkedToId!.Value)))
-                .GroupBy(e => e.IngredientId)
-                .ToDictionary(g => g.Key, g => (IReadOnlyList<int>)g.Select(e => e.DependencyId).ToList());
+            var dependencyIdsByIngredientId = IngredientCostRules.Dependencies(ingredients.Values, bomLines);
 
             return new IngredientGraph(ingredients, bomLines.ToLookup(l => l.IngredientId), dependencyIdsByIngredientId);
         }
@@ -111,49 +105,16 @@ internal static class IngredientCostPropagator
         /// <summary>
         /// Recomputes one made or linked ingredient from its components' or linked-to ingredient's costs, which must already
         /// be correct (dependency order), reading each directly off the loaded ingredients rather than re-walking its own
-        /// tree. Returns whether anything stored changed. Each cost is stored to the column's 20 places (RawMaterialRules.StoredCost),
-        /// so a cost recomputed from unchanged inputs equals the stored one and isn't saved, or dated, again.
+        /// tree (IngredientCostRules.Recompute, which the What-If screen shares). Returns whether anything stored changed:
+        /// a cost recomputed from unchanged inputs equals the stored one, so it isn't saved, or dated, again.
         /// </summary>
         public bool Recompute(int id)
         {
             var ingredient = ingredients[id];
-            var (costBefore, bufferedBefore, bufferBefore) = (ingredient.CostPerBaseUnit, ingredient.BufferedCostPerBaseUnit, ingredient.CostBufferPercent);
-
-            // The same share of the linked-to ingredient's true cost and of its buffered cost, so a part follows the
-            // linked-to ingredient's fixed buffered cost. The buffer percent is copied for show, so a buffer change on the
-            // linked-to ingredient (which cascades) reaches its parts, down a chain of links.
-            if (ingredient is { Source: RawMaterialSource.Linked, LinkedToId: { } linkedToId, WeightSharePercent: { } weightShare, CostSharePercent: { } costShare })
-            {
-                var linkedTo = ingredients[linkedToId];
-                ingredient.CostBufferPercent = linkedTo.CostBufferPercent;
-                ingredient.CostPerBaseUnit = RawMaterialRules.StoredCost(RawMaterialRules.LinkedCost(linkedTo.CostPerBaseUnit, weightShare, costShare));
-                ingredient.BufferedCostPerBaseUnit = RawMaterialRules.StoredCost(RawMaterialRules.LinkedCost(linkedTo.BufferedCostPerBaseUnit, weightShare, costShare));
-            }
-            else
-            {
-                // Two rollups over the same lines: the true cost from the components' true costs, and the buffered cost
-                // from their buffered costs — with no buffer of its own on top (2026-09-21, at the user's request), since
-                // every component's own buffer is already inside the figures being rolled up. The weight loss still
-                // divides both. Its stored percent is normalised to 0 so nothing reads it as meaningful: a made ingredient
-                // has no buffer box on the screen.
-                var lines = linesByIngredientId[id].ToList();
-                var weightLossPercent = ingredient.WeightLossPercent ?? 0m;
-
-                var (_, costPerGram) = IngredientBomRules.CalculateCost(
-                    [.. lines.Select(l => (l.Grams, ComponentCostPerGram: ingredients[l.ComponentIngredientId].CostPerBaseUnit))],
-                    weightLossPercent);
-                var (_, componentsBufferedCostPerGram) = IngredientBomRules.CalculateCost(
-                    [.. lines.Select(l => (l.Grams, ComponentCostPerGram: ingredients[l.ComponentIngredientId].BufferedCostPerBaseUnit))],
-                    weightLossPercent);
-
-                ingredient.CostPerBaseUnit = RawMaterialRules.StoredCost(costPerGram);
-                ingredient.BufferedCostPerBaseUnit = RawMaterialRules.StoredCost(componentsBufferedCostPerGram);
-                ingredient.CostBufferPercent = 0m;
-            }
-
-            return ingredient.CostPerBaseUnit != costBefore
-                || ingredient.BufferedCostPerBaseUnit != bufferedBefore
-                || ingredient.CostBufferPercent != bufferBefore;
+            var before = new IngredientCosts(ingredient.CostPerBaseUnit, ingredient.BufferedCostPerBaseUnit, ingredient.CostBufferPercent);
+            var after = IngredientCostRules.Recompute(ingredient, linesByIngredientId[id], dependencyId => ingredients[dependencyId]);
+            (ingredient.CostPerBaseUnit, ingredient.BufferedCostPerBaseUnit, ingredient.CostBufferPercent) = after;
+            return after != before;
         }
     }
 }

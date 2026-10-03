@@ -9,6 +9,7 @@ public enum AppScreen
     SubAssemblies,
     Products,
     Reports,
+    WhatIf,
     Print,
 }
 

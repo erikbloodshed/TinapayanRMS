@@ -34,6 +34,8 @@ public class VimCommandLineTests
     [InlineData("pro", AppScreen.Products)]
     [InlineData("products", AppScreen.Products)]
     [InlineData("rep", AppScreen.Reports)]
+    [InlineData("wh", AppScreen.WhatIf)]
+    [InlineData("whatif", AppScreen.WhatIf)]
     [InlineData("pri", AppScreen.Print)]
     public void A_screen_is_named_by_its_command(string line, AppScreen screen)
     {

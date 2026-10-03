@@ -15,6 +15,7 @@ namespace TinapayanRMS.UI.Exporting;
 /// <item>it writes hidden columns too, so they're left out by name;</item>
 /// <item>it formats a figure without a thousands separator ("0.00"), so each numeric column gets the grid's own
 /// decimals with one ("#,##0.00");</item>
+/// <item>it writes a picker column's id, so its cells go as the name the grid shows;</item>
 /// <item>it sizes the columns to the grid's on-screen widths, which Reports' two-line headings make too narrow for
 /// one-line ones, so the columns are fitted to what's in them.</item>
 /// </list>
@@ -72,7 +73,20 @@ public static class ExcelExport
 
     private static void Write(SfDataGrid grid, IWorksheet worksheet)
     {
-        var options = new ExcelExportingOptions { ExcelVersion = ExcelVersion.Xlsx, ExportMode = ExportMode.Value };
+        // A picker column holds an id: its cells go as the name the grid shows (ExportMode.Text), the rest as values.
+        var pickers = grid.Columns.Where(column => column is GridComboBoxColumn or GridMultiColumnDropDownList).Select(column => column.MappingName).ToHashSet();
+        var options = new ExcelExportingOptions
+        {
+            ExcelVersion = ExcelVersion.Xlsx,
+            ExportMode = ExportMode.Value,
+            CellsExportingEventHandler = (_, e) =>
+            {
+                if (e.CellType == ExportCellType.RecordCell && pickers.Contains(e.ColumnName))
+                {
+                    e.ExportMode = ExportMode.Text;
+                }
+            },
+        };
         options.ExcludeColumns.AddRange(grid.Columns.Where(column => column.IsHidden).Select(column => column.MappingName));
         grid.ExportToExcel(grid.View, options, worksheet);
 

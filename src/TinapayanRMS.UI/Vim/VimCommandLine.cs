@@ -43,6 +43,7 @@ public static class VimCommandLine
         new("sub", 3, VimCommandKind.Screen, AppScreen.SubAssemblies, false, ":sub", "Sub-Assemblies"),
         new("products", 3, VimCommandKind.Screen, AppScreen.Products, false, ":products", "Products"),
         new("reports", 3, VimCommandKind.Screen, AppScreen.Reports, false, ":reports", "Reports"),
+        new("whatif", 2, VimCommandKind.Screen, AppScreen.WhatIf, false, ":whatif", "What-If Prices"),
         new("print", 3, VimCommandKind.Screen, AppScreen.Print, false, ":print", "Print what Products has open"),
         new("settings", 3, VimCommandKind.Settings, default, false, ":settings", "Settings"),
         new("help", 1, VimCommandKind.Help, default, false, ":help", "These keys"),

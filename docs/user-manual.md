@@ -17,9 +17,10 @@ This manual is for the people who use the app day to day. It doesn't assume any 
 7. [Products](#7-products)
 8. [Printing recipes and costings](#8-printing-recipes-and-costings)
 9. [Reports](#9-reports)
-10. [How costs are worked out](#10-how-costs-are-worked-out)
-11. [How to…](#11-how-to)
-12. [Troubleshooting and questions](#12-troubleshooting-and-questions)
+10. [What-If Prices](#10-what-if-prices)
+11. [How costs are worked out](#11-how-costs-are-worked-out)
+12. [How to…](#12-how-to)
+13. [Troubleshooting and questions](#13-troubleshooting-and-questions)
 
 ---
 
@@ -136,7 +137,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 
 ### The main window
 
-- **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products** and **Reports**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
+- **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports** and **What-If Prices**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
 - **Tabs**: each screen opens in a tab along the top. A tab you close can be opened again from the menu. Each tab keeps its place, such as the record you were looking at and anything you haven't saved, until you close the app.
 - **Back and Forward** (the arrows at the top right, next to the minimize button, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, like a web browser.
 - Changes made on one tab show up on another tab the next time you switch to it.
@@ -158,7 +159,7 @@ The **Raw Materials** and **Products** lists are trees of folders, like File Exp
 - **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly or Packaging) can be typed into. Typing narrows the list to matching names and highlights the best match: the name you typed in full, or else the first name that starts with what you typed, or else the first that contains it. **Enter** or **Tab** picks the highlighted name, so "marg" and Enter picks Margarine. **Down** and **Up** move the highlight to the other names.
 - **New** starts a blank record. **Delete** asks before deleting anything.
 - A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use. It also says when the app couldn't reach its database, or the database didn't answer in time. Nothing is saved then, and the screen keeps working: once the database answers again, try again, or pick the record again.
-- If something goes wrong that the app didn't expect, a message says what happened and that the app is still running, and the details go in the [log files](#12-troubleshooting-and-questions). Nothing you haven't saved is lost.
+- If something goes wrong that the app didn't expect, a message says what happened and that the app is still running, and the details go in the [log files](#13-troubleshooting-and-questions). Nothing you haven't saved is lost.
 
 ### Working in tables
 
@@ -212,7 +213,7 @@ Type **:**, then a command, then **Enter**. A bar opens at the bottom of the win
 - **:delete** deletes the one open, asking first.
 - **:e** and a name opens the one whose name matches. For example, **:e pandesal** opens Pandesal on the Products screen.
 - **:revert** throws away a product's changes since the last Save.
-- **:raw**, **:sub**, **:products**, **:reports** and **:print** switch screens.
+- **:raw**, **:sub**, **:products**, **:reports**, **:whatif** and **:print** switch screens.
 - **:settings** opens Settings.
 - **:help** lists every key.
 
@@ -617,7 +618,7 @@ On the right, the **Costing Summary** lists each component with its amount and i
 - **VAT**
 - **Total Selling Price**
 
-Everything updates as you type, before you save. See [How costs are worked out](#10-how-costs-are-worked-out).
+Everything updates as you type, before you save. See [How costs are worked out](#11-how-costs-are-worked-out).
 
 ### Scaling tab
 
@@ -731,7 +732,37 @@ If a file of that name is open in Excel, the app can't replace it. Close it in E
 
 ---
 
-## 10. How costs are worked out
+## 10. What-If Prices
+
+**What-If Prices** shows what raw material price changes would do to every product, before they happen. Nothing on it is saved, and nothing else in the app changes: the changes you try last until you close the app.
+
+### Price Changes
+
+The top table holds the changes to try, one row per raw material:
+
+- **Raw Material**: pick a purchased ingredient or packaging material. Type to search the list.
+- **Per** and **Current Price**: the unit it's bought in and what one costs now. These come from its dearest brand on **Cost Setup**, which is the price its cost comes from. A material with no price yet shows its base unit and no price.
+- **Change %** or **New Price**: type either one, and the other is worked out. For example, a sack of flour at 1,250 up **10**% shows a new price of 1,375. A material with no price yet needs its new price typed.
+
+**Remove Line** takes the picked row away, and **Clear All** takes them all away, so every figure is today's again.
+
+A change moves the material's cost and its buffered cost by the same amount, as typing its Cost Buffer % again after a real price change would. It reaches every made ingredient using the material and every linked ingredient cut from it, as a real price change does. For example, a rise in eggs reaches egg white and the custard made with it.
+
+### Products
+
+The lower table shows every product for one sellable unit, at buffered costs, now and with the changes:
+
+- **Base Cost** and **What-If Base Cost**, and the **Change %** between them.
+- **Suggested Price** and **What-If Suggested Price**: the Costing tab's Total Selling Price.
+- **Markup %** and **What-If Markup %**: what the product's current price earns, now and with the changes. Blank for a product with no current price.
+
+A composite product moves with the products it holds. Tick **Only affected products** to hide the products no change reaches. Sort by **What-If Markup %** to see which products would earn the least. Filter by product or category from the funnel in its heading, and double-click a product to open it.
+
+**Export to Excel** saves the products as the table shows them, and the price changes, on two sheets of one workbook.
+
+---
+
+## 11. How costs are worked out
 
 ### The cascade
 
@@ -837,7 +868,7 @@ The app keeps costs at full precision and rounds them only for display. So a tot
 
 ---
 
-## 11. How to…
+## 12. How to…
 
 ### Record a price increase
 
@@ -865,6 +896,13 @@ Open the product and compare the header's **Markup %**, which is what the curren
 ### Move a product into production
 
 Right-click it in the Products list and choose **Promote to Production**, or drag it into a Production folder. Right-click a category folder and choose **Promote All to Production** to promote every product in that folder.
+
+### See what a price rise would do
+
+1. Open **What-If Prices** from the menu.
+2. In the top table, pick the raw material and type its **Change %**, such as **8**, or its **New Price**.
+3. Tick **Only affected products** and sort by **What-If Markup %**.
+4. To make the price real, record it on **Raw Materials** as in [Record a price increase](#record-a-price-increase). What-If Prices never changes a price itself.
 
 ### Back up to a USB stick
 
@@ -911,7 +949,7 @@ Or type the packaging straight into the pack product's Packaging tab, then press
 
 ---
 
-## 12. Troubleshooting and questions
+## 13. Troubleshooting and questions
 
 **"Something can't be deleted."**
 It's still in use. The message says where. For example:

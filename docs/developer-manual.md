@@ -53,6 +53,7 @@ It's a single-user desktop app. There's no server, no login and no network servi
 | Sub-Assemblies | `SubAssembliesView` | `SubAssembliesViewModel` |
 | Products | `ProductsView`, with its cards in `Views/Products/` | `ProductsViewModel` |
 | Reports | `ReportsView` | `ReportsViewModel` |
+| What-If Prices | `WhatIfView` | `WhatIfViewModel` |
 | Print (opened from Products) | `ProductPrintView` | `PrintTabViewModel` |
 | Settings dialog: Units of Measure, Categories, Product Categories, Roles, Costing Defaults, Keyboard | `SettingsWindow`, and one view per tab | `UnitsOfMeasureViewModel`, `CategoriesViewModel`, `ProductCategoriesViewModel`, `SubAssemblyRolesViewModel`, `CostingDefaultsViewModel`, `KeyboardSettingsViewModel` |
 
@@ -107,7 +108,7 @@ You'll be productive sooner if you're comfortable with the following.
 | AwesomeAssertions | `Should()` assertions. It's a fork of FluentAssertions 7, with the same API. | `tests/` |
 | Respawn | Resetting a database between tests | The test fixtures |
 | MSBuild | `Directory.Build.props`, Central Package Management | The build |
-| The domain | Recipe costing in a bakery: bills of materials, yield, shrinkage, baker's percentage, cost-plus pricing | Read the user manual's [Key ideas](user-manual.md#1-key-ideas) and [How costs are worked out](user-manual.md#10-how-costs-are-worked-out) |
+| The domain | Recipe costing in a bakery: bills of materials, yield, shrinkage, baker's percentage, cost-plus pricing | Read the user manual's [Key ideas](user-manual.md#1-key-ideas) and [How costs are worked out](user-manual.md#11-how-costs-are-worked-out) |
 
 ### Software
 
@@ -440,7 +441,7 @@ The database's messages say what kind of thing went wrong, never which rule. So 
 
 ## 7. Costing
 
-Before you change any cost path, read the user manual's [How costs are worked out](user-manual.md#10-how-costs-are-worked-out), which has worked examples, and PLAN.md's [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade).
+Before you change any cost path, read the user manual's [How costs are worked out](user-manual.md#11-how-costs-are-worked-out), which has worked examples, and PLAN.md's [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade).
 
 ### Stored and computed costs
 
@@ -508,7 +509,9 @@ The cascade doesn't push changes live to other screens. A screen picks up new co
 | Markup at the current price | (current price ÷ (1 + VAT %) − base cost) ÷ base cost | `CostingRules.CalculateMarkupPercentFromPrice` |
 | A composite's line | The product's recipe cost per sellable unit × quantity, plus its packaging cost when the composite includes it | `CompositeProductRules.CalculateComponentCost`, `CalculateComponentPackagingCost` |
 
-[SavedProductReader](../src/TinapayanRMS.UI/ViewModels/SavedProductReader.cs) is the one place where a saved product is read and priced. The Products screen, Reports and Print all go through it, so they always agree. It reads any number of products together (`ReadDetailsAsync`, `ReadAllAsync`) in about fifteen queries however many there are, on the repositories' plural reads: packaging link chains are followed in memory, and the products a composite holds are read with it and costed bottom-up.
+A made or linked ingredient's costs are worked out by **`IngredientCostRules.Recompute`**, which the cascade (`IngredientCostPropagator`) stores and the What-If screen uses without storing (`IngredientCostRules.Reprice`: copies of the changed materials and of every ingredient depending on them, in dependency order). A what-if price change moves a material's cost and buffered cost by the same factor (`PriceChangeRules.CostsAfter`).
+
+[SavedProductReader](../src/TinapayanRMS.UI/ViewModels/SavedProductReader.cs) is the one place where a saved product is read and priced. The Products screen, Reports and Print all go through it, so they always agree. It reads any number of products together (`ReadDetailsAsync`, `ReadAllAsync`) in about fifteen queries however many there are, on the repositories' plural reads: packaging link chains are followed in memory, and the products a composite holds are read with it and costed bottom-up. For the What-If screen, `Build` takes substitute materials (by id) for its sections and packaging, and `PricedAt` prices a composite's products again with them, however deep.
 
 ### Precision and rounding
 
@@ -639,7 +642,7 @@ To discard a migration you've generated but haven't applied anywhere, run `dotne
 
 ### The shell
 
-[MainWindow](../src/TinapayanRMS.UI/Views/MainWindow.xaml) is an `AppWindow`, which is a Syncfusion `ChromelessWindow`: the title bar is drawn in the theme, with Back and Forward on its right, just before Minimize. The hamburger button opens an `SfNavigationDrawer` menu with Raw Materials, Sub-Assemblies, Products and Reports, and a Settings button at the bottom. The screens are the tabs of `MainTabControl`, a `TabControlExt` with two important settings:
+[MainWindow](../src/TinapayanRMS.UI/Views/MainWindow.xaml) is an `AppWindow`, which is a Syncfusion `ChromelessWindow`: the title bar is drawn in the theme, with Back and Forward on its right, just before Minimize. The hamburger button opens an `SfNavigationDrawer` menu with Raw Materials, Sub-Assemblies, Products, Reports and What-If Prices, and a Settings button at the bottom. The screens are the tabs of `MainTabControl`, a `TabControlExt` with two important settings:
 
 - **`CloseMode="Hide"`**: closing a tab hides it rather than deleting it, so the menu can always show it again.
 - **`IsDisableUnloadTabItemExtContent="True"`**: every tab's content stays loaded. Scroll positions, sort orders, sub-tabs and typed text survive a switch without any code.
@@ -1100,7 +1103,7 @@ Respawn picks up the new table by itself.
 2. Change or add the formula in its Rules class, with unit tests.
 3. If the figure is stored, make sure every write path that can change one of its inputs recomputes it, and that the propagators do too. If it's computed on read, the Rules change is enough: `SavedProductReader` and the screens share it.
 4. Extend `ReactiveCostCascadeTests` with the end-to-end case.
-5. Update the user manual's [How costs are worked out](user-manual.md#10-how-costs-are-worked-out), including its worked example, in the same change.
+5. Update the user manual's [How costs are worked out](user-manual.md#11-how-costs-are-worked-out), including its worked example, in the same change.
 6. Record the decision in PLAN.md.
 
 ### Add a screen

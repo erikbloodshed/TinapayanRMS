@@ -86,6 +86,7 @@ public static class CompositionRoot
                 services.AddSingleton<SubAssembliesViewModel>();
                 services.AddSingleton<ProductsViewModel>();
                 services.AddSingleton<ReportsViewModel>();
+                services.AddSingleton<WhatIfViewModel>();
                 services.AddSingleton<PrintTabViewModel>();
                 services.AddSingleton<UnitsOfMeasureViewModel>();
                 services.AddSingleton<CategoriesViewModel>();

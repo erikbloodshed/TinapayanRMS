@@ -92,4 +92,11 @@ public class RawMaterial
 
     /// <summary>The units it's bought or used in besides its base unit.</summary>
     public List<RawMaterialUnit> Units { get; set; } = [];
+
+    /// <summary>
+    /// A copy to give other costs to without touching this one, as the What-If screen prices with (2026-10-03). It shares
+    /// this material's category, base unit and units, which no cost lives in. Every property comes with it, so one added
+    /// later is never left behind.
+    /// </summary>
+    public RawMaterial ShallowCopy() => (RawMaterial)MemberwiseClone();
 }

@@ -70,6 +70,24 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
     private static RawMaterialBrandPrice Brand(string? brand, int? unitId, decimal price) => new() { Brand = brand, UnitId = unitId, Price = price };
 
     [Fact]
+    public async Task GetAllAsync_reads_every_materials_prices_with_their_units_material_by_material()
+    {
+        var (flourId, bagId, packId) = await SeedPurchasedIngredientAsync();
+        var (ribbonId, rollId) = await SeedPackagingMaterialAsync();
+        var repository = CreateBrandPriceRepository();
+        await repository.SetAsync(ribbonId, [Brand(null, rollId, 120m)], Cancellation);
+        await repository.SetAsync(flourId, [Brand("Gold", bagId, 1250m), Brand("Silver", packId, 55m)], Cancellation);
+
+        var prices = await repository.GetAllAsync(Cancellation);
+
+        prices.Select(p => (p.RawMaterialId, p.Brand, p.Price)).Should().Equal(
+            (flourId, "Gold", 1250m), (flourId, "Silver", 55m), (ribbonId, null, 120m));
+        prices[0].Unit!.BaseUnitsPerUnit.Should().Be(25000m);
+        prices[0].Unit!.UnitOfMeasure!.Name.Should().Be("bag");
+        prices[2].Unit!.UnitOfMeasure!.Name.Should().Be("roll");
+    }
+
+    [Fact]
     public async Task A_single_brand_prices_the_ingredient_per_gram_through_its_unit()
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
