@@ -7,6 +7,9 @@ public interface IPackagingLinkRepository
     /// <summary>The product's packaging link, with the product or packaging set it's linked to, or null when it owns its packaging.</summary>
     Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken);
 
+    /// <summary>GetForProductAsync for several products at once, in one query: the links there are, one at most for each.</summary>
+    Task<IReadOnlyList<PackagingLink>> GetForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
+
     /// <summary>
     /// Links productId's packaging to a standalone packaging set (a sub-assembly in the Packaging role), one set per
     /// piece, replacing any existing link. Refused for any other sub-assembly.

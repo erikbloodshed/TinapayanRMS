@@ -2100,11 +2100,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .Where(_ => !IsBusyApplying)
             .Subscribe(ResetDetails);
 
-        // A newer selection cancels an older one still loading (Switch disposes it, which cancels its token).
-        Observable.Switch(this.WhenAnyValue(x => x.SelectedProduct)
-                .Where(_ => !IsBusyApplying)
-                .Select(product => Observable.FromAsync(cancellationToken => LoadProductDetailAsync(product, cancellationToken))))
-            .Subscribe();
+        // A newer selection cancels an older one still loading; one that fails shows why, and the next pick loads as usual.
+        LoadLatest(this.WhenAnyValue(x => x.SelectedProduct).Where(_ => !IsBusyApplying), LoadProductDetailAsync);
 
         this.WhenAnyValue(x => x.SelectedRecipeTab)
             .Subscribe(RecipeTabPicked);
@@ -2188,18 +2185,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 RecomputeUsageForm();
             });
 
-        Observable.Switch(this.WhenAnyValue(x => x.EditingUsageSource)
+        LoadLatest(
+            this.WhenAnyValue(x => x.EditingUsageSource)
                 .Skip(1)
-                .Where(_ => !IsBusyApplying && IsUsageFormOpen && IsAddingUsage)
-                .Select(source => Observable.FromAsync(cancellationToken => LoadUsageSourceAsync(source, cancellationToken))))
-            .Subscribe();
+                .Where(_ => !IsBusyApplying && IsUsageFormOpen && IsAddingUsage),
+            LoadUsageSourceAsync);
 
         // A sub-assembly picked to link instead relinks the section once its lines are in; a later pick overtakes it.
-        Observable.Switch(this.WhenAnyValue(x => x.ChangeLinkTarget)
+        LoadLatest(
+            this.WhenAnyValue(x => x.ChangeLinkTarget)
                 .Skip(1)
                 .Where(target => target is not null && IsChangingLink && !IsBusyApplying)
-                .Select(target => Observable.FromAsync(cancellationToken => ChangeLinkAsync(target!, cancellationToken))))
-            .Subscribe();
+                .Select(target => target!),
+            ChangeLinkAsync);
 
         // Typing one figure of the piece size works out the other, and makes it the one that's kept.
         this.WhenAnyValue(x => x.EditingUsageWeightPerPiece)
@@ -2303,7 +2301,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // rather than replaces, so the screen keeps its selection, pickers and unsaved edits while
         // picking up what changed elsewhere: a repriced ingredient, or a linked sub-assembly its owner
         // changed.
-        LoadCommand = ReactiveCommand.CreateFromTask(async () =>
+        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
             // A linked section reads a sub-assembly kept on the Sub-Assemblies screen, which can change there (its
             // lines, name or role), so those are fetched again; the product's own and new sections only need their
@@ -2440,7 +2438,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 _productToOpen = null;
                 TrySelectProduct(productId);
             }
-        });
+        }));
 
         NewCommand = ReactiveCommand.Create(() => StartNewProduct());
         NewCompositeCommand = ReactiveCommand.Create(() => StartNewProduct(isComposite: true));
@@ -2668,7 +2666,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     ErrorMessage = null;
                     applied = ApplyUsageForm();
                 }
-                catch (InvalidOperationException ex)
+                catch (BusinessRuleException ex)
                 {
                     ErrorMessage = ex.Message;
                     return;
@@ -2750,7 +2748,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 {
                     lineCount = CurrentLines().Count;
                 }
-                catch (InvalidOperationException ex)
+                catch (BusinessRuleException ex)
                 {
                     ErrorMessage = ex.Message;
                     return;
@@ -3366,7 +3364,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             // Nothing awaits this read, so what went wrong is shown rather than lost. The line stays unpriced, and the
             // next LoadCommand reads it again.
-            ErrorMessage = $"Couldn't read what a product in the Products table costs: {ex.Message}";
+            ShowFailure(ex, "Couldn't read what a product in the Products table costs");
         }
         finally
         {
@@ -4131,7 +4129,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             ErrorMessage = null;
             if (lines.Count == 0)
             {
-                throw new InvalidOperationException($"{subAssembly.Name} has no ingredients yet. Add them on the Sub-Assemblies screen first.");
+                throw new BusinessRuleException($"{subAssembly.Name} has no ingredients yet. Add them on the Sub-Assemblies screen first.");
             }
 
             var lineIngredientIds = lines.Select(l => l.Ingredient.Id).ToHashSet();
@@ -4155,7 +4153,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 SuccessMessage = $"Now linked to {subAssembly.Name}. {string.Join(", ", dropped)} left the add-ins: {subAssembly.Name} already has {(dropped.Count == 1 ? "it" : "them")}.";
             }
         }
-        catch (InvalidOperationException ex)
+        catch (BusinessRuleException ex)
         {
             ErrorMessage = ex.Message;
         }
@@ -4227,13 +4225,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var target = EditingUsageSource?.PackagingTarget;
         if (linking && target is null)
         {
-            throw new InvalidOperationException("Pick the packaging to link, or cancel the form.");
+            throw new BusinessRuleException("Pick the packaging to link, or cancel the form.");
         }
 
         var lines = PackagingLineRow.CompleteLines(FormPackagingLines);
         if (lines.Count == 0)
         {
-            throw new InvalidOperationException(linking
+            throw new BusinessRuleException(linking
                 ? $"{target!.Name} is still loading its packaging, or has none. Try again in a moment, or pick another."
                 : "Add the packaging materials one piece takes.");
         }
@@ -4264,7 +4262,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             var lines = IngredientLineRow.CompleteLines(FormLines, linked.DisplayName);
             if (lines.Count == 0)
             {
-                throw new InvalidOperationException($"Add the ingredients that go into {linked.DisplayName}, in grams.");
+                throw new BusinessRuleException($"Add the ingredients that go into {linked.DisplayName}, in grams.");
             }
 
             IReadOnlyList<SubAssemblyLineEdit> lineEdits = [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
@@ -4274,12 +4272,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         else if (IsFormEditingLines)
         {
             var role = EditingUsageRole
-                ?? throw new InvalidOperationException("Pick the sub-assembly's role. It's what the sub-assembly is called.");
+                ?? throw new BusinessRuleException("Pick the sub-assembly's role. It's what the sub-assembly is called.");
 
             var lines = IngredientLineRow.CompleteLines(FormLines, role.Name);
             if (lines.Count == 0)
             {
-                throw new InvalidOperationException($"Add the ingredients that go into the {role.Name}, in grams.");
+                throw new BusinessRuleException($"Add the ingredients that go into the {role.Name}, in grams.");
             }
 
             // One of the product's own keeps its id, so Save rewrites it in place; a new one has none yet. One unlinked
@@ -4290,14 +4288,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         else
         {
             var source = EditingUsageSource?.SubAssembly
-                ?? throw new InvalidOperationException("Pick the sub-assembly to link, or cancel the form.");
+                ?? throw new BusinessRuleException("Pick the sub-assembly to link, or cancel the form.");
             var sourceName = source.Name;
 
             // The table's read-only lines are the ones LoadUsageSourceAsync loaded for this very pick; a pick
             // whose lines are still on their way has none yet, and linking it would make a batch of nothing.
             if (FormLines.Count == 0)
             {
-                throw new InvalidOperationException($"{sourceName} is still loading its ingredients. Try again in a moment.");
+                throw new BusinessRuleException($"{sourceName} is still loading its ingredients. Try again in a moment.");
             }
 
             IReadOnlyList<SubAssemblyLineEdit> sourceLines =
@@ -4375,7 +4373,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             ApplyForm();
             return true;
         }
-        catch (InvalidOperationException ex)
+        catch (BusinessRuleException ex)
         {
             ErrorMessage = ex.Message;
             return false;
@@ -5257,28 +5255,22 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             read = await Task.Run(async () =>
             {
-                // A composite held in the composite holds products of its own, which are read with it.
-                List<(Product, ProductDetail)> details = [];
-                HashSet<int> seen = [.. products.Select(p => p.Id)];
-                var queue = new Queue<Product>(products);
-                while (queue.TryDequeue(out var product))
+                // A composite held in the composite holds products of its own, which the same read brings with it.
+                var details = await _savedProducts.ReadDetailsAsync([.. products.Select(p => p.Id)], CancellationToken.None);
+                Dictionary<int, Product> productsRead = products.ToDictionary(p => p.Id);
+                foreach (var held in details.Values.SelectMany(d => d.Components).Select(c => c.Component.ComponentProduct!))
                 {
-                    var detail = await _savedProducts.ReadDetailAsync(product.Id, CancellationToken.None);
-                    details.Add((product, detail));
-                    foreach (var held in detail.Components.Select(c => c.Component.ComponentProduct!).Where(p => seen.Add(p.Id)))
-                    {
-                        queue.Enqueue(held);
-                    }
+                    productsRead.TryAdd(held.Id, held);
                 }
 
-                return details;
+                return productsRead.Values.Where(p => details.ContainsKey(p.Id)).Select(p => (p, details[p.Id])).ToList();
             });
         }
         catch (Exception ex)
         {
             // Nothing awaits this read, so what went wrong is shown rather than lost. The products keep reading
             // "Reading…", and the next LoadCommand reads them again.
-            ErrorMessage = $"Couldn't read the recipe of a product in the Products table: {ex.Message}";
+            ShowFailure(ex, "Couldn't read the recipe of a product in the Products table");
         }
         finally
         {
@@ -5317,7 +5309,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             ApplyOpenForm();
         }
-        catch (InvalidOperationException ex)
+        catch (BusinessRuleException ex)
         {
             ErrorMessage = ex.Message;
             return (null, ex.Message);

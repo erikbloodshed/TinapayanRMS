@@ -8,13 +8,20 @@ using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class PackagingLinkRepository(
-    IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,
-    IPackagingLineRepository packagingLineRepository) : IPackagingLinkRepository
+public class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IPackagingLinkRepository
 {
     // ProductId is unique, so there's at most one link.
-    public Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
-        dbContextFactory.ReadAsync(
+    public async Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
+        (await GetLinksAsync("l.ProductId = @productId", new { productId }, cancellationToken)).SingleOrDefault();
+
+    public async Task<IReadOnlyList<PackagingLink>> GetForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
+        productIds.Count == 0
+            ? []
+            : await GetLinksAsync($"l.ProductId IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(productIds) }, cancellationToken);
+
+    /// <summary>The links <paramref name="filter"/> picks, each with the product or packaging set it's linked to.</summary>
+    private Task<IReadOnlyList<PackagingLink>> GetLinksAsync(string filter, object parameters, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync<IReadOnlyList<PackagingLink>>(
             async dbContext => (await dbContext.Connection().QueryAsync<PackagingLink, Product?, SubAssembly?, PackagingLink>(
                 dbContext.Command(
                     $"""
@@ -22,9 +29,10 @@ public class PackagingLinkRepository(
                     FROM PackagingLinks l
                     LEFT JOIN Products p ON p.Id = l.LinkedProductId
                     LEFT JOIN SubAssemblies s ON s.Id = l.LinkedSubAssemblyId
-                    WHERE l.ProductId = @productId
+                    WHERE {filter}
+                    ORDER BY l.ProductId
                     """,
-                    new { productId },
+                    parameters,
                     cancellationToken),
                 (link, linkedProduct, linkedSet) =>
                 {
@@ -32,7 +40,7 @@ public class PackagingLinkRepository(
                     link.LinkedSubAssembly = linkedSet;
                     return link;
                 },
-                splitOn: "Id,Id")).SingleOrDefault(),
+                splitOn: "Id,Id")).AsList(),
             cancellationToken);
 
     public async Task SetSubAssemblyLinkAsync(int productId, int subAssemblyId, CancellationToken cancellationToken)
@@ -53,6 +61,9 @@ public class PackagingLinkRepository(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
+        // The link goes and the lines it showed take its place in one transaction (2026-10-03): they were two saves on two
+        // contexts, so lines refused after the link had gone left the product with no packaging at all.
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var link = await dbContext.PackagingLinks.FirstOrDefaultAsync(l => l.ProductId == productId, cancellationToken);
         if (link is null)
         {
@@ -61,15 +72,17 @@ public class PackagingLinkRepository(
 
         // Freeze what the packaging currently shows (resolved through the link) into the product's own
         // lines, then drop the link — never leaves less data behind.
-        var effectiveLines = await packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken);
+        var effectiveLines = await PackagingLineRepository.ResolveEffectiveAsync(dbContext, productId, cancellationToken);
         dbContext.PackagingLinks.Remove(link);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await packagingLineRepository.SetLinesAsync(
+        await PackagingLineRepository.SetLinesAsync(
+            dbContext,
             productId,
             [.. effectiveLines.Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
                 l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))],
             cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -113,11 +126,11 @@ public class PackagingLinkRepository(
             .Where(p => p.Id == productId)
             .Select(p => p.Name)
             .FirstOrDefaultAsync(cancellationToken)
-            ?? throw new InvalidOperationException($"Product {productId} does not exist.");
+            ?? throw new BusinessRuleException($"Product {productId} does not exist.");
 
         // Known by its flag, never its name: the role can be renamed.
         var role = await dbContext.SubAssemblyRoles.AsNoTracking().FirstOrDefaultAsync(r => r.IsPackaging, cancellationToken)
-            ?? throw new InvalidOperationException("There's no Packaging role to keep a packaging set in.");
+            ?? throw new BusinessRuleException("There's no Packaging role to keep a packaging set in.");
         var takenNames = await dbContext.SubAssemblies.Select(s => s.Name).ToListAsync(cancellationToken);
         var name = SubAssemblyRules.UniqueStandaloneName(SubAssemblyRules.StandaloneNameFor(productName, role.Name, null), takenNames);
 
@@ -139,7 +152,7 @@ public class PackagingLinkRepository(
         var linkedProductExists = await dbContext.Products.AnyAsync(p => p.Id == linkedProductId, cancellationToken);
         if (!linkedProductExists)
         {
-            throw new InvalidOperationException($"Product {linkedProductId} does not exist.");
+            throw new BusinessRuleException($"Product {linkedProductId} does not exist.");
         }
 
         var links = await dbContext.PackagingLinks.ToDictionaryAsync(l => l.ProductId, l => l.LinkedProductId, cancellationToken);
@@ -166,10 +179,10 @@ public class PackagingLinkRepository(
             .Where(s => s.Id == subAssemblyId)
             .Select(s => new { s.Role!.IsPackaging })
             .FirstOrDefaultAsync(cancellationToken)
-            ?? throw new InvalidOperationException($"Sub-assembly {subAssemblyId} does not exist.");
+            ?? throw new BusinessRuleException($"Sub-assembly {subAssemblyId} does not exist.");
         if (!set.IsPackaging)
         {
-            throw new InvalidOperationException("A product's packaging can only link a packaging set from the Sub-Assemblies screen.");
+            throw new BusinessRuleException("A product's packaging can only link a packaging set from the Sub-Assemblies screen.");
         }
 
         // A set links nothing itself, so no chain runs through it and there's nothing to cycle.
@@ -192,7 +205,7 @@ public class PackagingLinkRepository(
         var productExists = await dbContext.Products.AnyAsync(p => p.Id == productId, cancellationToken);
         if (!productExists)
         {
-            throw new InvalidOperationException($"Product {productId} does not exist.");
+            throw new BusinessRuleException($"Product {productId} does not exist.");
         }
     }
 }

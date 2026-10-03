@@ -62,7 +62,7 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
         {
             if (!ingredients.TryGetValue(line.IngredientId, out var ingredient))
             {
-                throw new InvalidOperationException($"Ingredient {line.IngredientId} does not exist.");
+                throw new BusinessRuleException($"Ingredient {line.IngredientId} does not exist.");
             }
 
             RawMaterialRules.EnsureUsableInRecipes(ingredient.Type, ingredient.Name);

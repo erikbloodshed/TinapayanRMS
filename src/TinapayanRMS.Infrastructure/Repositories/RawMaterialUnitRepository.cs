@@ -8,9 +8,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class RawMaterialUnitRepository(
-    IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,
-    IngredientCostPropagator costPropagator) : IRawMaterialUnitRepository
+public class RawMaterialUnitRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialUnitRepository
 {
     public Task<IReadOnlyList<RawMaterialUnit>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(dbContext => RawMaterialReads.GetUnitsAsync(dbContext, rawMaterialId, cancellationToken), cancellationToken);
@@ -25,20 +23,15 @@ public class RawMaterialUnitRepository(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        // One transaction for the unit and the cost, so they can't disagree. It commits before the
-        // cascade, which reads through its own connections.
-        bool costChanged;
-        await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
-        {
-            costChanged = await UpdateAsync(dbContext, unit, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-        }
-
-        if (costChanged)
+        // One transaction for the unit, the cost and its cascade, so none of them can disagree.
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (await UpdateAsync(dbContext, unit, cancellationToken))
         {
             // Every made ingredient using this one and every sub-assembly using any of them.
-            await costPropagator.RecomputeAndPropagateAsync(unit.RawMaterialId, cancellationToken);
+            await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, unit.RawMaterialId, cancellationToken);
         }
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
@@ -57,7 +50,7 @@ public class RawMaterialUnitRepository(
             .Where(m => m.Id == unit.RawMaterialId)
             .Select(m => new { m.Type, m.BaseUnitId })
             .FirstOrDefaultAsync(cancellationToken)
-            ?? throw new InvalidOperationException($"Raw material {unit.RawMaterialId} does not exist.");
+            ?? throw new BusinessRuleException($"Raw material {unit.RawMaterialId} does not exist.");
 
         var baseUnitsPerUnit = await MultiplierToSaveAsync(dbContext, material.Type, material.BaseUnitId, unit, cancellationToken);
         UnitConversionRules.EnsureValidMultiplier(baseUnitsPerUnit);
@@ -79,14 +72,14 @@ public class RawMaterialUnitRepository(
     /// Changes the unit, multiplier or description of <paramref name="unit"/>, which must belong to its
     /// RawMaterialId, and saves it. A standard unit takes its fixed multiplier. A new multiplier reprices the material when a brand is priced in
     /// this unit (logging a new cost in price history); recipe lines are in grams, so nothing else moves. Returns whether that changed an
-    /// ingredient's cost, for the caller to cascade once its transaction commits.
+    /// ingredient's cost, for the caller to cascade before its transaction commits.
     /// </summary>
     internal static async Task<bool> UpdateAsync(TinapayanRMSDbContext dbContext, RawMaterialUnit unit, CancellationToken cancellationToken)
     {
         var existing = await dbContext.RawMaterialUnits
             .Include(u => u.RawMaterial)
             .FirstOrDefaultAsync(u => u.Id == unit.Id && u.RawMaterialId == unit.RawMaterialId, cancellationToken)
-            ?? throw new InvalidOperationException($"Raw material unit {unit.Id} does not exist.");
+            ?? throw new BusinessRuleException($"Raw material unit {unit.Id} does not exist.");
 
         var material = existing.RawMaterial!;
         var baseUnitsPerUnit = await MultiplierToSaveAsync(dbContext, material.Type, material.BaseUnitId, unit, cancellationToken);
@@ -123,19 +116,19 @@ public class RawMaterialUnitRepository(
             .Include(u => u.UnitOfMeasure)
             .Include(u => u.RawMaterial)
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken)
-            ?? throw new InvalidOperationException($"Raw material unit {id} does not exist.");
+            ?? throw new BusinessRuleException($"Raw material unit {id} does not exist.");
 
         var brandCount = await dbContext.RawMaterialBrandPrices.CountAsync(p => p.UnitId == id, cancellationToken);
         if (brandCount > 0)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"'{unit.UnitOfMeasure!.Name}' is used by {brandCount} purchase {(brandCount == 1 ? "price" : "prices")}. Change those to another unit first.");
         }
 
         var priceCount = await dbContext.RawMaterialPriceHistories.CountAsync(h => h.UnitId == id, cancellationToken);
         if (priceCount > 0)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"'{unit.UnitOfMeasure!.Name}' is used by {priceCount} price {(priceCount == 1 ? "entry" : "entries")}. Delete those first.");
         }
 
@@ -145,14 +138,14 @@ public class RawMaterialUnitRepository(
             var lineCount = await dbContext.PackagingLines.CountAsync(l => l.UnitId == id, cancellationToken);
             if (lineCount > 0)
             {
-                throw new InvalidOperationException(
+                throw new BusinessRuleException(
                     $"'{unit.UnitOfMeasure!.Name}' is used by {lineCount} packaging {(lineCount == 1 ? "line" : "lines")}. Change those to another unit first.");
             }
 
             var setCount = await dbContext.SubAssemblyPackagingLines.CountAsync(l => l.UnitId == id, cancellationToken);
             if (setCount > 0)
             {
-                throw new InvalidOperationException(
+                throw new BusinessRuleException(
                     $"'{unit.UnitOfMeasure!.Name}' is used by {setCount} packaging set {(setCount == 1 ? "line" : "lines")}. Change those to another unit first.");
             }
         }

@@ -83,7 +83,7 @@ public sealed class UnitsOfMeasureViewModel : ViewModelBase, IDisposable
 
         // Runs each time Settings opens and after this tab's own saves. It merges rather than
         // replaces, so the selection and any unsaved edits survive.
-        LoadCommand = ReactiveCommand.CreateFromTask(async () =>
+        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
             var units = await _unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
             var selectedId = SelectedUnit?.Id;
@@ -93,7 +93,7 @@ public sealed class UnitsOfMeasureViewModel : ViewModelBase, IDisposable
                 _unitCache.MergeFrom(units);
                 SelectedUnit = Units.FirstOrDefault(u => u.Id == selectedId);
             });
-        });
+        }));
 
         NewCommand = ReactiveCommand.Create(ClearForm);
 

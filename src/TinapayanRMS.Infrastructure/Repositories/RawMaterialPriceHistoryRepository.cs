@@ -1,6 +1,7 @@
 using Dapper;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure.Queries;
 
@@ -49,7 +50,7 @@ public class RawMaterialPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbC
         var deleted = await dbContext.RawMaterialPriceHistories.Where(h => h.Id == id).ExecuteDeleteAsync(cancellationToken);
         if (deleted == 0)
         {
-            throw new InvalidOperationException($"Price history entry {id} does not exist.");
+            throw new BusinessRuleException($"Price history entry {id} does not exist.");
         }
     }
 }

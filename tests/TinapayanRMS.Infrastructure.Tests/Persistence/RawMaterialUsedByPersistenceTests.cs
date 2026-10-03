@@ -16,11 +16,11 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
+    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
 
     private PackagingLineRepository CreatePackagingLineRepository() => new(CreateDbContextFactory());
 
-    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory(), CreatePackagingLineRepository());
+    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory());
 
     private async Task<IReadOnlyList<string>> UsedByNamesAsync(int rawMaterialId) =>
         [.. (await CreateRepository().GetUsedByAsync(rawMaterialId, Cancellation)).Select(p => p.Name)];

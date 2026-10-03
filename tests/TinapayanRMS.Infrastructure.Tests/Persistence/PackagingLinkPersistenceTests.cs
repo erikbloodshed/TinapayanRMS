@@ -25,7 +25,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
 
     private CostingParametersRepository CreateCostingParametersRepository() => new(CreateDbContextFactory());
 
-    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory(), CreatePackagingLineRepository());
+    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory());
 
     private ProductCloner CreateProductCloner() => new(CreateDbContextFactory());
 

@@ -19,7 +19,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
     /// <summary>Stored costs keep 4 decimal places, so a share that doesn't divide evenly is compared to within one of them.</summary>
     private const decimal StoredPrecision = 0.0001m;
 
-    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
+    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
 
     private async Task<int> SeedCategoryAsync()
     {
@@ -291,7 +291,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
             [(eggId, 100m)]);
         var mixWhiteId = await SaveAsync(Linked("Egg Mix White", categoryId, eggMixId, weightShare: 70m, costShare: 30m));
 
-        var act = () => new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator())
+        var act = () => new IngredientBomLineRepository(CreateDbContextFactory())
             .SetLinesAsync(eggMixId, [(mixWhiteId, 100m)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*cycle*");

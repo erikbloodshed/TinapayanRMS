@@ -294,7 +294,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
         await SetPriceAsync(ingredientId, bagId, 900m);
 
-        await new RawMaterialRepository(CreateDbContextFactory(), CreateCostPropagator()).DeleteAsync(ingredientId, Cancellation);
+        await new RawMaterialRepository(CreateDbContextFactory()).DeleteAsync(ingredientId, Cancellation);
 
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterialBrandPrices.AnyAsync(Cancellation)).Should().BeFalse();

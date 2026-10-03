@@ -144,7 +144,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         var ubeId = await AddIngredientAsync("Ube Flavour", costPerGram: 0.8m);
         await SaveRecipeAsync(linkerId, new RecipeDraft([], [Linked(doughId, 30m, (ubeId, 20m))]));
 
-        var act = async () => await new RawMaterialRepository(CreateDbContextFactory(), CreateCostPropagator())
+        var act = async () => await new RawMaterialRepository(CreateDbContextFactory())
             .DeleteAsync(ubeId, Cancellation);
 
         await act.Should().ThrowAsync<Exception>("the ingredient FK is Restrict, as a sub-assembly line's is");

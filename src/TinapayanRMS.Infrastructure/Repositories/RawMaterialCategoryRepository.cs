@@ -25,7 +25,7 @@ public class RawMaterialCategoryRepository(IDbContextFactory<TinapayanRMSDbConte
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var existing = await dbContext.RawMaterialCategories.FirstOrDefaultAsync(c => c.Id == category.Id, cancellationToken)
-            ?? throw new InvalidOperationException($"Category {category.Id} does not exist.");
+            ?? throw new BusinessRuleException($"Category {category.Id} does not exist.");
 
         if (existing.Type != category.Type)
         {

@@ -17,38 +17,83 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
     public async Task<IReadOnlyList<PackagingLine>> GetEffectiveForProductAsync(int productId, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await ResolveEffectiveAsync(dbContext, productId, [], cancellationToken);
+        return await ResolveEffectiveAsync(dbContext, productId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<int, IReadOnlyList<PackagingLine>>> GetEffectiveForProductsAsync(
+        IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await ResolveEffectiveAsync(dbContext, productIds, cancellationToken);
+    }
+
+    /// <summary><see cref="ResolveEffectiveAsync(TinapayanRMSDbContext, IReadOnlyCollection{int}, CancellationToken)"/> for one product.</summary>
+    internal static async Task<IReadOnlyList<PackagingLine>> ResolveEffectiveAsync(
+        TinapayanRMSDbContext dbContext, int productId, CancellationToken cancellationToken) =>
+        (await ResolveEffectiveAsync(dbContext, [productId], cancellationToken))[productId];
+
+    /// <summary>
+    /// Each product's packaging as it shows, by product id: its link chain (if any) is followed to an unlinked product,
+    /// whose own lines it shows, or to a packaging set, whose lines it shows as its own (<see cref="SetLinesAsPackagingLines"/>).
+    /// Every link is read in one query and followed in memory, then the lines at the chains' ends in one query for
+    /// products and one for sets, however many products and however long their chains (2026-10-03: it was a query per
+    /// link followed, for each product, and Reports read every product that way). A chain that comes round again is
+    /// refused, should one slip past SetLinkAsync's own check (e.g. a manual data edit). Reads through Dapper, in
+    /// <paramref name="dbContext"/>'s transaction if it has one (ProductCloner's and RemoveLinkAsync's do).
+    /// </summary>
+    internal static async Task<IReadOnlyDictionary<int, IReadOnlyList<PackagingLine>>> ResolveEffectiveAsync(
+        TinapayanRMSDbContext dbContext, IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
+    {
+        // One row a product at most, so every link is a small read, and a chain costs nothing more to follow.
+        var links = (await dbContext.QueryAsync<PackagingLink>(
+                $"SELECT {Columns.Of<PackagingLink>("l")} FROM PackagingLinks l", null, cancellationToken))
+            .ToDictionary(l => l.ProductId);
+
+        var ends = productIds.Distinct().ToDictionary(id => id, id => ChainEnd(id, links));
+        var ownerIds = ends.Values.Where(end => end.SetId is null).Select(end => end.ProductId).Distinct().ToList();
+        var setIds = ends.Values.Select(end => end.SetId).OfType<int>().Distinct().ToList();
+
+        var ownLines = ownerIds.Count == 0
+            ? []
+            : await RawMaterialReads.GetPackagingLinesAsync(
+                dbContext, $"WHERE l.ProductId IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(ownerIds) }, cancellationToken);
+        var setLines = setIds.Count == 0 ? [] : await RawMaterialReads.GetSetLinesAsync(dbContext, setIds, cancellationToken);
+
+        var ownLinesByProduct = ownLines.ToLookup(l => l.ProductId);
+        var setLinesBySet = setLines.ToLookup(l => l.SubAssemblyId);
+        return ends.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value.SetId is { } setId
+                ? SetLinesAsPackagingLines(pair.Value.ProductId, setLinesBySet[setId])
+                : (IReadOnlyList<PackagingLine>)[.. ownLinesByProduct[pair.Value.ProductId]]);
     }
 
     /// <summary>
-    /// Follows the packaging's link chain (if any) until an unlinked product or a packaging set is found, then
-    /// returns that product's own lines, or the set's lines as this product's (<see cref="SetLinesAsPackagingLines"/>).
-    /// visitedProductIds guards against a cycle slipping past SetLinkAsync's own check (e.g. a manual data edit).
-    /// Reads through Dapper, in <paramref name="dbContext"/>'s transaction if it has one (ProductCloner's does).
+    /// Where <paramref name="productId"/>'s link chain ends: at the product whose own lines it shows, or at the set the
+    /// last product in it links (SetId), with that product.
     /// </summary>
-    internal static async Task<IReadOnlyList<PackagingLine>> ResolveEffectiveAsync(
-        TinapayanRMSDbContext dbContext, int productId, HashSet<int> visitedProductIds, CancellationToken cancellationToken)
+    private static (int ProductId, int? SetId) ChainEnd(int productId, Dictionary<int, PackagingLink> links)
     {
-        if (!visitedProductIds.Add(productId))
+        HashSet<int> visited = [];
+        while (true)
         {
-            throw new InvalidOperationException("Circular packaging link detected.");
+            if (!visited.Add(productId))
+            {
+                throw new BusinessRuleException("Circular packaging link detected.");
+            }
+
+            if (!links.TryGetValue(productId, out var link) || link is { LinkedSubAssemblyId: null, LinkedProductId: null })
+            {
+                return (productId, null);
+            }
+
+            if (link.LinkedSubAssemblyId is { } setId)
+            {
+                return (productId, setId);
+            }
+
+            productId = link.LinkedProductId!.Value;
         }
-
-        var link = await dbContext.QuerySingleOrDefaultAsync<PackagingLink>(
-            $"SELECT {Columns.Of<PackagingLink>("l")} FROM PackagingLinks l WHERE l.ProductId = @productId", new { productId }, cancellationToken);
-
-        if (link?.LinkedSubAssemblyId is { } setId)
-        {
-            return await SetLinesAsPackagingLines(dbContext, productId, setId, cancellationToken);
-        }
-
-        if (link?.LinkedProductId is { } linkedProductId)
-        {
-            return await ResolveEffectiveAsync(dbContext, linkedProductId, visitedProductIds, cancellationToken);
-        }
-
-        return await RawMaterialReads.GetPackagingLinesAsync(
-            dbContext, "WHERE l.ProductId = @productId", new { productId }, cancellationToken);
     }
 
     /// <summary>
@@ -57,12 +102,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
     /// Everything that reads a product's packaging (the Products screen, Reports, unlinking's copy, a clone)
     /// takes them as they are.
     /// </summary>
-    private static async Task<IReadOnlyList<PackagingLine>> SetLinesAsPackagingLines(
-        TinapayanRMSDbContext dbContext, int productId, int setId, CancellationToken cancellationToken)
-    {
-        var setLines = await RawMaterialReads.GetSetLinesAsync(dbContext, setId, cancellationToken);
-
-        return
+    private static IReadOnlyList<PackagingLine> SetLinesAsPackagingLines(int productId, IEnumerable<SubAssemblyPackagingLine> setLines) =>
         [
             .. setLines.Select(l =>
             {
@@ -80,15 +120,17 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
                 };
             }),
         ];
-    }
 
     public async Task SetLinesAsync(
         int productId,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
         CancellationToken cancellationToken)
     {
+        // The old lines' delete, which runs at once, and the new lines' insert commit together.
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         await SetLinesAsync(dbContext, productId, lines, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -107,13 +149,13 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         var productExists = await dbContext.Products.AnyAsync(p => p.Id == productId, cancellationToken);
         if (!productExists)
         {
-            throw new InvalidOperationException($"Product {productId} does not exist.");
+            throw new BusinessRuleException($"Product {productId} does not exist.");
         }
 
         var isLinked = await dbContext.PackagingLinks.AnyAsync(l => l.ProductId == productId, cancellationToken);
         if (isLinked)
         {
-            throw new InvalidOperationException("This product's packaging is linked to another product's — unlink it before editing its lines directly.");
+            throw new BusinessRuleException("This product's packaging is linked to another product's — unlink it before editing its lines directly.");
         }
 
         var materialIds = lines.Select(l => l.PackagingMaterialId).ToList();
@@ -126,7 +168,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         {
             if (!materials.TryGetValue(line.PackagingMaterialId, out var material))
             {
-                throw new InvalidOperationException($"Packaging material {line.PackagingMaterialId} does not exist.");
+                throw new BusinessRuleException($"Packaging material {line.PackagingMaterialId} does not exist.");
             }
 
             RawMaterialRules.EnsureUsableAsPackaging(material.Type, material.Name);
@@ -142,7 +184,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
             if (line.UnitId is { } unitId
                 && (!materialIdByUnitId.TryGetValue(unitId, out var unitMaterialId) || unitMaterialId != line.PackagingMaterialId))
             {
-                throw new InvalidOperationException("A packaging line's unit must be one of that material's own units.");
+                throw new BusinessRuleException("A packaging line's unit must be one of that material's own units.");
             }
         }
 

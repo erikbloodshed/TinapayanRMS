@@ -271,17 +271,17 @@ public sealed class PackagingLineRow : ReactiveObject
         {
             if (row.PackagingMaterial is not { } material)
             {
-                throw new InvalidOperationException($"Pick the packaging material for the {row.QtyPerUnit:#,0.####} per {unitNoun} line, or delete that line.");
+                throw new BusinessRuleException($"Pick the packaging material for the {row.QtyPerUnit:#,0.####} per {unitNoun} line, or delete that line.");
             }
 
             if (row.QtyPerUnit is not > 0m)
             {
-                throw new InvalidOperationException($"Enter how much {material.Name} one {unitNoun} takes, or delete its line.");
+                throw new BusinessRuleException($"Enter how much {material.Name} one {unitNoun} takes, or delete its line.");
             }
 
             if (lines.Any(l => l.PackagingMaterial.Id == material.Id))
             {
-                throw new InvalidOperationException(
+                throw new BusinessRuleException(
                     $"{material.Name} is on two of the same {unitNoun}'s packaging lines — put its quantity on one line and delete the other.");
             }
 

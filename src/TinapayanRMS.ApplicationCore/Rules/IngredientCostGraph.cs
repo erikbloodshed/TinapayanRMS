@@ -55,11 +55,18 @@ public static class IngredientCostGraph
             }
         }
 
-        if (affected.Count == 0)
-        {
-            return [];
-        }
+        return affected.Count == 0 ? [] : InDependencyOrder(affected, componentIdsByIngredientId);
+    }
 
+    /// <summary>
+    /// <paramref name="ingredientIds"/> in dependency order: each after every one of the others it's made from or linked
+    /// to, however far down, so recomputing them left to right always sees fresh inputs. What recomputing every made and
+    /// linked ingredient at once takes (IngredientCostPropagator.RecomputeAllAsync); a dependency outside the set is
+    /// taken as already correct. The same cycle guard as GetDependentsInOrder's.
+    /// </summary>
+    public static IReadOnlyList<int> InDependencyOrder(IEnumerable<int> ingredientIds, IReadOnlyDictionary<int, IReadOnlyList<int>> componentIdsByIngredientId)
+    {
+        var included = ingredientIds as IReadOnlySet<int> ?? ingredientIds.ToHashSet();
         var order = new List<int>();
         var visited = new HashSet<int>();
         var visiting = new HashSet<int>();
@@ -75,7 +82,7 @@ public static class IngredientCostGraph
             {
                 foreach (var componentId in components)
                 {
-                    if (affected.Contains(componentId))
+                    if (included.Contains(componentId))
                     {
                         Visit(componentId);
                     }
@@ -86,7 +93,7 @@ public static class IngredientCostGraph
             order.Add(ingredientId);
         }
 
-        foreach (var ingredientId in affected)
+        foreach (var ingredientId in included)
         {
             Visit(ingredientId);
         }

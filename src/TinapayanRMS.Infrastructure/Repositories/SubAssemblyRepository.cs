@@ -127,7 +127,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         foreach (var line in lines)
         {
             var material = materials.GetValueOrDefault(line.PackagingMaterialId)
-                ?? throw new InvalidOperationException($"Packaging material {line.PackagingMaterialId} does not exist.");
+                ?? throw new BusinessRuleException($"Packaging material {line.PackagingMaterialId} does not exist.");
             RawMaterialRules.EnsureUsableAsPackaging(material.Type, material.Name);
         }
 
@@ -141,7 +141,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             if (line.UnitId is { } unitId
                 && (!materialIdByUnitId.TryGetValue(unitId, out var unitMaterialId) || unitMaterialId != line.PackagingMaterialId))
             {
-                throw new InvalidOperationException("A packaging set line's unit must be one of that material's own units.");
+                throw new BusinessRuleException("A packaging set line's unit must be one of that material's own units.");
             }
         }
 
@@ -171,14 +171,14 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         var name = subAssembly.Name.Trim();
         if (name.Length == 0)
         {
-            throw new InvalidOperationException("Every sub-assembly needs a name.");
+            throw new BusinessRuleException("Every sub-assembly needs a name.");
         }
 
         var role = await dbContext.SubAssemblyRoles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == subAssembly.RoleId, cancellationToken)
-            ?? throw new InvalidOperationException("Every sub-assembly needs a role, and that role must still exist.");
+            ?? throw new BusinessRuleException("Every sub-assembly needs a role, and that role must still exist.");
         if (isPackaging && !role.IsPackaging)
         {
-            throw new InvalidOperationException($"A packaging set goes in the Packaging role, not {role.Name}.");
+            throw new BusinessRuleException($"A packaging set goes in the Packaging role, not {role.Name}.");
         }
 
         if (!isPackaging)
@@ -202,10 +202,10 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         else
         {
             stored = await dbContext.SubAssemblies.Include(s => s.Role).Include(s => s.OwnerProduct).FirstOrDefaultAsync(s => s.Id == subAssembly.Id, cancellationToken)
-                ?? throw new InvalidOperationException($"Sub-assembly {subAssembly.Id} does not exist.");
+                ?? throw new BusinessRuleException($"Sub-assembly {subAssembly.Id} does not exist.");
             if (stored.OwnerProduct is { } owner)
             {
-                throw new InvalidOperationException($"{stored.Name} is {owner.Name}'s own. Change it in that product's recipe.");
+                throw new BusinessRuleException($"{stored.Name} is {owner.Name}'s own. Change it in that product's recipe.");
             }
 
             SubAssemblyRules.EnsureKindUnchanged(stored.Role!.IsPackaging, isPackaging);
@@ -221,7 +221,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
                 && !role.IsProductOwned
                 && await ProductComponentRepository.CompositesUsingRoleAsync(dbContext, stored.RoleId, stored.Id, cancellationToken) is [_, ..] composites)
             {
-                throw new InvalidOperationException(
+                throw new BusinessRuleException(
                     $"{ProductComponentRepository.NamesHave(composites)} {stored.Name} as a section, and a composite product can only "
                     + $"have sections in product-owned roles, which {role.Name} isn't. Take it out there first, or pick a product-owned role.");
             }
@@ -238,10 +238,10 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var stored = await dbContext.SubAssemblies.Where(s => s.Id == id).Select(s => new { s.Name, OwnerName = s.OwnerProduct!.Name }).FirstOrDefaultAsync(cancellationToken)
-            ?? throw new InvalidOperationException($"Sub-assembly {id} does not exist.");
+            ?? throw new BusinessRuleException($"Sub-assembly {id} does not exist.");
         if (stored.OwnerName is { } ownerName)
         {
-            throw new InvalidOperationException($"{stored.Name} is {ownerName}'s own. Remove it from that product's recipe instead.");
+            throw new BusinessRuleException($"{stored.Name} is {ownerName}'s own. Remove it from that product's recipe instead.");
         }
 
         var name = stored.Name;

@@ -9,9 +9,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class RawMaterialBrandPriceRepository(
-    IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,
-    IngredientCostPropagator costPropagator) : IRawMaterialBrandPriceRepository
+public class RawMaterialBrandPriceRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialBrandPriceRepository
 {
     /// <summary>In the order they were added, each with its unit (if any) and that unit's unit of measure.</summary>
     public Task<IReadOnlyList<RawMaterialBrandPrice>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken) =>
@@ -41,25 +39,23 @@ public class RawMaterialBrandPriceRepository(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        bool costChanged;
-        await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
-        {
-            var material = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == rawMaterialId, cancellationToken)
-                ?? throw new InvalidOperationException($"Raw material {rawMaterialId} does not exist.");
-            var costBefore = material.CostPerBaseUnit;
+        // The prices, the cost they give and its cascade commit together.
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var material = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == rawMaterialId, cancellationToken)
+            ?? throw new BusinessRuleException($"Raw material {rawMaterialId} does not exist.");
+        var costBefore = material.CostPerBaseUnit;
 
-            await RemoveAllAsync(dbContext, rawMaterialId, cancellationToken);
-            await AddAllAsync(dbContext, material, brandPrices, cancellationToken);
-            costChanged = await RepriceAsync(dbContext, material, costBefore, cancellationToken);
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            await transaction.CommitAsync(cancellationToken);
-        }
+        await RemoveAllAsync(dbContext, rawMaterialId, cancellationToken);
+        await AddAllAsync(dbContext, material, brandPrices, cancellationToken);
+        var costChanged = await RepriceAsync(dbContext, material, costBefore, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         if (costChanged)
         {
-            await costPropagator.RecomputeAndPropagateAsync(rawMaterialId, cancellationToken);
+            await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, rawMaterialId, cancellationToken);
         }
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
     /// <summary>Removes every brand price of the material, so the units they were in can be removed too.</summary>
@@ -80,7 +76,7 @@ public class RawMaterialBrandPriceRepository(
 
         if (material.Source != RawMaterialSource.Purchased)
         {
-            throw new InvalidOperationException("Only a purchased material has purchase prices.");
+            throw new BusinessRuleException("Only a purchased material has purchase prices.");
         }
 
         RawMaterialRules.EnsureDistinctBrandPrices(brandPrices.Select(p => (p.Brand, p.UnitId)));
@@ -95,7 +91,7 @@ public class RawMaterialBrandPriceRepository(
             RawMaterialRules.EnsureValidBrandPrice(brandPrice.Price);
             if (brandPrice.UnitId is { } unitId && !unitIds.Contains(unitId))
             {
-                throw new InvalidOperationException("A price's unit must be one of that material's own units.");
+                throw new BusinessRuleException("A price's unit must be one of that material's own units.");
             }
 
             // A copy: the caller's row is never attached, and never given an id by a save that then rolls back.
@@ -114,8 +110,9 @@ public class RawMaterialBrandPriceRepository(
     /// <summary>
     /// Reprices a purchased material from its saved brand prices (ApplyBrandPrices) without saving. When
     /// its cost is no longer <paramref name="costBefore"/>, the brand price it now comes from is logged in
-    /// price history, dated today. Returns whether an ingredient's cost changed, which the caller cascades;
-    /// a packaging material's needs nothing, since products cost their packaging lines on read.
+    /// price history, dated today. Returns whether an ingredient's cost changed, which the caller cascades
+    /// before its transaction commits; a packaging material's needs nothing, since products cost their
+    /// packaging lines on read.
     /// </summary>
     internal static async Task<bool> RepriceAsync(
         TinapayanRMSDbContext dbContext, RawMaterial material, decimal costBefore, CancellationToken cancellationToken)

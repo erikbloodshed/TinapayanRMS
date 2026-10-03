@@ -125,7 +125,7 @@ public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTes
         var flourId = await AddIngredientAsync("Flour");
         var butterId = await AddIngredientAsync("Butter");
         var sugarId = await AddIngredientAsync("Sugar");
-        var repository = new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator());
+        var repository = new IngredientBomLineRepository(CreateDbContextFactory());
         await repository.SetLinesAsync(madeId, [(flourId, 100m), (butterId, 50m), (sugarId, 50m)], Cancellation);
 
         await repository.SetLinesAsync(madeId, [(sugarId, 50m), (flourId, 100m), (butterId, 50m)], Cancellation);

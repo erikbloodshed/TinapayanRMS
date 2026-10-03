@@ -16,17 +16,17 @@ public static class ProductRules
     {
         if (usages.Any(u => u.AuthoredValue < 0))
         {
-            throw new InvalidOperationException("A sub-assembly's weight per piece or yield can't be negative.");
+            throw new BusinessRuleException("A sub-assembly's weight per piece or yield can't be negative.");
         }
 
         if (usages.Any(u => u.ShrinkagePercent < 0 || u.ShrinkagePercent >= 100))
         {
-            throw new InvalidOperationException("A sub-assembly's shrinkage must be at least 0% and less than 100%.");
+            throw new BusinessRuleException("A sub-assembly's shrinkage must be at least 0% and less than 100%.");
         }
 
         if (usages.Select(u => u.SubAssemblyId).Distinct().Count() != usages.Count)
         {
-            throw new InvalidOperationException("A product can't use the same sub-assembly more than once.");
+            throw new BusinessRuleException("A product can't use the same sub-assembly more than once.");
         }
     }
 
@@ -44,20 +44,20 @@ public static class ProductRules
     {
         if (addIns.Any(a => a.Grams <= 0))
         {
-            throw new InvalidOperationException("An add-in's grams must be positive.");
+            throw new BusinessRuleException("An add-in's grams must be positive.");
         }
 
         var duplicate = addIns.GroupBy(a => a.IngredientId).FirstOrDefault(g => g.Count() > 1);
         if (duplicate is not null)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"{duplicate.First().IngredientName} is on two add-in lines. Put its total on one line and delete the other.");
         }
 
         var alreadyThere = addIns.Where(a => baseIngredientIds.Contains(a.IngredientId)).Select(a => a.IngredientName).FirstOrDefault();
         if (alreadyThere is not null)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"{alreadyThere} is already in {subAssemblyName}. Add-ins are only for what its recipe doesn't have — "
                 + $"change how much it uses where {subAssemblyName} is kept, or make this product a copy of it.");
         }
@@ -142,12 +142,12 @@ public static class ProductRules
     {
         if (lines.Any(l => l.QtyPerUnit <= 0))
         {
-            throw new InvalidOperationException("A packaging line's quantity must be positive.");
+            throw new BusinessRuleException("A packaging line's quantity must be positive.");
         }
 
         if (lines.GroupBy(l => l.PackagingMaterialId).Any(g => g.Count() > 1))
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 "A product can't use the same packaging material more than once — combine it into a single line instead.");
         }
     }

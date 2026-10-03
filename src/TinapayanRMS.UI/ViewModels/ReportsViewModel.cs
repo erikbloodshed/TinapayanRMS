@@ -7,6 +7,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
+using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI.ViewModels;
 
@@ -116,15 +117,12 @@ public sealed class RawMaterialPriceSummaryRow
         UnitConversionRules.CostPerBaseUnit(entry.Price, entry.Unit?.BaseUnitsPerUnit);
 }
 
-/// <summary>The Reports screen: summaries across every product and every purchased raw material, each on a tab of its own.</summary>
-public sealed class ReportsViewModel : ReactiveObject, IDisposable
+/// <summary>
+/// The Reports screen: summaries across every product and every purchased raw material, each on a tab of its own. A load
+/// that fails says why in the screen's error notice (ViewModelBase.LoadSafelyAsync).
+/// </summary>
+public sealed class ReportsViewModel : ViewModelBase, IDisposable
 {
-    /// <summary>
-    /// How many products the Product Cost Summary reads at a time. Each makes up to five reads at once
-    /// (SavedProductReader.ReadDetailAsync), so 40 connections at most: well inside SqlClient's pool of 100.
-    /// </summary>
-    private const int ProductsReadAtOnce = 8;
-
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IProductRepository _productRepository;
@@ -160,7 +158,9 @@ public sealed class ReportsViewModel : ReactiveObject, IDisposable
         IRawMaterialPriceHistoryRepository priceHistoryRepository,
         IRawMaterialRepository rawMaterialRepository,
         IProductRepository productRepository,
-        SavedProductReader savedProducts)
+        SavedProductReader savedProducts,
+        ILogger logger)
+        : base(logger)
     {
         _priceHistoryRepository = priceHistoryRepository;
         _rawMaterialRepository = rawMaterialRepository;
@@ -170,7 +170,7 @@ public sealed class ReportsViewModel : ReactiveObject, IDisposable
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
         OpenRawMaterialCommand = ReactiveCommand.Create<int>(_rawMaterialOpenRequests.OnNext);
 
-        LoadCommand = ReactiveCommand.CreateFromTask(async () =>
+        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
             // Off the UI thread, as Products and Raw Materials read their details, and both summaries at once.
             var productCostsRead = Task.Run(ReadProductCostsAsync);
@@ -182,26 +182,20 @@ public sealed class ReportsViewModel : ReactiveObject, IDisposable
             ProductCosts.AddRange(productCosts);
             RawMaterialPrices.Clear();
             RawMaterialPrices.AddRange(rawMaterialPrices);
-        });
+        }));
     }
 
     /// <summary>
     /// Every product as it's saved, priced as the Products screen prices it once opened (SavedProductReader, which the
-    /// screen and Print read through too). A product takes six reads one after another, so several products are read at
-    /// once (each read has a context of its own); the rows stay in the list's order, by name.
+    /// screen and Print read through too). All of them are read together, in the same dozen or so queries however many
+    /// products there are (2026-10-03: they were read a product at a time, nine or so queries each, several products at
+    /// once). The rows stay in the list's order, by name.
     /// </summary>
-    private async Task<ProductCostRow[]> ReadProductCostsAsync()
+    private async Task<List<ProductCostRow>> ReadProductCostsAsync()
     {
         var products = await _productRepository.GetAllAsync(CancellationToken.None);
-        var rows = new ProductCostRow[products.Count];
-
-        await Parallel.ForEachAsync(
-            Enumerable.Range(0, products.Count),
-            new ParallelOptions { MaxDegreeOfParallelism = ProductsReadAtOnce },
-            async (i, cancellationToken) =>
-                rows[i] = new ProductCostRow(products[i], (await _savedProducts.ReadAsync(products[i], cancellationToken)).Costs));
-
-        return rows;
+        var saved = await _savedProducts.ReadAllAsync(products, CostBasis.Buffered, CancellationToken.None);
+        return [.. saved.Select(s => new ProductCostRow(s.Product, s.Costs))];
     }
 
     /// <summary>The purchased materials, ingredients and packaging alike, by name: a made or linked ingredient has no price history.</summary>

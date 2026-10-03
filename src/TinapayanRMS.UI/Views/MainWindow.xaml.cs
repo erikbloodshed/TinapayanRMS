@@ -416,6 +416,9 @@ public partial class MainWindow : AppWindow, IVimHost
             return;
         }
 
-        load.Execute().Finally(() => _loadingTabs.Remove(tab)).Subscribe();
+        // A load shows its own failure in its screen's error notice (ViewModelBase.LoadSafelyAsync). Should one escape it
+        // all the same, ReactiveUI hands it to App's handler, which says what went wrong; the error on Execute's own
+        // observable is the same failure again, and without a handler here it would be thrown a second time.
+        load.Execute().Finally(() => _loadingTabs.Remove(tab)).Subscribe(_ => { }, _ => { });
     }
 }

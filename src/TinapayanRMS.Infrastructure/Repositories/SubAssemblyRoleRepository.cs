@@ -28,7 +28,7 @@ public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> 
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         var existing = await dbContext.SubAssemblyRoles.FirstOrDefaultAsync(r => r.Id == role.Id, cancellationToken)
-            ?? throw new InvalidOperationException($"Sub-assembly role {role.Id} does not exist.");
+            ?? throw new BusinessRuleException($"Sub-assembly role {role.Id} does not exist.");
 
         // The flag is checked against the role as stored: IsPackaging is never the caller's to change.
         SubAssemblyRules.EnsureProductOwnedAllowed(new SubAssemblyRole { Name = existing.Name, IsPackaging = existing.IsPackaging, IsProductOwned = role.IsProductOwned });
@@ -37,7 +37,7 @@ public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> 
         if (existing.IsProductOwned && !role.IsProductOwned
             && await ProductComponentRepository.CompositesUsingRoleAsync(dbContext, existing.Id, null, cancellationToken) is [_, ..] composites)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"{ProductComponentRepository.NamesHave(composites)} a {existing.Name} section, and a composite product can only have "
                 + $"sections in product-owned roles. Take it out there first, then untick Product-owned.");
         }
@@ -91,7 +91,7 @@ public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> 
         var isPackaging = await dbContext.SubAssemblyRoles.AnyAsync(r => r.Id == id && r.IsPackaging, cancellationToken);
         if (isPackaging)
         {
-            throw new InvalidOperationException("The Packaging role holds the packaging sets, so it can't be deleted. It can be renamed.");
+            throw new BusinessRuleException("The Packaging role holds the packaging sets, so it can't be deleted. It can be renamed.");
         }
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -109,7 +109,7 @@ public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> 
         var index = roles.FindIndex(r => r.Id == id);
         if (index < 0)
         {
-            throw new InvalidOperationException($"Sub-assembly role {id} does not exist.");
+            throw new BusinessRuleException($"Sub-assembly role {id} does not exist.");
         }
 
         var other = up ? index - 1 : index + 1;

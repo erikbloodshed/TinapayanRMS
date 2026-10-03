@@ -23,7 +23,7 @@ public class ProductQuantityRequiredPersistenceTests(DatabaseFixture fixture) : 
 
     private PackagingLineRepository CreatePackagingLineRepository() => new(CreateDbContextFactory());
 
-    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory(), CreatePackagingLineRepository());
+    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory());
 
     private ProductCloner CreateCloner() => new(CreateDbContextFactory());
 

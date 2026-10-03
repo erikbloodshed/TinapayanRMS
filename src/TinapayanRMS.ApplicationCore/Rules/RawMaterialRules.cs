@@ -16,7 +16,7 @@ public static class RawMaterialRules
         {
             if (material.BaseUnitId is not null)
             {
-                throw new InvalidOperationException("An ingredient's base unit is always the gram.");
+                throw new BusinessRuleException("An ingredient's base unit is always the gram.");
             }
 
             return;
@@ -24,12 +24,12 @@ public static class RawMaterialRules
 
         if (material.BaseUnitId is not > 0)
         {
-            throw new InvalidOperationException("A packaging material needs a base unit.");
+            throw new BusinessRuleException("A packaging material needs a base unit.");
         }
 
         if (material.Source != RawMaterialSource.Purchased)
         {
-            throw new InvalidOperationException("Only an ingredient can be made or linked; packaging is always purchased.");
+            throw new BusinessRuleException("Only an ingredient can be made or linked; packaging is always purchased.");
         }
     }
 
@@ -45,7 +45,7 @@ public static class RawMaterialRules
         if (material.Source != RawMaterialSource.Linked
             && (material.LinkedToId is not null || material.WeightSharePercent is not null || material.CostSharePercent is not null))
         {
-            throw new InvalidOperationException("Only a linked ingredient is linked to another.");
+            throw new BusinessRuleException("Only a linked ingredient is linked to another.");
         }
 
         switch (material.Source)
@@ -53,7 +53,7 @@ public static class RawMaterialRules
             case RawMaterialSource.Purchased:
                 if (material.WeightLossPercent is not null)
                 {
-                    throw new InvalidOperationException("A purchased material has no weight loss percent.");
+                    throw new BusinessRuleException("A purchased material has no weight loss percent.");
                 }
 
                 break;
@@ -61,12 +61,12 @@ public static class RawMaterialRules
             case RawMaterialSource.Made:
                 if (material.WeightLossPercent is not { } weightLossPercent)
                 {
-                    throw new InvalidOperationException("A made ingredient needs a weight loss percent.");
+                    throw new BusinessRuleException("A made ingredient needs a weight loss percent.");
                 }
 
                 if (weightLossPercent is < 0 or >= 100)
                 {
-                    throw new InvalidOperationException("Weight loss percent must be at least 0 and less than 100.");
+                    throw new BusinessRuleException("Weight loss percent must be at least 0 and less than 100.");
                 }
 
                 break;
@@ -74,12 +74,12 @@ public static class RawMaterialRules
             case RawMaterialSource.Linked:
                 if (material.WeightLossPercent is not null)
                 {
-                    throw new InvalidOperationException("A linked ingredient has no weight loss percent.");
+                    throw new BusinessRuleException("A linked ingredient has no weight loss percent.");
                 }
 
                 if (material.LinkedToId is not > 0)
                 {
-                    throw new InvalidOperationException("Pick the ingredient it's linked to.");
+                    throw new BusinessRuleException("Pick the ingredient it's linked to.");
                 }
 
                 EnsureValidShare(material.WeightSharePercent, "Weight share");
@@ -87,7 +87,7 @@ public static class RawMaterialRules
                 break;
 
             default:
-                throw new InvalidOperationException($"Unknown source {material.Source}.");
+                throw new BusinessRuleException($"Unknown source {material.Source}.");
         }
     }
 
@@ -95,7 +95,7 @@ public static class RawMaterialRules
     {
         if (sharePercent is not (> 0 and <= 100))
         {
-            throw new InvalidOperationException($"{label} must be above 0 and at most 100 percent.");
+            throw new BusinessRuleException($"{label} must be above 0 and at most 100 percent.");
         }
     }
 
@@ -114,12 +114,12 @@ public static class RawMaterialRules
     {
         if (id != 0 && id == linkedToId)
         {
-            throw new InvalidOperationException("An ingredient can't be linked to itself.");
+            throw new BusinessRuleException("An ingredient can't be linked to itself.");
         }
 
         if (linkedToType != RawMaterialType.Ingredient)
         {
-            throw new InvalidOperationException($"'{linkedToName}' is packaging, and an ingredient can only be linked to another ingredient.");
+            throw new BusinessRuleException($"'{linkedToName}' is packaging, and an ingredient can only be linked to another ingredient.");
         }
     }
 
@@ -150,7 +150,7 @@ public static class RawMaterialRules
 
         var takers = string.Join(", ", otherParts.Select(p => $"{p.Name} ({p.SharePercent:0.##}%)"));
         var verb = otherParts.Count == 1 ? "takes" : "take";
-        throw new InvalidOperationException(
+        throw new BusinessRuleException(
             $"{takers} already {verb} {taken:0.##}% of {linkedToName}'s {what}, so {name} can take at most {100m - taken:0.##}%.");
     }
 
@@ -159,7 +159,7 @@ public static class RawMaterialRules
     {
         if (original != updated)
         {
-            throw new InvalidOperationException("A raw material's type can't change after it's created.");
+            throw new BusinessRuleException("A raw material's type can't change after it's created.");
         }
     }
 
@@ -168,7 +168,7 @@ public static class RawMaterialRules
     {
         if (original != updated)
         {
-            throw new InvalidOperationException("A raw material's source can't change after it's created.");
+            throw new BusinessRuleException("A raw material's source can't change after it's created.");
         }
     }
 
@@ -177,7 +177,7 @@ public static class RawMaterialRules
     {
         if (type != RawMaterialType.Ingredient)
         {
-            throw new InvalidOperationException($"'{name}' is packaging, and only ingredients can go in a recipe.");
+            throw new BusinessRuleException($"'{name}' is packaging, and only ingredients can go in a recipe.");
         }
     }
 
@@ -186,7 +186,7 @@ public static class RawMaterialRules
     {
         if (type != RawMaterialType.Packaging)
         {
-            throw new InvalidOperationException($"'{name}' is an ingredient, and only packaging can go on a packaging line.");
+            throw new BusinessRuleException($"'{name}' is an ingredient, and only packaging can go on a packaging line.");
         }
     }
 
@@ -202,21 +202,34 @@ public static class RawMaterialRules
     /// </summary>
     public static int? ApplyBrandPrices(RawMaterial material, IReadOnlyList<(decimal Price, decimal? BaseUnitsPerUnit)> brandPrices)
     {
+        // Worked out at full precision and rounded only as it's stored, the buffered cost from the cost before rounding.
         var dearest = FindDearestBrandPrice(brandPrices);
-        material.CostPerBaseUnit = dearest is { } index
+        var cost = dearest is { } index
             ? UnitConversionRules.CostPerBaseUnit(brandPrices[index].Price, brandPrices[index].BaseUnitsPerUnit)
             : 0m;
+        material.CostPerBaseUnit = StoredCost(cost);
         if (dearest is null)
         {
             material.BufferedCostPerBaseUnit = 0m;
         }
         else if (material.BufferedCostPerBaseUnit == 0m)
         {
-            material.BufferedCostPerBaseUnit = BufferedCost(material.CostPerBaseUnit, material.CostBufferPercent);
+            material.BufferedCostPerBaseUnit = StoredCost(BufferedCost(cost, material.CostBufferPercent));
         }
 
         return dearest;
     }
+
+    /// <summary>How many decimal places a material's two costs per base unit are stored to (RawMaterialConfiguration: decimal(28,20)).</summary>
+    public const int StoredCostScale = 20;
+
+    /// <summary>
+    /// <paramref name="cost"/> as the database stores it: to 20 places, rounded half away from zero as SQL Server rounds it.
+    /// A stored cost is always set through this. Worked out in memory, a cost that doesn't come out even carries up to 28
+    /// places (₱170 a pack of 240 is ₱0.708333… a piece), and compared with the stored one it read as changed when nothing
+    /// had: a Save logged the same price in price history again, and moved the cost's date (found 2026-10-03).
+    /// </summary>
+    public static decimal StoredCost(decimal cost) => decimal.Round(cost, StoredCostScale, MidpointRounding.AwayFromZero);
 
     /// <summary>
     /// The index of the brand price that costs the most per base unit (the first, on a tie), or null for
@@ -258,7 +271,7 @@ public static class RawMaterialRules
         if (duplicate is not null)
         {
             var brand = NormalizeBrand(duplicate.First().Brand);
-            throw new InvalidOperationException(brand is null
+            throw new BusinessRuleException(brand is null
                 ? "Two prices without a brand are in the same unit. Name their brands, or remove one."
                 : $"'{brand}' is priced twice in the same unit. Remove one.");
         }
@@ -269,7 +282,7 @@ public static class RawMaterialRules
     {
         if (price <= 0)
         {
-            throw new InvalidOperationException("A brand's purchase price must be positive.");
+            throw new BusinessRuleException("A brand's purchase price must be positive.");
         }
     }
 
@@ -303,7 +316,7 @@ public static class RawMaterialRules
     {
         if (bufferPercent is < 0 or > 100)
         {
-            throw new InvalidOperationException("Cost buffer must be at least 0 and at most 100 percent.");
+            throw new BusinessRuleException("Cost buffer must be at least 0 and at most 100 percent.");
         }
     }
 
@@ -312,7 +325,7 @@ public static class RawMaterialRules
     {
         if (bufferedCost < 0)
         {
-            throw new InvalidOperationException("Buffered cost can't be negative.");
+            throw new BusinessRuleException("Buffered cost can't be negative.");
         }
     }
 
@@ -325,7 +338,7 @@ public static class RawMaterialRules
     {
         if (baseUnitId == unitOfMeasureId)
         {
-            throw new InvalidOperationException("That's already the material's base unit.");
+            throw new BusinessRuleException("That's already the material's base unit.");
         }
     }
 
@@ -334,7 +347,7 @@ public static class RawMaterialRules
     {
         if (alreadyAdded)
         {
-            throw new InvalidOperationException("This material already has that unit.");
+            throw new BusinessRuleException("This material already has that unit.");
         }
     }
 
@@ -346,7 +359,7 @@ public static class RawMaterialRules
     {
         if (hasUnits || hasPrices || hasLines)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 "The base unit can't change once the material has alternative units, prices or packaging lines, which are all measured in it.");
         }
     }
@@ -359,7 +372,7 @@ public static class RawMaterialRules
     {
         if (materialType != categoryType)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"{categoryName} is a{(categoryType == RawMaterialType.Ingredient ? "n ingredient" : " packaging")} category. "
                 + $"Put this {(materialType == RawMaterialType.Ingredient ? "ingredient" : "packaging material")} in a category for {TypePlural(materialType)}.");
         }
@@ -370,7 +383,7 @@ public static class RawMaterialRules
     {
         if (materialsInIt > 0)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"{categoryName} has {materialsInIt} material{(materialsInIt == 1 ? "" : "s")} in it, so its type can't change. "
                 + $"Move {(materialsInIt == 1 ? "it" : "them")} to another category first.");
         }

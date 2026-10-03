@@ -314,7 +314,7 @@ ReactiveUI 25 must be initialised exactly once per process, before any `Reactive
 
 ### Dependency injection and lifetimes
 
-Everything in the container is a **singleton**: the repositories, the propagators, the validators, every ViewModel and `MainWindow`. A screen lives for the whole session, and so does its ViewModel.
+Everything in the container is a **singleton**: the repositories, the services (`ProductCloner`, `CostRecalculator`, `SavedProductReader`), the validators, every ViewModel and `MainWindow`. A screen lives for the whole session, and so does its ViewModel.
 
 The DbContext is registered with **`AddDbContextFactory`**, never `AddDbContext`. A singleton can't hold a `DbContext`: two screens loading at once would share it, and EF Core throws when a second operation starts on a context that's still busy. That happened the first time the app ran. So every repository takes `IDbContextFactory<TinapayanRMSDbContext>` and creates a short-lived context for each call:
 
@@ -326,7 +326,7 @@ public class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbContext> 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var existing = await dbContext.ProductCategories.FirstOrDefaultAsync(c => c.Id == category.Id, cancellationToken)
-            ?? throw new InvalidOperationException($"Category {category.Id} does not exist.");
+            ?? throw new BusinessRuleException($"Category {category.Id} does not exist.");
 
         existing.Name = category.Name;
 
@@ -346,8 +346,8 @@ A ViewModel that owns a DynamicData `SourceCache` is `sealed` and `IDisposable`,
 Take a user who types a new price for cake flour on Raw Materials and presses **Save**:
 
 1. **The ViewModel.** `RawMaterialsViewModel.SaveCommand` runs inside `RunSafelyAsync`. It runs the FluentValidation validators for what it's about to save, and stops with an `ErrorMessage` if one fails.
-2. **The repository, in one transaction.** `IRawMaterialRepository.SaveAsync(material, units, brandPrices, bomLines)` opens one context and one transaction. It saves the material through `RawMaterialRules`' checks, replaces the units and brand prices, and reprices the material at its dearest brand, logging one price history entry if the cost moved. It replaces the BOM lines if they were sent, then commits. A rule that throws anywhere rolls all of it back.
-3. **The cascade, after the commit.** `IngredientCostPropagator` recomputes every made or linked ingredient that depends on the flour, in dependency order. It then hands the changed ids to `SubAssemblyCostPropagator`, which recomputes the `TotalWeight` and `TotalCost` of every sub-assembly that uses any of them.
+2. **The repository, in one transaction.** `IRawMaterialRepository.SaveAsync(material, units, brandPrices, bomLines)` opens one context and one transaction. It saves the material through `RawMaterialRules`' checks, replaces the units and brand prices, and reprices the material at its dearest brand, logging one price history entry if the cost moved. It replaces the BOM lines if they were sent.
+3. **The cascade, in the same transaction.** `IngredientCostPropagator` recomputes every made or linked ingredient that depends on the flour, in dependency order. It then hands the changed ids to `SubAssemblyCostPropagator`, which recomputes the `TotalWeight` and `TotalCost` of every sub-assembly that uses any of them. Then the transaction commits. A rule that throws anywhere, or a cascade that fails part-way, rolls all of it back.
 4. **The DbContext** stamps `CostUpdatedAt` on every material whose stored cost changed.
 5. **Back in the ViewModel**, `LoadCommand` merges the fresh data into the screen, and a success toast says "Cake Flour was saved."
 6. **The Products screen** stores no costs. The next time its tab shows, its `LoadCommand` reads the new sub-assembly costs, and `ProductRules` and `CostingRules` work out the new selling price on read.
@@ -362,7 +362,8 @@ Take a user who types a new price for cake flour on Raw Materials and presses **
 | A pure ordering function plus a database orchestrator, instead of DynamicData joins | Simpler, testable without a database, and the database stays the single source of truth | [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade) |
 | Cost-plus pricing, in three separate steps | The shop owner can check each step by hand | Application Architecture, "Cost-plus pricing" |
 | `decimal` at full precision, rounded only for display and the final price | Rounding each figure before adding them up drifts | Conventions, "Decimal precision" |
-| One Save per screen, in one transaction | A rejected part leaves nothing half-saved | Application Architecture, "One Save writes the whole material" |
+| One Save per screen, in one transaction, with the cost cascade it causes | A rejected part, or a cascade that fails, leaves nothing half-saved and no stored cost stale | Application Architecture, "One Save writes the whole material"; [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade) |
+| A failure is shown on its screen, and the app carries on | A crash loses unsaved work, and one failed read mustn't stop a screen working | Application Architecture, "A failure is shown on its screen" |
 | Screens merge fresh data instead of reloading it | A tab keeps its selection, scroll position and unsaved edits | Application Architecture, "A tab keeps its view state" |
 | Tests on a real database, with nothing mocked | They catch what mocks miss: SQL, constraints and EF Core's behaviour | [Development Environment](../PLAN.md#development-environment) |
 | Syncfusion controls over native ones | The whole UI picks up the theme consistently | [Syncfusion UI Framework](../PLAN.md#syncfusion-ui-framework) |
@@ -427,10 +428,10 @@ Three layers check the same rules, each for a different reason.
 | Layer | Where | What it gives | On failure |
 |---|---|---|---|
 | Form pre-checks | FluentValidation validators in `ApplicationCore/Validators`, which a ViewModel runs before it saves | An immediate, friendly message | `ErrorMessage` is set, and nothing reaches the repository |
-| Business rules (the authority) | Static `*Rules` methods, which the repositories call before they write anything destructive | The real guarantee, whichever code path writes | An `InvalidOperationException`, whose message `RunSafelyAsync` shows exactly as written |
-| The database (a backstop) | Unique indexes, check constraints and `Restrict` foreign keys, in `Infrastructure/Configurations` | Integrity even if a code path forgets a check | A `DbUpdateException`, shown as "That name is already in use.", or a `SqlException`, shown as "This item is currently in use elsewhere and can't be deleted." |
+| Business rules (the authority) | Static `*Rules` methods, which the repositories call before they write anything destructive | The real guarantee, whichever code path writes | A `BusinessRuleException`, whose message `RunSafelyAsync` shows exactly as written |
+| The database (a backstop) | Unique indexes, check constraints and `Restrict` foreign keys, in `Infrastructure/Configurations` | Integrity even if a code path forgets a check | A `DbUpdateException` or a `SqlException`, which [Failure](../src/TinapayanRMS.UI/ViewModels/Failure.cs) puts plainly by SQL Server's error number: "That name is already in use.", "This item is currently in use elsewhere and can't be deleted.", and so on |
 
-The database's errors map to just those two generic messages. So a rule that a user can break must be checked first in a `*Rules` method, with a message that says what's wrong. Validators exist only for entities that have a Save form. A set of lines saved together (BOM lines, recipe lines, packaging lines) gets its checks across rows from its Rules class instead.
+The database's messages say what kind of thing went wrong, never which rule. So a rule that a user can break must be checked first in a `*Rules` method, with a message that says what's wrong. Validators exist only for entities that have a Save form. A set of lines saved together (BOM lines, recipe lines, packaging lines) gets its checks across rows from its Rules class instead.
 
 ---
 
@@ -475,11 +476,13 @@ products, packaging, composites, Reports and Print
 A packaging material's saved price ──► its stored cost, which every packaging line and set reads (no propagation needed)
 ```
 
-The repositories call the propagators; the UI never does. The callers are `RawMaterialRepository` (add, update and Save), `RawMaterialBrandPriceRepository`, `RawMaterialUnitRepository` (a corrected multiplier) and `IngredientBomLineRepository`. Each call comes after the write has been saved. Each propagator uses one context of its own: it loads what it needs once, recomputes in memory, and saves once.
+The repositories call the propagators; the UI never does. The callers are `RawMaterialRepository` (add, update and Save), `RawMaterialBrandPriceRepository`, `RawMaterialUnitRepository` (a corrected multiplier) and `IngredientBomLineRepository`. Each call comes after the write has been saved and before its transaction commits. The propagators are static classes that run on the caller's context, so a save and the cascade it causes commit together or not at all. Each loads what it needs once, recomputes in memory, and saves once. A recomputed cost is stored at its column's scale (see [Precision and rounding](#precision-and-rounding)), so one worked out again from unchanged inputs equals what's stored, and isn't written or dated again.
 
 `IngredientCostGraph` is pure and lives in ApplicationCore. It finds the dependents with a reverse breadth-first search, then orders them with a depth-first topological sort. A linked ingredient's link is just one more edge in the same graph. `IngredientCostPropagator`, in Infrastructure, loads every ingredient and BOM line, asks the graph for the order, and recomputes each ingredient from its components' costs, which are already fresh by then. Sub-assemblies don't nest, so they need no ordering.
 
 The cascade doesn't push changes live to other screens. A screen picks up new costs the next time it's shown, through its `LoadCommand`.
+
+**Recalculate Costs**, on Settings' Costing Defaults tab, is the safety net for a change made outside the app, such as by a script. [CostRecalculator](../src/TinapayanRMS.Infrastructure/Services/CostRecalculator.cs) runs the propagators' own code over every made and linked ingredient, in dependency order (`IngredientCostGraph.InDependencyOrder`), and then every sub-assembly, in one transaction, and returns how many were wrong. Purchased materials aren't touched: their cost comes straight from their saved prices.
 
 ### Formulas and where they live
 
@@ -502,13 +505,14 @@ The cascade doesn't push changes live to other screens. A screen picks up new co
 | Markup at the current price | (current price ÷ (1 + VAT %) − base cost) ÷ base cost | `CostingRules.CalculateMarkupPercentFromPrice` |
 | A composite's line | The product's recipe cost per sellable unit × quantity, plus its packaging cost when the composite includes it | `CompositeProductRules.CalculateComponentCost`, `CalculateComponentPackagingCost` |
 
-[SavedProductReader](../src/TinapayanRMS.UI/ViewModels/SavedProductReader.cs) is the one place where a saved product is read and priced. The Products screen, Reports and Print all go through it, so they always agree.
+[SavedProductReader](../src/TinapayanRMS.UI/ViewModels/SavedProductReader.cs) is the one place where a saved product is read and priced. The Products screen, Reports and Print all go through it, so they always agree. It reads any number of products together (`ReadDetailsAsync`, `ReadAllAsync`) in about fifteen queries however many there are, on the repositories' plural reads: packaging link chains are followed in memory, and the products a composite holds are read with it and costed bottom-up.
 
 ### Precision and rounding
 
 - Every cost is a `decimal` at full precision through the whole cascade. Round only for display, and for the final selling price.
 - `TinapayanRMSDbContext.ConfigureConventions` makes every `decimal` column `decimal(18,4)`, so a new column can't fall back to SQL Server's `decimal(18,2)`. The two costs per base unit are `decimal(28,20)`, so a buffered cost typed per bag comes back exactly as typed after it's divided down to the gram.
 - A value that goes through a `decimal(18,4)` column comes back rounded to 4 places: 1/6 becomes 0.1667. A test that reads a value back from the database asserts the rounded value.
+- A stored figure worked out in memory is set at its column's scale, after it's worked out at full precision: a cost per base unit through `RawMaterialRules.StoredCost` (20 places), a sub-assembly's totals through `TinapayanRMSDbContext.Stored` (4), each rounded half away from zero as SQL Server rounds. At full precision, a cost that doesn't come out even (170 ÷ 240) never equals the stored one, so a Save that changed nothing would read it as changed, log a price again and move the cost's date.
 - On screen: 2 decimals for the Products screen's per-piece costing figures and for prices, and 4 for a cost per base unit and for a recipe tab's cost per piece. Grid quantities show 1 decimal and accept up to 4. No amount shows a currency symbol.
 
 ### Buffered and unbuffered costs
@@ -541,6 +545,7 @@ The rules for reads:
 
 - **`Columns` must list exactly EF Core's columns.** A property it leaves out comes back as its default value, with no error. [ColumnsTests](../tests/TinapayanRMS.Infrastructure.Tests/Queries/ColumnsTests.cs) compares every list with EF Core's model, so a new or renamed property fails that test until `Columns` has it. (That's what Infrastructure's `InternalsVisibleTo` is for.)
 - **Table names are the `DbSet` names, written into the SQL.** Renaming a table means updating that SQL by hand; the persistence tests will catch any you miss.
+- **Read many records in one query, never one query each.** A read for several products (or anything else) is a plural method, such as `GetForProductsAsync(ids)`, rather than a loop of single reads: Reports once made nine queries a product.
 - **A list of ids is one parameter:** `WHERE x.Id IN ({DapperReads.IdsTable})` with `new { ids = DapperReads.IdList(ids) }`. It's split by `STRING_SPLIT`, so it never hits SQL Server's limit of 2,100 parameters.
 - **An optional navigation is a `LEFT JOIN`.** Dapper returns null for a split whose `Id` is null.
 - **A collection navigation, such as a material's `Units`, is a second query stitched on by id,** not a join, because Dapper's multi-mapping over several result sets is synchronous only.
@@ -548,14 +553,14 @@ The rules for reads:
 - **Every read has an explicit `ORDER BY`.** Lines are read `ORDER BY SortOrder, Id`.
 - Dapper maps a `date` column to `DateOnly`, and an enum stored as a string back to the enum, on its own.
 
-Never write through Dapper. A Dapper write would skip the cost propagators and the `CostUpdatedAt` stamp, leaving stored costs stale. A duplicate name would also come back as a `SqlException` instead of the `DbUpdateException` that `ViewModelBase` turns into "That name is already in use."
+Never write through Dapper. A Dapper write would skip the cost propagators and the `CostUpdatedAt` stamp, leaving stored costs stale.
 
 ### Writing safely
 
 - **Update by loading, then applying.** An `UpdateAsync` loads the tracked entity, copies across only the fields a user can edit, and saves. Never call `dbContext.Update(incoming)` on an object the caller built: it marks every property as modified, and silently overwrites the stored costs. If an edited field feeds a stored figure (a unit's multiplier feeds the cost), the same method recomputes that figure.
-- **Delete with `ExecuteDeleteAsync`.** It runs at once, outside the change tracker, so a foreign key's refusal arrives as a `SqlException`, not a `DbUpdateException`. `RunSafelyAsync` shows it as "This item is currently in use elsewhere and can't be deleted." A test of it expects `SqlException`.
+- **Delete with `ExecuteDeleteAsync`.** It runs at once, outside the change tracker, so a foreign key's refusal arrives as a `SqlException`, not a `DbUpdateException`. `RunSafelyAsync` shows it as "This item is currently in use elsewhere and can't be deleted." A test of it expects `SqlException`. It also runs inside the context's transaction when there is one, so a set of lines replaced with it commits or rolls back with the rest.
 - **Replace a set of lines whole.** The `SetLinesAsync` methods first check every incoming row, and every record the rows refer to. Only then do they delete the old rows with `ExecuteDeleteAsync`, insert the new ones with `SortOrder` set to each row's position, recompute any totals and save. A rejected set leaves the old lines untouched. The set a method replaces must match exactly what the UI edits as one unit.
-- **One Save, one transaction.** `RawMaterialRepository.SaveAsync` and `ProductRepository.SaveAsync` write everything a screen's form holds in one context and one transaction. Each step is an `internal static` method that takes the context, so steps from several repositories compose. Each step saves as it goes, so the checks of later steps see what earlier ones wrote. A part passed as `null` means "leave it as saved". The caller's entity is copied, never attached, so a rolled-back save never leaves an id on it. The cost cascade runs once, after the commit, because the propagators read through contexts of their own.
+- **One Save, one transaction.** `RawMaterialRepository.SaveAsync` and `ProductRepository.SaveAsync` write everything a screen's form holds in one context and one transaction. Each step is an `internal static` method that takes the context, so steps from several repositories compose. Each step saves as it goes, so the checks of later steps see what earlier ones wrote. A part passed as `null` means "leave it as saved". The caller's entity is copied, never attached, so a rolled-back save never leaves an id on it. The cost cascade runs once, at the end, on the same context and in the same transaction, so it commits with the save or not at all.
 - **Save inputs are immutable records:** `RecipeDraft`, `NewSubAssemblyDraft`, `LinkedUsageDraft`, `PackagingLinkDraft`, `ProductMove`, `RawMaterialMove` and the `RecipeLine` record struct, all in `ApplicationCore/Interfaces`.
 - **`CostUpdatedAt` is stamped centrally**, in `TinapayanRMSDbContext.SaveChangesAsync`, by comparing the costs' original and current values. Don't set it by hand.
 
@@ -575,12 +580,12 @@ await using (var transaction = await dbContext.Database.BeginTransactionAsync(ca
 
     // … the units, brand prices and BOM lines, each through another repository's internal static method …
 
-    await transaction.CommitAsync(cancellationToken);
-}
+    if (costChanged)
+    {
+        await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, id, cancellationToken);   // same context, before the commit
+    }
 
-if (costChanged)
-{
-    await costPropagator.RecomputeAndPropagateAsync(id, cancellationToken);    // its own context, after the commit
+    await transaction.CommitAsync(cancellationToken);
 }
 ```
 
@@ -588,7 +593,8 @@ if (costChanged)
 
 `Infrastructure/Services` holds the work that spans entities:
 
-- **`IngredientCostPropagator` and `SubAssemblyCostPropagator`**: the cascade. They're concrete classes that collaborate with the repositories, and aren't exposed through ApplicationCore interfaces.
+- **`IngredientCostPropagator` and `SubAssemblyCostPropagator`**: the cascade. They're internal static classes that run on a repository's context, inside its transaction, and aren't exposed through ApplicationCore interfaces.
+- **`CostRecalculator`** (`ICostRecalculator`): Settings' Recalculate Costs, the propagators' code run over every made and linked ingredient and every sub-assembly, in one transaction.
 - **`IngredientDependencies`**: loads the ingredient dependency graph, made of BOM edges and link edges, for the cycle checks.
 - **`ProductCloner`** (`IProductCloner`): Clone and Create Variant. Both link the sub-assemblies the source links and copy the source's own ones. A clone copies the packaging; a variant links it.
 - **`JsonViewStateStore`** (`IViewStateStore`): the view-state file. A missing or broken file reads as empty, and a failed write is dropped.
@@ -656,10 +662,13 @@ Each screen puts an `ErrorToast` over its content, and a `SuccessToast` where it
 
 ### ViewModels
 
-**[ViewModelBase](../src/TinapayanRMS.UI/ViewModels/ViewModelBase.cs)** is the base of every screen's ViewModel except Reports, which has nothing that can fail. It provides:
+**[ViewModelBase](../src/TinapayanRMS.UI/ViewModels/ViewModelBase.cs)** is the base of every screen's ViewModel. It provides:
 
 - `ErrorMessage` and `SuccessMessage`, which the toasts show.
-- **`RunSafelyAsync(action)`**, which clears both messages and runs the action. It turns an `InvalidOperationException` into its own message, a `DbUpdateException` into "That name is already in use.", and a `SqlException` into "This item is currently in use elsewhere and can't be deleted.", logging each as a warning. Any other exception is a bug, so it isn't caught.
+- **`RunSafelyAsync(action)`**, which clears both messages and runs the action. Whatever the action throws becomes `ErrorMessage`, in the words [Failure](../src/TinapayanRMS.UI/ViewModels/Failure.cs) gives it: a `BusinessRuleException`'s message as written; what the database refused or couldn't do, put plainly by its error number (a duplicate name, something in use, a database that can't be reached); and anything else, a bug, as "Something went wrong, and the details went to the log: …". A refusal is logged as a warning, anything else as an error with its stack. Nothing reaches ReactiveUI, which would hand it to `App`.
+- **`LoadSafelyAsync(load)`**, which every `LoadCommand` runs its body in. A load that fails shows why in the same words, without clearing the notices (a screen loads after its own Save, and mustn't take that Save's message away), and a later load that works clears it.
+- **`LoadLatest(values, load)`**, for a load driven by a selection: each value's load runs as it comes, a newer value cancels a load still running, and one that fails shows why while the next value loads as usual. Never write `Observable.Switch(...).Subscribe()` for this by hand: an exception that reaches `Switch` ends the subscription, and from then on no pick loads anything.
+- **`ShowFailure(exception, context)`**, for a failure that code catches itself, such as a read nothing awaits.
 - **`RunWithConfirmationAsync(message, action)`**, which asks through the `ConfirmDelete` interaction first.
 - **`ApplyRefresh`/`IsRefreshing`** and **`ApplyRestore`/`IsRestoring`**, which mark a load merging data in and an undo putting a form back. Code that reacts to user edits skips while either is set (`IsBusyApplying`).
 - A logger for the concrete class (`logger.ForContext(GetType())`).
@@ -741,7 +750,7 @@ The rules for ViewModels:
 - **Properties** use `RaiseAndSetIfChanged`.
 - **A derived property** uses `WhenAnyValue(...).Select(...).ToProperty(...)`, but only when every input is itself an observable property. If the real input is a collection the code changes directly, use a plain property and recompute it explicitly at each place the collection changes. Calling `RaisePropertyChanged` on a `ToProperty` property doesn't recompute it.
 - **Commands without a parameter** are `ReactiveCommand<RxVoid, RxVoid>`. Import the type with `using RxVoid = ReactiveUI.Primitives.RxVoid;`. Never write `using ReactiveUI.Primitives;`: its own `Select`, `Where` and `Subscribe` clash with `System.Reactive.Linq`'s (error CS0121). `System.Reactive` is referenced directly for the Rx operators.
-- **Switching to the latest inner observable** is written `Observable.Switch(source)`, never `source.Switch()`. ReactiveUI imports `ReactiveUI.Binding` into every file, and that namespace has a `Switch` of its own that clashes with Rx's (error CS0121). The ViewModels use it to load a selection's details, so a newer pick cancels an older load that is still running.
+- **Switching to the latest inner observable** is written `Observable.Switch(source)`, never `source.Switch()`. ReactiveUI imports `ReactiveUI.Binding` into every file, and that namespace has a `Switch` of its own that clashes with Rx's (error CS0121). `ViewModelBase.LoadLatest` uses it to load a selection's details, so a newer pick cancels an older load that is still running.
 - **Lists** are a DynamicData `SourceCache<T, int>` bound with `Connect().SortAndBind(out collection, comparer).Subscribe()`, or an `ObservableCollection<T>` of editable rows.
 - **Several reads at once** start in parallel with `Task.Run`, are awaited together with `Task.WhenAll`, and are applied in one step on the UI thread. Code inside `Task.Run` calls repositories only and never touches ViewModel state. (`ProductsViewModel`'s `LoadCommand` starts about a dozen reads at once this way.)
 - **Dialogs and prompts** are `Interaction`s that the view handles: `ConfirmDelete` (a Yes/No `MessageBox`, through `RegisterNativeMessageBoxHandler`), and `PromptForName` and `PromptForNewCategory` (`TextPromptWindow.Prompt`). Tests register handlers of their own.
@@ -754,6 +763,7 @@ The rules for ViewModels:
 - **[CollectionMerge](../src/TinapayanRMS.UI/ViewModels/CollectionMerge.cs)** (`MergeFrom`) keeps the existing object for every row whose values haven't changed, because that object is what a grid's selection and scroll position and a picker's `SelectedItem` are tied to. `HasSameValues` compares scalar properties, plus those of referenced entities one level deep. A collection that a row owns (a material's `Units`) counts as part of the row.
 - **Subscriptions driven by a selection skip while `IsRefreshing` is set.** Pointing a selection at its refreshed copy must not reload the form or throw away unsaved edits.
 - Save and Delete call the same `LoadCommand` afterwards, so the record you saved stays selected.
+- **A load that fails says so, and the screen keeps working.** `LoadSafelyAsync` and `LoadLatest` show the failure in the screen's error notice, and the next tab show or pick tries again. A selection's load that fails clears what it would have replaced rather than leave another record's details under the new pick.
 
 ### Editing, undo and Save
 
@@ -871,7 +881,9 @@ The Products screen prints a product, its scaled recipe, or a whole folder of pr
 ### Logging and errors
 
 - Serilog's static `Log.Logger` is built in `App`'s static constructor, so even a licence failure is logged. It writes one rolling file a day under `logs/`, keeping 31. It's registered in DI as a `Serilog.ILogger`.
-- `RunSafelyAsync` logs every rejection as a warning. `App` logs unhandled exceptions from the UI thread (`DispatcherUnhandledException`) and from elsewhere (`AppDomain.UnhandledException`).
+- `RunSafelyAsync`, `LoadSafelyAsync` and `LoadLatest` log a refusal as a warning, and any other failure as an error with its stack.
+- `App` handles an exception that nothing else caught on the UI thread (`DispatcherUnhandledException`): it logs it, shows a message saying the app is still running, and carries on. If more than three arrive within ten seconds, [UnhandledErrorGuard](../src/TinapayanRMS.UI/UnhandledErrorGuard.cs) lets the app close, since they'd come faster than anyone could act on them. A failure ReactiveUI was left holding arrives wrapped in its `UnhandledErrorException`, and `App` shows the cause inside. It logs exceptions from other threads (`AppDomain.UnhandledException`) and unobserved task exceptions.
+- Once the main window shows, `App` checks off the UI thread for migrations the database doesn't have yet, and says so in a message.
 - In Debug builds, [BindingErrorLog](../src/TinapayanRMS.UI/BindingErrorLog.cs) writes WPF's binding errors to the log as `WPF binding …` warnings, even without a debugger attached. Some are expected at every startup and harmless: one `Cannot find governing FrameworkElement` for each `GridMultiColumnDropDownList.ItemsSource` or `GridCheckBoxColumn.AllowEditing` binding while its grid is built, and a `FindAncestor` warning from Syncfusion's `TabItemExt` template.
 
 ---
@@ -896,7 +908,7 @@ The Products screen prints a product, its scaled recipe, or a whole folder of pr
 
 - **[DatabaseFixtureBase](../tests/TinapayanRMS.Tests.Common/Fixtures/DatabaseFixtureBase.cs)** (in Tests.Common) reads the app's connection string, swaps in the project's database name, migrates the database, and resets it with Respawn.
 - **`DatabaseFixture`** and **`DatabaseCollection`** are defined in each project's own `Fixtures/` folder, because xUnit only finds a collection definition in the tests' own assembly. Each `DatabaseFixture` is one line that names its database.
-- **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()`, `CreateCostPropagator()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`.
+- **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`.
 - **Every concrete test class must carry `[Collection(DatabaseCollection.Name)]`.** It's deliberately left off the base class: xUnit isn't guaranteed to honour it there, and without it tests could run in parallel against the one database.
 
 ### Writing tests
@@ -992,6 +1004,8 @@ A test that creates WPF objects runs on an STA thread:
 - `StaThread.Run(() => …)` for plain WPF objects.
 - `StaThread.RunLicensed(() => …)` when it builds Syncfusion controls. It's skipped if `SYNCFUSION_LICENSE_KEY` isn't set, because an unlicensed control shows a dialog.
 - `StaThread.RunThemed(() => …)` when it themes a window. All such tests share one STA thread, with the app's theme settings, because SfSkinManager ties a theme's resources to the thread that loaded them.
+- `FailingDbContextFactory` (in UI.Tests' `Fixtures/`) wraps a factory and refuses every context while its `Fail` is set: for a test that a screen survives a database that stops answering, and recovers once it answers. A test that a write is all or nothing fails it part-way with an EF Core save interceptor instead (`CostCascadeTransactionPersistenceTests`).
+- `SqlCommandCounter` (also in UI.Tests' `Fixtures/`) counts the SQL commands sent from where it's started: for a test that a read's round trips don't grow with what it reads.
 - `OffscreenGrid.Run(create, test)` shows a real grid off-screen. Its test classes carry `[Collection(OffscreenGridCollection.Name)]`, so that only one off-screen window is up at a time.
 
 ### Naming
@@ -1011,7 +1025,7 @@ Coverage comes from Microsoft's MTP coverage extension (see the [command referen
 - **Use modern C# 14 and .NET 10 idioms**: primary constructors (every repository has one), collection expressions, `record` and `record struct` for immutable shapes (drafts, snapshots, printouts), `required` members, file-scoped namespaces and pattern matching.
 - **Nullable reference types are on everywhere.** Treat their warnings as real.
 - **Everything that touches the database is `async`** and takes a `CancellationToken`. ViewModels pass `CancellationToken.None`.
-- **A Rules method throws `InvalidOperationException` with a message written for the shop's staff**, because `RunSafelyAsync` shows it exactly as written.
+- **A rule throws `BusinessRuleException` with a message written for the shop's staff**, because `RunSafelyAsync` shows it exactly as written. That goes for a repository's checks and a screen's own form checks too. A plain `InvalidOperationException` reads as a bug: EF Core and SqlClient throw those for failures.
 - **Strings**: compare names with `StringComparison.OrdinalIgnoreCase`; sort for display with `StringComparer.CurrentCultureIgnoreCase`; format display dates with `CultureInfo.CurrentCulture`, and log output with `CultureInfo.InvariantCulture`.
 - **Correctness and performance come before brevity.** Query only the rows and columns you need, rather than loading more and filtering in memory. Avoid needless intermediate collections in hot paths such as the cascade.
 - **Comments explain why.** Types and non-obvious members have XML doc comments that give their domain meaning. Inline comments record a decision and its reason, often with its date. Match the comment density of the code around yours.
@@ -1054,7 +1068,7 @@ Respawn picks up the new table by itself.
 
 ### Add a business rule
 
-1. Add a static method to the right `*Rules` class in ApplicationCore. Keep it pure, and make it throw `InvalidOperationException` with a message a user can act on.
+1. Add a static method to the right `*Rules` class in ApplicationCore. Keep it pure, and make it throw `BusinessRuleException` with a message a user can act on.
 2. Call it from the repository's write path, before anything is deleted or written.
 3. If a form can break the rule, mirror it in the entity's validator for an immediate message.
 4. If the database can enforce it, add a check constraint or unique index as a backstop, which needs a migration.
@@ -1103,7 +1117,10 @@ Respawn picks up the new table by itself.
 | Symptom | Cause | Fix |
 |---|---|---|
 | The app closes at startup, and the log says `SYNCFUSION_LICENSE_KEY` isn't set | The variable isn't visible to the process | Set the user environment variable, then restart your terminal or IDE |
-| "A network-related or instance-specific error" | SQL Server Express isn't running, or the instance name differs | Start the `MSSQL$SQLEXPRESS` service, and check `appsettings.json` |
+| A screen says "Couldn't reach the database.", and the log has "A network-related or instance-specific error" | SQL Server Express isn't running, or the instance name differs | Start the `MSSQL$SQLEXPRESS` service, and check `appsettings.json` |
+| A message at startup says the database is out of date | A migration hasn't been applied to it | `dotnet ef database update --project src/TinapayanRMS.Infrastructure` |
+| A message says something went wrong and the app is still running | An exception nothing else caught | Read the log for its stack |
+| Queries that take about 1 ms take 10–50 ms, and vary from run to run | SQL Server is short of memory: Windows trims its plan cache and data, so every query compiles again | Free memory, or give the instance a `min server memory`. Compare timings in one process, alternating before and after |
 | `dotnet ef` can't connect | The design-time factory's connection string is hard-coded | Use `.\SQLEXPRESS`, or edit `TinapayanRMSDbContextFactory` |
 | The build fails with `CS0103: The name 'InitializeComponent' does not exist`, or `CS2001` for `*.g.cs` files, all against a `*_wpftmp.csproj` | The WPF markup pass has gone stale | Run `dotnet clean src/TinapayanRMS.UI`, build the UI project on its own, then build the solution |
 | The build can't copy `TinapayanRMS.UI.exe` or a DLL | The app is running | Close it |

@@ -10,6 +10,14 @@ namespace TinapayanRMS.Infrastructure.Repositories;
 public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductSubAssemblyUsageRepository
 {
     public Task<IReadOnlyList<ProductSubAssemblyUsage>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
+        GetUsagesAsync("u.ProductId = @productId", new { productId }, cancellationToken);
+
+    public async Task<IReadOnlyList<ProductSubAssemblyUsage>> GetForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
+        productIds.Count == 0
+            ? []
+            : await GetUsagesAsync($"u.ProductId IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(productIds) }, cancellationToken);
+
+    private Task<IReadOnlyList<ProductSubAssemblyUsage>> GetUsagesAsync(string filter, object parameters, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<ProductSubAssemblyUsage>>(
             async dbContext => (await dbContext.Connection().QueryAsync<ProductSubAssemblyUsage, SubAssembly, SubAssemblyRole, ProductSubAssemblyUsage>(
                 dbContext.Command(
@@ -18,10 +26,10 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                     FROM ProductSubAssemblyUsages u
                     JOIN SubAssemblies s ON s.Id = u.SubAssemblyId
                     {SubAssemblyReads.RoleJoin}
-                    WHERE u.ProductId = @productId
-                    ORDER BY u.Id
+                    WHERE {filter}
+                    ORDER BY u.ProductId, u.Id
                     """,
-                    new { productId },
+                    parameters,
                     cancellationToken),
                 (usage, subAssembly, role) =>
                 {
@@ -33,6 +41,14 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
 
     // The Ingredient comes with it: every add-in is priced from its BufferedCostPerBaseUnit on read.
     public Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductAsync(int productId, CancellationToken cancellationToken) =>
+        GetAddInsAsync("u.ProductId = @productId", new { productId }, cancellationToken);
+
+    public async Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
+        productIds.Count == 0
+            ? []
+            : await GetAddInsAsync($"u.ProductId IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(productIds) }, cancellationToken);
+
+    private Task<IReadOnlyList<UsageAddInLine>> GetAddInsAsync(string filter, object parameters, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<UsageAddInLine>>(
             async dbContext => (await dbContext.Connection().QueryAsync<UsageAddInLine, RawMaterial, UsageAddInLine>(
                 dbContext.Command(
@@ -41,10 +57,10 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                     FROM UsageAddInLines l
                     JOIN ProductSubAssemblyUsages u ON u.Id = l.UsageId
                     JOIN RawMaterials i ON i.Id = l.IngredientId
-                    WHERE u.ProductId = @productId
-                    ORDER BY l.SortOrder, l.Id
+                    WHERE {filter}
+                    ORDER BY u.ProductId, l.SortOrder, l.Id
                     """,
-                    new { productId },
+                    parameters,
                     cancellationToken),
                 (line, ingredient) =>
                 {
@@ -95,13 +111,13 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             .Where(p => p.Id == productId)
             .Select(p => p.Name)
             .FirstOrDefaultAsync(cancellationToken)
-            ?? throw new InvalidOperationException($"Product {productId} does not exist.");
+            ?? throw new BusinessRuleException($"Product {productId} does not exist.");
 
         var roleIds = recipe.New.Select(n => n.RoleId).Distinct().ToList();
         var roles = await dbContext.SubAssemblyRoles.AsNoTracking().Where(r => roleIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, cancellationToken);
         if (roleIds.Count != roles.Count)
         {
-            throw new InvalidOperationException("Every sub-assembly needs a role, and that role must still exist.");
+            throw new BusinessRuleException("Every sub-assembly needs a role, and that role must still exist.");
         }
 
         foreach (var role in roles.Values)
@@ -116,7 +132,7 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             .ToDictionaryAsync(s => s.Id, cancellationToken);
         foreach (var section in recipe.New.Where(n => n.Id > 0 && !existingOwned.ContainsKey(n.Id)))
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"Sub-assembly {section.Id} isn't one of this product's own any more. Revert the product to see its recipe as it's saved now.");
         }
 
@@ -132,7 +148,7 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
         {
             if (!linkedSubAssemblies.TryGetValue(id, out var linked))
             {
-                throw new InvalidOperationException($"Sub-assembly {id} does not exist.");
+                throw new BusinessRuleException($"Sub-assembly {id} does not exist.");
             }
 
             // A packaging set is linked by the product's packaging, never as a recipe section; a product's own is copied.

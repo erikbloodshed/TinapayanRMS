@@ -263,7 +263,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
-            new RawMaterialRepository(factory, CreateCostPropagator()),
+            new RawMaterialRepository(factory),
             new SubAssemblyValidator(),
             new LoggerConfiguration().CreateLogger());
     }

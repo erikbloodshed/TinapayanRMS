@@ -11,7 +11,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
+    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
 
     private async Task<int> SeedCategoryAsync()
     {
@@ -137,7 +137,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         var repository = CreateRepository();
         await repository.AddAsync(new RawMaterial { Type = RawMaterialType.Packaging, Name = "Satin Ribbon", CategoryId = categoryId, BaseUnitId = centimeterId }, Cancellation);
         var packagingMaterial = (await repository.GetAllAsync(Cancellation)).Single();
-        await new RawMaterialUnitRepository(CreateDbContextFactory(), CreateCostPropagator()).AddAsync(
+        await new RawMaterialUnitRepository(CreateDbContextFactory()).AddAsync(
             new RawMaterialUnit { RawMaterialId = packagingMaterial.Id, UnitOfMeasureId = rollId, BaseUnitsPerUnit = 1000m }, Cancellation);
 
         packagingMaterial.BaseUnitId = inchId;
@@ -191,7 +191,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
 
         await repository.AddAsync(new RawMaterial { Type = RawMaterialType.Packaging, Name = "Twine", CategoryId = categoryId, BaseUnitId = meterId }, Cancellation);
         var packagingMaterial = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
-        var unitRepository = new RawMaterialUnitRepository(CreateDbContextFactory(), CreateCostPropagator());
+        var unitRepository = new RawMaterialUnitRepository(CreateDbContextFactory());
         await unitRepository.AddAsync(new RawMaterialUnit { RawMaterialId = packagingMaterial.Id, UnitOfMeasureId = spoolId, BaseUnitsPerUnit = 50m }, Cancellation);
         var spool = (await unitRepository.GetForRawMaterialAsync(packagingMaterial.Id, Cancellation)).Single();
         await SetPriceAsync(packagingMaterial.Id, spool.Id, 100m);

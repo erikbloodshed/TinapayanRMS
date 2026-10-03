@@ -76,7 +76,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         var flour = await SeedCategoryAsync("Flour");
         var boxesId = await AddPackagingCategoryAsync("Boxes");
         var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
-        var materials = new RawMaterialRepository(CreateDbContextFactory(), CreateCostPropagator());
+        var materials = new RawMaterialRepository(CreateDbContextFactory());
 
         var boxAsFlour = () => materials.AddAsync(
             new RawMaterial { Name = "Cake Box", Type = RawMaterialType.Packaging, CategoryId = flour.Id, BaseUnitId = pieceId }, Cancellation);

@@ -8,9 +8,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class RawMaterialRepository(
-    IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,
-    IngredientCostPropagator costPropagator) : IRawMaterialRepository
+public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialRepository
 {
     public Task<IReadOnlyList<RawMaterial>> GetAllAsync(CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(
@@ -91,20 +89,28 @@ public class RawMaterialRepository(
 
     public async Task AddAsync(RawMaterial material, CancellationToken cancellationToken)
     {
+        // The material and its cascade commit together.
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         if (await AddAsync(dbContext, material, cancellationToken))
         {
-            await costPropagator.RecomputeAndPropagateAsync(material.Id, cancellationToken);
+            await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, material.Id, cancellationToken);
         }
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task UpdateAsync(RawMaterial material, CancellationToken cancellationToken)
     {
+        // The material and its cascade commit together.
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         if (await UpdateAsync(dbContext, material, cancellationToken))
         {
-            await costPropagator.RecomputeAndPropagateAsync(material.Id, cancellationToken);
+            await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, material.Id, cancellationToken);
         }
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task MoveAsync(IReadOnlyCollection<RawMaterialMove> moves, CancellationToken cancellationToken)
@@ -119,7 +125,7 @@ public class RawMaterialRepository(
         var materials = await dbContext.RawMaterials.Where(m => materialIds.Contains(m.Id)).ToDictionaryAsync(m => m.Id, cancellationToken);
         if (materialIds.Where(id => !materials.ContainsKey(id)).ToList() is [var missingId, ..])
         {
-            throw new InvalidOperationException($"Raw material {missingId} does not exist.");
+            throw new BusinessRuleException($"Raw material {missingId} does not exist.");
         }
 
         // Checked rather than left to the foreign key, whose refusal would read as a duplicate name: a move undone after
@@ -130,7 +136,7 @@ public class RawMaterialRepository(
             .ToDictionaryAsync(c => c.Id, cancellationToken);
         if (categories.Count < categoryIds.Count)
         {
-            throw new InvalidOperationException("The category to move it to no longer exists.");
+            throw new BusinessRuleException("The category to move it to no longer exists.");
         }
 
         var now = DateTime.Now;
@@ -150,7 +156,7 @@ public class RawMaterialRepository(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var existing = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == id, cancellationToken)
-            ?? throw new InvalidOperationException($"Raw material {id} does not exist.");
+            ?? throw new BusinessRuleException($"Raw material {id} does not exist.");
 
         existing.Name = name;
         existing.UpdatedAt = DateTime.Now;
@@ -166,9 +172,9 @@ public class RawMaterialRepository(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        // One transaction for every part, so a part that's rejected leaves nothing half-saved. Each
-        // step saves as it goes, so the checks of the steps after it see what it wrote. The cost
-        // cascade runs once, after the commit, since it reads through its own connections.
+        // One transaction for every part and the cost cascade they cause, so a part that's rejected,
+        // or a cascade that fails, leaves nothing half-saved. Each step saves as it goes, so the checks
+        // of the steps after it see what it wrote. The cascade runs once, after the last step.
         int id;
         var costChanged = false;
         await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
@@ -246,12 +252,12 @@ public class RawMaterialRepository(
                 costChanged = true;
             }
 
-            await transaction.CommitAsync(cancellationToken);
-        }
+            if (costChanged)
+            {
+                await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, id, cancellationToken);
+            }
 
-        if (costChanged)
-        {
-            await costPropagator.RecomputeAndPropagateAsync(id, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
 
         return id;
@@ -282,10 +288,9 @@ public class RawMaterialRepository(
         var inheritedBuffer = await EnsureValidLinkAsync(dbContext, material, cancellationToken);
         material.CostBufferPercent = RawMaterialRules.StoredCostBufferPercent(material.Source, inheritedBuffer, material.CostBufferPercent);
 
-        if (material.Source != RawMaterialSource.Purchased)
-        {
-            material.BufferedCostPerBaseUnit = 0m;
-        }
+        material.BufferedCostPerBaseUnit = material.Source == RawMaterialSource.Purchased
+            ? RawMaterialRules.StoredCost(material.BufferedCostPerBaseUnit)
+            : 0m;
 
         material.UpdatedAt = DateTime.Now;
         dbContext.RawMaterials.Add(material);
@@ -320,7 +325,7 @@ public class RawMaterialRepository(
         RawMaterialRules.EnsureValidBufferedCost(material.BufferedCostPerBaseUnit);
 
         var existing = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == material.Id, cancellationToken)
-            ?? throw new InvalidOperationException($"Raw material {material.Id} does not exist.");
+            ?? throw new BusinessRuleException($"Raw material {material.Id} does not exist.");
 
         RawMaterialRules.EnsureTypeUnchanged(existing.Type, material.Type);
         RawMaterialRules.EnsureSourceUnchanged(existing.Source, material.Source);
@@ -358,11 +363,12 @@ public class RawMaterialRepository(
         var bufferChanged = existing.CostBufferPercent != costBufferPercent;
         existing.CostBufferPercent = costBufferPercent;
         // None sent (0) is worked out afresh from the cost and the percent, as for a first price.
+        // Stored to the column's places, so a buffered cost sent again unchanged compares equal and doesn't cascade.
         if (existing.Source == RawMaterialSource.Purchased)
         {
-            var bufferedCost = material.BufferedCostPerBaseUnit > 0
+            var bufferedCost = RawMaterialRules.StoredCost(material.BufferedCostPerBaseUnit > 0
                 ? material.BufferedCostPerBaseUnit
-                : RawMaterialRules.BufferedCost(existing.CostPerBaseUnit, existing.CostBufferPercent);
+                : RawMaterialRules.BufferedCost(existing.CostPerBaseUnit, existing.CostBufferPercent));
             bufferChanged = existing.BufferedCostPerBaseUnit != bufferedCost;
             existing.BufferedCostPerBaseUnit = bufferedCost;
         }
@@ -394,7 +400,7 @@ public class RawMaterialRepository(
             .Where(m => m.Id == linkedToId)
             .Select(m => new { m.Name, m.Type, m.CostBufferPercent })
             .FirstOrDefaultAsync(cancellationToken)
-            ?? throw new InvalidOperationException($"Ingredient {linkedToId} does not exist.");
+            ?? throw new BusinessRuleException($"Ingredient {linkedToId} does not exist.");
 
         RawMaterialRules.EnsureValidLinkTarget(material.Id, linkedToId, linkedTo.Type, linkedTo.Name);
 
@@ -481,6 +487,6 @@ public class RawMaterialRepository(
             .Where(u => u.RawMaterialId == rawMaterialId && u.UnitOfMeasureId == unitOfMeasureId)
             .Select(u => (int?)u.Id)
             .SingleOrDefaultAsync(cancellationToken)
-            ?? throw new InvalidOperationException("A price's unit must be one of that material's own units.");
+            ?? throw new BusinessRuleException("A price's unit must be one of that material's own units.");
     }
 }

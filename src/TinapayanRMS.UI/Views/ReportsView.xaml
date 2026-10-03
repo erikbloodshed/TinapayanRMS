@@ -164,5 +164,8 @@
                 </syncfusion:TabItemExt>
             </syncfusion:TabControlExt>
         </Border>
+
+        <!-- ErrorMessage as a toast, over the card: a report that couldn't be read says why -->
+        <controls:ErrorToast />
     </Grid>
 </UserControl>

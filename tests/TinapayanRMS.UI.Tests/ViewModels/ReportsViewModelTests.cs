@@ -1,5 +1,6 @@
 using System.Reactive.Linq;
 using AwesomeAssertions;
+using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
@@ -27,15 +28,16 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
 
         return new ReportsViewModel(
             new RawMaterialPriceHistoryRepository(factory),
-            new RawMaterialRepository(factory, CreateCostPropagator()),
+            new RawMaterialRepository(factory),
             new ProductRepository(factory),
             new SavedProductReader(
-                new PackagingLinkRepository(factory, packagingLineRepository),
+                new PackagingLinkRepository(factory),
                 new ProductSubAssemblyUsageRepository(factory),
                 packagingLineRepository,
                 new CostingParametersRepository(factory),
                 new SubAssemblyLineRepository(factory),
-                new ProductRepository(factory)));
+                new ProductRepository(factory)),
+            new LoggerConfiguration().CreateLogger());
     }
 
     [Fact]

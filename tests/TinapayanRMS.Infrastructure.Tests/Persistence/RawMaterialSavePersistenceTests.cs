@@ -17,9 +17,9 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
 {
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
 
-    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
+    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
 
-    private IngredientBomLineRepository CreateBomRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
+    private IngredientBomLineRepository CreateBomRepository() => new(CreateDbContextFactory());
 
     private async Task<int> SeedCategoryAsync()
     {

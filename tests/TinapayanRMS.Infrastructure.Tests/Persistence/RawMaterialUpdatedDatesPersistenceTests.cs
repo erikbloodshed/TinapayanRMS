@@ -18,7 +18,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
+    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
 
     private async Task<int> SeedCategoryAsync()
     {

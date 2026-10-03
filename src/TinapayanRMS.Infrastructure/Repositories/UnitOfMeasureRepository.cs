@@ -26,7 +26,7 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var existing = await dbContext.UnitsOfMeasure.FirstOrDefaultAsync(u => u.Id == unitOfMeasure.Id, cancellationToken)
-            ?? throw new InvalidOperationException($"Unit of measure {unitOfMeasure.Id} does not exist.");
+            ?? throw new BusinessRuleException($"Unit of measure {unitOfMeasure.Id} does not exist.");
 
         existing.Name = UnitOfMeasureRules.NormalizeName(unitOfMeasure.Name);
         existing.Abbreviation = unitOfMeasure.Abbreviation;

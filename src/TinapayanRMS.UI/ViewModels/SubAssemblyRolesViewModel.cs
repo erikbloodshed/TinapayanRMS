@@ -106,7 +106,7 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
 
         // Runs each time Settings opens and after this tab's own saves. It merges rather than
         // replaces, so the selection and any unsaved edits survive.
-        LoadCommand = ReactiveCommand.CreateFromTask(async () =>
+        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
             var roles = await _roleRepository.GetAllAsync(CancellationToken.None);
             var selectedId = SelectedRole?.Id;
@@ -116,7 +116,7 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
                 _roleCache.MergeFrom(roles);
                 SelectedRole = Roles.FirstOrDefault(r => r.Id == selectedId);
             });
-        });
+        }));
 
         NewCommand = ReactiveCommand.Create(ClearForm);
 

@@ -7,17 +7,17 @@ public static class IngredientBomRules
     {
         if (lines.Count == 0)
         {
-            throw new InvalidOperationException("A made ingredient needs at least one BOM line.");
+            throw new BusinessRuleException("A made ingredient needs at least one BOM line.");
         }
 
         if (lines.Any(l => l.Grams <= 0))
         {
-            throw new InvalidOperationException("A BOM line's grams must be positive.");
+            throw new BusinessRuleException("A BOM line's grams must be positive.");
         }
 
         if (lines.Select(l => l.ComponentIngredientId).Distinct().Count() != lines.Count)
         {
-            throw new InvalidOperationException("A made ingredient can't use the same component ingredient more than once — combine it into a single line instead.");
+            throw new BusinessRuleException("A made ingredient can't use the same component ingredient more than once — combine it into a single line instead.");
         }
     }
 
@@ -37,12 +37,12 @@ public static class IngredientBomRules
         {
             if (componentId == ingredientId)
             {
-                throw new InvalidOperationException("An ingredient can't be a component of itself.");
+                throw new BusinessRuleException("An ingredient can't be a component of itself.");
             }
 
             if (IsReachable(componentId, ingredientId, componentIdsByIngredientId))
             {
-                throw new InvalidOperationException(
+                throw new BusinessRuleException(
                     $"That would create a cycle: ingredient {componentId} already uses ingredient {ingredientId} somewhere in its BOM or links.");
             }
         }

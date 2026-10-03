@@ -51,14 +51,15 @@ public partial class SettingsWindow : AppWindow, IVimHost
             ReleaseControls();
         };
 
-        // Every list is small, so each opening loads them all fresh rather than per tab.
+        // Every list is small, so each opening loads them all fresh rather than per tab. Each load shows its own failure
+        // in its tab's error notice, as the main window's tabs do (MainWindow.LoadSelectedTab).
         Loaded += (_, _) =>
         {
-            unitsOfMeasureViewModel.LoadCommand.Execute().Subscribe();
-            categoriesViewModel.LoadCommand.Execute().Subscribe();
-            productCategoriesViewModel.LoadCommand.Execute().Subscribe();
-            rolesViewModel.LoadCommand.Execute().Subscribe();
-            costingDefaultsViewModel.LoadCommand.Execute().Subscribe();
+            unitsOfMeasureViewModel.LoadCommand.Execute().Subscribe(_ => { }, _ => { });
+            categoriesViewModel.LoadCommand.Execute().Subscribe(_ => { }, _ => { });
+            productCategoriesViewModel.LoadCommand.Execute().Subscribe(_ => { }, _ => { });
+            rolesViewModel.LoadCommand.Execute().Subscribe(_ => { }, _ => { });
+            costingDefaultsViewModel.LoadCommand.Execute().Subscribe(_ => { }, _ => { });
         };
     }
 

@@ -129,6 +129,9 @@ public interface IProductRepository
     /// </summary>
     Task<IReadOnlyList<ProductComponent>> GetComponentsAsync(int productId, CancellationToken cancellationToken);
 
+    /// <summary>GetComponentsAsync for several composites at once, in one query: each one's lines in its Products table's order.</summary>
+    Task<IReadOnlyList<ProductComponent>> GetComponentsForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
+
     /// <summary>Every composite's lines, without their products: which product goes into which, for the loop check.</summary>
     Task<IReadOnlyList<ProductComponent>> GetAllComponentsAsync(CancellationToken cancellationToken);
 

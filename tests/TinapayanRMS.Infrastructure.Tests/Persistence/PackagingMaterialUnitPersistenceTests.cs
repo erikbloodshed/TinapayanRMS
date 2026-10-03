@@ -11,7 +11,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private RawMaterialUnitRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
+    private RawMaterialUnitRepository CreateRepository() => new(CreateDbContextFactory());
 
     /// <summary>A satin ribbon with a centimeter base unit; returns its id and the centimeter's.</summary>
     private async Task<(int PackagingMaterialId, int CentimeterId)> SeedRibbonAsync()

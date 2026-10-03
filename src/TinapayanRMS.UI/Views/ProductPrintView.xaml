@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
              mc:Ignorable="d"
              Background="{StaticResource PageBackgroundBrush}">
     <Grid>
@@ -14,6 +15,9 @@
 
         <!-- Syncfusion's print pane (PrintPreview), put here in code: it takes its PrintManager in its constructor -->
         <ContentControl x:Name="PreviewHost" Focusable="False" />
+
+        <!-- ErrorMessage as a toast, over the pane and clear of the bar under it: a set that couldn't be read says why -->
+        <controls:ErrorToast />
 
         <!--
             What to print, and which parts. The bar's DataContext is the PrintTabViewModel; the tick boxes' is the

@@ -19,7 +19,7 @@ public static class UnitConversionRules
     {
         if (baseUnitsPerUnit <= 0)
         {
-            throw new InvalidOperationException("A unit's multiplier must be positive.");
+            throw new BusinessRuleException("A unit's multiplier must be positive.");
         }
     }
 }

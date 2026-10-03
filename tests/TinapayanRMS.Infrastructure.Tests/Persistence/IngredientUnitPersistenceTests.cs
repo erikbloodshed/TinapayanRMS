@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private RawMaterialUnitRepository CreateRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
+    private RawMaterialUnitRepository CreateRepository() => new(CreateDbContextFactory());
 
     private async Task<int> SeedIngredientAsync(string name, RawMaterialSource source = RawMaterialSource.Purchased)
     {
@@ -145,7 +145,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         var sack = (await repository.GetForRawMaterialAsync(sugarId, Cancellation)).Single();
 
         await SetPriceAsync(sugarId, sack.Id, 90m);
-        await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation);
+        await new IngredientBomLineRepository(CreateDbContextFactory()).SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation);
         var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Custard Bun", await AddRoleAsync("Filling"), [(sugarId, 500m)]);
 
         (await GetCostPerGramAsync(sugarId)).Should().Be(0.09m);
@@ -175,7 +175,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         var piece = (await repository.GetForRawMaterialAsync(eggId, Cancellation)).Single();
         await SetPriceAsync(eggId, null, 0.2m); // per gram
 
-        await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(custardId, [(eggId, 100m)], Cancellation);
+        await new IngredientBomLineRepository(CreateDbContextFactory()).SetLinesAsync(custardId, [(eggId, 100m)], Cancellation);
         var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Egg Bun", await AddRoleAsync("Topping"), [(eggId, 150m)]);
 
         // The eggs are bigger than recorded: 60 g each.
@@ -201,7 +201,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         var repository = CreateRepository();
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = eggId, UnitOfMeasureId = pieceUnitOfMeasureId, BaseUnitsPerUnit = 50m }, Cancellation);
         var piece = (await repository.GetForRawMaterialAsync(eggId, Cancellation)).Single();
-        await new IngredientBomLineRepository(CreateDbContextFactory(), CreateCostPropagator()).SetLinesAsync(custardId, [(eggId, 100m)], Cancellation);
+        await new IngredientBomLineRepository(CreateDbContextFactory()).SetLinesAsync(custardId, [(eggId, 100m)], Cancellation);
 
         await repository.DeleteAsync(piece.Id, Cancellation);
 

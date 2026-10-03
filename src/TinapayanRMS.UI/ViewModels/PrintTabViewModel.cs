@@ -77,7 +77,7 @@ public sealed class PrintTabViewModel : ViewModelBase
         _productRepository = productRepository;
         _savedProducts = savedProducts;
 
-        LoadCommand = ReactiveCommand.CreateFromTask(PrepareAsync);
+        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(PrepareAsync));
 
         this.WhenAnyValue(x => x.SelectedScope)
             .Skip(1)
@@ -111,7 +111,7 @@ public sealed class PrintTabViewModel : ViewModelBase
     }
 
     private string? _progress;
-    /// <summary>While a set is read: "Preparing 12 of 30…".</summary>
+    /// <summary>While a set is read: "Preparing 30 products…".</summary>
     public string? Progress
     {
         get => _progress;
@@ -212,16 +212,13 @@ public sealed class PrintTabViewModel : ViewModelBase
         var products = ProductTree.InListOrder((await _productRepository.GetAllAsync(cancellationToken)).Where(scope.Holds));
         var printedAt = DateTime.Now;
 
-        // At the costs the Products screen shows: buffered, unless it's been switched to unbuffered.
-        var costBasis = _products.CostBasis;
-        List<ProductPrintout> printouts = [];
-        for (var i = 0; i < products.Count; i++)
-        {
-            Progress = $"Preparing {i + 1} of {products.Count}…";
-            printouts.Add((await _savedProducts.ReadAsync(products[i], costBasis, cancellationToken)).ToPrintout(printedAt));
-        }
-
+        // At the costs the Products screen shows: buffered, unless it's been switched to unbuffered. Read together, in the
+        // same dozen or so queries however many products the set holds (2026-10-03; they were read one at a time, with
+        // "Preparing 12 of 30…" while they were).
+        Progress = products.Count == 1 ? "Preparing 1 product…" : $"Preparing {products.Count} products…";
+        var saved = await _savedProducts.ReadAllAsync(products, _products.CostBasis, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
+        List<ProductPrintout> printouts = [.. saved.Select(s => s.ToPrintout(printedAt))];
 
         // The Products screen's product prints as it's saved; its edits there don't reach a set.
         Note = _products.History.IsDirty && _products.SelectedProduct is { } open && products.Any(p => p.Id == open.Id)

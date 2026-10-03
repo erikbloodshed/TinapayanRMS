@@ -97,11 +97,21 @@ public class TinapayanRMSDbContext : DbContext
         }
     }
 
+    /// <summary>The decimal places every decimal column has, unless its configuration says otherwise (ConfigureConventions).</summary>
+    public const int DecimalScale = 4;
+
+    /// <summary>
+    /// <paramref name="value"/> as a <see cref="DecimalScale"/>-place column stores it, rounded half away from zero as SQL
+    /// Server rounds. For a figure worked out in memory and compared with the stored one, such as a sub-assembly's totals:
+    /// at full precision they never compare equal, and every save would write them again.
+    /// </summary>
+    public static decimal Stored(decimal value) => decimal.Round(value, DecimalScale, MidpointRounding.AwayFromZero);
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         // Every decimal column defaults to this precision unless a configuration overrides it,
         // so a future column can't silently fall back to SQL Server's decimal(18,2) default and
         // truncate a fractional cost (e.g. a ribbon's ₱0.045/cm).
-        configurationBuilder.Properties<decimal>().HavePrecision(18, 4);
+        configurationBuilder.Properties<decimal>().HavePrecision(18, DecimalScale);
     }
 }

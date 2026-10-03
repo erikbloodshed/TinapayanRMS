@@ -22,7 +22,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
 
     private PackagingLineRepository CreatePackagingLineRepository() => new(CreateDbContextFactory());
 
-    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory(), CreatePackagingLineRepository());
+    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory());
 
     private Task<int> CreateVariantAsync(int sourceProductId, string name) =>
         new ProductCloner(CreateDbContextFactory()).CreateVariantAsync(sourceProductId, name, Cancellation);

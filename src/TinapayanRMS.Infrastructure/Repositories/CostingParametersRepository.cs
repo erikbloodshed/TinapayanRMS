@@ -15,6 +15,14 @@ public class CostingParametersRepository(IDbContextFactory<TinapayanRMSDbContext
             new { productId },
             cancellationToken);
 
+    public async Task<IReadOnlyList<CostingParameters>> GetForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
+        productIds.Count == 0
+            ? []
+            : await dbContextFactory.QueryAsync<CostingParameters>(
+                $"SELECT {Columns.Of<CostingParameters>("c")} FROM CostingParameters c WHERE c.ProductId IN ({DapperReads.IdsTable})",
+                new { ids = DapperReads.IdList(productIds) },
+                cancellationToken);
+
     public async Task SetAsync(
         int productId, decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent, decimal vatPercent, CancellationToken cancellationToken)
     {

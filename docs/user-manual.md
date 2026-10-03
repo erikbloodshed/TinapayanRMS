@@ -157,7 +157,8 @@ The **Raw Materials** and **Products** lists are trees of folders, like File Exp
 - **Revert**, on the Products screen only, puts the whole product back as it was last saved.
 - **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly or Packaging) can be typed into. Typing narrows the list to matching names and highlights the best match: the name you typed in full, or else the first name that starts with what you typed, or else the first that contains it. **Enter** or **Tab** picks the highlighted name, so "marg" and Enter picks Margarine. **Down** and **Up** move the highlight to the other names.
 - **New** starts a blank record. **Delete** asks before deleting anything.
-- A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use.
+- A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use. It also says when the app couldn't reach its database, or the database didn't answer in time. Nothing is saved then, and the screen keeps working: once the database answers again, try again, or pick the record again.
+- If something goes wrong that the app didn't expect, a message says what happened and that the app is still running, and the details go in the [log files](#12-troubleshooting-and-questions). Nothing you haven't saved is lost.
 
 ### Working in tables
 
@@ -280,6 +281,8 @@ These are the five percentages a **new** product's costing starts with:
 - **VAT %**: added on top of the marked-up price.
 
 Each product keeps its own percentages from its first Save. Changing the defaults doesn't change any saved product.
+
+**Stored Costs**, under the defaults, has a **Recalculate Costs** button. The app keeps every made and linked ingredient's cost, and every sub-assembly's total weight and cost, up to date as you save. You only need this button if the database was changed outside the app, for example by a script. It works all of those costs out again from what they're made of, and a green notice says how many were out of date. Purchased materials keep their prices.
 
 ### Keyboard
 
@@ -406,6 +409,8 @@ This tab lists every product the material ends up in as tiles, including product
 This tab is shown for saved purchased materials only. It's a log of every price the material has been costed at: **Date**, **Brand**, **Unit**, **Price** and **Cost / Base Unit**.
 
 **Delete Price** removes a log entry only. It doesn't change the material's cost.
+
+A Save adds an entry only when it changes the material's cost. Saving again without changing a price adds nothing.
 
 ---
 
@@ -870,7 +875,22 @@ A composite product's own sections can only be in a role with **Product-owned** 
 **A product can't go into a composite.**
 The product picker leaves out the composite itself, and any composite that already holds it. Otherwise the composite would end up holding itself.
 
-**"The name is already taken."**
+**"Couldn't reach the database."**
+The app keeps its data in SQL Server Express on this computer, and it isn't answering. Check that the **SQL Server (SQLEXPRESS)** service is running in Windows' **Services**, then try again. The screen you're on keeps working: switch to another tab and back, or pick the record again, once the database is running.
+
+**"The database didn't answer in time."** or **"The database was busy with another change."**
+Nothing was saved. Try again.
+
+**A message says the database is out of date for this version of TinapayanRMS.**
+The app was updated, but the update to its database wasn't applied. Close the app and ask whoever installs it to apply the database update. Until they do, some screens show an error.
+
+**"A number is too large to save."**
+A figure has more digits than the app keeps, for example a price typed with too many zeros. Check what you typed.
+
+**A message says something went wrong, and that the app is still running.**
+Something happened that the app didn't expect. It's in the log file, which helps whoever looks after the app. If anything on the screen looks wrong afterwards, save what you can, then close the app and open it again. If such messages keep coming, the app closes by itself.
+
+**"That name is already in use."** or **"That abbreviation is already in use."**
 Names must be unique within each list: raw materials, sub-assemblies, products, categories, roles and units. A unit's abbreviation must be unique too. Upper and lower case count as the same.
 
 **Letters don't type, or a table cell won't start an edit when I type.**

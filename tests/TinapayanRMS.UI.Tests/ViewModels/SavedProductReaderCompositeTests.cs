@@ -263,7 +263,7 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
         return new SavedProductReader(
-            new PackagingLinkRepository(factory, packagingLineRepository),
+            new PackagingLinkRepository(factory),
             new ProductSubAssemblyUsageRepository(factory),
             packagingLineRepository,
             new CostingParametersRepository(factory),

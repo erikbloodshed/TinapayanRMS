@@ -96,7 +96,7 @@ public sealed record SavedProduct(
 /// <summary>
 /// Reads a product as it's saved, and turns it into what the Products screen shows: the one place a saved product is
 /// read and priced. The Products screen reads the product it opens through it, Reports prices every product with it,
-/// and Print reads each product of a set with it, so all three agree. Repositories only: a read runs off the UI thread.
+/// and Print reads a set of products with it, so all three agree. Repositories only: a read runs off the UI thread.
 /// </summary>
 public sealed class SavedProductReader(
     IPackagingLinkRepository packagingLinkRepository,
@@ -110,60 +110,113 @@ public sealed class SavedProductReader(
     /// The product's saved detail: its packaging link and lines, its recipe with its sections' lines and add-ins, a
     /// composite's products with their recipe costs, and its costing.
     /// </summary>
-    public Task<ProductDetail> ReadDetailAsync(int productId, CancellationToken cancellationToken) =>
-        ReadDetailAsync(productId, [], cancellationToken);
+    public async Task<ProductDetail> ReadDetailAsync(int productId, CancellationToken cancellationToken) =>
+        (await ReadDetailsAsync([productId], cancellationToken))[productId];
 
-    /// <param name="holders">The composites this read is inside, each holding the next: none may come round again.</param>
-    private async Task<ProductDetail> ReadDetailAsync(int productId, ImmutableHashSet<int> holders, CancellationToken cancellationToken)
+    /// <summary>
+    /// Several products' saved details at once, by id: <see cref="ReadDetailAsync"/>'s, in a dozen or so queries however
+    /// many products there are (2026-10-03). A product took nine or so queries of its own, and Reports and Print read every
+    /// product that way, so their round trips grew with the list, and a composite's products each started reads of their
+    /// own at once. The products a composite among them holds are read with it, however deep, and are in the result too.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<int, ProductDetail>> ReadDetailsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
     {
-        // Save refuses a composite that would hold itself, so this only guards against data changed outside the app,
-        // which would otherwise read round the loop for ever.
-        if (holders.Contains(productId))
+        // The products the composites among them hold, and the ones those hold: one read for each level of holding.
+        Dictionary<int, IReadOnlyList<ProductComponent>> componentsByHolder = [];
+        HashSet<int> productIdsRead = [.. productIds];
+        List<int> holders = [.. productIdsRead];
+        while (holders.Count > 0)
         {
-            throw new InvalidOperationException("A composite product holds itself, through the products in it. Take it out of one of them.");
+            var components = await productRepository.GetComponentsForProductsAsync(holders, cancellationToken);
+            foreach (var held in components.GroupBy(c => c.ProductId))
+            {
+                componentsByHolder[held.Key] = [.. held];
+            }
+
+            holders = [.. components.Select(c => c.ComponentProductId).Where(productIdsRead.Add)];
         }
 
-        // At once, each on its own context: a read is mostly a round trip's wait. Only the sections' lines wait, for
-        // the sections, and a composite's products' costs for its lines. Reports reads several products this way at a
-        // time (ProductsReadAtOnce).
-        var packagingLinkRead = packagingLinkRepository.GetForProductAsync(productId, cancellationToken);
-        var linesRead = packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken);
-        var costingRead = costingParametersRepository.GetForProductAsync(productId, cancellationToken);
-        var addInsRead = usageRepository.GetAddInsForProductAsync(productId, cancellationToken);
-        var usagesRead = usageRepository.GetForProductAsync(productId, cancellationToken);
-        var subAssemblyLinesRead = ReadSectionLinesAsync(usagesRead, cancellationToken);
-        var componentsRead = ReadComponentsAsync(productId, holders.Add(productId), cancellationToken);
-        await Task.WhenAll(packagingLinkRead, linesRead, costingRead, addInsRead, usagesRead, subAssemblyLinesRead, componentsRead);
+        // The rest at once, each on its own context: a read is mostly a round trip's wait. Only the sections' lines wait,
+        // for the sections.
+        List<int> ids = [.. productIdsRead];
+        var linksRead = packagingLinkRepository.GetForProductsAsync(ids, cancellationToken);
+        var packagingRead = packagingLineRepository.GetEffectiveForProductsAsync(ids, cancellationToken);
+        var costingsRead = costingParametersRepository.GetForProductsAsync(ids, cancellationToken);
+        var addInsRead = usageRepository.GetAddInsForProductsAsync(ids, cancellationToken);
+        var usagesRead = usageRepository.GetForProductsAsync(ids, cancellationToken);
+        var sectionLinesRead = ReadSectionLinesAsync(usagesRead, cancellationToken);
+        await Task.WhenAll(linksRead, packagingRead, costingsRead, addInsRead, usagesRead, sectionLinesRead);
 
-        return new ProductDetail(
-            await packagingLinkRead, await usagesRead, await linesRead, await costingRead, await subAssemblyLinesRead, await addInsRead)
+        var linksByProduct = (await linksRead).ToDictionary(l => l.ProductId);
+        var packagingByProduct = await packagingRead;
+        var costingsByProduct = (await costingsRead).ToDictionary(c => c.ProductId);
+        var usages = await usagesRead;
+        var usagesByProduct = usages.ToLookup(u => u.ProductId);
+        var productIdByUsage = usages.ToDictionary(u => u.Id, u => u.ProductId);
+        var addInsByProduct = (await addInsRead).ToLookup(a => productIdByUsage[a.UsageId]);
+        var sectionLinesBySubAssembly = (await sectionLinesRead).ToLookup(l => l.SubAssemblyId);
+
+        // Each product put together from what was read, a composite's products before it: what one brings is its own
+        // costing worked out, at both bases, once however many composites hold it.
+        Dictionary<int, ProductDetail> details = [];
+        Dictionary<int, ComponentCosts> costsByProduct = [];
+
+        ProductDetail DetailOf(int productId, ImmutableHashSet<int> holding)
         {
-            Components = await componentsRead,
-        };
+            // Save refuses a composite that would hold itself, so this only guards against data changed outside the app,
+            // which would otherwise read round the loop for ever.
+            if (holding.Contains(productId))
+            {
+                throw new BusinessRuleException("A composite product holds itself, through the products in it. Take it out of one of them.");
+            }
+
+            if (details.TryGetValue(productId, out var built))
+            {
+                return built;
+            }
+
+            var productUsages = usagesByProduct[productId].ToList();
+            var detail = new ProductDetail(
+                linksByProduct.GetValueOrDefault(productId),
+                productUsages,
+                packagingByProduct[productId],
+                costingsByProduct.GetValueOrDefault(productId),
+                [.. productUsages.Select(u => u.SubAssemblyId).Distinct().SelectMany(id => sectionLinesBySubAssembly[id])],
+                [.. addInsByProduct[productId]])
+            {
+                Components =
+                [
+                    .. componentsByHolder.GetValueOrDefault(productId, [])
+                        .Select(c => new SavedComponent(c, CostsOf(c.ComponentProduct!, holding.Add(productId)))),
+                ],
+            };
+            details[productId] = detail;
+            return detail;
+        }
+
+        ComponentCosts CostsOf(Product product, ImmutableHashSet<int> holding)
+        {
+            if (!costsByProduct.TryGetValue(product.Id, out var costs))
+            {
+                costs = ComponentCostsOf(product, DetailOf(product.Id, holding));
+                costsByProduct[product.Id] = costs;
+            }
+
+            return costs;
+        }
+
+        foreach (var productId in ids)
+        {
+            DetailOf(productId, []);
+        }
+
+        return details;
     }
 
     private async Task<IReadOnlyList<SubAssemblyLine>> ReadSectionLinesAsync(
         Task<IReadOnlyList<ProductSubAssemblyUsage>> usagesRead, CancellationToken cancellationToken) =>
         await subAssemblyLineRepository.GetForSubAssembliesAsync(
             [.. (await usagesRead).Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
-
-    /// <summary>A composite's lines, each with its product's recipe and packaging costs as saved, read at once; none for any other product.</summary>
-    private async Task<IReadOnlyList<SavedComponent>> ReadComponentsAsync(
-        int productId, ImmutableHashSet<int> holders, CancellationToken cancellationToken)
-    {
-        var components = await productRepository.GetComponentsAsync(productId, cancellationToken);
-        if (components.Count == 0)
-        {
-            return [];
-        }
-
-        var costs = await Task.WhenAll(components
-            .Select(c => c.ComponentProduct!)
-            .DistinctBy(p => p.Id)
-            .Select(async p => (p.Id, Cost: await ReadComponentCostsAsync(p, holders, cancellationToken))));
-        var costById = costs.ToDictionary(c => c.Id, c => c.Cost);
-        return [.. components.Select(c => new SavedComponent(c, costById[c.ComponentProductId]))];
-    }
 
     /// <summary>
     /// What one of each product brings into a composite, as it's saved: its recipe (sub-assemblies, ingredients) cost for
@@ -178,15 +231,17 @@ public sealed class SavedProductReader(
         }
 
         // Read again rather than taken from the screen's list, which may be older than a quantity required saved since.
-        var products = await productRepository.GetByIdsAsync(productIds, cancellationToken);
-        var costs = await Task.WhenAll(products.Select(async p => (p.Id, Cost: await ReadComponentCostsAsync(p, [], cancellationToken))));
-        return costs.ToDictionary(c => c.Id, c => c.Cost);
+        var productsRead = productRepository.GetByIdsAsync(productIds, cancellationToken);
+        var detailsRead = ReadDetailsAsync(productIds, cancellationToken);
+        await Task.WhenAll(productsRead, detailsRead);
+
+        var details = await detailsRead;
+        return (await productsRead).ToDictionary(p => p.Id, p => ComponentCostsOf(p, details[p.Id]));
     }
 
     /// <summary>Its recipe and packaging costs at both bases, from one read: pricing it twice is only arithmetic.</summary>
-    private async Task<ComponentCosts> ReadComponentCostsAsync(Product product, ImmutableHashSet<int> holders, CancellationToken cancellationToken)
+    private static ComponentCosts ComponentCostsOf(Product product, ProductDetail detail)
     {
-        var detail = await ReadDetailAsync(product.Id, holders, cancellationToken);
         var buffered = Build(product, detail, CostBasis.Buffered).Costs;
         var unbuffered = Build(product, detail, CostBasis.Unbuffered).Costs;
         return new(buffered.SubAssemblies, unbuffered.SubAssemblies, buffered.Packaging, unbuffered.Packaging);
@@ -199,6 +254,21 @@ public sealed class SavedProductReader(
     /// <summary><paramref name="product"/> as it's saved, read and priced at <paramref name="basis"/>.</summary>
     public async Task<SavedProduct> ReadAsync(Product product, CostBasis basis, CancellationToken cancellationToken) =>
         Build(product, await ReadDetailAsync(product.Id, cancellationToken), basis);
+
+    /// <summary>
+    /// <paramref name="products"/> as they're saved, read together (<see cref="ReadDetailsAsync"/>) and each priced at
+    /// <paramref name="basis"/>, in the same order: what Reports prices and a Print set prints.
+    /// </summary>
+    public async Task<IReadOnlyList<SavedProduct>> ReadAllAsync(IReadOnlyList<Product> products, CostBasis basis, CancellationToken cancellationToken)
+    {
+        if (products.Count == 0)
+        {
+            return [];
+        }
+
+        var details = await ReadDetailsAsync([.. products.Select(p => p.Id).Distinct()], cancellationToken);
+        return [.. products.Select(p => Build(p, details[p.Id], basis))];
+    }
 
     /// <summary>
     /// <paramref name="detail"/> as the screen shows it: each section with the ingredients and role it was read with,

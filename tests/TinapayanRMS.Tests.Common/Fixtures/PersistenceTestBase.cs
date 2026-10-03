@@ -39,11 +39,7 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
     protected IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
         new TestDbContextFactory(CreateDbContextOptions());
 
-    /// <summary>The ingredient cost cascade the raw material repositories hand ingredient cost changes to.</summary>
-    protected IngredientCostPropagator CreateCostPropagator() =>
-        new(CreateDbContextFactory(), new SubAssemblyCostPropagator(CreateDbContextFactory()));
-
-    protected RawMaterialBrandPriceRepository CreateBrandPriceRepository() => new(CreateDbContextFactory(), CreateCostPropagator());
+    protected RawMaterialBrandPriceRepository CreateBrandPriceRepository() => new(CreateDbContextFactory());
 
     /// <summary>
     /// Prices a purchased material at a single, unnamed brand (<paramref name="unitId"/> one of its own units, or null for
@@ -65,7 +61,7 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
     /// <summary>Sets a purchased material's fixed buffered cost to its cost with its buffer percent on top, and saves it. It cascades.</summary>
     protected async Task RecalculateBufferAsync(int rawMaterialId)
     {
-        var repository = new RawMaterialRepository(CreateDbContextFactory(), CreateCostPropagator());
+        var repository = new RawMaterialRepository(CreateDbContextFactory());
         var material = (await repository.GetByIdAsync(rawMaterialId, Cancellation))!;
         material.BufferedCostPerBaseUnit = RawMaterialRules.BufferedCost(material.CostPerBaseUnit, material.CostBufferPercent);
         await repository.UpdateAsync(material, Cancellation);

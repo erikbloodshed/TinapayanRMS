@@ -22,13 +22,9 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private SubAssemblyCostPropagator CreateSubAssemblyCostPropagator() => new(CreateDbContextFactory());
+    private RawMaterialRepository CreateIngredientRepository() => new(CreateDbContextFactory());
 
-    private IngredientCostPropagator CreateIngredientCostPropagator() => new(CreateDbContextFactory(), CreateSubAssemblyCostPropagator());
-
-    private RawMaterialRepository CreateIngredientRepository() => new(CreateDbContextFactory(), CreateIngredientCostPropagator());
-
-    private IngredientBomLineRepository CreateBomRepository() => new(CreateDbContextFactory(), CreateIngredientCostPropagator());
+    private IngredientBomLineRepository CreateBomRepository() => new(CreateDbContextFactory());
 
     private async Task<int> SeedCategoryAsync(string name)
     {

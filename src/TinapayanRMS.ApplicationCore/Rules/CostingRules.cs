@@ -6,12 +6,12 @@ public static class CostingRules
     {
         if (laborPercent < 0 || overheadPercent < 0 || administrativePercent < 0)
         {
-            throw new InvalidOperationException("Labor, overhead and administrative percentages can't be negative.");
+            throw new BusinessRuleException("Labor, overhead and administrative percentages can't be negative.");
         }
 
         if (marginPercent < 0 || vatPercent < 0)
         {
-            throw new InvalidOperationException("Margin and VAT percentages can't be negative.");
+            throw new BusinessRuleException("Margin and VAT percentages can't be negative.");
         }
     }
 

@@ -587,4 +587,38 @@ public class RawMaterialRulesTests
 
         act.Should().Throw<InvalidOperationException>();
     }
+
+    [Fact]
+    public void StoredCost_rounds_to_the_20_places_a_cost_is_stored_to_as_SQL_Server_does()
+    {
+        // ₱170 a pack of 240, and ₱0.47 an egg of 3 g: one rounds down, one up, as the database stores them.
+        RawMaterialRules.StoredCost(170m / 240m).Should().Be(0.70833333333333333333m);
+        RawMaterialRules.StoredCost(0.47m / 3m).Should().Be(0.15666666666666666667m);
+        RawMaterialRules.StoredCost(0.05m).Should().Be(0.05m, "a cost that comes out even is left as it is");
+    }
+
+    [Fact]
+    public void StoredCost_rounds_a_half_away_from_zero()
+    {
+        RawMaterialRules.StoredCost(0.000000000000000000005m).Should().Be(0.00000000000000000001m);
+    }
+
+    [Fact]
+    public void ApplyBrandPrices_sets_both_costs_as_they_are_stored()
+    {
+        var material = new RawMaterial { Name = "Cello Sheet", CostBufferPercent = 10m };
+
+        RawMaterialRules.ApplyBrandPrices(material, [(170m, 240m)]);
+
+        material.CostPerBaseUnit.Should().Be(0.70833333333333333333m, "compared with the stored cost, it mustn't read as a change");
+        material.BufferedCostPerBaseUnit.Should().Be(0.77916666666666666667m, "the cost with its 10% buffer on top, stored the same way");
+    }
+
+    [Fact]
+    public void BusinessRuleException_is_still_an_InvalidOperationException()
+    {
+        var act = () => RawMaterialRules.EnsureValidBrandPrice(0m);
+
+        act.Should().Throw<BusinessRuleException>().Which.Should().BeAssignableTo<InvalidOperationException>();
+    }
 }

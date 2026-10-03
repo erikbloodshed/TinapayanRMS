@@ -306,10 +306,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
         // Picking a sub-assembly loads it into the form; a refresh only re-points the selection at its
         // refreshed copy, so it leaves the form and its unsaved edits alone.
-        Observable.Switch(this.WhenAnyValue(x => x.SelectedRow)
-                .Where(_ => !IsBusyApplying)
-                .Select(row => Observable.FromAsync(() => LoadIntoFormAsync(row))))
-            .Subscribe();
+        LoadLatest(this.WhenAnyValue(x => x.SelectedRow).Where(_ => !IsBusyApplying), (row, _) => LoadIntoFormAsync(row));
 
         // An ingredient picked in the table is pointed at the screen's copy of it, which prices the line.
         Lines.ToObservableChangeSet()
@@ -378,7 +375,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
         // rather than replaces, so the screen keeps its selection and unsaved lines while picking up
         // what changed elsewhere: a repriced ingredient, a renamed role, a product that links one.
-        LoadCommand = ReactiveCommand.CreateFromTask(async () =>
+        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
             var roles = await roleRepository.GetAllAsync(CancellationToken.None);
             var rawMaterials = await rawMaterialRepository.GetAllAsync(CancellationToken.None);
@@ -428,7 +425,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 _subAssemblyToOpen = null;
                 TrySelectSubAssembly(subAssemblyId);
             }
-        });
+        }));
 
         NewCommand = ReactiveCommand.Create(ClearForm);
 
@@ -693,8 +690,21 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         // A sub-assembly has one kind of line or the other, as its role says.
         var version = ++_formLoadVersion;
         var isSet = row.SubAssembly.Role?.IsPackaging == true;
-        IReadOnlyList<SubAssemblyLine> saved = isSet ? [] : await _lineRepository.GetForSubAssembliesAsync([row.Id], CancellationToken.None);
-        IReadOnlyList<SubAssemblyPackagingLine> savedSet = isSet ? await _subAssemblyRepository.GetPackagingLinesAsync(row.Id, CancellationToken.None) : [];
+        IReadOnlyList<SubAssemblyLine> saved;
+        IReadOnlyList<SubAssemblyPackagingLine> savedSet;
+        try
+        {
+            saved = isSet ? [] : await _lineRepository.GetForSubAssembliesAsync([row.Id], CancellationToken.None);
+            savedSet = isSet ? await _subAssemblyRepository.GetPackagingLinesAsync(row.Id, CancellationToken.None) : [];
+        }
+        catch (Exception) when (version == _formLoadVersion)
+        {
+            // Nothing of the picked one's came: the form mustn't go on showing another sub-assembly under its row, so it's
+            // left blank, with nothing picked. Picking it again tries again.
+            ClearForm();
+            throw;
+        }
+
         if (version != _formLoadVersion)
         {
             return;

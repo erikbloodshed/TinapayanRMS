@@ -12,68 +12,87 @@
         <controls:ErrorToast />
         <controls:SuccessToast />
 
-        <!-- The five percentages, as the Products screen's Costing tab labels them -->
-        <Border Style="{StaticResource CardStyle}" Width="420" HorizontalAlignment="Left" VerticalAlignment="Top">
-            <StackPanel>
-                <TextBlock Text="Costing Defaults" Style="{StaticResource SectionHeaderStyle}" />
-                <TextBlock Style="{StaticResource CaptionStyle}"
-                           Margin="0,0,0,12"
-                           Text="What a new product's costing starts with. Each product keeps its own from its first Save: changing these doesn't change any saved product." />
+        <StackPanel Width="420" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <!-- The five percentages, as the Products screen's Costing tab labels them -->
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <TextBlock Text="Costing Defaults" Style="{StaticResource SectionHeaderStyle}" />
+                    <TextBlock Style="{StaticResource CaptionStyle}"
+                               Margin="0,0,0,12"
+                               Text="What a new product's costing starts with. Each product keeps its own from its first Save: changing these doesn't change any saved product." />
 
-                <!-- One under another, each label on the left of its box (FormLabelStyle); the Auto column lines the boxes up -->
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="12" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="12" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="12" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="12" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                    <!-- One under another, each label on the left of its box (FormLabelStyle); the Auto column lines the boxes up -->
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="12" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="12" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="12" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="12" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="Labor %" Style="{StaticResource FormLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece" />
-                    <syncfusion:DoubleTextBox Grid.Column="1"
-                                              MinValue="0"
-                                              Value="{Binding EditingLaborPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Text="Labor %" Style="{StaticResource FormLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece" />
+                        <syncfusion:DoubleTextBox Grid.Column="1"
+                                                  MinValue="0"
+                                                  Value="{Binding EditingLaborPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="2" Text="Overhead %" Style="{StaticResource FormLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece" />
-                    <syncfusion:DoubleTextBox Grid.Row="2"
-                                              Grid.Column="1"
-                                              MinValue="0"
-                                              Value="{Binding EditingOverheadPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Grid.Row="2" Text="Overhead %" Style="{StaticResource FormLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece" />
+                        <syncfusion:DoubleTextBox Grid.Row="2"
+                                                  Grid.Column="1"
+                                                  MinValue="0"
+                                                  Value="{Binding EditingOverheadPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="4" Text="Administrative %" Style="{StaticResource FormLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece: office, permits, bookkeeping" />
-                    <syncfusion:DoubleTextBox Grid.Row="4"
-                                              Grid.Column="1"
-                                              MinValue="0"
-                                              Value="{Binding EditingAdministrativePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Grid.Row="4" Text="Administrative %" Style="{StaticResource FormLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece: office, permits, bookkeeping" />
+                        <syncfusion:DoubleTextBox Grid.Row="4"
+                                                  Grid.Column="1"
+                                                  MinValue="0"
+                                                  Value="{Binding EditingAdministrativePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="6" Text="Markup %" Style="{StaticResource FormLabelStyle}" ToolTip="On the base cost: materials, labor, overhead and administrative" />
-                    <syncfusion:DoubleTextBox Grid.Row="6"
-                                              Grid.Column="1"
-                                              MinValue="0"
-                                              Value="{Binding EditingMarginPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Grid.Row="6" Text="Markup %" Style="{StaticResource FormLabelStyle}" ToolTip="On the base cost: materials, labor, overhead and administrative" />
+                        <syncfusion:DoubleTextBox Grid.Row="6"
+                                                  Grid.Column="1"
+                                                  MinValue="0"
+                                                  Value="{Binding EditingMarginPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="8" Text="VAT %" Style="{StaticResource FormLabelStyle}" ToolTip="On top of the marked-up price" />
-                    <syncfusion:DoubleTextBox Grid.Row="8"
-                                              Grid.Column="1"
-                                              MinValue="0"
-                                              Value="{Binding EditingVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                </Grid>
+                        <TextBlock Grid.Row="8" Text="VAT %" Style="{StaticResource FormLabelStyle}" ToolTip="On top of the marked-up price" />
+                        <syncfusion:DoubleTextBox Grid.Row="8"
+                                                  Grid.Column="1"
+                                                  MinValue="0"
+                                                  Value="{Binding EditingVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </Grid>
 
-                <syncfusion:ButtonAdv Label="Save"
-                                      HorizontalAlignment="Left"
-                                      Margin="0,16,0,0"
-                                      IconTemplate="{StaticResource SaveIconTemplate}"
-                                      Command="{Binding SaveCommand}" />
-            </StackPanel>
-        </Border>
+                    <syncfusion:ButtonAdv Label="Save"
+                                          HorizontalAlignment="Left"
+                                          Margin="0,16,0,0"
+                                          IconTemplate="{StaticResource SaveIconTemplate}"
+                                          Command="{Binding SaveCommand}" />
+                </StackPanel>
+            </Border>
+
+            <!--
+                The stored costs worked out again, from what they're made of: each Save keeps them right as it goes, so this is
+                for after the database was changed outside the app. The toast says how many were out of date.
+            -->
+            <Border Style="{StaticResource CardStyle}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="Stored Costs" Style="{StaticResource SectionHeaderStyle}" />
+                    <TextBlock Style="{StaticResource CaptionStyle}"
+                               Margin="0,0,0,12"
+                               Text="Each Save keeps made and linked ingredients' costs, and sub-assemblies' totals, up to date. If the database was changed outside the app, work them all out again from what they're made of." />
+                    <syncfusion:ButtonAdv Label="Recalculate Costs"
+                                          HorizontalAlignment="Left"
+                                          IconTemplate="{StaticResource CalculateIconTemplate}"
+                                          Command="{Binding RecalculateCostsCommand}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
     </Grid>
 </UserControl>

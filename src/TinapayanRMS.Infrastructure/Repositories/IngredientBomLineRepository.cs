@@ -9,9 +9,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class IngredientBomLineRepository(
-    IDbContextFactory<TinapayanRMSDbContext> dbContextFactory,
-    IngredientCostPropagator costPropagator) : IIngredientBomLineRepository
+public class IngredientBomLineRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IIngredientBomLineRepository
 {
     public Task<IReadOnlyList<IngredientBomLine>> GetForIngredientAsync(int ingredientId, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<IngredientBomLine>>(
@@ -52,21 +50,19 @@ public class IngredientBomLineRepository(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        // The old lines' delete and the new lines' insert commit together.
-        await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
-        {
-            await SetLinesAsync(dbContext, ingredientId, lines, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-        }
+        // The old lines' delete, the new lines' insert and the cost they give commit together.
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await SetLinesAsync(dbContext, ingredientId, lines, cancellationToken);
 
         // Recomputes ingredientId's own CostPerBaseUnit from the lines just saved, then
         // ripples the change to anything that depends on it.
-        await costPropagator.RecomputeAndPropagateAsync(ingredientId, cancellationToken);
+        await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, ingredientId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     /// <summary>
     /// Replaces the made ingredient's BOM with <paramref name="lines"/> and saves, once every line
-    /// passes. Its cost is the caller's to cascade, after its transaction commits.
+    /// passes. Its cost is the caller's to cascade, in its transaction (IngredientCostPropagator).
     /// </summary>
     internal static async Task SetLinesAsync(
         TinapayanRMSDbContext dbContext,
@@ -75,12 +71,12 @@ public class IngredientBomLineRepository(
         CancellationToken cancellationToken)
     {
         var ingredient = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == ingredientId, cancellationToken)
-            ?? throw new InvalidOperationException($"Ingredient {ingredientId} does not exist.");
+            ?? throw new BusinessRuleException($"Ingredient {ingredientId} does not exist.");
 
         // Made implies the Ingredient type (RawMaterialRules.EnsureFieldsMatchType).
         if (ingredient.Source != RawMaterialSource.Made)
         {
-            throw new InvalidOperationException("Only made ingredients have a BOM.");
+            throw new BusinessRuleException("Only made ingredients have a BOM.");
         }
 
         IngredientBomRules.EnsureValidLines(lines);
@@ -102,7 +98,7 @@ public class IngredientBomLineRepository(
         {
             if (!components.TryGetValue(line.ComponentIngredientId, out var component))
             {
-                throw new InvalidOperationException($"Ingredient {line.ComponentIngredientId} does not exist.");
+                throw new BusinessRuleException($"Ingredient {line.ComponentIngredientId} does not exist.");
             }
 
             RawMaterialRules.EnsureUsableInRecipes(component.Type, component.Name);

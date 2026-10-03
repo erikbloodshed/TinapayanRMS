@@ -860,7 +860,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         var flourId = await SeedPurchasedIngredientAsync("Flour", (bagId, 25000m));
         var factory = CreateDbContextFactory();
-        var bagUnitId = (await new RawMaterialUnitRepository(factory, CreateCostPropagator()).GetForRawMaterialAsync(flourId, Cancellation)).Single().Id;
+        var bagUnitId = (await new RawMaterialUnitRepository(factory).GetForRawMaterialAsync(flourId, Cancellation)).Single().Id;
         await SetPriceAsync(flourId, bagUnitId, 1250m); // ₱0.05/g
 
         var viewModel = CreateViewModel();
@@ -1561,13 +1561,12 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     {
         ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
-        var costPropagator = CreateCostPropagator();
 
         return new RawMaterialsViewModel(
-            new RawMaterialRepository(factory, costPropagator),
+            new RawMaterialRepository(factory),
             new RawMaterialPriceHistoryRepository(factory),
-            new RawMaterialBrandPriceRepository(factory, costPropagator),
-            new IngredientBomLineRepository(factory, costPropagator),
+            new RawMaterialBrandPriceRepository(factory),
+            new IngredientBomLineRepository(factory),
             new RawMaterialCategoryRepository(factory),
             new RawMaterialCategoryValidator(),
             new RawMaterialValidator(),

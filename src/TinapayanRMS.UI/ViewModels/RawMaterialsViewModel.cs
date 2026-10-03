@@ -1181,11 +1181,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             .Subscribe(ResetDetails);
 
         // A newer selection cancels an older one still loading (Switch disposes it, which cancels its token), so a quick
-        // second pick never gets the first one's details added to its own.
-        Observable.Switch(this.WhenAnyValue(x => x.SelectedRawMaterial)
-                .Where(_ => !IsBusyApplying)
-                .Select(material => Observable.FromAsync(cancellationToken => LoadDetailsAsync(material, cancellationToken))))
-            .Subscribe();
+        // second pick never gets the first one's details added to its own. One that fails shows why, and the next pick
+        // loads as usual.
+        LoadLatest(this.WhenAnyValue(x => x.SelectedRawMaterial).Where(_ => !IsBusyApplying), LoadDetailsAsync);
 
         // A unit's multiplier changed in the Alternative Units grid reprices the brands bought in it straight away,
         // and the add row goes once there are two units.
@@ -1220,7 +1218,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
         // rather than replaces, so the screen keeps its selection, picker choices and unsaved edits
         // while picking up what changed elsewhere, such as a unit renamed in Settings.
-        LoadCommand = ReactiveCommand.CreateFromTask(async () =>
+        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
             var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
             var units = await unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
@@ -1295,7 +1293,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 _rawMaterialToOpen = null;
                 TrySelectRawMaterial(rawMaterialId);
             }
-        });
+        }));
 
         NewCommand = ReactiveCommand.Create(() => ClearForm());
 
@@ -1953,20 +1951,20 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         {
             if (unit.UnitOfMeasureId <= 0)
             {
-                throw new InvalidOperationException("Pick a unit for every alternative unit, or remove the empty row.");
+                throw new BusinessRuleException("Pick a unit for every alternative unit, or remove the empty row.");
             }
 
             if (unit.BaseUnitsPerUnit <= 0)
             {
                 // A unit added by picking it on a brand row gets its multiplier from that row's quantity.
                 var where = _brandAddedUnits.Contains(unit) ? "Qty per Purchase Unit" : "Alternative Units";
-                throw new InvalidOperationException($"Enter how many {BaseUnitAbbreviation} are in one {unit.UnitOfMeasure?.Name ?? "unit"} ({where}).");
+                throw new BusinessRuleException($"Enter how many {BaseUnitAbbreviation} are in one {unit.UnitOfMeasure?.Name ?? "unit"} ({where}).");
             }
 
             var validation = _unitValidator.Validate(unit);
             if (!validation.IsValid)
             {
-                throw new InvalidOperationException(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage)));
+                throw new BusinessRuleException(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage)));
             }
 
             RawMaterialRules.EnsureNotTheBaseUnit(EditingType == RawMaterialType.Packaging ? EditingBaseUnit?.Id : null, unit.UnitOfMeasureId);
@@ -2276,21 +2274,21 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
             if (row.UnitKey is not { } key)
             {
-                throw new InvalidOperationException(brand is null
+                throw new BusinessRuleException(brand is null
                     ? "Pick the purchase unit every price is for, or remove the empty row."
                     : $"Pick the purchase unit '{brand}' is priced in.");
             }
 
             if (key != PurchaseUnitChoice.BaseUnitKey && ((IBrandPriceRowHost)this).FindUnit(key) is null)
             {
-                throw new InvalidOperationException(
+                throw new BusinessRuleException(
                     $"{(brand is null ? "A price" : $"'{brand}'")} is in a unit this material doesn't have. Pick another, or add it in Alternative Units.");
             }
 
             var validation = _brandPriceValidator.Validate(new RawMaterialBrandPrice { Brand = brand, Price = row.Price ?? 0m });
             if (!validation.IsValid)
             {
-                throw new InvalidOperationException(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage)));
+                throw new BusinessRuleException(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage)));
             }
 
             prices.Add((brand, key == PurchaseUnitChoice.BaseUnitKey ? null : key, row.Price!.Value));

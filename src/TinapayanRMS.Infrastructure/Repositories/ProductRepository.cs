@@ -30,6 +30,9 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     public Task<IReadOnlyList<ProductComponent>> GetComponentsAsync(int productId, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(dbContext => ProductComponentRepository.GetForProductAsync(dbContext, productId, cancellationToken), cancellationToken);
 
+    public Task<IReadOnlyList<ProductComponent>> GetComponentsForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync(dbContext => ProductComponentRepository.GetForProductsAsync(dbContext, productIds, cancellationToken), cancellationToken);
+
     public Task<IReadOnlyList<ProductComponent>> GetAllComponentsAsync(CancellationToken cancellationToken) =>
         dbContextFactory.QueryAsync<ProductComponent>(
             $"SELECT {Columns.Of<ProductComponent>("pc")} FROM ProductComponents pc ORDER BY pc.ProductId, pc.SortOrder, pc.Id",
@@ -53,7 +56,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         // A composite holds at least two products from the moment it's saved, and only SaveAsync writes them with it.
         if (product.IsComposite)
         {
-            throw new InvalidOperationException("A composite product is saved with its products (SaveAsync).");
+            throw new BusinessRuleException("A composite product is saved with its products (SaveAsync).");
         }
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -80,7 +83,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         var products = await dbContext.Products.Where(p => productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, cancellationToken);
         if (productIds.Where(id => !products.ContainsKey(id)).ToList() is [var missingId, ..])
         {
-            throw new InvalidOperationException($"Product {missingId} does not exist.");
+            throw new BusinessRuleException($"Product {missingId} does not exist.");
         }
 
         // Checked rather than left to the foreign key, whose refusal would read as a duplicate name: a move undone after
@@ -89,7 +92,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         if (categoryIds.Count > 0
             && await dbContext.ProductCategories.CountAsync(c => categoryIds.Contains(c.Id), cancellationToken) < categoryIds.Count)
         {
-            throw new InvalidOperationException("The category to move it to no longer exists.");
+            throw new BusinessRuleException("The category to move it to no longer exists.");
         }
 
         var now = DateTime.Now;
@@ -109,7 +112,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var existing = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == productId, cancellationToken)
-            ?? throw new InvalidOperationException($"Product {productId} does not exist.");
+            ?? throw new BusinessRuleException($"Product {productId} does not exist.");
 
         var oldName = existing.Name;
         existing.Name = name;
@@ -225,7 +228,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             .ToListAsync(cancellationToken);
         if (packagingLinkedBy.Count > 0)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"{string.Join(", ", packagingLinkedBy.Order(StringComparer.CurrentCultureIgnoreCase))} "
                 + $"{(packagingLinkedBy.Count == 1 ? "links" : "link")} this product's packaging. Unlink it there first.");
         }
@@ -238,7 +241,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             .ToListAsync(cancellationToken);
         if (heldBy.Count > 0)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"{string.Join(", ", heldBy.Order(StringComparer.CurrentCultureIgnoreCase))} "
                 + $"{(heldBy.Count == 1 ? "holds" : "hold")} this product. Take it out there first.");
         }
@@ -276,7 +279,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     internal static async Task<Product> UpdateAsync(TinapayanRMSDbContext dbContext, Product product, CancellationToken cancellationToken)
     {
         var existing = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == product.Id, cancellationToken)
-            ?? throw new InvalidOperationException($"Product {product.Id} does not exist.");
+            ?? throw new BusinessRuleException($"Product {product.Id} does not exist.");
 
         CompositeProductRules.EnsureKindUnchanged(existing.IsComposite, product.IsComposite);
         CompositeProductRules.EnsureOneUnit(existing.IsComposite, product.QuantityRequired);

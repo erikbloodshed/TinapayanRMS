@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure.Queries;
 
@@ -22,7 +23,7 @@ public class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbContext> 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var existing = await dbContext.ProductCategories.FirstOrDefaultAsync(c => c.Id == category.Id, cancellationToken)
-            ?? throw new InvalidOperationException($"Category {category.Id} does not exist.");
+            ?? throw new BusinessRuleException($"Category {category.Id} does not exist.");
 
         existing.Name = category.Name;
 

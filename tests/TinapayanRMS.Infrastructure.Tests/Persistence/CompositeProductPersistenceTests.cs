@@ -329,7 +329,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
 
         var packagingLines = new PackagingLineRepository(CreateDbContextFactory());
         (await packagingLines.GetForProductAsync(cloneId, Cancellation)).Select(l => l.PackagingMaterialId).Should().Equal(giftBoxId);
-        var variantLink = await new PackagingLinkRepository(CreateDbContextFactory(), packagingLines).GetForProductAsync(variantId, Cancellation);
+        var variantLink = await new PackagingLinkRepository(CreateDbContextFactory()).GetForProductAsync(variantId, Cancellation);
         variantLink!.LinkedProductId.Should().Be(boxId);
     }
 }

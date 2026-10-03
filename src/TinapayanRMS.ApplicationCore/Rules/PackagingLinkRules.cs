@@ -6,7 +6,7 @@ public static class PackagingLinkRules
     {
         if (productId == linkedProductId)
         {
-            throw new InvalidOperationException("A product's packaging can't be linked to itself.");
+            throw new BusinessRuleException("A product's packaging can't be linked to itself.");
         }
     }
 
@@ -27,14 +27,14 @@ public static class PackagingLinkRules
         {
             if (current == productId)
             {
-                throw new InvalidOperationException("This link would create a circular chain of packaging links.");
+                throw new BusinessRuleException("This link would create a circular chain of packaging links.");
             }
 
             if (!visited.Add(current))
             {
                 // A cycle exists among other products' links already, unrelated to
                 // productId, but still not safe to link into.
-                throw new InvalidOperationException("This product's packaging can't be linked here — it would join an existing circular chain of links.");
+                throw new BusinessRuleException("This product's packaging can't be linked here — it would join an existing circular chain of links.");
             }
 
             var next = existingLinkedProductId(current);

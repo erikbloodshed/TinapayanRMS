@@ -190,19 +190,19 @@ public sealed class ProductComponentRow : ReactiveObject
         {
             if (row.Product is not { } product)
             {
-                throw new InvalidOperationException(row.Quantity is { } count
+                throw new BusinessRuleException(row.Quantity is { } count
                     ? $"Pick the product for the line of {count:#,0}, or delete that line."
                     : "Pick a product for every line, or delete the line without one.");
             }
 
             if (row.Quantity is not > 0)
             {
-                throw new InvalidOperationException($"Enter how many {product.Name} go in, or delete its line.");
+                throw new BusinessRuleException($"Enter how many {product.Name} go in, or delete its line.");
             }
 
             if (lines.Any(l => l.Product.Id == product.Id))
             {
-                throw new InvalidOperationException($"{product.Name} is on two lines. Put its quantity on one line and delete the other.");
+                throw new BusinessRuleException($"{product.Name} is on two lines. Put its quantity on one line and delete the other.");
             }
 
             lines.Add((product, row.Quantity.Value));

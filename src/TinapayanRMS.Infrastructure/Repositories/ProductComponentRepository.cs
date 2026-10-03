@@ -29,13 +29,28 @@ public static class ProductComponentRepository
         TinapayanRMSDbContext dbContext, int productId, CancellationToken cancellationToken) =>
         (await dbContext.Connection().QueryAsync<ProductComponent, Product, ProductCategory?, ProductComponent>(
             dbContext.Command($"{ComponentsWithProductSql}\nWHERE pc.ProductId = @productId\nORDER BY pc.SortOrder, pc.Id", new { productId }, cancellationToken),
-            (component, product, category) =>
-            {
-                product.Category = category;
-                component.ComponentProduct = product;
-                return component;
-            },
+            WithProduct,
             splitOn: "Id,Id")).AsList();
+
+    /// <summary>GetForProductAsync for several composites at once: each one's lines in its Products table's order, in one query.</summary>
+    internal static async Task<IReadOnlyList<ProductComponent>> GetForProductsAsync(
+        TinapayanRMSDbContext dbContext, IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
+        productIds.Count == 0
+            ? []
+            : (await dbContext.Connection().QueryAsync<ProductComponent, Product, ProductCategory?, ProductComponent>(
+                dbContext.Command(
+                    $"{ComponentsWithProductSql}\nWHERE pc.ProductId IN ({DapperReads.IdsTable})\nORDER BY pc.ProductId, pc.SortOrder, pc.Id",
+                    new { ids = DapperReads.IdList(productIds) },
+                    cancellationToken),
+                WithProduct,
+                splitOn: "Id,Id")).AsList();
+
+    private static ProductComponent WithProduct(ProductComponent component, Product product, ProductCategory? category)
+    {
+        product.Category = category;
+        component.ComponentProduct = product;
+        return component;
+    }
 
     /// <summary>
     /// Replaces a composite's lines on the caller's context, which should hold a transaction. Only a composite holds
@@ -54,7 +69,7 @@ public static class ProductComponentRepository
         {
             if (components.Count > 0)
             {
-                throw new InvalidOperationException(
+                throw new BusinessRuleException(
                     $"{product.Name} is made of sub-assemblies, so it can't hold other products. Make a composite product for that.");
             }
 
@@ -68,7 +83,7 @@ public static class ProductComponentRepository
             .ToDictionaryAsync(p => p.Id, p => p.Name, cancellationToken);
         if (ids.FirstOrDefault(id => !names.ContainsKey(id)) is var missingId and not 0)
         {
-            throw new InvalidOperationException($"Product {missingId} does not exist.");
+            throw new BusinessRuleException($"Product {missingId} does not exist.");
         }
 
         CompositeProductRules.EnsureValidComponents(

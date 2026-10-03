@@ -1,6 +1,4 @@
 using System.Reactive.Linq;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
 using ReactiveUI;
 using ILogger = Serilog.ILogger;
 
@@ -8,7 +6,7 @@ namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// Shared behavior for every screen's ViewModel: a friendly ErrorMessage surfaced in the UI (as an
-/// error toast, Controls/ErrorToast) instead of letting a validation/business-rule exception fail
+/// error toast, Controls/ErrorToast) instead of letting a failed action or load fail
 /// silently or crash the app, a SuccessMessage for what an action did (Controls/SuccessToast), and a
 /// Delete-confirmation Interaction the View wires up to a native MessageBox. Introduced in Phase 13 once every screen needed the same things — not before, since
 /// one screen needing them wouldn't have justified a shared base class over ReactiveObject directly.
@@ -89,38 +87,118 @@ public abstract class ViewModelBase : ReactiveObject
     /// <summary>Input: a confirmation message to show the user. Output: true if they confirmed. The View registers a handler that shows a native MessageBox.</summary>
     public Interaction<string, bool> ConfirmDelete { get; } = new();
 
+    /// <summary>The error a failed load showed, which the next load that succeeds takes away again; null when it's gone.</summary>
+    private string? _loadFailure;
+
     /// <summary>
-    /// Runs action, clearing any previous ErrorMessage and SuccessMessage first (which also closes their toasts).
-    /// A business-rule violation (InvalidOperationException, thrown by every ApplicationCore
-    /// Rules class), a duplicate-name save (DbUpdateException, a unique-index violation), or
-    /// a delete blocked by a Restrict foreign key (SqlException, raised by ExecuteDeleteAsync
-    /// outside the change tracker — see PLAN.md) are caught and shown as ErrorMessage instead
-    /// of crashing or failing silently. Any other exception is a real bug, so it still
-    /// propagates rather than being hidden behind a generic message.
+    /// Runs action, clearing any previous ErrorMessage and SuccessMessage first (which also closes their toasts). Whatever
+    /// it throws is shown as ErrorMessage, in the words <see cref="Failure"/> gives it, and logged: a rule's refusal
+    /// (BusinessRuleException) as written, what the database refused or couldn't do put plainly, and anything else, a bug,
+    /// as "Something went wrong", logged as an error with its stack. Nothing reaches ReactiveUI, which would take the app
+    /// down with it, and nothing fails silently.
     /// </summary>
     protected async Task RunSafelyAsync(Func<Task> action)
     {
         ErrorMessage = null;
         SuccessMessage = null;
+        _loadFailure = null;
         try
         {
             await action();
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex)
         {
-            ErrorMessage = ex.Message;
-            _logger.Warning(ex, "Rejected by a business rule");
+            ShowFailure(ex);
         }
-        catch (DbUpdateException ex)
+    }
+
+    /// <summary>
+    /// Runs a load, a LoadCommand's body: a load that fails shows why and is logged as <see cref="RunSafelyAsync"/>'s
+    /// actions are, rather than reaching ReactiveUI, and the next load tries again (showing the tab again). Unlike an
+    /// action it leaves the notices alone, since a screen loads after its own Save too and mustn't take that Save's message
+    /// away; but a load that succeeds takes away the error a failed one left.
+    /// </summary>
+    protected async Task LoadSafelyAsync(Func<Task> load)
+    {
+        try
         {
-            ErrorMessage = "That name is already in use.";
-            _logger.Warning(ex, "Rejected by a database constraint");
+            await load();
+            ClearLoadFailure();
         }
-        catch (SqlException ex)
+        catch (OperationCanceledException)
         {
-            ErrorMessage = "This item is currently in use elsewhere and can't be deleted.";
-            _logger.Warning(ex, "Rejected by a foreign key constraint");
+            // A newer load took over.
         }
+        catch (Exception ex)
+        {
+            ShowLoadFailure(ex);
+        }
+    }
+
+    /// <summary>
+    /// Loads what each of <paramref name="values"/> needs as it comes (a record picked in a list), a newer value cancelling a
+    /// load still running (Switch). A load that fails shows why and is logged, and the next value loads as usual: a failure
+    /// reaching Switch would end the subscription, and from then on no pick would load anything until the app restarted
+    /// (found 2026-10-03: one failed read left Products and Raw Materials ignoring every later pick, Save included). A load
+    /// cancelled by a newer value isn't a failure, whatever it threw on its way out (SqlClient reports a command cancelled
+    /// mid-read as a SqlException). Nothing picked loads nothing, so it leaves a failed load's error showing: the
+    /// failure itself can clear the pick, as Sub-Assemblies does.
+    /// </summary>
+    protected void LoadLatest<T>(IObservable<T> values, Func<T, CancellationToken, Task> load) =>
+        Observable.Switch(values.Select(value => Observable.FromAsync(async cancellationToken =>
+            {
+                try
+                {
+                    await load(value, cancellationToken);
+                    if (value is not null)
+                    {
+                        ClearLoadFailure();
+                    }
+                }
+                catch (Exception) when (cancellationToken.IsCancellationRequested)
+                {
+                    // A newer value took over.
+                }
+                catch (Exception ex)
+                {
+                    ShowLoadFailure(ex);
+                }
+            })))
+            .Subscribe();
+
+    /// <summary>
+    /// Shows <paramref name="exception"/> as ErrorMessage, in <see cref="Failure"/>'s words after <paramref name="context"/>
+    /// when there is one ("Couldn't read …: "), and logs it: a refusal as a warning, anything else as an error. For a
+    /// failure an action catches itself, such as a read nothing awaits.
+    /// </summary>
+    protected void ShowFailure(Exception exception, string? context = null)
+    {
+        var failure = Failure.Of(exception);
+        ErrorMessage = context is null ? failure.Text : $"{context}: {failure.Text}";
+        if (failure.IsRejection)
+        {
+            _logger.Warning(exception, "Refused: {Reason}", failure.Text);
+        }
+        else
+        {
+            _logger.Error(exception, "Failed: {Reason}", failure.Text);
+        }
+    }
+
+    private void ShowLoadFailure(Exception exception)
+    {
+        ShowFailure(exception);
+        _loadFailure = ErrorMessage;
+    }
+
+    private void ClearLoadFailure()
+    {
+        if (_loadFailure is not null && ErrorMessage == _loadFailure)
+        {
+            ErrorMessage = null;
+        }
+
+        _loadFailure = null;
     }
 
     /// <summary>Asks the user to confirm via ConfirmDelete, then runs action (through RunSafelyAsync) only if they agree.</summary>

@@ -10,28 +10,28 @@ public static class SubAssemblyRules
     {
         if (lines.Count == 0)
         {
-            throw new InvalidOperationException("A sub-assembly needs at least one line.");
+            throw new BusinessRuleException("A sub-assembly needs at least one line.");
         }
 
         if (lines.Any(l => l.Grams <= 0))
         {
-            throw new InvalidOperationException("A sub-assembly line's grams must be positive.");
+            throw new BusinessRuleException("A sub-assembly line's grams must be positive.");
         }
 
         if (lines.Select(l => l.IngredientId).Distinct().Count() != lines.Count)
         {
-            throw new InvalidOperationException("A sub-assembly can't use the same ingredient more than once — combine it into a single line instead.");
+            throw new BusinessRuleException("A sub-assembly can't use the same ingredient more than once — combine it into a single line instead.");
         }
 
         // The base is 100% between its lines by definition, so a base line is always given in grams.
         if (lines.Any(l => l.IsFormulaBase && l.AuthoredBakersPercent is not null))
         {
-            throw new InvalidOperationException("A base line is given in grams, not as a percentage.");
+            throw new BusinessRuleException("A base line is given in grams, not as a percentage.");
         }
 
         if (lines.Any(l => l.AuthoredBakersPercent is <= 0))
         {
-            throw new InvalidOperationException("A sub-assembly line's baker's percentage must be positive.");
+            throw new BusinessRuleException("A sub-assembly line's baker's percentage must be positive.");
         }
     }
 
@@ -44,17 +44,17 @@ public static class SubAssemblyRules
     {
         if (lines.Count == 0)
         {
-            throw new InvalidOperationException("A packaging set needs at least one line.");
+            throw new BusinessRuleException("A packaging set needs at least one line.");
         }
 
         if (lines.Any(l => l.QtyPerSet <= 0))
         {
-            throw new InvalidOperationException("A packaging set line's quantity must be positive.");
+            throw new BusinessRuleException("A packaging set line's quantity must be positive.");
         }
 
         if (lines.Select(l => l.PackagingMaterialId).Distinct().Count() != lines.Count)
         {
-            throw new InvalidOperationException("A packaging set can't use the same material more than once — put its quantity on a single line instead.");
+            throw new BusinessRuleException("A packaging set can't use the same material more than once — put its quantity on a single line instead.");
         }
     }
 
@@ -66,7 +66,7 @@ public static class SubAssemblyRules
     {
         if (wasPackaging != isPackaging)
         {
-            throw new InvalidOperationException(wasPackaging
+            throw new BusinessRuleException(wasPackaging
                 ? "A packaging set stays in the Packaging role. Make a new sub-assembly for a recipe instead."
                 : "A recipe can't move to the Packaging role. Make a new sub-assembly for a packaging set instead.");
         }
@@ -80,7 +80,7 @@ public static class SubAssemblyRules
     {
         if (role.IsPackaging)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"The {role.Name} role is for packaging sets on the Sub-Assemblies screen, not a recipe section. A product takes one as its packaging: Add Sub-Assembly in the Packaging role.");
         }
     }
@@ -94,7 +94,7 @@ public static class SubAssemblyRules
     {
         if (ownerName is not null)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"{subAssemblyName} is {ownerName}'s own, so it can't be linked. Copy it instead: Add Sub-Assembly, then Copy an existing one.");
         }
     }
@@ -125,7 +125,7 @@ public static class SubAssemblyRules
     {
         if (role.IsPackaging && role.IsProductOwned)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"The {role.Name} role holds packaging sets from the Sub-Assemblies screen, so it can't be product-owned.");
         }
     }
@@ -254,7 +254,7 @@ public static class SubAssemblyRules
             }
 
             var roleName = role.First().RoleName;
-            throw new InvalidOperationException(clash.Key is null
+            throw new BusinessRuleException(clash.Key is null
                 ? $"{recipe} has more than one {roleName} without a name. Name them, such as Ube and Cheese, so their tabs can be told apart."
                 : $"{recipe} has two {roleName} sub-assemblies called {clash.Key}. Give one of them another name.");
         }
@@ -265,7 +265,7 @@ public static class SubAssemblyRules
     {
         if (NormalizeName(name) is { Length: > MaxNameLength } tooLong)
         {
-            throw new InvalidOperationException($"'{tooLong[..20]}…' is too long for a sub-assembly's name: keep it to {MaxNameLength} characters.");
+            throw new BusinessRuleException($"'{tooLong[..20]}…' is too long for a sub-assembly's name: keep it to {MaxNameLength} characters.");
         }
     }
 
@@ -278,7 +278,7 @@ public static class SubAssemblyRules
         var trimmed = name.Trim();
         if (otherStandaloneNames.Any(n => string.Equals(n.Trim(), trimmed, StringComparison.OrdinalIgnoreCase)))
         {
-            throw new InvalidOperationException($"There's already a sub-assembly named '{trimmed}'. Give this one its own name.");
+            throw new BusinessRuleException($"There's already a sub-assembly named '{trimmed}'. Give this one its own name.");
         }
     }
 
@@ -295,7 +295,7 @@ public static class SubAssemblyRules
 
         var names = string.Join(", ", linkingProductNames.Order(StringComparer.CurrentCultureIgnoreCase));
         var verb = linkingProductNames.Count == 1 ? "links" : "link";
-        throw new InvalidOperationException(
+        throw new BusinessRuleException(
             $"{names} {verb} {subAssemblyName}. Make a copy of it there, or remove it there, first.");
     }
 }

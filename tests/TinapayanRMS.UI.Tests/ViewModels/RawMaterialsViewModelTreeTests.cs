@@ -550,13 +550,12 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
     {
         ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
-        var costPropagator = CreateCostPropagator();
 
         return new RawMaterialsViewModel(
-            new RawMaterialRepository(factory, costPropagator),
+            new RawMaterialRepository(factory),
             new RawMaterialPriceHistoryRepository(factory),
-            new RawMaterialBrandPriceRepository(factory, costPropagator),
-            new IngredientBomLineRepository(factory, costPropagator),
+            new RawMaterialBrandPriceRepository(factory),
+            new IngredientBomLineRepository(factory),
             new RawMaterialCategoryRepository(factory),
             new RawMaterialCategoryValidator(),
             new RawMaterialValidator(),

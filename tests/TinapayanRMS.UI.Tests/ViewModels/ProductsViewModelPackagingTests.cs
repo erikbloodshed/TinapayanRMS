@@ -352,8 +352,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         return viewModel;
     }
 
-    private PackagingLinkRepository CreatePackagingLinkRepository() =>
-        new(CreateDbContextFactory(), new PackagingLineRepository(CreateDbContextFactory()));
+    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory());
 
     /// <summary>A packaging material with <paramref name="baseUnit"/> as its base unit, costing <paramref name="cost"/> a base unit, buffered the same.</summary>
     private async Task<int> AddPackagingAsync(string name, decimal cost, string baseUnit = "pc")
@@ -389,13 +388,13 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
             packagingLineRepository,
             new CostingParametersRepository(factory),
             new CostingDefaultsRepository(factory),
-            new PackagingLinkRepository(factory, packagingLineRepository),
+            new PackagingLinkRepository(factory),
             new ProductCloner(factory),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
-            new RawMaterialRepository(factory, CreateCostPropagator()),
-            new IngredientBomLineRepository(factory, CreateCostPropagator()),
+            new RawMaterialRepository(factory),
+            new IngredientBomLineRepository(factory),
             new ProductCategoryRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),

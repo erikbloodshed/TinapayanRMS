@@ -16,6 +16,14 @@ public interface IPackagingLineRepository
     Task<IReadOnlyList<PackagingLine>> GetEffectiveForProductAsync(int productId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// GetEffectiveForProductAsync for several products at once, by product id, in a few queries however many there are
+    /// and however long their link chains: every link is read once and followed in memory. Products showing the same
+    /// packaging share its line objects, which are only read.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, IReadOnlyList<PackagingLine>>> GetEffectiveForProductsAsync(
+        IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Replaces the product's whole packaging line set. AuthoredValue is whichever of
     /// QtyPerUnit/UnitsPerPackagingUnit the user actually typed for that line (per
     /// AuthoredField) — the repository derives the other one (ProductRules.ReconcileReciprocal).

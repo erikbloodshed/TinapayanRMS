@@ -341,17 +341,17 @@ public sealed class IngredientLineRow : ReactiveObject
         {
             if (row.Ingredient is not { } ingredient)
             {
-                throw new InvalidOperationException($"Pick the ingredient for the {row.Grams:#,0.##} g line of {madeInto}, or delete that line.");
+                throw new BusinessRuleException($"Pick the ingredient for the {row.Grams:#,0.##} g line of {madeInto}, or delete that line.");
             }
 
             if (row.Grams is not > 0m)
             {
-                throw new InvalidOperationException($"Enter how many grams of {ingredient.Name} go into {madeInto}, or delete its line.");
+                throw new BusinessRuleException($"Enter how many grams of {ingredient.Name} go into {madeInto}, or delete its line.");
             }
 
             if (lines.Any(l => l.Ingredient.Id == ingredient.Id))
             {
-                throw new InvalidOperationException($"{ingredient.Name} is on two lines of {madeInto}. Put its total on one line and delete the other.");
+                throw new BusinessRuleException($"{ingredient.Name} is on two lines of {madeInto}. Put its total on one line and delete the other.");
             }
 
             lines.Add((ingredient, row.Grams.Value, row.IsFormulaBase, row.AuthoredBakersPercent));

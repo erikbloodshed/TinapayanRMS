@@ -76,7 +76,7 @@ public sealed class ProductCategoriesViewModel : ViewModelBase, IDisposable
 
         // Runs each time Settings opens and after this tab's own saves. It merges rather than
         // replaces, so the selection and any unsaved edits survive.
-        LoadCommand = ReactiveCommand.CreateFromTask(async () =>
+        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
             var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
             var selectedId = SelectedCategory?.Id;
@@ -86,7 +86,7 @@ public sealed class ProductCategoriesViewModel : ViewModelBase, IDisposable
                 _categoryCache.MergeFrom(categories);
                 SelectedCategory = Categories.FirstOrDefault(c => c.Id == selectedId);
             });
-        });
+        }));
 
         NewCommand = ReactiveCommand.Create(ClearForm);
 

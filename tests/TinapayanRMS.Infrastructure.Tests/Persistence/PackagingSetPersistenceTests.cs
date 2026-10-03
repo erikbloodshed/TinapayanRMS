@@ -23,7 +23,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
 
     private PackagingLineRepository CreatePackagingLineRepository() => new(CreateDbContextFactory());
 
-    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory(), CreatePackagingLineRepository());
+    private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory());
 
     /// <summary>A set whose lines are all in their materials' base units, which most of these tests are.</summary>
     private Task<int> SaveSetAsync(string name, int roleId, IReadOnlyList<(int PackagingMaterialId, decimal QtyPerSet)> lines, int id = 0) =>
@@ -453,7 +453,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var ribbonId = await AddPackagingAsync("Ribbon", 0.05m, "cm");
         await SaveSetAsync("Gift Box Set", packagingRoleId, [(ribbonId, 30m)]);
         var meterId = await GetOrCreateUnitOfMeasureAsync("m", "m");
-        var repository = new RawMaterialRepository(CreateDbContextFactory(), CreateCostPropagator());
+        var repository = new RawMaterialRepository(CreateDbContextFactory());
         var ribbon = await repository.GetByIdAsync(ribbonId, Cancellation);
 
         ribbon!.BaseUnitId = meterId;
@@ -510,7 +510,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var rollId = await AddAlternativeUnitAsync(ribbonId, "roll", 1000m);
         await SaveSetInUnitsAsync("Gift Box Set", packagingRoleId, [(ribbonId, rollId, 1m)]);
 
-        var act = () => new RawMaterialUnitRepository(CreateDbContextFactory(), CreateCostPropagator())
+        var act = () => new RawMaterialUnitRepository(CreateDbContextFactory())
             .DeleteAsync(rollId, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*packaging set line*");

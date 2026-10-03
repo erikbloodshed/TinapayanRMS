@@ -27,7 +27,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         var source = await dbContext.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == sourceProductId, cancellationToken)
-            ?? throw new InvalidOperationException($"Product {sourceProductId} does not exist.");
+            ?? throw new BusinessRuleException($"Product {sourceProductId} does not exist.");
 
         // What the source shows: its usages (with its own sub-assemblies' lines), its packaging resolved through any
         // link, and its costing.
@@ -57,7 +57,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                 .ThenBy(l => l.Id)
                 .ToListAsync(cancellationToken))
             .ToLookup(l => l.UsageId);
-        var packagingLines = await PackagingLineRepository.ResolveEffectiveAsync(dbContext, sourceProductId, [], cancellationToken);
+        var packagingLines = await PackagingLineRepository.ResolveEffectiveAsync(dbContext, sourceProductId, cancellationToken);
 
         // A packaging set the source links directly stays linked, like its recipe's sub-assemblies: it's kept apart to
         // be shared. Reached through another product's link, it's copied like the rest of that product's packaging.

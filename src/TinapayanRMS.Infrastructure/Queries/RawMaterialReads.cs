@@ -87,8 +87,18 @@ internal static class RawMaterialReads
     /// A packaging set's lines, in the order the user put them in: each with its material's details, and the unit
     /// the line is entered in.
     /// </summary>
-    public static async Task<IReadOnlyList<SubAssemblyPackagingLine>> GetSetLinesAsync(
-        TinapayanRMSDbContext dbContext, int subAssemblyId, CancellationToken cancellationToken)
+    public static Task<IReadOnlyList<SubAssemblyPackagingLine>> GetSetLinesAsync(
+        TinapayanRMSDbContext dbContext, int subAssemblyId, CancellationToken cancellationToken) =>
+        GetSetLinesAsync(dbContext, "WHERE l.SubAssemblyId = @subAssemblyId", new { subAssemblyId }, cancellationToken);
+
+    /// <summary>Several packaging sets' lines at once, each set's in the order the user put them in, as GetSetLinesAsync reads one set's.</summary>
+    public static Task<IReadOnlyList<SubAssemblyPackagingLine>> GetSetLinesAsync(
+        TinapayanRMSDbContext dbContext, IReadOnlyCollection<int> subAssemblyIds, CancellationToken cancellationToken) =>
+        GetSetLinesAsync(
+            dbContext, $"WHERE l.SubAssemblyId IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(subAssemblyIds) }, cancellationToken);
+
+    private static async Task<IReadOnlyList<SubAssemblyPackagingLine>> GetSetLinesAsync(
+        TinapayanRMSDbContext dbContext, string filter, object parameters, CancellationToken cancellationToken)
     {
         var lines = (await dbContext.Connection().QueryAsync<SubAssemblyPackagingLine, RawMaterial, RawMaterialCategory, UnitOfMeasure?, RawMaterialUnit?, UnitOfMeasure?, SubAssemblyPackagingLine>(
             dbContext.Command(
@@ -99,10 +109,10 @@ internal static class RawMaterialReads
                 {MaterialJoins}
                 LEFT JOIN RawMaterialUnits lu ON lu.Id = l.UnitId
                 LEFT JOIN UnitsOfMeasure lum ON lum.Id = lu.UnitOfMeasureId
-                WHERE l.SubAssemblyId = @subAssemblyId
-                ORDER BY l.SortOrder, l.Id
+                {filter}
+                ORDER BY l.SubAssemblyId, l.SortOrder, l.Id
                 """,
-                new { subAssemblyId },
+                parameters,
                 cancellationToken),
             (line, material, category, baseUnit, unit, unitOfMeasure) =>
             {

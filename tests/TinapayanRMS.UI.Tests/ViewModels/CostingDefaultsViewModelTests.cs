@@ -1,8 +1,11 @@
 using System.Reactive.Linq;
 using AwesomeAssertions;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.UI.Tests.Fixtures;
 using TinapayanRMS.UI.ViewModels;
@@ -17,7 +20,10 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
     {
         ReactiveUIBootstrapper.EnsureInitialized();
         return new CostingDefaultsViewModel(
-            new CostingDefaultsRepository(CreateDbContextFactory()), new CostingParametersValidator(), new LoggerConfiguration().CreateLogger());
+            new CostingDefaultsRepository(CreateDbContextFactory()),
+            new CostingParametersValidator(),
+            new CostRecalculator(CreateDbContextFactory()),
+            new LoggerConfiguration().CreateLogger());
     }
 
     [Fact]
@@ -52,5 +58,35 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ErrorMessage.Should().Be("VAT percent can't be negative.");
         (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).VatPercent.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task Recalculate_costs_puts_right_a_total_changed_outside_the_app_and_says_how_many()
+    {
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var roleId = await AddRoleAsync("Dough");
+        var (_, doughId) = await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 1000m)]);
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.SubAssemblies.Where(s => s.Id == doughId).ExecuteUpdateAsync(set => set.SetProperty(s => s.TotalCost, 1m), Cancellation);
+        }
+
+        var viewModel = CreateViewModel();
+        await viewModel.RecalculateCostsCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SuccessMessage.Should().Be("Costs recalculated: 1 sub-assembly was out of date, and is right now.");
+        await using var check = CreateDbContext();
+        (await check.SubAssemblies.SingleAsync(s => s.Id == doughId, Cancellation)).TotalCost.Should().Be(50m, "1,000 g of flour at 0.05 a gram");
+    }
+
+    [Theory]
+    [InlineData(0, 0, "Costs recalculated: every one was already up to date.")]
+    [InlineData(1, 0, "Costs recalculated: 1 made or linked ingredient was out of date, and is right now.")]
+    [InlineData(0, 2, "Costs recalculated: 2 sub-assemblies were out of date, and are right now.")]
+    [InlineData(2, 3, "Costs recalculated: 2 made or linked ingredients and 3 sub-assemblies were out of date, and are right now.")]
+    public void RecalculatedText_says_how_many_were_out_of_date(int ingredients, int subAssemblies, string expected)
+    {
+        CostingDefaultsViewModel.RecalculatedText(new CostRecalculation(ingredients, subAssemblies)).Should().Be(expected);
     }
 }

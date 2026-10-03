@@ -9,12 +9,14 @@ namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// The Settings dialog's Costing Defaults tab: the labor, overhead, administrative, markup and VAT percentages a new
-/// product's costing starts with (ProductsViewModel). Saving them changes no saved product.
+/// product's costing starts with (ProductsViewModel). Saving them changes no saved product. Its second card works every
+/// stored cost out again (RecalculateCostsCommand).
 /// </summary>
 public sealed class CostingDefaultsViewModel : ViewModelBase
 {
     private readonly ICostingDefaultsRepository _repository;
     private readonly IValidator<CostingParameters> _validator;
+    private readonly ICostRecalculator _costRecalculator;
 
     private decimal _editingLaborPercent;
     public decimal EditingLaborPercent
@@ -55,14 +57,23 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
 
-    public CostingDefaultsViewModel(ICostingDefaultsRepository repository, IValidator<CostingParameters> validator, ILogger logger)
+    /// <summary>
+    /// Recalculate Costs (2026-10-03): every made and linked ingredient's costs and every sub-assembly's totals worked out
+    /// again from what they're made of (ICostRecalculator), for after the database was changed outside the app. Says how
+    /// many were out of date.
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> RecalculateCostsCommand { get; }
+
+    public CostingDefaultsViewModel(
+        ICostingDefaultsRepository repository, IValidator<CostingParameters> validator, ICostRecalculator costRecalculator, ILogger logger)
         : base(logger)
     {
         _repository = repository;
         _validator = validator;
+        _costRecalculator = costRecalculator;
 
         // What's saved replaces the fields: an unsaved edit doesn't outlive the dialog it was typed in.
-        LoadCommand = ReactiveCommand.CreateFromTask(async () =>
+        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
             var defaults = await _repository.GetAsync(CancellationToken.None);
             EditingLaborPercent = defaults.LaborPercent;
@@ -70,7 +81,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
             EditingAdministrativePercent = defaults.AdministrativePercent;
             EditingMarginPercent = defaults.MarginPercent;
             EditingVatPercent = defaults.VatPercent;
-        });
+        }));
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
@@ -101,5 +112,34 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
                 CancellationToken.None);
             SuccessMessage = "Costing defaults saved. New products start with them.";
         }));
+
+        RecalculateCostsCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        {
+            var result = await _costRecalculator.RecalculateAllAsync(CancellationToken.None);
+            SuccessMessage = RecalculatedText(result);
+        }));
+    }
+
+    /// <summary>"Costs recalculated: 1 made or linked ingredient and 2 sub-assemblies were out of date, and are right now."</summary>
+    public static string RecalculatedText(CostRecalculation result)
+    {
+        if (!result.CorrectedAny)
+        {
+            return "Costs recalculated: every one was already up to date.";
+        }
+
+        List<string> parts = [];
+        if (result.IngredientsCorrected > 0)
+        {
+            parts.Add(result.IngredientsCorrected == 1 ? "1 made or linked ingredient" : $"{result.IngredientsCorrected} made or linked ingredients");
+        }
+
+        if (result.SubAssembliesCorrected > 0)
+        {
+            parts.Add(result.SubAssembliesCorrected == 1 ? "1 sub-assembly" : $"{result.SubAssembliesCorrected} sub-assemblies");
+        }
+
+        var verb = result.IngredientsCorrected + result.SubAssembliesCorrected == 1 ? "was" : "were";
+        return $"Costs recalculated: {string.Join(" and ", parts)} {verb} out of date, and {(verb == "was" ? "is" : "are")} right now.";
     }
 }

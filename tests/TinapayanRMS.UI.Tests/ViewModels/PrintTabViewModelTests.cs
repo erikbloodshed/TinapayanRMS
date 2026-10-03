@@ -242,7 +242,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
         return new SavedProductReader(
-            new PackagingLinkRepository(factory, packagingLineRepository),
+            new PackagingLinkRepository(factory),
             new ProductSubAssemblyUsageRepository(factory),
             packagingLineRepository,
             new CostingParametersRepository(factory),
@@ -278,13 +278,13 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             packagingLineRepository,
             new CostingParametersRepository(factory),
             new CostingDefaultsRepository(factory),
-            new PackagingLinkRepository(factory, packagingLineRepository),
+            new PackagingLinkRepository(factory),
             new ProductCloner(factory),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
-            new RawMaterialRepository(factory, CreateCostPropagator()),
-            new IngredientBomLineRepository(factory, CreateCostPropagator()),
+            new RawMaterialRepository(factory),
+            new IngredientBomLineRepository(factory),
             new ProductCategoryRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),

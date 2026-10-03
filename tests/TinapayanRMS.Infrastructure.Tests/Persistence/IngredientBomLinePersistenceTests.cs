@@ -13,7 +13,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private IngredientBomLineRepository CreateBomRepository() =>
-        new(CreateDbContextFactory(), CreateCostPropagator());
+        new(CreateDbContextFactory());
 
     private async Task<int> SeedCategoryAsync(string name)
     {
@@ -173,7 +173,7 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
 
         var syrup = await GetIngredientAsync(syrupId);
         syrup.WeightLossPercent = 10m;
-        await new RawMaterialRepository(CreateDbContextFactory(), CreateCostPropagator()).UpdateAsync(syrup, Cancellation);
+        await new RawMaterialRepository(CreateDbContextFactory()).UpdateAsync(syrup, Cancellation);
 
         // 1000g -> 900g output, same ₱90 total cost -> ₱0.10/g.
         (await GetIngredientAsync(syrupId)).CostPerBaseUnit.Should().Be(0.1m);

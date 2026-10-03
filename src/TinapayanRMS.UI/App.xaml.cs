@@ -5,8 +5,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using ReactiveUI;
 using Serilog;
 using Syncfusion.Licensing;
 using Syncfusion.SfSkinManager;
@@ -16,6 +18,7 @@ using Syncfusion.Windows.Controls.Input;
 using Syncfusion.Windows.Shared;
 using Syncfusion.Windows.Tools.Controls;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.Infrastructure;
 using TinapayanRMS.UI.Controls;
 using TinapayanRMS.UI.ViewModels;
 using TinapayanRMS.UI.Vim;
@@ -29,6 +32,11 @@ public partial class App : Application
     private const double ControlHeight = 24;
 
     private IHost? _host;
+
+    private readonly UnhandledErrorGuard _errorGuard = new();
+
+    // Set while an unhandled exception's message is up, so another arriving meanwhile is only logged.
+    private bool _isShowingError;
 
     static App()
     {
@@ -193,6 +201,7 @@ public partial class App : Application
 
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
         // Re-colors the theme's primary accent (buttons, grid selection, tab/drawer
         // indicators, focus rings) to the app's Catppuccin Latte Sky, with text on it in Sky's Ink
@@ -217,6 +226,45 @@ public partial class App : Application
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         SfSkinManager.SetTheme(mainWindow, new Theme("Windows11Light"));
         mainWindow.Show();
+
+        _ = WarnOfPendingMigrationsAsync(_host.Services.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>());
+    }
+
+    /// <summary>
+    /// Says so when the database is behind this version of the app: a migration added since it was last updated, and not
+    /// applied with `dotnet ef database update`. Every screen reading a column the database doesn't have yet would fail
+    /// otherwise, one error notice at a time, with nothing saying why. Read off the UI thread once the window shows, so the
+    /// app starts no later; a database that can't be reached is left to the screens, which say so themselves.
+    /// </summary>
+    private async Task WarnOfPendingMigrationsAsync(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory)
+    {
+        IReadOnlyList<string> pending;
+        try
+        {
+            pending = await Task.Run(async () =>
+            {
+                await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+                return (IReadOnlyList<string>)[.. await dbContext.Database.GetPendingMigrationsAsync()];
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Couldn't check the database for migrations not applied yet");
+            return;
+        }
+
+        if (pending.Count == 0)
+        {
+            return;
+        }
+
+        Log.Warning("The database is missing {Count} migrations: {Migrations}", pending.Count, pending);
+        ShowError(
+            $"The database is out of date for this version of TinapayanRMS: {pending.Count} "
+            + $"{(pending.Count == 1 ? "update hasn't" : "updates haven't")} been applied to it, so some screens won't work."
+            + Environment.NewLine + Environment.NewLine
+            + "Close the app and apply them (dotnet ef database update), then open it again.",
+            MessageBoxImage.Warning);
     }
 
     /// <summary>
@@ -245,13 +293,66 @@ public partial class App : Application
         base.OnExit(e);
     }
 
-    private static void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    /// <summary>
+    /// An exception nothing else caught on the UI thread: logged, said in a message, and the app carries on with whatever
+    /// hasn't been saved still there (UnhandledErrorGuard says when it shouldn't). A failure ReactiveUI was left holding
+    /// (a command's or an observable's) arrives wrapped in its UnhandledErrorException, and it's the cause inside that's
+    /// worth showing.
+    /// </summary>
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        Log.Error(e.Exception, "Unhandled exception on the UI thread");
+        var exception = e.Exception is UnhandledErrorException { InnerException: { } inner } ? inner : e.Exception;
+        Log.Error(exception, "Unhandled exception on the UI thread");
+        if (!_errorGuard.Admit(DateTime.Now))
+        {
+            Log.Fatal("Unhandled exceptions kept coming, more than {Count} in {Window}: closing", UnhandledErrorGuard.MaxFailures, UnhandledErrorGuard.Window);
+            return;
+        }
+
+        e.Handled = true;
+        ShowError(
+            Failure.Of(exception).Text
+            + Environment.NewLine + Environment.NewLine
+            + "The app is still running, and nothing you haven't saved was lost. "
+            + "If something looks wrong, save what you can, then close the app and open it again.",
+            MessageBoxImage.Error);
+    }
+
+    /// <summary>A message over the main window. One at a time: another arriving while one is up is only logged.</summary>
+    private void ShowError(string message, MessageBoxImage image)
+    {
+        if (_isShowingError)
+        {
+            return;
+        }
+
+        _isShowingError = true;
+        try
+        {
+            if (MainWindow is { IsVisible: true } owner)
+            {
+                MessageBox.Show(owner, message, "TinapayanRMS", MessageBoxButton.OK, image);
+            }
+            else
+            {
+                MessageBox.Show(message, "TinapayanRMS", MessageBoxButton.OK, image);
+            }
+        }
+        finally
+        {
+            _isShowingError = false;
+        }
     }
 
     private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
         Log.Fatal(e.ExceptionObject as Exception, "Unhandled exception ({IsTerminating})", e.IsTerminating);
+    }
+
+    /// <summary>A task that failed with nothing awaiting it: nothing else would ever hear of it.</summary>
+    private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        Log.Warning(e.Exception, "A task failed with nothing awaiting it");
+        e.SetObserved();
     }
 }

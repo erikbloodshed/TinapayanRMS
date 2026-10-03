@@ -19,25 +19,25 @@ public static class CompositeProductRules
     {
         if (productId > 0 && components.Any(c => c.ComponentProductId == productId))
         {
-            throw new InvalidOperationException("A composite product can't contain itself.");
+            throw new BusinessRuleException("A composite product can't contain itself.");
         }
 
         var notCounted = components.Where(c => c.Quantity < 1).Select(c => c.Name).FirstOrDefault();
         if (notCounted is not null)
         {
-            throw new InvalidOperationException($"Enter how many {notCounted} go in: a whole number, 1 or more.");
+            throw new BusinessRuleException($"Enter how many {notCounted} go in: a whole number, 1 or more.");
         }
 
         var duplicate = components.GroupBy(c => c.ComponentProductId).FirstOrDefault(g => g.Count() > 1);
         if (duplicate is not null)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"{duplicate.First().Name} is on two lines. Put its quantity on one line and delete the other.");
         }
 
         if (components.Count < MinimumProducts)
         {
-            throw new InvalidOperationException("A composite product needs at least two different products.");
+            throw new BusinessRuleException("A composite product needs at least two different products.");
         }
     }
 
@@ -58,12 +58,12 @@ public static class CompositeProductRules
         {
             if (componentId == productId)
             {
-                throw new InvalidOperationException("A composite product can't contain itself.");
+                throw new BusinessRuleException("A composite product can't contain itself.");
             }
 
             if (Contains(componentId, productId, componentIdsByProductId))
             {
-                throw new InvalidOperationException(
+                throw new BusinessRuleException(
                     $"{nameOf(componentId)} can't go into {nameOf(productId)}: it already contains {nameOf(productId)}, so {nameOf(productId)} would end up containing itself.");
             }
         }
@@ -108,7 +108,7 @@ public static class CompositeProductRules
         var notOwned = roles.Where(r => !r.IsProductOwned).Select(r => r.Name).FirstOrDefault();
         if (notOwned is not null)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 $"{compositeName} can only have sections in product-owned roles, such as a topping or filling. {notOwned} isn't one: tick Product-owned for it in Settings ▸ Roles, or take that section out.");
         }
     }
@@ -118,7 +118,7 @@ public static class CompositeProductRules
     {
         if (storedIsComposite != isComposite)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 storedIsComposite
                     ? "A composite product can't become a single product once it's saved."
                     : "A product can't become a composite product once it's saved. Make a new composite product instead.");
@@ -130,7 +130,7 @@ public static class CompositeProductRules
     {
         if (isComposite && quantityRequired != 1)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 "A composite product is one sellable unit. Say how many of each product go in on its Products table instead.");
         }
     }
@@ -140,7 +140,7 @@ public static class CompositeProductRules
     {
         if (!isComposite && includesComponentPackaging)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleException(
                 "Only a composite product can include the packaging of the products in it.");
         }
     }
