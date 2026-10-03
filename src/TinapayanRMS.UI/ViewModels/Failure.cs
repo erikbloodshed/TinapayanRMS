@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Rules;
@@ -31,6 +32,10 @@ public readonly record struct Failure(string Text, bool IsRejection)
 
     public const string TooLargeText = "A number is too large to save.";
 
+    public const string FileInUseText = "Couldn't write the file. If it's open in another program, such as Excel, close it there and try again.";
+
+    public const string NoAccessText = "Windows didn't allow the app to use that file or folder. Pick another one.";
+
     public static Failure Of(Exception exception) => exception switch
     {
         BusinessRuleException rule => new(rule.Message, IsRejection: true),
@@ -44,6 +49,10 @@ public readonly record struct Failure(string Text, bool IsRejection)
             new(TooLargeText, IsRejection: true),
         SqlException sql => Of(sql),
         TimeoutException => new(TimedOutText, IsRejection: false),
+
+        // A file the app writes or reads, such as an exported workbook: the user can close it elsewhere or pick another place.
+        IOException => new(FileInUseText, IsRejection: true),
+        UnauthorizedAccessException => new(NoAccessText, IsRejection: true),
         _ => new($"Something went wrong, and the details went to the log: {FirstLine(exception.Message)}", IsRejection: false),
     };
 

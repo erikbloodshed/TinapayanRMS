@@ -114,6 +114,11 @@
                 <TextBlock Text="&#xE749;" Style="{StaticResource IconGlyphStyle}" />
             </DataTemplate>
 
+            <!-- A table to an Excel workbook: Export, an arrow leaving a box -->
+            <DataTemplate x:Key="ExportIconTemplate">
+                <TextBlock Text="&#xEDE1;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
+
             <!-- A composite product, made of several: AllApps, as its Products tab and its row in the list show it -->
             <DataTemplate x:Key="CompositeIconTemplate">
                 <TextBlock Text="&#xE71D;" Style="{StaticResource IconGlyphStyle}" />

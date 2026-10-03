@@ -694,6 +694,20 @@ A material that has never been priced shows blank figures.
 
 Double-click a material to open it on the **Raw Materials** screen.
 
+### Exporting to Excel
+
+Each tab has **Export to Excel** at its top right. It saves the table to an Excel workbook (an .xlsx file) exactly as it's shown:
+
+- in the order you sorted it;
+- with only the rows your filters leave;
+- with only the columns showing (Product Cost Summary's **Columns** list decides which).
+
+Choose where to save it and press **Save**. The name offered is the report's and today's date, such as *Product Cost Summary 2026-10-03.xlsx*. A notice then says where the file went.
+
+The figures are real numbers in Excel, kept to every decimal the app works with, and shown to 2 decimal places as on the screen. So you can add them up or chart them in Excel.
+
+If a file of that name is open in Excel, the app can't replace it. Close it in Excel first, or save under another name.
+
 ---
 
 ## 10. How costs are worked out
@@ -831,6 +845,12 @@ Open the product and compare the header's **Markup %**, which is what the curren
 
 Right-click it in the Products list and choose **Promote to Production**, or drag it into a Production folder. Right-click a category folder and choose **Promote All to Production** to promote every product in that folder.
 
+### Send a report to Excel
+
+1. Open **Reports** and pick the tab.
+2. Sort, filter and choose the columns as you want them in the file.
+3. Press **Export to Excel**, choose a folder and a name, and press **Save**.
+
 ### Print the recipes of a whole category
 
 Right-click the category's folder in the Products list and choose **Print Folder**. Untick **Costing** for kitchen copies.
@@ -883,6 +903,12 @@ Nothing was saved. Try again.
 
 **A message says the database is out of date for this version of TinapayanRMS.**
 The app was updated, but the update to its database wasn't applied. Close the app and ask whoever installs it to apply the database update. Until they do, some screens show an error.
+
+**"Couldn't write the file. If it's open in another program, such as Excel, close it there and try again."**
+The file you're saving over is open, usually in Excel. Close it there and try again, or save under another name.
+
+**"Windows didn't allow the app to use that file or folder. Pick another one."**
+The folder is protected, such as a system folder. Save in Documents, on the Desktop or on a USB stick instead.
 
 **"A number is too large to save."**
 A figure has more digits than the app keeps, for example a price typed with too many zeros. Check what you typed.

@@ -123,6 +123,12 @@ public sealed class RawMaterialPriceSummaryRow
 /// </summary>
 public sealed class ReportsViewModel : ViewModelBase, IDisposable
 {
+    /// <summary>The Product Cost Summary's name, which its export file takes and the View picks its grid by.</summary>
+    public const string ProductCostSummaryTitle = "Product Cost Summary";
+
+    /// <summary>The Raw Materials Price Summary's name, which its export file takes and the View picks its grid by.</summary>
+    public const string RawMaterialPriceSummaryTitle = "Raw Materials Price Summary";
+
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IProductRepository _productRepository;
@@ -154,6 +160,12 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     /// <summary>Runs whenever the tab is shown (MainWindow), so both summaries are from current prices.</summary>
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
 
+    /// <summary>The Product Cost Summary to an Excel workbook, as its grid shows it: sorted, filtered and with its shown columns.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ExportProductCostsCommand { get; }
+
+    /// <summary>The Raw Materials Price Summary to an Excel workbook, as its grid shows it.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ExportRawMaterialPricesCommand { get; }
+
     public ReportsViewModel(
         IRawMaterialPriceHistoryRepository priceHistoryRepository,
         IRawMaterialRepository rawMaterialRepository,
@@ -169,6 +181,8 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
 
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
         OpenRawMaterialCommand = ReactiveCommand.Create<int>(_rawMaterialOpenRequests.OnNext);
+        ExportProductCostsCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(ProductCostSummaryTitle));
+        ExportRawMaterialPricesCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(RawMaterialPriceSummaryTitle));
 
         LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {

@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup Label="Syncfusion">
+    <PackageVersion Include="Syncfusion.DataGridExcelExport.WPF" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.Licensing" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.SfChart.WPF" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.SfGrid.WPF" Version="$(SyncfusionVersion)" />

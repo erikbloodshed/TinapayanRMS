@@ -1,3 +1,4 @@
+using System.IO;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
@@ -168,5 +169,64 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         }
 
         opened.Should().Equal(sugarId);
+    }
+
+    [Fact]
+    public async Task An_export_says_where_its_workbook_was_saved()
+    {
+        var viewModel = CreateViewModel();
+        string? asked = null;
+        viewModel.ExportToExcel.RegisterHandler(interaction =>
+        {
+            asked = interaction.Input;
+            interaction.SetOutput(@"C:\Reports\Product Cost Summary 2026-10-03.xlsx");
+        });
+
+        await viewModel.ExportProductCostsCommand.Execute();
+
+        asked.Should().Be(ReportsViewModel.ProductCostSummaryTitle, "the View picks the grid by the title, and the file is named after it");
+        viewModel.SuccessMessage.Should().Be(@"Saved Product Cost Summary 2026-10-03.xlsx in C:\Reports.");
+        viewModel.ErrorMessage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Each_tab_exports_its_own_table()
+    {
+        var viewModel = CreateViewModel();
+        string? asked = null;
+        viewModel.ExportToExcel.RegisterHandler(interaction =>
+        {
+            asked = interaction.Input;
+            interaction.SetOutput(null);
+        });
+
+        await viewModel.ExportRawMaterialPricesCommand.Execute();
+
+        asked.Should().Be(ReportsViewModel.RawMaterialPriceSummaryTitle);
+    }
+
+    [Fact]
+    public async Task A_cancelled_export_says_nothing()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.ExportToExcel.RegisterHandler(interaction => interaction.SetOutput(null));
+
+        await viewModel.ExportProductCostsCommand.Execute();
+
+        viewModel.SuccessMessage.Should().BeNull();
+        viewModel.ErrorMessage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_workbook_that_cant_be_written_says_why()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.ExportToExcel.RegisterHandler(_ =>
+            throw new IOException("The process cannot access the file because it is being used by another process."));
+
+        await viewModel.ExportProductCostsCommand.Execute();
+
+        viewModel.ErrorMessage.Should().Be(Failure.FileInUseText);
+        viewModel.SuccessMessage.Should().BeNull();
     }
 }

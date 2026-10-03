@@ -210,10 +210,10 @@ A change is done when:
 | `src/TinapayanRMS.Domain` | `net10.0` | Nothing | `Entities/`, `Enums/` |
 | `src/TinapayanRMS.ApplicationCore` | `net10.0` | Domain; FluentValidation | `Interfaces/`, `Rules/`, `Validators/` |
 | `src/TinapayanRMS.Infrastructure` | `net10.0` | Domain, ApplicationCore; EF Core (SQL Server), Dapper | `TinapayanRMSDbContext` and its design-time factory at the root; `Configurations/`, `Migrations/`, `Queries/`, `Repositories/`, `Services/` |
-| `src/TinapayanRMS.UI` | `net10.0-windows10.0.19041.0` | All three; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion | App startup at the root; `Views/`, `ViewModels/`, `Controls/`, `Converters/`, `Printing/`, `Vim/`, `Themes/` |
+| `src/TinapayanRMS.UI` | `net10.0-windows10.0.19041.0` | All three; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion | App startup at the root; `Views/`, `ViewModels/`, `Controls/`, `Converters/`, `Printing/`, `Exporting/`, `Vim/`, `Themes/` |
 | `tests/TinapayanRMS.ApplicationCore.Tests` | `net10.0` | Domain, ApplicationCore | Rule and validator tests, with no database |
 | `tests/TinapayanRMS.Infrastructure.Tests` | `net10.0` | Infrastructure, Tests.Common | Persistence tests against the project's own database |
-| `tests/TinapayanRMS.UI.Tests` | `net10.0-windows10.0.19041.0` | UI, Tests.Common | ViewModel, control, printing, converter and Vim-key tests |
+| `tests/TinapayanRMS.UI.Tests` | `net10.0-windows10.0.19041.0` | UI, Tests.Common | ViewModel, control, printing, export, converter and Vim-key tests |
 | `tests/TinapayanRMS.Tests.Common` | `net10.0` | Infrastructure; Respawn | The shared database fixtures. It's a plain library, not a test project. |
 
 The two UI projects target Windows SDK 10.0.19041 because ReactiveUI.WPF needs it. The bare `net10.0-windows` moniker resolves to `windows7.0`, which is too low.
@@ -234,6 +234,7 @@ Every folder in a project is a sub-namespace: `src/TinapayanRMS.UI/ViewModels/` 
 | Card of a large screen | `UI/Views/<Screen>/` | — |
 | Reusable control or behaviour | `UI/Controls/` | `UI.Tests/Controls/` |
 | Value converter | `UI/Converters/` | `UI.Tests/Converters/` |
+| Something written to a file, such as an Excel export | `UI/Exporting/` | `UI.Tests/Exporting/` |
 | Part of the Vim keys | `UI/Vim/` | `UI.Tests/Vim/` |
 
 A ViewModel file can also hold the small row and edit types that only its screen uses. For example, `ProductsViewModel.cs` defines `ProductUsageEdit` and `ProductCostSummary`.
@@ -665,11 +666,12 @@ Each screen puts an `ErrorToast` over its content, and a `SuccessToast` where it
 **[ViewModelBase](../src/TinapayanRMS.UI/ViewModels/ViewModelBase.cs)** is the base of every screen's ViewModel. It provides:
 
 - `ErrorMessage` and `SuccessMessage`, which the toasts show.
-- **`RunSafelyAsync(action)`**, which clears both messages and runs the action. Whatever the action throws becomes `ErrorMessage`, in the words [Failure](../src/TinapayanRMS.UI/ViewModels/Failure.cs) gives it: a `BusinessRuleException`'s message as written; what the database refused or couldn't do, put plainly by its error number (a duplicate name, something in use, a database that can't be reached); and anything else, a bug, as "Something went wrong, and the details went to the log: …". A refusal is logged as a warning, anything else as an error with its stack. Nothing reaches ReactiveUI, which would hand it to `App`.
+- **`RunSafelyAsync(action)`**, which clears both messages and runs the action. Whatever the action throws becomes `ErrorMessage`, in the words [Failure](../src/TinapayanRMS.UI/ViewModels/Failure.cs) gives it: a `BusinessRuleException`'s message as written; what the database refused or couldn't do, put plainly by its error number (a duplicate name, something in use, a database that can't be reached); a file that couldn't be written or opened (`IOException`, `UnauthorizedAccessException`); and anything else, a bug, as "Something went wrong, and the details went to the log: …". A refusal is logged as a warning, anything else as an error with its stack. Nothing reaches ReactiveUI, which would hand it to `App`.
 - **`LoadSafelyAsync(load)`**, which every `LoadCommand` runs its body in. A load that fails shows why in the same words, without clearing the notices (a screen loads after its own Save, and mustn't take that Save's message away), and a later load that works clears it.
 - **`LoadLatest(values, load)`**, for a load driven by a selection: each value's load runs as it comes, a newer value cancels a load still running, and one that fails shows why while the next value loads as usual. Never write `Observable.Switch(...).Subscribe()` for this by hand: an exception that reaches `Switch` ends the subscription, and from then on no pick loads anything.
 - **`ShowFailure(exception, context)`**, for a failure that code catches itself, such as a read nothing awaits.
 - **`RunWithConfirmationAsync(message, action)`**, which asks through the `ConfirmDelete` interaction first.
+- **`ExportToExcelAsync(title)`**, which asks the view to write its grids to a workbook through the `ExportToExcel` interaction, and says where the file went. See [Exporting to Excel](#exporting-to-excel).
 - **`ApplyRefresh`/`IsRefreshing`** and **`ApplyRestore`/`IsRestoring`**, which mark a load merging data in and an undo putting a form back. Code that reacts to user edits skips while either is set (`IsBusyApplying`).
 - A logger for the concrete class (`logger.ForContext(GetType())`).
 
@@ -753,7 +755,7 @@ The rules for ViewModels:
 - **Switching to the latest inner observable** is written `Observable.Switch(source)`, never `source.Switch()`. ReactiveUI imports `ReactiveUI.Binding` into every file, and that namespace has a `Switch` of its own that clashes with Rx's (error CS0121). `ViewModelBase.LoadLatest` uses it to load a selection's details, so a newer pick cancels an older load that is still running.
 - **Lists** are a DynamicData `SourceCache<T, int>` bound with `Connect().SortAndBind(out collection, comparer).Subscribe()`, or an `ObservableCollection<T>` of editable rows.
 - **Several reads at once** start in parallel with `Task.Run`, are awaited together with `Task.WhenAll`, and are applied in one step on the UI thread. Code inside `Task.Run` calls repositories only and never touches ViewModel state. (`ProductsViewModel`'s `LoadCommand` starts about a dozen reads at once this way.)
-- **Dialogs and prompts** are `Interaction`s that the view handles: `ConfirmDelete` (a Yes/No `MessageBox`, through `RegisterNativeMessageBoxHandler`), and `PromptForName` and `PromptForNewCategory` (`TextPromptWindow.Prompt`). Tests register handlers of their own.
+- **Dialogs and prompts** are `Interaction`s that the view handles: `ConfirmDelete` (a Yes/No `MessageBox`, through `RegisterNativeMessageBoxHandler`), `ExportToExcel` (a Save dialog and the export, through `RegisterExcelExport`), and `PromptForName` and `PromptForNewCategory` (`TextPromptWindow.Prompt`). Tests register handlers of their own.
 - **One screen asks another for something** through an `IObservable<T>` backed by a `Subject<T>`: `ProductOpenRequests` (from Raw Materials, Sub-Assemblies and Reports), `RawMaterialOpenRequests` (from Reports), `SubAssemblyOpenRequests` and `PrintRequests` (from Products). `MainWindow` subscribes to them, calls the target screen's `Open*` method and shows its tab, so the ViewModels never know about each other.
 
 ### Loading and refreshing
@@ -877,6 +879,20 @@ The Products screen prints a product, its scaled recipe, or a whole folder of pr
 4. **`PrintPagination`** is pure: it splits the blocks into pages, keeps headings with what follows them, and continues a long table under "(continued)".
 5. **`ProductPrintManager`**, a subclass of Syncfusion's `PrintManager`, lays the printout out again whenever the paper, margins or orientation change. It overrides `PrintDocument` to print on the printer's own ticket and to report errors, which the base class swallows.
 6. Syncfusion's **`PrintPreview`** pane shows the pages. `PrintPaneFit` and `PrintPaneTemplates.xaml` fit the pane to the app's 14 px text. The window must be themed before the pane goes into it.
+
+### Exporting to Excel
+
+Reports' tables go to an Excel workbook with **Export to Excel**. The parts, in [Exporting/](../src/TinapayanRMS.UI/Exporting/):
+
+1. The ViewModel's command calls `ExportToExcelAsync(title)`, which raises `ViewModelBase.ExportToExcel` with the export's title and, once the view answers with a path, sets `SuccessMessage` to where the file went. It runs inside `RunSafelyAsync`, so a file open in Excel shows as an error notice.
+2. The view answers through `RegisterExcelExport(this, title => sheets)` (`ExcelExportHandlerRegistration`): it asks for a path with a Save dialog, then writes the `ExcelSheet`s it picks for that title. The grids are the view's, because the sort, the filters and the hidden columns the user chose live on them, not in the ViewModel.
+3. **`ExcelExport.Save`** writes each grid on a sheet of its own through Syncfusion's grid converter (`Syncfusion.DataGridExcelExport.WPF`, which brings XlsIO, licensed by the same key). It exports the grid's `View`, so the current sort and filters come with it. It also does three things the converter leaves undone:
+   - it leaves out hidden columns by name (`ExcludeColumns`), since the converter writes them too;
+   - it gives each numeric column the grid's decimals with a thousands separator (`#,##0.00`), since the converter's own format has none;
+   - it fits the columns to their contents, since the converter copies the grid's on-screen widths.
+   `GridFillerRows`' padding is a grid's unbound rows, which stay out because `ExportUnBoundRows` is left false. Figures are written as numbers at full precision; the format only shows them rounded. The workbook is built in memory before the file is touched, so a file that can't be written is left as it was.
+
+`ExcelExportTests` checks all of this against a real grid read back with XlsIO.
 
 ### Logging and errors
 
@@ -1097,6 +1113,14 @@ Respawn picks up the new table by itself.
 1. Write the ViewModel and view as for a screen, and register the ViewModel.
 2. Add the tab to `SettingsWindow.xaml`. In `SettingsWindow`'s constructor, set its content, add its `RegisterNativeMessageBoxHandler()` to the disposables, and run its `LoadCommand` on `Loaded`.
 3. Pass the ViewModel through `MainWindow` to `OpenSettings`.
+
+### Export a grid to Excel
+
+1. Give the grid an `x:Name`.
+2. In the ViewModel, add a command that runs `ExportToExcelAsync("<title>")`. The title names the file and lets the view tell several exports apart.
+3. In the view's constructor, call `viewModel.RegisterExcelExport(this, title => [new ExcelSheet("<sheet>", TheGrid)])`, and give the view a `SuccessToast` for the "Saved … in …" notice.
+4. Add an **Export to Excel** `ButtonAdv` with `ExportIconTemplate`, bound to the command.
+5. Test the command with a handler of your own on `ExportToExcel`.
 
 ### Use a new Syncfusion control
 

@@ -13,6 +13,7 @@
     <PackageReference Include="ReactiveUI.WPF" />
     <PackageReference Include="Serilog.Extensions.Hosting" />
     <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Syncfusion.DataGridExcelExport.WPF" />
     <PackageReference Include="Syncfusion.Licensing" />
     <PackageReference Include="Syncfusion.SfChart.WPF" />
     <PackageReference Include="Syncfusion.SfGrid.WPF" />

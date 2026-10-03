@@ -33,8 +33,17 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Product Cost Summary" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                                <!-- The table as it's shown, sorted, filtered and with its shown columns, to an Excel workbook (Exporting/ExcelExport) -->
+                                <syncfusion:ButtonAdv Grid.Column="1"
+                                                      Label="Export to Excel"
+                                                      IconTemplate="{StaticResource ExportIconTemplate}"
+                                                      Command="{Binding ExportProductCostsCommand}"
+                                                      ToolTip="Saves this table to an Excel workbook as it's shown: in its order, with its filters, and with only the columns showing."
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,8,0" />
                                 <!--
                                     Which columns show: a tick box for each but Product, ticked while it shows, bound to the
                                     column's IsHidden (ColumnChoices, filled from the grid's columns in ReportsView). A
@@ -42,7 +51,7 @@
                                     one go. The choice lasts while the app is open, as the filters do; a hidden column's filter
                                     still applies.
                                 -->
-                                <syncfusion:DropDownButtonAdv Grid.Column="1"
+                                <syncfusion:DropDownButtonAdv Grid.Column="2"
                                                               Label="Columns"
                                                               ToolTip="Choose which columns show. Product always does."
                                                               IconTemplate="{StaticResource ColumnsIconTemplate}"
@@ -130,14 +139,27 @@
                 <syncfusion:TabItemExt Header="Raw Materials Price Summary" CanClose="False">
                     <Border Padding="12">
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Raw Materials Price Summary" Style="{StaticResource SectionHeaderStyle}" />
+                            <Grid DockPanel.Dock="Top">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Raw Materials Price Summary" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                                <syncfusion:ButtonAdv Grid.Column="1"
+                                                      Label="Export to Excel"
+                                                      IconTemplate="{StaticResource ExportIconTemplate}"
+                                                      Command="{Binding ExportRawMaterialPricesCommand}"
+                                                      ToolTip="Saves this table to an Excel workbook as it's shown, in its order."
+                                                      VerticalAlignment="Center" />
+                            </Grid>
                             <TextBlock DockPanel.Dock="Top"
                                        Text="Every purchased material's latest price, from its price history. Change % is how far that price moved its cost from the price before it. Double-click a material to open it."
                                        Style="{StaticResource CaptionStyle}"
                                        TextWrapping="Wrap"
                                        Margin="0,0,0,12" />
                             <!-- Double-clicking a material opens it on Raw Materials, as a product opens on Products above -->
-                            <syncfusion:SfDataGrid ItemsSource="{Binding RawMaterialPrices}"
+                            <syncfusion:SfDataGrid x:Name="RawMaterialPricesGrid"
+                                                   ItemsSource="{Binding RawMaterialPrices}"
                                                    CellDoubleTapped="RawMaterialPrices_CellDoubleTapped"
                                                    GridLinesVisibility="Both"
                                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"
@@ -165,7 +187,9 @@
             </syncfusion:TabControlExt>
         </Border>
 
-        <!-- ErrorMessage as a toast, over the card: a report that couldn't be read says why -->
+        <!-- ErrorMessage as a toast, over the card: a report that couldn't be read or exported says why -->
         <controls:ErrorToast />
+        <!-- SuccessMessage: where an exported workbook was saved -->
+        <controls:SuccessToast />
     </Grid>
 </UserControl>

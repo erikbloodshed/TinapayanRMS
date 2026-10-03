@@ -1,3 +1,4 @@
+using System.IO;
 using AwesomeAssertions;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -126,6 +127,34 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
     public void A_timeout_says_the_database_didnt_answer()
     {
         Failure.Of(new TimeoutException("Execution Timeout Expired.")).Should().Be(new Failure(Failure.TimedOutText, IsRejection: false));
+    }
+
+    [Fact]
+    public async Task A_file_open_in_another_program_says_to_close_it_there()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"TinapayanRMS failure {Guid.NewGuid():N}.xlsx");
+        await File.WriteAllTextAsync(path, "open in Excel", Cancellation);
+        try
+        {
+            Failure failure;
+            await using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                failure = await FailureOfAsync(() => File.WriteAllBytesAsync(path, [1, 2, 3], Cancellation));
+            }
+
+            failure.Should().Be(new Failure(Failure.FileInUseText, IsRejection: true));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void A_place_windows_wont_let_the_app_use_says_to_pick_another()
+    {
+        Failure.Of(new UnauthorizedAccessException(@"Access to the path 'C:\Windows\report.xlsx' is denied."))
+            .Should().Be(new Failure(Failure.NoAccessText, IsRejection: true));
     }
 
     [Fact]

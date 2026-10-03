@@ -1,3 +1,4 @@
+using System.IO;
 using System.Reactive.Linq;
 using ReactiveUI;
 using ILogger = Serilog.ILogger;
@@ -86,6 +87,13 @@ public abstract class ViewModelBase : ReactiveObject
 
     /// <summary>Input: a confirmation message to show the user. Output: true if they confirmed. The View registers a handler that shows a native MessageBox.</summary>
     public Interaction<string, bool> ConfirmDelete { get; } = new();
+
+    /// <summary>
+    /// Input: what's being exported, which names the file ("Product Cost Summary"). Output: where the workbook was saved, or
+    /// null when the user cancelled. The View registers the handler (Exporting/ExcelExportHandlerRegistration), since the
+    /// grids it writes, in their sort, filter and columns, are the View's.
+    /// </summary>
+    public Interaction<string, string?> ExportToExcel { get; } = new();
 
     /// <summary>The error a failed load showed, which the next load that succeeds takes away again; null when it's gone.</summary>
     private string? _loadFailure;
@@ -200,6 +208,19 @@ public abstract class ViewModelBase : ReactiveObject
 
         _loadFailure = null;
     }
+
+    /// <summary>
+    /// Exports through <see cref="ExportToExcel"/> and says where the workbook went. A file that couldn't be written (open
+    /// in Excel, or a folder Windows won't let the app write to) shows as any action's failure does.
+    /// </summary>
+    protected Task ExportToExcelAsync(string title) => RunSafelyAsync(async () =>
+    {
+        var path = await ExportToExcel.Handle(title);
+        if (path is not null)
+        {
+            SuccessMessage = $"Saved {Path.GetFileName(path)} in {Path.GetDirectoryName(path)}.";
+        }
+    });
 
     /// <summary>Asks the user to confirm via ConfirmDelete, then runs action (through RunSafelyAsync) only if they agree.</summary>
     protected async Task RunWithConfirmationAsync(string confirmationMessage, Func<Task> action)
