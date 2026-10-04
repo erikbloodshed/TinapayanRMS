@@ -69,4 +69,25 @@ public class RecipeScalingRulesTests
     {
         RecipeScalingRules.ScaleBom(600m, [0m], 0m).Should().Equal(0m);
     }
+
+    [Fact]
+    public void BatchRatio_is_the_batches_before_rounding_and_WholeBatches_rounds_them_up()
+    {
+        RecipeScalingRules.BatchRatio(160m, UsageAuthoredField.WeightPerPiece, 10m, 1000m).Should().Be(1.6m);
+        RecipeScalingRules.BatchRatio(50m, UsageAuthoredField.Yield, 24m, 1500m).Should().BeApproximately(2.0833m, 0.0001m);
+        RecipeScalingRules.BatchRatio(50m, UsageAuthoredField.Yield, 0m, 1500m).Should().Be(0m);
+        RecipeScalingRules.WholeBatches(1.6m).Should().Be(2m);
+        RecipeScalingRules.WholeBatches(3.00001m).Should().Be(3m, "a hair over a whole batch is decimal noise");
+        RecipeScalingRules.WholeBatches(0.00001m).Should().Be(1m, "but a need too small to survive that is still a batch");
+        RecipeScalingRules.WholeBatches(0m).Should().Be(0m);
+    }
+
+    [Fact]
+    public void UnitsToBuy_rounds_up_to_whole_purchase_units()
+    {
+        RecipeScalingRules.UnitsToBuy(30000m, 25000m).Should().Be(2m);
+        RecipeScalingRules.UnitsToBuy(50000m, 25000m).Should().Be(2m, "an exact multiple isn't one more");
+        RecipeScalingRules.UnitsToBuy(1m, 25000m).Should().Be(1m);
+        RecipeScalingRules.UnitsToBuy(1500m, 1m).Should().Be(1500m);
+    }
 }

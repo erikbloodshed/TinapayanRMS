@@ -18,9 +18,10 @@ This manual is for the people who use the app day to day. It doesn't assume any 
 8. [Printing recipes and costings](#8-printing-recipes-and-costings)
 9. [Reports](#9-reports)
 10. [What-If Prices](#10-what-if-prices)
-11. [How costs are worked out](#11-how-costs-are-worked-out)
-12. [How to…](#12-how-to)
-13. [Troubleshooting and questions](#13-troubleshooting-and-questions)
+11. [Production Plan](#11-production-plan)
+12. [How costs are worked out](#12-how-costs-are-worked-out)
+13. [How to…](#13-how-to)
+14. [Troubleshooting and questions](#14-troubleshooting-and-questions)
 
 ---
 
@@ -137,7 +138,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 
 ### The main window
 
-- **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports** and **What-If Prices**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
+- **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports**, **Production Plan** and **What-If Prices**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
 - **Tabs**: each screen opens in a tab along the top. A tab you close can be opened again from the menu. Each tab keeps its place, such as the record you were looking at and anything you haven't saved, until you close the app.
 - **Back and Forward** (the arrows at the top right, next to the minimize button, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, like a web browser.
 - Changes made on one tab show up on another tab the next time you switch to it.
@@ -159,7 +160,7 @@ The **Raw Materials** and **Products** lists are trees of folders, like File Exp
 - **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly or Packaging) can be typed into. Typing narrows the list to matching names and highlights the best match: the name you typed in full, or else the first name that starts with what you typed, or else the first that contains it. **Enter** or **Tab** picks the highlighted name, so "marg" and Enter picks Margarine. **Down** and **Up** move the highlight to the other names.
 - **New** starts a blank record. **Delete** asks before deleting anything.
 - A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use. It also says when the app couldn't reach its database, or the database didn't answer in time. Nothing is saved then, and the screen keeps working: once the database answers again, try again, or pick the record again.
-- If something goes wrong that the app didn't expect, a message says what happened and that the app is still running, and the details go in the [log files](#13-troubleshooting-and-questions). Nothing you haven't saved is lost.
+- If something goes wrong that the app didn't expect, a message says what happened and that the app is still running, and the details go in the [log files](#14-troubleshooting-and-questions). Nothing you haven't saved is lost.
 
 ### Working in tables
 
@@ -213,7 +214,7 @@ Type **:**, then a command, then **Enter**. A bar opens at the bottom of the win
 - **:delete** deletes the one open, asking first.
 - **:e** and a name opens the one whose name matches. For example, **:e pandesal** opens Pandesal on the Products screen.
 - **:revert** throws away a product's changes since the last Save.
-- **:raw**, **:sub**, **:products**, **:reports**, **:whatif** and **:print** switch screens.
+- **:raw**, **:sub**, **:products**, **:reports**, **:plan**, **:whatif** and **:print** switch screens.
 - **:settings** opens Settings.
 - **:help** lists every key.
 
@@ -618,7 +619,7 @@ On the right, the **Costing Summary** lists each component with its amount and i
 - **VAT**
 - **Total Selling Price**
 
-Everything updates as you type, before you save. See [How costs are worked out](#11-how-costs-are-worked-out).
+Everything updates as you type, before you save. See [How costs are worked out](#12-how-costs-are-worked-out).
 
 ### Scaling tab
 
@@ -665,6 +666,8 @@ The footer on each page shows the product, when it was printed, whether it inclu
 While the Products screen shows unbuffered costs, everything printed, a single product or a set, is at the materials' true costs. Each product's page says **Unbuffered costs** under its title and over its costing.
 
 Close the Print tab with its ✕.
+
+A production plan prints from the **Production Plan** screen's own **Print**: see [Production Plan](#11-production-plan).
 
 ### Printing a scaled recipe
 
@@ -760,9 +763,53 @@ A composite product moves with the products it holds. Tick **Only affected produ
 
 **Export to Excel** saves the products as the table shows them, and the price changes, on two sheets of one workbook.
 
+## 11. Production Plan
+
+**Production Plan** works out what to make and what to buy for a day's or a week's baking.
+
+### The plan
+
+On the left, the **Plan** table lists the products to make:
+
+- **Product**: pick one. Type to search the list. Products in Research and Development can be planned too.
+- **Units**: how many sellable units to make. That's pieces for a product sold by the piece, or boxes for a Box of 8.
+- **Pieces**: what the units come to. A composite product shows none, since it's one unit of other products.
+
+A product listed twice is made once, its units added together. **Remove Line** takes the picked line out, and **Clear Plan** empties the table.
+
+The plan is kept for you on this computer. It's there again the next time you open the app, worked out from the products and prices as they are then. A product deleted since is left out.
+
+### Mixing Sheet
+
+Each mix to make, in whole batches:
+
+- **Mix**: the sub-assembly, such as *Sweet Dough*, or a product's own section, such as *Ube Roll Filling*.
+- **For**: the products it's for, and how many pieces each takes from it.
+- **Batches** and **Weight (g)**: the whole batches to make, and what they weigh before baking.
+
+Products sharing a sub-assembly share its batches: two products needing 0.4 of a batch each make 1 batch between them, not 2. A product that adds its own add-ins to a linked recipe needs batches with the add-ins in, so that's a mix of its own, its name followed by the add-ins.
+
+A made ingredient the mixes use, such as a syrup, is listed under the mixes with the grams to prepare. A composite product makes the products it holds, times how many of each it holds.
+
+Under the table, a note in orange says what couldn't be planned, such as a section with no weight per piece or yield yet.
+
+### Shopping List
+
+Everything to buy for the plan, ingredients first, then packaging:
+
+- **Needed**, in the material's base unit (grams for an ingredient).
+- **Buy** and **Per**: whole units to buy, in the unit of its dearest brand price, such as **2** *sack*. It's rounded up. A material with no price yet shows no Buy.
+- **Cost**: what the amount needed costs, at buffered costs. **Total Cost** is at the top.
+
+A made ingredient is bought as what it's made of. Egg white and yolk are bought as the eggs they come from: 300 g of white and 120 g of yolk take the same eggs, so only the larger amount of eggs is listed, and any whole egg the plan uses comes on top. Packaging is listed for every sellable unit. A composite product's products bring theirs only when it includes its products' packaging.
+
+### Printing and exporting
+
+**Print** opens the plan in a print preview: what to make, the mixing sheet and the shopping list. Clear **Costs** at the bottom to print it without the costs, for the kitchen or the market. **Export to Excel** saves the mixing sheet and the shopping list on two sheets of one workbook.
+
 ---
 
-## 11. How costs are worked out
+## 12. How costs are worked out
 
 ### The cascade
 
@@ -868,7 +915,7 @@ The app keeps costs at full precision and rounds them only for display. So a tot
 
 ---
 
-## 12. How to…
+## 13. How to…
 
 ### Record a price increase
 
@@ -896,6 +943,13 @@ Open the product and compare the header's **Markup %**, which is what the curren
 ### Move a product into production
 
 Right-click it in the Products list and choose **Promote to Production**, or drag it into a Production folder. Right-click a category folder and choose **Promote All to Production** to promote every product in that folder.
+
+### Plan a day's baking
+
+1. Open **Production Plan** from the menu.
+2. In the **Plan** table, pick each product and type how many to make.
+3. Check the **Mixing Sheet** for how many batches of each mix to make, and read any orange note under it.
+4. Press **Print**, clear **Costs** for the kitchen, and print. Or press **Export to Excel** to send the shopping list on.
 
 ### See what a price rise would do
 
@@ -949,7 +1003,7 @@ Or type the packaging straight into the pack product's Packaging tab, then press
 
 ---
 
-## 13. Troubleshooting and questions
+## 14. Troubleshooting and questions
 
 **"Something can't be deleted."**
 It's still in use. The message says where. For example:

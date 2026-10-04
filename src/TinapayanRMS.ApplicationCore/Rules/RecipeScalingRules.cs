@@ -20,21 +20,42 @@ public static class RecipeScalingRules
     /// one worked out from it: 85 pieces at a typed 60 g from 1,700 g is exactly 3 batches, where the worked-out yield,
     /// 28.3333…, would make it a hair over 3 and so 4. 0 for a section with no piece size yet, or a batch of nothing.
     /// </summary>
-    public static decimal BatchesFor(decimal pieces, UsageAuthoredField authoredField, decimal authoredValue, decimal finalWeight)
+    public static decimal BatchesFor(decimal pieces, UsageAuthoredField authoredField, decimal authoredValue, decimal finalWeight) =>
+        WholeBatches(BatchRatio(pieces, authoredField, authoredValue, finalWeight));
+
+    /// <summary>
+    /// The batches of a section <paramref name="pieces"/> take, not rounded: 160 pieces at 10 g from a 1,000 g batch are 1.6.
+    /// The Production Plan adds these up across the products sharing a batch before rounding up once (<see cref="WholeBatches"/>).
+    /// 0 for a section with no piece size yet, or a batch of nothing.
+    /// </summary>
+    public static decimal BatchRatio(decimal pieces, UsageAuthoredField authoredField, decimal authoredValue, decimal finalWeight)
     {
         if (pieces <= 0 || authoredValue <= 0 || finalWeight <= 0)
         {
             return 0m;
         }
 
-        var ratio = authoredField switch
+        return authoredField switch
         {
             UsageAuthoredField.WeightPerPiece => pieces * authoredValue / finalWeight,
             UsageAuthoredField.Yield => pieces / authoredValue,
             _ => throw new ArgumentOutOfRangeException(nameof(authoredField)),
         };
-        return Math.Ceiling(Math.Round(ratio, RatioDecimals));
     }
+
+    /// <summary>
+    /// <paramref name="ratio"/> rounded up to whole batches, after rounding off decimal noise (<see cref="RatioDecimals"/>
+    /// places), so an exact 3 that comes out a hair over isn't 4. Anything at all needs one: a need too small to survive
+    /// the noise rounding is still a need.
+    /// </summary>
+    public static decimal WholeBatches(decimal ratio) => ratio > 0m ? Math.Max(1m, Math.Ceiling(Math.Round(ratio, RatioDecimals))) : 0m;
+
+    /// <summary>
+    /// The whole purchase units to buy for <paramref name="baseQuantity"/>: 30,000 g of flour in 25,000 g sacks is 2 sacks.
+    /// Rounded up as batches are, so an exact multiple isn't one more, and 1 g of it is still a sack.
+    /// </summary>
+    public static decimal UnitsToBuy(decimal baseQuantity, decimal baseUnitsPerUnit) =>
+        baseUnitsPerUnit > 0 ? WholeBatches(baseQuantity / baseUnitsPerUnit) : 0m;
 
     /// <summary>The pieces whole batches make beyond what's needed: 2 batches of 100 for 160 pieces leave 40. Never below 0.</summary>
     public static decimal ExtraPieces(decimal batches, decimal yield, decimal pieces) =>

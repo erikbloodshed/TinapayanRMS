@@ -48,6 +48,10 @@ public sealed class ProductPrintLayout
     private static readonly GridLength[] ContentsColumns = [new(1, GridUnitType.Star), new(240), new(56)];
     private static readonly GridLength[] ScalingColumns = [new(1, GridUnitType.Star), new(130), new(90)];
     private static readonly GridLength[] ScalingColumnsWithoutCosts = [new(1, GridUnitType.Star), new(130)];
+    private static readonly GridLength[] PlanOrderColumns = [new(1, GridUnitType.Star), new(100), new(120)];
+    private static readonly GridLength[] MixColumns = [new(1, GridUnitType.Star), new(70), new(110)];
+    private static readonly GridLength[] ShoppingColumns = [new(1, GridUnitType.Star), new(110), new(130), new(90)];
+    private static readonly GridLength[] ShoppingColumnsWithoutCosts = [new(1, GridUnitType.Star), new(110), new(130)];
 
     /// <summary>How far a scaled recipe's row sits in from the one it's part of, as the Scaling tab's tree indents it.</summary>
     private const double ScalingIndent = 16;
@@ -146,7 +150,7 @@ public sealed class ProductPrintLayout
     public string DocumentName => $"{_set.Title ?? (_set.Products.Count > 0 ? _set.Products[0].ProductName : null)} — {Parts}";
 
     // The Scaling tab is printed in place of both parts, whichever are ticked.
-    private string Parts => _set.IsScaling ? "Scaling" : (_includeRecipe, _includeCosting) switch
+    private string Parts => _set.Plan is not null ? "Mixing Sheet and Shopping List" : _set.IsScaling ? "Scaling" : (_includeRecipe, _includeCosting) switch
     {
         (true, true) => "Recipe and Costing",
         (true, false) => "Recipe",
@@ -192,6 +196,12 @@ public sealed class ProductPrintLayout
     private void Compose()
     {
         var table = 0;
+        if (_set.Plan is { } plan)
+        {
+            AddPlan(plan, ref table);
+            return;
+        }
+
         if (_set.Title is { } title)
         {
             AddContents(title, ++table);
@@ -507,6 +517,109 @@ public sealed class ProductPrintLayout
             row.Children.SelectMany(child => Flatten(child, depth + 1)).Prepend((row, depth));
     }
 
+    /// <summary>
+    /// The Production Plan (2026-10-03): what to make, the mixing sheet and the shopping list, each a table continued under
+    /// its heading on a page it runs on to, and what the plan couldn't work out. Without the costs the shopping list has
+    /// no Cost column and no total, as the recipe has no costs.
+    /// </summary>
+    private void AddPlan(PrintedPlan plan, ref int table)
+    {
+        Add(_ => PlanTitle(plan), keepWithNext: true);
+
+        var orders = ++table;
+        Add(repeat => PartHeading(repeat ? "To Make (continued)" : "To Make"), keepWithNext: true, table: orders, repeats: true);
+        if (plan.Orders.Count == 0)
+        {
+            Add(_ => Caption("Nothing in the plan yet."));
+            return;
+        }
+
+        Add(_ => HeaderRow(PlanOrderColumns, ["Product", "Units", "Pieces"]), keepWithNext: true, table: orders, repeats: true);
+        foreach (var line in plan.Orders)
+        {
+            Add(
+                _ => Row(PlanOrderColumns, [Label(line.ProductName), Figure($"{line.Units:#,0.##}"), Figure(line.PiecesText)]),
+                table: orders);
+        }
+
+        var mixes = ++table;
+        Add(repeat => PartHeading(repeat ? "Mixing Sheet (continued)" : "Mixing Sheet"), keepWithNext: true, table: mixes, repeats: true);
+        Add(_ => HeaderRow(MixColumns, ["Mix", "Batches", "Weight"]), keepWithNext: true, table: mixes, repeats: true);
+        foreach (var mix in plan.Mixes)
+        {
+            Add(
+                _ => Row(MixColumns, [MixItem(mix), Figure(mix.Batches is { } batches ? $"{batches:#,0}" : string.Empty), Figure(Grams(mix.Grams))]),
+                table: mixes);
+        }
+
+        var shopping = ++table;
+        var columns = _includeCosting ? ShoppingColumns : ShoppingColumnsWithoutCosts;
+        Add(repeat => PartHeading(repeat ? "Shopping List (continued)" : "Shopping List"), keepWithNext: true, table: shopping, repeats: true);
+        Add(
+            _ => HeaderRow(columns, _includeCosting ? ["Raw Material", "Needed", "Buy", "Cost"] : ["Raw Material", "Needed", "Buy"]),
+            keepWithNext: true,
+            table: shopping,
+            repeats: true);
+        foreach (var row in plan.Shopping)
+        {
+            Add(
+                _ =>
+                {
+                    List<FrameworkElement> cells =
+                    [
+                        Label(row.Name),
+                        Figure($"{row.Needed:#,0.##} {row.Unit}"),
+                        Figure(row.Buy is { } buy ? $"{buy:#,0} {row.BuyUnit}" : string.Empty),
+                    ];
+                    if (_includeCosting)
+                    {
+                        cells.Add(Figure(row.Cost is { } cost ? Money(cost) : string.Empty));
+                    }
+
+                    return Row(columns, cells);
+                },
+                table: shopping);
+        }
+
+        if (_includeCosting)
+        {
+            Add(_ => TotalRow(columns, "Total", string.Empty, string.Empty, Money(plan.TotalCost)), table: shopping);
+        }
+
+        foreach (var note in plan.Notes)
+        {
+            Add(_ => Caption(note));
+        }
+    }
+
+    /// <summary>The plan's title: how many products, the costs it's at, and when it was printed.</summary>
+    private StackPanel PlanTitle(PrintedPlan plan)
+    {
+        var count = plan.Orders.Count;
+        var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 2) };
+        heading.Children.Add(Text(_set.Title ?? "Production Plan", TitleSize, weight: FontWeights.SemiBold, wrap: true));
+        heading.Children.Add(Text(
+            $"{count} {(count == 1 ? "product" : "products")} · Printed {Printed(_set.PrintedAt)}" + (_includeCosting ? " · Buffered costs" : string.Empty),
+            BodySize,
+            _muted,
+            wrap: true));
+        heading.Children.Add(Text(
+            "Each mix is made in whole batches, shared by the products it's for. A made ingredient is bought as what it's made of.",
+            SmallSize,
+            _muted,
+            wrap: true));
+        return heading;
+    }
+
+    /// <summary>A mix and, after it in small muted type, the products it's for.</summary>
+    private TextBlock MixItem(MixRow mix)
+    {
+        var item = Label(string.Empty);
+        item.Inlines.Add(new Run(mix.Name) { FontWeight = FontWeights.SemiBold });
+        item.Inlines.Add(new Run($"   {mix.For}") { FontSize = SmallSize, Foreground = _muted });
+        return item;
+    }
+
     private void Add(
         Func<bool, FrameworkElement> create,
         bool keepWithNext = false,
@@ -676,7 +789,7 @@ public sealed class ProductPrintLayout
     {
         // It wraps rather than trims: a long name beside the save note would otherwise cut off when it was printed.
         var product = owner >= 0 ? _set.Products[owner] : null;
-        var name = product is not null ? $"{product.ProductName} — {Parts}" : $"{_set.Title} — Contents";
+        var name = product is not null ? $"{product.ProductName} — {Parts}" : _set.Plan is not null ? $"{_set.Title}" : $"{_set.Title} — Contents";
         var about = Text($"{name} · Printed {Printed(_set.PrintedAt)}", SmallSize, _muted, wrap: true);
 
         var page = Text(string.Empty, SmallSize, _muted, alignment: TextAlignment.Right);

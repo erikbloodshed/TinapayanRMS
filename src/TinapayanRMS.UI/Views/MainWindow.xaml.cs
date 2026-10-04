@@ -42,6 +42,7 @@ public partial class MainWindow : AppWindow, IVimHost
         SubAssembliesViewModel subAssembliesViewModel,
         ProductsViewModel productsViewModel,
         ReportsViewModel reportsViewModel,
+        ProductionPlanViewModel productionPlanViewModel,
         WhatIfViewModel whatIfViewModel,
         UnitsOfMeasureViewModel unitsOfMeasureViewModel,
         CategoriesViewModel categoriesViewModel,
@@ -66,6 +67,7 @@ public partial class MainWindow : AppWindow, IVimHost
         SubAssembliesTab.Content = new SubAssembliesView(subAssembliesViewModel);
         ProductsTab.Content = new ProductsView(productsViewModel);
         ReportsTab.Content = new ReportsView(reportsViewModel);
+        ProductionPlanTab.Content = new ProductionPlanView(productionPlanViewModel);
         WhatIfTab.Content = new WhatIfView(whatIfViewModel);
         var printView = new ProductPrintView(printTabViewModel);
         PrintTab.Content = printView;
@@ -75,12 +77,14 @@ public partial class MainWindow : AppWindow, IVimHost
         SubAssembliesNavItem.Tag = SubAssembliesTab;
         ProductsNavItem.Tag = ProductsTab;
         ReportsNavItem.Tag = ReportsTab;
+        ProductionPlanNavItem.Tag = ProductionPlanTab;
         WhatIfNavItem.Tag = WhatIfTab;
 
         _loadCommands[RawMaterialsTab] = rawMaterialsViewModel.LoadCommand;
         _loadCommands[SubAssembliesTab] = subAssembliesViewModel.LoadCommand;
         _loadCommands[ProductsTab] = productsViewModel.LoadCommand;
         _loadCommands[ReportsTab] = reportsViewModel.LoadCommand;
+        _loadCommands[ProductionPlanTab] = productionPlanViewModel.LoadCommand;
         _loadCommands[WhatIfTab] = whatIfViewModel.LoadCommand;
 
         // Print's load prepares its pages again: This product as Products shows it now, so the tab follows the edits made
@@ -95,6 +99,7 @@ public partial class MainWindow : AppWindow, IVimHost
         _historyScreens[ProductsTab] = new(AppScreen.Products,
             () => productsViewModel.SelectedProduct?.Id, productsViewModel.OpenProduct, () => productsViewModel.History.IsDirty);
         _historyScreens[ReportsTab] = new(AppScreen.Reports, () => null, null, () => false);
+        _historyScreens[ProductionPlanTab] = new(AppScreen.ProductionPlan, () => null, null, () => false);
         _historyScreens[WhatIfTab] = new(AppScreen.WhatIf, () => null, null, () => false);
         _historyScreens[PrintTab] = new(AppScreen.Print, () => null, null, () => false);
 

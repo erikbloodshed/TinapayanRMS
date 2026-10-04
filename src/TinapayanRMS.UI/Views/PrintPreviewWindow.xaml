@@ -1,0 +1,65 @@
+<!--
+    A print pane in a dialog of its own, chromeless as Settings is: the Production Plan's printout, previewed and printed
+    from Syncfusion's PrintPreview, with Costs under it. The pane is put in by code, after the window is themed.
+-->
+<controls:AppWindow x:Class="TinapayanRMS.UI.Views.PrintPreviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+        xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
+        xmlns:skinManager="clr-namespace:Syncfusion.SfSkinManager;assembly=Syncfusion.SfSkinManager.WPF"
+        xmlns:collections="clr-namespace:System.Collections;assembly=System.Runtime"
+        Title="Print"
+        Width="1200"
+        Height="800"
+        MinWidth="800"
+        MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        ShowIcon="False"
+        ShowTitle="False"
+        TitleBarHeight="30"
+        ShowMinimizeButton="False"
+        TitleBarBackground="{StaticResource CardBackgroundBrush}"
+        TitleBarForeground="{StaticResource HeadingForegroundBrush}"
+        skinManager:SfSkinManager.SizeMode="Default"
+        Background="{StaticResource PageBackgroundBrush}">
+    <controls:AppWindow.LeftHeaderItemsSource>
+        <collections:ArrayList>
+            <TextBlock x:Name="Heading" Text="Print" Style="{StaticResource AppTitleStyle}" Margin="12,0,0,0" VerticalAlignment="Center" />
+        </collections:ArrayList>
+    </controls:AppWindow.LeftHeaderItemsSource>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <ContentControl x:Name="PreviewHost" Focusable="False" />
+        <Border Grid.Row="1"
+                Background="{StaticResource CardBackgroundBrush}"
+                BorderBrush="{StaticResource CardBorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="16,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel x:Name="IncludeBar" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Include" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,0" />
+                    <CheckBox Content="Costs"
+                              IsChecked="{Binding IncludeCosting, Mode=TwoWay}"
+                              ToolTip="Each material's cost, and the total. Without them the shopping list shows only the amounts, for the kitchen or the market."
+                              VerticalAlignment="Center" />
+                </StackPanel>
+                <syncfusion:ButtonAdv Grid.Column="1"
+                                      HorizontalAlignment="Right"
+                                      Label="Close"
+                                      IconTemplate="{StaticResource CancelIconTemplate}"
+                                      IsCancel="True"
+                                      Click="CloseButton_Click" />
+            </Grid>
+        </Border>
+    </Grid>
+</controls:AppWindow>

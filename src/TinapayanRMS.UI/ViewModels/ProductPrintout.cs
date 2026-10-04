@@ -80,6 +80,12 @@ public sealed record ProductPrintSet(string? Title, IReadOnlyList<ProductPrintou
     /// <summary>One product on its own: no contents page.</summary>
     public static ProductPrintSet Of(ProductPrintout printout) => new(null, [printout], printout.PrintedAt);
 
+    /// <summary>The Production Plan screen's plan, printed in place of any product: what to make, the mixes and what to buy.</summary>
+    public static ProductPrintSet Of(PrintedPlan plan, DateTime printedAt) => new("Production Plan", [], printedAt) { Plan = plan };
+
+    /// <summary>A production plan, which a set holding one prints alone; null for products.</summary>
+    public PrintedPlan? Plan { get; init; }
+
     /// <summary>The Products screen's Scaling tab: one product's recipe scaled, which a set never is.</summary>
     public bool IsScaling => Products.Any(p => p.Scaling is not null);
 }
@@ -209,3 +215,14 @@ public sealed record PrintedComponent(string Product, int? Quantity, decimal Rec
 /// <param name="UnitCost">What one of <paramref name="Unit"/> costs, buffered unless the printout isn't.</param>
 /// <param name="Cost">What the line costs for one sellable unit.</param>
 public sealed record PrintedPackagingLine(string Material, decimal? Qty, string Unit, decimal UnitCost, decimal Cost);
+
+/// <summary>
+/// The Production Plan on paper: the products to make, then the mixing sheet and the shopping list as the screen shows
+/// them, and what the plan couldn't work out.
+/// </summary>
+public sealed record PrintedPlan(
+    IReadOnlyList<PlanLineRow> Orders,
+    IReadOnlyList<MixRow> Mixes,
+    IReadOnlyList<ShoppingListRow> Shopping,
+    decimal TotalCost,
+    IReadOnlyList<string> Notes);

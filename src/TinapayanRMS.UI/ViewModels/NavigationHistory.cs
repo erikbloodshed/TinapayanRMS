@@ -10,6 +10,7 @@ public enum AppScreen
     Products,
     Reports,
     WhatIf,
+    ProductionPlan,
     Print,
 }
 

@@ -53,6 +53,7 @@ It's a single-user desktop app. There's no server, no login and no network servi
 | Sub-Assemblies | `SubAssembliesView` | `SubAssembliesViewModel` |
 | Products | `ProductsView`, with its cards in `Views/Products/` | `ProductsViewModel` |
 | Reports | `ReportsView` | `ReportsViewModel` |
+| Production Plan | `ProductionPlanView` | `ProductionPlanViewModel` |
 | What-If Prices | `WhatIfView` | `WhatIfViewModel` |
 | Print (opened from Products) | `ProductPrintView` | `PrintTabViewModel` |
 | Settings dialog: Units of Measure, Categories, Product Categories, Roles, Costing Defaults, Keyboard | `SettingsWindow`, and one view per tab | `UnitsOfMeasureViewModel`, `CategoriesViewModel`, `ProductCategoriesViewModel`, `SubAssemblyRolesViewModel`, `CostingDefaultsViewModel`, `KeyboardSettingsViewModel` |
@@ -108,7 +109,7 @@ You'll be productive sooner if you're comfortable with the following.
 | AwesomeAssertions | `Should()` assertions. It's a fork of FluentAssertions 7, with the same API. | `tests/` |
 | Respawn | Resetting a database between tests | The test fixtures |
 | MSBuild | `Directory.Build.props`, Central Package Management | The build |
-| The domain | Recipe costing in a bakery: bills of materials, yield, shrinkage, baker's percentage, cost-plus pricing | Read the user manual's [Key ideas](user-manual.md#1-key-ideas) and [How costs are worked out](user-manual.md#11-how-costs-are-worked-out) |
+| The domain | Recipe costing in a bakery: bills of materials, yield, shrinkage, baker's percentage, cost-plus pricing | Read the user manual's [Key ideas](user-manual.md#1-key-ideas) and [How costs are worked out](user-manual.md#12-how-costs-are-worked-out) |
 
 ### Software
 
@@ -441,7 +442,7 @@ The database's messages say what kind of thing went wrong, never which rule. So 
 
 ## 7. Costing
 
-Before you change any cost path, read the user manual's [How costs are worked out](user-manual.md#11-how-costs-are-worked-out), which has worked examples, and PLAN.md's [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade).
+Before you change any cost path, read the user manual's [How costs are worked out](user-manual.md#12-how-costs-are-worked-out), which has worked examples, and PLAN.md's [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade).
 
 ### Stored and computed costs
 
@@ -642,7 +643,7 @@ To discard a migration you've generated but haven't applied anywhere, run `dotne
 
 ### The shell
 
-[MainWindow](../src/TinapayanRMS.UI/Views/MainWindow.xaml) is an `AppWindow`, which is a Syncfusion `ChromelessWindow`: the title bar is drawn in the theme, with Back and Forward on its right, just before Minimize. The hamburger button opens an `SfNavigationDrawer` menu with Raw Materials, Sub-Assemblies, Products, Reports and What-If Prices, and a Settings button at the bottom. The screens are the tabs of `MainTabControl`, a `TabControlExt` with two important settings:
+[MainWindow](../src/TinapayanRMS.UI/Views/MainWindow.xaml) is an `AppWindow`, which is a Syncfusion `ChromelessWindow`: the title bar is drawn in the theme, with Back and Forward on its right, just before Minimize. The hamburger button opens an `SfNavigationDrawer` menu with Raw Materials, Sub-Assemblies, Products, Reports, Production Plan and What-If Prices, and a Settings button at the bottom. The screens are the tabs of `MainTabControl`, a `TabControlExt` with two important settings:
 
 - **`CloseMode="Hide"`**: closing a tab hides it rather than deleting it, so the menu can always show it again.
 - **`IsDisableUnloadTabItemExtContent="True"`**: every tab's content stays loaded. Scroll positions, sort orders, sub-tabs and typed text survive a switch without any code.
@@ -900,6 +901,12 @@ Reports' tables go to an Excel workbook with **Export to Excel**. The parts, in 
 
 `ExcelExportTests` checks all of this against a real grid read back with XlsIO.
 
+The Production Plan prints through the same layout and manager: a `ProductPrintSet` made with `ProductPrintSet.Of(PrintedPlan, …)` holds no products, and `ProductPrintLayout.AddPlan` lays out what to make, the mixing sheet and the shopping list with the same headings, tables and footer. It opens in [PrintPreviewWindow](../src/TinapayanRMS.UI/Views/PrintPreviewWindow.xaml.cs), a dialog that themes itself before the pane goes in, so its opener mustn't theme it again.
+
+### The Production Plan
+
+[ProductionPlanRules](../src/TinapayanRMS.ApplicationCore/Rules/ProductionPlanRules.cs) is pure: from the products to make (`PlanRecipe`s, by id), it adds up each section's unrounded batches (`RecipeScalingRules.BatchRatio`) per sub-assembly and set of add-ins, rounds them up once (`WholeBatches`), then opens made ingredients into their BOMs and linked ones into what they're cut from, taking the largest of one ingredient's parts. [ProductionPlanBuilder](../src/TinapayanRMS.UI/ViewModels/ProductionPlanBuilder.cs) maps saved products (`SavedProduct`) to its inputs and names and costs its result. `ProductionPlanViewModel` keeps the plan in the view-state file under `production-plan`, as `"id:units"`.
+
 ### Logging and errors
 
 - Serilog's static `Log.Logger` is built in `App`'s static constructor, so even a licence failure is logged. It writes one rolling file a day under `logs/`, keeping 31. It's registered in DI as a `Serilog.ILogger`.
@@ -1103,7 +1110,7 @@ Respawn picks up the new table by itself.
 2. Change or add the formula in its Rules class, with unit tests.
 3. If the figure is stored, make sure every write path that can change one of its inputs recomputes it, and that the propagators do too. If it's computed on read, the Rules change is enough: `SavedProductReader` and the screens share it.
 4. Extend `ReactiveCostCascadeTests` with the end-to-end case.
-5. Update the user manual's [How costs are worked out](user-manual.md#11-how-costs-are-worked-out), including its worked example, in the same change.
+5. Update the user manual's [How costs are worked out](user-manual.md#12-how-costs-are-worked-out), including its worked example, in the same change.
 6. Record the decision in PLAN.md.
 
 ### Add a screen
