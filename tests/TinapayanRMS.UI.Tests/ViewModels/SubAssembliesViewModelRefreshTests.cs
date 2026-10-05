@@ -328,6 +328,68 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.Rows.Select(r => r.Name).Should().Equal("Gift Set", "Gift Set Copy");
     }
 
+    [Fact]
+    public async Task New_Product_asks_for_a_product_linking_the_picked_sub_assembly_once_its_changes_are_saved()
+    {
+        var roleId = await AddRoleAsync("Glaze");
+        var sugarId = await AddIngredientAsync("Sugar");
+        var glazeId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Name = "Glaze", RoleId = roleId }, [(sugarId, 100m)], Cancellation);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        var requested = new List<int>();
+        using var _ = viewModel.NewProductRequests.Subscribe(requested.Add);
+
+        (await viewModel.NewProductCommand.CanExecute.FirstAsync()).Should().BeFalse("nothing is picked");
+
+        viewModel.SelectedRow = viewModel.Rows.Single();
+        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}");
+        (await viewModel.NewProductCommand.CanExecute.FirstAsync()).Should().BeTrue();
+        viewModel.EditingName = "Sugar Glaze";
+        await viewModel.NewProductCommand.Execute();
+
+        requested.Should().BeEmpty("the product would link the glaze as it's saved, not as the form shows it");
+        viewModel.ErrorMessage.Should().Be("Save Glaze first, or undo its changes: the new product links it as it's saved.");
+
+        viewModel.EditingName = "Glaze";
+        await viewModel.NewProductCommand.Execute();
+
+        requested.Should().Equal(glazeId);
+        viewModel.ErrorMessage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task New_Product_is_not_offered_for_a_packaging_set()
+    {
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        int boxId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var box = new RawMaterial
+            {
+                Type = RawMaterialType.Packaging,
+                Name = "Gift Box",
+                Category = new RawMaterialCategory { Name = "Boxes" },
+                BaseUnitId = pieceId,
+                CostPerBaseUnit = 30m,
+                BufferedCostPerBaseUnit = 30m,
+            };
+            dbContext.RawMaterials.Add(box);
+            await dbContext.SaveChangesAsync(Cancellation);
+            boxId = box.Id;
+        }
+
+        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Gift Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedRow = viewModel.Rows.Single();
+
+        (await viewModel.NewProductCommand.CanExecute.FirstAsync()).Should().BeFalse("a packaging set isn't a recipe");
+    }
+
     private SubAssembliesViewModel CreateViewModel()
     {
         ReactiveUIBootstrapper.EnsureInitialized();

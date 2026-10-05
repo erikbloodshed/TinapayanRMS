@@ -250,6 +250,20 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
 
     /// <summary>
+    /// Starts a new product that links the picked sub-assembly, through <see cref="NewProductRequests"/>. Not for a packaging
+    /// set, which isn't a recipe, and not while the form has changes not saved: the product links it as it's saved.
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> NewProductCommand { get; }
+
+    private readonly Subject<int> _newProductRequests = new();
+
+    /// <summary>
+    /// The sub-assemblies New Product asks a new product to link, by id. The main window subscribes and starts the new
+    /// product on the Products screen, as it opens a Used By tile's product.
+    /// </summary>
+    public IObservable<int> NewProductRequests => _newProductRequests;
+
+    /// <summary>
     /// The form's undo and redo stacks, the same shape as Products'. One step is one finished change — a cell
     /// committed, a line added or removed, a field typed and left. Cleared whenever the form stops being the one
     /// it recorded: another sub-assembly picked, a new one started, or a Save.
@@ -432,6 +446,20 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         CopyCommand = ReactiveCommand.Create(CopyForm, this.WhenAnyValue(x => x.SelectedRow).Select(row => row is not null));
 
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
+
+        NewProductCommand = ReactiveCommand.Create(
+            () =>
+            {
+                if (History.IsDirty)
+                {
+                    ErrorMessage = $"Save {HeaderTitle} first, or undo its changes: the new product links it as it's saved.";
+                    return;
+                }
+
+                ErrorMessage = null;
+                _newProductRequests.OnNext(SelectedRow!.Id);
+            },
+            this.WhenAnyValue(x => x.SelectedRow).Select(row => row is not null && row.SubAssembly.Role?.IsPackaging != true));
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
@@ -800,5 +828,6 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     {
         _rowCache.Dispose();
         _productOpenRequests.Dispose();
+        _newProductRequests.Dispose();
     }
 }

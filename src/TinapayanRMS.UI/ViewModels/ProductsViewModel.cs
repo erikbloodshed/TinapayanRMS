@@ -1070,6 +1070,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>A product <see cref="OpenProduct"/> was asked for before the list held it, for LoadCommand to open once it does.</summary>
     private int? _productToOpen;
 
+    /// <summary>A sub-assembly <see cref="StartNewProductFrom"/> was asked to link, for LoadCommand to start the new product with once its lists are fresh.</summary>
+    private int? _subAssemblyToStartFrom;
+
     private int _editingId;
 
     /// <summary>The product whose recipe, packaging, costing and links the form holds, or null for a new product.</summary>
@@ -2438,6 +2441,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 _productToOpen = null;
                 TrySelectProduct(productId);
             }
+
+            if (_subAssemblyToStartFrom is { } subAssemblyId)
+            {
+                _subAssemblyToStartFrom = null;
+                StartNewProductLinking(subAssemblyId);
+            }
         }));
 
         NewCommand = ReactiveCommand.Create(() => StartNewProduct());
@@ -2891,6 +2900,39 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public void OpenProduct(int productId)
     {
         _productToOpen = TrySelectProduct(productId) ? null : productId;
+    }
+
+    /// <summary>
+    /// Starts a new product that links a standalone sub-assembly, for Sub-Assemblies' New Product. It waits for the next
+    /// LoadCommand, which showing the screen runs, so the sub-assembly is found as it's saved now: it may have been made or
+    /// renamed there since this screen last loaded.
+    /// </summary>
+    public void StartNewProductFrom(int subAssemblyId)
+    {
+        _productToOpen = null;
+        _subAssemblyToStartFrom = subAssemblyId;
+    }
+
+    /// <summary>
+    /// A new product named after the sub-assembly, with the Link form open on it, as Add Sub-Assembly's Link an existing
+    /// one would have it: its lines load, and the piece size is left to type. Like New, it replaces whatever the form
+    /// showed and has nothing to undo; it's measured against a blank product, so Save is offered straight away.
+    /// </summary>
+    private void StartNewProductLinking(int subAssemblyId)
+    {
+        if (_linkable.FirstOrDefault(s => s.Id == subAssemblyId && s.OwnerProductId is null && s.Role?.IsPackaging != true) is not { } subAssembly)
+        {
+            ErrorMessage = "That sub-assembly is no longer on the Sub-Assemblies screen.";
+            return;
+        }
+
+        StartNewProduct();
+        EditingName = subAssembly.Name;
+        InsertAddSubAssemblyTab();
+        SelectRecipeTab(AddSubAssemblyTab);
+        EditingUsageMode = UsageFormMode.Link;
+        EditingUsageSource = LinkableSubAssemblies.FirstOrDefault(o => o.SubAssembly?.Id == subAssemblyId);
+        History.RefreshDirty();
     }
 
     /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the product the name means best.</summary>

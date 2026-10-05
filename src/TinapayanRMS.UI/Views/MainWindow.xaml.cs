@@ -124,6 +124,14 @@ public partial class MainWindow : AppWindow, IVimHost
                 ShowTab(ProductsTab);
             });
 
+        // Sub-Assemblies' New Product starts a new product on Products that links the sub-assembly. It waits for the load
+        // that showing the tab starts, so the sub-assembly is found as it's saved now.
+        subAssembliesViewModel.NewProductRequests.Subscribe(subAssemblyId =>
+        {
+            productsViewModel.StartNewProductFrom(subAssemblyId);
+            ShowTab(ProductsTab);
+        });
+
         // A double-clicked row of Reports' Raw Materials Price Summary opens its material on Raw Materials, the same way.
         reportsViewModel.RawMaterialOpenRequests.Subscribe(rawMaterialId =>
         {

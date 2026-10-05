@@ -93,7 +93,7 @@
         <Border Grid.Column="2" Style="{StaticResource CardStyle}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,0">
                 <StackPanel>
-                    <!-- Title and caption beside New, Copy, Save and Delete -->
+                    <!-- Title and caption beside New, Copy, New Product, Save and Delete -->
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -114,6 +114,11 @@
                                                   IconTemplate="{StaticResource CopyIconTemplate}"
                                                   Command="{Binding CopyCommand}"
                                                   ToolTip="Starts a new sub-assembly with this one's role and lines, named '… Copy'. Rename it if you like, then Save; this one stays as it was saved."
+                                                  Margin="0,0,8,0" />
+                            <syncfusion:ButtonAdv Label="New Product"
+                                                  IconTemplate="{StaticResource LinkIconTemplate}"
+                                                  Command="{Binding NewProductCommand}"
+                                                  ToolTip="Starts a new product on the Products screen that links this sub-assembly, named after it. Type its piece size, then Save there. Not for a packaging set."
                                                   Margin="0,0,8,0" />
                             <syncfusion:ButtonAdv Label="Save"
                                                   IconTemplate="{StaticResource SaveIconTemplate}"

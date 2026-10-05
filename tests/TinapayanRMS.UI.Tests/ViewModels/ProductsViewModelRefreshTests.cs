@@ -1109,6 +1109,44 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task StartNewProductFrom_starts_a_new_product_linking_the_sub_assembly_on_the_next_load_and_Save_writes_the_link()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var creamLoafId = await AddProductAsync("Cream Loaf");
+        var doughId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Name = "Pandesal Dough", RoleId = roleId }, [(flourId, 1000m)], Cancellation);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.OpenProduct(creamLoafId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
+
+        // As Sub-Assemblies' New Product does: nothing changes until the load that showing the screen starts.
+        viewModel.StartNewProductFrom(doughId);
+        viewModel.SelectedProduct!.Id.Should().Be(creamLoafId);
+
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.SelectedProduct.Should().BeNull("the product is a new one, not saved yet");
+        viewModel.EditingName.Should().Be("Pandesal Dough", "it's named after the sub-assembly, to rename");
+        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.AddSubAssemblyTab);
+        viewModel.EditingUsageMode.Should().Be(UsageFormMode.Link);
+        viewModel.EditingUsageSource!.SubAssembly!.Id.Should().Be(doughId);
+        await WaitUntilSettledAsync(() => viewModel.FormLines.Count == 1, () => $"form lines={viewModel.FormLines.Count}");
+        viewModel.History.IsDirty.Should().BeTrue("Save is offered straight away");
+
+        viewModel.EditingName = "Pandesal";
+        viewModel.EditingUsageWeightPerPiece = 30m;
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SelectedProduct!.Name.Should().Be("Pandesal");
+        await using var dbContext = CreateDbContext();
+        var usage = await dbContext.ProductSubAssemblyUsages.SingleAsync(u => u.ProductId == viewModel.SelectedProduct.Id, Cancellation);
+        usage.SubAssemblyId.Should().Be(doughId, "the product links the sub-assembly, not a copy of it");
+    }
+
+    [Fact]
     public async Task OpenByName_opens_the_product_a_name_means_best_as_the_Vim_command_line_asks()
     {
         await AddProductAsync("Ube Cheese Pandesal");

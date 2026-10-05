@@ -449,7 +449,7 @@ The list shows **Name** and **Role**, with a search box. When a product saves a 
 
 ### The form
 
-At the top are the name and **New**, **Copy**, **Save**, **Undo**, **Redo** and **Delete**. Below them:
+At the top are the name and **New**, **Copy**, **New Product**, **Save**, **Undo**, **Redo** and **Delete**. Below them:
 
 - **Name** and **Role**.
 - **Batch Weight**, **Batch Cost** and **Cost per g**, worked out from the lines as you type.
@@ -457,6 +457,8 @@ At the top are the name and **New**, **Copy**, **Save**, **Undo**, **Redo** and 
 - **Used By**: a tile for each product that links this sub-assembly. Click one to open it.
 
 **Copy** starts a new, unsaved sub-assembly with the same role and lines, named "… Copy". Rename it if you like, then press Save. The original stays as it was.
+
+**New Product** starts a new product from the sub-assembly picked in the list. The Products screen opens with a new, unsaved product named after the sub-assembly, and its recipe already **links** the sub-assembly. Type the piece size (and rename the product if you like), then press Save there. New Product isn't offered for a packaging set. If the sub-assembly has changes you haven't saved, save or undo them first, because the product links the sub-assembly as it's saved.
 
 Changing a sub-assembly here changes every product that links it. A sub-assembly that a product links **can't be deleted**. The message names the products.
 
