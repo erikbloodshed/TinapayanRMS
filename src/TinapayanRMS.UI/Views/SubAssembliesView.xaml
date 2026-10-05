@@ -90,8 +90,18 @@
             </DockPanel>
         </Border>
 
-        <Border Grid.Column="2" Style="{StaticResource CardStyle}">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,0">
+        <!--
+            As on Products and Raw Materials (2026-10-06, at the user's request): the header card, with the title, the
+            buttons, the figures and the fields typed in, then the details in a card of their own, 4px under it. The
+            header stays put while the details scroll. They shared one scrolling card until then.
+        -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Style="{StaticResource CardStyle}" Padding="12" MinHeight="{StaticResource HeaderCardHeight}">
                 <StackPanel>
                     <!-- Title and caption beside New, Copy, New Product, Save and Delete -->
                     <Grid>
@@ -262,174 +272,209 @@
                                                 controls:FieldUndoStep.Recorder="{Binding}"
                                                 SelectedItem="{Binding EditingRole, Mode=TwoWay}" />
                     </Grid>
-
-                    <TextBlock Text="Lines" Style="{StaticResource PanelHeaderStyle}" Margin="0,16,0,8" />
-
-                    <!--
-                        A packaging set's lines: how much of each material one set takes, in its base unit. The same
-                        columns as a product's Packaging tab, which a product linking the set shows them in, one set per sellable unit.
-                    -->
-                    <syncfusion:SfDataGrid ItemsSource="{Binding PackagingLines}"
-                                           controls:GridUndoSteps.Recorder="{Binding}"
-                                           controls:GridRowReordering.IsEnabled="True"
-                                           controls:NumericEditing.IsEnabled="True"
-                                           Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                           SelectedItem="{Binding SelectedPackagingLine, Mode=TwoWay}"
-                                           GridLinesVisibility="Both"
-                                           CurrentCellBorderBrush="{StaticResource AccentBrush}"
-                                           CurrentCellBorderThickness="1"
-                                           controls:GridFillerRows.IsEnabled="True"
-                                           ShowRowHeader="True"
-                                           AutoGenerateColumns="False"
-                                           AllowEditing="True"
-                                           AllowDeleting="True"
-                                           EditTrigger="OnTap"
-                                           AddNewRowPosition="Bottom"
-                                           SelectionMode="Single"
-                                           ColumnSizer="Star"
-                                           controls:GridEditCommit.OnFocusLeave="True"
-                                           controls:GridAddNewRow.DropWhenUntouched="True"
-                                           controls:AutoCompleteDropDown.IsEnabled="True"
-                                           controls:GridAddNewRow.ItemFactory="{Binding NewPackagingLine}"
-                                           Height="280">
-                        <syncfusion:SfDataGrid.Columns>
-                            <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
-                            <syncfusion:GridMultiColumnDropDownList MappingName="PackagingMaterialId"
-                                                                    HeaderText="Material"
-                                                                    ItemsSource="{Binding PackagingMaterials}"
-                                                                    DisplayMember="Name"
-                                                                    ValueMember="Id"
-                                                                    AllowAutoComplete="True"
-                                                                    AllowNullInput="True"
-                                                                    AllowIncrementalFiltering="True"
-                                                                    SearchCondition="Contains"
-                                                                    AutoGenerateColumns="False"
-                                                                    IsAutoPopupSize="False"
-                                                                    PopUpWidth="380"
-                                                                    PopUpHeight="260"
-                                                                    GridColumnSizer="Star">
-                                <syncfusion:GridMultiColumnDropDownList.Columns>
-                                    <syncfusion:Columns>
-                                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Material" />
-                                        <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
-                                        <syncfusion:GridTextColumn MappingName="BaseUnit.Abbreviation" HeaderText="Unit" Width="52" />
-                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per Unit" Width="96" NumberDecimalDigits="4" />
-                                    </syncfusion:Columns>
-                                </syncfusion:GridMultiColumnDropDownList.Columns>
-                            </syncfusion:GridMultiColumnDropDownList>
-                            <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
-                            <!--
-                                The unit the Qty is typed in: the material's base unit, or one of its alternative units. Each row has its
-                                own material, so its list comes from the row (PackagingUnitSelector). Editable, so the unit can be typed
-                                as well as picked. What the quantity comes to in base units is never shown — the conversion is behind
-                                the scenes, in Unit Cost (what one of the picked unit costs) and in the line's own total.
-                            -->
-                            <syncfusion:GridComboBoxColumn MappingName="UnitKey"
-                                                           HeaderText="Unit"
-                                                           Width="72"
-                                                           ItemsSourceSelector="{StaticResource PackagingUnitSelector}"
-                                                           DisplayMemberPath="Abbreviation"
-                                                           SelectedValuePath="Key"
-                                                           IsEditable="True" />
-                            <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" AllowEditing="False" />
-                            <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Set" Width="104" NumberDecimalDigits="2" AllowEditing="False" />
-                        </syncfusion:SfDataGrid.Columns>
-                    </syncfusion:SfDataGrid>
-
-                    <!-- Typed straight into: the add row at the bottom starts a line, Delete removes the selected one -->
-                    <syncfusion:SfDataGrid ItemsSource="{Binding Lines}"
-                                           controls:GridUndoSteps.Recorder="{Binding}"
-                                           controls:GridRowReordering.IsEnabled="True"
-                                           controls:NumericEditing.IsEnabled="True"
-                                           Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}"
-                                           controls:GridAddNewRow.HideCheckBoxes="True"
-                                           controls:GridCellEditing.IsEnabled="True"
-                                           SelectedItem="{Binding SelectedLine, Mode=TwoWay}"
-                                           GridLinesVisibility="Both"
-                                           CurrentCellBorderBrush="{StaticResource AccentBrush}"
-                                           CurrentCellBorderThickness="1"
-                                           controls:GridFillerRows.IsEnabled="True"
-                                           ShowRowHeader="True"
-                                           AutoGenerateColumns="False"
-                                           AllowEditing="True"
-                                           AllowDeleting="True"
-                                           EditTrigger="OnTap"
-                                           AddNewRowPosition="Bottom"
-                                           SelectionMode="Single"
-                                           ColumnSizer="Star"
-                                           controls:GridEditCommit.OnFocusLeave="True"
-                                           controls:GridAddNewRow.DropWhenUntouched="True"
-                                           controls:AutoCompleteDropDown.IsEnabled="True"
-                                           controls:GridAddNewRow.ItemFactory="{Binding NewLine}"
-                                           Height="280">
-                        <syncfusion:SfDataGrid.Columns>
-                            <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
-                            <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
-                                                                    HeaderText="Ingredient"
-                                                                    ItemsSource="{Binding Ingredients}"
-                                                                    DisplayMember="Name"
-                                                                    ValueMember="Id"
-                                                                    AllowAutoComplete="True"
-                                                                    AllowNullInput="True"
-                                                                    AllowIncrementalFiltering="True"
-                                                                    SearchCondition="Contains"
-                                                                    AutoGenerateColumns="False"
-                                                                    IsAutoPopupSize="False"
-                                                                    PopUpWidth="380"
-                                                                    PopUpHeight="260"
-                                                                    GridColumnSizer="Star">
-                                <syncfusion:GridMultiColumnDropDownList.Columns>
-                                    <syncfusion:Columns>
-                                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
-                                        <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
-                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost/g" Width="88" NumberDecimalDigits="4" />
-                                    </syncfusion:Columns>
-                                </syncfusion:GridMultiColumnDropDownList.Columns>
-                            </syncfusion:GridMultiColumnDropDownList>
-                            <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="120" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
-                            <controls:NumericColumn MappingName="Percent"
-                                                    HeaderTemplate="{StaticResource PercentHeaderTemplate}"
-                                                    Width="86"
-                                                    NumberDecimalDigits="1"
-                                                    AllowNullValue="True"
-                                                    controls:GridCellEditing.AllowWhen="CanTypeBakersPercent" />
-                            <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost/g" Width="120" NumberDecimalDigits="4" AllowEditing="False" />
-                            <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="120" NumberDecimalDigits="2" AllowEditing="False" />
-                            <!-- The formula's 100% base for baker's percentage, usually the flour; more than one can be ticked. -->
-                            <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"
-                                                           HeaderText="Base"
-                                                           Width="54"
-                                                           HorizontalHeaderContentAlignment="Center" />
-                        </syncfusion:SfDataGrid.Columns>
-                    </syncfusion:SfDataGrid>
-
-                    <Grid Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center">
-                            <!-- What the percentages are read against, and the figure a batch is scaled by. -->
-                            <TextBlock Text="{Binding FormulaBaseCaption}"
-                                       Style="{StaticResource CaptionStyle}"
-                                       Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
-                            <TextBlock Text="A product whose packaging links this set takes one whole set per sellable unit."
-                                       Style="{StaticResource CaptionStyle}"
-                                       Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        </StackPanel>
-                        <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveLineCommand}" />
-                    </Grid>
-
-                    <Border Style="{StaticResource SectionDividerStyle}" />
-
-                    <TextBlock Text="Used By" Style="{StaticResource PanelHeaderStyle}" Margin="0,0,0,8" />
-
-                    <!-- One tile per product linking it (UsedByTilesStyle), which opens it on the Products screen -->
-                    <ItemsControl ItemsSource="{Binding UsedBy}" Style="{StaticResource UsedByTilesStyle}" />
-
-                    <TextBlock Text="{Binding UsedByText}" Style="{StaticResource CaptionStyle}" Margin="0,2,0,0" />
                 </StackPanel>
-            </ScrollViewer>
-        </Border>
+            </Border>
+
+            <!--
+                The details in tabs along the bottom (2026-10-06, at the user's request), as Products and Raw Materials have
+                theirs: the recipe, and the products that link it. In a card of its own with 4px padding, so the tabs get the
+                rounded corners the theme's square frame doesn't have; the tab control draws no frame (BorderThickness 0).
+                Each tab scrolls on its own, so the strip stays put.
+            -->
+            <Border Grid.Row="1" Margin="0,4,0,0" Style="{StaticResource CardStyle}" Padding="4">
+                <syncfusion:TabControlExt BorderThickness="0"
+                                          Background="{StaticResource CardBackgroundBrush}"
+                                          TabPanelBackground="{StaticResource CardTabStripBrush}"
+                                          TabItemSelectedBackground="{StaticResource CardBackgroundBrush}"
+                                          TabItemHoverBackground="{StaticResource CardTabHoverBrush}"
+                                          AllowDragDrop="False"
+                                          EnableLabelEdit="False"
+                                          TabStripPlacement="Bottom"
+                                          CloseButtonType="Hide"
+                                          ShowTabItemContextMenu="False"
+                                          ShowTabListContextMenu="False">
+                    <!-- The lines, a recipe's ingredients or a packaging set's materials -->
+                    <syncfusion:TabItemExt Header="Recipe" CanClose="False">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <Border Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="Lines" Style="{StaticResource SectionHeaderStyle}" />
+
+                                    <!--
+                                        A packaging set's lines: how much of each material one set takes, in its base unit. The same
+                                        columns as a product's Packaging tab, which a product linking the set shows them in, one set per sellable unit.
+                                    -->
+                                    <syncfusion:SfDataGrid ItemsSource="{Binding PackagingLines}"
+                                                           controls:GridUndoSteps.Recorder="{Binding}"
+                                                           controls:GridRowReordering.IsEnabled="True"
+                                                           controls:NumericEditing.IsEnabled="True"
+                                                           Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                           SelectedItem="{Binding SelectedPackagingLine, Mode=TwoWay}"
+                                                           GridLinesVisibility="Both"
+                                                           CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                                           CurrentCellBorderThickness="1"
+                                                           controls:GridFillerRows.IsEnabled="True"
+                                                           ShowRowHeader="True"
+                                                           AutoGenerateColumns="False"
+                                                           AllowEditing="True"
+                                                           AllowDeleting="True"
+                                                           EditTrigger="OnTap"
+                                                           AddNewRowPosition="Bottom"
+                                                           SelectionMode="Single"
+                                                           ColumnSizer="Star"
+                                                           controls:GridEditCommit.OnFocusLeave="True"
+                                                           controls:GridAddNewRow.DropWhenUntouched="True"
+                                                           controls:AutoCompleteDropDown.IsEnabled="True"
+                                                           controls:GridAddNewRow.ItemFactory="{Binding NewPackagingLine}"
+                                                           Height="280">
+                                        <syncfusion:SfDataGrid.Columns>
+                                            <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
+                                            <syncfusion:GridMultiColumnDropDownList MappingName="PackagingMaterialId"
+                                                                                    HeaderText="Material"
+                                                                                    ItemsSource="{Binding PackagingMaterials}"
+                                                                                    DisplayMember="Name"
+                                                                                    ValueMember="Id"
+                                                                                    AllowAutoComplete="True"
+                                                                                    AllowNullInput="True"
+                                                                                    AllowIncrementalFiltering="True"
+                                                                                    SearchCondition="Contains"
+                                                                                    AutoGenerateColumns="False"
+                                                                                    IsAutoPopupSize="False"
+                                                                                    PopUpWidth="380"
+                                                                                    PopUpHeight="260"
+                                                                                    GridColumnSizer="Star">
+                                                <syncfusion:GridMultiColumnDropDownList.Columns>
+                                                    <syncfusion:Columns>
+                                                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Material" />
+                                                        <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
+                                                        <syncfusion:GridTextColumn MappingName="BaseUnit.Abbreviation" HeaderText="Unit" Width="52" />
+                                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost per Unit" Width="96" NumberDecimalDigits="4" />
+                                                    </syncfusion:Columns>
+                                                </syncfusion:GridMultiColumnDropDownList.Columns>
+                                            </syncfusion:GridMultiColumnDropDownList>
+                                            <controls:NumericColumn MappingName="QtyPerUnit" HeaderText="Qty" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
+                                            <!--
+                                                The unit the Qty is typed in: the material's base unit, or one of its alternative units. Each row has its
+                                                own material, so its list comes from the row (PackagingUnitSelector). Editable, so the unit can be typed
+                                                as well as picked. What the quantity comes to in base units is never shown — the conversion is behind
+                                                the scenes, in Unit Cost (what one of the picked unit costs) and in the line's own total.
+                                            -->
+                                            <syncfusion:GridComboBoxColumn MappingName="UnitKey"
+                                                                           HeaderText="Unit"
+                                                                           Width="72"
+                                                                           ItemsSourceSelector="{StaticResource PackagingUnitSelector}"
+                                                                           DisplayMemberPath="Abbreviation"
+                                                                           SelectedValuePath="Key"
+                                                                           IsEditable="True" />
+                                            <controls:NumericColumn MappingName="UnitCost" HeaderText="Unit Cost" Width="88" NumberDecimalDigits="4" AllowEditing="False" />
+                                            <controls:NumericColumn MappingName="CostPerUnit" HeaderText="Cost per Set" Width="104" NumberDecimalDigits="2" AllowEditing="False" />
+                                        </syncfusion:SfDataGrid.Columns>
+                                    </syncfusion:SfDataGrid>
+
+                                    <!-- Typed straight into: the add row at the bottom starts a line, Delete removes the selected one -->
+                                    <syncfusion:SfDataGrid ItemsSource="{Binding Lines}"
+                                                           controls:GridUndoSteps.Recorder="{Binding}"
+                                                           controls:GridRowReordering.IsEnabled="True"
+                                                           controls:NumericEditing.IsEnabled="True"
+                                                           Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}"
+                                                           controls:GridAddNewRow.HideCheckBoxes="True"
+                                                           controls:GridCellEditing.IsEnabled="True"
+                                                           SelectedItem="{Binding SelectedLine, Mode=TwoWay}"
+                                                           GridLinesVisibility="Both"
+                                                           CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                                           CurrentCellBorderThickness="1"
+                                                           controls:GridFillerRows.IsEnabled="True"
+                                                           ShowRowHeader="True"
+                                                           AutoGenerateColumns="False"
+                                                           AllowEditing="True"
+                                                           AllowDeleting="True"
+                                                           EditTrigger="OnTap"
+                                                           AddNewRowPosition="Bottom"
+                                                           SelectionMode="Single"
+                                                           ColumnSizer="Star"
+                                                           controls:GridEditCommit.OnFocusLeave="True"
+                                                           controls:GridAddNewRow.DropWhenUntouched="True"
+                                                           controls:AutoCompleteDropDown.IsEnabled="True"
+                                                           controls:GridAddNewRow.ItemFactory="{Binding NewLine}"
+                                                           Height="280">
+                                        <syncfusion:SfDataGrid.Columns>
+                                            <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
+                                            <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
+                                                                                    HeaderText="Ingredient"
+                                                                                    ItemsSource="{Binding Ingredients}"
+                                                                                    DisplayMember="Name"
+                                                                                    ValueMember="Id"
+                                                                                    AllowAutoComplete="True"
+                                                                                    AllowNullInput="True"
+                                                                                    AllowIncrementalFiltering="True"
+                                                                                    SearchCondition="Contains"
+                                                                                    AutoGenerateColumns="False"
+                                                                                    IsAutoPopupSize="False"
+                                                                                    PopUpWidth="380"
+                                                                                    PopUpHeight="260"
+                                                                                    GridColumnSizer="Star">
+                                                <syncfusion:GridMultiColumnDropDownList.Columns>
+                                                    <syncfusion:Columns>
+                                                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
+                                                        <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
+                                                        <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost/g" Width="88" NumberDecimalDigits="4" />
+                                                    </syncfusion:Columns>
+                                                </syncfusion:GridMultiColumnDropDownList.Columns>
+                                            </syncfusion:GridMultiColumnDropDownList>
+                                            <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="120" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
+                                            <controls:NumericColumn MappingName="Percent"
+                                                                    HeaderTemplate="{StaticResource PercentHeaderTemplate}"
+                                                                    Width="86"
+                                                                    NumberDecimalDigits="1"
+                                                                    AllowNullValue="True"
+                                                                    controls:GridCellEditing.AllowWhen="CanTypeBakersPercent" />
+                                            <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost/g" Width="120" NumberDecimalDigits="4" AllowEditing="False" />
+                                            <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="120" NumberDecimalDigits="2" AllowEditing="False" />
+                                            <!-- The formula's 100% base for baker's percentage, usually the flour; more than one can be ticked. -->
+                                            <syncfusion:GridCheckBoxColumn MappingName="IsFormulaBase"
+                                                                           HeaderText="Base"
+                                                                           Width="54"
+                                                                           HorizontalHeaderContentAlignment="Center" />
+                                        </syncfusion:SfDataGrid.Columns>
+                                    </syncfusion:SfDataGrid>
+
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <!-- What the percentages are read against, and the figure a batch is scaled by. -->
+                                            <TextBlock Text="{Binding FormulaBaseCaption}"
+                                                       Style="{StaticResource CaptionStyle}"
+                                                       Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+                                            <TextBlock Text="A product whose packaging links this set takes one whole set per sellable unit."
+                                                       Style="{StaticResource CaptionStyle}"
+                                                       Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        </StackPanel>
+                                        <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveLineCommand}" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </ScrollViewer>
+                    </syncfusion:TabItemExt>
+
+                    <syncfusion:TabItemExt Header="Used By" CanClose="False">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <Border Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="Used By" Style="{StaticResource SectionHeaderStyle}" />
+
+                                    <!-- One tile per product linking it (UsedByTilesStyle), which opens it on the Products screen -->
+                                    <ItemsControl ItemsSource="{Binding UsedBy}" Style="{StaticResource UsedByTilesStyle}" />
+
+                                    <TextBlock Text="{Binding UsedByText}" Style="{StaticResource CaptionStyle}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </ScrollViewer>
+                    </syncfusion:TabItemExt>
+                </syncfusion:TabControlExt>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

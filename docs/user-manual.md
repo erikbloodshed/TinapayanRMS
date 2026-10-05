@@ -449,11 +449,14 @@ The list shows **Name** and **Role**, with a search box. When a product saves a 
 
 ### The form
 
-At the top are the name and **New**, **Copy**, **New Product**, **Save**, **Undo**, **Redo** and **Delete**. Below them:
+The form has two cards. The header at the top holds the name and **New**, **Copy**, **New Product**, **Save**, **Undo**, **Redo** and **Delete**, then:
 
-- **Name** and **Role**.
 - **Batch Weight**, **Batch Cost** and **Cost per g**, worked out from the lines as you type.
-- **Lines**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base** (tick it for baker's percentages).
+- **Name** and **Role**.
+
+The card under it has two tabs along its bottom. Each scrolls while the header stays put:
+
+- **Recipe**: the **Lines**, with **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base** (tick it for baker's percentages).
 - **Used By**: a tile for each product that links this sub-assembly. Click one to open it.
 
 **Copy** starts a new, unsaved sub-assembly with the same role and lines, named "… Copy". Rename it if you like, then press Save. The original stays as it was.
