@@ -96,7 +96,7 @@ You'll be productive sooner if you're comfortable with the following.
 |---|---|---|
 | C# 14 and .NET 10 | Primary constructors, records and `record struct`, `required` members, collection expressions, pattern matching, nullable reference types, `async`/`await` | Everywhere |
 | WPF and XAML | Data binding and `DataContext` inheritance, dependency and attached properties, resources, styles and templates, routed events, the `Dispatcher` and STA threads | `src/TinapayanRMS.UI` |
-| MVVM with ReactiveUI 25 and Rx | `ReactiveObject`, `RaiseAndSetIfChanged`, `WhenAnyValue`, `ToProperty` (`ObservableAsPropertyHelper`), `ReactiveCommand`, `Interaction`, `Subject`, Rx operators | `ViewModels/` |
+| MVVM with ReactiveUI 26 and Rx | `ReactiveObject`, `RaiseAndSetIfChanged`, `WhenAnyValue`, `ToProperty` (`ObservableAsPropertyHelper`), `ReactiveCommand`, `Interaction`, `Subject`, Rx operators | `ViewModels/` |
 | DynamicData | `SourceCache<T, TKey>`, `Connect().SortAndBind(...)` | List ViewModels |
 | EF Core 10 | `DbContext`, `IEntityTypeConfiguration<T>`, migrations, change tracking, transactions, `ExecuteDeleteAsync` | Writes and the schema, in `Infrastructure` |
 | Dapper and T-SQL | Multi-mapped joins (`splitOn`), CTEs, `STRING_SPLIT` | Reads, in `Infrastructure` |
@@ -315,7 +315,7 @@ Business and costing rules go in ApplicationCore, and EF Core and other I/O stay
 5. Once the window shows, **`App`** starts two things off the UI thread: a check for migrations the database doesn't have yet, and the day's automatic backup (`IDatabaseBackups.BackUpDailyIfDueAsync`), taken the first time the app starts each day. A backup that fails is only logged.
 6. **`App.OnExit`** disposes the host, which disposes the singleton ViewModels, and flushes the log. After a restore, `App.RestartAfterExit` has set it to start the app again, once the log is closed.
 
-ReactiveUI 25 must be initialised exactly once per process, before any `ReactiveObject` exists. [ReactiveUIBootstrapper](../src/TinapayanRMS.UI/ReactiveUIBootstrapper.cs) does it with `RxAppBuilder.CreateReactiveUIBuilder().WithCoreServices().WithWpf().BuildApp()`, and tests that build ViewModels call `ReactiveUIBootstrapper.EnsureInitialized()` themselves.
+ReactiveUI 26 must be initialised exactly once per process, before any `ReactiveObject` exists. [ReactiveUIBootstrapper](../src/TinapayanRMS.UI/ReactiveUIBootstrapper.cs) does it with `RxAppBuilder.CreateReactiveUIBuilder().WithCoreServices().WithWpf().BuildApp()`, and tests that build ViewModels call `ReactiveUIBootstrapper.EnsureInitialized()` themselves.
 
 ### Dependency injection and lifetimes
 
