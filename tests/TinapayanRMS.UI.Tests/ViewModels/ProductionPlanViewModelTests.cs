@@ -13,7 +13,7 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>
-/// The Production Plan screen against a real database: products sharing a dough share its batches, the shopping list
+/// The Production Plan screen against a real database: products sharing a dough share its batches, the purchase requisition
 /// buys in whole purchase units, and the plan is kept between runs.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
@@ -61,7 +61,7 @@ public class ProductionPlanViewModelTests(DatabaseFixture fixture) : Persistence
         mix.Batches.Should().Be(1m);
         mix.Grams.Should().Be(1000m);
         mix.For.Should().Be("Ube Roll 4 pcs, Cheese Roll 5 pcs");
-        var flour = viewModel.Shopping.Should().ContainSingle().Subject;
+        var flour = viewModel.Requisition.Should().ContainSingle().Subject;
         flour.Needed.Should().Be(1000m);
         flour.Unit.Should().Be("g");
         flour.Buy.Should().Be(1m);
@@ -113,7 +113,7 @@ public class ProductionPlanViewModelTests(DatabaseFixture fixture) : Persistence
         var viewModel = CreateViewModel(new InMemoryViewStateStore());
         await viewModel.LoadCommand.Execute();
         AddLine(viewModel, bakery.UbeRollId, 4m);
-        await WaitUntilSettledAsync(() => viewModel.Shopping.Count == 1, () => viewModel.ErrorMessage ?? "no list");
+        await WaitUntilSettledAsync(() => viewModel.Requisition.Count == 1, () => viewModel.ErrorMessage ?? "no list");
         ProductPrintSet? printed = null;
         viewModel.ShowPrint.RegisterHandler(interaction =>
         {
@@ -125,7 +125,7 @@ public class ProductionPlanViewModelTests(DatabaseFixture fixture) : Persistence
 
         printed!.Plan!.Orders.Should().ContainSingle().Which.ProductName.Should().Be("Ube Roll");
         printed.Plan.Mixes.Should().Equal(viewModel.Mixes);
-        printed.Plan.Shopping.Should().Equal(viewModel.Shopping);
+        printed.Plan.Requisition.Should().Equal(viewModel.Requisition);
         printed.Title.Should().Be("Production Plan");
     }
 

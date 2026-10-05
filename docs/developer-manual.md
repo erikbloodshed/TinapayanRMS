@@ -901,7 +901,7 @@ Reports' tables go to an Excel workbook with **Export to Excel**. The parts, in 
 
 `ExcelExportTests` checks all of this against a real grid read back with XlsIO.
 
-The Production Plan prints through the same layout and manager: a `ProductPrintSet` made with `ProductPrintSet.Of(PrintedPlan, …)` holds no products, and `ProductPrintLayout.AddPlan` lays out what to make, the mixing sheet and the shopping list with the same headings, tables and footer. It opens in [PrintPreviewWindow](../src/TinapayanRMS.UI/Views/PrintPreviewWindow.xaml.cs), a dialog that themes itself before the pane goes in, so its opener mustn't theme it again.
+The Production Plan prints through the same layout and manager: a `ProductPrintSet` made with `ProductPrintSet.Of(PrintedPlan, …)` holds no products, and `ProductPrintLayout.AddPlan` lays out what to make, the mixing sheet and the purchase requisition with the same headings, tables and footer. It opens in [PrintPreviewWindow](../src/TinapayanRMS.UI/Views/PrintPreviewWindow.xaml.cs), a dialog that themes itself before the pane goes in, so its opener mustn't theme it again.
 
 ### The Production Plan
 

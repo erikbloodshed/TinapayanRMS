@@ -9,7 +9,7 @@
              d:DesignHeight="700" d:DesignWidth="1400">
     <!--
         The plan on the left, as Raw Materials has its list; what it comes to on the right, the mixing sheet over the
-        shopping list. Cards 4px from the page's edge and from each other. Both tables on the right are always shown, so
+        purchase requisition. Cards 4px from the page's edge and from each other. Both tables on the right are always shown, so
         Export to Excel writes both.
     -->
     <Grid Background="{StaticResource PageBackgroundBrush}" Margin="4">
@@ -112,14 +112,14 @@
                                           Label="Print"
                                           IconTemplate="{StaticResource PrintIconTemplate}"
                                           Command="{Binding PrintCommand}"
-                                          ToolTip="Previews and prints the plan: what to make, the mixing sheet and the shopping list."
+                                          ToolTip="Previews and prints the plan: what to make, the mixing sheet and the purchase requisition."
                                           VerticalAlignment="Center"
                                           Margin="0,0,8,0" />
                     <syncfusion:ButtonAdv Grid.Column="2"
                                           Label="Export to Excel"
                                           IconTemplate="{StaticResource ExportIconTemplate}"
                                           Command="{Binding ExportCommand}"
-                                          ToolTip="Saves the mixing sheet and the shopping list, as shown, to an Excel workbook."
+                                          ToolTip="Saves the mixing sheet and the purchase requisition, as shown, to an Excel workbook."
                                           VerticalAlignment="Center" />
                 </Grid>
                 <TextBlock DockPanel.Dock="Top"
@@ -163,7 +163,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Shopping List" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                    <TextBlock Text="Purchase Requisition" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource CaptionStyle}">
                         <Run Text="Total Cost" />
                         <Run Text="{Binding TotalCost, Mode=OneWay, StringFormat='{}{0:N2}'}" FontWeight="SemiBold" Foreground="{StaticResource HeadingForegroundBrush}" />
@@ -173,8 +173,8 @@
                            Style="{StaticResource CaptionStyle}"
                            Margin="0,0,0,12"
                            Text="Everything to buy: made ingredients as what they're made of, and egg white or yolk as the eggs they're cut from. Buy is in the unit of its dearest brand price, rounded up. Cost is what's needed, at buffered costs." />
-                <syncfusion:SfDataGrid x:Name="ShoppingGrid"
-                                       ItemsSource="{Binding Shopping}"
+                <syncfusion:SfDataGrid x:Name="RequisitionGrid"
+                                       ItemsSource="{Binding Requisition}"
                                        GridLinesVisibility="Both"
                                        CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                        CurrentCellBorderThickness="1"

@@ -50,7 +50,7 @@
                     <TextBlock Text="Include" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,0" />
                     <CheckBox Content="Costs"
                               IsChecked="{Binding IncludeCosting, Mode=TwoWay}"
-                              ToolTip="Each material's cost, and the total. Without them the shopping list shows only the amounts, for the kitchen or the market."
+                              ToolTip="Each material's cost, and the total. Without them the purchase requisition shows only the amounts, for the kitchen or the market."
                               VerticalAlignment="Center" />
                 </StackPanel>
                 <syncfusion:ButtonAdv Grid.Column="1"

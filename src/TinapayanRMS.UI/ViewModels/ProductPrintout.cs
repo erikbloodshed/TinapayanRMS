@@ -217,12 +217,12 @@ public sealed record PrintedComponent(string Product, int? Quantity, decimal Rec
 public sealed record PrintedPackagingLine(string Material, decimal? Qty, string Unit, decimal UnitCost, decimal Cost);
 
 /// <summary>
-/// The Production Plan on paper: the products to make, then the mixing sheet and the shopping list as the screen shows
+/// The Production Plan on paper: the products to make, then the mixing sheet and the purchase requisition as the screen shows
 /// them, and what the plan couldn't work out.
 /// </summary>
 public sealed record PrintedPlan(
     IReadOnlyList<PlanLineRow> Orders,
     IReadOnlyList<MixRow> Mixes,
-    IReadOnlyList<ShoppingListRow> Shopping,
+    IReadOnlyList<PurchaseRequisitionRow> Requisition,
     decimal TotalCost,
     IReadOnlyList<string> Notes);

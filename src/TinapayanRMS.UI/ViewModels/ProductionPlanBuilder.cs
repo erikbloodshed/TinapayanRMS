@@ -58,17 +58,17 @@ public sealed class PlanLineRow(Func<int, Product?> find) : ReactiveObject
 public sealed record MixRow(string Name, string For, decimal? Batches, decimal Grams);
 
 /// <summary>
-/// A row of the Shopping List: a purchased material's total, in its base unit, the purchase units to buy for it, and what
+/// A row of the Purchase Requisition: a purchased material's total, in its base unit, the purchase units to buy for it, and what
 /// the total costs.
 /// </summary>
 /// <param name="Needed">In the material's base unit: grams of an ingredient, pieces or metres of packaging.</param>
 /// <param name="Buy">Whole purchase units to buy; null for a material with no price, so no purchase unit.</param>
 /// <param name="BuyUnit">What it's bought in, "sack"; null with no price.</param>
 /// <param name="Cost">What the amount needed costs at the material's buffered cost; null with no cost.</param>
-public sealed record ShoppingListRow(int MaterialId, string Name, string Type, decimal Needed, string Unit, decimal? Buy, string? BuyUnit, decimal? Cost);
+public sealed record PurchaseRequisitionRow(int MaterialId, string Name, string Type, decimal Needed, string Unit, decimal? Buy, string? BuyUnit, decimal? Cost);
 
 /// <summary>A production plan as the screen shows it.</summary>
-public sealed record ProductionPlanResult(IReadOnlyList<MixRow> Mixes, IReadOnlyList<ShoppingListRow> Shopping, decimal TotalCost, IReadOnlyList<string> Notes)
+public sealed record ProductionPlanResult(IReadOnlyList<MixRow> Mixes, IReadOnlyList<PurchaseRequisitionRow> Requisition, decimal TotalCost, IReadOnlyList<string> Notes)
 {
     public static ProductionPlanResult Empty { get; } = new([], [], 0m, []);
 }
@@ -112,19 +112,19 @@ public static class ProductionPlanBuilder
                 .OrderBy(row => row.Name, StringComparer.CurrentCultureIgnoreCase),
         ];
 
-        List<ShoppingListRow> shopping =
+        List<PurchaseRequisitionRow> requisition =
         [
             .. plan.Purchases
                 .Where(p => p.Value > 0m)
-                .Select(p => ShoppingRowOf(p.Key, p.Value, materials.GetValueOrDefault(p.Key), brandPrices[p.Key].ToList()))
+                .Select(p => RequisitionRowOf(p.Key, p.Value, materials.GetValueOrDefault(p.Key), brandPrices[p.Key].ToList()))
                 .OrderBy(row => row.Type == "Packaging")
                 .ThenBy(row => row.Name, StringComparer.CurrentCultureIgnoreCase),
         ];
 
         return new ProductionPlanResult(
             mixes,
-            shopping,
-            shopping.Sum(row => row.Cost ?? 0m),
+            requisition,
+            requisition.Sum(row => row.Cost ?? 0m),
             [.. plan.Issues.Select(issue => NoteOf(issue, products, NameOf)).Distinct()]);
     }
 
@@ -164,16 +164,16 @@ public static class ProductionPlanBuilder
             .GroupBy(u => u.ProductId)
             .Select(g => string.Create(CultureInfo.CurrentCulture, $"{products[g.Key].Product.Name} {g.Sum(u => u.Pieces):#,0.##} pcs")));
 
-    private static ShoppingListRow ShoppingRowOf(int id, decimal needed, RawMaterial? material, IReadOnlyList<RawMaterialBrandPrice> prices)
+    private static PurchaseRequisitionRow RequisitionRowOf(int id, decimal needed, RawMaterial? material, IReadOnlyList<RawMaterialBrandPrice> prices)
     {
         if (material is null)
         {
-            return new ShoppingListRow(id, $"Raw material {id}", "Ingredient", needed, "g", null, null, null);
+            return new PurchaseRequisitionRow(id, $"Raw material {id}", "Ingredient", needed, "g", null, null, null);
         }
 
         var unit = PurchaseUnit.Of(material, prices);
         var cost = needed * material.BufferedCostPerBaseUnit;
-        return new ShoppingListRow(
+        return new PurchaseRequisitionRow(
             id,
             material.Name,
             material.Type == RawMaterialType.Ingredient ? "Ingredient" : "Packaging",

@@ -795,7 +795,7 @@ A made ingredient the mixes use, such as a syrup, is listed under the mixes with
 
 Under the table, a note in orange says what couldn't be planned, such as a section with no weight per piece or yield yet.
 
-### Shopping List
+### Purchase Requisition
 
 Everything to buy for the plan, ingredients first, then packaging:
 
@@ -807,7 +807,7 @@ A made ingredient is bought as what it's made of. Egg white and yolk are bought 
 
 ### Printing and exporting
 
-**Print** opens the plan in a print preview: what to make, the mixing sheet and the shopping list. Clear **Costs** at the bottom to print it without the costs, for the kitchen or the market. **Export to Excel** saves the mixing sheet and the shopping list on two sheets of one workbook.
+**Print** opens the plan in a print preview: what to make, the mixing sheet and the purchase requisition. Clear **Costs** at the bottom to print it without the costs, for the kitchen or the market. **Export to Excel** saves the mixing sheet and the purchase requisition on two sheets of one workbook.
 
 ---
 
@@ -951,7 +951,7 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 1. Open **Production Plan** from the menu.
 2. In the **Plan** table, pick each product and type how many to make.
 3. Check the **Mixing Sheet** for how many batches of each mix to make, and read any orange note under it.
-4. Press **Print**, clear **Costs** for the kitchen, and print. Or press **Export to Excel** to send the shopping list on.
+4. Press **Print**, clear **Costs** for the kitchen, and print. Or press **Export to Excel** to send the purchase requisition on.
 
 ### See what a price rise would do
 

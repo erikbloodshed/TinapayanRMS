@@ -54,10 +54,10 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<MixRow> Mixes { get; } = [];
 
-    public ObservableCollection<ShoppingListRow> Shopping { get; } = [];
+    public ObservableCollection<PurchaseRequisitionRow> Requisition { get; } = [];
 
     private decimal _totalCost;
-    /// <summary>What the shopping list comes to, at the materials' buffered costs.</summary>
+    /// <summary>What the purchase requisition comes to, at the materials' buffered costs.</summary>
     public decimal TotalCost
     {
         get => _totalCost;
@@ -94,7 +94,7 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
 
     public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
 
-    /// <summary>The mixing sheet and the shopping list as the tables show them, to an Excel workbook.</summary>
+    /// <summary>The mixing sheet and the purchase requisition as the tables show them, to an Excel workbook.</summary>
     public ReactiveCommand<RxVoid, RxVoid> ExportCommand { get; }
 
     public ProductionPlanViewModel(
@@ -163,7 +163,7 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
 
     /// <summary>The plan on paper, as the tables show it now.</summary>
     public ProductPrintSet PrintSet(DateTime printedAt) => ProductPrintSet.Of(
-        new PrintedPlan([.. Lines.Where(l => l.Product is not null && l.Units is > 0m)], [.. Mixes], [.. Shopping], TotalCost, Notes),
+        new PrintedPlan([.. Lines.Where(l => l.Product is not null && l.Units is > 0m)], [.. Mixes], [.. Requisition], TotalCost, Notes),
         printedAt);
 
     private void Recalculate() => _recalculations.OnNext(RxVoid.Default);
@@ -195,10 +195,10 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
             Mixes.Add(mix);
         }
 
-        Shopping.Clear();
-        foreach (var row in result.Shopping)
+        Requisition.Clear();
+        foreach (var row in result.Requisition)
         {
-            Shopping.Add(row);
+            Requisition.Add(row);
         }
 
         TotalCost = result.TotalCost;

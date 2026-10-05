@@ -21,11 +21,11 @@ public class ProductPrintLayoutTests
         var layout = new ProductPrintLayout(SamplePlan(), includeRecipe: true, includeCosting: true, A4);
         var texts = AllTexts(layout);
 
-        layout.DocumentName.Should().Be("Production Plan — Mixing Sheet and Shopping List");
+        layout.DocumentName.Should().Be("Production Plan — Mixing Sheet and Purchase Requisition");
         texts.Should().ContainInConsecutiveOrder("To Make", "Product", "Units", "Pieces");
         texts.Should().ContainInConsecutiveOrder("Mixing Sheet", "Mix", "Batches", "Weight");
         texts.Should().Contain(t => t.StartsWith("Sweet Dough", StringComparison.Ordinal) && t.Contains("Ube Roll 40 pcs", StringComparison.Ordinal));
-        texts.Should().ContainInConsecutiveOrder("Shopping List", "Raw Material", "Needed", "Buy", "Cost");
+        texts.Should().ContainInConsecutiveOrder("Purchase Requisition", "Raw Material", "Needed", "Buy", "Cost");
         texts.Should().ContainInConsecutiveOrder("Bread Flour", "2,000 g", "1 sack", Figure(100m, "N2"));
         texts.Should().ContainInConsecutiveOrder("Total", string.Empty, string.Empty, Figure(100m, "N2"));
         texts.Should().Contain("Cheese Roll: its Filling has no weight per piece or yield yet, so it isn't planned.");
@@ -47,7 +47,7 @@ public class ProductPrintLayoutTests
             new PrintedPlan(
                 [line],
                 [new MixRow("Sweet Dough", "Ube Roll 40 pcs", 2m, 2000m)],
-                [new ShoppingListRow(7, "Bread Flour", "Ingredient", 2000m, "g", 1m, "sack", 100m)],
+                [new PurchaseRequisitionRow(7, "Bread Flour", "Ingredient", 2000m, "g", 1m, "sack", 100m)],
                 100m,
                 ["Cheese Roll: its Filling has no weight per piece or yield yet, so it isn't planned."]),
             new DateTime(2026, 10, 3, 8, 0, 0));

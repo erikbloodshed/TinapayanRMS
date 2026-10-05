@@ -50,8 +50,8 @@ public sealed class ProductPrintLayout
     private static readonly GridLength[] ScalingColumnsWithoutCosts = [new(1, GridUnitType.Star), new(130)];
     private static readonly GridLength[] PlanOrderColumns = [new(1, GridUnitType.Star), new(100), new(120)];
     private static readonly GridLength[] MixColumns = [new(1, GridUnitType.Star), new(70), new(110)];
-    private static readonly GridLength[] ShoppingColumns = [new(1, GridUnitType.Star), new(110), new(130), new(90)];
-    private static readonly GridLength[] ShoppingColumnsWithoutCosts = [new(1, GridUnitType.Star), new(110), new(130)];
+    private static readonly GridLength[] RequisitionColumns = [new(1, GridUnitType.Star), new(110), new(130), new(90)];
+    private static readonly GridLength[] RequisitionColumnsWithoutCosts = [new(1, GridUnitType.Star), new(110), new(130)];
 
     /// <summary>How far a scaled recipe's row sits in from the one it's part of, as the Scaling tab's tree indents it.</summary>
     private const double ScalingIndent = 16;
@@ -150,7 +150,7 @@ public sealed class ProductPrintLayout
     public string DocumentName => $"{_set.Title ?? (_set.Products.Count > 0 ? _set.Products[0].ProductName : null)} — {Parts}";
 
     // The Scaling tab is printed in place of both parts, whichever are ticked.
-    private string Parts => _set.Plan is not null ? "Mixing Sheet and Shopping List" : _set.IsScaling ? "Scaling" : (_includeRecipe, _includeCosting) switch
+    private string Parts => _set.Plan is not null ? "Mixing Sheet and Purchase Requisition" : _set.IsScaling ? "Scaling" : (_includeRecipe, _includeCosting) switch
     {
         (true, true) => "Recipe and Costing",
         (true, false) => "Recipe",
@@ -518,8 +518,8 @@ public sealed class ProductPrintLayout
     }
 
     /// <summary>
-    /// The Production Plan (2026-10-03): what to make, the mixing sheet and the shopping list, each a table continued under
-    /// its heading on a page it runs on to, and what the plan couldn't work out. Without the costs the shopping list has
+    /// The Production Plan (2026-10-03): what to make, the mixing sheet and the purchase requisition, each a table continued under
+    /// its heading on a page it runs on to, and what the plan couldn't work out. Without the costs the purchase requisition has
     /// no Cost column and no total, as the recipe has no costs.
     /// </summary>
     private void AddPlan(PrintedPlan plan, ref int table)
@@ -552,15 +552,15 @@ public sealed class ProductPrintLayout
                 table: mixes);
         }
 
-        var shopping = ++table;
-        var columns = _includeCosting ? ShoppingColumns : ShoppingColumnsWithoutCosts;
-        Add(repeat => PartHeading(repeat ? "Shopping List (continued)" : "Shopping List"), keepWithNext: true, table: shopping, repeats: true);
+        var requisition = ++table;
+        var columns = _includeCosting ? RequisitionColumns : RequisitionColumnsWithoutCosts;
+        Add(repeat => PartHeading(repeat ? "Purchase Requisition (continued)" : "Purchase Requisition"), keepWithNext: true, table: requisition, repeats: true);
         Add(
             _ => HeaderRow(columns, _includeCosting ? ["Raw Material", "Needed", "Buy", "Cost"] : ["Raw Material", "Needed", "Buy"]),
             keepWithNext: true,
-            table: shopping,
+            table: requisition,
             repeats: true);
-        foreach (var row in plan.Shopping)
+        foreach (var row in plan.Requisition)
         {
             Add(
                 _ =>
@@ -578,12 +578,12 @@ public sealed class ProductPrintLayout
 
                     return Row(columns, cells);
                 },
-                table: shopping);
+                table: requisition);
         }
 
         if (_includeCosting)
         {
-            Add(_ => TotalRow(columns, "Total", string.Empty, string.Empty, Money(plan.TotalCost)), table: shopping);
+            Add(_ => TotalRow(columns, "Total", string.Empty, string.Empty, Money(plan.TotalCost)), table: requisition);
         }
 
         foreach (var note in plan.Notes)
