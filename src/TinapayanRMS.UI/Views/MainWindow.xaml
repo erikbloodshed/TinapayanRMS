@@ -326,9 +326,13 @@
                     <syncfusion:TabItemExt x:Name="RawMaterialsTab" Header="Raw Materials" />
                     <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
                     <syncfusion:TabItemExt x:Name="ProductsTab" Header="Products" />
-                    <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" />
-                    <syncfusion:TabItemExt x:Name="ProductionPlanTab" Header="Production Plan" />
-                    <syncfusion:TabItemExt x:Name="WhatIfTab" Header="What-If Prices" />
+                    <!--
+                        The app starts with only the first three open (2026-10-04, at the user's request); these open
+                        from the menu, as a closed tab does, and load when first shown.
+                    -->
+                    <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" Visibility="Collapsed" />
+                    <syncfusion:TabItemExt x:Name="ProductionPlanTab" Header="Production Plan" Visibility="Collapsed" />
+                    <syncfusion:TabItemExt x:Name="WhatIfTab" Header="What-If Prices" Visibility="Collapsed" />
                     <!--
                         Print, opened by the Products header's Print and closed with its ✕ (hidden, as CloseMode says);
                         not in the menu, since it prints what Products has open. Hidden until then.

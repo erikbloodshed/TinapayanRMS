@@ -648,7 +648,7 @@ To discard a migration you've generated but haven't applied anywhere, run `dotne
 - **`CloseMode="Hide"`**: closing a tab hides it rather than deleting it, so the menu can always show it again.
 - **`IsDisableUnloadTabItemExtContent="True"`**: every tab's content stays loaded. Scroll positions, sort orders, sub-tabs and typed text survive a switch without any code.
 
-The Print tab stays hidden until Products asks for it. The Settings dialog, `SettingsWindow`, is built afresh each time it opens, over the same singleton ViewModels. When it closes, it disposes its delete confirmations and releases its controls (grids, text boxes and picker filters), which would otherwise keep every closed dialog in memory. Then the main window reloads the screen on show, so its pickers include anything added in Settings.
+The app starts with only Raw Materials, Sub-Assemblies and Products open: Reports, Production Plan and What-If Prices start hidden (`Visibility="Collapsed"`), like a closed tab, until the menu shows them. The Print tab stays hidden until Products asks for it. The Settings dialog, `SettingsWindow`, is built afresh each time it opens, over the same singleton ViewModels. When it closes, it disposes its delete confirmations and releases its controls (grids, text boxes and picker filters), which would otherwise keep every closed dialog in memory. Then the main window reloads the screen on show, so its pickers include anything added in Settings.
 
 ### Views and cards
 
