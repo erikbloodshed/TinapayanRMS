@@ -194,7 +194,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
     }
 
     [Fact]
-    public async Task Deleting_a_product_that_links_a_standalone_sub_assembly_leaves_it()
+    public async Task Deleting_a_product_permanently_that_links_a_standalone_sub_assembly_leaves_it()
     {
         var roleId = await AddRoleAsync("Glaze");
         var sugarId = await AddIngredientAsync("Sugar");
@@ -202,7 +202,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         var productId = await AddProductAsync("Cream Loaf");
         await LinkAsync(productId, glazeId, 5m);
 
-        await new ProductRepository(CreateDbContextFactory()).DeleteAsync(productId, Cancellation);
+        await new ProductRepository(CreateDbContextFactory()).DeletePermanentlyAsync(productId, Cancellation);
 
         (await GetSubAssemblyAsync(glazeId)).Name.Should().Be("Glaze");
         (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation)).Should().BeEmpty();

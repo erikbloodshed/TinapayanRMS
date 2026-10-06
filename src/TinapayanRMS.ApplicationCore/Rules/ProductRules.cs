@@ -5,6 +5,25 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 public static class ProductRules
 {
     /// <summary>
+    /// How a product is named where it's in the way of something (a refusal, a Used By tile): "Cheese Roll (deleted)" for
+    /// one in the Deleted folder, which still holds what it uses until it's deleted permanently.
+    /// </summary>
+    public static string ListedName(string name, bool isDeleted) => isDeleted ? $"{name} (deleted)" : name;
+
+    /// <summary>
+    /// A product's name is unique among deleted products too, as the one waiting in the Deleted folder keeps it for its
+    /// restore: say so, rather than that the name is taken by nothing in sight.
+    /// </summary>
+    public static void EnsureNameNotHeldByDeleted(string name, bool isHeldByDeleted)
+    {
+        if (isHeldByDeleted)
+        {
+            throw new BusinessRuleException(
+                $"A deleted product is named {name}. Restore it from the Deleted folder, or delete it permanently there first.");
+        }
+    }
+
+    /// <summary>
     /// A product's whole set of usages: an empty set is valid (PLAN.md doesn't require a product to
     /// have a usage at all times), and so is a piece size of 0 — a section can go into the recipe before
     /// anyone knows how much of it a piece takes (2026-09-20, at the user's request), and until it's

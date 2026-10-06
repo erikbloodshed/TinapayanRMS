@@ -172,14 +172,14 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task Deleting_a_product_cascades_to_its_own_packaging_link()
+    public async Task Deleting_a_product_permanently_cascades_to_its_own_packaging_link()
     {
         var bigId = await AddProductAsync("Big");
         var smallId = await AddProductAsync("Small");
         var links = CreatePackagingLinkRepository();
         await links.SetLinkAsync(smallId, bigId, Cancellation);
 
-        await CreateProductRepository().DeleteAsync(smallId, Cancellation);
+        await CreateProductRepository().DeletePermanentlyAsync(smallId, Cancellation);
 
         (await links.GetForProductAsync(smallId, Cancellation)).Should().BeNull();
     }

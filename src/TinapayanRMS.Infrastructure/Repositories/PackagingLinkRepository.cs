@@ -149,10 +149,14 @@ public class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbContext> db
     {
         PackagingLinkRules.EnsureNotSelfLink(productId, linkedProductId);
 
-        var linkedProductExists = await dbContext.Products.AnyAsync(p => p.Id == linkedProductId, cancellationToken);
-        if (!linkedProductExists)
+        var linked = await dbContext.Products
+            .Where(p => p.Id == linkedProductId)
+            .Select(p => new { p.Name, p.DeletedAt })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new BusinessRuleException($"Product {linkedProductId} does not exist.");
+        if (linked.DeletedAt is not null)
         {
-            throw new BusinessRuleException($"Product {linkedProductId} does not exist.");
+            throw new BusinessRuleException($"{linked.Name} is deleted. Restore it from the Deleted folder to link its packaging.");
         }
 
         var links = await dbContext.PackagingLinks.ToDictionaryAsync(l => l.ProductId, l => l.LinkedProductId, cancellationToken);

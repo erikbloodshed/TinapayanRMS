@@ -285,9 +285,15 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         var deleteBox = () => CreateRepository().DeleteAsync(boxId, Cancellation);
         await deleteBox.Should().ThrowAsync<InvalidOperationException>().WithMessage("Merienda Set holds this product. Take it out there first.");
 
+        // A deleted composite still holds its products, so it can be restored whole, until it's deleted permanently.
         var setId = (await CreateRepository().GetAllAsync(Cancellation)).Single(p => p.Name == "Merienda Set").Id;
         await CreateRepository().DeleteAsync(setId, Cancellation);
-        await CreateRepository().DeleteAsync(boxId, Cancellation);
+        await deleteBox.Should().ThrowAsync<InvalidOperationException>().WithMessage("Merienda Set (deleted) holds this product. Take it out there first.");
+        var deleteBoxPermanently = () => CreateRepository().DeletePermanentlyAsync(boxId, Cancellation);
+        await deleteBoxPermanently.Should().ThrowAsync<InvalidOperationException>().WithMessage("Merienda Set (deleted) holds this product.*");
+
+        await CreateRepository().DeletePermanentlyAsync(setId, Cancellation);
+        await CreateRepository().DeletePermanentlyAsync(boxId, Cancellation);
 
         await using var dbContext = CreateDbContext();
         (await dbContext.ProductComponents.CountAsync(Cancellation)).Should().Be(0, "a composite's lines go with it");

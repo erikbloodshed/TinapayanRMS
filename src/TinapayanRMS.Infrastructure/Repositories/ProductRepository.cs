@@ -17,7 +17,10 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         """;
 
     public Task<IReadOnlyList<Product>> GetAllAsync(CancellationToken cancellationToken) =>
-        GetWithCategoryAsync("ORDER BY p.Name", null, cancellationToken);
+        GetWithCategoryAsync("WHERE p.DeletedAt IS NULL\nORDER BY p.Name", null, cancellationToken);
+
+    public Task<IReadOnlyList<Product>> GetDeletedAsync(CancellationToken cancellationToken) =>
+        GetWithCategoryAsync("WHERE p.DeletedAt IS NOT NULL\nORDER BY p.Name", null, cancellationToken);
 
     public async Task<Product?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
         (await GetWithCategoryAsync("WHERE p.Id = @id", new { id }, cancellationToken)).SingleOrDefault();
@@ -113,6 +116,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var existing = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == productId, cancellationToken)
             ?? throw new BusinessRuleException($"Product {productId} does not exist.");
+        await EnsureNameNotHeldByDeletedAsync(dbContext, productId, name, cancellationToken);
 
         var oldName = existing.Name;
         existing.Name = name;
@@ -221,30 +225,33 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var product = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == id, cancellationToken)
+            ?? throw new BusinessRuleException($"Product {id} does not exist.");
 
-        var packagingLinkedBy = await dbContext.PackagingLinks
-            .Where(l => l.LinkedProductId == id)
-            .Select(l => l.Product!.Name)
-            .ToListAsync(cancellationToken);
-        if (packagingLinkedBy.Count > 0)
-        {
-            throw new BusinessRuleException(
-                $"{string.Join(", ", packagingLinkedBy.Order(StringComparer.CurrentCultureIgnoreCase))} "
-                + $"{(packagingLinkedBy.Count == 1 ? "links" : "link")} this product's packaging. Unlink it there first.");
-        }
+        // The same refusals as a permanent delete: what restoring it would bring back has to still make sense, so nothing
+        // that leans on it can be left leaning on a deleted product.
+        await EnsureNothingLeansOnAsync(dbContext, id, cancellationToken);
 
-        // Checked rather than left to the foreign key, whose refusal would read as something else, and so the message can
-        // name the composites.
-        var heldBy = await dbContext.ProductComponents
-            .Where(c => c.ComponentProductId == id)
-            .Select(c => c.Product!.Name)
-            .ToListAsync(cancellationToken);
-        if (heldBy.Count > 0)
-        {
-            throw new BusinessRuleException(
-                $"{string.Join(", ", heldBy.Order(StringComparer.CurrentCultureIgnoreCase))} "
-                + $"{(heldBy.Count == 1 ? "holds" : "hold")} this product. Take it out there first.");
-        }
+        product.DeletedAt = DateTime.Now;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RestoreAsync(int id, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var product = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == id, cancellationToken)
+            ?? throw new BusinessRuleException($"Product {id} does not exist.");
+
+        // Whole as it was deleted: everything it uses was held for it, and its category, if deleted since, has left it
+        // uncategorized (SetNull).
+        product.DeletedAt = null;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeletePermanentlyAsync(int id, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await EnsureNothingLeansOnAsync(dbContext, id, cancellationToken);
 
         // Its own sub-assemblies go with it (Cascade). Nothing else can link one, but should another product's recipe
         // somehow use it, say so rather than let the database refuse.
@@ -258,6 +265,50 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     }
 
     /// <summary>
+    /// Refuses deleting product <paramref name="id"/>, to the Deleted folder or for good, while another product links its
+    /// packaging or a composite holds it, deleted or not, naming them.
+    /// </summary>
+    private static async Task EnsureNothingLeansOnAsync(TinapayanRMSDbContext dbContext, int id, CancellationToken cancellationToken)
+    {
+        var packagingLinkedBy = await dbContext.PackagingLinks
+            .Where(l => l.LinkedProductId == id)
+            .Select(l => new { l.Product!.Name, l.Product.DeletedAt })
+            .ToListAsync(cancellationToken);
+        if (packagingLinkedBy.Count > 0)
+        {
+            throw new BusinessRuleException(
+                $"{ListedNames(packagingLinkedBy.Select(p => (p.Name, p.DeletedAt)))} "
+                + $"{(packagingLinkedBy.Count == 1 ? "links" : "link")} this product's packaging. Unlink it there first.");
+        }
+
+        // Checked rather than left to the foreign key, whose refusal would read as something else, and so the message can
+        // name the composites.
+        var heldBy = await dbContext.ProductComponents
+            .Where(c => c.ComponentProductId == id)
+            .Select(c => new { c.Product!.Name, c.Product.DeletedAt })
+            .ToListAsync(cancellationToken);
+        if (heldBy.Count > 0)
+        {
+            throw new BusinessRuleException(
+                $"{ListedNames(heldBy.Select(p => (p.Name, p.DeletedAt)))} "
+                + $"{(heldBy.Count == 1 ? "holds" : "hold")} this product. Take it out there first.");
+        }
+
+        static string ListedNames(IEnumerable<(string Name, DateTime? DeletedAt)> products) =>
+            string.Join(", ", products
+                .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Select(p => ProductRules.ListedName(p.Name, p.DeletedAt is not null)));
+    }
+
+    /// <summary>
+    /// Refuses <paramref name="name"/> for product <paramref name="id"/> (0 for a new one) while a deleted product has it,
+    /// before the unique index would, so the message can say where that one is.
+    /// </summary>
+    internal static async Task EnsureNameNotHeldByDeletedAsync(TinapayanRMSDbContext dbContext, int id, string name, CancellationToken cancellationToken) =>
+        ProductRules.EnsureNameNotHeldByDeleted(
+            name, await dbContext.Products.AnyAsync(p => p.Id != id && p.Name == name && p.DeletedAt != null, cancellationToken));
+
+    /// <summary>
     /// Adds <paramref name="product"/>, stamped as saved now, and saves it: the product gets its id. Returns it, tracked.
     /// A composite is one sellable unit.
     /// </summary>
@@ -265,6 +316,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     {
         CompositeProductRules.EnsureOneUnit(product.IsComposite, product.QuantityRequired);
         CompositeProductRules.EnsureComponentPackagingOnComposite(product.IsComposite, product.IncludesComponentPackaging);
+        await EnsureNameNotHeldByDeletedAsync(dbContext, 0, product.Name, cancellationToken);
         product.UpdatedAt = DateTime.Now;
         dbContext.Products.Add(product);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -284,6 +336,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         CompositeProductRules.EnsureKindUnchanged(existing.IsComposite, product.IsComposite);
         CompositeProductRules.EnsureOneUnit(existing.IsComposite, product.QuantityRequired);
         CompositeProductRules.EnsureComponentPackagingOnComposite(existing.IsComposite, product.IncludesComponentPackaging);
+        await EnsureNameNotHeldByDeletedAsync(dbContext, existing.Id, product.Name, cancellationToken);
 
         var oldName = existing.Name;
         existing.Name = product.Name;

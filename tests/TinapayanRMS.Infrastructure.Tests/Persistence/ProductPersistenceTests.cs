@@ -197,7 +197,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     }
 
     [Fact]
-    public async Task Deleting_a_product_cascades_to_its_usages_lines_and_costing_parameters()
+    public async Task Deleting_a_product_permanently_cascades_to_its_usages_lines_and_costing_parameters()
     {
         var roleId = await AddRoleAsync("Filling");
         var sugarId = await AddIngredientAsync("Sugar");
@@ -212,7 +212,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         ], Cancellation);
         await CreateCostingParametersRepository().SetAsync(productId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, marginPercent: 40m, vatPercent: 12m, Cancellation);
 
-        await CreateProductRepository().DeleteAsync(productId, Cancellation);
+        await CreateProductRepository().DeletePermanentlyAsync(productId, Cancellation);
 
         (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Should().BeEmpty();
         (await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation)).Should().BeEmpty();

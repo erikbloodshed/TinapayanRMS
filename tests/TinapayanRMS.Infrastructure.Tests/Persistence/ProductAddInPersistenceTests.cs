@@ -125,13 +125,13 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
     }
 
     [Fact]
-    public async Task Deleting_the_product_takes_its_usages_add_ins_with_it()
+    public async Task Deleting_the_product_permanently_takes_its_usages_add_ins_with_it()
     {
         var (_, linkerId, doughId, _) = await SeedLinkedDoughAsync();
         var ubeId = await AddIngredientAsync("Ube Flavour", costPerGram: 0.8m);
         await SaveRecipeAsync(linkerId, new RecipeDraft([], [Linked(doughId, 30m, (ubeId, 20m))]));
 
-        await new ProductRepository(CreateDbContextFactory()).DeleteAsync(linkerId, Cancellation);
+        await new ProductRepository(CreateDbContextFactory()).DeletePermanentlyAsync(linkerId, Cancellation);
 
         await using var dbContext = CreateDbContext();
         (await dbContext.UsageAddInLines.CountAsync(Cancellation)).Should().Be(0, "Products → usages → add-ins cascades all the way down");

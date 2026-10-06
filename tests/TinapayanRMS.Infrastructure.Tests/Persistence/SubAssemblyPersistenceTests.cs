@@ -371,13 +371,13 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
     }
 
     [Fact]
-    public async Task Deleting_a_product_keeps_the_sub_assemblies_it_used_and_their_lines()
+    public async Task Deleting_a_product_permanently_keeps_the_sub_assemblies_it_used_and_their_lines()
     {
         var roleId = await AddRoleAsync("Filling");
         var sugarId = await AddIngredientAsync("Sugar");
         var (productId, custardId) = await AddProductWithSubAssemblyAsync("Ensaymada", roleId, [(sugarId, 100m)]);
 
-        await CreateProductRepository().DeleteAsync(productId, Cancellation);
+        await CreateProductRepository().DeletePermanentlyAsync(productId, Cancellation);
 
         await using var dbContext = CreateDbContext();
         (await dbContext.SubAssemblies.AnyAsync(s => s.Id == custardId, Cancellation)).Should().BeTrue();
@@ -386,7 +386,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
     }
 
     [Fact]
-    public async Task Deleting_a_product_leaves_another_product_linking_its_sub_assembly_as_it_was()
+    public async Task Deleting_a_product_permanently_leaves_another_product_linking_its_sub_assembly_as_it_was()
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour");
@@ -394,7 +394,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var smallId = await AddProductAsync("Ensaymada Small");
         await SaveRecipeAsync(smallId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m)]));
 
-        await CreateProductRepository().DeleteAsync(bigId, Cancellation);
+        await CreateProductRepository().DeletePermanentlyAsync(bigId, Cancellation);
 
         (await CreateProductRepository().GetByIdAsync(bigId, Cancellation)).Should().BeNull();
         (await CreateUsageRepository().GetForProductAsync(smallId, Cancellation)).Should().ContainSingle(u => u.SubAssemblyId == doughId);

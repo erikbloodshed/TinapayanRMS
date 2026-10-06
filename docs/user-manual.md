@@ -483,6 +483,8 @@ The Products screen has the product list on the left. On the right are the selec
 
 The top-level folders are **Production** and **Research and Development**. Each has a folder for every product category, plus **Uncategorized**. Drag products between folders to change their stage or category.
 
+Below them is the **Deleted** folder 🗑, where deleted products wait, by name, until you restore them or delete them permanently. Clicking a deleted product doesn't open it. It can't be dragged, and nothing can be dropped on the folder.
+
 Right-click menus:
 
 - **A product**:
@@ -496,6 +498,7 @@ Right-click menus:
 - **A stage's folder**: **New Product Here**, **New Composite Product Here**, **New Category…**, **Print Stage**, **Expand All** and **Collapse All**.
 - **A category's folder**: **New Product Here**, **New Composite Product Here**, **Promote All to Production**, **Print Folder**, **New Category…**, **Rename Category…** and **Delete Category**.
 - **The empty space**: **New Product**, **New Composite Product**, **New Category…**, **Print All Products**, **Expand All** and **Collapse All**.
+- **A product in the Deleted folder**: **Restore** and **Delete Permanently** (Del).
 
 **New Product Here** and **New Composite Product Here** file the new product in that folder when you save it. **New** from the header puts it in Research and Development.
 
@@ -524,7 +527,13 @@ Below the header are the fields you fill in:
 - It stays on when you open another product, until you switch it off or close the app. The app always starts on buffered costs.
 - **Print** uses whichever costs the screen shows (see [Printing](#8-printing-recipes-and-costings)).
 
-Deleting a product asks first. Its linked sub-assemblies stay on the Sub-Assemblies screen, and its own sub-assemblies are deleted with it. Deleting a composite product leaves the products it holds as they are. A product can't be deleted while another product's packaging links it, or while a composite product holds it.
+Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage and category are all kept. Until you restore it, no picker, report, print, What-If or Production Plan includes it.
+
+- **Restore** (right-click it in the Deleted folder) puts it back in its folder and opens it. If its category was deleted in the meantime, it comes back in **Uncategorized**.
+- **Delete Permanently** asks first and can't be undone. The product's own sub-assemblies are deleted with it. Its linked sub-assemblies stay on the Sub-Assemblies screen. Deleting a composite product leaves the products it holds as they are.
+- A deleted product **still holds everything it uses**, so it can come back whole. A sub-assembly it links, an ingredient in its recipe, or a product it holds or whose packaging it links can't be deleted until you delete the deleted product permanently. **Used By** tiles and refusal messages name it with "(deleted)" after its name. Clicking its tile picks it in the Deleted folder.
+- A deleted product keeps its name, so no other product can take that name until it's deleted permanently.
+- A product can't be deleted, to the Deleted folder or permanently, while another product's packaging links it, or while a composite product holds it. That includes a deleted product.
 
 ### Recipe tab: Recipe Structure
 
@@ -962,6 +971,10 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 2. In the top table, pick the raw material and type its **Change %**, such as **8**, or its **New Price**.
 3. Tick **Only affected products** and sort by **What-If Markup %**.
 4. To make the price real, record it on **Raw Materials** as in [Record a price increase](#record-a-price-increase). What-If Prices never changes a price itself.
+### Bring back a deleted product
+
+Open the **Deleted** folder at the bottom of the Products list, right-click the product and choose **Restore**. It goes back to its folder as it was when you deleted it.
+
 
 ### Back up to a USB stick
 
@@ -1018,7 +1031,10 @@ It's still in use. The message says where. For example:
 - A product whose packaging another product links.
 - A product that a composite product holds.
 
-Move or remove what uses it first.
+Move or remove what uses it first. When the message names a product with "(deleted)" after it, that product is in the Products list's **Deleted** folder. It still holds what it uses until you restore it and take it out there, or right-click it and choose **Delete Permanently**.
+
+**"A deleted product is named …"**
+A product in the **Deleted** folder keeps its name. Restore it, or delete it permanently, before giving its name to another product.
 
 **"A composite product needs at least two different products."**
 A composite is made of two or more different products. For more of one product, give that line a bigger **Qty**. For a pack of one product, use **Quantity Required** on a product of its own instead.

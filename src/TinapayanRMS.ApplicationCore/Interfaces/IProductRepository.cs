@@ -116,11 +116,16 @@ public sealed record ProductMove(int ProductId, ProductStage Stage, int? Categor
 
 public interface IProductRepository
 {
+    /// <summary>Every product in use, by name: none of those in the Deleted folder (GetDeletedAsync).</summary>
     Task<IReadOnlyList<Product>> GetAllAsync(CancellationToken cancellationToken);
 
+    /// <summary>The products in the Deleted folder, by name, each as it was when it was deleted.</summary>
+    Task<IReadOnlyList<Product>> GetDeletedAsync(CancellationToken cancellationToken);
+
+    /// <summary>The product with this id, deleted or not; null when there's none.</summary>
     Task<Product?> GetByIdAsync(int id, CancellationToken cancellationToken);
 
-    /// <summary>The products with these ids, by name; an id with no product is left out.</summary>
+    /// <summary>The products with these ids, deleted or not, by name; an id with no product is left out.</summary>
     Task<IReadOnlyList<Product>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken);
 
     /// <summary>
@@ -191,9 +196,22 @@ public interface IProductRepository
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Deletes the product with its own sub-assemblies, usages, packaging, costing and, for a composite, its lines; the
-    /// sub-assemblies it links from the Sub-Assemblies screen, and the products a composite holds, stay. Refused while
-    /// another product links its packaging, or while a composite holds it.
+    /// Moves the product to the Deleted folder: it's stamped DeletedAt and kept whole, so RestoreAsync brings it back as it
+    /// was. Everything it uses stays held by it, as the Used By lists and refusals show ("Cheese Roll (deleted)"). Refused
+    /// while another product links its packaging, or while a composite holds it, deleted or not.
     /// </summary>
     Task DeleteAsync(int id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Takes the product out of the Deleted folder, back to its stage and category (Uncategorized if that category has
+    /// gone since). Nothing else changes, UpdatedAt included.
+    /// </summary>
+    Task RestoreAsync(int id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes the product for good, with its own sub-assemblies, usages, packaging, costing and, for a composite, its
+    /// lines; the sub-assemblies it links from the Sub-Assemblies screen, and the products a composite holds, stay. Refused
+    /// as DeleteAsync is.
+    /// </summary>
+    Task DeletePermanentlyAsync(int id, CancellationToken cancellationToken);
 }

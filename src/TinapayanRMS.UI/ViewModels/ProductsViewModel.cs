@@ -655,11 +655,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private readonly SourceCache<ProductCategory, int> _categoryCache = new(c => c.Id);
     private readonly ReadOnlyObservableCollection<ProductCategory> _categories;
 
-    /// <summary>Every product, for the packaging link and clone pickers.</summary>
+    /// <summary>Every product in use (none of the deleted), for the packaging link and clone pickers.</summary>
     public ReadOnlyObservableCollection<Product> Products => _products;
 
     /// <summary>The products the list shows: those whose name matches SearchText.</summary>
     public ReadOnlyObservableCollection<Product> VisibleProducts => _visibleProducts;
+
+    /// <summary>
+    /// The products in the list's Deleted folder, by name (IProductRepository.GetDeletedAsync). Kept apart from
+    /// <see cref="Products"/>, so no picker offers one; only the list shows them, to restore or delete permanently.
+    /// </summary>
+    public IReadOnlyList<Product> DeletedProducts { get; private set; } = [];
 
     /// <summary>The Products list (ProductListCard): VisibleProducts filed in a folder for their stage, then their category.</summary>
     public ProductTree ProductTree { get; }
@@ -709,8 +715,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }
     }
 
-    /// <summary>The products picked in the list, in the order they were picked.</summary>
-    public IReadOnlyList<ProductLeafNode> SelectedTreeProducts => [.. SelectedTreeNodes.OfType<ProductLeafNode>()];
+    /// <summary>The products picked in the list, in the order they were picked, deleted ones left out.</summary>
+    public IReadOnlyList<ProductLeafNode> SelectedTreeProducts => [.. SelectedTreeNodes.OfType<ProductLeafNode>().Where(l => !l.IsDeleted)];
 
     /// <summary>
     /// Set while the list's selection changes for a reason that's no pick of the user's: SyncTreeSelection moving it to
@@ -1869,6 +1875,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>Delete on a product of the list: Delete for that product, asking first.</summary>
     public ReactiveCommand<ProductLeafNode, RxVoid> DeleteProductCommand { get; }
 
+    /// <summary>Restore on a product in the Deleted folder: puts it back in its folder, and picks it.</summary>
+    public ReactiveCommand<ProductLeafNode, RxVoid> RestoreProductCommand { get; }
+
+    /// <summary>Delete Permanently on a product in the Deleted folder: asks first, then deletes it for good.</summary>
+    public ReactiveCommand<ProductLeafNode, RxVoid> DeletePermanentlyCommand { get; }
+
     /// <summary>New Category on the list: asks for its name and adds it, a folder in both stages. Its parameter is the folder asked on.</summary>
     public ReactiveCommand<ProductFolderNode?, RxVoid> NewCategoryCommand { get; }
 
@@ -2324,6 +2336,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             var categoriesRead = Task.Run(() => _categoryRepository.GetAllAsync(CancellationToken.None));
             var rawMaterialsRead = Task.Run(() => rawMaterialRepository.GetAllAsync(CancellationToken.None));
             var productsRead = Task.Run(() => _productRepository.GetAllAsync(CancellationToken.None));
+            var deletedRead = Task.Run(() => _productRepository.GetDeletedAsync(CancellationToken.None));
             var linkableRead = Task.Run(() => _subAssemblyRepository.GetLinkableAsync(CancellationToken.None));
             var standaloneRead = Task.Run(() => _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None));
             var costingDefaultsRead = Task.Run(() => _costingDefaultsRepository.GetAsync(CancellationToken.None));
@@ -2336,13 +2349,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             var componentCostsRead = Task.Run(() => _savedProducts.ReadComponentCostsAsync(componentIds, CancellationToken.None));
             var bomLinesRead = Task.Run(() => _ingredientBomLineRepository.GetAllAsync(CancellationToken.None));
             await Task.WhenAll(
-                rolesRead, categoriesRead, rawMaterialsRead, productsRead, linkableRead, standaloneRead, costingDefaultsRead,
+                rolesRead, categoriesRead, rawMaterialsRead, productsRead, deletedRead, linkableRead, standaloneRead, costingDefaultsRead,
                 linkedSubAssembliesRead, linkedLinesRead, packagingLinkRead, componentLinksRead, componentCostsRead, bomLinesRead);
 
             var roles = await rolesRead;
             var categories = await categoriesRead;
             var rawMaterials = await rawMaterialsRead;
             var products = await productsRead;
+            var deleted = await deletedRead;
             var linkable = await linkableRead;
             var packagingSets = (await standaloneRead).Where(s => s.Role?.IsPackaging == true).ToList();
             var costingDefaults = await costingDefaultsRead;
@@ -2383,7 +2397,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId);
                 Ingredients.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Ingredient).OrderBy(m => m.Name)], m => m.Id);
                 PackagingMaterials.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Packaging).OrderBy(m => m.Name)], m => m.Id);
+                // The Deleted folder first, so the tree, refreshed as the products merge, files a product deleted or
+                // restored since in its new place in one go. The tree is refreshed again for a change to Deleted alone.
+                DeletedProducts = deleted;
                 _productCache.MergeFrom(products);
+                RefreshProductTree();
                 _linkable = linkable;
                 _packagingSets = packagingSets;
                 RefreshCostingDefaults(costingDefaults);
@@ -2475,6 +2493,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             new TextPromptRequest("Create Variant", "Name", $"{leaf.Product.Name} Copy", $"A new product that links {leaf.Product.Name}'s recipe and packaging, filed in Research and Development."),
             _productCloner.CreateVariantAsync));
         DeleteProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => DeleteProductAsync(leaf.Product));
+        RestoreProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => RestoreProductAsync(leaf.Product));
+        DeletePermanentlyCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => DeletePermanentlyAsync(leaf.Product));
         NewCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(NewCategoryAsync);
         RenameCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(RenameCategoryAsync);
         DeleteCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(DeleteCategoryAsync);
@@ -2819,14 +2839,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>
-    /// Deletes <paramref name="product"/> once it's confirmed. The form starts a new product if it was showing this one,
-    /// as it was after the header's Delete, which only ever deletes the product showing.
+    /// Moves <paramref name="product"/> to the Deleted folder once it's confirmed. The form starts a new product if it was
+    /// showing this one, as it was after the header's Delete, which only ever deletes the product showing.
     /// </summary>
     private Task DeleteProductAsync(Product product) =>
         RunWithConfirmationAsync(
-            product.IsComposite
-                ? $"Delete '{product.Name}'? The products it holds stay. This can't be undone."
-                : $"Delete '{product.Name}'? Its own sub-assemblies go with it; the ones it links stay on the Sub-Assemblies screen. This can't be undone.",
+            $"Delete '{product.Name}'? It moves to the Deleted folder at the bottom of the list, where it can be restored as it is.",
             async () =>
             {
                 await _productRepository.DeleteAsync(product.Id, CancellationToken.None);
@@ -2835,6 +2853,27 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     StartNewProduct();
                 }
 
+                await LoadCommand.Execute();
+            });
+
+    /// <summary>Takes <paramref name="product"/> out of the Deleted folder, back to its own, and opens it, as a click on it would.</summary>
+    private Task RestoreProductAsync(Product product) =>
+        RunSafelyAsync(async () =>
+        {
+            await _productRepository.RestoreAsync(product.Id, CancellationToken.None);
+            await LoadCommand.Execute();
+            TrySelectProduct(product.Id);
+        });
+
+    /// <summary>Deletes <paramref name="product"/>, from the Deleted folder, for good once it's confirmed.</summary>
+    private Task DeletePermanentlyAsync(Product product) =>
+        RunWithConfirmationAsync(
+            product.IsComposite
+                ? $"Delete '{product.Name}' permanently? The products it holds stay. This can't be undone."
+                : $"Delete '{product.Name}' permanently? Its own sub-assemblies go with it; the ones it links stay on the Sub-Assemblies screen. This can't be undone.",
+            async () =>
+            {
+                await _productRepository.DeletePermanentlyAsync(product.Id, CancellationToken.None);
                 await LoadCommand.Execute();
             });
 
@@ -2949,6 +2988,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     private bool TrySelectProduct(int productId)
     {
+        // A deleted one (a Used By tile names it as deleted) has its row picked in the Deleted folder, opened; the form stays.
+        if (DeletedProducts.Any(p => p.Id == productId))
+        {
+            if (ProductTree.Find(productId) is null)
+            {
+                SearchText = string.Empty;
+            }
+
+            ProductTree.DeletedFolder.IsExpanded = true;
+            SelectedTreeNode = ProductTree.Find(productId);
+            return true;
+        }
+
         if (Products.FirstOrDefault(p => p.Id == productId) is not { } product)
         {
             return false;
@@ -2970,16 +3022,22 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _isSyncingTreeSelection = true;
         try
         {
-            ProductTree.Refresh(Categories, VisibleProducts, isFiltered: SearchText.Trim().Length > 0);
+            var search = SearchText.Trim();
+            ProductTree.Refresh(
+                Categories,
+                VisibleProducts,
+                isFiltered: search.Length > 0,
+                [.. DeletedProducts.Where(p => search.Length == 0 || p.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase))]);
         }
         finally
         {
             _isSyncingTreeSelection = false;
         }
 
-        // A folder picked stays picked. Otherwise the row goes back to the product picked: a product moved to another
-        // folder leaves the tree's selection as it goes, and one a search hid gets its row back when the search ends.
-        if (SelectedTreeNode is not ProductFolderNode)
+        // A folder picked stays picked, and so does a deleted product, which the form never shows. Otherwise the row goes
+        // back to the product picked: a product moved to another folder leaves the tree's selection as it goes, and one a
+        // search hid gets its row back when the search ends.
+        if (SelectedTreeNode is not (ProductFolderNode or ProductLeafNode { IsDeleted: true }))
         {
             SyncTreeSelection();
         }
@@ -3034,7 +3092,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // The tree calls this in the middle of changing SelectedItems: picking the product leads to SyncTreeSelection,
         // which then finds its row first already and leaves the collection alone, as it must mid-change.
-        if (!_isSyncingTreeSelection && first is ProductLeafNode leaf && leaf.Product.Id != SelectedProduct?.Id)
+        // A deleted product's row is picked as a folder's is, leaving the form as it is: it's there to restore.
+        if (!_isSyncingTreeSelection && first is ProductLeafNode { IsDeleted: false } leaf && leaf.Product.Id != SelectedProduct?.Id)
         {
             SelectedProduct = leaf.Product;
         }
@@ -5402,6 +5461,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private const string CopyGlyph = "";
     private const string LinkGlyph = "";
     private const string DeleteGlyph = "";
+    private const string RestoreGlyph = "";
     private const string PrintGlyph = "";
 
     /// <summary>
@@ -5411,6 +5471,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     public IReadOnlyList<TreeMenuItem> TreeMenuFor(ProductTreeNode? node) => node switch
     {
+        ProductLeafNode { IsDeleted: true } leaf => DeletedProductMenu(leaf),
+        ProductFolderNode { IsDeletedFolder: true } => [],
         ProductLeafNode leaf => ProductsMenu(SelectedTreeProducts is var picked && picked.Contains(leaf) ? picked : [leaf]),
         ProductFolderNode { IsStage: true } stage => StageMenu(stage),
         ProductFolderNode folder => FolderMenu(folder),
@@ -5487,6 +5549,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             }
         }
     }
+
+    /// <summary>A product in the Deleted folder: it can only come back, or go for good.</summary>
+    private List<TreeMenuItem> DeletedProductMenu(ProductLeafNode leaf) =>
+    [
+        new("Restore", RestoreProductCommand, leaf) { Glyph = RestoreGlyph },
+        TreeMenuItem.Separator,
+        new("Delete Permanently", DeletePermanentlyCommand, leaf) { Gesture = "Del", Glyph = DeleteGlyph },
+    ];
 
     private List<TreeMenuItem> StageMenu(ProductFolderNode stage) =>
     [

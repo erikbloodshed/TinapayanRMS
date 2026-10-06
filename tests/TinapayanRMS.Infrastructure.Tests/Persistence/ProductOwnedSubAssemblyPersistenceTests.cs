@@ -310,7 +310,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
     }
 
     [Fact]
-    public async Task Deleting_a_product_takes_its_own_and_leaves_what_it_links()
+    public async Task Deleting_a_product_permanently_takes_its_own_and_leaves_what_it_links()
     {
         var doughRoleId = await AddRoleAsync("Dough");
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2, isProductOwned: true);
@@ -319,7 +319,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         var productId = await AddProductAsync("Cheese Roll");
         await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)]), Own(fillingRoleId, [(cheeseId, 100m)])], []));
 
-        await CreateProductRepository().DeleteAsync(productId, Cancellation);
+        await CreateProductRepository().DeletePermanentlyAsync(productId, Cancellation);
 
         (await SubAssembliesAsync()).Should().Equal(("Cheese Roll Dough", null));
     }

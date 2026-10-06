@@ -7,7 +7,10 @@ using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Tests.ViewModels;
 
-/// <summary>The Products list's tree: a folder per stage, holding a folder per category and Uncategorized, holding products.</summary>
+/// <summary>
+/// The Products list's tree: a folder per stage, holding a folder per category and Uncategorized, holding products; then
+/// the Deleted folder, holding the deleted products.
+/// </summary>
 public class ProductTreeTests
 {
     private static readonly ProductCategory Breads = new() { Id = 1, Name = "Breads" };
@@ -16,7 +19,13 @@ public class ProductTreeTests
     private static Product ProductOf(int id, string name, ProductStage stage, ProductCategory? category) =>
         new() { Id = id, Name = name, Stage = stage, CategoryId = category?.Id, Category = category };
 
-    private static ProductFolderNode Root(ProductTree tree, ProductStage stage) => tree.Roots.Single(r => r.Stage == stage);
+    private static ProductFolderNode Root(ProductTree tree, ProductStage stage) => tree.Stages.Single(r => r.Stage == stage);
+
+    private static Product Deleted(Product product)
+    {
+        product.DeletedAt = new DateTime(2026, 10, 6, 9, 0, 0, DateTimeKind.Local);
+        return product;
+    }
 
     private static ProductFolderNode Folder(ProductTree tree, ProductStage stage, string title) =>
         Root(tree, stage).Children.OfType<ProductFolderNode>().Single(f => f.Title == title);
@@ -62,12 +71,82 @@ public class ProductTreeTests
     }
 
     [Fact]
-    public void The_stages_are_the_top_level_folders_Production_first()
+    public void The_stages_are_the_top_level_folders_Production_first_then_Deleted()
     {
         var tree = new ProductTree();
 
-        tree.Roots.Select(r => r.Title).Should().Equal("Production", "Research and Development");
-        tree.Roots.Should().OnlyContain(r => r.IsStage && r.CategoryId == null);
+        tree.Roots.Select(r => r.Title).Should().Equal("Production", "Research and Development", "Deleted");
+        tree.Stages.Should().Equal(tree.Roots.Take(2));
+        tree.Stages.Should().OnlyContain(r => r.IsStage && r.IsTopLevel && r.CategoryId == null && !r.IsDeletedFolder);
+        tree.DeletedFolder.Should().BeSameAs(tree.Roots[2]);
+        tree.DeletedFolder.Should().Match<ProductFolderNode>(f => f.IsDeletedFolder && f.IsTopLevel && !f.IsStage && !f.IsCategory);
+        tree.DeletedFolder.Key.Should().Be("Deleted");
+        tree.DeletedFolder.IsExpanded.Should().BeFalse("it starts closed");
+    }
+
+    [Fact]
+    public void The_Deleted_folder_holds_the_deleted_products_by_name_whatever_their_stage_and_category()
+    {
+        var tree = new ProductTree();
+        var pandesal = ProductOf(1, "Pandesal", ProductStage.Production, Breads);
+        var mamon = Deleted(ProductOf(2, "Mamon", ProductStage.Production, Cakes));
+        var ensaymada = Deleted(ProductOf(3, "Ensaymada", ProductStage.ResearchAndDevelopment, null));
+
+        tree.Refresh([Breads, Cakes], [pandesal], isFiltered: false, [ensaymada, mamon]);
+
+        TitlesIn(tree.DeletedFolder).Should().Equal("Ensaymada", "Mamon");
+        tree.DeletedFolder.ProductCount.Should().Be(2);
+        tree.DeletedFolder.Glyph.Should().Be("\ue74d", "the bin, open or not");
+        TitlesIn(Folder(tree, ProductStage.Production, "Cakes")).Should().BeEmpty();
+        Root(tree, ProductStage.Production).ProductCount.Should().Be(1, "a stage counts only its own");
+        tree.Find(2)!.IsDeleted.Should().BeTrue();
+        tree.Find(1)!.IsDeleted.Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_product_deleted_or_restored_keeps_its_row_which_moves_to_and_from_the_Deleted_folder()
+    {
+        var tree = new ProductTree();
+        var mamon = ProductOf(2, "Mamon", ProductStage.Production, Cakes);
+        tree.Refresh([Cakes], [mamon], isFiltered: false);
+        var leaf = tree.Find(2)!;
+
+        tree.Refresh([Cakes], [], isFiltered: false, [Deleted(mamon)]);
+
+        tree.Find(2).Should().BeSameAs(leaf);
+        tree.DeletedFolder.Children.Should().Equal(leaf);
+        Folder(tree, ProductStage.Production, "Cakes").Children.Should().BeEmpty();
+
+        tree.Refresh([Cakes], [mamon], isFiltered: false, []);
+
+        tree.Find(2).Should().BeSameAs(leaf);
+        tree.DeletedFolder.Children.Should().BeEmpty();
+        Folder(tree, ProductStage.Production, "Cakes").Children.Should().Equal(leaf);
+    }
+
+    [Fact]
+    public void A_search_opens_the_Deleted_folder_on_its_matches()
+    {
+        var tree = new ProductTree();
+
+        tree.Refresh([Cakes], [], isFiltered: true, []);
+        tree.DeletedFolder.IsExpanded.Should().BeFalse("nothing in it matches");
+
+        tree.Refresh([Cakes], [], isFiltered: true, [Deleted(ProductOf(2, "Mamon", ProductStage.Production, Cakes))]);
+        tree.DeletedFolder.IsExpanded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_deleted_product_moves_nowhere_and_nothing_moves_into_the_Deleted_folder()
+    {
+        var tree = new ProductTree();
+        var pandesal = ProductOf(1, "Pandesal", ProductStage.Production, Breads);
+        var mamon = Deleted(ProductOf(2, "Mamon", ProductStage.Production, Cakes));
+        tree.Refresh([Breads, Cakes], [pandesal], isFiltered: false, [mamon]);
+
+        ProductTree.MoveTo(Folder(tree, ProductStage.ResearchAndDevelopment, "Breads"), mamon).Should().BeNull();
+        ProductTree.MoveTo(tree.DeletedFolder, pandesal).Should().BeNull();
+        ProductTree.MoveTo(tree.Find(2), pandesal).Should().BeNull("dropped on a deleted product is dropped in Deleted");
     }
 
     [Fact]
@@ -85,7 +164,7 @@ public class ProductTreeTests
             ],
             isFiltered: false);
 
-        foreach (var root in tree.Roots)
+        foreach (var root in tree.Stages)
         {
             TitlesIn(root).Should().Equal("Breads", "Cakes", "Uncategorized");
         }
@@ -114,7 +193,7 @@ public class ProductTreeTests
         Product[] products = [ProductOf(1, "Pandesal", ProductStage.Production, Breads)];
         tree.Refresh([Breads, Cakes], products, isFiltered: false);
 
-        tree.Roots.Should().OnlyContain(r => r.IsExpanded);
+        tree.Stages.Should().OnlyContain(r => r.IsExpanded);
         Folder(tree, ProductStage.Production, "Breads").IsExpanded.Should().BeFalse();
 
         tree.Refresh([Breads, Cakes], products, isFiltered: true);
@@ -352,11 +431,13 @@ public class ProductTreeTests
         Root(tree, ProductStage.ResearchAndDevelopment).Children.Cast<ProductFolderNode>().Should().OnlyContain(f => !f.IsExpanded, "the other stage is left alone");
 
         tree.ExpandAll(null);
-        tree.Roots.SelectMany(r => r.Children).Cast<ProductFolderNode>().Should().OnlyContain(f => f.IsExpanded, "null is both stages");
+        tree.Stages.SelectMany(r => r.Children).Cast<ProductFolderNode>().Should().OnlyContain(f => f.IsExpanded, "null is both stages");
+        tree.DeletedFolder.IsExpanded.Should().BeTrue("and the Deleted folder");
 
         tree.CollapseAll(null);
-        tree.Roots.SelectMany(r => r.Children).Cast<ProductFolderNode>().Should().OnlyContain(f => !f.IsExpanded);
-        tree.Roots.Should().OnlyContain(r => r.IsExpanded, "the stages stay open on their folders");
+        tree.Stages.SelectMany(r => r.Children).Cast<ProductFolderNode>().Should().OnlyContain(f => !f.IsExpanded);
+        tree.Stages.Should().OnlyContain(r => r.IsExpanded, "the stages stay open on their folders");
+        tree.DeletedFolder.IsExpanded.Should().BeFalse();
     }
 
     [Fact]

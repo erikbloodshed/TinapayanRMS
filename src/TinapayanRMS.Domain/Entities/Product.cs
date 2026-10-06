@@ -55,4 +55,13 @@ public class Product
     /// clone when it's made. Null for a product not saved since this was added.
     /// </summary>
     public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// When it was deleted, in local time; null while it's in use. A deleted product waits in the Products list's Deleted
+    /// folder, whole, to be restored or deleted permanently: it keeps its stage, category, recipe, packaging and costing,
+    /// and still holds what it uses (IProductRepository.DeleteAsync). Nothing else lists it.
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
+
+    public bool IsDeleted => DeletedAt is not null;
 }

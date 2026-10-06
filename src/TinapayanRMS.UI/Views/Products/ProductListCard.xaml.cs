@@ -66,9 +66,9 @@ public partial class ProductListCard : UserControl
         };
     }
 
-    /// <summary>Only products can be dragged, one or several: the folders are fixed.</summary>
+    /// <summary>Only products can be dragged, one or several: the folders are fixed, and a deleted product only comes back by Restore.</summary>
     private void Tree_ItemDragStarting(object? sender, TreeViewItemDragStartingEventArgs e) =>
-        e.Cancel = e.DraggingNodes.Any(node => node.Content is not ProductLeafNode);
+        e.Cancel = e.DraggingNodes.Any(node => node.Content is not ProductLeafNode { IsDeleted: false });
 
     /// <summary>
     /// Shows where a drop files the products: into a folder, highlighted whole, or beside another product in that one's
@@ -136,7 +136,14 @@ public partial class ProductListCard : UserControl
             viewModel.SelectedTreeNode = node;
         }
 
-        e.ContextMenu = TreeContextMenu.Build(this, viewModel.TreeMenuFor(node));
+        // The Deleted folder has nothing to offer: its products have their own menus.
+        if (viewModel.TreeMenuFor(node) is not { Count: > 0 } items)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        e.ContextMenu = TreeContextMenu.Build(this, items);
     }
 
     /// <summary>
@@ -157,7 +164,12 @@ public partial class ProductListCard : UserControl
         if (e.CursorLeft < 0 && e.CursorTop < 0 && viewModel.SelectedTreeNode is ProductTreeNode node)
         {
             e.Handled = true;
-            var rowMenu = TreeContextMenu.Build(this, viewModel.TreeMenuFor(node));
+            if (viewModel.TreeMenuFor(node) is not { Count: > 0 } items)
+            {
+                return;
+            }
+
+            var rowMenu = TreeContextMenu.Build(this, items);
             rowMenu.PlacementTarget = TreeContextMenu.RowOf(Tree, node) ?? (UIElement)Tree;
             rowMenu.Placement = PlacementMode.Bottom;
             rowMenu.IsOpen = true;

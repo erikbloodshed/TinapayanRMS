@@ -21,9 +21,13 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
 
     public async Task<IReadOnlyList<LinkingProduct>> GetUsedByAsync(int id, CancellationToken cancellationToken) =>
         [
-            .. (await dbContextFactory.QueryAsync<LinkingProduct>(UsedBySql, new { id }, cancellationToken))
+            .. (await dbContextFactory.QueryAsync<UsedByRow>(UsedBySql, new { id }, cancellationToken))
+                .Select(p => new LinkingProduct(p.Id, ProductRules.ListedName(p.Name, p.DeletedAt is not null), p.CategoryName))
                 .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase),
         ];
+
+    /// <summary>A product GetUsedByAsync finds. One in the Deleted folder still holds the material, and is named as deleted.</summary>
+    private sealed record UsedByRow(int Id, string Name, string? CategoryName, DateTime? DeletedAt);
 
     /// <summary>
     /// GetUsedByAsync's products. Feeds is the material and every ingredient whose cost it feeds: a made one with it in its
@@ -81,7 +85,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             JOIN Products h ON h.Id = c.ProductId
             WHERE h.IncludesComponentPackaging = 1
         )
-        SELECT p.Id, p.Name, c.Name AS CategoryName
+        SELECT p.Id, p.Name, c.Name AS CategoryName, p.DeletedAt
         FROM Products p
         LEFT JOIN ProductCategories c ON c.Id = p.CategoryId
         WHERE p.Id IN (SELECT ProductId FROM RecipeUsers) OR p.Id IN (SELECT ProductId FROM PackagingCosts)

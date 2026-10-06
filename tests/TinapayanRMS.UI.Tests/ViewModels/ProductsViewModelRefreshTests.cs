@@ -1879,7 +1879,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         TypeName(viewModel, "Mamon Special");
 
         var ensaymada = viewModel.Products.Single(p => p.Id == ensaymadaId);
-        var move = ProductTree.MoveTo(viewModel.ProductTree.Roots.Single(r => r.Stage == ProductStage.Production), ensaymada);
+        var move = ProductTree.MoveTo(viewModel.ProductTree.Stages.Single(r => r.Stage == ProductStage.Production), ensaymada);
         await viewModel.MoveProductsCommand.Execute([move!]);
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -1995,7 +1995,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     private static ProductFolderNode TreeFolder(ProductsViewModel viewModel, ProductStage stage, string title) =>
-        viewModel.ProductTree.Roots.Single(r => r.Stage == stage).Children.OfType<ProductFolderNode>().Single(f => f.Title == title);
+        viewModel.ProductTree.Stages.Single(r => r.Stage == stage).Children.OfType<ProductFolderNode>().Single(f => f.Title == title);
 
     /// <summary>Gives <paramref name="productId"/> a per-piece packaging line of a box, so it has a Packaging tab.</summary>
     private async Task<int> GivePackagingAsync(int productId, string boxName = "Box")

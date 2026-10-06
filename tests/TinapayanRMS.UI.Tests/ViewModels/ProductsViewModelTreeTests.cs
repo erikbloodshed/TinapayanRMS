@@ -149,8 +149,8 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "Expand All"));
         await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "Collapse All"));
-        viewModel.ProductTree.Roots.SelectMany(r => r.Children).Cast<ProductFolderNode>().Should().OnlyContain(f => !f.IsExpanded);
-        viewModel.ProductTree.Roots.Should().OnlyContain(r => r.IsExpanded);
+        viewModel.ProductTree.Stages.SelectMany(r => r.Children).Cast<ProductFolderNode>().Should().OnlyContain(f => !f.IsExpanded);
+        viewModel.ProductTree.Stages.Should().OnlyContain(r => r.IsExpanded);
     }
 
     [Fact]
@@ -338,7 +338,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
     }
 
     [Fact]
-    public async Task Delete_on_a_product_asks_first_and_the_form_starts_afresh_only_if_it_was_showing_it()
+    public async Task Delete_on_a_product_asks_first_moves_it_to_Deleted_and_the_form_starts_afresh_only_if_it_was_showing_it()
     {
         var mamonId = await SaveProductAsync("Mamon", null);
         var ensaymadaId = await SaveProductAsync("Ensaymada", null);
@@ -352,15 +352,86 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         await RunAsync(viewModel.TreeMenuFor(viewModel.ProductTree.Find(ensaymadaId)).Single(i => i.Header == "Delete"));
 
-        question.Should().StartWith("Delete 'Ensaymada'?");
+        question.Should().Be("Delete 'Ensaymada'? It moves to the Deleted folder at the bottom of the list, where it can be restored as it is.");
         viewModel.Products.Select(p => p.Name).Should().Equal("Mamon");
+        viewModel.DeletedProducts.Select(p => p.Name).Should().Equal("Ensaymada");
+        TitlesIn(viewModel.ProductTree.DeletedFolder).Should().Equal("Ensaymada");
         viewModel.SelectedProduct!.Id.Should().Be(mamonId, "the one showing wasn't the one deleted");
 
         await RunAsync(viewModel.TreeMenuFor(viewModel.ProductTree.Find(mamonId)).Single(i => i.Header == "Delete"));
 
         viewModel.Products.Should().BeEmpty();
+        TitlesIn(viewModel.ProductTree.DeletedFolder).Should().Equal("Ensaymada", "Mamon");
         viewModel.SelectedProduct.Should().BeNull();
         viewModel.EditingName.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_deleted_products_row_leaves_the_form_as_it_is_and_its_menu_restores_it_or_deletes_it_permanently()
+    {
+        var breadsId = await AddProductCategoryAsync("Breads");
+        var mamonId = await SaveProductAsync("Mamon", breadsId, ProductStage.Production);
+        var pandesalId = await SaveProductAsync("Pandesal", null);
+        await new ProductRepository(CreateDbContextFactory()).DeleteAsync(mamonId, Cancellation);
+        var viewModel = await OpenedViewModelAsync(pandesalId);
+        var mamon = viewModel.ProductTree.Find(mamonId)!;
+
+        viewModel.SelectedTreeNode = mamon;
+
+        viewModel.SelectedProduct!.Id.Should().Be(pandesalId, "a deleted product isn't opened");
+        viewModel.SelectedTreeNode.Should().BeSameAs(mamon, "and its row stays picked");
+        viewModel.SelectedTreeProducts.Should().BeEmpty("no live product's menu takes it in");
+        var menu = viewModel.TreeMenuFor(mamon);
+        Headers(menu).Should().Equal("Restore", "Delete Permanently");
+        viewModel.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == viewModel.DeletePermanentlyCommand && i.Parameter == mamon);
+        viewModel.TreeShortcut("F2").Should().BeNull();
+        viewModel.TreeMenuFor(viewModel.ProductTree.DeletedFolder).Should().BeEmpty("the folder itself has nothing to offer");
+        viewModel.ComponentProductOptions.Select(p => p.Id).Should().NotContain(mamonId);
+
+        await RunAsync(menu.Single(i => i.Header == "Restore"));
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.DeletedProducts.Should().BeEmpty();
+        TreeFolder(viewModel, ProductStage.Production, "Breads").Products.Should().ContainSingle(l => l.Product.Id == mamonId, "back where it was");
+        viewModel.ProductTree.Find(mamonId).Should().BeSameAs(mamon, "its row moves back with it");
+        viewModel.SelectedProduct!.Id.Should().Be(mamonId, "a restored product is opened");
+
+        await new ProductRepository(CreateDbContextFactory()).DeleteAsync(mamonId, Cancellation);
+        await viewModel.LoadCommand.Execute();
+        string? question = null;
+        viewModel.ConfirmDelete.RegisterHandler(interaction =>
+        {
+            question = interaction.Input;
+            interaction.SetOutput(true);
+        });
+
+        await RunAsync(viewModel.TreeMenuFor(viewModel.ProductTree.Find(mamonId)).Single(i => i.Header == "Delete Permanently"));
+
+        question.Should().StartWith("Delete 'Mamon' permanently?").And.EndWith("This can't be undone.");
+        viewModel.DeletedProducts.Should().BeEmpty();
+        viewModel.ProductTree.Find(mamonId).Should().BeNull();
+        (await new ProductRepository(CreateDbContextFactory()).GetByIdAsync(mamonId, Cancellation)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_deleted_product_opened_from_elsewhere_is_picked_in_the_Deleted_folder_and_a_search_finds_it_there()
+    {
+        var mamonId = await SaveProductAsync("Mamon", null);
+        var pandesalId = await SaveProductAsync("Pandesal", null);
+        await new ProductRepository(CreateDbContextFactory()).DeleteAsync(mamonId, Cancellation);
+        var viewModel = await OpenedViewModelAsync(pandesalId);
+        viewModel.ProductTree.DeletedFolder.IsExpanded.Should().BeFalse();
+
+        viewModel.OpenProduct(mamonId);
+
+        viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.ProductTree.Find(mamonId));
+        viewModel.ProductTree.DeletedFolder.IsExpanded.Should().BeTrue("the row picked shows");
+        viewModel.SelectedProduct!.Id.Should().Be(pandesalId, "the form stays on what it showed");
+
+        viewModel.SearchText = "Pan";
+        TitlesIn(viewModel.ProductTree.DeletedFolder).Should().BeEmpty();
+        viewModel.SearchText = "Mam";
+        TitlesIn(viewModel.ProductTree.DeletedFolder).Should().Equal("Mamon");
     }
 
     [Fact]

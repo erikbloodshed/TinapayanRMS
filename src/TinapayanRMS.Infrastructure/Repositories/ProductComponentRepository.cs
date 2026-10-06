@@ -77,14 +77,21 @@ public static class ProductComponentRepository
         }
 
         var ids = components.Select(c => c.ComponentProductId).Distinct().ToList();
-        var names = await dbContext.Products
+        var found = await dbContext.Products
             .Where(p => ids.Contains(p.Id))
-            .Select(p => new { p.Id, p.Name })
-            .ToDictionaryAsync(p => p.Id, p => p.Name, cancellationToken);
-        if (ids.FirstOrDefault(id => !names.ContainsKey(id)) is var missingId and not 0)
+            .Select(p => new { p.Id, p.Name, p.DeletedAt })
+            .ToDictionaryAsync(p => p.Id, cancellationToken);
+        if (ids.FirstOrDefault(id => !found.ContainsKey(id)) is var missingId and not 0)
         {
             throw new BusinessRuleException($"Product {missingId} does not exist.");
         }
+
+        if (found.Values.FirstOrDefault(p => p.DeletedAt is not null) is { } deleted)
+        {
+            throw new BusinessRuleException($"{deleted.Name} is deleted. Restore it from the Deleted folder to put it in {product.Name}.");
+        }
+
+        var names = found.ToDictionary(p => p.Key, p => p.Value.Name);
 
         CompositeProductRules.EnsureValidComponents(
             product.Id, [.. components.Select(c => (c.ComponentProductId, c.Quantity, names[c.ComponentProductId]))]);
@@ -140,17 +147,21 @@ public static class ProductComponentRepository
     /// <summary>
     /// The composites with a section in <paramref name="roleId"/>, by name: while there are any, the role stays
     /// product-owned (SubAssemblyRoleRepository.UpdateAsync). Optionally only through <paramref name="subAssemblyId"/>.
+    /// A deleted one counts, named as deleted (ProductRules.ListedName).
     /// </summary>
     internal static async Task<IReadOnlyList<string>> CompositesUsingRoleAsync(
         TinapayanRMSDbContext dbContext, int roleId, int? subAssemblyId, CancellationToken cancellationToken) =>
-        await dbContext.ProductSubAssemblyUsages
-            .Where(u => u.Product!.IsComposite
-                && u.SubAssembly!.RoleId == roleId
-                && (subAssemblyId == null || u.SubAssemblyId == subAssemblyId))
-            .Select(u => u.Product!.Name)
-            .Distinct()
-            .OrderBy(n => n)
-            .ToListAsync(cancellationToken);
+        [
+            .. (await dbContext.ProductSubAssemblyUsages
+                .Where(u => u.Product!.IsComposite
+                    && u.SubAssembly!.RoleId == roleId
+                    && (subAssemblyId == null || u.SubAssemblyId == subAssemblyId))
+                .Select(u => new { u.Product!.Name, u.Product.DeletedAt })
+                .Distinct()
+                .OrderBy(p => p.Name)
+                .ToListAsync(cancellationToken))
+                .Select(p => ProductRules.ListedName(p.Name, p.DeletedAt is not null)),
+        ];
 
     /// <summary>"Party Box has" or "Party Box, Pasalubong Box have": the start of a refusal naming composites.</summary>
     internal static string NamesHave(IReadOnlyList<string> names) =>

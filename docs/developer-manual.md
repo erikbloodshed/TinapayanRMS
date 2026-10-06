@@ -415,7 +415,7 @@ PER PRODUCT
 | `SubAssembly` | A recipe, or a packaging set | Names are unique. A null `OwnerProductId` means standalone. It stores `TotalWeight` and `TotalCost`, and can't be deleted while a product links it. |
 | `SubAssemblyLine` | An ingredient in a recipe, in grams | Grams are always stored. `AuthoredBakersPercent` records a percentage the user typed instead. |
 | `SubAssemblyPackagingLine` | A packaging material in a packaging set | Costed on read. |
-| `Product` | A sellable product | Names are unique. `IsComposite` is fixed once saved. `QuantityRequired` is at least 1, and exactly 1 for a composite. |
+| `Product` | A sellable product | Names are unique, deleted products' included. `IsComposite` is fixed once saved. `QuantityRequired` is at least 1, and exactly 1 for a composite. Deleting one only stamps `DeletedAt` (a soft delete): see [Deleted products](#deleted-products). |
 | `ProductCategory` | Breads, Cakes, … | A list of its own, separate from raw material categories. |
 | `ProductSubAssemblyUsage` | A sub-assembly in a product's recipe | Stores only the typed piece-size figure (`AuthoredField`, `AuthoredValue`) and `ShrinkagePercent`. |
 | `UsageAddInLine` | A product's extra ingredient on a linked usage | Never changes the sub-assembly that the usage links. |
@@ -425,6 +425,16 @@ PER PRODUCT
 | `CostingParameters` | A product's five percentages | One per product. Never linked or shared. |
 | `CostingDefaults` | The percentages a new product starts with | At most one row (Id 1). |
 | `UnitOfMeasure`, `RawMaterialCategory` | Lookups edited in Settings | A unit's name is stored in lowercase. A category is for one type of material. |
+
+### Deleted products
+
+A product is deleted in two steps, so a delete can be taken back. `IProductRepository.DeleteAsync` stamps `Product.DeletedAt` and changes nothing else, which moves the product to the Products list's **Deleted** folder. `RestoreAsync` clears it. `DeletePermanentlyAsync` is the hard delete, with its cascades.
+
+- **Reads leave deleted products out by default.** `GetAllAsync` returns the products in use, and `GetDeletedAsync` returns the deleted ones. `GetByIdAsync` and `GetByIdsAsync` return either, since a holder reads what it holds by id. Every screen except Products reads through `GetAllAsync`, so a deleted product is in no list, picker, report, print, What-If or plan. There's no global query filter: one would also drop the rows of the "in use" checks below.
+- **A deleted product still holds what it uses.** Its usages, packaging lines, links and composite lines stay, so a restore brings it back whole. The `Restrict` keys keep refusing deletes of what it uses. The checks that name products (`SubAssemblyRepository`'s Used By and refusals, `RawMaterialRepository.GetUsedByAsync`, a composite's role refusals) name it "Cheese Roll (deleted)", through `ProductRules.ListedName`.
+- **The checks on what leans on a product run for both deletes.** Neither a soft nor a hard delete goes through while another product, deleted or not, links its packaging or holds it in a composite (`ProductRepository.EnsureNothingLeansOnAsync`). Nothing in use ever leans on a deleted product, so a restore never needs a check.
+- **A deleted product can't be newly linked or held.** `PackagingLinkRepository` and `ProductComponentRepository.SetComponentsAsync` refuse it by name. Its name stays taken: Add, Update and Rename refuse it first (`ProductRules.EnsureNameNotHeldByDeleted`), so the message points to the Deleted folder instead of the unique index's "That name is already in use."
+- **On the Products screen**, `ProductsViewModel.DeletedProducts` feeds `ProductTree.DeletedFolder` and nothing else. A deleted row (`ProductLeafNode.IsDeleted`) is picked the way a folder is: the form doesn't open it. Its menu has Restore and Delete Permanently, and `ProductTree.MoveTo` refuses it as a drag source or a drop target. `OpenProduct` on a deleted id picks its row in the Deleted folder.
 
 ### Where rules are enforced
 
