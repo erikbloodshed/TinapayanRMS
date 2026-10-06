@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -214,6 +215,15 @@ public static class VimKeys
 
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var modifiers = e.KeyboardDevice.Modifiers;
+        var focused = e.OriginalSource as DependencyObject;
+        var isListOpen = modifiers == ModifierKeys.Control && key is Key.N or Key.P && IsListOpen(focused);
+        if (KeyForChord(key, modifiers, isListOpen) is { } stoodFor)
+        {
+            e.Handled = true;
+            PressInstead(e, stoodFor);
+            return;
+        }
+
         if (CapturingOverlay(sender) is { } overlay)
         {
             if (overlay.TakeKey(key, IsModifier(key) || TypesText(key, modifiers)))
@@ -224,7 +234,6 @@ public static class VimKeys
             return;
         }
 
-        var focused = e.OriginalSource as DependencyObject;
         var place = Track(focused);
         if (place.Kind == PlaceKind.Overlay)
         {
@@ -547,6 +556,51 @@ public static class VimKeys
         VimAction.Right => Key.Right,
         _ => Key.Down,
     };
+
+    /// <summary>
+    /// The key a Vim chord stands for, or null when <paramref name="key"/> with <paramref name="modifiers"/> isn't one:
+    /// Ctrl+[ is Esc anywhere, and Ctrl+N and Ctrl+P are Down and Up while a dropdown or suggestion list is open.
+    /// </summary>
+    public static Key? KeyForChord(Key key, ModifierKeys modifiers, bool isListOpen) =>
+        modifiers != ModifierKeys.Control ? null : key switch
+        {
+            Key.OemOpenBrackets => Key.Escape,
+            Key.N when isListOpen => Key.Down,
+            Key.P when isListOpen => Key.Up,
+            _ => null,
+        };
+
+    /// <summary>
+    /// Presses <paramref name="key"/> in place of <paramref name="chord"/>, as if it were typed alone. It goes through
+    /// the input manager, as a real press does, and not just to the element with the keyboard: a dialog's Cancel button
+    /// takes Esc as an access key, which only the input manager's own processing hands it. Ctrl is still held, and WPF
+    /// reads it live from the thread's key state (GetKeyState), so it's lifted from that state while the key goes
+    /// through: a list's own Down would otherwise be Ctrl+Down, which jumps to its last row.
+    /// </summary>
+    private static void PressInstead(KeyEventArgs chord, Key key)
+    {
+        var held = new byte[256];
+        if (chord.InputSource is not { } source || !GetKeyboardState(held))
+        {
+            return;
+        }
+
+        var lifted = (byte[])held.Clone();
+        foreach (var control in (ReadOnlySpan<int>)[VkControl, VkLeftControl, VkRightControl])
+        {
+            lifted[control] &= 0x7F;
+        }
+
+        SetKeyboardState(lifted);
+        try
+        {
+            InputManager.Current.ProcessInput(new KeyEventArgs(chord.KeyboardDevice, source, chord.Timestamp, key) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
+        }
+        finally
+        {
+            SetKeyboardState(held);
+        }
+    }
 
     /// <summary>
     /// Raises <paramref name="key"/> on <paramref name="target"/> as a real press reaches it: PreviewKeyDown, then KeyDown
@@ -899,4 +953,16 @@ public static class VimKeys
             Log.Warning("The Vim key {Key} took {Milliseconds:0.0} ms", key, elapsed.TotalMilliseconds);
         }
     }
+
+    private const int VkControl = 0x11;
+    private const int VkLeftControl = 0xA2;
+    private const int VkRightControl = 0xA3;
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetKeyboardState(byte[] keyState);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetKeyboardState(byte[] keyState);
 }

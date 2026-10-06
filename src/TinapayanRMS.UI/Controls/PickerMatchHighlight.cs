@@ -19,7 +19,9 @@ namespace TinapayanRMS.UI.Controls;
 /// <item>Enter or Tab picks the highlighted name, as a click on it would. Typing a name the list doesn't hold still
 /// leaves nothing highlighted, so Category's prompt to add a new one still comes up.</item>
 /// <item>Down and Up move on from the highlighted name. The picker's own arrow keys start from the top of the list
-/// whatever is highlighted, so the first press would have landed on the name already there, or jumped back above it.</item>
+/// whatever is highlighted, so the first press would have landed on the name already there, or jumped back above it.
+/// The key-ups that follow, up to the next key-down, are kept from the picker, which would refilter by the name written
+/// into its box.</item>
 /// <item>Moving the mouse onto another name takes the highlight off, as the picker does for its own pick, so only one
 /// name is ever highlighted and Enter picks nothing the list doesn't show as highlighted.</item>
 /// </list>
@@ -61,8 +63,11 @@ public static class PickerMatchHighlight
         /// <summary>Where the mouse was over the picker when the match was highlighted.</summary>
         public Point MousePosition { get; set; }
 
-        /// <summary>An arrow key moved on from the match here, so its key-up mustn't reach the picker.</summary>
-        public Key SwallowKeyUp { get; set; }
+        /// <summary>
+        /// An arrow key moved on from the match here, so no key-up may reach the picker until a key goes down again: not
+        /// the arrow's, nor a Ctrl or Shift held with it, nor the N or P of Vim's Ctrl+N and Ctrl+P, which press it.
+        /// </summary>
+        public bool SwallowKeyUps { get; set; }
     }
 
     private static void OnKeyUp(object sender, KeyEventArgs e)
@@ -72,10 +77,10 @@ public static class PickerMatchHighlight
             return;
         }
 
-        // The picker would refilter its list by the name the arrow key wrote into its box, leaving only that name.
-        if (Highlights.TryGetValue(picker, out var highlight) && highlight.SwallowKeyUp != Key.None && e.Key == highlight.SwallowKeyUp)
+        // The picker would refilter its list by the name the arrow key wrote into its box, leaving only that name. Any
+        // key-up does it, until a key going down through the picker's own handling brings its filter text up to date.
+        if (Highlights.TryGetValue(picker, out var highlight) && highlight.SwallowKeyUps)
         {
-            highlight.SwallowKeyUp = Key.None;
             e.Handled = true;
             return;
         }
@@ -118,9 +123,14 @@ public static class PickerMatchHighlight
 
     private static void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (sender is not ComboBoxAdv picker
-            || !Highlights.TryGetValue(picker, out var highlight)
-            || highlight is not { Item: { } item, Container: { IsHighlighted: true } container }
+        if (sender is not ComboBoxAdv picker || !Highlights.TryGetValue(picker, out var highlight))
+        {
+            return;
+        }
+
+        // A key going down reaches the picker's own handling, which brings its filter text up to date.
+        highlight.SwallowKeyUps = false;
+        if (highlight is not { Item: { } item, Container: { IsHighlighted: true } container }
             || !picker.IsDropDownOpen
             || TypingBox(picker) is not { } box
             || !ReferenceEquals(e.OriginalSource, box))
@@ -159,7 +169,7 @@ public static class PickerMatchHighlight
 
                 // What the picker's own arrow key does to a row: into its box goes the name, and the row takes the focus.
                 Clear(highlight);
-                highlight.SwallowKeyUp = e.Key;
+                highlight.SwallowKeyUps = true;
                 box.Text = DisplayName(picker, picker.Items[index]);
                 next.Focus();
                 next.IsHighlighted = true;

@@ -181,6 +181,10 @@ With them on, the keys work in two modes. The mode shows at the top right of the
 
 Clicking a field or cell, tabbing into it, or picking it by its label (**f**, below) puts you in INSERT, ready to type. **Esc** stops typing and goes back to NORMAL.
 
+**Ctrl+[** does everything Esc does, as in Vim, so you don't have to reach for the Esc key. It works wherever Esc does: in a field or cell, on the labels, the command bar and the list of keys, and to close Settings or a small window.
+
+While a picker's list is open, **Ctrl+N** and **Ctrl+P** move down and up it, like the Down and Up arrows. That covers the list under a field you're typing a name into and the one in a table cell. With no list open, they do nothing.
+
 - In a table cell, Esc keeps what you typed. Without Vim keys, Esc in a cell throws the typing away.
 - In Settings, or a small window that asks for a name, the first Esc stops typing, and a second Esc closes the window.
 
