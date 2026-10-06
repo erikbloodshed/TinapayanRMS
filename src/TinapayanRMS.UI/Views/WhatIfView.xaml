@@ -100,6 +100,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Products" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
                     <!-- Syncfusion has no check box of its own outside its grids and ribbon; the Keyboard tab uses WPF's too -->
@@ -109,6 +110,13 @@
                               VerticalAlignment="Center"
                               Margin="0,0,12,0" />
                     <syncfusion:ButtonAdv Grid.Column="2"
+                                          Label="Print Report"
+                                          IconTemplate="{StaticResource PrintIconTemplate}"
+                                          Command="{Binding PrintCommand}"
+                                          ToolTip="Previews and prints each product's recipe and costing with the price changes, beside today's: the products picked in the table, or every product it shows."
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,8,0" />
+                    <syncfusion:ButtonAdv Grid.Column="3"
                                           Label="Export to Excel"
                                           IconTemplate="{StaticResource ExportIconTemplate}"
                                           Command="{Binding ExportCommand}"
@@ -118,7 +126,7 @@
                 <TextBlock DockPanel.Dock="Top"
                            Style="{StaticResource CaptionStyle}"
                            Margin="0,0,0,12"
-                           Text="Every product for one sellable unit, now and with the price changes, at buffered costs. A change reaches made and linked ingredients as a real one would, and moves a material's cost and buffered cost by the same amount. Markup % is what the product's current price earns. Double-click a product to open it." />
+                           Text="Every product for one sellable unit, now and with the price changes, at buffered costs. A change reaches made and linked ingredients as a real one would, and moves a material's cost and buffered cost by the same amount. Markup % is what the product's current price earns. Double-click a product to open it. Click a product, or several with Ctrl or Shift held, for Print Report to print only those." />
                 <syncfusion:SfDataGrid x:Name="ProductsGrid"
                                        ItemsSource="{Binding Products}"
                                        CellDoubleTapped="Products_CellDoubleTapped"
@@ -132,7 +140,7 @@
                                        AutoGenerateColumns="False"
                                        AllowEditing="False"
                                        AllowSorting="True"
-                                       SelectionMode="Single"
+                                       SelectionMode="Extended"
                                        NavigationMode="Row"
                                        ColumnSizer="Star">
                     <syncfusion:SfDataGrid.FilterPopupStyle>

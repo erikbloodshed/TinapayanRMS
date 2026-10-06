@@ -63,6 +63,14 @@ public static class IngredientCostRules
             .ToDictionary(g => g.Key, g => (IReadOnlyList<int>)[.. g.Select(e => e.DependencyId)]);
 
     /// <summary>
+    /// The materials a change to <paramref name="materialId"/>'s cost reaches: itself, and every made and linked
+    /// ingredient depending on it, however deeply, the ones <see cref="Reprice"/> works out again (the What-If report's
+    /// "price changes applied" to a product, 2026-10-06).
+    /// </summary>
+    public static IReadOnlySet<int> ReachedBy(IEnumerable<RawMaterial> materials, IEnumerable<IngredientBomLine> bomLines, int materialId) =>
+        IngredientCostGraph.GetDependentsInOrder(materialId, Dependencies(materials, bomLines)).Prepend(materialId).ToHashSet();
+
+    /// <summary>
     /// What <paramref name="materials"/> would cost with <paramref name="newCosts"/> (purchased materials' true and buffered
     /// costs per base unit, by id), worked out as a save would cascade them: copies of the changed materials with their new
     /// costs, and copies of every made and linked ingredient depending on them, recomputed in dependency order. Only those

@@ -1,6 +1,8 @@
 <!--
-    A print pane in a dialog of its own, chromeless as Settings is: the Production Plan's printout, previewed and printed
-    from Syncfusion's PrintPreview, with Costs under it. The pane is put in by code, after the window is themed.
+    A print pane in a dialog of its own, chromeless as Settings is: the Production Plan's printout, or the What-If report,
+    previewed and printed from Syncfusion's PrintPreview. Under it, what to print when there's a choice (the What-If
+    report's selected products or all those shown), and the parts to include: the plan's Costs, or a report's Recipe and
+    Costing, either cleared only while the other is ticked. The pane is put in by code, after the window is themed.
 -->
 <controls:AppWindow x:Class="TinapayanRMS.UI.Views.PrintPreviewWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -44,16 +46,38 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <StackPanel x:Name="IncludeBar" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel x:Name="ChoiceBar" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,28,0" Visibility="Collapsed">
+                    <TextBlock Text="Print" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,0" />
+                    <syncfusion:ComboBoxAdv x:Name="ChoiceBox"
+                                            Width="240"
+                                            DisplayMemberPath="Label"
+                                            ToolTip="The products picked in the table, or every product it shows, as its filters and sorting have them." />
+                </StackPanel>
+                <StackPanel x:Name="IncludeBar" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="Include" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,0" />
-                    <CheckBox Content="Costs"
+                    <CheckBox x:Name="PlanCosts"
+                              Content="Costs"
                               IsChecked="{Binding IncludeCosting, Mode=TwoWay}"
                               ToolTip="Each material's cost, and the total. Without them the purchase requisition shows only the amounts, for the kitchen or the market."
                               VerticalAlignment="Center" />
+                    <StackPanel x:Name="ProductParts" Orientation="Horizontal" Visibility="Collapsed">
+                        <CheckBox Content="Recipe"
+                                  IsChecked="{Binding IncludeRecipe, Mode=TwoWay}"
+                                  IsEnabled="{Binding IncludeCosting}"
+                                  ToolTip="Each sub-assembly's ingredients and piece size, then the packaging, the lines a price change moves marked, with their cost now."
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,16,0" />
+                        <CheckBox Content="Costing"
+                                  IsChecked="{Binding IncludeCosting, Mode=TwoWay}"
+                                  IsEnabled="{Binding IncludeRecipe}"
+                                  ToolTip="The price changes applied, and the costing now and with the changes. Without it the recipe shows no costs."
+                                  VerticalAlignment="Center" />
+                    </StackPanel>
                 </StackPanel>
-                <syncfusion:ButtonAdv Grid.Column="1"
+                <syncfusion:ButtonAdv Grid.Column="2"
                                       HorizontalAlignment="Right"
                                       Label="Close"
                                       IconTemplate="{StaticResource CancelIconTemplate}"

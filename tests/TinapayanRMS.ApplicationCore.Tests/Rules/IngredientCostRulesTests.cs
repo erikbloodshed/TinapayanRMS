@@ -98,6 +98,18 @@ public class IngredientCostRulesTests
         copies[2].CostPerBaseUnit.Should().Be(RawMaterialRules.StoredCost(0.028m * 30m / 70m));
     }
 
+    [Fact]
+    public void A_change_reaches_the_material_and_everything_made_or_cut_from_it_and_nothing_else()
+    {
+        // Egg → egg white (linked) → custard (made from white and sugar); syrup is made from sugar alone.
+        RawMaterial[] materials = [Purchased(1, 0.014m, 0.014m), Linked(2, linkedToId: 1, weightShare: 70m, costShare: 30m), Purchased(3, 0.08m, 0.08m), Made(4), Made(5)];
+        IngredientBomLine[] lines = [Line(4, 2, 700m), Line(4, 3, 300m), Line(5, 3, 1000m)];
+
+        IngredientCostRules.ReachedBy(materials, lines, 1).Should().BeEquivalentTo([1, 2, 4]);
+        IngredientCostRules.ReachedBy(materials, lines, 3).Should().BeEquivalentTo([3, 4, 5]);
+        IngredientCostRules.ReachedBy(materials, lines, 5).Should().BeEquivalentTo([5], "nothing is made from the syrup");
+    }
+
     private static RawMaterial Purchased(int id, decimal cost, decimal buffered, decimal bufferPercent = 0m) => new()
     {
         Id = id, Name = $"Purchased {id}", Source = RawMaterialSource.Purchased, CostPerBaseUnit = cost, BufferedCostPerBaseUnit = buffered,

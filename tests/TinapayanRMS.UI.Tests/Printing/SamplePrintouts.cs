@@ -95,6 +95,37 @@ internal static class SamplePrintouts
         return Scaled() with { Scaling = new PrintedScaling(20, 160m, rows, rows.Sum(r => r.Cost)) };
     }
 
+    /// <summary>Flour from 1,250.00 a sack to 1,375.00, 10% up, as the What-If screen tries it.</summary>
+    public static readonly PrintedPriceChange FlourRise = new("Bread Flour", "sack", 1250m, 10m, 1375m);
+
+    /// <summary>
+    /// Ube Roll on the What-If report: its Dough's first line moved from 4.00 to 5.00 by <see cref="FlourRise"/>, so the batch
+    /// from 1 less, and its costing worked out at today's figures too: a Dough of 2.00 a piece now, 2.50 with the change.
+    /// </summary>
+    public static ProductPrintout WhatIf(int lineCount = 2)
+    {
+        var printout = WithLines(lineCount);
+        var section = printout.Sections[0];
+        return printout with
+        {
+            Sections =
+            [
+                section with
+                {
+                    Lines = [section.Lines[0] with { NowCost = 4m }, .. section.Lines.Skip(1)],
+                    NowBatchCost = section.BatchCost - 1m,
+                },
+            ],
+            WhatIf = new PrintedWhatIf(new ProductCostSummary([("Dough", 2m)], 1, [30m], 25m, 10m, 5m, 30m, 12m, 60m), [FlourRise]),
+        };
+    }
+
+    /// <summary>The What-If report of the products given, each <see cref="WhatIf()"/> under its own name, after the change tried.</summary>
+    public static ProductPrintSet WhatIfSet(params string[] names) => WhatIfReport.Set(
+        [.. names.Select(name => WhatIf() with { ProductName = name })],
+        [FlourRise],
+        new DateTime(2026, 10, 6, 9, 0, 0));
+
     /// <summary>A titled set of products, each named and with as many Dough lines as given, as a folder or All products prints them.</summary>
     public static ProductPrintSet Set(string title, params (string Name, int Lines)[] products) => new(
         title,

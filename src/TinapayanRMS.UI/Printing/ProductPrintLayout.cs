@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.UI.ViewModels;
 
@@ -53,6 +54,16 @@ public sealed class ProductPrintLayout
     private static readonly GridLength[] RequisitionColumns = [new(1, GridUnitType.Star), new(110), new(130), new(90)];
     private static readonly GridLength[] RequisitionColumnsWithoutCosts = [new(1, GridUnitType.Star), new(110), new(130)];
 
+    // The What-If report's (2026-10-06): its tables have a Cost Now column after their cost, and its costing sets today's
+    // figures beside the what-if ones.
+    private static readonly GridLength[] RecipeColumnsWithNow = [new(1, GridUnitType.Star), new(70), new(64), new(84), new(72), new(72), new(40)];
+    private static readonly GridLength[] PackagingColumnsWithNow = [new(1, GridUnitType.Star), new(60), new(56), new(84), new(80), new(80)];
+    private static readonly GridLength[] ComponentColumnsWithNow = [new(1, GridUnitType.Star), new(60), new(90), new(80), new(80)];
+    private static readonly GridLength[] ComponentColumnsWithPackagingAndNow = [new(1, GridUnitType.Star), new(50), new(84), new(96), new(80), new(80)];
+    private static readonly GridLength[] WhatIfCostingColumns = [new(1, GridUnitType.Star), new(84), new(84), new(76), new(70)];
+    private static readonly GridLength[] PriceChangeColumns = [new(1, GridUnitType.Star), new(90), new(96), new(80), new(96)];
+    private static readonly GridLength[] WhatIfContentsColumns = [new(1, GridUnitType.Star), new(80), new(80), new(76), new(56)];
+
     /// <summary>How far a scaled recipe's row sits in from the one it's part of, as the Scaling tab's tree indents it.</summary>
     private const double ScalingIndent = 16;
 
@@ -69,6 +80,10 @@ public sealed class ProductPrintLayout
     private readonly ProductPrintSet _set;
     private readonly bool _includeRecipe;
     private readonly bool _includeCosting;
+
+    // The What-If report with its costing: every table has a Cost Now column, and the costing sets today's figures beside
+    // the what-if ones. Fixed for the whole layout, since a block's columns are read when its page is built.
+    private readonly bool _nowColumn;
     private readonly Size _size;
     private readonly List<(Func<bool, FrameworkElement> Create, PrintBlock Layout, int Owner)> _blocks = [];
     private readonly IReadOnlyList<IReadOnlyList<PlacedBlock>> _pages;
@@ -107,6 +122,7 @@ public sealed class ProductPrintLayout
         _set = set;
         _includeRecipe = includeRecipe;
         _includeCosting = includeCosting;
+        _nowColumn = includeCosting && (set.PriceChanges is not null || set.Products.Any(p => p.WhatIf is not null));
         _size = new Size(Math.Max(printableSize.Width, MinimumSide), Math.Max(printableSize.Height, MinimumSide));
 
         Compose();
@@ -204,7 +220,7 @@ public sealed class ProductPrintLayout
 
         if (_set.Title is { } title)
         {
-            AddContents(title, ++table);
+            AddContents(title, ref table);
         }
 
         for (var i = 0; i < _set.Products.Count; i++)
@@ -217,13 +233,26 @@ public sealed class ProductPrintLayout
     }
 
     /// <summary>A set's contents: its title, then every product with its folder and the page it starts on.</summary>
-    private void AddContents(string title, int table)
+    private void AddContents(string title, ref int table)
     {
+        table++;
         var count = _set.Products.Count;
-        Add(_ => SetTitle(title, count), keepWithNext: count > 0);
+        Add(_ => SetTitle(title, count), keepWithNext: count > 0 || _nowColumn);
+        if (_nowColumn && _set.PriceChanges is { } changes)
+        {
+            AddPriceChanges("Price Changes", changes, "No price changes tried: every figure is today's.", table);
+            Add(repeat => SectionHeading("Products", null, repeat), keepWithNext: count > 0, table: ++table, repeats: true);
+        }
+
         if (count == 0)
         {
             Add(_ => Caption($"No products in {title}."));
+            return;
+        }
+
+        if (_nowColumn)
+        {
+            AddWhatIfContents(table);
             return;
         }
 
@@ -234,6 +263,51 @@ public sealed class ProductPrintLayout
             var product = _set.Products[i];
             Add(
                 _ => Row(ContentsColumns, [Label(product.ProductName), Label($"{product.StageTitle} · {product.CategoryName}", foreground: _muted), Figure(ContentsPage(index))]),
+                table: table);
+        }
+    }
+
+    /// <summary>The What-If report's contents: each product's base cost now and with the changes, how far it moves, and its page.</summary>
+    private void AddWhatIfContents(int table)
+    {
+        Add(_ => HeaderRow(WhatIfContentsColumns, ["Product", "Base Cost", "What-If Base Cost", "Change %", "Page"]), keepWithNext: true, table: table, repeats: true);
+        for (var i = 0; i < _set.Products.Count; i++)
+        {
+            var index = i;
+            var product = _set.Products[i];
+            var now = product.WhatIf?.Now.BaseCost ?? product.Costs.BaseCost;
+            var whatIf = product.Costs.BaseCost;
+            Add(
+                _ => Row(WhatIfContentsColumns, [Label(product.ProductName), Figure(Money(now)), Figure(Money(whatIf)), Figure(ChangePercent(now, whatIf)), Figure(ContentsPage(index))]),
+                table: table);
+        }
+    }
+
+    /// <summary>
+    /// Price changes as the What-If screen's table has them: the report's every one on its first page, or a product's own
+    /// under its title. <paramref name="none"/> says so when there are none.
+    /// </summary>
+    private void AddPriceChanges(string heading, IReadOnlyList<PrintedPriceChange> changes, string none, int table)
+    {
+        Add(repeat => SectionHeading(heading, null, repeat), keepWithNext: true, table: table, repeats: true);
+        if (changes.Count == 0)
+        {
+            Add(_ => Caption(none), table: table);
+            return;
+        }
+
+        Add(_ => HeaderRow(PriceChangeColumns, ["Raw Material", "Per", "Current Price", "Change %", "New Price"]), keepWithNext: true, table: table, repeats: true);
+        foreach (var change in changes)
+        {
+            Add(
+                _ => Row(PriceChangeColumns,
+                [
+                    Label(change.Material),
+                    Figure(change.Per ?? "—"),
+                    Figure(change.CurrentPrice is { } price ? Money(price) : "—"),
+                    Figure(change.ChangePercent is { } percent ? SignedPercent(percent) : "—"),
+                    Figure(Money(change.NewPrice), weight: FontWeights.SemiBold),
+                ]),
                 table: table);
         }
     }
@@ -251,6 +325,11 @@ public sealed class ProductPrintLayout
         {
             AddScaling(scaling, ++table);
             return;
+        }
+
+        if (_nowColumn && printout.WhatIf is { } whatIf)
+        {
+            AddPriceChanges("Price Changes Applied", whatIf.Changes, "No price change reaches this product: its figures are today's.", ++table);
         }
 
         if (_includeRecipe)
@@ -284,27 +363,43 @@ public sealed class ProductPrintLayout
         }
     }
 
-    /// <summary>A recipe table's cells: its cost per gram and cost only while the costing is printed.</summary>
-    private T[] RecipeCells<T>(T ingredient, T grams, T percent, T costPerGram, T cost, T isBase) =>
-        _includeCosting ? [ingredient, grams, percent, costPerGram, cost, isBase] : [ingredient, grams, percent, isBase];
+    /// <summary>
+    /// A recipe table's cells: its cost per gram and cost only while the costing is printed, and on the What-If report its
+    /// cost now after them.
+    /// </summary>
+    private T[] RecipeCells<T>(T ingredient, T grams, T percent, T costPerGram, T cost, T now, T isBase) =>
+        !_includeCosting ? [ingredient, grams, percent, isBase]
+        : _nowColumn ? [ingredient, grams, percent, costPerGram, cost, now, isBase]
+        : [ingredient, grams, percent, costPerGram, cost, isBase];
 
-    /// <summary>A packaging table's cells: its unit cost and cost only while the costing is printed.</summary>
-    private T[] PackagingCells<T>(T material, T qty, T unit, T unitCost, T cost) =>
-        _includeCosting ? [material, qty, unit, unitCost, cost] : [material, qty, unit];
+    /// <summary>A packaging table's cells: its unit cost and cost only while the costing is printed, and on the What-If report its cost now.</summary>
+    private T[] PackagingCells<T>(T material, T qty, T unit, T unitCost, T cost, T now) =>
+        !_includeCosting ? [material, qty, unit] : _nowColumn ? [material, qty, unit, unitCost, cost, now] : [material, qty, unit, unitCost, cost];
 
     /// <summary>
     /// A composite's Products table's cells: a product's recipe cost and its line's cost only while the costing is printed,
-    /// and its packaging cost between them when the composite includes its products' packaging.
+    /// and its packaging cost between them when the composite includes its products' packaging; on the What-If report, the
+    /// line's cost now after them.
     /// </summary>
-    private T[] ComponentCells<T>(bool withPackaging, T product, T qty, T recipeCost, T packagingCost, T cost) =>
-        !_includeCosting ? [product, qty] : withPackaging ? [product, qty, recipeCost, packagingCost, cost] : [product, qty, recipeCost, cost];
+    private T[] ComponentCells<T>(bool withPackaging, T product, T qty, T recipeCost, T packagingCost, T cost, T now)
+    {
+        if (!_includeCosting)
+        {
+            return [product, qty];
+        }
 
-    private GridLength[] RecipeTable => _includeCosting ? RecipeColumns : RecipeColumnsWithoutCosts;
+        T[] cells = withPackaging ? [product, qty, recipeCost, packagingCost, cost] : [product, qty, recipeCost, cost];
+        return _nowColumn ? [.. cells, now] : cells;
+    }
 
-    private GridLength[] PackagingTable => _includeCosting ? PackagingColumns : PackagingColumnsWithoutCosts;
+    private GridLength[] RecipeTable => !_includeCosting ? RecipeColumnsWithoutCosts : _nowColumn ? RecipeColumnsWithNow : RecipeColumns;
+
+    private GridLength[] PackagingTable => !_includeCosting ? PackagingColumnsWithoutCosts : _nowColumn ? PackagingColumnsWithNow : PackagingColumns;
 
     private GridLength[] ComponentTable(bool withPackaging) =>
-        !_includeCosting ? ComponentColumnsWithoutCosts : withPackaging ? ComponentColumnsWithPackaging : ComponentColumns;
+        !_includeCosting ? ComponentColumnsWithoutCosts
+        : withPackaging ? (_nowColumn ? ComponentColumnsWithPackagingAndNow : ComponentColumnsWithPackaging)
+        : _nowColumn ? ComponentColumnsWithNow : ComponentColumns;
 
     /// <summary>
     /// A composite's products, as its Products tab shows them: each product, how many go in, and with the costing what one
@@ -323,18 +418,19 @@ public sealed class ProductPrintLayout
         // Every line has a packaging cost, or none does: the composite includes its products' packaging or it doesn't.
         var withPackaging = components.Any(c => c.PackagingCost is not null);
         var columns = ComponentTable(withPackaging);
-        Add(_ => HeaderRow(columns, ComponentCells(withPackaging, "Product", "Qty", "Recipe Cost", "Packaging Cost", "Cost")), keepWithNext: true, table: table, repeats: true);
+        Add(_ => HeaderRow(columns, ComponentCells(withPackaging, "Product", "Qty", "Recipe Cost", "Packaging Cost", "Cost", "Cost Now")), keepWithNext: true, table: table, repeats: true);
         for (var i = 0; i < components.Count; i++)
         {
             var line = components[i];
             Add(
                 _ => Row(columns, ComponentCells(
                     withPackaging,
-                    Label(line.Product),
+                    Label(line.Product, foreground: Moved(line.NowCost), weight: MovedWeight(line.NowCost)),
                     Figure(line.Quantity is { } qty ? qty.ToString("N0", CultureInfo.CurrentCulture) : "—"),
                     Figure(Money(line.RecipeCost)),
                     Figure(Money(line.PackagingCost ?? 0m)),
-                    Figure(Money(line.Cost)))),
+                    Figure(Money(line.Cost), foreground: Moved(line.NowCost), weight: MovedWeight(line.NowCost)),
+                    Figure(line.NowCost is { } now ? Money(now) : string.Empty, foreground: _muted))),
                 keepWithNext: _includeCosting && i == components.Count - 1,
                 table: table);
         }
@@ -343,10 +439,9 @@ public sealed class ProductPrintLayout
         if (_includeCosting)
         {
             var total = Money(components.Sum(c => c.Cost));
+            var nowTotal = NowTotal(components.Select(c => (c.Cost, c.NowCost)));
             Add(
-                _ => withPackaging
-                    ? TotalRow(columns, "Total", string.Empty, string.Empty, string.Empty, total)
-                    : TotalRow(columns, "Total", string.Empty, string.Empty, total),
+                _ => TotalRow(columns, ComponentCells(withPackaging, "Total", string.Empty, string.Empty, string.Empty, total, nowTotal)),
                 table: table);
         }
     }
@@ -355,7 +450,7 @@ public sealed class ProductPrintLayout
     {
         Add(repeat => SectionHeading(section.Name, section.Source, repeat), keepWithNext: true, table: table, repeats: true);
         Add(
-            _ => HeaderRow(RecipeTable, RecipeCells("Ingredient", "Grams", section.PercentHeader, "Cost/g", "Cost", "Base"), isLastCentred: true),
+            _ => HeaderRow(RecipeTable, RecipeCells("Ingredient", "Grams", section.PercentHeader, "Cost/g", "Cost", "Cost Now", "Base"), isLastCentred: true),
             keepWithNext: true,
             table: table,
             repeats: true);
@@ -369,7 +464,7 @@ public sealed class ProductPrintLayout
         }
 
         Add(
-            _ => TotalRow(RecipeTable, RecipeCells("Total", Grams(section.TotalWeight), Percent(section.TotalPercent), string.Empty, Money(section.BatchCost), string.Empty)),
+            _ => TotalRow(RecipeTable, RecipeCells("Total", Grams(section.TotalWeight), Percent(section.TotalPercent), string.Empty, Money(section.BatchCost), section.NowBatchCost is { } now ? Money(now) : string.Empty, string.Empty)),
             keepWithNext: true,
             table: table);
         Add(_ => Caption(PieceSizeText(section, withCost: _includeCosting)), table: table);
@@ -381,7 +476,14 @@ public sealed class ProductPrintLayout
         {
             var line = lines[i];
             Add(
-                _ => Row(RecipeTable, RecipeCells(Label(line.Ingredient), Figure(Grams(line.Grams)), Figure(Percent(line.Percent)), Figure(UnitMoney(line.CostPerGram)), Figure(Money(line.Cost)), Tick(line.IsFormulaBase))),
+                _ => Row(RecipeTable, RecipeCells(
+                    Label(line.Ingredient, foreground: Moved(line.NowCost), weight: MovedWeight(line.NowCost)),
+                    Figure(Grams(line.Grams)),
+                    Figure(Percent(line.Percent)),
+                    Figure(UnitMoney(line.CostPerGram), foreground: Moved(line.NowCost), weight: MovedWeight(line.NowCost)),
+                    Figure(Money(line.Cost), foreground: Moved(line.NowCost), weight: MovedWeight(line.NowCost)),
+                    Figure(line.NowCost is { } now ? Money(now) : string.Empty, foreground: _muted),
+                    Tick(line.IsFormulaBase))),
                 keepWithNext: keepLastWithNext && i == lines.Count - 1,
                 table: table);
         }
@@ -390,17 +492,18 @@ public sealed class ProductPrintLayout
     private void AddPackaging(PrintedPackaging packaging, int table)
     {
         Add(repeat => SectionHeading("Packaging", packaging.LinkedTo, repeat), keepWithNext: true, table: table, repeats: true);
-        Add(_ => HeaderRow(PackagingTable, PackagingCells("Material", "Qty", "Unit", "Unit Cost", "Cost")), keepWithNext: true, table: table, repeats: true);
+        Add(_ => HeaderRow(PackagingTable, PackagingCells("Material", "Qty", "Unit", "Unit Cost", "Cost", "Cost Now")), keepWithNext: true, table: table, repeats: true);
         for (var i = 0; i < packaging.Lines.Count; i++)
         {
             var line = packaging.Lines[i];
             Add(
                 _ => Row(PackagingTable, PackagingCells(
-                    Label(line.Material),
+                    Label(line.Material, foreground: Moved(line.NowCost), weight: MovedWeight(line.NowCost)),
                     Figure(line.Qty is { } qty ? qty.ToString("N1", CultureInfo.CurrentCulture) : "—"),
                     Figure(line.Unit),
-                    Figure(UnitMoney(line.UnitCost)),
-                    Figure(UnitMoney(line.Cost)))),
+                    Figure(UnitMoney(line.UnitCost), foreground: Moved(line.NowCost), weight: MovedWeight(line.NowCost)),
+                    Figure(UnitMoney(line.Cost), foreground: Moved(line.NowCost), weight: MovedWeight(line.NowCost)),
+                    Figure(line.NowCost is { } now ? UnitMoney(now) : string.Empty, foreground: _muted))),
                 keepWithNext: _includeCosting && i == packaging.Lines.Count - 1,
                 table: table);
         }
@@ -408,12 +511,19 @@ public sealed class ProductPrintLayout
         // The total is only a cost, so without the costing the table ends at its last line.
         if (_includeCosting)
         {
-            Add(_ => TotalRow(PackagingTable, "Total", string.Empty, string.Empty, string.Empty, Money(packaging.Total)), table: table);
+            var nowTotal = NowTotal(packaging.Lines.Select(l => (l.Cost, l.NowCost)));
+            Add(_ => TotalRow(PackagingTable, PackagingCells("Total", string.Empty, string.Empty, string.Empty, Money(packaging.Total), nowTotal)), table: table);
         }
     }
 
     private void AddCosting(ProductPrintout printout, int table)
     {
+        if (_nowColumn && printout.WhatIf is { } whatIf)
+        {
+            AddWhatIfCosting(printout, whatIf.Now, table);
+            return;
+        }
+
         var costs = printout.Costs;
         var unit = printout.CostUnitCaption;
 
@@ -429,24 +539,81 @@ public sealed class ProductPrintLayout
         {
             var line = costs.SubAssemblyLines[i];
             var isLast = i == costs.SubAssemblyLines.Count - 1;
-            Add(_ => PartRow(line.Name, line.Cost, line.Share, isLast), table: table, keepTogether: CostingGroup);
+            Add(_ => PartRow(line.Name, [Money(line.Cost), Share(line.Share)], isLast), table: table, keepTogether: CostingGroup);
         }
 
         AddCost(costs.PackagingTitle, costs.Packaging, costs.PackagingShare);
         AddCost($"Labor ({costs.LaborPercent:0.##}% of {costs.PartsBase})", costs.Labor, costs.LaborShare);
         AddCost($"Overhead ({costs.OverheadPercent:0.##}% of {costs.PartsBase})", costs.Overhead, costs.OverheadShare);
         AddCost($"Administrative ({costs.AdministrativePercent:0.##}% of {costs.PartsBase})", costs.Administrative, costs.AdministrativeShare);
-        Add(_ => BandRow("Subtotal (base cost)", Money(costs.BaseCost), Share(costs.BaseCostShare), isTotal: false), table: table, keepTogether: CostingGroup);
+        Add(_ => BandRow("Subtotal (base cost)", [Money(costs.BaseCost), Share(costs.BaseCostShare)], isTotal: false), table: table, keepTogether: CostingGroup);
         AddCost($"Markup ({costs.MarginPercent:0.##}%)", costs.Markup, costs.MarkupShare);
         AddCost($"VAT ({costs.VatPercent:0.##}%)", costs.Vat, costs.VatShare);
         Add(
-            _ => BandRow($"Total Selling Price ({unit})", Money(costs.SellingPrice), costs.SellingPriceShare.ToString("N0", CultureInfo.CurrentCulture) + "%", isTotal: true),
+            _ => BandRow($"Total Selling Price ({unit})", [Money(costs.SellingPrice), costs.SellingPriceShare.ToString("N0", CultureInfo.CurrentCulture) + "%"], isTotal: true),
             table: table,
             keepTogether: CostingGroup);
 
         void AddCost(string label, decimal amount, decimal share, bool isFollowedByParts = false) =>
             Add(
                 _ => Row(CostingColumns, [Label(label), Figure(Money(amount)), Figure(Share(share), foreground: _muted)], rule: !isFollowedByParts),
+                table: table,
+                keepTogether: CostingGroup);
+    }
+
+    /// <summary>
+    /// The What-If report's costing: the breakdown as a product's costing has it, each part now, with the price changes, and
+    /// how far it moves, its share being of the what-if selling price; over it the headline figures with the changes, each
+    /// with today's under it. Its parts are the same in both, so they pair up in order.
+    /// </summary>
+    private void AddWhatIfCosting(ProductPrintout printout, ProductCostSummary now, int table)
+    {
+        var costs = printout.Costs;
+        var unit = printout.CostUnitCaption;
+
+        Add(_ => PartHeading($"Costing ({unit}{BasisSuffix(printout)})"), keepWithNext: true, keepTogether: CostingGroup);
+        Add(_ => WhatIfFigures(now, costs), keepWithNext: true, keepTogether: CostingGroup);
+        Add(_ => HeaderRow(WhatIfCostingColumns, ["Component", "Now", "What-If", "Change", "% of Price"]), keepWithNext: true, table: table, repeats: true, keepTogether: CostingGroup);
+
+        AddCost(costs.PartsTitle, now.SubAssemblies, costs.SubAssemblies, costs.SubAssembliesShare, isFollowedByParts: costs.SubAssemblyLines.Count > 0);
+        for (var i = 0; i < costs.SubAssemblyLines.Count; i++)
+        {
+            var line = costs.SubAssemblyLines[i];
+            var was = i < now.SubAssemblyLines.Count ? now.SubAssemblyLines[i].Cost : line.Cost;
+            var isLast = i == costs.SubAssemblyLines.Count - 1;
+            Add(_ => PartRow(line.Name, [Money(was), Money(line.Cost), Change(was, line.Cost), Share(line.Share)], isLast), table: table, keepTogether: CostingGroup);
+        }
+
+        AddCost(costs.PackagingTitle, now.Packaging, costs.Packaging, costs.PackagingShare);
+        AddCost($"Labor ({costs.LaborPercent:0.##}% of {costs.PartsBase})", now.Labor, costs.Labor, costs.LaborShare);
+        AddCost($"Overhead ({costs.OverheadPercent:0.##}% of {costs.PartsBase})", now.Overhead, costs.Overhead, costs.OverheadShare);
+        AddCost($"Administrative ({costs.AdministrativePercent:0.##}% of {costs.PartsBase})", now.Administrative, costs.Administrative, costs.AdministrativeShare);
+        Add(
+            _ => BandRow("Subtotal (base cost)", [Money(now.BaseCost), Money(costs.BaseCost), Change(now.BaseCost, costs.BaseCost), Share(costs.BaseCostShare)], isTotal: false),
+            table: table,
+            keepTogether: CostingGroup);
+        AddCost($"Markup ({costs.MarginPercent:0.##}%)", now.Markup, costs.Markup, costs.MarkupShare);
+        AddCost($"VAT ({costs.VatPercent:0.##}%)", now.Vat, costs.Vat, costs.VatShare);
+        Add(
+            _ => BandRow(
+                $"Total Selling Price ({unit})",
+                [Money(now.SellingPrice), Money(costs.SellingPrice), Change(now.SellingPrice, costs.SellingPrice), costs.SellingPriceShare.ToString("N0", CultureInfo.CurrentCulture) + "%"],
+                isTotal: true),
+            table: table,
+            keepTogether: CostingGroup);
+
+        void AddCost(string label, decimal was, decimal amount, decimal share, bool isFollowedByParts = false) =>
+            Add(
+                _ => Row(
+                    WhatIfCostingColumns,
+                    [
+                        Label(label),
+                        Figure(Money(was), foreground: _muted),
+                        Figure(Money(amount), foreground: Moved(was != amount ? was : null), weight: MovedWeight(was != amount ? was : null)),
+                        Figure(Change(was, amount)),
+                        Figure(Share(share), foreground: _muted),
+                    ],
+                    rule: !isFollowedByParts),
                 table: table,
                 keepTogether: CostingGroup);
     }
@@ -466,16 +633,16 @@ public sealed class ProductPrintLayout
     {
         Add(repeat => PartHeading(repeat ? "Scaling (continued)" : "Scaling"), keepWithNext: true, table: table, repeats: true);
 
-        List<(string Label, string Value, Brush? Foreground)> figures =
-            [("Sellable Units", scaling.Units.ToString("N0", CultureInfo.CurrentCulture), null)];
+        List<(string Label, string Value, Brush? Foreground, string? Note)> figures =
+            [("Sellable Units", scaling.Units.ToString("N0", CultureInfo.CurrentCulture), null, null)];
         if (scaling.Pieces is { } pieces)
         {
-            figures.Add(("Pieces", pieces.ToString("#,0.##", CultureInfo.CurrentCulture), null));
+            figures.Add(("Pieces", pieces.ToString("#,0.##", CultureInfo.CurrentCulture), null, null));
         }
 
         if (_includeCosting)
         {
-            figures.Add(("Total Cost", Money(scaling.TotalCost), null));
+            figures.Add(("Total Cost", Money(scaling.TotalCost), null, null));
         }
 
         Add(_ => Figures(figures), keepWithNext: true);
@@ -635,7 +802,8 @@ public sealed class ProductPrintLayout
     {
         var title = new StackPanel { Margin = new Thickness(0, 0, 0, 2) };
         title.Children.Add(Text(printout.ProductName, TitleSize, weight: FontWeights.SemiBold, wrap: true));
-        title.Children.Add(Text($"{printout.CategoryName} · {printout.StageTitle} · {printout.CostUnitCaption}{BasisSuffix(printout)}", BodySize, _muted, wrap: true));
+        var whatIf = _nowColumn && printout.WhatIf is not null ? " · What-If prices" : string.Empty;
+        title.Children.Add(Text($"{printout.CategoryName} · {printout.StageTitle} · {printout.CostUnitCaption}{BasisSuffix(printout)}{whatIf}", BodySize, _muted, wrap: true));
         title.Children.Add(Text($"Last updated {printout.LastUpdatedText}", SmallSize, _muted));
         return title;
     }
@@ -652,6 +820,15 @@ public sealed class ProductPrintLayout
         heading.Children.Add(Text(
             $"{count} {(count == 1 ? "product" : "products")} · {Parts} · Printed {Printed(_set.PrintedAt)}", BodySize, _muted, wrap: true));
         heading.Children.Add(Text("As saved: edits not yet saved on the Products screen aren't in these pages.", SmallSize, _muted, wrap: true));
+        if (_nowColumn)
+        {
+            heading.Children.Add(Text(
+                "At buffered costs, with the price changes tried on the What-If Prices screen, beside today's figures. Nothing in it is saved.",
+                SmallSize,
+                _muted,
+                wrap: true));
+        }
+
         return heading;
     }
 
@@ -718,24 +895,32 @@ public sealed class ProductPrintLayout
             _band,
             rule: false);
 
-    /// <summary>One sub-assembly's part of the costing's Sub-assemblies row: indented, smaller and muted.</summary>
-    private Border PartRow(string name, decimal cost, decimal share, bool isLast)
+    /// <summary>
+    /// One sub-assembly's part of the costing's Sub-assemblies row: indented, smaller and muted. Its figures are its cost
+    /// and share, or on the What-If report its cost now, with the changes, the change and its share.
+    /// </summary>
+    private Border PartRow(string name, IReadOnlyList<string> figures, bool isLast)
     {
         var label = Label(name, SmallSize, _muted);
         label.Margin = new Thickness(24, 1.5, CellPadding.Right, 1.5);
-        return Row(CostingColumns, [label, Figure(Money(cost), SmallSize, _muted), Figure(Share(share), SmallSize, _muted)], rule: isLast);
+        return Row(CostingColumnsFor(figures), [label, .. figures.Select(f => Figure(f, SmallSize, _muted))], rule: isLast);
     }
 
-    /// <summary>The costing's Subtotal or Total Selling Price, on the accent's soft band; the total's figures in the accent.</summary>
-    private Border BandRow(string label, string amount, string share, bool isTotal)
+    /// <summary>
+    /// The costing's Subtotal or Total Selling Price, on the accent's soft band; the total's figures in the accent. Its
+    /// figures are an amount and its share, or on the What-If report the amount now, with the changes, the change and the
+    /// share.
+    /// </summary>
+    private Border BandRow(string label, IReadOnlyList<string> figures, bool isTotal)
     {
-        var figures = isTotal ? _emphasis : _text;
+        var emphasis = isTotal ? _emphasis : _text;
         var row = Row(
-            CostingColumns,
+            CostingColumnsFor(figures),
             [
                 Label(label, weight: FontWeights.SemiBold),
-                Figure(amount, foreground: figures, weight: FontWeights.SemiBold),
-                Figure(share, foreground: isTotal ? figures : _muted, weight: isTotal ? FontWeights.SemiBold : FontWeights.Normal),
+                .. figures.Select((figure, i) => i < figures.Count - 1
+                    ? Figure(figure, foreground: emphasis, weight: FontWeights.SemiBold)
+                    : Figure(figure, foreground: isTotal ? emphasis : _muted, weight: isTotal ? FontWeights.SemiBold : FontWeights.Normal)),
             ],
             _emphasisBand,
             rule: false);
@@ -743,24 +928,45 @@ public sealed class ProductPrintLayout
         return row;
     }
 
+    // A costing row's columns, by how many figures it has: a product's two, or the What-If report's four.
+    private static GridLength[] CostingColumnsFor(IReadOnlyList<string> figures) => figures.Count > 2 ? WhatIfCostingColumns : CostingColumns;
+
+    /// <summary>
+    /// The What-If report's headline figures: base cost, suggested price and the markup the current price earns, with the
+    /// price changes, each with today's under it; and the current price, which the changes don't move.
+    /// </summary>
+    private Grid WhatIfFigures(ProductCostSummary now, ProductCostSummary costs) => Figures(
+    [
+        ("Base Cost", Money(costs.BaseCost), null, $"Now {Money(now.BaseCost)}"),
+        ("Suggested Price", Money(costs.SellingPrice), null, $"Now {Money(now.SellingPrice)}"),
+        ("Current Price", costs.CurrentPrice is { } price ? Money(price) : "—", null, null),
+        (
+            "Markup at Current Price",
+            MarkupText(costs.CurrentMarkupPercent),
+            costs.IsCurrentPriceBelowCost ? _error : null,
+            $"Now {MarkupText(now.CurrentMarkupPercent)}"
+        ),
+    ]);
+
+    private static string MarkupText(decimal? markup) => markup is { } value ? value.ToString("N2", CultureInfo.CurrentCulture) + "%" : "—";
+
     /// <summary>
     /// The costing's headline figures, labels over values, as the product header has them. The header's Markup % is named
     /// for what it is here, the markup the current price earns, since the breakdown below has a Markup row of its own.
     /// </summary>
     private Grid Figures(ProductCostSummary costs) => Figures(
     [
-        ("Material Cost", Money(costs.Material), null),
-        ("Base Cost", Money(costs.BaseCost), null),
-        ("Current Price", costs.CurrentPrice is { } price ? Money(price) : "—", null),
-        (
-            "Markup at Current Price",
-            costs.CurrentMarkupPercent is { } markup ? markup.ToString("N2", CultureInfo.CurrentCulture) + "%" : "—",
-            costs.IsCurrentPriceBelowCost ? _error : null
-        ),
+        ("Material Cost", Money(costs.Material), null, null),
+        ("Base Cost", Money(costs.BaseCost), null, null),
+        ("Current Price", costs.CurrentPrice is { } price ? Money(price) : "—", null, null),
+        ("Markup at Current Price", MarkupText(costs.CurrentMarkupPercent), costs.IsCurrentPriceBelowCost ? _error : null, null),
     ]);
 
-    /// <summary>Figures, labels over values, in a row of at least four columns, so fewer line up as the costing's four do.</summary>
-    private Grid Figures(List<(string Label, string Value, Brush? Foreground)> figures)
+    /// <summary>
+    /// Figures, labels over values, in a row of at least four columns, so fewer line up as the costing's four do; a note
+    /// under a value in small muted type, where it has one.
+    /// </summary>
+    private Grid Figures(List<(string Label, string Value, Brush? Foreground, string? Note)> figures)
     {
         var grid = new Grid { Margin = new Thickness(0, 6, 0, 8) };
         for (var i = 0; i < Math.Max(figures.Count, 4); i++)
@@ -773,6 +979,10 @@ public sealed class ProductPrintLayout
             var figure = new StackPanel { Margin = new Thickness(CellPadding.Left, 0, CellPadding.Right, 0) };
             figure.Children.Add(Text(figures[i].Label, SmallSize, _muted));
             figure.Children.Add(Text(figures[i].Value, BodySize + 1, figures[i].Foreground, FontWeights.SemiBold));
+            if (figures[i].Note is { } note)
+            {
+                figure.Children.Add(Text(note, SmallSize, _muted));
+            }
             Grid.SetColumn(figure, i);
             grid.Children.Add(figure);
         }
@@ -991,6 +1201,28 @@ public sealed class ProductPrintLayout
     private static string Share(decimal share) => share.ToString("N1", CultureInfo.CurrentCulture) + "%";
 
     private static string Money(decimal amount) => amount.ToString("N2", CultureInfo.CurrentCulture);
+
+    /// <summary>How far a figure moves, signed, "+1.25" or "-0.40"; "—" for one that doesn't.</summary>
+    private static string Change(decimal now, decimal whatIf) =>
+        whatIf == now ? "—" : (whatIf - now).ToString("+#,0.00;-#,0.00", CultureInfo.CurrentCulture);
+
+    /// <summary>How far a figure moves, in percent of what it is now, "+5.20%"; "—" for one that doesn't.</summary>
+    private static string ChangePercent(decimal now, decimal whatIf) =>
+        whatIf == now ? "—" : SignedPercent(CostingRules.PercentOf(whatIf - now, now));
+
+    private static string SignedPercent(decimal percent) => percent.ToString("+#,0.00;-#,0.00;0.00", CultureInfo.CurrentCulture) + "%";
+
+    /// <summary>A What-If table's Total Cost Now: what its lines cost now when a change moves any of them, or nothing.</summary>
+    private static string NowTotal(IEnumerable<(decimal Cost, decimal? NowCost)> lines)
+    {
+        var list = lines.ToList();
+        return list.Any(l => l.NowCost is not null) ? Money(list.Sum(l => l.NowCost ?? l.Cost)) : string.Empty;
+    }
+
+    // A line a price change moves, on the What-If report: its name and figures in the accent, semibold.
+    private Brush? Moved(decimal? nowCost) => nowCost is null ? null : _emphasis;
+
+    private static FontWeight? MovedWeight(decimal? nowCost) => nowCost is null ? null : FontWeights.SemiBold;
 
     /// <summary>A per-unit cost, to the 4 decimals the Packaging tab shows.</summary>
     private static string UnitMoney(decimal amount) => amount.ToString("N4", CultureInfo.CurrentCulture);

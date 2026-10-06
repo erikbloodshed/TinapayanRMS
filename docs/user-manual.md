@@ -681,7 +681,7 @@ While the Products screen shows unbuffered costs, everything printed, a single p
 
 Close the Print tab with its ✕.
 
-A production plan prints from the **Production Plan** screen's own **Print**: see [Production Plan](#11-production-plan).
+A production plan prints from the **Production Plan** screen's own **Print**: see [Production Plan](#11-production-plan). A report of what price changes would do prints from **What-If Prices**: see [Printing a What-If report](#printing-a-what-if-report).
 
 ### Printing a scaled recipe
 
@@ -776,6 +776,23 @@ The lower table shows every product for one sellable unit, at buffered costs, no
 A composite product moves with the products it holds. Tick **Only affected products** to hide the products no change reaches. Sort by **What-If Markup %** to see which products would earn the least. Filter by product or category from the funnel in its heading, and double-click a product to open it.
 
 **Export to Excel** saves the products as the table shows them, and the price changes, on two sheets of one workbook.
+
+### Printing a What-If report
+
+**Print Report** opens a print preview with each product's recipe and costing at the new prices, next to today's figures. Print it, or save it as a PDF with **Microsoft Print to PDF**.
+
+To print only some products, click one in the **Products** table, or several with **Ctrl** or **Shift** held, before pressing **Print Report**. The products you picked stay picked while you change prices. At the bottom of the preview, **Print** chooses:
+
+- **Selected products**: only the ones you picked. The preview opens on this choice when you've picked any.
+- **All products shown**: every product the table shows, with **Only affected products** and the column filters applied, in the table's order.
+
+The first page lists the **Price Changes** tried, then every product with its **Base Cost**, **What-If Base Cost**, **Change %** and the page it starts on. Each product then starts on a new page, with:
+
+- **Price Changes Applied**: the changes that reach the product. That includes changes reaching it through a made or linked ingredient, or through the products a composite holds. A product no change reaches says so.
+- **Recipe**: each sub-assembly's ingredients and the packaging, at the new prices. A line a change moves is in the accent colour, with what it costs today in the **Cost Now** column.
+- **Costing**: the Base Cost, Suggested Price and Markup at Current Price with the changes, with today's figure under each. The breakdown has **Now**, **What-If** and **Change** columns for every part, up to the Total Selling Price.
+
+**Include** chooses **Recipe**, **Costing** or both. Without the costing, the report prints the recipes with no costs and no price changes.
 
 ## 11. Production Plan
 
@@ -954,6 +971,10 @@ The app keeps costs at full precision and rounds them only for display. So a tot
 
 Open the product and compare the header's **Markup %**, which is what the current price earns, with the **Markup Metric** on the Costing tab, which is what you're aiming for. For an overview of all products, look at **Reports → Product Cost Summary** and sort by **Markup %**.
 
+### Bring back a deleted product
+
+Open the **Deleted** folder at the bottom of the Products list, right-click the product and choose **Restore**. It goes back to its folder as it was when you deleted it.
+
 ### Move a product into production
 
 Right-click it in the Products list and choose **Promote to Production**, or drag it into a Production folder. Right-click a category folder and choose **Promote All to Production** to promote every product in that folder.
@@ -970,11 +991,8 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 1. Open **What-If Prices** from the menu.
 2. In the top table, pick the raw material and type its **Change %**, such as **8**, or its **New Price**.
 3. Tick **Only affected products** and sort by **What-If Markup %**.
-4. To make the price real, record it on **Raw Materials** as in [Record a price increase](#record-a-price-increase). What-If Prices never changes a price itself.
-### Bring back a deleted product
-
-Open the **Deleted** folder at the bottom of the Products list, right-click the product and choose **Restore**. It goes back to its folder as it was when you deleted it.
-
+4. To see why a product moves, Ctrl-click it and any others, press **Print Report**, and read each product's ingredients and costing, now and with the change. Print it, or save it as a PDF.
+5. To make the price real, record it on **Raw Materials** as in [Record a price increase](#record-a-price-increase). What-If Prices never changes a price itself.
 
 ### Back up to a USB stick
 

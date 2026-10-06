@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using AwesomeAssertions;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.UI.Printing;
 using TinapayanRMS.UI.Tests.Fixtures;
@@ -348,6 +349,61 @@ public class ProductPrintLayoutTests
         texts.Should().ContainInConsecutiveOrder("Sellable Units", "120", "Total Cost", Figure(0m, "N2"));
         texts.Should().NotContain("Pieces").And.NotContain("Item");
         texts.Should().Contain("Nothing to scale yet.");
+    });
+
+    [Fact]
+    public void A_what_if_report_lists_the_changes_tried_then_each_products_base_cost_now_and_with_them() => StaThread.Run(() =>
+    {
+        var layout = new ProductPrintLayout(SamplePrintouts.WhatIfSet("Cheese Roll", "Ube Roll"), includeRecipe: true, includeCosting: true, A4);
+        var sample = SamplePrintouts.WhatIf();
+        var now = sample.WhatIf!.Now.BaseCost;
+        var whatIf = sample.Costs.BaseCost;
+
+        layout.DocumentName.Should().Be("What-If Prices — Recipe and Costing");
+        var cover = AllTexts(layout, 1);
+        cover[0].Should().Be(WhatIfReport.Title);
+        cover.Should().ContainInConsecutiveOrder("Price Changes", "Raw Material", "Per", "Current Price", "Change %", "New Price");
+        cover.Should().ContainInConsecutiveOrder("Bread Flour", "sack", Figure(1250m, "N2"), "+10.00%", Figure(1375m, "N2"));
+        cover.Should().ContainInConsecutiveOrder("Products", "Product", "Base Cost", "What-If Base Cost", "Change %", "Page");
+        cover.Should().ContainInConsecutiveOrder(
+            "Cheese Roll", Figure(now, "N2"), Figure(whatIf, "N2"), $"+{Figure(CostingRules.PercentOf(whatIf - now, now), "N2")}%", "2");
+        EveryPageShouldFitAboveItsFooter(layout, A4);
+    });
+
+    [Fact]
+    public void A_what_if_products_pages_have_the_changes_applied_the_moved_line_with_its_cost_now_and_the_costing_now_and_with_them() => StaThread.Run(() =>
+    {
+        var sample = SamplePrintouts.WhatIf();
+        var texts = AllTexts(new ProductPrintLayout(SamplePrintouts.WhatIfSet("Ube Roll"), includeRecipe: true, includeCosting: true, A4));
+
+        texts.Should().Contain(t => t.EndsWith(" · Per piece · What-If prices", StringComparison.Ordinal));
+        texts.Should().ContainInConsecutiveOrder("Price Changes Applied", "Raw Material", "Per", "Current Price", "Change %", "New Price", "Bread Flour");
+        texts.Should().ContainInConsecutiveOrder("Ingredient", "Grams", "Baker's %", "Cost/g", "Cost", "Cost Now", "Base");
+        texts.Should().ContainInConsecutiveOrder("Ingredient 1", Figure(100m, "N1"), Figure(10m, "N1"), Figure(0.05m, "N4"), Figure(5m, "N2"), Figure(4m, "N2"));
+        texts.Should().ContainInConsecutiveOrder("Ingredient 2", Figure(100m, "N1"), Figure(10m, "N1"), Figure(0.05m, "N4"), Figure(5m, "N2"), string.Empty);
+        texts.Should().ContainInConsecutiveOrder("Total", Figure(200m, "N1"), Figure(20m, "N1"), string.Empty, Figure(10m, "N2"), Figure(9m, "N2"), string.Empty);
+        texts.Should().ContainInConsecutiveOrder("Material", "Qty", "Unit", "Unit Cost", "Cost", "Cost Now", "Gift Box", Figure(1m, "N1"), "pc", Figure(30m, "N4"), Figure(30m, "N4"), string.Empty);
+
+        texts.Should().ContainInConsecutiveOrder("Base Cost", Figure(sample.Costs.BaseCost, "N2"), $"Now {Figure(sample.WhatIf!.Now.BaseCost, "N2")}");
+        texts.Should().ContainInConsecutiveOrder("Component", "Now", "What-If", "Change", "% of Price");
+        texts.Should().ContainInConsecutiveOrder("Dough", Figure(2m, "N2"), Figure(2.5m, "N2"), "+0.50");
+        texts.Should().ContainInConsecutiveOrder("Packaging", Figure(30m, "N2"), Figure(30m, "N2"), "—");
+    });
+
+    [Fact]
+    public void A_what_if_product_no_change_reaches_says_so_and_without_the_costing_the_report_prints_no_costs_or_changes() => StaThread.Run(() =>
+    {
+        var untouched = SamplePrintouts.WhatIfSet("Ube Roll") with
+        {
+            Products = [SamplePrintouts.WhatIf() with { WhatIf = new PrintedWhatIf(SamplePrintouts.WhatIf().Costs, []) }],
+        };
+        AllTexts(new ProductPrintLayout(untouched, includeRecipe: true, includeCosting: true, A4))
+            .Should().Contain("No price change reaches this product: its figures are today's.");
+
+        var kitchen = AllTexts(new ProductPrintLayout(SamplePrintouts.WhatIfSet("Ube Roll"), includeRecipe: true, includeCosting: false, A4));
+        kitchen.Should().ContainInConsecutiveOrder("Product", "Folder", "Page");
+        kitchen.Should().NotContain(["Price Changes", "Price Changes Applied", "Cost Now", "What-If Base Cost", "Bread Flour"]);
+        kitchen.Should().NotContain(t => t.Contains("What-If prices", StringComparison.Ordinal));
     });
 
     /// <summary>Lays every page out at <paramref name="size"/>, as the pane does, and checks its blocks end above its footer.</summary>

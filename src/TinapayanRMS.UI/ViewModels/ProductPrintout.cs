@@ -51,6 +51,12 @@ public sealed record ProductPrintout(
     public const string UnbufferedNote = "Unbuffered costs";
 
     /// <summary>
+    /// The What-If report's own: what the product costs at today's prices, and the price changes that reach it, its other
+    /// figures being at the what-if prices (WhatIfReport, 2026-10-06). Null for every other printout.
+    /// </summary>
+    public PrintedWhatIf? WhatIf { get; init; }
+
+    /// <summary>
     /// The Scaling tab, when Print was pressed with it showing: the pages are then the recipe scaled to its number of
     /// sellable units, in place of the recipe and the costing. Null otherwise.
     /// </summary>
@@ -86,12 +92,28 @@ public sealed record ProductPrintSet(string? Title, IReadOnlyList<ProductPrintou
     /// <summary>A production plan, which a set holding one prints alone; null for products.</summary>
     public PrintedPlan? Plan { get; init; }
 
+    /// <summary>
+    /// The What-If report's price changes, every one tried, which its first page lists over its contents; null for any
+    /// other set. Its products' figures are at those prices (<see cref="ProductPrintout.WhatIf"/>).
+    /// </summary>
+    public IReadOnlyList<PrintedPriceChange>? PriceChanges { get; init; }
+
     /// <summary>The Products screen's Scaling tab: one product's recipe scaled, which a set never is.</summary>
     public bool IsScaling => Products.Any(p => p.Scaling is not null);
 }
 
 /// <summary>
-/// The Scaling tab on paper: the recipe scaled to a number of sellable units, as the tab's tree shows it, each section in
+/// One of the sets a print dialog offers in its Print dropdown: the What-If report's "Selected products (3)" or "All
+/// products shown (24)".
+/// </summary>
+public sealed record PrintChoice(string Label, ProductPrintSet Set)
+{
+    /// <summary>Its label, which the dropdown shows and a screen reader reads.</summary>
+    public override string ToString() => Label;
+}
+
+/// <summary>
+/// The Scaling tab on paper:the recipe scaled to a number of sellable units, as the tab's tree shows it, each section in
 /// whole batches and each made ingredient opened into what it's made from.
 /// </summary>
 /// <param name="Units">The sellable units it's scaled to: the tab's Sellable Units.</param>
@@ -125,6 +147,9 @@ public sealed record PrintedSection(
     decimal CostPerPiece,
     bool HasPieceSize)
 {
+    /// <summary>On the What-If report, the batch's cost at today's prices, when a price change moves it; null otherwise.</summary>
+    public decimal? NowBatchCost { get; init; }
+
     /// <summary>The section as its recipe tab shows it, at <paramref name="basis"/>.</summary>
     public static PrintedSection From(ProductUsageEdit usage, CostBasis basis)
     {
@@ -161,7 +186,11 @@ public sealed record PrintedSection(
 /// <param name="CostPerGram">The ingredient's cost per gram (buffered, unless the printout isn't), as the recipe form's Cost/g column shows it.</param>
 /// <param name="Cost">What it adds to the batch's cost, at <paramref name="CostPerGram"/>.</param>
 /// <param name="IsFormulaBase">Part of the formula's 100% base, usually the flour.</param>
-public sealed record PrintedLine(string Ingredient, decimal Grams, decimal? Percent, decimal CostPerGram, decimal Cost, bool IsFormulaBase);
+public sealed record PrintedLine(string Ingredient, decimal Grams, decimal? Percent, decimal CostPerGram, decimal Cost, bool IsFormulaBase)
+{
+    /// <summary>On the What-If report, what the line costs at today's prices, when a price change moves it; null otherwise.</summary>
+    public decimal? NowCost { get; init; }
+}
 
 /// <summary>The product's packaging on paper: what one sellable unit takes of each material, as the Packaging tab shows it.</summary>
 /// <param name="LinkedTo">"Linked to Gift Box Set (Sub-Assemblies)" for linked packaging; null for the product's own lines.</param>
@@ -200,6 +229,9 @@ public sealed record PrintedPackaging(string? LinkedTo, IReadOnlyList<PrintedPac
 /// </param>
 public sealed record PrintedComponent(string Product, int? Quantity, decimal RecipeCost, decimal Cost, decimal? PackagingCost = null)
 {
+    /// <summary>On the What-If report, what the line costs at today's prices, when a price change moves it; null otherwise.</summary>
+    public decimal? NowCost { get; init; }
+
     /// <summary>The Products table's rows, leaving out any without a product, which isn't a line yet.</summary>
     public static IReadOnlyList<PrintedComponent> From(IEnumerable<ProductComponentRow> rows) =>
     [
@@ -214,7 +246,27 @@ public sealed record PrintedComponent(string Product, int? Quantity, decimal Rec
 /// <param name="Qty">Null while nothing is typed for it.</param>
 /// <param name="UnitCost">What one of <paramref name="Unit"/> costs, buffered unless the printout isn't.</param>
 /// <param name="Cost">What the line costs for one sellable unit.</param>
-public sealed record PrintedPackagingLine(string Material, decimal? Qty, string Unit, decimal UnitCost, decimal Cost);
+public sealed record PrintedPackagingLine(string Material, decimal? Qty, string Unit, decimal UnitCost, decimal Cost)
+{
+    /// <summary>On the What-If report, what the line costs at today's prices, when a price change moves it; null otherwise.</summary>
+    public decimal? NowCost { get; init; }
+}
+
+/// <summary>
+/// One price change of the What-If screen on paper: a purchased material and the price it's tried at, per the unit it's
+/// bought in, as the Price Changes table shows it.
+/// </summary>
+/// <param name="Per">The unit the prices are per: "sack".</param>
+/// <param name="CurrentPrice">What one costs now; null for a material with no price yet.</param>
+/// <param name="ChangePercent">How far the price moves; null when there's no current price to move from.</param>
+public sealed record PrintedPriceChange(string Material, string? Per, decimal? CurrentPrice, decimal? ChangePercent, decimal NewPrice);
+
+/// <summary>
+/// What the What-If report adds to a product's printout, whose other figures are at the what-if prices: its costs at
+/// today's prices, for the costing's Now column, and the price changes that reach it.
+/// </summary>
+/// <param name="Changes">The changes reaching the product, through its own ingredients and packaging or the products it holds; none when no change does.</param>
+public sealed record PrintedWhatIf(ProductCostSummary Now, IReadOnlyList<PrintedPriceChange> Changes);
 
 /// <summary>
 /// The Production Plan on paper: the products to make, then the mixing sheet and the purchase requisition as the screen shows

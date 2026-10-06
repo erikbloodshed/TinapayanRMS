@@ -117,6 +117,86 @@ public class WhatIfViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
     }
 
     [Fact]
+    public async Task The_report_sets_each_product_beside_today_with_the_changes_that_reach_it()
+    {
+        var bakery = await AddBakeryAsync();
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        var change = viewModel.NewChange();
+        viewModel.Changes.Add(change);
+        change.MaterialId = bakery.EggId;
+        change.ChangePercent = 10m;
+        await WaitUntilSettledAsync(() => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+
+        var choices = viewModel.PrintChoices(new DateTime(2026, 10, 6, 9, 0, 0));
+
+        var shown = choices.Should().ContainSingle("nothing is picked in the table").Subject;
+        shown.Label.Should().Be("All products shown (3)");
+        shown.Set.Title.Should().Be(WhatIfReport.Title);
+        var egg = new PrintedPriceChange("Egg", "gram", 0.014m, 10m, 0.0154m);
+        shown.Set.PriceChanges.Should().Equal(egg);
+        shown.Set.Products.Select(p => p.ProductName).Should().Equal(viewModel.Products.Select(r => r.ProductName), "in the table's order");
+
+        var meringue = shown.Set.Products.Single(p => p.ProductName == "Meringue");
+        var meringueRow = Row(viewModel, bakery.MeringueId)!;
+        meringue.WhatIf!.Changes.Should().Equal(egg);
+        meringue.WhatIf.Now.BaseCost.Should().Be(meringueRow.BaseCost);
+        meringue.Costs.BaseCost.Should().Be(meringueRow.WhatIfBaseCost);
+        var white = meringue.Sections.Single().Lines.Single();
+        white.Ingredient.Should().Be("Egg White");
+        white.NowCost.Should().NotBeNull().And.BeLessThan(white.Cost, "the egg white costs more with the egg");
+        meringue.Sections.Single().NowBatchCost.Should().NotBeNull();
+
+        var pandesal = shown.Set.Products.Single(p => p.ProductName == "Pandesal");
+        pandesal.WhatIf!.Changes.Should().BeEmpty("no change reaches flour");
+        pandesal.Sections.Single().Lines.Should().OnlyContain(l => l.NowCost == null);
+        pandesal.Sections.Single().NowBatchCost.Should().BeNull();
+
+        var box = shown.Set.Products.Single(p => p.ProductName == "Party Box");
+        box.WhatIf!.Changes.Should().Equal([egg], "it holds meringues");
+        box.Components!.Single(c => c.Product == "Meringue").NowCost.Should().NotBeNull();
+        box.Components!.Single(c => c.Product == "Pandesal").NowCost.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Picked_products_print_on_their_own_in_the_tables_order_and_stay_picked_through_a_change()
+    {
+        var bakery = await AddBakeryAsync();
+        var viewModel = CreateViewModel();
+        IReadOnlyList<PrintChoice>? printed = null;
+        viewModel.ShowPrint.RegisterHandler(interaction =>
+        {
+            printed = interaction.Input;
+            interaction.SetOutput(ReactiveUI.Primitives.RxVoid.Default);
+        });
+        await viewModel.LoadCommand.Execute();
+        await WaitUntilSettledAsync(() => viewModel.Products.Count == 3, () => $"{viewModel.Products.Count} rows");
+
+        viewModel.SelectedProducts.Add(Row(viewModel, bakery.PandesalId)!);
+        viewModel.SelectedProducts.Add(Row(viewModel, bakery.MeringueId)!);
+        await viewModel.PrintCommand.Execute();
+
+        printed.Should().NotBeNull();
+        printed!.Select(c => c.Label).Should().Equal("Selected products (2)", "All products shown (3)");
+        printed[0].Set.Products.Select(p => p.ProductName).Should().Equal(
+            viewModel.Products.Where(r => r.ProductId is var id && (id == bakery.PandesalId || id == bakery.MeringueId)).Select(r => r.ProductName),
+            "in the table's order, not the order they were picked in");
+        printed[0].Set.PriceChanges.Should().BeEmpty();
+
+        // A change makes new rows, and the products picked are picked again among them; ticking Only affected hides Pandesal.
+        var change = viewModel.NewChange();
+        viewModel.Changes.Add(change);
+        change.MaterialId = bakery.EggId;
+        change.ChangePercent = 10m;
+        await WaitUntilSettledAsync(() => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+        viewModel.SelectedProducts.Should().BeEquivalentTo([Row(viewModel, bakery.PandesalId), Row(viewModel, bakery.MeringueId)]);
+
+        viewModel.OnlyAffected = true;
+        viewModel.SelectedProducts.Should().Equal(Row(viewModel, bakery.MeringueId)!);
+        viewModel.PrintChoices(DateTime.Now).Select(c => c.Label).Should().Equal("Selected products (1)", "All products shown (2)");
+    }
+
+    [Fact]
     public async Task A_new_price_works_out_the_change_and_the_other_way_round()
     {
         var bakery = await AddBakeryAsync();

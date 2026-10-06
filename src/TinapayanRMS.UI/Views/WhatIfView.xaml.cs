@@ -1,8 +1,11 @@
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using Syncfusion.SfSkinManager;
 using Syncfusion.UI.Xaml.Grid;
 using TinapayanRMS.UI.Exporting;
 using TinapayanRMS.UI.ViewModels;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.UI.Views;
 
@@ -13,10 +16,30 @@ public partial class WhatIfView : UserControl
     {
         InitializeComponent();
         DataContext = viewModel;
+
+        // The rows picked are the ViewModel's, for Print Report. Handed over here rather than bound: the grid gives itself a
+        // collection of its own as it's initialized, while a binding still reads null, and that replaces the binding.
+        ProductsGrid.SelectedItems = viewModel.SelectedProducts;
         viewModel.RegisterNativeMessageBoxHandler();
 
         // The products as the table shows them, and the changes that made them.
         viewModel.RegisterExcelExport(this, _ => [new ExcelSheet("Products", ProductsGrid), new ExcelSheet("Price Changes", ChangesGrid)]);
+
+        // The report prints the products as the table shows them: its column filters applied, in its sort order.
+        viewModel.ShownProducts = () => ProductsGrid.View is { } view
+            ? [.. view.Records.Select(record => record.Data).OfType<WhatIfProductRow>()]
+            : viewModel.Products;
+
+        // The report in a print pane of its own, themed as the main window is, after the button's click is over, as the
+        // Production Plan's is.
+        viewModel.ShowPrint.RegisterHandler(async interaction =>
+        {
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            var owner = Window.GetWindow(this);
+            var window = new PrintPreviewWindow(interaction.Input, SfSkinManager.GetTheme(owner)) { Owner = owner };
+            window.ShowDialog();
+            interaction.SetOutput(RxVoid.Default);
+        });
     }
 
     /// <summary>Opens the double-clicked product once the press is over, as Reports does (ReportsView explains why).</summary>
