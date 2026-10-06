@@ -663,7 +663,7 @@
                                                   MaxValue="99.99"
                                                   Value="{Binding EditingUsageShrinkagePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                   NumberDecimalDigits="2"
-                                                  ToolTip="How much of the batch's weight this product loses making it — baking a dough off, reducing a filling. The pieces come out of what's left, so the batch's cost is spread over fewer of them. Leave it at 0 if nothing is lost." />
+                                                  ToolTip="How much of the batch's weight this product loses making it — baking a dough off, reducing a filling. The pieces come out of what's left, so the batch's cost is spread over fewer of them. A new section starts at the default in Settings → Costing Defaults; set it to 0 if nothing is lost." />
                     </Grid>
                 </Border>
                 <Border Style="{StaticResource ParamRowStyle}">

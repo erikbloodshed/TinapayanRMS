@@ -9,8 +9,8 @@ namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// The Settings dialog's Costing Defaults tab: the labor, overhead, administrative, markup and VAT percentages a new
-/// product's costing starts with (ProductsViewModel). Saving them changes no saved product. Its second card works every
-/// stored cost out again (RecalculateCostsCommand).
+/// product's costing starts with, and the Shrinkage % a new Recipe Structure section starts with (ProductsViewModel).
+/// Saving them changes no saved product. Its second card works every stored cost out again (RecalculateCostsCommand).
 /// </summary>
 public sealed class CostingDefaultsViewModel : ViewModelBase
 {
@@ -54,6 +54,14 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingVatPercent, value);
     }
 
+    private decimal _editingShrinkagePercent = CostingDefaults.DefaultShrinkagePercent;
+    /// <summary>What a new section's Shrinkage % starts at: 0 to under 100, as a section's own.</summary>
+    public decimal EditingShrinkagePercent
+    {
+        get => _editingShrinkagePercent;
+        set => this.RaiseAndSetIfChanged(ref _editingShrinkagePercent, value);
+    }
+
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
 
@@ -81,6 +89,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
             EditingAdministrativePercent = defaults.AdministrativePercent;
             EditingMarginPercent = defaults.MarginPercent;
             EditingVatPercent = defaults.VatPercent;
+            EditingShrinkagePercent = defaults.ShrinkagePercent;
         }));
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
@@ -108,9 +117,10 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
                     AdministrativePercent = EditingAdministrativePercent,
                     MarginPercent = EditingMarginPercent,
                     VatPercent = EditingVatPercent,
+                    ShrinkagePercent = EditingShrinkagePercent,
                 },
                 CancellationToken.None);
-            SuccessMessage = "Costing defaults saved. New products start with them.";
+            SuccessMessage = "Costing defaults saved. New products and sections start with them.";
         }));
 
         RecalculateCostsCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>

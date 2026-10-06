@@ -80,7 +80,7 @@ The [user manual](user-manual.md) describes every screen. Read its [Key ideas](u
 | Packaging line, packaging link | `PackagingLine`, `PackagingLink` | A packaging material used by one sellable unit; or a link that reads a product's packaging from another product or from a packaging set. |
 | Quantity Required | `Product.QuantityRequired` | Pieces per sellable unit: 8 for a Box of 8. A recipe is written per piece, and costing is per sellable unit. |
 | Composite product | `Product.IsComposite`, `ProductComponent` | A product made of other products, plus its own packaging and sections in product-owned roles. |
-| Costing parameters, costing defaults | `CostingParameters`, `CostingDefaults` | A product's labor, overhead, administrative, markup and VAT percentages; and the values a new product starts with. |
+| Costing parameters, costing defaults | `CostingParameters`, `CostingDefaults` | A product's labor, overhead, administrative, markup and VAT percentages; and the values a new product starts with, with the shrinkage a new Recipe Structure section starts with. |
 | Stage | `ProductStage` | Research and Development, or Production: the Products tree's two top folders. |
 | Baker's percentage | `SubAssemblyLine.IsFormulaBase`, `AuthoredBakersPercent` | A line's weight as a percentage of the total weight of the lines ticked as the formula's base. |
 
@@ -423,7 +423,7 @@ PER PRODUCT
 | `PackagingLink` | A product's packaging, read from another product or from a set | Exactly one target, and no loops (`PackagingLinkRules`). |
 | `ProductComponent` | A product inside a composite | `Quantity` is at least 1, and a composite never contains itself (`CompositeProductRules.EnsureNoCycle`). |
 | `CostingParameters` | A product's five percentages | One per product. Never linked or shared. |
-| `CostingDefaults` | The percentages a new product starts with | At most one row (Id 1). |
+| `CostingDefaults` | The percentages a new product starts with, and a new section's shrinkage | At most one row (Id 1). With no row, the costing reads as zero and the shrinkage as 3% (`DefaultShrinkagePercent`). |
 | `UnitOfMeasure`, `RawMaterialCategory` | Lookups edited in Settings | A unit's name is stored in lowercase. A category is for one type of material. |
 
 ### Deleted products

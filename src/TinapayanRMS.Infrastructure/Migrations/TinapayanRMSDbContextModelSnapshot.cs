@@ -43,6 +43,10 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
+                    b.Property<decimal>("ShrinkagePercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<decimal>("VatPercent")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
@@ -51,6 +55,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     b.ToTable("CostingDefaults", t =>
                         {
+                            t.HasCheckConstraint("CK_CostingDefaults_ShrinkagePercent", "[ShrinkagePercent] >= 0 AND [ShrinkagePercent] < 100");
+
                             t.HasCheckConstraint("CK_CostingDefaults_SingleRow", "[Id] = 1");
                         });
                 });

@@ -1770,6 +1770,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     // What a new product's costing starts with (Settings → Costing Defaults), as of the last LoadCommand.
     private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) _costingDefaults;
 
+    // What the add form's Shrinkage % starts at (Settings → Costing Defaults), as of the last LoadCommand, and what the
+    // form open now started at, which it still shows if it's untouched.
+    private decimal _defaultShrinkagePercent = CostingDefaults.DefaultShrinkagePercent;
+    private decimal _usageFormStartShrinkagePercent;
+
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
@@ -3983,6 +3988,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         var untouchedNewProduct = _editingId == 0 && CurrentCosting() == _costingDefaults;
         _costingDefaults = (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent);
+        _defaultShrinkagePercent = defaults.ShrinkagePercent;
         if (untouchedNewProduct)
         {
             ApplyCostingDefaults();
@@ -4175,7 +4181,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         EditingUsageRole = FormRoleOptions.FirstOrDefault(r => !takenRoleIds.Contains(r.Id)) ?? FormRoleOptions.FirstOrDefault();
         EditingUsageName = null;
         EditingUsageSource = null;
-        SetPieceSize(UsageAuthoredField.WeightPerPiece, 0m, 0m);
+
+        // The shrinkage is this product's, whichever way the section comes in, so it starts at Settings' default.
+        _usageFormStartShrinkagePercent = _defaultShrinkagePercent;
+        SetPieceSize(UsageAuthoredField.WeightPerPiece, 0m, _usageFormStartShrinkagePercent);
     }
 
     /// <summary>The badge's Edit: the picker, holding what the section could link instead, in the badge's place.</summary>
@@ -4616,7 +4625,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         RebaseSettledForm();
     }
 
-    /// <summary>The add form as it opened: nothing picked to link or copy, no line and no piece size. Its role alone isn't an entry.</summary>
+    /// <summary>
+    /// The add form as it opened: nothing picked to link or copy, no line, no piece size, and the shrinkage it started
+    /// at. Its role alone isn't an entry.
+    /// </summary>
     private bool IsUsageFormUntouched() =>
         IsAddingUsage
         && EditingUsageSource is null
@@ -4625,7 +4637,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         && FormAddIns.All(l => l.IngredientId is null && l.Grams == 0)
         && FormPackagingLines.All(l => l.PackagingMaterialId is null && l.QtyPerUnit == 0)
         && CurrentAuthoredValue() == 0
-        && EditingUsageShrinkagePercent == 0;
+        && EditingUsageShrinkagePercent == _usageFormStartShrinkagePercent;
 
     /// <summary>The form's lines changed, or its source's were loaded: the batch weight, the other piece-size figure and the preview follow.</summary>
     private void FormLinesChanged()

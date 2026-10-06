@@ -111,6 +111,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task One_Save_writes_a_new_product_with_a_sub_assembly_made_in_it()
     {
+        await WithoutDefaultShrinkageAsync();
         var roleId = await AddRoleAsync("Filling");
         await AddIngredientAsync("Ube", costPerGram: 0.24m);
         var viewModel = CreateViewModel();
@@ -543,6 +544,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task A_typed_yield_is_kept_and_the_weight_per_piece_follows_the_batch()
     {
+        await WithoutDefaultShrinkageAsync();
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var productId = await AddProductAsync("Pandesal");
@@ -609,6 +611,38 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     /// <summary>
+    /// A section added starts at Settings' default shrinkage (3% until it's changed there), whichever way it comes in:
+    /// the shrinkage is this product's, even for a linked one. A form still at it counts as untouched, so another way
+    /// picked on the drop-down changes that form in place rather than adding it.
+    /// </summary>
+    [Fact]
+    public async Task The_add_form_starts_at_the_default_shrinkage_from_Settings()
+    {
+        await AddRoleAsync("Dough");
+        var productId = await AddProductAsync("Pandesal");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == productId, () => $"selected={viewModel.SelectedProduct?.Id}");
+
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.New);
+        viewModel.EditingUsageShrinkagePercent.Should().Be(3m, "nothing is saved in Settings yet");
+
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
+        viewModel.RecipeTabs.OfType<AddSubAssemblyRecipeTab>().Should().ContainSingle("a form showing only what it opened with is changed in place");
+        viewModel.UsageEdits.Should().BeEmpty("nothing was entered to add");
+        viewModel.EditingUsageShrinkagePercent.Should().Be(3m);
+
+        await new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(new CostingDefaults { ShrinkagePercent = 8m }, Cancellation);
+        var reopened = CreateViewModel();
+        await reopened.LoadCommand.Execute();
+        reopened.SelectedProduct = reopened.Products.Single(p => p.Id == productId);
+        await WaitUntilSettledAsync(() => reopened.SelectedProduct?.Id == productId, () => $"selected={reopened.SelectedProduct?.Id}");
+        await reopened.AddUsageCommand.Execute(UsageFormMode.Link);
+        reopened.EditingUsageShrinkagePercent.Should().Be(8m, "the default saved in Settings");
+    }
+
+    /// <summary>
     /// Add Sub-Assembly is a drop-down of the three ways in (RecipeStructureCard), and the way it carries is what the
     /// form opens in — the form has no picker of its own any more. Another item picked while the add tab shows changes
     /// that form instead of opening a second one, and the whole add is one undo step.
@@ -668,6 +702,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task A_linked_sub_assembly_follows_its_changes_and_Make_a_Copy_saves_a_new_one_the_product_links()
     {
+        await WithoutDefaultShrinkageAsync();
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
@@ -1200,6 +1235,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task A_sub_assembly_goes_in_and_saves_before_its_piece_size_is_known()
     {
+        await WithoutDefaultShrinkageAsync();
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var productId = await AddProductAsync("Pan de Sal");
@@ -1534,6 +1570,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task A_standalone_sub_assembly_is_offered_to_link_and_shows_where_its_from()
     {
+        await WithoutDefaultShrinkageAsync();
         var roleId = await AddRoleAsync("Glaze");
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
         var glazeId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
@@ -2181,6 +2218,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task Add_ins_go_into_a_linked_usages_batch_and_its_cost_per_piece()
     {
+        await WithoutDefaultShrinkageAsync();
         var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -2373,6 +2411,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task Make_a_Copy_folds_the_add_ins_into_the_new_sections_lines()
     {
+        await WithoutDefaultShrinkageAsync();
         var (linkerId, _, ubeId, flourId) = await SeedLinkableDoughAsync();
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -2419,6 +2458,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task A_repriced_add_in_ingredient_reaches_the_usage_on_a_refresh()
     {
+        await WithoutDefaultShrinkageAsync();
         var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();

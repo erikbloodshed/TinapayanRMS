@@ -119,7 +119,7 @@ For each sub-assembly in a product you say how much of the batch one piece takes
 - **Weight/piece (g)**: what one finished piece weighs
 - **Yield (pcs)**: how many pieces one batch makes
 
-**Shrinkage %** is weight the batch loses while it's made, such as a dough baking off or a filling reducing. The pieces come out of what's left, the **final weight**.
+**Shrinkage %** is weight the batch loses while it's made, such as a dough baking off or a filling reducing. The pieces come out of what's left, the **final weight**. A section you add starts at the default shrinkage in Settings → Costing Defaults, 3% unless you change it there. Set it to 0 for a section that loses nothing.
 
 The figure you typed stays put. If the batch changes, the other figure is worked out again.
 
@@ -232,7 +232,7 @@ On a new database, set things up in this order. Each step uses what the one befo
 2. **Material categories** (Settings → Material Categories): how raw materials are grouped, such as Flour, Dairy, Boxes and Ribbons. Each category is for either ingredients or packaging.
 3. **Product categories** (Settings → Product Categories): how products are grouped, such as Breads, Cakes and Pastries.
 4. **Roles** (Settings → Roles): the parts of a recipe. Dough, Filling, Topping, Inclusion, Finishing and Packaging are there from the start.
-5. **Costing defaults** (Settings → Costing Defaults): the labour, overhead, administrative, markup and VAT percentages that a new product starts with.
+5. **Costing defaults** (Settings → Costing Defaults): the labour, overhead, administrative, markup and VAT percentages that a new product starts with, and the shrinkage a new recipe section starts with.
 6. **Raw materials**: every purchased ingredient and packaging material with its prices, then the made and linked ingredients.
 7. **Sub-assemblies**: the doughs, fillings and packaging sets shared by more than one product.
 8. **Products**.
@@ -282,9 +282,11 @@ These are the five percentages a **new** product's costing starts with:
 - **Markup %**: added on the base cost (materials, labour, overhead and administrative).
 - **VAT %**: added on top of the marked-up price.
 
-Each product keeps its own percentages from its first Save. Changing the defaults doesn't change any saved product.
+Under them, **Shrinkage %** is what a section added to a product's Recipe Structure starts with: the weight its batch loses being made. It starts at 3%. It can be anything from 0 up to, but not including, 100.
 
-**Stored Costs**, under the defaults, has a **Recalculate Costs** button. The app keeps every made and linked ingredient's cost, and every sub-assembly's total weight and cost, up to date as you save. You only need this button if the database was changed outside the app, for example by a script. It works all of those costs out again from what they're made of, and a green notice says how many were out of date. Purchased materials keep their prices.
+Each product keeps its own percentages, and each section its own shrinkage, from its first Save. Changing the defaults doesn't change any saved product.
+
+**Stored Costs**, to the right of the defaults, has a **Recalculate Costs** button. The app keeps every made and linked ingredient's cost, and every sub-assembly's total weight and cost, up to date as you save. You only need this button if the database was changed outside the app, for example by a script. It works all of those costs out again from what they're made of, and a green notice says how many were out of date. Purchased materials keep their prices.
 
 ### Keyboard
 

@@ -23,6 +23,18 @@ public static class ProductRules
         }
     }
 
+    /// <summary>Shrinkage runs from 0 to under 100: a batch can't lose all of itself, or there'd be nothing left to cut pieces from.</summary>
+    public static bool IsValidShrinkage(decimal shrinkagePercent) => shrinkagePercent is >= 0 and < 100;
+
+    /// <summary>The shrinkage a new section starts with (Settings' Costing Defaults), held to a section's own range.</summary>
+    public static void EnsureValidDefaultShrinkage(decimal shrinkagePercent)
+    {
+        if (!IsValidShrinkage(shrinkagePercent))
+        {
+            throw new BusinessRuleException("The default shrinkage must be at least 0% and less than 100%.");
+        }
+    }
+
     /// <summary>
     /// A product's whole set of usages: an empty set is valid (PLAN.md doesn't require a product to
     /// have a usage at all times), and so is a piece size of 0 — a section can go into the recipe before
@@ -38,7 +50,7 @@ public static class ProductRules
             throw new BusinessRuleException("A sub-assembly's weight per piece or yield can't be negative.");
         }
 
-        if (usages.Any(u => u.ShrinkagePercent < 0 || u.ShrinkagePercent >= 100))
+        if (usages.Any(u => !IsValidShrinkage(u.ShrinkagePercent)))
         {
             throw new BusinessRuleException("A sub-assembly's shrinkage must be at least 0% and less than 100%.");
         }

@@ -137,6 +137,13 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
         return product.Id;
     }
 
+    /// <summary>
+    /// Settings' default shrinkage set to none, so a section added through the Products form makes its whole batch into
+    /// pieces, as a test's figures assume. Call it before the screen loads, which is when it reads the default.
+    /// </summary>
+    protected Task WithoutDefaultShrinkageAsync() =>
+        new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(new CostingDefaults { ShrinkagePercent = 0m }, Cancellation);
+
     /// <summary>A role for a test's sub-assemblies; <paramref name="isPackaging"/> makes it the role packaging sets go in.</summary>
     protected async Task<int> AddRoleAsync(string name, int sortOrder = 1, bool isPackaging = false, bool isProductOwned = false)
     {

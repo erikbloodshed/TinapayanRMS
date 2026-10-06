@@ -36,7 +36,7 @@ internal static class Columns
             ["Id", "ProductId", "PackagingMaterialId", "UnitId", "QtyPerUnit", "UnitsPerPackagingUnit", "AuthoredField", "SortOrder"],
         [typeof(CostingParameters)] =
             ["Id", "ProductId", "LaborPercent", "OverheadPercent", "AdministrativePercent", "MarginPercent", "VatPercent"],
-        [typeof(CostingDefaults)] = ["Id", "LaborPercent", "OverheadPercent", "AdministrativePercent", "MarginPercent", "VatPercent"],
+        [typeof(CostingDefaults)] = ["Id", "LaborPercent", "OverheadPercent", "AdministrativePercent", "MarginPercent", "VatPercent", "ShrinkagePercent"],
         [typeof(PackagingLink)] = ["Id", "ProductId", "LinkedProductId", "LinkedSubAssemblyId"],
     };
 
