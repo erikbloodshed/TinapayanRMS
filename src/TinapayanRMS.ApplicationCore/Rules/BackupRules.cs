@@ -40,6 +40,24 @@ public static class BackupRules
         $"{databaseName}_{takenAt.ToString(TimeFormat, CultureInfo.InvariantCulture)}_{Suffixes[kind]}{Extension}";
 
     /// <summary>
+    /// <see cref="FileNameFor"/>'s name, a second later for each one <paramref name="isTaken"/> says is already in the folder.
+    /// Names only go to the second, and two backups in the same second mustn't share a file: a restore's safety backup taken
+    /// within a second of the one before it overwrote it (BACKUP … WITH INIT), and the restore then put back the data it was
+    /// replacing. Found by DatabaseBackupsTests (2026-10-07). Still a name <see cref="TryParse"/> reads, in order.
+    /// </summary>
+    public static string FreeFileNameFor(string databaseName, BackupKind kind, DateTime takenAt, Func<string, bool> isTaken)
+    {
+        var name = FileNameFor(databaseName, kind, takenAt);
+        while (isTaken(name))
+        {
+            takenAt = takenAt.AddSeconds(1);
+            name = FileNameFor(databaseName, kind, takenAt);
+        }
+
+        return name;
+    }
+
+    /// <summary>
     /// The database, what made it and when, for a file named by <see cref="FileNameFor"/>; false for any other name, such as
     /// a backup made outside the app. Read from the right, since a database's name can hold underscores of its own.
     /// </summary>

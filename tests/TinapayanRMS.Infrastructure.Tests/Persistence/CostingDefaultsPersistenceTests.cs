@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Tests.Fixtures;
 using TinapayanRMS.Tests.Common.Fixtures;
@@ -8,8 +9,9 @@ using TinapayanRMS.Tests.Common.Fixtures;
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
 /// <summary>
-/// The costing a new product and the shrinkage a new section start with, set in Settings: one row, reading as the
-/// costing at zero and the shrinkage at 3% until first saved.
+/// The stage and costing a new product, the shrinkage a new section and the cost buffer a new raw material start with,
+/// set in Settings: one row, reading as new products in Production, the costing at zero, the shrinkage at 3% and the
+/// buffer at 10% until first saved.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
@@ -27,6 +29,39 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
         new[] { defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent }
             .Should().OnlyContain(p => p == 0m);
         defaults.ShrinkagePercent.Should().Be(3m);
+        defaults.NewProductStage.Should().Be(ProductStage.Production);
+        defaults.CostBufferPercent.Should().Be(10m);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(100)]
+    public async Task SetAsync_keeps_the_cost_buffer_typed_even_none(int buffer)
+    {
+        await CreateRepository().SetAsync(new CostingDefaults { CostBufferPercent = buffer }, Cancellation);
+
+        (await CreateRepository().GetAsync(Cancellation)).CostBufferPercent.Should().Be(buffer, "a buffer of 0 isn't left for the store default to make 10%");
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(101)]
+    public async Task SetAsync_refuses_a_cost_buffer_a_material_couldnt_have(int buffer)
+    {
+        var act = () => CreateRepository().SetAsync(new CostingDefaults { CostBufferPercent = buffer }, Cancellation);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task SetAsync_keeps_the_stage_picked_for_new_products_even_Research_and_Development()
+    {
+        await CreateRepository().SetAsync(new CostingDefaults { NewProductStage = ProductStage.ResearchAndDevelopment }, Cancellation);
+        (await CreateRepository().GetAsync(Cancellation)).NewProductStage.Should().Be(
+            ProductStage.ResearchAndDevelopment, "the CLR default isn't left for the store default to make Production");
+
+        await CreateRepository().SetAsync(new CostingDefaults { NewProductStage = ProductStage.Production }, Cancellation);
+        (await CreateRepository().GetAsync(Cancellation)).NewProductStage.Should().Be(ProductStage.Production);
     }
 
     [Fact]

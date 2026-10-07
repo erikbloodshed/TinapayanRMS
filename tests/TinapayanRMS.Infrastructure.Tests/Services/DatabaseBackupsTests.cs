@@ -92,6 +92,21 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
     }
 
     [Fact]
+    public async Task Two_backups_taken_straight_after_each_other_are_two_files_and_neither_overwrites_the_other()
+    {
+        await AddCategoryAsync("Breads");
+        var first = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
+        await AddCategoryAsync("Cakes");
+
+        var second = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
+
+        second.Path.Should().NotBe(first.Path, "names go to the second, and a name taken moves on a second");
+        _backups.List().Select(b => b.Path).Should().Contain([first.Path, second.Path]);
+        await _backups.RestoreAsync(first, Cancellation);
+        (await CategoryNamesAsync()).Should().Equal(["Breads"], "the first backup still holds what it was taken with");
+    }
+
+    [Fact]
     public async Task A_backup_from_an_earlier_version_is_brought_up_to_date()
     {
         string[] migrations;

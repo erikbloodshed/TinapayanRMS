@@ -159,14 +159,14 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         var breadsId = await AddProductCategoryAsync("Breads");
         var viewModel = await LoadedViewModelAsync();
         viewModel.ConfirmDelete.RegisterHandler(interaction => interaction.SetOutput(true));
-        var breads = TreeFolder(viewModel, ProductStage.Production, "Breads");
-        viewModel.NewProductTag.Should().Be("Goes in Research and Development", "the blank form is a new product too");
+        var breads = TreeFolder(viewModel, ProductStage.ResearchAndDevelopment, "Breads");
+        viewModel.NewProductTag.Should().Be("Goes in Production", "the blank form is a new product too, in Settings' stage");
 
         await RunAsync(viewModel.TreeMenuFor(breads).Single(i => i.Header == "New Product Here"));
 
         viewModel.SelectedProduct.Should().BeNull();
         viewModel.EditingCategory!.Id.Should().Be(breadsId);
-        viewModel.NewProductTag.Should().Be("Goes in Production", "the header says where Save will file it");
+        viewModel.NewProductTag.Should().Be("Goes in Research and Development", "the header says where Save will file it");
         viewModel.History.IsDirty.Should().BeFalse("nothing is typed yet");
 
         // Revert keeps the folder it was started from.
@@ -174,25 +174,56 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         await viewModel.RevertCommand.Execute();
         viewModel.EditingName.Should().BeEmpty();
         viewModel.EditingCategory!.Id.Should().Be(breadsId);
-        viewModel.NewProductTag.Should().Be("Goes in Production");
+        viewModel.NewProductTag.Should().Be("Goes in Research and Development");
 
         TypeName(viewModel, "Pan de Coco");
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         var saved = await ProductNamedAsync("Pan de Coco");
-        (saved.Stage, saved.CategoryId).Should().Be((ProductStage.Production, breadsId));
+        (saved.Stage, saved.CategoryId).Should().Be((ProductStage.ResearchAndDevelopment, breadsId));
         breads.Products.Select(l => l.Title).Should().Equal("Pan de Coco");
         viewModel.NewProductTag.Should().BeNull("a saved product shows no tag");
 
-        // New, from the header, still starts one in Research and Development.
+        // New, from the header, starts one in the stage Settings gives a new product: Production, to start with.
         await viewModel.NewCommand.Execute();
-        viewModel.NewProductTag.Should().Be("Goes in Research and Development");
+        viewModel.NewProductTag.Should().Be("Goes in Production");
         TypeName(viewModel, "Test Loaf");
         await viewModel.SaveCommand.Execute();
 
         var plain = await ProductNamedAsync("Test Loaf");
-        (plain.Stage, plain.CategoryId).Should().Be((ProductStage.ResearchAndDevelopment, (int?)null));
+        (plain.Stage, plain.CategoryId).Should().Be((ProductStage.Production, (int?)null));
+    }
+
+    [Fact]
+    public async Task New_files_a_product_in_the_stage_Settings_gives_a_new_one_and_follows_it_when_it_changes()
+    {
+        var defaults = new CostingDefaultsRepository(CreateDbContextFactory());
+        await defaults.SetAsync(new CostingDefaults { NewProductStage = ProductStage.ResearchAndDevelopment }, Cancellation);
+        var viewModel = await LoadedViewModelAsync();
+        viewModel.ConfirmDelete.RegisterHandler(interaction => interaction.SetOutput(true));
+
+        viewModel.NewProductTag.Should().Be("Goes in Research and Development");
+        TypeName(viewModel, "Test Loaf");
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        (await ProductNamedAsync("Test Loaf")).Stage.Should().Be(ProductStage.ResearchAndDevelopment);
+
+        // Changed in Settings while a new product is being typed: its stage was never picked, so it follows. Revert keeps it.
+        await viewModel.NewCommand.Execute();
+        TypeName(viewModel, "Pan de Coco");
+        await defaults.SetAsync(new CostingDefaults { NewProductStage = ProductStage.Production }, Cancellation);
+        await viewModel.LoadCommand.Execute();
+        viewModel.NewProductTag.Should().Be("Goes in Production");
+        viewModel.EditingName.Should().Be("Pan de Coco", "only the stage follows the setting");
+        await viewModel.RevertCommand.Execute();
+        viewModel.NewProductTag.Should().Be("Goes in Production");
+
+        // A product started from a folder keeps that folder's stage whatever the setting says.
+        await RunAsync(viewModel.TreeMenuFor(viewModel.ProductTree.StageFolder(ProductStage.ResearchAndDevelopment)).Single(i => i.Header == "New Product Here"));
+        await defaults.SetAsync(new CostingDefaults { NewProductStage = ProductStage.Production }, Cancellation);
+        await viewModel.LoadCommand.Execute();
+        viewModel.NewProductTag.Should().Be("Goes in Research and Development");
     }
 
     [Fact]

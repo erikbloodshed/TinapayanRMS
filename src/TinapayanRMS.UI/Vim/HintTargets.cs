@@ -89,7 +89,7 @@ internal static class HintTargets
                 Add(box, root, clip, targets, () => box.Focus());
                 return true;
             case ComboBoxAdv picker:
-                Add(picker, root, clip, targets, () => picker.Focus());
+                Add(picker, root, clip, targets, () => VimKeys.FocusPicker(picker));
                 return true;
             case ComboBox comboBox:
                 Add(comboBox, root, clip, targets, () => comboBox.Focus());

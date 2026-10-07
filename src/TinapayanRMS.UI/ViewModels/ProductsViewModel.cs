@@ -738,10 +738,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>Where the products the last move took were before it: what Undo on the notice puts back.</summary>
     private IReadOnlyList<ProductMove> _moveUndo = [];
 
-    private ProductStage _newProductStage = ProductStage.ResearchAndDevelopment;
+    private ProductStage _newProductStage = CostingDefaults.DefaultNewProductStage;
     /// <summary>
-    /// The stage Save files a new product in: Research and Development after New, or the stage of the folder New Product
-    /// Here was picked on (the user's choice, 2026-09-26). Revert keeps it. The header says so (NewProductTag).
+    /// The stage Save files a new product in: the one Settings → Costing Defaults gives a new product after New
+    /// (Production unless it says otherwise, 2026-10-07), or the stage of the folder New Product Here was picked on (the
+    /// user's choice, 2026-09-26). Revert keeps it. The header says so (NewProductTag).
     /// </summary>
     public ProductStage NewProductStage
     {
@@ -751,6 +752,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>The category New Product Here started the product in, which Revert puts back; null after New.</summary>
     private int? _newProductCategoryId;
+
+    /// <summary>
+    /// Whether the new product showing goes in Settings' stage rather than a folder's: started by New, not New Product
+    /// Here. Such a product follows the setting when it changes (RefreshCostingDefaults).
+    /// </summary>
+    private bool _newProductInDefaultStage = true;
 
     /// <summary>What the Category picker lists. A name that isn't one of them is added by typing it (CommitCategoryTextAsync).</summary>
     public ReadOnlyObservableCollection<ProductCategory> Categories => _categories;
@@ -1775,6 +1782,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private decimal _defaultShrinkagePercent = CostingDefaults.DefaultShrinkagePercent;
     private decimal _usageFormStartShrinkagePercent;
 
+    // The stage New files a product in (Settings → Costing Defaults), as of the last LoadCommand.
+    private ProductStage _defaultNewProductStage = CostingDefaults.DefaultNewProductStage;
+
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
@@ -2475,7 +2485,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         NewCommand = ReactiveCommand.Create(() => StartNewProduct());
         NewCompositeCommand = ReactiveCommand.Create(() => StartNewProduct(isComposite: true));
         NewCompositeProductInCommand = ReactiveCommand.Create<ProductFolderNode?>(folder => StartNewProduct(
-            folder?.Stage ?? ProductStage.ResearchAndDevelopment, folder?.CategoryId, isComposite: true));
+            folder?.Stage, folder?.CategoryId, isComposite: true));
         RemoveComponentCommand = ReactiveCommand.Create(
             () => AsUndoStep(() => ComponentEdits.Remove(SelectedComponentEdit!)),
             this.WhenAnyValue(x => x.SelectedComponentEdit).Select(row => row is not null));
@@ -2486,8 +2496,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
         UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveProductsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
         DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
-        NewProductInCommand = ReactiveCommand.Create<ProductFolderNode?>(folder => StartNewProduct(
-            folder?.Stage ?? ProductStage.ResearchAndDevelopment, folder?.CategoryId));
+        NewProductInCommand = ReactiveCommand.Create<ProductFolderNode?>(folder => StartNewProduct(folder?.Stage, folder?.CategoryId));
         RenameProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(RenameProductAsync);
         CloneProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => MakeFromWithPromptAsync(
             leaf,
@@ -2601,7 +2610,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             {
                 if (SelectedProduct is not { } product)
                 {
-                    StartNewProduct(NewProductStage, _newProductCategoryId, IsEditingComposite);
+                    StartNewProduct(_newProductInDefaultStage ? null : NewProductStage, _newProductCategoryId, IsEditingComposite);
                     History.Clear();
                     return;
                 }
@@ -3193,12 +3202,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>
     /// A new product: no name, recipe, packaging or links, its costing at the defaults, and nothing selected. Save files it
-    /// in <paramref name="stage"/> and <paramref name="categoryId"/>, which its Category picker starts on.
-    /// <paramref name="isComposite"/> makes it a composite, which opens on its empty Products table.
+    /// in <paramref name="stage"/>, or Settings' stage for a new product when it's null, and <paramref name="categoryId"/>,
+    /// which its Category picker starts on. <paramref name="isComposite"/> makes it a composite, which opens on its empty
+    /// Products table.
     /// </summary>
-    private void StartNewProduct(ProductStage stage = ProductStage.ResearchAndDevelopment, int? categoryId = null, bool isComposite = false)
+    private void StartNewProduct(ProductStage? stage = null, int? categoryId = null, bool isComposite = false)
     {
-        NewProductStage = stage;
+        _newProductInDefaultStage = stage is null;
+        NewProductStage = stage ?? _defaultNewProductStage;
         _newProductCategoryId = categoryId;
         SelectedProduct = null;
         _editingId = 0;
@@ -3983,12 +3994,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>
     /// Takes up the defaults as LoadCommand read them. A new product still showing the ones it started with (the screen's
     /// first load, or defaults changed in Settings since) takes the new ones; one whose costing was typed into keeps it.
+    /// A new product started by New goes in the new stage whatever was typed, since its stage was never picked.
     /// </summary>
     private void RefreshCostingDefaults(CostingDefaults defaults)
     {
         var untouchedNewProduct = _editingId == 0 && CurrentCosting() == _costingDefaults;
         _costingDefaults = (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent);
         _defaultShrinkagePercent = defaults.ShrinkagePercent;
+        _defaultNewProductStage = defaults.NewProductStage;
+        if (_editingId == 0 && _newProductInDefaultStage)
+        {
+            NewProductStage = _defaultNewProductStage;
+        }
         if (untouchedNewProduct)
         {
             ApplyCostingDefaults();

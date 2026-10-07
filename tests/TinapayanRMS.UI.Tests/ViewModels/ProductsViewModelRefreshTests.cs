@@ -2017,7 +2017,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         return category.Id;
     }
 
-    /// <summary>A product with nothing but its name and category, saved as the Products screen saves a new one: in Research and Development.</summary>
+    /// <summary>A product with nothing but its name and category, saved through the repository, which files it in Research and Development.</summary>
     private Task<int> SaveProductAsync(string name, int? categoryId) =>
         new ProductRepository(CreateDbContextFactory()).SaveAsync(
             new Product { Name = name, CategoryId = categoryId }, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);

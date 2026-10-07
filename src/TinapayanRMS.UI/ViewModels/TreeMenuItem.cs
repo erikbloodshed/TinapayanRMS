@@ -3,9 +3,10 @@ using System.Windows.Input;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// One item of the menu a right-click opens on a folder tree (the Products list's, ProductsViewModel.TreeMenuFor, and
-/// the Raw Materials list's, RawMaterialsViewModel.TreeMenuFor), which Controls/TreeContextMenu turns into a MenuItem:
-/// what it reads, the command it runs and what with, the key that runs it too, and a submenu in place of a command.
+/// One item of the menu a right-click opens on a folder tree (the Products list's, ProductsViewModel.TreeMenuFor, the Raw
+/// Materials list's, RawMaterialsViewModel.TreeMenuFor, and the Sub-Assemblies list's, SubAssembliesViewModel.TreeMenuFor),
+/// which Controls/TreeContextMenu turns into a MenuItem: what it reads, the command it runs and what with, the key that
+/// runs it too, and a submenu in place of a command.
 /// </summary>
 public sealed record TreeMenuItem(string Header, ICommand? Command = null, object? Parameter = null)
 {

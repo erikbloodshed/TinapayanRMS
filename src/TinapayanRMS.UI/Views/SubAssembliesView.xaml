@@ -4,8 +4,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
-             xmlns:vim="clr-namespace:TinapayanRMS.UI.Vim"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
+             xmlns:sa="clr-namespace:TinapayanRMS.UI.Views.SubAssemblies"
              mc:Ignorable="d"
              d:DesignHeight="800"
              d:DesignWidth="1400">
@@ -35,7 +35,7 @@
     <!--
         Standalone sub-assemblies, which no product owns: the list beside the one being edited. Products
         link them (and follow every change saved here) or copy them, from their recipe. The list is as
-        wide as its columns (Auto), and the form takes the rest. Cards are 4px apart and 4px from the page's
+        wide as its tree (Auto), and the form takes the rest. Cards are 4px apart and 4px from the page's
         edge, as on Raw Materials.
     -->
     <Grid Background="{StaticResource PageBackgroundBrush}" Margin="4">
@@ -49,46 +49,8 @@
         <controls:ErrorToast Grid.ColumnSpan="3" />
         <controls:SuccessToast Grid.ColumnSpan="3" />
 
-        <Border Grid.Column="0" Style="{StaticResource CardStyle}">
-            <DockPanel>
-                <!-- Title and search on one row, laid out as the Raw Materials and Products list cards lay out their own -->
-                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-                    <syncfusion:SfTextBoxExt DockPanel.Dock="Right"
-                                             Width="190"
-                                             Watermark="Search sub-assembly"
-                                             vim:VimKeys.IsSearchBox="True"
-                                             WatermarkTemplate="{StaticResource AlignedWatermarkTemplate}"
-                                             Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    <TextBlock Text="Sub-Assemblies"
-                               Style="{StaticResource SectionHeaderStyle}"
-                               Margin="0"
-                               VerticalAlignment="Center" />
-                </DockPanel>
-
-                <!-- Fixed widths, so the card is as wide as its columns and never cuts one off -->
-                <syncfusion:SfDataGrid x:Name="List"
-                                       ItemsSource="{Binding VisibleRows}"
-                                       SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
-                                       GridLinesVisibility="Both"
-                                       CurrentCellBorderBrush="{StaticResource AccentBrush}"
-                                       CurrentCellBorderThickness="1"
-                                       controls:GridFillerRows.IsEnabled="True"
-                                       AutoGenerateColumns="False"
-                                       AllowEditing="False"
-                                       SelectionMode="Single"
-                                       NavigationMode="Row">
-                    <syncfusion:SfDataGrid.Columns>
-                        <!--
-                            The Raw Materials list's width in all, so the three lists are the same width, but more of it for
-                            the name: one saved from a product is named after it and its role ("Almond Cheese Bread
-                            Filling: Cheesy Corn Custard"), and a role is one short word. The tooltip shows a name cut short.
-                        -->
-                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" Width="260" ShowToolTip="True" />
-                        <syncfusion:GridTextColumn MappingName="RoleName" HeaderText="Role" Width="110" />
-                    </syncfusion:SfDataGrid.Columns>
-                </syncfusion:SfDataGrid>
-            </DockPanel>
-        </Border>
+        <!-- The sub-assemblies in a folder for their role, as the Raw Materials and Products lists file theirs -->
+        <sa:SubAssemblyListCard Grid.Column="0" />
 
         <!--
             As on Products and Raw Materials (2026-10-06, at the user's request): the header card, with the title, the

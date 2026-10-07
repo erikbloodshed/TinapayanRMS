@@ -2,21 +2,35 @@ using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// The Settings dialog's Costing Defaults tab: the labor, overhead, administrative, markup and VAT percentages a new
-/// product's costing starts with, and the Shrinkage % a new Recipe Structure section starts with (ProductsViewModel).
-/// Saving them changes no saved product. Its second card works every stored cost out again (RecalculateCostsCommand).
+/// The Settings dialog's Costing Defaults tab: the stage New files a new product in, the labor, overhead, administrative,
+/// markup and VAT percentages its costing starts with, the Shrinkage % a new Recipe Structure section starts with
+/// (ProductsViewModel), and the Cost Buffer % a new raw material starts with (RawMaterialsViewModel). Saving them changes
+/// no saved product or material. Its second card works every stored cost out again (RecalculateCostsCommand).
 /// </summary>
 public sealed class CostingDefaultsViewModel : ViewModelBase
 {
     private readonly ICostingDefaultsRepository _repository;
     private readonly IValidator<CostingParameters> _validator;
     private readonly ICostRecalculator _costRecalculator;
+
+    /// <summary>What the New Products In picker offers, Production first, each with its folder's title.</summary>
+    public IReadOnlyList<KeyValuePair<ProductStage, string>> Stages { get; } =
+        [.. new[] { ProductStage.Production, ProductStage.ResearchAndDevelopment }.Select(s => KeyValuePair.Create(s, ProductFolderNode.StageTitle(s)))];
+
+    private ProductStage _editingNewProductStage = CostingDefaults.DefaultNewProductStage;
+    /// <summary>The stage the Products screen's New files a product in.</summary>
+    public ProductStage EditingNewProductStage
+    {
+        get => _editingNewProductStage;
+        set => this.RaiseAndSetIfChanged(ref _editingNewProductStage, value);
+    }
 
     private decimal _editingLaborPercent;
     public decimal EditingLaborPercent
@@ -62,6 +76,14 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingShrinkagePercent, value);
     }
 
+    private decimal _editingCostBufferPercent = CostingDefaults.DefaultCostBufferPercent;
+    /// <summary>What a new raw material's Cost Buffer % starts at: 0 to 100, as a material's own.</summary>
+    public decimal EditingCostBufferPercent
+    {
+        get => _editingCostBufferPercent;
+        set => this.RaiseAndSetIfChanged(ref _editingCostBufferPercent, value);
+    }
+
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
 
@@ -84,12 +106,14 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
         LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
             var defaults = await _repository.GetAsync(CancellationToken.None);
+            EditingNewProductStage = defaults.NewProductStage;
             EditingLaborPercent = defaults.LaborPercent;
             EditingOverheadPercent = defaults.OverheadPercent;
             EditingAdministrativePercent = defaults.AdministrativePercent;
             EditingMarginPercent = defaults.MarginPercent;
             EditingVatPercent = defaults.VatPercent;
             EditingShrinkagePercent = defaults.ShrinkagePercent;
+            EditingCostBufferPercent = defaults.CostBufferPercent;
         }));
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
@@ -112,15 +136,17 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
             await _repository.SetAsync(
                 new CostingDefaults
                 {
+                    NewProductStage = EditingNewProductStage,
                     LaborPercent = EditingLaborPercent,
                     OverheadPercent = EditingOverheadPercent,
                     AdministrativePercent = EditingAdministrativePercent,
                     MarginPercent = EditingMarginPercent,
                     VatPercent = EditingVatPercent,
                     ShrinkagePercent = EditingShrinkagePercent,
+                    CostBufferPercent = EditingCostBufferPercent,
                 },
                 CancellationToken.None);
-            SuccessMessage = "Costing defaults saved. New products and sections start with them.";
+            SuccessMessage = "Costing defaults saved. New products, sections and raw materials start with them.";
         }));
 
         RecalculateCostsCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>

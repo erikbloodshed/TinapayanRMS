@@ -18,7 +18,8 @@ public class Product
 
     /// <summary>
     /// Whether it's under development or in production: the Products list's top-level folder for it. A new product
-    /// starts in Research and Development; dragging it to another folder in the list moves it (IProductRepository.MoveAsync).
+    /// starts in the stage Settings gives it (CostingDefaults.NewProductStage), a clone or variant in Research and
+    /// Development; dragging it to another folder in the list moves it (IProductRepository.MoveAsync).
     /// </summary>
     public ProductStage Stage { get; set; }
 

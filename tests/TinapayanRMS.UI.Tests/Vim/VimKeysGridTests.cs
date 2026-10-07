@@ -199,6 +199,55 @@ public class VimKeysGridTests
         });
     }
 
+    [Fact]
+    public void Insert_lasts_from_cell_to_cell_so_a_digit_on_the_next_cell_starts_typing_until_Esc()
+    {
+        RunWithVimKeys(() => LinesGrid(), grid =>
+        {
+            GridKeyboardFocus.PlaceCurrentCell(grid);
+            var lines = (ObservableCollection<Line>)grid.ItemsSource;
+
+            Type(grid, "i");
+            Editor(grid).Text = "Rye flour";
+            Press(Editor(grid), Key.Tab);
+
+            var cell = grid.SelectionController.CurrentCellManager.CurrentCell;
+            cell.IsEditing.Should().BeFalse("Tab ends the cell's edit and moves on");
+            CurrentColumn(grid).Should().Be(grid.GetFirstColumnIndex() + 1);
+            VimKeys.State.Mode.Should().Be(VimMode.Insert, "the keys stay in Insert until Esc");
+
+            TypeOne(grid, '2').Should().BeFalse("in Insert every key types, a digit included");
+            grid.SelectionController.CurrentCellManager.CurrentCell.IsEditing.Should().BeTrue("the digit starts the cell's edit, as it does with the keys off");
+
+            Press(Editor(grid), Key.Escape).Should().BeTrue();
+            VimKeys.State.Mode.Should().Be(VimMode.Normal);
+            lines[0].Name.Should().Be("Rye flour");
+
+            Type(grid, "j");
+            CurrentRow(grid).Should().Be(grid.GetFirstDataRowIndex() + 1, "back in Normal, j moves");
+            grid.SelectionController.CurrentCellManager.CurrentCell.IsEditing.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public void Esc_on_a_cell_not_being_typed_into_takes_Insert_back_to_Normal()
+    {
+        RunWithVimKeys(() => LinesGrid(), grid =>
+        {
+            GridKeyboardFocus.PlaceCurrentCell(grid);
+
+            Type(grid, "i");
+            Press(Editor(grid), Key.Tab);
+            VimKeys.State.Mode.Should().Be(VimMode.Insert);
+
+            Press(grid, Key.Escape).Should().BeTrue("the Esc was the Vim keys'");
+            VimKeys.State.Mode.Should().Be(VimMode.Normal);
+
+            TypeOne(grid, 'x').Should().BeTrue("in Normal no letter types");
+            grid.SelectionController.CurrentCellManager.CurrentCell.IsEditing.Should().BeFalse();
+        });
+    }
+
     /// <summary>Runs <paramref name="test"/> on <paramref name="grid"/> with the Vim keys on, and off again after.</summary>
     private static void RunWithVimKeys(Func<SfDataGrid> create, Action<SfDataGrid> test) =>
         OffscreenGrid.Run(create, shown =>

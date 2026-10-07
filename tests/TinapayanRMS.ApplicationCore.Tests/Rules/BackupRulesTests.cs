@@ -24,6 +24,26 @@ public class BackupRulesTests
     }
 
     [Fact]
+    public void A_name_already_taken_moves_on_a_second_at_a_time_until_its_free_and_still_reads_back()
+    {
+        HashSet<string> taken =
+        [
+            "TinapayanRMS_20261003_081512_before-restore.bak",
+            "TinapayanRMS_20261003_081513_before-restore.bak",
+            "TinapayanRMS_20261003_081515_before-restore.bak",
+        ];
+
+        var name = BackupRules.FreeFileNameFor("TinapayanRMS", BackupKind.BeforeRestore, Morning, taken.Contains);
+
+        name.Should().Be("TinapayanRMS_20261003_081514_before-restore.bak");
+        BackupRules.TryParse(name, out _, out var kind, out var takenAt).Should().BeTrue();
+        (kind, takenAt).Should().Be((BackupKind.BeforeRestore, Morning.AddSeconds(2)));
+
+        BackupRules.FreeFileNameFor("TinapayanRMS", BackupKind.Manual, Morning, taken.Contains)
+            .Should().Be("TinapayanRMS_20261003_081512_manual.bak", "another kind's file in the same second is a different name");
+    }
+
+    [Fact]
     public void A_database_name_with_underscores_of_its_own_still_reads_back()
     {
         var fileName = BackupRules.FileNameFor("TinapayanRMS_Test_Backup_ab12cd34", BackupKind.Automatic, Morning);

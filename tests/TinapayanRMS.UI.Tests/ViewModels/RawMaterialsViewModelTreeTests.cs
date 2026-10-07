@@ -563,6 +563,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
             new RawMaterialBrandPriceValidator(),
             new UnitOfMeasureRepository(factory),
             viewStateStore ?? new InMemoryViewStateStore(),
+            new CostingDefaultsRepository(factory),
             new LoggerConfiguration().CreateLogger());
     }
 

@@ -3,6 +3,12 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.ApplicationCore.Interfaces;
 
 /// <summary>
+/// A sub-assembly filed under another folder of the Sub-Assemblies list: the role it takes from now on, which has to be of
+/// its own kind (the Packaging role for a packaging set, any other for a recipe).
+/// </summary>
+public sealed record SubAssemblyMove(int SubAssemblyId, int RoleId);
+
+/// <summary>
 /// Reads sub-assemblies, and writes them as the Sub-Assemblies screen edits them. A product's new recipe
 /// sections are first written as sub-assemblies by IProductRepository.SaveAsync.
 /// </summary>
@@ -41,6 +47,17 @@ public interface ISubAssemblyRepository
     /// </summary>
     Task<int> SaveStandalonePackagingAsync(
         SubAssembly subAssembly, IReadOnlyList<(int PackagingMaterialId, int? UnitId, decimal QtyPerSet)> lines, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gives each sub-assembly another role, all in one transaction, and changes nothing else: the Sub-Assemblies list's
+    /// drag and Move To. Each is checked as Save checks a new role (a recipe stays out of the Packaging role and a set in
+    /// it, every recipe linking it can still tell its sections apart, a composite linking it keeps to product-owned roles),
+    /// and the first refusal moves none. A role costs nothing, so nothing cascades.
+    /// </summary>
+    Task MoveAsync(IReadOnlyCollection<SubAssemblyMove> moves, CancellationToken cancellationToken);
+
+    /// <summary>Renames a sub-assembly and changes nothing else, checked as Save checks a new name.</summary>
+    Task RenameAsync(int id, string name, CancellationToken cancellationToken);
 
     /// <summary>Deletes a sub-assembly and its lines; refused while a product links it.</summary>
     Task DeleteStandaloneAsync(int id, CancellationToken cancellationToken);

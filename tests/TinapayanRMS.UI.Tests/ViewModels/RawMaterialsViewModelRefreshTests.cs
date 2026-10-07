@@ -888,7 +888,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         await viewModel.NewCommand.Execute();
-        viewModel.EditingCostBufferPercent.Should().Be(0m, "a new material starts with no buffer");
+        viewModel.EditingCostBufferPercent.Should().Be(10m, "a new material starts at Settings' default buffer");
         viewModel.EditingBufferedCost.Should().BeNull();
         viewModel.EditingName = "Flour";
         PickCategory(viewModel);
@@ -959,7 +959,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             () => $"buffered={viewModel.BufferedCostText}, error={viewModel.ErrorMessage ?? "none"}");
 
         await viewModel.NewCommand.Execute();
-        viewModel.EditingCostBufferPercent.Should().Be(0m);
+        viewModel.EditingCostBufferPercent.Should().Be(10m, "the next new material starts at Settings' default again");
         viewModel.EditingBufferedCost.Should().BeNull();
     }
 
@@ -1024,8 +1024,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        // ₱170 for a box of 240 g is ₱0.708333…/g to 28 places, which the decimal(28,20) column cuts to 20.
+        // ₱170 for a box of 240 g is ₱0.708333…/g to 28 places, which the decimal(28,20) column cuts to 20. No buffer, so
+        // the buffered cost is the dearest brand's own.
         await viewModel.NewCommand.Execute();
+        viewModel.EditingCostBufferPercent = 0m;
         viewModel.EditingName = "Cello Sheet";
         PickCategory(viewModel);
         await AddUnitAsync(viewModel, boxId, 240m);
@@ -1094,7 +1096,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         dearer.UnitKey = PurchaseUnitChoice.BaseUnitKey;
         dearer.Price = 1m;
         viewModel.BrandPriceRows.Add(dearer);
-        dearer.BufferPercent.Should().Be(0m, "no buffer yet");
+        dearer.BufferPercent.Should().Be(10m, "Settings' default buffer, until one is typed");
 
         viewModel.TypedCostBufferPercent = 5m;
         viewModel.EditingBufferedCost.Should().Be(1.05m);
@@ -1240,6 +1242,34 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task A_new_material_starts_at_Settings_cost_buffer_and_an_untouched_one_follows_it_when_it_changes()
+    {
+        var defaults = new CostingDefaultsRepository(CreateDbContextFactory());
+        await defaults.SetAsync(new CostingDefaults { CostBufferPercent = 7.5m }, Cancellation);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await viewModel.NewCommand.Execute();
+
+        viewModel.EditingCostBufferPercent.Should().Be(7.5m);
+        viewModel.History.IsDirty.Should().BeFalse("the default isn't an edit to save");
+
+        // Changed in Settings while the form is still as New left it: it takes the new default, and still has nothing to save.
+        await defaults.SetAsync(new CostingDefaults { CostBufferPercent = 12m }, Cancellation);
+        await viewModel.LoadCommand.Execute();
+        viewModel.EditingCostBufferPercent.Should().Be(12m);
+        viewModel.History.IsDirty.Should().BeFalse();
+
+        // A buffer typed is kept whatever Settings says next.
+        viewModel.EditingCostBufferPercent = 4m;
+        await defaults.SetAsync(new CostingDefaults { CostBufferPercent = 15m }, Cancellation);
+        await viewModel.LoadCommand.Execute();
+        viewModel.EditingCostBufferPercent.Should().Be(4m);
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingCostBufferPercent.Should().Be(15m, "the next new material starts at the new default");
+    }
+
+    [Fact]
     public async Task New_starts_a_purchased_ingredient_with_the_other_pickers_empty_and_the_numbers_kept()
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
@@ -1265,7 +1295,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ExampleUnitOptions.Should().BeEmpty();
 
         viewModel.PurchaseCostText.Should().Be("—");
-        viewModel.EditingCostBufferPercent.Should().Be(0m);
+        viewModel.EditingCostBufferPercent.Should().Be(10m, "Settings' default buffer, not the last material's");
         viewModel.ExampleQuantity.Should().Be(3m, "the usage example's quantity stays");
         viewModel.ShowPurchaseSetup.Should().BeTrue("a new purchased material can be priced before it's saved");
         viewModel.BaseUnitAbbreviation.Should().Be("g");
@@ -1574,6 +1604,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             new RawMaterialBrandPriceValidator(),
             new UnitOfMeasureRepository(factory),
             new InMemoryViewStateStore(),
+            new CostingDefaultsRepository(factory),
             new LoggerConfiguration().CreateLogger());
     }
 

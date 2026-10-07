@@ -70,7 +70,7 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
     {
         var target = await TargetAsync(cancellationToken);
         await PrepareFolderAsync(target, cancellationToken);
-        var path = Path.Combine(folder, BackupRules.FileNameFor(target.Database, BackupKind.CopiedIn, DateTime.Now));
+        var path = FreePath(target.Database, BackupKind.CopiedIn, DateTime.Now);
         await CopyAsync(sourcePath, path, cancellationToken);
         return Describe(new FileInfo(path));
     }
@@ -118,6 +118,10 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
 
     public void Dispose() => _turn.Dispose();
 
+    /// <summary>Where a new backup goes: a name no file in the folder has yet (BackupRules.FreeFileNameFor), so it overwrites none.</summary>
+    private string FreePath(string databaseName, BackupKind kind, DateTime takenAt) =>
+        Path.Combine(folder, BackupRules.FreeFileNameFor(databaseName, kind, takenAt, name => File.Exists(Path.Combine(folder, name))));
+
     /// <summary>A file in the folder, by its name when the app named it, else as copied in, dated by when it was written.</summary>
     private static DatabaseBackup Describe(FileInfo file) =>
         BackupRules.TryParse(file.Name, out var databaseName, out var kind, out var takenAt)
@@ -127,7 +131,7 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
     private async Task<DatabaseBackup> BackUpInTurnAsync(Target target, BackupKind kind, DateTime takenAt, CancellationToken cancellationToken)
     {
         await PrepareFolderAsync(target, cancellationToken);
-        var path = Path.Combine(folder, BackupRules.FileNameFor(target.Database, kind, takenAt));
+        var path = FreePath(target.Database, kind, takenAt);
         await using (var connection = await OpenMasterAsync(target, cancellationToken))
         {
             await ExecuteAsync(

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Validators;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
@@ -12,7 +13,7 @@ using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Tests.ViewModels;
 
-/// <summary>Settings' Costing Defaults tab: loads what's saved, saves what's typed, and refuses a negative percentage.</summary>
+/// <summary>Settings' Costing Defaults tab: loads what's saved, saves what's typed and picked, and refuses a negative percentage.</summary>
 [Collection(DatabaseCollection.Name)]
 public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
@@ -37,6 +38,8 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingMarginPercent = 40m;
         viewModel.EditingVatPercent = 12m;
         viewModel.EditingShrinkagePercent = 4.5m;
+        viewModel.EditingNewProductStage = ProductStage.ResearchAndDevelopment;
+        viewModel.EditingCostBufferPercent = 8m;
 
         await viewModel.SaveCommand.Execute();
 
@@ -47,6 +50,36 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         (reloaded.EditingLaborPercent, reloaded.EditingOverheadPercent, reloaded.EditingAdministrativePercent, reloaded.EditingMarginPercent, reloaded.EditingVatPercent)
             .Should().Be((25m, 10m, 5m, 40m, 12m));
         reloaded.EditingShrinkagePercent.Should().Be(4.5m);
+        reloaded.EditingNewProductStage.Should().Be(ProductStage.ResearchAndDevelopment);
+        reloaded.EditingCostBufferPercent.Should().Be(8m);
+    }
+
+    [Fact]
+    public async Task Load_shows_a_cost_buffer_of_10_percent_before_anything_is_saved_and_Save_refuses_one_over_100()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.EditingCostBufferPercent = 50m;
+
+        await viewModel.LoadCommand.Execute();
+        viewModel.EditingCostBufferPercent.Should().Be(10m);
+
+        viewModel.EditingCostBufferPercent = 101m;
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().Be("Cost buffer must be at least 0 and at most 100 percent.");
+        (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).CostBufferPercent.Should().Be(10m);
+    }
+
+    [Fact]
+    public async Task Load_files_new_products_in_Production_before_anything_is_saved_and_offers_both_stages()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.EditingNewProductStage = ProductStage.ResearchAndDevelopment;
+
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.EditingNewProductStage.Should().Be(ProductStage.Production);
+        viewModel.Stages.Select(s => s.Value).Should().Equal("Production", "Research and Development");
     }
 
     [Fact]

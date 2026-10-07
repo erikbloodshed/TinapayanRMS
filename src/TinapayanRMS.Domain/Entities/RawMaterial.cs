@@ -61,7 +61,8 @@ public class RawMaterial
 
     /// <summary>
     /// A cushion on top of the cost for price swings, waste and yield variation, at least 0 and at
-    /// most 100. Defaults to 0, which makes the buffered cost the same as the true cost. A Linked ingredient
+    /// most 100. 0 makes the buffered cost the same as the true cost; a new one on the Raw Materials screen starts at
+    /// Settings' default (CostingDefaults.CostBufferPercent, 10% unless changed). A Linked ingredient
     /// inherits it from the ingredient it's linked to, and the cascade keeps it in step. A Made ingredient is
     /// always 0: its components are already buffered, so it adds none of its own.
     /// </summary>

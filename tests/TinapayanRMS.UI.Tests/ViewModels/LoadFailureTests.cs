@@ -213,6 +213,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new RawMaterialBrandPriceValidator(),
             new UnitOfMeasureRepository(factory),
             new InMemoryViewStateStore(),
+            new CostingDefaultsRepository(factory),
             new LoggerConfiguration().CreateLogger());
     }
 
@@ -225,6 +226,8 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory),
             new SubAssemblyValidator(),
+            new SubAssemblyRoleValidator(),
+            new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
     }
 

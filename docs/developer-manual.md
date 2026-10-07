@@ -50,7 +50,7 @@ It's a single-user desktop app. There's no server, no login and no network servi
 | Screen | View | ViewModel |
 |---|---|---|
 | Raw Materials | `RawMaterialsView`, with its cards in `Views/RawMaterials/` | `RawMaterialsViewModel` |
-| Sub-Assemblies | `SubAssembliesView` | `SubAssembliesViewModel` |
+| Sub-Assemblies | `SubAssembliesView`, with its list in `Views/SubAssemblies/` | `SubAssembliesViewModel` |
 | Products | `ProductsView`, with its cards in `Views/Products/` | `ProductsViewModel` |
 | Reports | `ReportsView` | `ReportsViewModel` |
 | Production Plan | `ProductionPlanView` | `ProductionPlanViewModel` |
@@ -80,7 +80,7 @@ The [user manual](user-manual.md) describes every screen. Read its [Key ideas](u
 | Packaging line, packaging link | `PackagingLine`, `PackagingLink` | A packaging material used by one sellable unit; or a link that reads a product's packaging from another product or from a packaging set. |
 | Quantity Required | `Product.QuantityRequired` | Pieces per sellable unit: 8 for a Box of 8. A recipe is written per piece, and costing is per sellable unit. |
 | Composite product | `Product.IsComposite`, `ProductComponent` | A product made of other products, plus its own packaging and sections in product-owned roles. |
-| Costing parameters, costing defaults | `CostingParameters`, `CostingDefaults` | A product's labor, overhead, administrative, markup and VAT percentages; and the values a new product starts with, with the shrinkage a new Recipe Structure section starts with. |
+| Costing parameters, costing defaults | `CostingParameters`, `CostingDefaults` | A product's labor, overhead, administrative, markup and VAT percentages; and the values a new product starts with (its stage among them), with the shrinkage a new Recipe Structure section and the cost buffer a new raw material start with. |
 | Stage | `ProductStage` | Research and Development, or Production: the Products tree's two top folders. |
 | Baker's percentage | `SubAssemblyLine.IsFormulaBase`, `AuthoredBakersPercent` | A line's weight as a percentage of the total weight of the lines ticked as the formula's base. |
 
@@ -168,7 +168,7 @@ If your SQL Server instance isn't `.\SQLEXPRESS`, change the first two.
 ### Where the app writes
 
 - **Logs**: `logs/tinapayanrms-<date>.log` beside the executable. In a debug build that's `src/TinapayanRMS.UI/bin/Debug/net10.0-windows10.0.19041.0/logs/`. There's one file a day, and the last 31 are kept.
-- **View state**: `%LocalAppData%\TinapayanRMS\view-state.json` remembers which tree folders were left open, and whether the Vim keys are on (`"vim-keys": ["on"]`). It's safe to delete.
+- **View state**: `%LocalAppData%\TinapayanRMS\view-state.json` remembers which tree folders were left open (on Sub-Assemblies, which were left closed), and whether the Vim keys are on (`"vim-keys": ["on"]`). It's safe to delete.
 - **Backups**: `%ProgramData%\TinapayanRMS\Backups`, one folder for every Windows user of the computer. SQL Server writes the `.bak` files itself, as its service account (`NT SERVICE\MSSQL$SQLEXPRESS`), which can't write into a user's profile. So the app creates this folder and, as its owner, gives the service account and `BUILTIN\Users` Modify on it, inherited by every file ([BackupFolder](../src/TinapayanRMS.Infrastructure/Services/BackupFolder.cs)). The tests use `%ProgramData%\TinapayanRMS\Test Backups\<guid>` and delete it afterwards.
 
 ### Command reference
@@ -423,7 +423,7 @@ PER PRODUCT
 | `PackagingLink` | A product's packaging, read from another product or from a set | Exactly one target, and no loops (`PackagingLinkRules`). |
 | `ProductComponent` | A product inside a composite | `Quantity` is at least 1, and a composite never contains itself (`CompositeProductRules.EnsureNoCycle`). |
 | `CostingParameters` | A product's five percentages | One per product. Never linked or shared. |
-| `CostingDefaults` | The percentages a new product starts with, and a new section's shrinkage | At most one row (Id 1). With no row, the costing reads as zero and the shrinkage as 3% (`DefaultShrinkagePercent`). |
+| `CostingDefaults` | The stage and percentages a new product starts with, a new section's shrinkage and a new raw material's cost buffer | At most one row (Id 1). With no row, new products go in Production (`DefaultNewProductStage`), the costing reads as zero, the shrinkage as 3% (`DefaultShrinkagePercent`) and the cost buffer as 10% (`DefaultCostBufferPercent`). |
 | `UnitOfMeasure`, `RawMaterialCategory` | Lookups edited in Settings | A unit's name is stored in lowercase. A category is for one type of material. |
 
 ### Deleted products
@@ -615,7 +615,7 @@ await using (var transaction = await dbContext.Database.BeginTransactionAsync(ca
 - **`IngredientDependencies`**: loads the ingredient dependency graph, made of BOM edges and link edges, for the cycle checks.
 - **`ProductCloner`** (`IProductCloner`): Clone and Create Variant. Both link the sub-assemblies the source links and copy the source's own ones. A clone copies the packaging; a variant links it.
 - **`JsonViewStateStore`** (`IViewStateStore`): the view-state file. A missing or broken file reads as empty, and a failed write is dropped.
-- **`DatabaseBackups`** (`IDatabaseBackups`): Settings' Database tab and the daily automatic backup. It runs `BACKUP DATABASE … COPY_ONLY, CHECKSUM` and `RESTORE DATABASE … REPLACE` on its own non-pooled connections to `master`, one at a time (a `SemaphoreSlim`, since SQL Server refuses two backups of a database at once). A restore checks the file first (`RESTORE HEADERONLY`, `FILELISTONLY`, `VERIFYONLY`), takes a safety backup, puts everyone out of the database (`SINGLE_USER WITH ROLLBACK IMMEDIATE`), restores with its files moved onto the database's own, and brings an older backup up to date with `MigrateAsync`. A backup from a later version, or of another database, is refused (`BackupRules.UpdatesNeeded`). Whatever fails after the safety backup puts the safety backup back. The app then restarts, since every singleton ViewModel holds data from before. `Failure` puts SQL Server's backup errors plainly, looking at every error in the exception, since 3013 follows the real one.
+- **`DatabaseBackups`** (`IDatabaseBackups`): Settings' Database tab and the daily automatic backup. It runs `BACKUP DATABASE … COPY_ONLY, CHECKSUM` and `RESTORE DATABASE … REPLACE` on its own non-pooled connections to `master`, one at a time (a `SemaphoreSlim`, since SQL Server refuses two backups of a database at once). A restore checks the file first (`RESTORE HEADERONLY`, `FILELISTONLY`, `VERIFYONLY`), takes a safety backup, puts everyone out of the database (`SINGLE_USER WITH ROLLBACK IMMEDIATE`), restores with its files moved onto the database's own, and brings an older backup up to date with `MigrateAsync`. A backup from a later version, or of another database, is refused (`BackupRules.UpdatesNeeded`). Whatever fails after the safety backup puts the safety backup back. A new backup or a file copied in never reuses a name in the folder: names go to the second and `WITH INIT` would overwrite, so `BackupRules.FreeFileNameFor` moves the time on a second while the name is taken. The app then restarts, since every singleton ViewModel holds data from before. `Failure` puts SQL Server's backup errors plainly, looking at every error in the exception, since 3013 follows the real one.
 
 ### Schema conventions
 
@@ -674,7 +674,7 @@ public RawMaterialsView(RawMaterialsViewModel viewModel)
 }
 ```
 
-A large screen is split into card `UserControl`s in a folder named after it (`Views/RawMaterials/`, `Views/Products/`). A card never sets its own `DataContext`: it inherits the screen's ViewModel. The screen's XAML decides when each card shows. Keep each XAML file shallow, and keep a card's code-behind to view-only work, such as focus and scrolling.
+A large screen is split into card `UserControl`s in a folder named after it (`Views/RawMaterials/`, `Views/SubAssemblies/`, `Views/Products/`). A card never sets its own `DataContext`: it inherits the screen's ViewModel. The screen's XAML decides when each card shows. Keep each XAML file shallow, and keep a card's code-behind to view-only work, such as focus and scrolling.
 
 Each screen puts an `ErrorToast` over its content, and a `SuccessToast` where it reports success. Both bind to the screen's `ErrorMessage` and `SuccessMessage`, which every `ViewModelBase` has.
 
@@ -809,6 +809,7 @@ Undo and redo follow the Memento pattern:
   - Keys that type nothing (Esc, Ctrl+R) come from `PreviewKeyDown`.
 - **Modes.**
   - Insert is the app as it always was. It applies when focus is in a `TextBoxBase` (a field, or a picker's text) or in a grid cell being edited.
+  - In a grid, Insert lasts until Esc (`_gridIsInsert`, set whenever a cell is seen being edited). Tab, Enter or an arrow ends the cell's edit, but the next letter or digit still goes through, so the grid starts that cell's edit itself. A grid reached from somewhere else takes the mode the keys were in (`Arrive`), so Tab from a field in Insert goes on typing. Esc on a cell that isn't being edited takes the grid back to Normal.
   - Normal applies everywhere else. It also applies to a field reached with `j`/`k` or left with Esc. In Normal, every printable character is handled, so none types or starts an edit.
   - Esc in a cell commits it through `GridEditCommit.Commit(grid, keepCurrentCell: true)` instead of cancelling it. Esc is handled only when it has something to do, so otherwise a dialog's Cancel still gets it.
   - Ctrl chords stand for other keys, as in Vim: Ctrl+[ is Esc, and Ctrl+N and Ctrl+P are Down and Up while a dropdown or suggestion list is open (`KeyForChord`). `PressInstead` sends the key through `InputManager.ProcessInput`, so it reaches what a typed key reaches. That includes a `ButtonAdv.IsCancel` button, which takes Esc as an access key and only through the input manager. Ctrl is still held, so it's lifted from the thread's key state (`GetKeyboardState`/`SetKeyboardState`) while the key goes through. WPF reads modifiers live from that state, and Ctrl+Down would jump a list to its last row.
@@ -818,7 +819,7 @@ Undo and redo follow the Memento pattern:
   - Each is raised on the element that has the keyboard, as WPF's `KeyboardDevice` raises a real key: `PreviewKeyDown`, then `KeyDown` unless the first was handled. So the controls' own handling and the app's behaviours (`GridFillerRows`, `GridUndoSteps`, the trees' `Tree_KeyDown`) apply unchanged.
   - A raised key reads Ctrl and Shift from the physical keyboard (`KeyboardDevice.Modifiers`), so only keys typed without a modifier are raised. `gg`, `G`, `0` and `$` use the grid's `MoveCurrentCell`, with `GetFirstDataRowIndex`, `GetLastDataRowIndex` (which skips the filler rows and the add row) and the column helpers. The trees pick their row through `SelectedItems`.
   - In a form, `j`/`k` call `MoveFocus` (Next or Previous), because an arrow key would step a number box's value.
-- **`SfTreeView` in Extended mode** (the Products and Raw Materials lists) has three behaviours to work around:
+- **`SfTreeView` in Extended mode** (the Products, Raw Materials and Sub-Assemblies lists) has three behaviours to work around:
   - its Home only moves the focus border, without picking the row;
   - its arrow keys do nothing while the current row is hidden, for example by a search;
   - a `SelectedItem` set from outside is inserted in front of the rows already picked, rather than replacing them.
@@ -831,12 +832,13 @@ Undo and redo follow the Memento pattern:
   - the command bar;
   - the cheat sheet, built from `VimKeymap` so it lists what the keys actually do.
 
-  A hint clicks a `ButtonBase` or `SplitButtonAdv` through its protected `OnClick`, by reflection, because `ButtonAdv`'s automation peer has no Invoke pattern.
+  A hint clicks a `ButtonBase` or `SplitButtonAdv` through its protected `OnClick`, by reflection, because `ButtonAdv`'s automation peer has no Invoke pattern. A hint on a picker puts the keyboard in its `PART_Editable` box (`VimKeys.FocusPicker`), not on the picker: a Shift+Tab out of the box leaves a `ComboBoxAdv` unfocusable for good, and its `Focus()` then does nothing.
 - **To add a key**, add a `VimKeyBinding` to `VimKeymap` (keys, action, contexts, description). Then handle its `VimAction` in `VimKeys.Perform`, or in the `In*` method for its place. The cheat sheet picks it up.
 - **Slow keys.** Debug builds log any key the layer takes more than 4 ms to handle (`The Vim key … took … ms`). Most of that time is the screen's own response, such as a picked row loading its form.
 - **Tests** are in `UI.Tests/Vim/`.
   - The parser, keymap, command line and labels are tested without WPF.
   - `VimKeysGridTests` raises text input and key presses on a real off-screen grid.
+  - `VimKeysPickerTests` checks a hint reaches a real off-screen picker, including one a Shift+Tab has left unfocusable.
   - These tests switch the static `VimKeys.State` on and off, so they run in `OffscreenGridCollection`.
 
 ### Controls and behaviours

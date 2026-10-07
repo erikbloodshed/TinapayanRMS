@@ -215,6 +215,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public const string OpenFoldersKey = "RawMaterials.OpenFolders";
 
     private readonly IViewStateStore _viewStateStore;
+    private readonly ICostingDefaultsRepository _costingDefaultsRepository;
+
+    // What a new material's Cost Buffer % starts at (Settings → Costing Defaults), as of the last LoadCommand.
+    private decimal _defaultCostBufferPercent = CostingDefaults.DefaultCostBufferPercent;
 
     /// <summary>The open folders last written to the view state, so a write is only made for a change.</summary>
     private IReadOnlyList<string> _writtenOpenFolders;
@@ -456,8 +460,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         set => this.RaiseAndSetIfChanged(ref _editingCostSharePercent, value);
     }
 
-    /// <summary>The material's cost buffer; empty saves as 0%, since the box shows 0.00 when cleared.</summary>
-    private decimal? _editingCostBufferPercent = 0m;
+    /// <summary>
+    /// The material's cost buffer; empty saves as 0%, since the box shows 0.00 when cleared. A new one starts at Settings'
+    /// default (<see cref="CostingDefaults.CostBufferPercent"/>).
+    /// </summary>
+    private decimal? _editingCostBufferPercent = CostingDefaults.DefaultCostBufferPercent;
     public decimal? EditingCostBufferPercent
     {
         get => _editingCostBufferPercent;
@@ -948,6 +955,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         IValidator<RawMaterialBrandPrice> brandPriceValidator,
         IUnitOfMeasureRepository unitOfMeasureRepository,
         IViewStateStore viewStateStore,
+        ICostingDefaultsRepository costingDefaultsRepository,
         ILogger logger)
         : base(logger)
     {
@@ -961,6 +969,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         _unitValidator = unitValidator;
         _brandPriceValidator = brandPriceValidator;
         _viewStateStore = viewStateStore;
+        _costingDefaultsRepository = costingDefaultsRepository;
 
         // The list's folders open as they were left last time, and the ones open are written for next time once they've
         // settled after a change, off the UI thread, as on the Products screen; Dispose writes any change still waiting.
@@ -1223,6 +1232,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
             var units = await unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
             var rawMaterials = await _rawMaterialRepository.GetAllAsync(CancellationToken.None);
+            var costingDefaults = await _costingDefaultsRepository.GetAsync(CancellationToken.None);
 
             // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
             var selectedId = SelectedRawMaterial?.Id;
@@ -1266,6 +1276,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
                 // Every time, so a unit of measure created or renamed in Settings shows as a purchase unit.
                 RebuildPurchaseUnitOptions();
+
+                RefreshDefaultCostBuffer(costingDefaults.CostBufferPercent);
 
                 var previousExample = ExampleRawMaterial;
                 ExampleRawMaterial = RawMaterials.FirstOrDefault(m => m.Id == exampleMaterialId);
@@ -1670,7 +1682,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>
     /// An empty form, for New and after Delete. It starts as a purchased ingredient, the usual kind, but
     /// the category, brand prices and the usage example's material start empty, so none is saved or
-    /// costed by accident. The numbers keep a value: the cost buffer is 0, and the usage example's
+    /// costed by accident. The numbers keep a value: the cost buffer is Settings' default, and the usage example's
     /// quantity stays. The list's New … Here starts it as <paramref name="type"/> in <paramref name="categoryId"/>
     /// instead, set before the form is settled, so it isn't taken for an edit to save.
     /// </summary>
@@ -1688,11 +1700,27 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         EditingLinkedTo = null;
         EditingWeightSharePercent = null;
         EditingCostSharePercent = null;
-        EditingCostBufferPercent = 0m;
+        EditingCostBufferPercent = _defaultCostBufferPercent;
         EditingBufferedCost = null;
         EditingBaseUnit = null;
         ExampleRawMaterial = null;
         ClearDetails();
+    }
+
+    /// <summary>
+    /// Takes up Settings' cost buffer for a new material as LoadCommand read it. A new material still showing the one it
+    /// started with takes the new one, and what Save measures against follows it, since the change isn't the user's; one
+    /// whose buffer was typed keeps it.
+    /// </summary>
+    private void RefreshDefaultCostBuffer(decimal defaultCostBufferPercent)
+    {
+        var untouchedNewMaterial = _editingId == 0 && EditingCostBufferPercent == _defaultCostBufferPercent;
+        _defaultCostBufferPercent = defaultCostBufferPercent;
+        if (untouchedNewMaterial)
+        {
+            EditingCostBufferPercent = defaultCostBufferPercent;
+            History.Rebase((settled, now) => settled with { CostBufferPercent = now.CostBufferPercent });
+        }
     }
 
     private void LoadIntoForm(RawMaterial material)

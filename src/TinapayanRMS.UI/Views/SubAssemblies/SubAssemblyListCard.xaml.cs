@@ -1,0 +1,206 @@
+using System.ComponentModel;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Threading;
+using ReactiveUI;
+using Syncfusion.UI.Xaml.TreeView;
+using Syncfusion.UI.Xaml.TreeView.Engine;
+using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.UI.Controls;
+using TinapayanRMS.UI.ViewModels;
+
+namespace TinapayanRMS.UI.Views.SubAssemblies;
+
+/// <summary>
+/// The Sub-Assemblies list: the sub-assemblies in a folder for their role, with a search box. It works as the Raw
+/// Materials list does (MaterialListCard): dragging recipes onto another role's folder gives them that role; a right-click
+/// opens a menu of what can be done with the row, or with the list; F2, Del and Enter work on the row picked. Inherits the
+/// Sub-Assemblies screen's DataContext (SubAssembliesViewModel).
+/// </summary>
+public partial class SubAssemblyListCard : UserControl
+{
+    /// <summary>How long the notice of a move shows before hiding itself; checked again later while the mouse is over it.</summary>
+    private readonly DispatcherTimer _moveNoticeTimer = new() { Interval = TimeSpan.FromSeconds(8) };
+
+    public SubAssemblyListCard()
+    {
+        InitializeComponent();
+
+        // A row picked from elsewhere (a Save, a linked badge on Products, a new role's folder) may be in a closed folder or
+        // scrolled out of sight: the tree doesn't bring a selection set from its SelectedItems into view itself. A row
+        // clicked is in view already, so this leaves it where it is.
+        DependencyPropertyDescriptor.FromProperty(SfTreeView.SelectedItemProperty, typeof(SfTreeView))
+            .AddValueChanged(Tree, (_, _) =>
+            {
+                if (Tree.SelectedItem is SubAssemblyTreeNode node)
+                {
+                    ShowRow(node);
+                }
+            });
+
+        // A new notice starts the clock again; none stops it.
+        DataContextChanged += (_, e) =>
+        {
+            if (e.NewValue is SubAssembliesViewModel viewModel)
+            {
+                viewModel.WhenAnyValue(x => x.MoveNotice).Subscribe(notice =>
+                {
+                    _moveNoticeTimer.Stop();
+                    if (notice is not null)
+                    {
+                        _moveNoticeTimer.Start();
+                    }
+                });
+            }
+        };
+
+        _moveNoticeTimer.Tick += (_, _) =>
+        {
+            // Kept while the mouse is over it, which may be on its way to Undo.
+            if (!MoveNoticeBar.IsMouseOver && DataContext is SubAssembliesViewModel viewModel)
+            {
+                _moveNoticeTimer.Stop();
+                viewModel.DismissMoveNoticeCommand.Execute().Subscribe();
+            }
+        };
+    }
+
+    /// <summary>Only sub-assemblies can be dragged, one or several: the folders are the roles, in their own order.</summary>
+    private void Tree_ItemDragStarting(object? sender, TreeViewItemDragStartingEventArgs e) =>
+        e.Cancel = e.DraggingNodes.Any(node => node.Content is not SubAssemblyLeafNode);
+
+    /// <summary>
+    /// Shows where a drop files the sub-assemblies: into a role's folder, highlighted whole, or beside another sub-assembly
+    /// in that one's folder. Refuses a drop that would leave them all where they are, a recipe onto the Packaging role or a
+    /// packaging set out of it, and anything dragged in from outside the list.
+    /// </summary>
+    private void Tree_ItemDragOver(object? sender, TreeViewItemDragOverEventArgs e)
+    {
+        if (MovesFor(e.DraggingNodes, e.TargetNode).Count == 0)
+        {
+            e.DropPosition = DropPosition.None;
+        }
+        else if (e.TargetNode.Content is SubAssemblyFolderNode)
+        {
+            e.DropPosition = DropPosition.DropAsChild;
+        }
+        else if (e.DropPosition is DropPosition.DropAsChild or DropPosition.None)
+        {
+            // A sub-assembly holds nothing: over the middle of one, the line goes under it.
+            e.DropPosition = DropPosition.DropBelow;
+        }
+    }
+
+    /// <summary>
+    /// Moves the sub-assemblies through the Sub-Assemblies screen, which saves the move and files them in their new folder;
+    /// the tree never moves a row itself. The folder the first lands in opens, so it's seen arriving.
+    /// </summary>
+    private void Tree_ItemDropping(object? sender, TreeViewItemDroppingEventArgs e)
+    {
+        e.Handled = true;
+        var moves = MovesFor(e.DraggingNodes, e.TargetNode);
+        if (moves.Count == 0 || DataContext is not SubAssembliesViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.MoveSubAssembliesCommand.Execute(moves).Subscribe(_ =>
+        {
+            if (viewModel.SubAssemblyTree.Find(moves[0].SubAssemblyId) is { } leaf)
+            {
+                ShowRow(leaf);
+            }
+        });
+    }
+
+    /// <summary>What dropping the sub-assemblies dragged on <paramref name="target"/> would do: none for nothing.</summary>
+    private static IReadOnlyList<SubAssemblyMove> MovesFor(IList<TreeViewNode>? dragging, TreeViewNode? target) =>
+        dragging is { Count: > 0 } && dragging.All(node => node.Content is SubAssemblyLeafNode)
+            ? SubAssemblyTree.MovesTo(target?.Content as SubAssemblyTreeNode, dragging.Select(node => ((SubAssemblyLeafNode)node.Content).SubAssembly))
+            : [];
+
+    /// <summary>
+    /// A row right-clicked: its menu, for it and, when it was one of the rows picked, for the rest of them too, as in a
+    /// file explorer. A row outside the selection is picked alone first, so the sub-assembly it opens on is the one showing.
+    /// </summary>
+    private void Tree_ItemContextMenuOpening(object? sender, ItemContextMenuOpeningEventArgs e)
+    {
+        if (DataContext is not SubAssembliesViewModel viewModel || e.MenuInfo.Node?.Content is not SubAssemblyTreeNode node)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        if (!viewModel.SelectedTreeNodes.Contains(node))
+        {
+            viewModel.SelectedTreeNode = node;
+        }
+
+        e.ContextMenu = TreeContextMenu.Build(this, viewModel.TreeMenuFor(node));
+    }
+
+    /// <summary>
+    /// The list's own menu, which opens where a right-click isn't on a row: New Sub-Assembly, New Role, Expand All and
+    /// Collapse All. From the keyboard (the menu key, or Shift+F10) it's the menu of the row picked instead, beneath it. A
+    /// row's own right-click never gets here: the tree has shown its menu and handled the event.
+    /// </summary>
+    private void Tree_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (DataContext is not SubAssembliesViewModel viewModel)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        // Opened here rather than by the service, which places a menu it opens from the keyboard itself, whatever it's
+        // given: over the row rather than under it.
+        if (e.CursorLeft < 0 && e.CursorTop < 0 && viewModel.SelectedTreeNode is SubAssemblyTreeNode node)
+        {
+            e.Handled = true;
+            var rowMenu = TreeContextMenu.Build(this, viewModel.TreeMenuFor(node));
+            rowMenu.PlacementTarget = TreeContextMenu.RowOf(Tree, node) ?? (UIElement)Tree;
+            rowMenu.Placement = PlacementMode.Bottom;
+            rowMenu.IsOpen = true;
+            return;
+        }
+
+        Tree.ContextMenu = TreeContextMenu.Build(this, viewModel.TreeMenuFor(null));
+    }
+
+    /// <summary>
+    /// F2 renames and Del deletes the row picked, sub-assembly or role, as its menu shows; Enter opens or closes a folder,
+    /// as clicking it does.
+    /// </summary>
+    private void Tree_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (DataContext is not SubAssembliesViewModel viewModel || Keyboard.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Enter && viewModel.SelectedTreeNodes is [SubAssemblyFolderNode folder])
+        {
+            folder.IsExpanded = !folder.IsExpanded;
+            e.Handled = true;
+            return;
+        }
+
+        var gesture = e.Key switch
+        {
+            Key.F2 => "F2",
+            Key.Delete => "Del",
+            _ => null,
+        };
+        if (gesture is not null && viewModel.TreeShortcut(gesture) is { Command: { } command } item && command.CanExecute(item.Parameter))
+        {
+            command.Execute(item.Parameter);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Opens the folder above <paramref name="node"/> and scrolls it into view, if it isn't already.</summary>
+    private void ShowRow(SubAssemblyTreeNode node) =>
+        Tree.BringIntoView(node, disableAnimation: true, canExpand: true, ScrollToPosition.MakeVisible);
+}

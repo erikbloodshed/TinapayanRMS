@@ -233,6 +233,53 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         return stored;
     }
 
+    public async Task MoveAsync(IReadOnlyCollection<SubAssemblyMove> moves, CancellationToken cancellationToken)
+    {
+        if (moves.Count == 0)
+        {
+            return;
+        }
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        // Saved one at a time, inside the transaction: each check reads the database, so two a product links that move
+        // into the same role are checked against each other.
+        foreach (var move in moves)
+        {
+            await RestageAsync(dbContext, move.SubAssemblyId, name: null, move.RoleId, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task RenameAsync(int id, string name, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await RestageAsync(dbContext, id, name, roleId: null, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// A saved sub-assembly with a new name or role and everything else as it is, through every check a Save of the form
+    /// makes (StageStandaloneAsync), not yet saved.
+    /// </summary>
+    private static async Task RestageAsync(TinapayanRMSDbContext dbContext, int id, string? name, int? roleId, CancellationToken cancellationToken)
+    {
+        var stored = await dbContext.SubAssemblies
+            .Where(s => s.Id == id)
+            .Select(s => new { s.Name, s.RoleId, s.Role!.IsPackaging })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new BusinessRuleException($"Sub-assembly {id} does not exist.");
+
+        await StageStandaloneAsync(
+            dbContext,
+            new SubAssembly { Id = id, Name = name ?? stored.Name, RoleId = roleId ?? stored.RoleId },
+            stored.IsPackaging,
+            cancellationToken);
+    }
+
     public async Task DeleteStandaloneAsync(int id, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);

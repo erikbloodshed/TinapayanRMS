@@ -401,6 +401,8 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory),
             new SubAssemblyValidator(),
+            new SubAssemblyRoleValidator(),
+            new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
     }
 

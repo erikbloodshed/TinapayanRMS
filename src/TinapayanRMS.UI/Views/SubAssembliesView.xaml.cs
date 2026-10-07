@@ -1,7 +1,6 @@
-using System.ComponentModel;
+﻿using System.Windows;
 using System.Windows.Controls;
-using Syncfusion.UI.Xaml.Grid;
-using Syncfusion.UI.Xaml.ScrollAxis;
+using System.Windows.Threading;
 using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Views;
@@ -14,15 +13,14 @@ public partial class SubAssembliesView : UserControl
         DataContext = viewModel;
         viewModel.RegisterNativeMessageBoxHandler();
 
-        // A sub-assembly picked from elsewhere (a linked badge on Products) may be scrolled out of sight, as in
-        // ProductListCard: the grid doesn't bring a SelectedItem set through its binding into view itself.
-        DependencyPropertyDescriptor.FromProperty(SfDataGrid.SelectedItemProperty, typeof(SfDataGrid))
-            .AddValueChanged(List, (_, _) =>
-            {
-                if (List.SelectedItem is { } row && List.ResolveToRowIndex(row) is var rowIndex and >= 0)
-                {
-                    List.ScrollInView(new RowColumnIndex(rowIndex, 0));
-                }
-            });
+        // A name asked for by the list's menu: a sub-assembly's new name, or a role's (RawMaterialsView does the same). The
+        // yield lets the menu finish with the click that ran the item first. The window is looked up as it's asked for, not
+        // now: the view isn't in one yet while its constructor runs.
+        viewModel.PromptForName.RegisterHandler(async interaction =>
+        {
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            var request = interaction.Input;
+            interaction.SetOutput(TextPromptWindow.Prompt(request.Title, request.Label, request.InitialValue, Window.GetWindow(this), request.Message));
+        });
     }
 }

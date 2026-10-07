@@ -84,6 +84,16 @@ public static class VimKeys
     [ThreadStatic]
     private static bool _fieldIsNormal;
 
+    // In a grid: true in Insert, which lasts from cell to cell (Tab, Enter, an arrow) until Esc, so a letter or digit on
+    // a cell not yet being typed into starts its edit, as it does with the keys off.
+    [ThreadStatic]
+    private static bool _gridIsInsert;
+
+    // Set while Esc ends a cell's edit: the keyboard moves from the cell's editor to the grid before the cell stops being
+    // edited, and that edit mustn't put the grid back in Insert.
+    [ThreadStatic]
+    private static bool _endingEdit;
+
     private enum PlaceKind
     {
         Other,
@@ -131,8 +141,11 @@ public static class VimKeys
         Sequence.Clear();
         VimOverlay.Capturing?.CloseCapture();
 
-        // Worked out afresh from wherever the keyboard is now, in Insert if it's in a field.
+        // Worked out afresh from wherever the keyboard is now, in Insert if it's in a field and Normal in a grid.
         _focused = null;
+        _place = default;
+        _gridIsInsert = false;
+        State.Mode = VimMode.Normal;
         if (State.IsEnabled)
         {
             Track(Keyboard.FocusedElement as DependencyObject);
@@ -159,12 +172,9 @@ public static class VimKeys
         var focused = e.NewFocus as DependencyObject;
         if (!ReferenceEquals(focused, _focused))
         {
-            _focused = focused;
-            _place = PlaceOf(focused);
-
             // A field reached by j or k stays in Normal, so they can go on walking the form. Any other way in — a click,
             // Tab, a hint, the app putting the keyboard there — is to type.
-            _fieldIsNormal = _movingFocus;
+            Arrive(focused, fieldIsNormal: _movingFocus);
         }
 
         ShowMode();
@@ -288,16 +298,28 @@ public static class VimKeys
 
         switch (place.Kind)
         {
-            case PlaceKind.Grid when place.Container is SfDataGrid grid && IsEditing(grid):
+            case PlaceKind.Grid when place.Container is SfDataGrid grid && (_gridIsInsert || IsEditing(grid)):
                 if (IsListOpen(focused))
                 {
                     return false;
                 }
 
-                GridEditCommit.Commit(grid, keepCurrentCell: true);
-                if (!grid.IsKeyboardFocusWithin)
+                _gridIsInsert = false;
+                if (IsEditing(grid))
                 {
-                    grid.Focus();
+                    _endingEdit = true;
+                    try
+                    {
+                        GridEditCommit.Commit(grid, keepCurrentCell: true);
+                        if (!grid.IsKeyboardFocusWithin)
+                        {
+                            grid.Focus();
+                        }
+                    }
+                    finally
+                    {
+                        _endingEdit = false;
+                    }
                 }
 
                 return true;
@@ -416,7 +438,7 @@ public static class VimKeys
     }
 
     /// <summary>
-    /// The Products and Raw Materials lists. Their own Home only moves the focus border in an Extended list (the tree's
+    /// The Products, Raw Materials and Sub-Assemblies lists. Their own Home only moves the focus border in an Extended list (the tree's
     /// ProcessSingleKeyInteraction), and their arrows do nothing while the row the keyboard was on is hidden (by a
     /// search, or a folder closed over it), so <c>gg</c>, <c>G</c>, and <c>j</c>/<c>k</c> from a hidden row pick their
     /// row themselves, as <c>j</c> and <c>k</c> otherwise do.
@@ -733,6 +755,24 @@ public static class VimKeys
     }
 
     /// <summary>
+    /// A hint on a picker: the keyboard in the box it's typed in, when it's typed in. Not through the picker itself,
+    /// which hands it on to the box only while it's focusable: a Shift+Tab out of the box makes it unfocusable for good
+    /// (ComboBoxAdv's Part_IsEdit_PreviewKeyDown sets Focusable to false, so Shift+Tab doesn't land back on the picker,
+    /// and nothing sets it back), and its Focus() then does nothing.
+    /// </summary>
+    public static void FocusPicker(ComboBoxAdv picker)
+    {
+        if (picker.IsEditable && picker.Template?.FindName("PART_Editable", picker) is TextBox { IsVisible: true } box)
+        {
+            box.Focus();
+        }
+        else
+        {
+            picker.Focus();
+        }
+    }
+
+    /// <summary>
     /// Picks <paramref name="item"/>'s row alone, as a click does, and scrolls to it. Through SelectedItems, the
     /// collection the screens bind: in Extended mode a SelectedItem set from outside is added in front of the rows
     /// already picked, not put in their place (the tree's ProcessSelectionPropertiesChanged).
@@ -827,12 +867,29 @@ public static class VimKeys
     {
         if (!ReferenceEquals(focused, _focused))
         {
-            _focused = focused;
-            _place = PlaceOf(focused);
-            _fieldIsNormal = false;
+            Arrive(focused, fieldIsNormal: false);
         }
 
         return _place;
+    }
+
+    /// <summary>
+    /// The keyboard has moved to <paramref name="focused"/>: where it is now, and the mode it's in there. A field starts in
+    /// Normal or Insert as <paramref name="fieldIsNormal"/> says. A grid keeps its mode while the keyboard moves within it
+    /// (into a cell's editor and back); come to from somewhere else, it takes the mode the keys were in, so Tab from a
+    /// field being typed into goes on typing in the grid.
+    /// </summary>
+    private static void Arrive(DependencyObject? focused, bool fieldIsNormal)
+    {
+        var wasInsert = State.Mode == VimMode.Insert;
+        var previous = _place;
+        _focused = focused;
+        _place = PlaceOf(focused);
+        _fieldIsNormal = fieldIsNormal;
+        if (_place.Kind == PlaceKind.Grid && !ReferenceEquals(_place.Container, previous.Container))
+        {
+            _gridIsInsert = wasInsert;
+        }
     }
 
     private static Place PlaceOf(DependencyObject? element)
@@ -871,10 +928,24 @@ public static class VimKeys
     private static bool IsTyping(Place place) => place.Kind switch
     {
         PlaceKind.Field => !_fieldIsNormal,
-        PlaceKind.Grid => IsEditing((SfDataGrid)place.Container!),
+        PlaceKind.Grid => IsGridInsert((SfDataGrid)place.Container!),
         PlaceKind.Overlay => true,
         _ => false,
     };
+
+    /// <summary>
+    /// Whether the grid is in Insert: a cell is being typed into, however that began (<c>i</c>, a click, a letter), or one
+    /// was and no Esc has come since. A cell seen being typed into puts the grid in Insert until then.
+    /// </summary>
+    private static bool IsGridInsert(SfDataGrid grid)
+    {
+        if (!_endingEdit && IsEditing(grid))
+        {
+            _gridIsInsert = true;
+        }
+
+        return _gridIsInsert;
+    }
 
     private static bool IsEditing(SfDataGrid grid) =>
         grid.SelectionController?.CurrentCellManager is { HasCurrentCell: true, CurrentCell.IsEditing: true };

@@ -4,7 +4,8 @@ namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// Brings a folder tree's rows in line with what should show, moving the rows it has rather than replacing them: a row
-/// keeps its object, which the tree's selection and open folders are tied to. ProductTree and RawMaterialTree use it.
+/// keeps its object, which the tree's selection and open folders are tied to. ProductTree, RawMaterialTree and
+/// SubAssemblyTree use it.
 /// </summary>
 public static class TreeRows
 {

@@ -31,6 +31,12 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
+                    b.Property<decimal>("CostBufferPercent")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)")
+                        .HasDefaultValue(10m);
+
                     b.Property<decimal>("LaborPercent")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
@@ -38,6 +44,13 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Property<decimal>("MarginPercent")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("NewProductStage")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("Production");
 
                     b.Property<decimal>("OverheadPercent")
                         .HasPrecision(18, 4)
@@ -55,6 +68,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     b.ToTable("CostingDefaults", t =>
                         {
+                            t.HasCheckConstraint("CK_CostingDefaults_CostBufferPercent", "[CostBufferPercent] >= 0 AND [CostBufferPercent] <= 100");
+
                             t.HasCheckConstraint("CK_CostingDefaults_ShrinkagePercent", "[ShrinkagePercent] >= 0 AND [ShrinkagePercent] < 100");
 
                             t.HasCheckConstraint("CK_CostingDefaults_SingleRow", "[Id] = 1");

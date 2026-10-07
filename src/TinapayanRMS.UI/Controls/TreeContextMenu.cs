@@ -10,7 +10,7 @@ using TreeViewItem = Syncfusion.UI.Xaml.TreeView.TreeViewItem;
 namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
-/// The right-click menus of the folder trees (the Products and Raw Materials lists): a menu built from the items a
+/// The right-click menus of the folder trees (the Products, Raw Materials and Sub-Assemblies lists): a menu built from the items a
 /// screen describes (TreeMenuItem), and the row a menu opened from the keyboard is placed under.
 /// </summary>
 public static class TreeContextMenu

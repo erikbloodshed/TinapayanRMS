@@ -97,7 +97,7 @@ A **product** is something the shop sells. It is made from:
 Other terms you'll see on a product:
 
 - **Quantity Required** is how many finished pieces make one sellable unit. It's 1 for a product sold by the piece, and 8 for a "Box of 8". The recipe is always written per piece. The costing is per sellable unit.
-- **Stage**: every product is either in **Research and Development** (still being worked out) or in **Production** (made and sold). New products start in Research and Development.
+- **Stage**: every product is either in **Research and Development** (still being worked out) or in **Production** (made and sold). A new product goes in Production, unless you change that in Settings → Costing Defaults.
 - **Clone** and **Create Variant** start a new product from an existing one. See [Clone tab](#clone-tab).
 - **Scaling** works out the ingredients and packaging for any number of sellable units. See [Scaling tab](#scaling-tab).
 
@@ -145,12 +145,12 @@ The column heading changes to show which one you're looking at. Only the grams a
 
 ### Lists as folder trees
 
-The **Raw Materials** and **Products** lists are trees of folders, like File Explorer:
+The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of folders, like File Explorer:
 
 - **Search** at the top of the list narrows it to matching names and opens the folders that hold them.
 - **Drag** one or more items onto a folder to move them there. A notice under the list says what moved, with an **Undo** button.
 - **Right-click** an item, a folder or the empty space for a menu of what you can do there. Some menu items have keyboard shortcuts: **F2** renames and **Del** deletes.
-- Folders you leave open are open again the next time you use the app.
+- Folders you leave open or closed are the same the next time you use the app.
 
 ### Editing and saving
 
@@ -186,12 +186,13 @@ Clicking a field or cell, tabbing into it, or picking it by its label (**f**, be
 While a picker's list is open, **Ctrl+N** and **Ctrl+P** move down and up it, like the Down and Up arrows. That covers the list under a field you're typing a name into and the one in a table cell. With no list open, they do nothing.
 
 - In a table cell, Esc keeps what you typed. Without Vim keys, Esc in a cell throws the typing away.
+- In a table, INSERT lasts from cell to cell. After **Tab**, **Enter** or an arrow takes you to the next cell, just type: there's no need to press **i** again. Tabbing into a table from a field you were typing in keeps INSERT too. Press **Esc** when you're done, and the letters move around the table again.
 - In Settings, or a small window that asks for a name, the first Esc stops typing, and a second Esc closes the window.
 
 **Moving around**
 
 - **j** and **k**: down and up. In a list or table that's a row. In a form, it's the next or previous field, like Tab and Shift+Tab.
-- **h** and **l**: left and right. In a table that's a cell. In the Raw Materials and Products lists, **h** closes a folder and **l** opens it. In a field, they move the cursor.
+- **h** and **l**: left and right. In a table that's a cell. In the Raw Materials, Sub-Assemblies and Products lists, **h** closes a folder and **l** opens it. In a field, they move the cursor.
 - **gg** and **G**: the first and last row.
 - **0** and **$**: the first and last column of a table, or the start and end of a field.
 - **J** and **K**: leave the list or table, for the control after it or before it.
@@ -236,7 +237,7 @@ On a new database, set things up in this order. Each step uses what the one befo
 2. **Material categories** (Settings → Material Categories): how raw materials are grouped, such as Flour, Dairy, Boxes and Ribbons. Each category is for either ingredients or packaging.
 3. **Product categories** (Settings → Product Categories): how products are grouped, such as Breads, Cakes and Pastries.
 4. **Roles** (Settings → Roles): the parts of a recipe. Dough, Filling, Topping, Inclusion, Finishing and Packaging are there from the start.
-5. **Costing defaults** (Settings → Costing Defaults): the labour, overhead, administrative, markup and VAT percentages that a new product starts with, and the shrinkage a new recipe section starts with.
+5. **Costing defaults** (Settings → Costing Defaults): the stage a new product goes in, the labour, overhead, administrative, markup and VAT percentages that it starts with, the shrinkage a new recipe section starts with, and the cost buffer a new raw material starts with.
 6. **Raw materials**: every purchased ingredient and packaging material with its prices, then the made and linked ingredients.
 7. **Sub-assemblies**: the doughs, fillings and packaging sets shared by more than one product.
 8. **Products**.
@@ -280,7 +281,9 @@ A role can't be deleted while any sub-assembly uses it.
 
 ### Costing Defaults
 
-These are the five percentages a **new** product's costing starts with:
+**New Products In** is where **New** on the Products screen files a product when you save it: **Production** (the default) or **Research and Development**. **New Product Here** still files it in the folder you picked it on, and a clone or variant still goes in Research and Development.
+
+Under it are the five percentages a **new** product's costing starts with:
 
 - **Labor %**, **Overhead %** and **Administrative %** (office, permits, bookkeeping): each is a percentage of the product's sub-assemblies (ingredients) cost.
 - **Markup %**: added on the base cost (materials, labour, overhead and administrative).
@@ -288,7 +291,9 @@ These are the five percentages a **new** product's costing starts with:
 
 Under them, **Shrinkage %** is what a section added to a product's Recipe Structure starts with: the weight its batch loses being made. It starts at 3%. It can be anything from 0 up to, but not including, 100.
 
-Each product keeps its own percentages, and each section its own shrinkage, from its first Save. Changing the defaults doesn't change any saved product.
+Last, **Cost Buffer %** is what a new raw material's [cost buffer](#cost-buffer) starts with on the Raw Materials screen. It starts at 10%, and can be anything from 0 to 100. It only matters for a purchased material: a linked ingredient takes the buffer of the one it's linked to, and a made ingredient has none of its own.
+
+Each product keeps its own stage and percentages, each section its own shrinkage, and each raw material its own cost buffer, from its first Save. Changing the defaults doesn't change anything saved. A new product you haven't saved yet moves to the new stage, since you didn't pick one for it. A new raw material you haven't saved moves to the new cost buffer, unless you've typed one.
 
 **Stored Costs**, to the right of the defaults, has a **Recalculate Costs** button. The app keeps every made and linked ingredient's cost, and every sub-assembly's total weight and cost, up to date as you save. You only need this button if the database was changed outside the app, for example by a script. It works all of those costs out again from what they're made of, and a green notice says how many were out of date. Purchased materials keep their prices.
 
@@ -377,6 +382,7 @@ The material's **current cost** comes from the **dearest** brand: its price divi
 
 <a id="cost-buffer"></a>**Cost buffer.** Under the brand table are **Cost Buffer %**, **Buffered Cost** and **Per**:
 
+- A new material's **Cost Buffer %** starts at the default in Settings → Costing Defaults, 10% unless you change it there. Set it to 0 for no buffer.
 - Typing the **Cost Buffer %** works out the **Buffered Cost** as the dearest brand plus that percentage.
 - Typing the **Buffered Cost** works out the percentage.
 - **Per** chooses the unit the buffered cost is shown and typed in, such as per gram or per bag. It's always stored per base unit.
@@ -451,7 +457,19 @@ Sections that belong to a single product, in a product-owned role, aren't listed
 
 ### The list
 
-The list shows **Name** and **Role**, with a search box. When a product saves a new section, it's saved here under a name made from the product and the role, such as *Cheese Roll Dough*. If the section has its own name, that's added after them, as in *Cheese Roll Filling: Ube*.
+The list has a folder for each role, in the order set in Settings → Roles, with the sub-assemblies in that role inside it, by name. Each folder shows how many it holds. All the folders start open. When a product saves a new section, it's saved here under a name made from the product and the role, such as *Cheese Roll Dough*. If the section has its own name, that's added after them, as in *Cheese Roll Filling: Ube*.
+
+Right-click menus:
+
+- **A sub-assembly**: **Move to** (another role), **Rename…** (F2) and **Delete** (Del). A packaging set has no **Move to**: it always stays in the Packaging role.
+- **A role's folder**: **New Sub-Assembly Here** (**New Packaging Set Here** on the Packaging role), **New Role…**, **Rename Role…** (F2), **Delete Role** (Del), **Expand All** and **Collapse All**. You can only delete a role when no sub-assembly here is in it. Otherwise the menu shows how many it holds. The Packaging role can't be deleted.
+- **The empty space**: **New Sub-Assembly**, **New Role…**, **Expand All** and **Collapse All**.
+
+Dragging sub-assemblies onto another role's folder changes their role straight away, and every product that links them follows. A recipe can't go into the Packaging role, and a packaging set can't leave it. A move is refused, with a message saying why, when a product that links the sub-assembly would end up with two sections in that role it can't tell apart, or when a composite product links it and the new role isn't product-owned.
+
+**Rename…** saves the new name straight away, and so does a move. If the sub-assembly is open in the form, its name or role there changes too, and anything else you've changed stays to be saved.
+
+A new role from the list goes after the others and isn't product-owned. Change its place and **Product-owned** in Settings → Roles.
 
 ### The form
 
@@ -506,7 +524,7 @@ Right-click menus:
 - **The empty space**: **New Product**, **New Composite Product**, **New Category…**, **Print All Products**, **Expand All** and **Collapse All**.
 - **A product in the Deleted folder**: **Restore** and **Delete Permanently** (Del).
 
-**New Product Here** and **New Composite Product Here** file the new product in that folder when you save it. **New** from the header puts it in Research and Development.
+**New Product Here** and **New Composite Product Here** file the new product in that folder when you save it. **New** from the header puts it in the stage set in Settings → Costing Defaults, Production unless you change it.
 
 Each product's name starts with a small coloured picture of what it is: a baguette 🥖 for **Breads**, a loaf 🍞 for **Loaves**, a shortcake 🍰 for **Cakes** and a moon cake 🥮 for **Pastries**. A composite product always has a wrapped present 🎁, whatever its category. A product in any other category, or in none, has no picture.
 
