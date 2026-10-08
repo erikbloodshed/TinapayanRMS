@@ -213,7 +213,7 @@ A change is done when:
 | `src/TinapayanRMS.Domain` | `net10.0` | Nothing | `Entities/`, `Enums/` |
 | `src/TinapayanRMS.ApplicationCore` | `net10.0` | Domain; FluentValidation | `Interfaces/`, `Rules/`, `Validators/` |
 | `src/TinapayanRMS.Infrastructure` | `net10.0` | Domain, ApplicationCore; EF Core (SQL Server), Dapper | `TinapayanRMSDbContext` and its design-time factory at the root; `Configurations/`, `Migrations/`, `Queries/`, `Repositories/`, `Services/` |
-| `src/TinapayanRMS.UI` | `net10.0-windows10.0.19041.0` | All three; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion | App startup at the root; `Views/`, `ViewModels/`, `Controls/`, `Converters/`, `Printing/`, `Exporting/`, `Vim/`, `Themes/` |
+| `src/TinapayanRMS.UI` | `net10.0-windows10.0.19041.0` | All three; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion | App startup at the root; `Views/`, `ViewModels/`, `Controls/`, `Converters/`, `Printing/`, `Exporting/`, `Vim/`, `Themes/`, `Assets/Icons/` |
 | `tests/TinapayanRMS.ApplicationCore.Tests` | `net10.0` | Domain, ApplicationCore | Rule and validator tests, with no database |
 | `tests/TinapayanRMS.Infrastructure.Tests` | `net10.0` | Infrastructure, Tests.Common | Persistence tests against the project's own database |
 | `tests/TinapayanRMS.UI.Tests` | `net10.0-windows10.0.19041.0` | UI, Tests.Common | ViewModel, control, printing, export, converter and Vim-key tests |
@@ -239,6 +239,7 @@ Every folder in a project is a sub-namespace: `src/TinapayanRMS.UI/ViewModels/` 
 | Value converter | `UI/Converters/` | `UI.Tests/Converters/` |
 | Something written to a file, such as an Excel export | `UI/Exporting/` | `UI.Tests/Exporting/` |
 | Part of the Vim keys | `UI/Vim/` | `UI.Tests/Vim/` |
+| Icon image file (`.png` or `.ico`) | `UI/Assets/Icons/` | — |
 
 A ViewModel file can also hold the small row and edit types that only its screen uses. For example, `ProductsViewModel.cs` defines `ProductUsageEdit` and `ProductCostSummary`.
 
@@ -868,7 +869,8 @@ The app extends Syncfusion's controls with **attached behaviours** in `Controls/
 
 - **The theme** is Syncfusion's `Syncfusion.Themes.Windows11Light.WPF` package. A window is themed with `SfSkinManager.SetTheme(window, new Theme("Windows11Light"))` before it's shown: `App.OnStartup` does it for `MainWindow`, and `MainWindow.OpenSettings` for the Settings dialog. `ApplyThemeAsDefaultStyle` is deliberately left unset, because it would restyle every window. `SizeMode` is `Default`.
 - **Colours** come from [Themes/Palette.xaml](../src/TinapayanRMS.UI/Themes/Palette.xaml), the Catppuccin Latte palette with derived Tint, Deep and Wash steps that make each hue readable as text or as a background. [App.xaml](../src/TinapayanRMS.UI/App.xaml) names them as design tokens (`PageBackgroundBrush`, `CardBackgroundBrush`, `AccentBrush`, `ErrorForegroundBrush`, …) and defines the shared styles (`CardStyle`, `SectionHeaderStyle`, `FormLabelStyle`, `FieldLabelStyle`, `FigureTileStyle`, …). Views use the tokens, never a hex colour or the raw palette.
-- **Icons** are Segoe Fluent Icons glyphs, through the `*IconTemplate` data templates and `IconGlyphStyle`. Don't add an icon package: one was tried, and its icons weren't crisp. WPF draws emoji as outlines only, so emoji are coloured with the tokens.
+- **Icons** are Segoe Fluent Icons glyphs, through the `*IconTemplate` data templates and `IconGlyphStyle`. Don't add an icon package: one was tried, and its icons weren't crisp. WPF draws emoji as outlines only, so a full-colour picture is an icon file (below).
+- **Icon files**: an icon that has to be an image rather than a glyph (a downloaded `.png` or `.ico`) goes in [Assets/Icons/](../src/TinapayanRMS.UI/Assets/Icons/). The UI project compiles every `.png` and `.ico` there into the app as a WPF `Resource`, so a view refers to it as `/Assets/Icons/<name>.png`, and nothing needs adding to the `.csproj`. The folder holds no code, so it isn't a namespace. Windows scales the app by the display's setting (125% on the development PC), so an image is nearly always resized, and enlarging one blurs it. Download it larger than it's shown (64 px for 16), and set its `Width`, `Height` and `RenderOptions.BitmapScalingMode="HighQuality"`, as the Products list (64 px shown at 16) and the Used By tiles (128 px shown at 32) do for the product images (`Bread_`, `Loaf_`, `Cake_`, `Pastry_` and `Composite_64px.png` and `_128px.png`). Set `UseLayoutRounding="True"` on the `Image` too: the app doesn't round layout to whole pixels, and an image placed between them blurs.
 - **Sizes**: every text box and button is 24 px tall, number boxes are right-aligned, and the body text is 14 px. `App` sets all of these.
 - **Forms**: an input's label goes on its left in a stacked form (`FormLabelStyle`, lined up with `SharedSizeGroup`). A row of fields side by side keeps each label above its field (`FieldLabelStyle`). A value that can never be typed is a `TextBlock`, not a read-only text box.
 - **Amounts** have no currency symbol, and use the decimals in [Precision and rounding](#precision-and-rounding).

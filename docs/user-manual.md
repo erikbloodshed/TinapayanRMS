@@ -526,7 +526,7 @@ Right-click menus:
 
 **New Product Here** and **New Composite Product Here** file the new product in that folder when you save it. **New** from the header puts it in the stage set in Settings → Costing Defaults, Production unless you change it.
 
-Each product's name starts with a small coloured picture of what it is: a baguette 🥖 for **Breads**, a loaf 🍞 for **Loaves**, a shortcake 🍰 for **Cakes** and a moon cake 🥮 for **Pastries**. A composite product always has a wrapped present 🎁, whatever its category. A product in any other category, or in none, has no picture.
+Each product's name starts with a small full-colour picture of what it is: a round bread for **Breads**, a loaf for **Loaves**, a strawberry cake for **Cakes** and a cupcake for **Pastries**. A composite product always has a bag of breads, whatever its category. A product in any other category, or in none, has no picture.
 
 ### The header
 

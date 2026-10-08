@@ -9,9 +9,12 @@ namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ISubAssemblyRepository
 {
-    /// <summary>A product's id, name, category name and whether it's deleted, for each recipe usage of a sub-assembly.</summary>
+    /// <summary>
+    /// A product's id, name, category name, whether it's deleted and whether it's a composite, for each recipe usage of a
+    /// sub-assembly.
+    /// </summary>
     private const string RecipeLinksSql = """
-        SELECT u.SubAssemblyId, p.Id AS ProductId, p.Name AS ProductName, c.Name AS CategoryName, p.DeletedAt
+        SELECT u.SubAssemblyId, p.Id AS ProductId, p.Name AS ProductName, c.Name AS CategoryName, p.DeletedAt, p.IsComposite
         FROM ProductSubAssemblyUsages u
         JOIN Products p ON p.Id = u.ProductId
         LEFT JOIN ProductCategories c ON c.Id = p.CategoryId
@@ -65,7 +68,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             $"""
             {RecipeLinksSql}
             UNION ALL
-            SELECT l.LinkedSubAssemblyId AS SubAssemblyId, p.Id AS ProductId, p.Name AS ProductName, c.Name AS CategoryName, p.DeletedAt
+            SELECT l.LinkedSubAssemblyId AS SubAssemblyId, p.Id AS ProductId, p.Name AS ProductName, c.Name AS CategoryName, p.DeletedAt, p.IsComposite
             FROM PackagingLinks l
             JOIN Products p ON p.Id = l.ProductId
             LEFT JOIN ProductCategories c ON c.Id = p.CategoryId
@@ -298,7 +301,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         await EnsureNoneLinkedElsewhereAsync(dbContext, u => u.SubAssemblyId == id, cancellationToken);
         var setLinkedBy = await dbContext.PackagingLinks
             .Where(l => l.LinkedSubAssemblyId == id)
-            .Select(l => new LinkRow(id, l.ProductId, l.Product!.Name, null, l.Product.DeletedAt))
+            .Select(l => new LinkRow(id, l.ProductId, l.Product!.Name, null, l.Product.DeletedAt, l.Product.IsComposite))
             .ToListAsync(cancellationToken);
         if (setLinkedBy.Count > 0)
         {
@@ -320,14 +323,14 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     {
         var links = await dbContext.ProductSubAssemblyUsages
             .Where(subAssemblyFilter)
-            .Select(u => new LinkRow(u.SubAssemblyId, u.ProductId, u.Product!.Name, null, u.Product.DeletedAt))
+            .Select(u => new LinkRow(u.SubAssemblyId, u.ProductId, u.Product!.Name, null, u.Product.DeletedAt, u.Product.IsComposite))
             .ToListAsync(cancellationToken);
 
         return ToLinkedBy(links);
     }
 
     /// <summary>A product linking a sub-assembly. One in the Deleted folder still holds it, and is named as deleted.</summary>
-    private sealed record LinkRow(int SubAssemblyId, int ProductId, string ProductName, string? CategoryName, DateTime? DeletedAt)
+    private sealed record LinkRow(int SubAssemblyId, int ProductId, string ProductName, string? CategoryName, DateTime? DeletedAt, bool IsComposite)
     {
         public string ListedName => ProductRules.ListedName(ProductName, DeletedAt is not null);
     }
@@ -345,7 +348,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             .ToDictionary(g => g.Key, g => (IReadOnlyList<LinkingProduct>)
             [
                 .. g.DistinctBy(l => l.ProductId)
-                    .Select(l => new LinkingProduct(l.ProductId, l.ListedName, l.CategoryName))
+                    .Select(l => new LinkingProduct(l.ProductId, l.ListedName, l.CategoryName, l.IsComposite))
                     .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase),
             ]);
 

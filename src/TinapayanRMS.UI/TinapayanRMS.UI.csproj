@@ -39,4 +39,8 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <Resource Include="Assets\Icons\**\*.png;Assets\Icons\**\*.ico" />
+  </ItemGroup>
+
 </Project>

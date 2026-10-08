@@ -1,4 +1,7 @@
+using System.Globalization;
+using System.Windows;
 using AwesomeAssertions;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.UI.Converters;
 
 namespace TinapayanRMS.UI.Tests.Converters;
@@ -16,7 +19,8 @@ public class ProductCategoryIconConverterTests
     [InlineData("Pies & Tarts", BakeryKind.Pastry)]
     [InlineData("Hopia", BakeryKind.Pastry)]
     [InlineData("Breads", BakeryKind.Bread)]
-    [InlineData("loaf breads", BakeryKind.Bread)]
+    [InlineData("Loaves", BakeryKind.Loaf)]
+    [InlineData("loaf breads", BakeryKind.Loaf)]
     [InlineData("Tinapay", BakeryKind.Bread)]
     [InlineData("Pandesal", BakeryKind.Bread)]
     [InlineData("Buns", BakeryKind.Bread)]
@@ -33,5 +37,18 @@ public class ProductCategoryIconConverterTests
     {
         ProductCategoryIconConverter.Classify("Cakes and Breads").Should().Be(BakeryKind.Cake);
         ProductCategoryIconConverter.Classify("Breads and Pastries").Should().Be(BakeryKind.Pastry);
+    }
+
+    [Fact]
+    public void A_composite_gets_the_composite_icon_whatever_its_category_and_any_other_product_its_categorys()
+    {
+        var composite = new DataTemplate();
+        var bread = new DataTemplate();
+        var converter = new ProductCategoryIconConverter { Composite = composite, Bread = bread };
+
+        converter.Convert(new LinkingProduct(1, "Pasalubong Box", "Breads", IsComposite: true), typeof(DataTemplate), null!, CultureInfo.InvariantCulture)
+            .Should().BeSameAs(composite);
+        converter.Convert(new LinkingProduct(2, "Pandesal", "Breads"), typeof(DataTemplate), null!, CultureInfo.InvariantCulture)
+            .Should().BeSameAs(bread);
     }
 }

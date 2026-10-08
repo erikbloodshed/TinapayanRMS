@@ -118,12 +118,20 @@
                                            Foreground="{StaticResource MutedForegroundBrush}"
                                            VerticalAlignment="Center"
                                            Margin="0,0,8,0" />
-                                <!-- A product's emoji, by its category or for a composite (ProductLeafNode.Emoji); a folder has none -->
-                                <TextBlock x:Name="Emoji"
-                                           Text="{Binding Emoji}"
-                                           FontFamily="Segoe UI Emoji"
-                                           VerticalAlignment="Center"
-                                           Margin="0,0,6,0" />
+                                <!--
+                                    A product's full-colour image (ProductTreeNode.IconKind), a trigger below setting the file;
+                                    none for a folder, or a product in another category or none. The 64 px file shrinks to 16
+                                    (20 px at 125% scaling): a clear reduction stays sharp, where enlarging a smaller one blurs.
+                                    Rounded to whole pixels, or it lands between them and blurs anyway.
+                                -->
+                                <Image x:Name="Icon"
+                                       Width="16"
+                                       Height="16"
+                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                       UseLayoutRounding="True"
+                                       Visibility="Collapsed"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,6,0" />
                                 <TextBlock x:Name="Title"
                                            Text="{Binding Title}"
                                            VerticalAlignment="Center" />
@@ -139,25 +147,26 @@
                                     <Setter TargetName="Glyph" Property="Visibility" Value="Collapsed" />
                                     <Setter TargetName="Count" Property="Visibility" Value="Collapsed" />
                                 </DataTrigger>
-                                <!-- No emoji, no gap: a folder, or a product in a category without one -->
-                                <DataTrigger Binding="{Binding EmojiKind}" Value="None">
-                                    <Setter TargetName="Emoji" Property="Visibility" Value="Collapsed" />
+                                <!-- Each kind's image (Assets/Icons) -->
+                                <DataTrigger Binding="{Binding IconKind}" Value="Breads">
+                                    <Setter TargetName="Icon" Property="Source" Value="/Assets/Icons/Bread_64px.png" />
+                                    <Setter TargetName="Icon" Property="Visibility" Value="Visible" />
                                 </DataTrigger>
-                                <!-- Each emoji in its Catppuccin colour (App.xaml's *EmojiBrush tokens) -->
-                                <DataTrigger Binding="{Binding EmojiKind}" Value="Breads">
-                                    <Setter TargetName="Emoji" Property="Foreground" Value="{StaticResource BreadsEmojiBrush}" />
+                                <DataTrigger Binding="{Binding IconKind}" Value="Loaves">
+                                    <Setter TargetName="Icon" Property="Source" Value="/Assets/Icons/Loaf_64px.png" />
+                                    <Setter TargetName="Icon" Property="Visibility" Value="Visible" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding EmojiKind}" Value="Loaves">
-                                    <Setter TargetName="Emoji" Property="Foreground" Value="{StaticResource LoavesEmojiBrush}" />
+                                <DataTrigger Binding="{Binding IconKind}" Value="Cakes">
+                                    <Setter TargetName="Icon" Property="Source" Value="/Assets/Icons/Cake_64px.png" />
+                                    <Setter TargetName="Icon" Property="Visibility" Value="Visible" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding EmojiKind}" Value="Cakes">
-                                    <Setter TargetName="Emoji" Property="Foreground" Value="{StaticResource CakesEmojiBrush}" />
+                                <DataTrigger Binding="{Binding IconKind}" Value="Pastries">
+                                    <Setter TargetName="Icon" Property="Source" Value="/Assets/Icons/Pastry_64px.png" />
+                                    <Setter TargetName="Icon" Property="Visibility" Value="Visible" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding EmojiKind}" Value="Pastries">
-                                    <Setter TargetName="Emoji" Property="Foreground" Value="{StaticResource PastriesEmojiBrush}" />
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding EmojiKind}" Value="Composite">
-                                    <Setter TargetName="Emoji" Property="Foreground" Value="{StaticResource CompositeEmojiBrush}" />
+                                <DataTrigger Binding="{Binding IconKind}" Value="Composite">
+                                    <Setter TargetName="Icon" Property="Source" Value="/Assets/Icons/Composite_64px.png" />
+                                    <Setter TargetName="Icon" Property="Visibility" Value="Visible" />
                                 </DataTrigger>
                                 <!-- The top-level folders: the two stages, and Deleted -->
                                 <DataTrigger Binding="{Binding IsTopLevel}" Value="True">

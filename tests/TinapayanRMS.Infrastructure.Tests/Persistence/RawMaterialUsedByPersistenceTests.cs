@@ -199,6 +199,8 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
             null, null, null, Cancellation);
 
         (await UsedByNamesAsync(flourId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
+        (await CreateRepository().GetUsedByAsync(flourId, Cancellation)).Select(p => p.IsComposite)
+            .Should().Equal([false, true, true], "a composite's tile shows the composite icon");
         (await UsedByNamesAsync(sugarId)).Should().Equal("Cheese Roll", "Party Package", "Pasalubong Box");
 
         // A product brings its recipe into a composite, not its packaging: the composite's packaging is its own.
