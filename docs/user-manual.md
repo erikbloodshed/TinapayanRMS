@@ -341,6 +341,8 @@ Right-click menus:
 - **A category's folder**: **New … Here**, **New Category…**, **Rename Category…** (F2) and **Delete Category** (Del). You can only delete a category when it's empty. Otherwise the menu shows how many materials it holds.
 - **The empty space**: **New Raw Material**, **New Ingredient Category…**, **New Packaging Category…**, **Expand All** and **Collapse All**.
 
+The same commands are buttons under the search box: **New Raw Material**, **New Category** (its arrow offers an ingredient or a packaging category), **Expand All** and **Collapse All**. Each button shows only its icon; point at it to see its name.
+
 Dragging materials onto another category moves them straight away. A material can't be dragged into the other type.
 
 ### The header
@@ -465,6 +467,8 @@ Right-click menus:
 - **A role's folder**: **New Sub-Assembly Here** (**New Packaging Set Here** on the Packaging role), **New Role…**, **Rename Role…** (F2), **Delete Role** (Del), **Expand All** and **Collapse All**. You can only delete a role when no sub-assembly here is in it. Otherwise the menu shows how many it holds. The Packaging role can't be deleted.
 - **The empty space**: **New Sub-Assembly**, **New Role…**, **Expand All** and **Collapse All**.
 
+The same commands are buttons under the search box. Each button shows only its icon; point at it to see its name.
+
 Dragging sub-assemblies onto another role's folder changes their role straight away, and every product that links them follows. A recipe can't go into the Packaging role, and a packaging set can't leave it. A move is refused, with a message saying why, when a product that links the sub-assembly would end up with two sections in that role it can't tell apart, or when a composite product links it and the new role isn't product-owned.
 
 **Rename…** saves the new name straight away, and so does a move. If the sub-assembly is open in the form, its name or role there changes too, and anything else you've changed stays to be saved.
@@ -521,7 +525,7 @@ Right-click menus:
   With several products picked, the menu offers to promote or move them all.
 - **A stage's folder**: **New Product Here**, **New Composite Product Here**, **New Category…**, **Print Stage**, **Expand All** and **Collapse All**.
 - **A category's folder**: **New Product Here**, **New Composite Product Here**, **Promote All to Production**, **Print Folder**, **New Category…**, **Rename Category…** and **Delete Category**.
-- **The empty space**: **New Product**, **New Composite Product**, **New Category…**, **Print All Products**, **Expand All** and **Collapse All**.
+- **The empty space**: **New Product**, **New Composite Product**, **New Category…**, **Print All Products**, **Expand All** and **Collapse All**. These are also buttons under the search box. Each button shows only its icon; point at it to see its name.
 - **A product in the Deleted folder**: **Restore** and **Delete Permanently** (Del).
 
 **New Product Here** and **New Composite Product Here** file the new product in that folder when you save it. **New** from the header puts it in the stage set in Settings → Costing Defaults, Production unless you change it.

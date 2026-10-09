@@ -134,6 +134,19 @@
                 <TextBlock Text="&#xE71D;" Style="{StaticResource IconGlyphStyle}" />
             </DataTemplate>
 
+            <!-- A new category or role, a folder in a list's tree: NewFolder, as the tree's right-click menus show it -->
+            <DataTemplate x:Key="NewFolderIconTemplate">
+                <TextBlock Text="&#xE8F4;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
+
+            <!-- A list's Expand All and Collapse All: the chevrons ExpandChevronStyle uses, down to open and up to close -->
+            <DataTemplate x:Key="ExpandAllIconTemplate">
+                <TextBlock Text="&#xE70D;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="CollapseAllIconTemplate">
+                <TextBlock Text="&#xE70E;" Style="{StaticResource IconGlyphStyle}" />
+            </DataTemplate>
             <!--
                 A collapse toggle's chevron (a checkable ButtonAdv): pointing up while the section is open
                 (unchecked), down once it's collapsed (checked).

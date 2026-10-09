@@ -8,7 +8,7 @@
     <Border Style="{StaticResource CardStyle}">
         <DockPanel>
             <!-- Title and search on one row, laid out as the Raw Materials list card lays out its own -->
-            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                 <syncfusion:SfTextBoxExt DockPanel.Dock="Right"
                                          Width="190"
                                          Watermark="Search products"
@@ -20,6 +20,76 @@
                            Margin="0"
                            VerticalAlignment="Center" />
             </DockPanel>
+
+            <!--
+                The list-wide commands, as the tree's menu offers them for its empty space (ProductsViewModel.EmptySpaceMenu),
+                as icons named in their tooltips: Small mode shows the icon alone. Not focusable, so Tab goes from the search
+                box straight to the tree. The Raw Materials and Sub-Assemblies lists have the same row.
+                Centring the glyph takes two settings. A Small button gets Padding 2,0,4,0, so Padding 3,0,3,0 evens it out.
+                Its icon box is 16 × 16, with the 14 px glyph drawn in its top-left corner, so IconWidth and IconHeight
+                size the box to the glyph.
+            -->
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
+                <syncfusion:ButtonAdv Label="New Product"
+                                      ToolTip="New Product"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource AddIconTemplate}"
+                                      Command="{Binding NewProductInCommand}"
+                                      Margin="0,0,6,0" />
+                <syncfusion:ButtonAdv Label="New Composite Product"
+                                      ToolTip="New Composite Product"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource CompositeIconTemplate}"
+                                      Command="{Binding NewCompositeProductInCommand}"
+                                      Margin="0,0,6,0" />
+                <syncfusion:ButtonAdv Label="New Category"
+                                      ToolTip="New Category…"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource NewFolderIconTemplate}"
+                                      Command="{Binding NewCategoryCommand}"
+                                      Margin="0,0,6,0" />
+                <syncfusion:ButtonAdv Label="Print All Products"
+                                      ToolTip="Print All Products"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource PrintIconTemplate}"
+                                      Command="{Binding PrintAllCommand}"
+                                      Margin="0,0,6,0" />
+                <syncfusion:ButtonAdv Label="Expand All"
+                                      ToolTip="Expand All"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource ExpandAllIconTemplate}"
+                                      Command="{Binding ExpandAllCommand}"
+                                      Margin="0,0,6,0" />
+                <syncfusion:ButtonAdv Label="Collapse All"
+                                      ToolTip="Collapse All"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource CollapseAllIconTemplate}"
+                                      Command="{Binding CollapseAllCommand}" />
+            </StackPanel>
 
             <!--
                 What the last move did, with Undo (ProductsViewModel.MoveNotice), under the tree: a drag, Move To or Promote

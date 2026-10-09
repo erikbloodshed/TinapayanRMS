@@ -8,7 +8,7 @@
     <Border Style="{StaticResource CardStyle}">
         <DockPanel>
             <!-- Title and search on one row, laid out as the Raw Materials and Products list cards lay out their own -->
-            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                 <syncfusion:SfTextBoxExt DockPanel.Dock="Right"
                                          Width="190"
                                          Watermark="Search sub-assembly"
@@ -20,6 +20,54 @@
                            Margin="0"
                            VerticalAlignment="Center" />
             </DockPanel>
+
+            <!--
+                The list-wide commands, as the tree's menu offers them for its empty space (SubAssembliesViewModel.EmptySpaceMenu),
+                as icons named in their tooltips, as on the Products list. Not focusable, so Tab goes from the search box to
+                the tree.
+                IconWidth, IconHeight and Padding centre each glyph, as the Products list explains.
+            -->
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
+                <syncfusion:ButtonAdv Label="New Sub-Assembly"
+                                      ToolTip="New Sub-Assembly"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource AddIconTemplate}"
+                                      Command="{Binding NewSubAssemblyInCommand}"
+                                      Margin="0,0,6,0" />
+                <syncfusion:ButtonAdv Label="New Role"
+                                      ToolTip="New Role…"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource NewFolderIconTemplate}"
+                                      Command="{Binding NewRoleCommand}"
+                                      Margin="0,0,6,0" />
+                <syncfusion:ButtonAdv Label="Expand All"
+                                      ToolTip="Expand All"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource ExpandAllIconTemplate}"
+                                      Command="{Binding ExpandAllCommand}"
+                                      Margin="0,0,6,0" />
+                <syncfusion:ButtonAdv Label="Collapse All"
+                                      ToolTip="Collapse All"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource CollapseAllIconTemplate}"
+                                      Command="{Binding CollapseAllCommand}" />
+            </StackPanel>
 
             <!--
                 What the last move did, with Undo (SubAssembliesViewModel.MoveNotice), under the tree, as on the Raw Materials

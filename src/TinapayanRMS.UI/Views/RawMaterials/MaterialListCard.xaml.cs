@@ -203,4 +203,7 @@ public partial class MaterialListCard : UserControl
     /// <summary>Opens the folders above <paramref name="node"/> and scrolls it into view, if it isn't already.</summary>
     private void ShowRow(RawMaterialTreeNode node) =>
         Tree.BringIntoView(node, disableAnimation: true, canExpand: true, ScrollToPosition.MakeVisible);
+
+    /// <summary>Closes New Category's drop-down once an item in it is clicked: a DropDownButtonAdv doesn't on its own.</summary>
+    private void NewCategoryItem_Click(object sender, RoutedEventArgs e) => NewCategoryButton.IsDropDownOpen = false;
 }

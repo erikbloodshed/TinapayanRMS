@@ -3,11 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:vim="clr-namespace:TinapayanRMS.UI.Vim"
-             xmlns:viewModels="clr-namespace:TinapayanRMS.UI.ViewModels">
+             xmlns:viewModels="clr-namespace:TinapayanRMS.UI.ViewModels"
+             xmlns:enums="clr-namespace:TinapayanRMS.Domain.Enums;assembly=TinapayanRMS.Domain">
 
     <Border Style="{StaticResource CardStyle}">
         <DockPanel>
-            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                 <syncfusion:SfTextBoxExt DockPanel.Dock="Right"
                                          Width="190"
                                          Watermark="Search raw material"
@@ -19,6 +20,82 @@
                            Margin="0"
                            VerticalAlignment="Center" />
             </DockPanel>
+
+            <!--
+                The list-wide commands, as the tree's menu offers them for its empty space (RawMaterialsViewModel.EmptySpaceMenu),
+                as icons named in their tooltips, as on the Products list. The two New Category items share one drop-down,
+                since two folder icons side by side would look the same; each item closes it (NewCategoryItem_Click), as
+                Add Sub-Assembly's do on the Products screen. Not focusable, so Tab goes from the search box to the tree.
+                IconWidth, IconHeight and Padding centre each glyph, as the Products list explains. The drop-down ignores
+                Padding, and at 125% its folder rounded 1.5 px high, so its icon box is 16 tall with the folder at the bottom,
+                1 DIP lower.
+            -->
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
+                <syncfusion:ButtonAdv Label="New Raw Material"
+                                      ToolTip="New Raw Material"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource AddIconTemplate}"
+                                      Command="{Binding NewMaterialInCommand}"
+                                      Margin="0,0,6,0" />
+                <syncfusion:DropDownButtonAdv x:Name="NewCategoryButton"
+                                              Label="New Category"
+                                              ToolTip="New Category: an ingredient category or a packaging category"
+                                              SizeMode="Small"
+                                              IconWidth="14"
+                                              IconHeight="16"
+                                              Focusable="False"
+                                              Margin="0,0,6,0">
+                    <syncfusion:DropDownButtonAdv.IconTemplate>
+                        <DataTemplate>
+                            <ContentPresenter ContentTemplate="{StaticResource NewFolderIconTemplate}" VerticalAlignment="Bottom" />
+                        </DataTemplate>
+                    </syncfusion:DropDownButtonAdv.IconTemplate>
+                    <StackPanel MinWidth="190" Margin="2">
+                        <syncfusion:ButtonAdv Label="New Ingredient Category…"
+                                              IconTemplate="{StaticResource NewFolderIconTemplate}"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Left"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Command="{Binding NewCategoryCommand}"
+                                              CommandParameter="{x:Static enums:RawMaterialType.Ingredient}"
+                                              Click="NewCategoryItem_Click" />
+                        <syncfusion:ButtonAdv Label="New Packaging Category…"
+                                              IconTemplate="{StaticResource NewFolderIconTemplate}"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Left"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Margin="0,2,0,0"
+                                              Command="{Binding NewCategoryCommand}"
+                                              CommandParameter="{x:Static enums:RawMaterialType.Packaging}"
+                                              Click="NewCategoryItem_Click" />
+                    </StackPanel>
+                </syncfusion:DropDownButtonAdv>
+                <syncfusion:ButtonAdv Label="Expand All"
+                                      ToolTip="Expand All"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource ExpandAllIconTemplate}"
+                                      Command="{Binding ExpandAllCommand}"
+                                      Margin="0,0,6,0" />
+                <syncfusion:ButtonAdv Label="Collapse All"
+                                      ToolTip="Collapse All"
+                                      SizeMode="Small"
+                                      IconWidth="14"
+                                      IconHeight="14"
+                                      Padding="3,1,3,0"
+                                      Focusable="False"
+                                      IconTemplate="{StaticResource CollapseAllIconTemplate}"
+                                      Command="{Binding CollapseAllCommand}" />
+            </StackPanel>
 
             <!--
                 What the last move did, with Undo (RawMaterialsViewModel.MoveNotice), under the tree, as on the Products list:
