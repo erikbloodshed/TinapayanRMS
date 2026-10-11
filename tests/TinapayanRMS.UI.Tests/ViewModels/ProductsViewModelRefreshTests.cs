@@ -643,6 +643,99 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     /// <summary>
+    /// A section made in a product-owned role is written for the one piece it goes into, so its form starts at a yield
+    /// of 1 where any other starts with no size: the weight per piece is the whole batch, less its shrinkage, and
+    /// follows the lines as they're typed and after it's saved, being the yield that's kept.
+    /// </summary>
+    [Fact]
+    public async Task A_section_added_in_a_product_owned_role_starts_at_a_yield_of_1_and_its_weight_per_piece_follows_the_batch()
+    {
+        await AddRoleAsync("Dough");
+        var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 2, isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var productId = await AddProductAsync("Cheese Roll");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == productId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}");
+
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.New);
+        viewModel.EditingUsageRole!.Name.Should().Be("Dough");
+        viewModel.EditingUsageYield.Should().Be(0m, "a Dough is a batch of many pieces, sized by hand");
+
+        viewModel.EditingUsageRole = viewModel.FormRoleOptions.Single(r => r.Id == toppingRoleId);
+        viewModel.EditingUsageYield.Should().Be(1m, "a Topping is the product's own");
+        viewModel.EditingUsageWeightPerPiece.Should().Be(0m, "there's no batch yet");
+
+        viewModel.FormLines.Add(new IngredientLineRow { IngredientId = cheeseId, Grams = 20m });
+        viewModel.EditingUsageWeightPerPiece.Should().Be(19.4m, "the 20 g that go in, less the default 3% shrinkage");
+        viewModel.UsageFormCostPerPieceText.Should().Be("8.00", "one piece takes the whole batch");
+
+        viewModel.FormLines.Single().Grams = 30m;
+        viewModel.EditingUsageYield.Should().Be(1m);
+        viewModel.EditingUsageWeightPerPiece.Should().Be(29.1m);
+        viewModel.UsageFormCostPerPieceText.Should().Be("12.00");
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        var usage = await dbContext.ProductSubAssemblyUsages.SingleAsync(u => u.ProductId == productId, Cancellation);
+        usage.AuthoredField.Should().Be(UsageAuthoredField.Yield, "so the weight per piece goes on following the lines");
+        usage.AuthoredValue.Should().Be(1m);
+    }
+
+    /// <summary>
+    /// The starting yield of 1 is the role's, not an entry: it follows the role while neither figure is typed, a form
+    /// still at it counts as untouched, and a link starts with no size, its batch being a shared one. A typed size
+    /// stays whatever the role becomes.
+    /// </summary>
+    [Fact]
+    public async Task The_starting_yield_of_1_follows_the_role_until_a_piece_size_is_typed()
+    {
+        await AddRoleAsync("Topping", sortOrder: 1, isProductOwned: true);
+        await AddRoleAsync("Dough", sortOrder: 2);
+        var productId = await AddProductAsync("Cheese Roll");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == productId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}");
+
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.New);
+        viewModel.EditingUsageRole!.Name.Should().Be("Topping", "the first role the recipe doesn't have yet");
+        viewModel.EditingUsageYield.Should().Be(1m);
+
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
+        viewModel.RecipeTabs.OfType<AddSubAssemblyRecipeTab>().Should().ContainSingle("a form showing only what it opened with is changed in place");
+        viewModel.UsageEdits.Should().BeEmpty("nothing was entered to add");
+        viewModel.EditingUsageYield.Should().Be(0m, "a linked batch is shared, and sized by hand");
+
+        // Undo puts the New form back at its yield of 1, which is still only what it opened with.
+        viewModel.TryUndo().Should().BeTrue();
+        viewModel.EditingUsageMode.Should().Be(UsageFormMode.New);
+        viewModel.EditingUsageYield.Should().Be(1m);
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
+        viewModel.ErrorMessage.Should().BeNull("there was nothing in the form to apply");
+        viewModel.RecipeTabs.OfType<AddSubAssemblyRecipeTab>().Should().ContainSingle();
+        viewModel.UsageEdits.Should().BeEmpty();
+        viewModel.EditingUsageYield.Should().Be(1m, "a copy made in a Topping is the product's own too");
+
+        await viewModel.AddUsageCommand.Execute(UsageFormMode.New);
+        viewModel.EditingUsageYield.Should().Be(1m);
+        viewModel.EditingUsageRole =viewModel.FormRoleOptions.Single(r => r.Name == "Dough");
+        viewModel.EditingUsageYield.Should().Be(0m, "a Dough starts with no size");
+        viewModel.EditingUsageRole = viewModel.FormRoleOptions.Single(r => r.Name == "Topping");
+        viewModel.EditingUsageYield.Should().Be(1m);
+
+        viewModel.EditingUsageWeightPerPiece = 15m;
+        viewModel.EditingUsageRole = viewModel.FormRoleOptions.Single(r => r.Name == "Dough");
+        viewModel.EditingUsageWeightPerPiece.Should().Be(15m, "the typed figure stays put");
+        viewModel.EditingUsageRole = viewModel.FormRoleOptions.Single(r => r.Name == "Topping");
+        viewModel.EditingUsageWeightPerPiece.Should().Be(15m);
+        viewModel.EditingUsageYield.Should().Be(0m, "the weight is the figure kept, and there's no batch to work a yield out from");
+    }
+
+    /// <summary>
     /// Add Sub-Assembly is a drop-down of the three ways in (RecipeStructureCard), and the way it carries is what the
     /// form opens in — the form has no picker of its own any more. Another item picked while the add tab shows changes
     /// that form instead of opening a second one, and the whole add is one undo step.

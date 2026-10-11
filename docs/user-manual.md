@@ -123,6 +123,8 @@ For each sub-assembly in a product you say how much of the batch one piece takes
 
 The figure you typed stays put. If the batch changes, the other figure is worked out again.
 
+A new section in a **product-owned** role, such as a Topping or a Filling, starts at a **Yield of 1**: one piece takes the whole batch. Its Weight/piece is then the final weight, which is the total of the Grams column when the shrinkage is 0, and it follows the lines as you type them and whenever you change them later. Type a weight per piece or a yield instead if the batch makes more than one piece. A section in any other role, and any section you link, starts with no piece size.
+
 ### Baker's % and Absolute %
 
 Each recipe line also shows a percentage.
@@ -274,6 +276,7 @@ Each role has:
 - **Order**: where the role's sections go in a recipe. Lower numbers come first. A new role goes last. To change a role's place, pick it in the list and press **Move Up** or **Move Down** above the list. The roles are numbered 1, 2, 3… again after a move or a delete, so there are no gaps.
 - **Product-owned**: a section made in a product in this role stays that product's own. It's edited in the product's recipe instead of on the Sub-Assemblies screen, and other products can copy it but not link it. Turning this on or off for a role that's already used asks first, and says how many sub-assemblies will move.
   - These are also the only roles a composite product can have sections in. So Product-owned can't be turned off while a composite has a section in the role; the message names the composites. Take the section out there first.
+  - A section you make in a product in this role starts at a Yield of 1, so its Weight/piece is the whole batch (see [Piece size](#piece-size-weight-per-piece-yield-and-shrinkage)).
 
 The **Packaging** role is special. Sub-assemblies in it are packaging sets. It can be renamed but not deleted, and it can't be product-owned.
 
@@ -587,7 +590,7 @@ Each section's tab shows its form:
   - **Weight/piece (g)** and **Yield (pcs)**: type either one
 - **Cost/piece** and **Batch cost** tiles.
 
-You don't need a piece size to add a section or to save it. Its cost per piece reads 0 until you enter one.
+You don't need a piece size to add a section or to save it. Its cost per piece reads 0 until you enter one. A new or copied section in a product-owned role already has one: a Yield of 1 (see [Piece size](#piece-size-weight-per-piece-yield-and-shrinkage)).
 
 A section's changes go into the recipe when you leave its tab, or when you press Save.
 

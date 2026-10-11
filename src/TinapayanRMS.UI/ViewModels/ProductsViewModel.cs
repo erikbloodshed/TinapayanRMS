@@ -2229,6 +2229,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 .Select(target => target!),
             ChangeLinkAsync);
 
+        // The add form's piece size starts as its role has it (StartingPieceSize), so it follows a role picked, or a
+        // copy's taken, while it's still what the role before started it at: neither figure typed.
+        this.WhenAnyValue(x => x.EditingUsageRole)
+            .Buffer(2, 1)
+            .Where(roles => !IsBusyApplying && IsUsageFormOpen && IsAddingUsage && IsPieceSizeAsStarted(roles[0]))
+            .Subscribe(_ => StartPieceSize(EditingUsageShrinkagePercent));
+
         // Typing one figure of the piece size works out the other, and makes it the one that's kept.
         this.WhenAnyValue(x => x.EditingUsageWeightPerPiece)
             .Skip(1)
@@ -4201,7 +4208,36 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // The shrinkage is this product's, whichever way the section comes in, so it starts at Settings' default.
         _usageFormStartShrinkagePercent = _defaultShrinkagePercent;
-        SetPieceSize(UsageAuthoredField.WeightPerPiece, 0m, _usageFormStartShrinkagePercent);
+        StartPieceSize(_usageFormStartShrinkagePercent);
+    }
+
+    /// <summary>
+    /// The piece size the add form starts at in <paramref name="role"/>. A section made in a product-owned role
+    /// (SubAssemblyRole.IsProductOwned), new or copied, is written for the one piece it goes into, so it starts at a
+    /// yield of 1: its weight per piece is the whole batch, and follows the lines as they're typed. Any other starts
+    /// with no size. So does a link, whose batch is the Sub-Assemblies screen's and shared.
+    /// </summary>
+    private (UsageAuthoredField Field, decimal Value) StartingPieceSize(SubAssemblyRole? role) =>
+        EditingUsageMode != UsageFormMode.Link && role is { IsProductOwned: true }
+            ? (UsageAuthoredField.Yield, 1m)
+            : (UsageAuthoredField.WeightPerPiece, 0m);
+
+    /// <summary>Shows the piece size the add form's role starts at, at <paramref name="shrinkagePercent"/>.</summary>
+    private void StartPieceSize(decimal shrinkagePercent)
+    {
+        var (field, value) = StartingPieceSize(EditingUsageRole);
+        SetPieceSize(field, value, shrinkagePercent);
+    }
+
+    /// <summary>
+    /// Whether the add form's piece size is still the one <paramref name="role"/> starts it at, with neither figure
+    /// typed. Worked out from the form, not remembered, so it holds for a form an undo put back. No size is no size,
+    /// whichever box it was left in.
+    /// </summary>
+    private bool IsPieceSizeAsStarted(SubAssemblyRole? role)
+    {
+        var (field, value) = StartingPieceSize(role);
+        return CurrentAuthoredValue() == value && (value == 0 || _usageAuthoredField == field);
     }
 
     /// <summary>The badge's Edit: the picker, holding what the section could link instead, in the badge's place.</summary>
@@ -4643,7 +4679,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>
-    /// The add form as it opened: nothing picked to link or copy, no line, no piece size, and the shrinkage it started
+    /// The add form as it opened: nothing picked to link or copy, no line, and the piece size and shrinkage it started
     /// at. Its role alone isn't an entry.
     /// </summary>
     private bool IsUsageFormUntouched() =>
@@ -4653,7 +4689,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         && FormLines.All(l => l.IngredientId is null && l.Grams == 0)
         && FormAddIns.All(l => l.IngredientId is null && l.Grams == 0)
         && FormPackagingLines.All(l => l.PackagingMaterialId is null && l.QtyPerUnit == 0)
-        && CurrentAuthoredValue() == 0
+        && IsPieceSizeAsStarted(EditingUsageRole)
         && EditingUsageShrinkagePercent == _usageFormStartShrinkagePercent;
 
     /// <summary>The form's lines changed, or its source's were loaded: the batch weight, the other piece-size figure and the preview follow.</summary>
@@ -4775,9 +4811,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         UsageFormFinalWeightText = $"{finalWeight:#,0.##} g";
         // Neither figure is needed to put the section in (ProductRules.EnsureValidUsages), so with none typed the
         // caption says what that costs: nothing per piece, until one is. With a shrinkage it says which batch the
-        // pair is read against, since that's the figure that stops matching the lines above.
+        // pair is read against, since that's the figure that stops matching the lines above. A yield of 1 is what a
+        // section in a product-owned role starts at (StartingPieceSize), so it says how to size a bigger batch.
         UsageFormPieceSizeCaption = authoredValue <= 0
             ? "Type the weight per piece or the yield; the other is worked out. Until then this section costs nothing per piece."
+            : _usageAuthoredField == UsageAuthoredField.Yield && authoredValue == 1
+                ? "One piece takes the whole batch, and still does if the batch changes. For a batch that makes more, type the weight per piece or the yield."
             : shrinkagePercent > 0
                 ? _usageAuthoredField == UsageAuthoredField.WeightPerPiece
                     ? $"A finished piece weighs {authoredValue:#,0.##} g, out of the {finalWeight:#,0.##} g the batch makes; it stays there if the batch changes."
