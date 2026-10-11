@@ -118,7 +118,7 @@ Microsoft.NETCore.App.Ref
 
 [metadataReferences]
 ../TinapayanRMS.Domain/obj/Release/net10.0/ref/TinapayanRMS.Domain.dll
-<NUGET>/fluentvalidation/12.1.1/lib/net8.0/FluentValidation.dll
+<NUGET>/fluentvalidation/12.2.0/lib/net8.0/FluentValidation.dll
 
 [analyzerReferences]
 <NETSDK>/Sdks/Microsoft.NET.Sdk/analyzers/
