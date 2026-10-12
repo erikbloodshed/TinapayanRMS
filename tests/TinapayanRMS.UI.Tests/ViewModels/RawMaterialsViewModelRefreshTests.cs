@@ -989,6 +989,53 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task A_length_unit_of_packaging_measured_in_a_length_is_fixed_as_its_picked_and_saved_that_way()
+    {
+        var millimeterId = await SeedUnitOfMeasureAsync("millimeter", "mm");
+        var meterId = await SeedUnitOfMeasureAsync("meter", "m");
+        var inchId = await SeedUnitOfMeasureAsync("inch", "in");
+        var rollId = await SeedUnitOfMeasureAsync("roll", "roll");
+        var tapesId = await AddPackagingCategoryAsync("Tapes");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Scotch Tape";
+        viewModel.EditingType = RawMaterialType.Packaging;
+        viewModel.EditingCategory = viewModel.CategoryOptions.Single(c => c.Id == tapesId);
+        viewModel.EditingBaseUnit = viewModel.UnitsOfMeasure.Single(u => u.Id == millimeterId);
+
+        // In the Alternative Units grid's add row: metric to metric, and English to metric.
+        var meter = viewModel.NewUnitRow();
+        meter.UnitOfMeasureId = meterId;
+        (meter.BaseUnitsPerUnit, meter.CanTypeMultiplier).Should().Be((1000m, false));
+        var inch = viewModel.NewUnitRow();
+        inch.UnitOfMeasureId = inchId;
+        (inch.BaseUnitsPerUnit, inch.CanTypeMultiplier).Should().Be((25.4m, false));
+        var roll = viewModel.NewUnitRow();
+        roll.UnitOfMeasureId = rollId;
+        (roll.BaseUnitsPerUnit, roll.CanTypeMultiplier).Should().Be((0m, true), "a roll's length is the material's own to type");
+
+        // Picked on a Purchase Cost Setup row, which adds the unit.
+        var brand = viewModel.NewBrandPriceRow();
+        brand.UnitKey = meterId;
+        brand.Quantity.Should().Be(1000m);
+        brand.CanTypeQuantity.Should().BeFalse();
+        viewModel.UnitRows.Should().ContainSingle().Which.BaseUnitsPerUnit.Should().Be(1000m);
+
+        viewModel.UnitRows.Add(inch);
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        var saved = await dbContext.RawMaterialUnits
+            .Where(u => u.RawMaterial!.Name == "Scotch Tape")
+            .Select(u => new { u.UnitOfMeasure!.Name, u.BaseUnitsPerUnit })
+            .ToListAsync(Cancellation);
+        saved.Select(u => (u.Name, u.BaseUnitsPerUnit)).Should().BeEquivalentTo([("meter", 1000m), ("inch", 25.4m)]);
+    }
+
+    [Fact]
     public async Task An_unsaved_materials_buffered_cost_per_base_unit_is_shown_to_four_places()
     {
         // A new material's Per unit starts on the base unit, where the cost is a fraction of a centavo: ₱0.0525/g
