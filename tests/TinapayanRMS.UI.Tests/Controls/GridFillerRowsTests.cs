@@ -3,7 +3,7 @@ using TinapayanRMS.UI.Controls;
 
 namespace TinapayanRMS.UI.Tests.Controls;
 
-/// <summary>How many empty rows GridFillerRows puts under a grid's rows: whole rows only, never enough to scroll.</summary>
+/// <summary>How many empty rows GridFillerRows draws under a grid's rows: whole rows only, never past its bottom edge.</summary>
 public class GridFillerRowsTests
 {
     [Fact]

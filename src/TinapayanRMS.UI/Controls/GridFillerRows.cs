@@ -1,58 +1,25 @@
-using System.Collections.Specialized;
-using System.ComponentModel;
 using System.Windows;
-using System.Windows.Input;
-using System.Windows.Threading;
 using Syncfusion.UI.Xaml.Grid;
-using Syncfusion.UI.Xaml.Grid.Helpers;
-using Syncfusion.UI.Xaml.ScrollAxis;
 
 namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
-/// Fills the space under an SfDataGrid's last row with empty rows, so a short list still reads as a table down
-/// to the grid's bottom edge. Set <c>controls:GridFillerRows.IsEnabled="True"</c> on a grid with a height to fill
+/// Fills the space under an SfDataGrid's last row with the lines of empty rows, so a short list still reads as a table
+/// down to the grid's bottom edge. Set <c>controls:GridFillerRows.IsEnabled="True"</c> on a grid with a height to fill
 /// (one in a star-sized row or with a fixed Height, not one sized to its rows).
-/// The rows are GridUnBoundRows, recalculated when the grid is loaded, resized, its records change, or a group
-/// is expanded or collapsed (the technique from the SfDataGrid_Demo sample), with these differences, read from
-/// the decompiled Syncfusion 34.2.7:
-/// <list type="bullet">
-/// <item>They're added with ShowBelowSummary, which puts them after the bottom add-new row; without it they come
-/// before it, and the row a line is typed into would sink below them.</item>
-/// <item>Those rows are frozen footer rows. With a short body they sit right under it (the scroll axis's
-/// ViewSize is the smaller of its render size and total extent), but once the rows outgrow the grid they'd be
-/// pinned over its last rows, which a grouped grid's row generation can't survive. So rows that no longer fit are
-/// removed at once, when records are added, a group is expanded or the grid shrinks, and after any layout that
-/// finds them overflowing (growth nothing announces, such as ExpandAllGroup); adding them waits for the change to
-/// settle.</item>
-/// <item>The space is measured on the grid's row scroll axis (render size against total extent), which counts
-/// the header, group captions and the add-new row as they're drawn, rather than by counting records.</item>
-/// <item>Only the difference is added or removed, never a Clear(): UnBoundRows' Reset handling miscounts its
-/// rows by position.</item>
-/// <item>Every trigger funnels into one pending recalculation, so a burst of record changes adds rows once.</item>
-/// <item>The rows can't be clicked, selected or edited: a click on one would otherwise deselect the record, which
-/// clears the form beside the list, and in a table typed into (EditTrigger OnTap) it would start editing the current
-/// cell wherever it is. A press on one never reaches the grid, and the keyboard can't move onto one.</item>
-/// <item>Changing unbound rows reaches the grid's selection (GridSelectionController.ProcessUnBoundRowChanged):
-/// it ends an edit of an existing row without committing it, and adding one while the current cell is on the row
-/// above the add-new row moves the current cell onto it. So nothing changes while a row is being edited (it's
-/// tried again shortly after), and a current cell moved by an addition is put back, but only from the add-new row
-/// onto a record that still exists.</item>
-/// <item>The grid can leave its current cell on a filler row, where it draws a second outline: when the last lines
-/// go while the current cell is on the add-new row, the add-new row moves up without it. It's put back on the
-/// add-new row.</item>
-/// </list>
+///
+/// The rows are only drawn (<see cref="GridFillerLayer"/>), not added to the grid (2026-10-15). Until then they were
+/// GridUnBoundRows, the technique from the SfDataGrid_Demo sample, and so live rows the grid selected, edited, moved its
+/// current cell onto and froze as footers: most of the code was guards against that, and they still crashed the app
+/// twice and drew a second current-cell outline. Drawn, the grid never knows they're there.
 /// </summary>
 public static class GridFillerRows
 {
-    /// <summary>How long a change has to settle before rows are added (a window drag grows the grid in steps), and how soon to try again during an edit.</summary>
-    private static readonly TimeSpan SettleDelay = TimeSpan.FromMilliseconds(150);
-
     public static readonly DependencyProperty IsEnabledProperty = DependencyProperty.RegisterAttached(
         "IsEnabled", typeof(bool), typeof(GridFillerRows), new PropertyMetadata(false, OnIsEnabledChanged));
 
-    private static readonly DependencyProperty StateProperty = DependencyProperty.RegisterAttached(
-        "State", typeof(FillerState), typeof(GridFillerRows), new PropertyMetadata(null));
+    private static readonly DependencyProperty LayerProperty = DependencyProperty.RegisterAttached(
+        "Layer", typeof(GridFillerLayer), typeof(GridFillerRows), new PropertyMetadata(null));
 
     public static bool GetIsEnabled(DependencyObject element) => (bool)element.GetValue(IsEnabledProperty);
 
@@ -60,7 +27,7 @@ public static class GridFillerRows
 
     /// <summary>
     /// How many whole rows of <paramref name="rowHeight"/> fit in the space <paramref name="contentHeight"/> leaves
-    /// in <paramref name="viewportHeight"/>. A part of a row is left empty, so filler rows never add a scrollbar.
+    /// in <paramref name="viewportHeight"/>. A part of a row is left empty.
     /// </summary>
     public static int FillerRowCount(double viewportHeight, double contentHeight, double rowHeight)
     {
@@ -82,20 +49,10 @@ public static class GridFillerRows
 
         grid.Loaded -= OnLoaded;
         grid.Unloaded -= OnUnloaded;
-        grid.SizeChanged -= OnSizeChanged;
-        grid.IsVisibleChanged -= OnIsVisibleChanged;
-        grid.ItemsSourceChanged -= OnItemsSourceChanged;
-        grid.GroupExpanded -= OnGroupExpanded;
-        grid.GroupCollapsed -= OnGroupCollapsed;
-        grid.SelectionChanging -= OnSelectionChanging;
-        grid.CurrentCellActivating -= OnCurrentCellActivating;
-        grid.PreviewMouseDown -= OnPreviewMouseDown;
-
-        if (GetState(grid) is { } previous)
+        if (GetLayer(grid) is { } previous)
         {
-            previous.StopWatching();
-            previous.RemoveRows();
-            grid.ClearValue(StateProperty);
+            previous.Remove();
+            grid.ClearValue(LayerProperty);
         }
 
         if (!(bool)e.NewValue)
@@ -103,347 +60,19 @@ public static class GridFillerRows
             return;
         }
 
-        var state = new FillerState(grid);
-        grid.SetValue(StateProperty, state);
+        var layer = new GridFillerLayer(grid);
+        grid.SetValue(LayerProperty, layer);
         grid.Loaded += OnLoaded;
         grid.Unloaded += OnUnloaded;
-        grid.SizeChanged += OnSizeChanged;
-        grid.IsVisibleChanged += OnIsVisibleChanged;
-        grid.ItemsSourceChanged += OnItemsSourceChanged;
-        grid.GroupExpanded += OnGroupExpanded;
-        grid.GroupCollapsed += OnGroupCollapsed;
-        grid.SelectionChanging += OnSelectionChanging;
-        grid.CurrentCellActivating += OnCurrentCellActivating;
-        grid.PreviewMouseDown += OnPreviewMouseDown;
-
         if (grid.IsLoaded)
         {
-            state.WatchView();
-            state.Schedule();
+            layer.StartWatching();
         }
     }
 
-    private static FillerState? GetState(DependencyObject grid) => grid.GetValue(StateProperty) as FillerState;
+    private static GridFillerLayer? GetLayer(DependencyObject grid) => grid.GetValue(LayerProperty) as GridFillerLayer;
 
-    private static void OnLoaded(object sender, RoutedEventArgs e)
-    {
-        if (GetState((DependencyObject)sender) is { } state)
-        {
-            state.WatchView();
-            state.Schedule();
-        }
-    }
+    private static void OnLoaded(object sender, RoutedEventArgs e) => GetLayer((DependencyObject)sender)?.StartWatching();
 
-    private static void OnUnloaded(object sender, RoutedEventArgs e) => GetState((DependencyObject)sender)?.StopWatching();
-
-    private static void OnSizeChanged(object sender, SizeChangedEventArgs e) => GetState((DependencyObject)sender)?.Resized(e.NewSize.Height);
-
-    private static void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
-    {
-        if ((bool)e.NewValue)
-        {
-            GetState((DependencyObject)sender)?.Schedule();
-        }
-    }
-
-    private static void OnItemsSourceChanged(object? sender, GridItemsSourceChangedEventArgs e)
-    {
-        if (sender is DependencyObject grid && GetState(grid) is { } state)
-        {
-            state.WatchView();
-            state.Schedule();
-        }
-    }
-
-    private static void OnGroupExpanded(object? sender, GroupChangedEventArgs e)
-    {
-        if (sender is DependencyObject grid)
-        {
-            GetState(grid)?.ContentGrew();
-        }
-    }
-
-    private static void OnGroupCollapsed(object? sender, GroupChangedEventArgs e)
-    {
-        if (sender is DependencyObject grid)
-        {
-            GetState(grid)?.Schedule();
-        }
-    }
-
-    /// <summary>
-    /// A press on a filler row goes no further, so the grid neither selects nor starts an edit for it. Only a press in the
-    /// grid's own window counts: a cell's drop-down list is a pop-up window inside the grid's tree, so a press on it reaches
-    /// here too, and where the list opens over the filler rows its position is a filler row's. Stopping that press kept the
-    /// list from ever selecting the item clicked, and a material or ingredient picked with the mouse was left blank.
-    /// </summary>
-    private static void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
-    {
-        if (sender is SfDataGrid grid
-            && e.OriginalSource is DependencyObject source
-            && ReferenceEquals(PresentationSource.FromDependencyObject(source), PresentationSource.FromVisual(grid))
-            && GetState(grid) is { } state
-            && grid.GetVisualContainer() is { } container
-            && state.IsFillerRowIndex(container.PointToCellRowColumnIndex(e.GetPosition(container), false).RowIndex))
-        {
-            e.Handled = true;
-        }
-    }
-
-    private static void OnSelectionChanging(object? sender, GridSelectionChangingEventArgs e)
-    {
-        if (sender is DependencyObject grid
-            && GetState(grid) is { } state
-            && e.AddedItems.OfType<GridRowInfo>().Any(r => r.IsUnBoundRow && state.IsFillerRowIndex(r.RowIndex)))
-        {
-            e.Cancel = true;
-        }
-    }
-
-    private static void OnCurrentCellActivating(object? sender, CurrentCellActivatingEventArgs e)
-    {
-        if (sender is DependencyObject grid
-            && GetState(grid) is { } state
-            && state.IsFillerRowIndex(e.CurrentRowColumnIndex.RowIndex))
-        {
-            e.Cancel = true;
-        }
-    }
-
-    /// <summary>One grid's filler rows, and what keeps them sized: its view's subscription, the settle delay and the pending recalculation.</summary>
-    private sealed class FillerState
-    {
-        private readonly SfDataGrid _grid;
-        private readonly DispatcherTimer _settleTimer;
-        private readonly List<GridUnBoundRow> _rows = [];
-        private INotifyCollectionChanged? _view;
-        private bool _watchingLayout;
-        private bool _pending;
-        private double _lastHeight;
-
-        public FillerState(SfDataGrid grid)
-        {
-            _grid = grid;
-            _settleTimer = new DispatcherTimer(DispatcherPriority.Background, grid.Dispatcher) { Interval = SettleDelay };
-            _settleTimer.Tick += (_, _) =>
-            {
-                _settleTimer.Stop();
-                Schedule();
-            };
-        }
-
-        /// <summary>
-        /// Whether the grid's row at <paramref name="rowIndex"/> is one of the filler rows. They're the grid's last rows
-        /// (bottom unbound rows shown below the summaries come after everything else, and the grid has no others), so
-        /// they're found by position: an unbound row's own RowIndex isn't kept up to date as records come and go, and
-        /// SfDataGrid.GetUnBoundRow, which matches it first, can take a group caption or a record for a filler row.
-        /// </summary>
-        public bool IsFillerRowIndex(int rowIndex)
-        {
-            var rowCount = _grid.GetVisualContainer()?.RowCount ?? 0;
-            return _rows.Count > 0 && rowIndex >= rowCount - _rows.Count && rowIndex < rowCount;
-        }
-
-        /// <summary>Follows the grid's current view: records added, removed or filtered out change the space left.</summary>
-        public void WatchView()
-        {
-            if (!_watchingLayout)
-            {
-                _grid.LayoutUpdated += OnLayoutUpdated;
-                _watchingLayout = true;
-            }
-
-            var view = _grid.View as INotifyCollectionChanged;
-            if (ReferenceEquals(view, _view))
-            {
-                return;
-            }
-
-            if (_view is not null)
-            {
-                _view.CollectionChanged -= OnViewChanged;
-            }
-
-            _view = view;
-            if (_view is not null)
-            {
-                _view.CollectionChanged += OnViewChanged;
-            }
-        }
-
-        public void StopWatching()
-        {
-            _settleTimer.Stop();
-            if (_watchingLayout)
-            {
-                _grid.LayoutUpdated -= OnLayoutUpdated;
-                _watchingLayout = false;
-            }
-
-            if (_view is not null)
-            {
-                _view.CollectionChanged -= OnViewChanged;
-                _view = null;
-            }
-        }
-
-        public void Resized(double height)
-        {
-            var shrank = height < _lastHeight;
-            _lastHeight = height;
-            if (shrank)
-            {
-                Apply(allowAdding: false);
-            }
-            else
-            {
-                _settleTimer.Stop();
-                _settleTimer.Start();
-            }
-        }
-
-        /// <summary>The rows took more room (records added, a group expanded): what no longer fits goes now, and the rest is recalculated after.</summary>
-        public void ContentGrew()
-        {
-            Apply(allowAdding: false);
-            Schedule();
-        }
-
-        /// <summary>Recalculates once, after layout, however many triggers ask before it runs.</summary>
-        public void Schedule()
-        {
-            if (_pending)
-            {
-                return;
-            }
-
-            _pending = true;
-            _grid.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
-            {
-                _pending = false;
-                Apply(allowAdding: true);
-            }));
-        }
-
-        public void RemoveRows()
-        {
-            while (_rows.Count > 0)
-            {
-                RemoveLastRow();
-            }
-        }
-
-        private void OnViewChanged(object? sender, NotifyCollectionChangedEventArgs e) => ContentGrew();
-
-        /// <summary>
-        /// Takes away rows that no longer fit, after any layout that grew the grid's rows without an event this class
-        /// hears: ExpandAllGroup raises no GroupExpanded and changes no records. Left there, they cover the rows they
-        /// were pinned over, and a grouped grid's row generation broke under them (an ArgumentOutOfRangeException from
-        /// GroupDisplayElements.GetItemAt during layout, which closed the app; GridFillerRowsGroupedTests). It only
-        /// compares two numbers until something doesn't fit.
-        /// </summary>
-        private void OnLayoutUpdated(object? sender, EventArgs e)
-        {
-            if (_rows.Count > 0
-                && _grid.GetVisualContainer()?.ScrollRows is PixelScrollAxis rows
-                && FillerRowCount(rows.RenderSize, rows.TotalExtent - (_rows.Count * _grid.RowHeight), _grid.RowHeight) < _rows.Count)
-            {
-                Apply(allowAdding: false);
-            }
-        }
-
-        private void Apply(bool allowAdding)
-        {
-            if (!_grid.IsLoaded || !_grid.IsVisible || _grid.GetVisualContainer()?.ScrollRows is not PixelScrollAxis rows)
-            {
-                return;
-            }
-
-            // A change now would end the row's edit without committing it: try again once it's over.
-            if (_grid.View is IEditableCollectionView { IsEditingItem: true })
-            {
-                _settleTimer.Stop();
-                _settleTimer.Start();
-                return;
-            }
-
-            var rowHeight = _grid.RowHeight;
-            var wanted = FillerRowCount(rows.RenderSize, rows.TotalExtent - (_rows.Count * rowHeight), rowHeight);
-
-            while (_rows.Count > wanted)
-            {
-                RemoveLastRow();
-            }
-
-            if (!allowAdding)
-            {
-                return;
-            }
-
-            if (_rows.Count < wanted)
-            {
-                AddRows(wanted);
-            }
-
-            // After the rows just added are laid out: until then the grid can't find the add-new row's cell to take it as
-            // its current cell, so it would note the index alone, and the next move would leave that cell outlined.
-            _grid.Dispatcher.BeginInvoke(DispatcherPriority.Background, MoveCurrentCellOffFillerRow);
-        }
-
-        private void AddRows(int wanted)
-        {
-            var currentCell = _grid.SelectionController?.CurrentCellManager?.CurrentRowColumnIndex ?? new RowColumnIndex(-1, -1);
-            while (_rows.Count < wanted)
-            {
-                var row = new GridUnBoundRow { Position = UnBoundRowsPosition.Bottom, ShowBelowSummary = true };
-                _rows.Add(row);
-                _grid.UnBoundRows.Add(row);
-            }
-
-            // With the current cell on the last line, an addition moves it onto the add-new row: put it back. Only
-            // that move is undone, and only onto a cell that still exists. The grid holds on to the current cell of a
-            // row that's gone — a selected line's, after the lines were replaced (another sub-assembly's form on the
-            // Products screen) — and drops it itself when rows are added. Moving back there threw "InValid
-            // RowColumnIndex" (GridCurrentCellManager.CanMoveCurrentCell) from this dispatcher callback, which closed
-            // the app (GridFillerRowsCurrentCellTests).
-            if (IsRecordCell(currentCell)
-                && _grid.SelectionController?.CurrentCellManager is { } manager
-                && manager.CurrentRowColumnIndex != currentCell
-                && _grid.IsAddNewIndex(manager.CurrentRowColumnIndex.RowIndex))
-            {
-                _grid.MoveCurrentCell(currentCell, needToClearSelection: false);
-            }
-        }
-
-        /// <summary>
-        /// Puts a current cell left on a filler row back on the add-new row. When the last lines go (an undo back to no
-        /// lines, another material with none) while the current cell is on the add-new row, the grid moves the add-new
-        /// row up but leaves its current cell at the old row index. Without filler rows nothing is there, but with them
-        /// a filler row is, and the grid draws a second current cell on it. The add-new row keeps its own outline too,
-        /// and every later click moves only the filler row's. Moving the current cell again clears both.
-        /// </summary>
-        private void MoveCurrentCellOffFillerRow()
-        {
-            if (_grid.SelectionController?.CurrentCellManager is { } manager
-                && IsFillerRowIndex(manager.CurrentRowColumnIndex.RowIndex)
-                && _grid.GetAddNewRowIndex() is var addRow and >= 0)
-            {
-                _grid.MoveCurrentCell(new RowColumnIndex(addRow, manager.CurrentRowColumnIndex.ColumnIndex), needToClearSelection: false);
-            }
-        }
-
-        /// <summary>Whether <paramref name="cell"/> is a cell of one of the grid's records, in one of its visible columns.</summary>
-        private bool IsRecordCell(RowColumnIndex cell) =>
-            cell.RowIndex >= 0
-            && _grid.ResolveToRecordIndex(cell.RowIndex) >= 0
-            && cell.ColumnIndex >= _grid.GetFirstColumnIndex()
-            && cell.ColumnIndex <= _grid.GetLastColumnIndex();
-
-        private void RemoveLastRow()
-        {
-            var row = _rows[^1];
-            _rows.RemoveAt(_rows.Count - 1);
-            _grid.UnBoundRows.Remove(row);
-        }
-    }
+    private static void OnUnloaded(object sender, RoutedEventArgs e) => GetLayer((DependencyObject)sender)?.StopWatching();
 }

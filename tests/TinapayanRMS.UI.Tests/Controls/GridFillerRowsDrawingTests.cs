@@ -1,0 +1,191 @@
+using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using AwesomeAssertions;
+using Syncfusion.SfSkinManager;
+using Syncfusion.UI.Xaml.Grid;
+using Syncfusion.UI.Xaml.Grid.Helpers;
+using TinapayanRMS.UI.Controls;
+using TinapayanRMS.UI.Tests.Fixtures;
+
+namespace TinapayanRMS.UI.Tests.Controls;
+
+/// <summary>
+/// GridFillerRows' drawn rows (GridFillerLayer) look like the grid's own empty rows: a themed grid padded with them is
+/// rendered beside the same grid holding that many blank records, and the two must match pixel for pixel, at 100% and at
+/// the 125% the dev machine's primary monitor runs at, with and without a row header, and scrolled sideways with the
+/// columns passing under the row header.
+/// </summary>
+public class GridFillerRowsDrawingTests
+{
+    public sealed class Line
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string Grams { get; set; } = string.Empty;
+
+        public string Cost { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// How far a pixel may be off, per channel out of 255. Rendered at 125%, the one pixel column where the last column's
+    /// line meets the grid's right edge comes out 2 levels apart, as the container's clip and the layer's fall on it a
+    /// little differently. A crossing drawn twice is 13 levels darker, and a line a quarter-pixel out at least 5.
+    /// </summary>
+    private const int Tolerance = 2;
+
+    [Theory]
+    [InlineData(false, 96, false, false)]
+    [InlineData(true, 96, false, false)]
+    [InlineData(false, 120, false, false)]
+    [InlineData(true, 120, false, false)]
+    [InlineData(true, 96, true, false)]
+    [InlineData(true, 120, true, false)]
+    [InlineData(true, 96, false, true)]
+    [InlineData(true, 120, false, true)]
+    public void The_drawn_rows_match_blank_records(bool showRowHeader, int dpi, bool scrolled, bool resized) => StaThread.RunThemed(() =>
+    {
+        var padded = LinesGrid(showRowHeader, scrolled, blankRecords: 0);
+        var host = new StackPanel { Orientation = Orientation.Horizontal, Children = { padded } };
+        var window = new Window
+        {
+            Content = host,
+            Width = 900,
+            Height = 500,
+            Left = -20000,
+            Top = -20000,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            ShowActivated = false,
+            ShowInTaskbar = false,
+        };
+        try
+        {
+            SfSkinManager.SetTheme(window, new Theme("Windows11Light"));
+            window.Show();
+            OffscreenGrid.Pump();
+            var rowCount = OffscreenGrid.FillerLayer(padded).Layout.RowCount;
+            rowCount.Should().BeGreaterThan(0, "a 300 px grid with two lines has room for more");
+
+            var blank = LinesGrid(showRowHeader, scrolled, rowCount);
+            host.Children.Add(blank);
+            OffscreenGrid.Pump();
+            if (scrolled)
+            {
+                padded.GetVisualContainer().SetHorizontalOffset(60);
+                blank.GetVisualContainer().SetHorizontalOffset(60);
+                OffscreenGrid.Pump();
+            }
+
+            // A column dragged wider by its header's edge (AllowResizingColumns). While the drag goes on, the grid resizes
+            // only the column's line on its scroll axis (GridColumnResizingController: ScrollColumns.SetLineResize); its
+            // Width is set when the mouse is let go. The drawn lines must follow both, in the same layout pass.
+            if (resized)
+            {
+                var before = OffscreenGrid.FillerLayer(padded).Layout.Columns;
+                var nameLine = padded.ResolveToScrollColumnIndex(0);
+                padded.GetVisualContainer().ScrollColumns.SetLineResize(nameLine, 180.75);
+                blank.GetVisualContainer().ScrollColumns.SetLineResize(nameLine, 180.75);
+                padded.UpdateLayout();
+                OffscreenGrid.FillerLayer(padded).Layout.Columns.Should().NotEqual(before, "the drawn lines follow the column as it's dragged");
+                OffscreenGrid.Pump();
+                var dragging = Differences(Render(padded, dpi), Render(blank, dpi));
+                dragging.Should().BeEmpty("mid-drag, these pixels differ: {0}", string.Join("; ", dragging));
+
+                foreach (var grid in new[] { padded, blank })
+                {
+                    grid.GetVisualContainer().ScrollColumns.ResetLineResize();
+                    grid.Columns[0].Width = 181;
+                }
+
+                OffscreenGrid.Pump();
+            }
+
+            OffscreenGrid.FillerLayer(padded).Layout.RowCount.Should().Be(rowCount);
+            var differences = Differences(Render(padded, dpi), Render(blank, dpi));
+            differences.Should().BeEmpty("the drawn rows should look like blank records, and these pixels don't: {0}", string.Join("; ", differences));
+        }
+        finally
+        {
+            window.Close();
+        }
+    });
+
+    /// <summary>
+    /// A 300 px lines table as the app's are, with two lines and <paramref name="blankRecords"/> empty ones under them, and
+    /// GridFillerRows on when it has none. Scrolled, its Name column is too wide for it, so it scrolls sideways.
+    /// </summary>
+    private static SfDataGrid LinesGrid(bool showRowHeader, bool scrolled, int blankRecords)
+    {
+        var lines = new ObservableCollection<Line>
+        {
+            new() { Name = "Flour", Grams = "1,000.0", Cost = "62.00" },
+            new() { Name = "Water", Grams = "650.0", Cost = "0.00" },
+        };
+        for (var i = 0; i < blankRecords; i++)
+        {
+            lines.Add(new Line());
+        }
+
+        var grid = new SfDataGrid
+        {
+            ItemsSource = lines,
+            AutoGenerateColumns = false,
+            AllowEditing = false,
+            GridLinesVisibility = GridLinesVisibility.Both,
+            ShowRowHeader = showRowHeader,
+            AllowRowHoverHighlighting = false,
+            Width = 377.5,
+            Height = 300,
+            VerticalAlignment = VerticalAlignment.Top,
+            ColumnSizer = GridLengthUnitType.AutoLastColumnFill,
+        };
+        grid.Columns.Add(new GridTextColumn { MappingName = nameof(Line.Name), Width = scrolled ? 300.25 : 140.25 });
+        grid.Columns.Add(new GridTextColumn { MappingName = nameof(Line.Grams), Width = 90 });
+        grid.Columns.Add(new GridTextColumn { MappingName = nameof(Line.Cost) });
+        GridFillerRows.SetIsEnabled(grid, blankRecords == 0);
+        return grid;
+    }
+
+    /// <summary><paramref name="element"/> as drawn at <paramref name="dpi"/>.</summary>
+    private static RenderTargetBitmap Render(FrameworkElement element, int dpi)
+    {
+        var scale = dpi / 96d;
+        var bitmap = new RenderTargetBitmap(
+            (int)Math.Ceiling(element.ActualWidth * scale), (int)Math.Ceiling(element.ActualHeight * scale), dpi, dpi, PixelFormats.Pbgra32);
+        var visual = new DrawingVisual();
+        using (var context = visual.RenderOpen())
+        {
+            context.DrawRectangle(new VisualBrush(element), null, new Rect(0, 0, element.ActualWidth, element.ActualHeight));
+        }
+
+        bitmap.Render(visual);
+        return bitmap;
+    }
+
+    /// <summary>The first 20 pixels further apart than <see cref="Tolerance"/>, as "x,y padded/blank" in ARGB.</summary>
+    private static List<string> Differences(BitmapSource padded, BitmapSource blank)
+    {
+        var (a, b) = (Pixels(padded), Pixels(blank));
+        List<string> differences = [];
+        for (var i = 0; i < a.Length && differences.Count < 20; i += 4)
+        {
+            if (Enumerable.Range(i, 4).Any(c => Math.Abs(a[c] - b[c]) > Tolerance))
+            {
+                var pixel = i / 4;
+                differences.Add($"{pixel % padded.PixelWidth},{pixel / padded.PixelWidth} {BitConverter.ToUInt32(a, i):X8}/{BitConverter.ToUInt32(b, i):X8}");
+            }
+        }
+
+        return differences;
+    }
+
+    private static byte[] Pixels(BitmapSource bitmap)
+    {
+        var stride = bitmap.PixelWidth * 4;
+        var pixels = new byte[stride * bitmap.PixelHeight];
+        bitmap.CopyPixels(pixels, stride, 0);
+        return pixels;
+    }
+}

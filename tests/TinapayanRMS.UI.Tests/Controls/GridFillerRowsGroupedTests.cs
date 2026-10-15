@@ -16,29 +16,29 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// <summary>
 /// GridFillerRows in a grouped, name-sorted, live-data-shaped list — how the Raw Materials list (MaterialListCard.xaml)
 /// was set up before its grouping was removed (2026-09-17). Kept as a regression test for any grid set up this way,
-/// since GridFillerRows is still used elsewhere. Filler rows are frozen footer rows, so ones that no longer fit sit
-/// over the list's rows, and a grouped grid's row generation breaks under them: an ArgumentOutOfRangeException from
-/// GroupDisplayElements.GetItemAt during layout closed the app (2026-09-16). Fuzzing the list reproduced it only
-/// after filler rows had been left overflowing, and never with them kept to what fits.
+/// since GridFillerRows is still used elsewhere. While the padding was the grid's own frozen footer rows (until
+/// 2026-10-15), ones that no longer fit sat over the list's rows, and a grouped grid's row generation broke under them:
+/// an ArgumentOutOfRangeException from GroupDisplayElements.GetItemAt during layout closed the app (2026-09-16). Drawn,
+/// the padding is never in the grid's rows, and it still has to keep to the space the rows leave.
 /// </summary>
 [Collection(OffscreenGridCollection.Name)]
 public class GridFillerRowsGroupedTests
 {
     [Fact]
-    public void Expanding_every_group_at_once_takes_away_the_filler_rows_that_no_longer_fit()
+    public void Expanding_every_group_at_once_takes_away_the_padding_that_no_longer_fits()
     {
         OffscreenGrid.Run(MaterialList, grid =>
         {
-            // Collapsed, the list is a header and a caption. CollapseAllGroup raises no GroupCollapsed either, so it's the
-            // next refresh of a row that fills the rest with filler rows.
+            // Collapsed, the list is a header and a caption, and the rest is padded.
             CollapseAndRefresh(grid);
-            grid.UnBoundRows.Should().NotBeEmpty();
+            OffscreenGrid.FillerLayer(grid).Layout.RowCount.Should().BePositive();
 
             // ExpandAllGroup raises no GroupExpanded and changes no records, so nothing but layout says the rows grew.
             grid.ExpandAllGroup();
             OffscreenGrid.Pump();
 
-            FillerRowsThatFit(grid).Should().BeGreaterThanOrEqualTo(grid.UnBoundRows.Count);
+            OffscreenGrid.FillerLayer(grid).Layout.RowCount.Should().Be(FillerRowsThatFit(grid));
+            grid.UnBoundRows.Should().BeEmpty();
         });
     }
 
@@ -54,7 +54,7 @@ public class GridFillerRowsGroupedTests
     private static int FillerRowsThatFit(SfDataGrid grid)
     {
         var rows = (PixelScrollAxis)grid.GetVisualContainer().ScrollRows;
-        return GridFillerRows.FillerRowCount(rows.RenderSize, rows.TotalExtent - (grid.UnBoundRows.Count * grid.RowHeight), grid.RowHeight);
+        return GridFillerRows.FillerRowCount(rows.RenderSize, rows.TotalExtent, grid.RowHeight);
     }
 
     private static readonly string[] MaterialNames = ["Butter", "Egg", "Egg White", "Egg Yolk", "Flour", "Salt", "Sugar"];

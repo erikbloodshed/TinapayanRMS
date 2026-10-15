@@ -1,8 +1,10 @@
 using System.Collections.Specialized;
 using System.Windows;
+using System.Windows.Threading;
 using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.UI.Xaml.Grid.Cells;
 using Syncfusion.UI.Xaml.Grid.Helpers;
+using Syncfusion.UI.Xaml.ScrollAxis;
 
 namespace TinapayanRMS.UI.Controls;
 
@@ -122,7 +124,8 @@ public static class GridAddNewRow
 /// untouched row the way the grid's own Esc does. A row with anything typed in it is still added.
 /// <para>
 /// An add row still open when the screen changes the grid's lines itself is dropped as well, typed into or not
-/// (<see cref="ProcessSourceCollectionChanged"/>).
+/// (<see cref="ProcessSourceCollectionChanged"/>), and a current cell on the add row stays on it when the lines above it
+/// go (<see cref="PutCurrentCellBackOnAddRow"/>).
 /// </para>
 /// </summary>
 internal sealed class UntouchedAddRowSelectionController(SfDataGrid grid) : GridSelectionController(grid)
@@ -142,7 +145,30 @@ internal sealed class UntouchedAddRowSelectionController(SfDataGrid grid) : Grid
             DataGrid.GetAddNewRowController().CancelAddNew();
         }
 
+        var wasOnAddRow = DataGrid.IsAddNewIndex(CurrentCellManager.CurrentRowColumnIndex.RowIndex);
         base.ProcessSourceCollectionChanged(e, reason);
+        if (wasOnAddRow)
+        {
+            DataGrid.Dispatcher.BeginInvoke(DispatcherPriority.Background, PutCurrentCellBackOnAddRow);
+        }
+    }
+
+    /// <summary>
+    /// When the last lines go while the add row's cell is current (Ctrl+Z back to no lines, another material with none),
+    /// the grid moves the add row up but leaves its current cell index where the add row was, past the last row it can
+    /// be on. The add row keeps its outline, but the next key moves from the index, off the rows: Left, Right and Tab
+    /// all left no cell current. So the index goes back on the add row's cell. One dispatcher pass after the change: until
+    /// the add row is laid out the grid can't find its cell, notes only the index, and the next move leaves it outlined.
+    /// (Until 2026-10-15 GridFillerRows did this, since one of its rows was at that index and drew a second outline.)
+    /// </summary>
+    private void PutCurrentCellBackOnAddRow()
+    {
+        // At the bottom the add row is the last row the current cell can be on.
+        var current = CurrentCellManager.CurrentRowColumnIndex;
+        if (DataGrid.AddNewRowPosition == AddNewRowPosition.Bottom && DataGrid.GetAddNewRowIndex() is var addRow and >= 0 && current.RowIndex > addRow)
+        {
+            DataGrid.MoveCurrentCell(new RowColumnIndex(addRow, current.ColumnIndex), needToClearSelection: false);
+        }
     }
 
     protected override void CommitAddNew(bool changeState = true)

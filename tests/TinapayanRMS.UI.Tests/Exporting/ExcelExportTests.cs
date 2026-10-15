@@ -39,7 +39,7 @@ public class ExcelExportTests
             grid.Columns[nameof(Row.Name)].FilterPredicates.Add(new FilterPredicate { FilterType = FilterType.NotEquals, FilterValue = "Hopia" });
             grid.Columns[nameof(Row.Note)].IsHidden = true;
             OffscreenGrid.Pump();
-            grid.UnBoundRows.Should().NotBeEmpty("the grid pads the space under its rows, and the padding mustn't reach the file");
+            OffscreenGrid.FillerLayer(grid).Layout.RowCount.Should().BePositive("the grid pads the space under its rows, and the padding mustn't reach the file");
 
             WithSavedWorkbook([new ExcelSheet("Costs", grid)], workbook =>
             {

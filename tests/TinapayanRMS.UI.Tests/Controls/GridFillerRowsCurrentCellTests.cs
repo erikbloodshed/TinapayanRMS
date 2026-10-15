@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using AwesomeAssertions;
 using Syncfusion.UI.Xaml.Grid;
@@ -11,9 +12,11 @@ using TinapayanRMS.UI.Tests.Fixtures;
 namespace TinapayanRMS.UI.Tests.Controls;
 
 /// <summary>
-/// GridFillerRows in a lines table set up as the app's are (UsageFormPanel.xaml): adding filler rows must never move
-/// the grid's current cell somewhere it can't be. Moving it back to a cell that no longer existed threw "InValid
-/// RowColumnIndex" from a dispatcher callback, which closed the app (twice on the Products screen, 2026-09-16).
+/// GridFillerRows in a lines table set up as the app's are (UsageFormPanel.xaml): padding must never move the grid's
+/// current cell, or leave it somewhere it can't be. While the padding was rows of the grid (until 2026-10-15), adding them
+/// moved it, and moving it back to a cell that no longer existed threw "InValid RowColumnIndex" from a dispatcher
+/// callback, which closed the app (twice on the Products screen, 2026-09-16); a cleared table also drew a second
+/// current-cell outline on one. Drawn, the padding can't touch the current cell, and these pin that it doesn't.
 /// </summary>
 [Collection(OffscreenGridCollection.Name)]
 public class GridFillerRowsCurrentCellTests
@@ -31,7 +34,7 @@ public class GridFillerRowsCurrentCellTests
     public void Replacing_the_lines_after_one_was_selected_does_not_crash(bool hasAddRow)
     {
         // Found by fuzzing: selecting a line puts the current cell on its row, and clearing the lines leaves the grid
-        // holding that row. The filler rows then added to the empty table make the grid drop it, and moving it back
+        // holding that row. The filler rows then added to the empty table made the grid drop it, and moving it back
         // threw. On the Products screen: pick a line, then open another sub-assembly's form.
         OffscreenGrid.Run(LinesGrid, grid =>
         {
@@ -71,7 +74,7 @@ public class GridFillerRowsCurrentCellTests
     }
 
     [Fact]
-    public void Filler_rows_added_under_the_last_line_leave_the_current_cell_on_it()
+    public void More_padding_under_the_last_line_leaves_the_current_cell_on_it()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
         {
@@ -79,7 +82,7 @@ public class GridFillerRowsCurrentCellTests
             grid.MoveCurrentCell(lastLine);
             OffscreenGrid.Pump();
 
-            // Taller: more filler rows are added, which moves a current cell on the last line onto the add row.
+            // Taller: more padding. Added as rows, they moved a current cell on the last line onto the add row.
             grid.Height += 150;
             OffscreenGrid.Pump();
 
@@ -90,8 +93,9 @@ public class GridFillerRowsCurrentCellTests
     [Fact]
     public void Removing_every_line_while_the_add_row_is_current_leaves_one_current_cell_on_the_add_row()
     {
-        // Ctrl+Z back to no brands on Raw Materials' Purchase Cost Setup, with the add row's cell current: the grid moved
-        // the add row up but kept its current cell at the old row index, a filler row now, and drew an outline on both.
+        // Ctrl+Z back to no brands on Raw Materials' Purchase Cost Setup, with the add row's cell current: the grid moves
+        // the add row up but keeps its current cell at the old row index. While that was a filler row it drew an outline
+        // on both; now nothing's there, but keys moved from it (GridAddNewRow puts it back on the add row).
         OffscreenGrid.Run(LinesGrid, grid =>
         {
             var column = grid.GetFirstColumnIndex() + 1;
@@ -110,6 +114,44 @@ public class GridFillerRowsCurrentCellTests
             OffscreenGrid.Pump();
 
             OutlinedCells(grid).Should().Equal(new RowColumnIndex(addRow, column - 1));
+        });
+    }
+
+    [Theory]
+    [InlineData(Key.Left, 1, 0, true)]
+    [InlineData(Key.Right, 0, 1, true)]
+    [InlineData(Key.Tab, 0, 1, true)]
+    [InlineData(Key.Left, 1, 0, false)]
+    [InlineData(Key.Right, 0, 1, false)]
+    [InlineData(Key.Tab, 0, 1, false)]
+    public void A_key_after_every_line_is_removed_moves_along_the_add_row(Key key, int from, int to, bool clear)
+    {
+        // The grid's current cell index is left where the last line was, below the add row; the next key must still
+        // move from the add row's cell, as it's drawn.
+        OffscreenGrid.Run(LinesGrid, grid =>
+        {
+            var first = grid.GetFirstColumnIndex();
+            grid.MoveCurrentCell(new RowColumnIndex(grid.GetAddNewRowIndex(), first + from));
+            grid.Focus();
+            OffscreenGrid.Pump();
+            if (clear)
+            {
+                ((ObservableCollection<Line>)grid.ItemsSource).Clear();
+            }
+
+            OffscreenGrid.Pump();
+
+            var source = PresentationSource.FromVisual(grid)!;
+            var preview = new KeyEventArgs(Keyboard.PrimaryDevice, source, 0, key) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
+            grid.RaiseEvent(preview);
+            if (!preview.Handled)
+            {
+                grid.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, 0, key) { RoutedEvent = Keyboard.KeyDownEvent });
+            }
+
+            OffscreenGrid.Pump();
+
+            OutlinedCells(grid).Should().Equal(new RowColumnIndex(grid.GetAddNewRowIndex(), first + to));
         });
     }
 

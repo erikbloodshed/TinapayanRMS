@@ -1,12 +1,14 @@
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Syncfusion.UI.Xaml.Grid;
+using TinapayanRMS.UI.Controls;
 
 namespace TinapayanRMS.UI.Tests.Fixtures;
 
 /// <summary>
 /// A real SfDataGrid in a window placed off-screen, on an STA thread of its own, for tests of the grid behaviours in
-/// UI/Controls that only go wrong in a live grid's layout and selection (GridFillerRows). Exceptions the grid throws
+/// UI/Controls that only go wrong in a live grid's layout and selection. Exceptions the grid throws
 /// from a dispatcher callback surface from <see cref="Pump"/>, as they'd have closed the app.
 /// </summary>
 public static class OffscreenGrid
@@ -45,7 +47,25 @@ public static class OffscreenGrid
             }
         });
 
-    /// <summary>Runs the dispatcher long enough for layout and GridFillerRows' settle delay (150 ms) to finish.</summary>
+    /// <summary>The layer GridFillerRows draws <paramref name="grid"/>'s empty rows on, in its template.</summary>
+    public static GridFillerLayer FillerLayer(SfDataGrid grid) =>
+        Descendants(grid).OfType<GridFillerLayer>().SingleOrDefault()
+        ?? throw new InvalidOperationException("The grid has no filler layer: GridFillerRows isn't on, or the grid isn't loaded.");
+
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject node)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
+        {
+            var child = VisualTreeHelper.GetChild(node, i);
+            yield return child;
+            foreach (var descendant in Descendants(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    /// <summary>Runs the dispatcher long enough for layout and the grid's own deferred work to finish.</summary>
     public static void Pump()
     {
         var until = DateTime.UtcNow.AddMilliseconds(500);

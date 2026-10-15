@@ -19,8 +19,8 @@ namespace TinapayanRMS.UI.Exporting;
 /// <item>it sizes the columns to the grid's on-screen widths, which Reports' two-line headings make too narrow for
 /// one-line ones, so the columns are fitted to what's in them.</item>
 /// </list>
-/// Figures are written as numbers at full precision, and the formats only show them. GridFillerRows' padding is a
-/// grid's unbound rows, which stay out (ExportUnBoundRows is false).
+/// Figures are written as numbers at full precision, and the formats only show them. GridFillerRows' padding is only
+/// drawn, never rows of the grid, so there's none to leave out.
 /// </summary>
 public static class ExcelExport
 {

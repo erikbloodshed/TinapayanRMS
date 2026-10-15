@@ -817,8 +817,8 @@ Undo and redo follow the Memento pattern:
 - **Speed.** Where the keyboard is (a `Place`: field, grid, tree, table, other or overlay) is worked out once per focus change and cached. A key is then a `FrozenDictionary` lookup (`VimKeySequence`, built from `VimKeymap`) plus the action.
 - **Keys stand for the keys they replace.**
   - In grids, trees and lists, `j` is raised as Down and `dd` as Delete. In a tree, `o` is raised as Enter and `r` as F2.
-  - Each is raised on the element that has the keyboard, as WPF's `KeyboardDevice` raises a real key: `PreviewKeyDown`, then `KeyDown` unless the first was handled. So the controls' own handling and the app's behaviours (`GridFillerRows`, `GridUndoSteps`, the trees' `Tree_KeyDown`) apply unchanged.
-  - A raised key reads Ctrl and Shift from the physical keyboard (`KeyboardDevice.Modifiers`), so only keys typed without a modifier are raised. `gg`, `G`, `0` and `$` use the grid's `MoveCurrentCell`, with `GetFirstDataRowIndex`, `GetLastDataRowIndex` (which skips the filler rows and the add row) and the column helpers. The trees pick their row through `SelectedItems`.
+  - Each is raised on the element that has the keyboard, as WPF's `KeyboardDevice` raises a real key: `PreviewKeyDown`, then `KeyDown` unless the first was handled. So the controls' own handling and the app's behaviours (`GridAddNewRow`, `GridUndoSteps`, the trees' `Tree_KeyDown`) apply unchanged.
+  - A raised key reads Ctrl and Shift from the physical keyboard (`KeyboardDevice.Modifiers`), so only keys typed without a modifier are raised. `gg`, `G`, `0` and `$` use the grid's `MoveCurrentCell`, with `GetFirstDataRowIndex`, `GetLastDataRowIndex` (which skips the add row) and the column helpers. The trees pick their row through `SelectedItems`.
   - In a form, `j`/`k` call `MoveFocus` (Next or Previous), because an arrow key would step a number box's value.
 - **Each list card has a toolbar under its search box**: icon-only `ButtonAdv`s (`SizeMode="Small"`, the name in `Label` and `ToolTip`, `Focusable="False"` so Tab still goes from the search box to the tree) bound to the commands of the tree's empty-space menu (`EmptySpaceMenu` in each ViewModel), with no parameter. Raw Materials' two New Category items share one `DropDownButtonAdv`. A list command added to that menu belongs in the toolbar too. The properties are set on each button, not through a `Style`, so the theme's template stays intact. A Small `ButtonAdv` comes with `Padding` 2,0,4,0 and draws the 14 px glyph in the top-left corner of a 16 × 16 icon box, so each toolbar button sets `IconWidth` and `IconHeight` to 14 and `Padding` to 3,1,3,0 to centre it. The `DropDownButtonAdv` ignores `Padding`, so it gets a 16-tall icon box with the glyph at its bottom instead. Their icons include `NewFolderIconTemplate`, `ExpandAllIconTemplate` and `CollapseAllIconTemplate` in `App.xaml`.
 - **`SfTreeView` in Extended mode** (the Products, Raw Materials and Sub-Assemblies lists) has three behaviours to work around:
@@ -849,7 +849,7 @@ The app extends Syncfusion's controls with **attached behaviours** in `Controls/
 
 | Behaviour | Set on | What it does |
 |---|---|---|
-| `GridFillerRows.IsEnabled` | A grid with height to fill | Pads the space under the last row with inert, empty rows |
+| `GridFillerRows.IsEnabled` | A grid with height to fill | Draws the lines of empty rows in the space under the last row (`GridFillerLayer`, in the grid's template). It adds no rows to the grid, so selection, editing and export never see them |
 | `GridRowReordering.IsEnabled` | An editable grid of lines | Lets rows be dragged into order. The collection's order is what's saved as `SortOrder`. |
 | `GridRowInserting.IsEnabled` | An editable grid of lines with an `ItemFactory` | Puts a blank line from the `ItemFactory` in above the current one, as one undo step, and opens its first column. It's run by the `GridRowInserting.InsertLine` routed command: a button with `CommandTarget` set to the grid, the Insert key, or Vim's `O`. It's on the ingredient line tables of Sub-Assemblies and of a product's section form, including its add-ins. |
 | `GridAddNewRow.ItemFactory` | An editable grid | Makes the add row edit a row the screen creates |
@@ -914,7 +914,7 @@ Reports' tables go to an Excel workbook with **Export to Excel**. The parts, in 
    - it leaves out hidden columns by name (`ExcludeColumns`), since the converter writes them too;
    - it gives each numeric column the grid's decimals with a thousands separator (`#,##0.00`), since the converter's own format has none;
    - it fits the columns to their contents, since the converter copies the grid's on-screen widths.
-   `GridFillerRows`' padding is a grid's unbound rows, which stay out because `ExportUnBoundRows` is left false. Figures are written as numbers at full precision; the format only shows them rounded. The workbook is built in memory before the file is touched, so a file that can't be written is left as it was.
+   `GridFillerRows`' padding is only drawn, never rows of the grid, so it can't reach the file. Figures are written as numbers at full precision; the format only shows them rounded. The workbook is built in memory before the file is touched, so a file that can't be written is left as it was.
 
 `ExcelExportTests` checks all of this against a real grid read back with XlsIO.
 
