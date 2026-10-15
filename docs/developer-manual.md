@@ -851,6 +851,7 @@ The app extends Syncfusion's controls with **attached behaviours** in `Controls/
 |---|---|---|
 | `GridFillerRows.IsEnabled` | A grid with height to fill | Pads the space under the last row with inert, empty rows |
 | `GridRowReordering.IsEnabled` | An editable grid of lines | Lets rows be dragged into order. The collection's order is what's saved as `SortOrder`. |
+| `GridRowInserting.IsEnabled` | An editable grid of lines with an `ItemFactory` | Puts a blank line from the `ItemFactory` in above the current one, as one undo step, and opens its first column. It's run by the `GridRowInserting.InsertLine` routed command: a button with `CommandTarget` set to the grid, the Insert key, or Vim's `O`. It's on the ingredient line tables of Sub-Assemblies and of a product's section form, including its add-ins. |
 | `GridAddNewRow.ItemFactory` | An editable grid | Makes the add row edit a row the screen creates |
 | `GridEditCommit` | An editable grid | Commits an open cell edit when focus leaves the grid, so Save sees it |
 | `GridCellEditing.IsEnabled` | A grid | Makes a column editable on some rows and not others |

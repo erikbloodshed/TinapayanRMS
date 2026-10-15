@@ -169,6 +169,7 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 - Most tables are typed straight into. Click a cell and type. The empty row at the bottom adds a new line.
 - Pickers inside tables, such as the ingredient or material pickers, suggest names as you type.
 - **Drag a row**, by its left edge or any cell you aren't typing in, to change the order of recipe lines, bill of materials lines and packaging lines. The order is saved.
+- **Insert Line** puts a blank line in above the selected one, so you don't have to add it at the bottom and drag it up. The new line's Ingredient cell opens, ready to type. With no line selected, or the empty row at the bottom selected, the new line goes in at the bottom. You can also press **Insert** while the table has the cursor and you aren't typing in a cell. It's on the ingredient tables: a sub-assembly's lines on the Sub-Assemblies screen, and a product section's lines and add-ins (the add-ins button is **Insert Add-In**). A line you leave blank does no harm, because Save leaves it out. **Undo** or **Remove Line** takes it away.
 - **Remove Line** removes the selected line.
 - Figures shown in grey are worked out by the app, so they can't be typed into.
 
@@ -208,6 +209,7 @@ While a picker's list is open, **Ctrl+N** and **Ctrl+P** move down and up it, li
 - **i** or **a**: start typing in the field or cell. **I** and **A** start at the beginning or end of a field. In a table, they start in the row's first or last column.
 - **cc**: type over a field or cell. Its text is selected, so what you type replaces it.
 - **o**: start a new line in a table, in the empty row at the bottom.
+- **O**: start a new line above the one under the cursor, as **Insert Line** does. It works in the ingredient tables that have that button.
 - **dd**: delete the table line under the cursor. In the Raw Materials and Products lists, it deletes the row, as the row's menu does, and asks first.
 - **r**: rename the list row, as the row's menu does.
 - **u**: undo. **Ctrl+R**: redo.
@@ -582,7 +584,7 @@ Each section's tab shows its form:
 
 - **Role**, and an optional **Name**. The name tells apart two sections in the same role, such as *Filling: Ube* and *Filling: Cheese*.
 - **Existing Sub-Assembly or Packaging** picker, when you're linking or copying.
-- **The lines table**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base**. Under it are **Remove Line** and the section's cost per piece.
+- **The lines table**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base**. Under it are **Insert Line**, **Remove Line** and the section's cost per piece.
 - **Batch parameters**:
   - **Total weight**: the batch that goes in, including add-ins
   - **Shrinkage %**

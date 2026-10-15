@@ -150,6 +150,37 @@ public class VimKeysGridTests
     }
 
     [Fact]
+    public void Capital_o_types_a_new_line_put_in_above_the_current_one()
+    {
+        RunWithVimKeys(
+            () =>
+            {
+                var grid = LinesGrid();
+                GridAddNewRow.SetItemFactory(grid, () => new Line());
+                GridRowInserting.SetIsEnabled(grid, true);
+                return grid;
+            },
+            grid =>
+            {
+                var lines = (ObservableCollection<Line>)grid.ItemsSource;
+                GridKeyboardFocus.PlaceCurrentCell(grid);
+                Type(grid, "j");
+
+                Type(grid, "O");
+                OffscreenGrid.Pump();
+
+                lines.Should().HaveCount(3);
+                lines[1].Name.Should().BeEmpty();
+                CurrentRow(grid).Should().Be(grid.ResolveToRowIndex(lines[1]));
+                Editor(grid).Text = "Salt";
+                Press(Editor(grid), Key.Escape);
+
+                lines[1].Name.Should().Be("Salt");
+                lines[2].Name.Should().Be("Line 2");
+            });
+    }
+
+    [Fact]
     public void Dd_deletes_the_line()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>

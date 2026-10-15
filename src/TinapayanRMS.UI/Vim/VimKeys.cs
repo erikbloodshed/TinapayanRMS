@@ -428,6 +428,9 @@ public static class VimKeys
                 MoveTo(grid, grid.GetAddNewRowIndex(), grid.GetFirstColumnIndex());
                 BeginEdit(grid, Caret.Start);
                 break;
+            case VimAction.OpenAbove when GridRowInserting.CanInsert(grid):
+                GridRowInserting.InsertAbove(grid);
+                break;
             case VimAction.Delete:
                 RaiseKey(focused, Key.Delete);
                 break;

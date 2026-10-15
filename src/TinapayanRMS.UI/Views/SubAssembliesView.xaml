@@ -333,10 +333,12 @@
                                         </syncfusion:SfDataGrid.Columns>
                                     </syncfusion:SfDataGrid>
 
-                                    <!-- Typed straight into: the add row at the bottom starts a line, Delete removes the selected one -->
-                                    <syncfusion:SfDataGrid ItemsSource="{Binding Lines}"
+                                    <!-- Typed straight into: the add row at the bottom starts a line, Insert puts one in above the current one, Delete removes the selected one -->
+                                    <syncfusion:SfDataGrid x:Name="LinesGrid"
+                                                           ItemsSource="{Binding Lines}"
                                                            controls:GridUndoSteps.Recorder="{Binding}"
                                                            controls:GridRowReordering.IsEnabled="True"
+                                                           controls:GridRowInserting.IsEnabled="True"
                                                            controls:NumericEditing.IsEnabled="True"
                                                            Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}"
                                                            controls:GridAddNewRow.HideCheckBoxes="True"
@@ -414,7 +416,17 @@
                                                        Style="{StaticResource CaptionStyle}"
                                                        Visibility="{Binding IsPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                         </StackPanel>
-                                        <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveLineCommand}" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <!-- Only the recipe's table: a packaging set's lines are added at the bottom -->
+                                            <syncfusion:ButtonAdv Label="Insert Line"
+                                                                  IconTemplate="{StaticResource AddIconTemplate}"
+                                                                  Command="{x:Static controls:GridRowInserting.InsertLine}"
+                                                                  CommandTarget="{Binding ElementName=LinesGrid}"
+                                                                  ToolTip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert."
+                                                                  Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}"
+                                                                  Margin="0,0,8,0" />
+                                            <syncfusion:ButtonAdv Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveLineCommand}" />
+                                        </StackPanel>
                                     </Grid>
                                 </StackPanel>
                             </Border>

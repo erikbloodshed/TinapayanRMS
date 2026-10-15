@@ -425,7 +425,7 @@
             <StackPanel Grid.Column="0">
                 <!--
                     The lines that make one batch, in grams, typed straight into: the add row at the bottom starts a
-                    line, Delete removes the selected one. A linked one's too, which Save writes to the sub-assembly where
+                    line, Insert puts one in above the current one, Delete removes the selected one. A linked one's too, which Save writes to the sub-assembly where
                     it's kept. Only a link being picked shows its lines read-only: AllowEditing is off and the add row goes
                     with it (AddNewRowPositionConverter).
                 -->
@@ -435,6 +435,7 @@
                                            controls:GridUndoSteps.Recorder="{Binding}"
                                            controls:CostBasisColumns.Basis="{Binding CostBasis}"
                                            controls:GridRowReordering.IsEnabled="True"
+                                           controls:GridRowInserting.IsEnabled="True"
                                            controls:NumericEditing.IsEnabled="True"
                                            controls:GridAddNewRow.HideCheckBoxes="True"
                                            controls:GridCellEditing.IsEnabled="True"
@@ -501,7 +502,7 @@
                         </syncfusion:SfDataGrid.Columns>
                     </syncfusion:SfDataGrid>
 
-                    <!-- The formula caption on the left; Remove Line only while the lines can be typed into -->
+                    <!-- The formula caption on the left; Insert Line and Remove Line only while the lines can be typed into -->
                     <Grid Margin="0,8,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -513,11 +514,19 @@
                                    VerticalAlignment="Center"
                                    TextWrapping="Wrap"
                                    Margin="0,0,12,0" />
-                        <syncfusion:ButtonAdv Grid.Column="1"
-                                              Label="Remove Line"
-                                              IconTemplate="{StaticResource RemoveIconTemplate}"
-                                              Command="{Binding RemoveFormLineCommand}"
-                                              Visibility="{Binding IsFormLinesEditable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    Visibility="{Binding IsFormLinesEditable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <syncfusion:ButtonAdv Label="Insert Line"
+                                                  IconTemplate="{StaticResource AddIconTemplate}"
+                                                  Command="{x:Static controls:GridRowInserting.InsertLine}"
+                                                  CommandTarget="{Binding ElementName=LinesGrid}"
+                                                  ToolTip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert."
+                                                  Margin="0,0,8,0" />
+                            <syncfusion:ButtonAdv Label="Remove Line"
+                                                  IconTemplate="{StaticResource RemoveIconTemplate}"
+                                                  Command="{Binding RemoveFormLineCommand}" />
+                        </StackPanel>
                     </Grid>
                 </StackPanel>
 
@@ -549,6 +558,7 @@
                                            controls:GridUndoSteps.Recorder="{Binding}"
                                            controls:CostBasisColumns.Basis="{Binding CostBasis}"
                                            controls:GridRowReordering.IsEnabled="True"
+                                           controls:GridRowInserting.IsEnabled="True"
                                            controls:NumericEditing.IsEnabled="True"
                                            controls:GridCellEditing.IsEnabled="True"
                                            SelectedItem="{Binding SelectedFormAddIn, Mode=TwoWay}"
@@ -613,7 +623,15 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="{Binding UsageFormAddInsCaption}" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,12,0" />
-                        <syncfusion:ButtonAdv Grid.Column="1" Label="Remove Add-In" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveFormAddInCommand}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <syncfusion:ButtonAdv Label="Insert Add-In"
+                                                  IconTemplate="{StaticResource AddIconTemplate}"
+                                                  Command="{x:Static controls:GridRowInserting.InsertLine}"
+                                                  CommandTarget="{Binding ElementName=AddInsGrid}"
+                                                  ToolTip="Puts a blank add-in in above the selected one, or at the bottom with none selected. Insert."
+                                                  Margin="0,0,8,0" />
+                            <syncfusion:ButtonAdv Label="Remove Add-In" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveFormAddInCommand}" />
+                        </StackPanel>
                     </Grid>
                 </StackPanel>
             </StackPanel>
