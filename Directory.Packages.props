@@ -1,21 +1,27 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <EFCoreVersion>10.0.12</EFCoreVersion>
+    <!-- Lets a PackageVersion below override a vulnerable transitive dependency. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <EFCoreVersion>10.0.13</EFCoreVersion>
     <!-- Every Syncfusion package must be on the same version: upgrade them together. -->
-    <SyncfusionVersion>35.1.39</SyncfusionVersion>
+    <SyncfusionVersion>35.1.40</SyncfusionVersion>
   </PropertyGroup>
   <ItemGroup Label="Application">
     <PackageVersion Include="Dapper" Version="2.1.89" />
-    <PackageVersion Include="DynamicData" Version="9.4.33" />
+    <PackageVersion Include="DynamicData" Version="9.5.0" />
     <PackageVersion Include="FluentValidation" Version="12.2.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EFCoreVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(EFCoreVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
     <PackageVersion Include="ReactiveUI.WPF" Version="26.0.1" />
     <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageVersion Include="System.Reactive" Version="7.0.0" />
+  </ItemGroup>
+  <ItemGroup Label="Transitive pins">
+    <!-- Microsoft.Data.SqlClient (via EF Core SqlServer) brings 9.0.11, which has known vulnerabilities. -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
   <ItemGroup Label="Syncfusion">
     <PackageVersion Include="Syncfusion.DataGridExcelExport.WPF" Version="$(SyncfusionVersion)" />
@@ -32,8 +38,8 @@
   </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
