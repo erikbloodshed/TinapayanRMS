@@ -1,7 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Windows;
-using System.Windows.Input;
-using System.Windows.Media;
 using AwesomeAssertions;
 using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.UI.Xaml.Grid.Helpers;
@@ -15,8 +12,8 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// GridFillerRows in a lines table set up as the app's are (UsageFormPanel.xaml): padding must never move the grid's
 /// current cell, or leave it somewhere it can't be. While the padding was rows of the grid (until 2026-10-15), adding them
 /// moved it, and moving it back to a cell that no longer existed threw "InValid RowColumnIndex" from a dispatcher
-/// callback, which closed the app (twice on the Products screen, 2026-09-16); a cleared table also drew a second
-/// current-cell outline on one. Drawn, the padding can't touch the current cell, and these pin that it doesn't.
+/// callback, which closed the app (twice on the Products screen, 2026-09-16). Drawn, the padding can't touch the current
+/// cell, and these pin that it doesn't. (The add row's current cell when its lines go is GridAddNewRowCurrentCellTests'.)
 /// </summary>
 [Collection(OffscreenGridCollection.Name)]
 public class GridFillerRowsCurrentCellTests
@@ -88,88 +85,6 @@ public class GridFillerRowsCurrentCellTests
 
             grid.SelectionController.CurrentCellManager.CurrentRowColumnIndex.Should().Be(lastLine);
         });
-    }
-
-    [Fact]
-    public void Removing_every_line_while_the_add_row_is_current_leaves_one_current_cell_on_the_add_row()
-    {
-        // Ctrl+Z back to no brands on Raw Materials' Purchase Cost Setup, with the add row's cell current: the grid moves
-        // the add row up but keeps its current cell at the old row index. While that was a filler row it drew an outline
-        // on both; now nothing's there, but keys moved from it (GridAddNewRow puts it back on the add row).
-        OffscreenGrid.Run(LinesGrid, grid =>
-        {
-            var column = grid.GetFirstColumnIndex() + 1;
-            grid.MoveCurrentCell(new RowColumnIndex(grid.GetAddNewRowIndex(), column));
-            OffscreenGrid.Pump();
-
-            ((ObservableCollection<Line>)grid.ItemsSource).Clear();
-            OffscreenGrid.Pump();
-
-            var addRow = grid.GetAddNewRowIndex();
-            grid.SelectionController.CurrentCellManager.CurrentRowColumnIndex.Should().Be(new RowColumnIndex(addRow, column));
-            OutlinedCells(grid).Should().Equal(new RowColumnIndex(addRow, column));
-
-            // The add row's own outline has to go with the next move too, not stay behind.
-            grid.MoveCurrentCell(new RowColumnIndex(addRow, column - 1), needToClearSelection: false);
-            OffscreenGrid.Pump();
-
-            OutlinedCells(grid).Should().Equal(new RowColumnIndex(addRow, column - 1));
-        });
-    }
-
-    [Theory]
-    [InlineData(Key.Left, 1, 0, true)]
-    [InlineData(Key.Right, 0, 1, true)]
-    [InlineData(Key.Tab, 0, 1, true)]
-    [InlineData(Key.Left, 1, 0, false)]
-    [InlineData(Key.Right, 0, 1, false)]
-    [InlineData(Key.Tab, 0, 1, false)]
-    public void A_key_after_every_line_is_removed_moves_along_the_add_row(Key key, int from, int to, bool clear)
-    {
-        // The grid's current cell index is left where the last line was, below the add row; the next key must still
-        // move from the add row's cell, as it's drawn.
-        OffscreenGrid.Run(LinesGrid, grid =>
-        {
-            var first = grid.GetFirstColumnIndex();
-            grid.MoveCurrentCell(new RowColumnIndex(grid.GetAddNewRowIndex(), first + from));
-            grid.Focus();
-            OffscreenGrid.Pump();
-            if (clear)
-            {
-                ((ObservableCollection<Line>)grid.ItemsSource).Clear();
-            }
-
-            OffscreenGrid.Pump();
-
-            var source = PresentationSource.FromVisual(grid)!;
-            var preview = new KeyEventArgs(Keyboard.PrimaryDevice, source, 0, key) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
-            grid.RaiseEvent(preview);
-            if (!preview.Handled)
-            {
-                grid.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, 0, key) { RoutedEvent = Keyboard.KeyDownEvent });
-            }
-
-            OffscreenGrid.Pump();
-
-            OutlinedCells(grid).Should().Equal(new RowColumnIndex(grid.GetAddNewRowIndex(), first + to));
-        });
-    }
-
-    /// <summary>The cells drawing the current-cell outline.</summary>
-    private static List<RowColumnIndex> OutlinedCells(DependencyObject node)
-    {
-        var cells = new List<RowColumnIndex>();
-        if (node is GridCell { CurrentCellBorderVisibility: Visibility.Visible, IsVisible: true, ColumnBase: { } column })
-        {
-            cells.Add(new RowColumnIndex(column.RowIndex, column.ColumnIndex));
-        }
-
-        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
-        {
-            cells.AddRange(OutlinedCells(VisualTreeHelper.GetChild(node, i)));
-        }
-
-        return cells;
     }
 
     /// <summary>A 200 px lines table with two lines and an add row, with the app's add-row and commit behaviours.</summary>
