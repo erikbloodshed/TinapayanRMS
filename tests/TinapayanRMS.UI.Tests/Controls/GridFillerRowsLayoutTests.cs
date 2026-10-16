@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows;
 using AwesomeAssertions;
 using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.UI.Xaml.Grid.Helpers;
@@ -84,6 +85,29 @@ public class GridFillerRowsLayoutTests
             grid.Height -= 240;
             grid.UpdateLayout();
             OffscreenGrid.FillerLayer(grid).Layout.RowCount.Should().Be(RowsThatFit(grid)).And.BeLessThan(before);
+        });
+    }
+
+    [Fact]
+    public void A_hidden_grid_is_left_alone_and_padded_for_what_changed_when_it_is_shown_again()
+    {
+        OffscreenGrid.Run(LinesGrid, grid =>
+        {
+            var lines = (ObservableCollection<Line>)grid.ItemsSource;
+            var before = OffscreenGrid.FillerLayer(grid).Layout;
+
+            grid.Visibility = Visibility.Collapsed;
+            grid.UpdateLayout();
+            lines.Add(new Line { Name = "Salt", Grams = 20m });
+            lines.Add(new Line { Name = "Yeast", Grams = 10m });
+            grid.UpdateLayout();
+
+            OffscreenGrid.FillerLayer(grid).Layout.Should().BeSameAs(before, "a hidden grid isn't measured after each layout pass");
+
+            grid.Visibility = Visibility.Visible;
+            grid.UpdateLayout();
+
+            OffscreenGrid.FillerLayer(grid).Layout.RowCount.Should().Be(before.RowCount - 2).And.Be(RowsThatFit(grid));
         });
     }
 

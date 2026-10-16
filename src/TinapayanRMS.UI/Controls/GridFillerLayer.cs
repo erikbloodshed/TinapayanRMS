@@ -8,8 +8,9 @@ using Syncfusion.UI.Xaml.ScrollAxis;
 namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
-/// Draws <see cref="GridFillerRows"/>' empty rows: the grid lines of the whole rows that fit under an SfDataGrid's last
-/// row, each row's bottom line and each column's right-hand one, as the theme draws a cell's (a 1 px border on its right
+/// Draws <see cref="GridFillerRows"/>' empty rows: the grid lines of the rows that fill the space under an SfDataGrid's
+/// last row, down to its bottom edge, which cuts off the last as it does the grid's own. Those lines are each row's bottom
+/// line and each column's right-hand one, as the theme draws a cell's (a 1 px border on its right
 /// and bottom, in the grid's own BorderBrush). Read from the decompiled Syncfusion 35.1.40:
 /// <list type="bullet">
 /// <item>It's put in the grid's template, in the root Grid that holds the ScrollViewer and its VisualContainer, over them
@@ -18,8 +19,10 @@ namespace TinapayanRMS.UI.Controls;
 /// <item>The rows' space is measured on the row scroll axis (render size against total extent), which counts the
 /// header, group captions, the add row and a summary row as they're drawn, and the columns' edges come from the column
 /// scroll axis's visible lines, so they follow column widths, the row header and horizontal scrolling.</item>
-/// <item>It's worked out again after every layout pass while the grid is loaded, which compares a few numbers, and
-/// redrawn only when they changed, by replacing its drawing: no layout follows, so lines never lag a resize.</item>
+/// <item>It's worked out again after every layout pass while the grid is loaded and shown, which compares a few
+/// numbers, and redrawn only when they changed, by replacing its drawing: no layout follows, so lines never lag a
+/// resize. LayoutUpdated comes after every layout pass in the app, not only the grid's, so a grid that's loaded but not
+/// shown (in a collapsed panel) skips it; showing it again is a layout pass, which brings it up to date.</item>
 /// </list>
 /// </summary>
 public sealed class GridFillerLayer : FrameworkElement
@@ -35,7 +38,7 @@ public sealed class GridFillerLayer : FrameworkElement
         Focusable = false;
     }
 
-    /// <summary>What it last drew: <see cref="FillerLayout.Empty"/> when no whole row fits.</summary>
+    /// <summary>What it last drew: <see cref="FillerLayout.Empty"/> when the grid's rows leave no space.</summary>
     public FillerLayout Layout { get; private set; } = FillerLayout.Empty;
 
     public void StartWatching()
@@ -71,6 +74,11 @@ public sealed class GridFillerLayer : FrameworkElement
 
     private void Refresh()
     {
+        if (!_grid.IsVisible)
+        {
+            return;
+        }
+
         EnsureInTemplate();
         var layout = Measure();
         if (layout.Equals(Layout))
