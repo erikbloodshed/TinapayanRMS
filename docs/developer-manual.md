@@ -863,7 +863,7 @@ The app extends Syncfusion's controls with **attached behaviours** in `Controls/
 | `MouseWheelForwarding`, `FocusScrolling` | Stacked grids; tall pages | Keep the page scrolling under the mouse, and stop a click from scrolling the page |
 | `CategoryTextCommit.Screen` | A Category picker | Offers to add a typed name that isn't a category yet |
 | `ReadOnlyText.IsGreyed` | A `DoubleTextBox` | Greys out a number that can't be typed |
-| `GridKeyboardFocus`, `GridHeaderHeight`, `PickerMatchHighlight`, `UndoShortcuts` | Every grid, picker or window (registered in `App`) | Focus sits on a cell, never the whole grid; header rows fit their text (two lines for a grid whose headings wrap, `GridHeaderHeight.Lines`); a picker highlights its best match for Enter or Tab; Ctrl+Z and Ctrl+Y |
+| `GridKeyboardFocus`, `GridHeaderHeight`, `PickerMatchHighlight`, `PickerSelectOnEntry`, `PickerRestoresPick`, `UndoShortcuts` | Every grid, picker or window (registered in `App`) | Focus sits on a cell, never the whole grid; header rows fit their text (two lines for a grid whose headings wrap, `GridHeaderHeight.Lines`); a picker highlights its best match for Enter or Tab; a picker selects its text when clicked or tabbed into, and a letter typed over a picked name stays; a picker emptied while bound to a value that can't be null (an enum) shows that value again once the keyboard leaves; Ctrl+Z and Ctrl+Y |
 | `AppWindow`, `ChromelessWindowDpi`, `ChromelessWindowMask`, `RestoreRendering` | Windows | The chromeless title bar, and fixes for its DPI changes, content mask and restore-from-taskbar flicker |
 | `ErrorToast`, `SuccessToast` | Each screen | Show `ErrorMessage` and `SuccessMessage` |
 

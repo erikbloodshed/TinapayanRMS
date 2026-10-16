@@ -114,6 +114,12 @@ public partial class App : Application
         // Every picker that filters as you type highlights the name its text matches, for Enter or Tab to pick.
         PickerMatchHighlight.Register();
 
+        // Every picker that's typed into selects its text as the keyboard enters it, by a click or by Tab.
+        PickerSelectOnEntry.Register();
+
+        // A picker emptied while bound to a value that can't be empty shows that value again once the keyboard leaves.
+        PickerRestoresPick.Register();
+
         // Ctrl+Z and Ctrl+Y for the screen the cursor is on. It goes here, on every window, because Syncfusion's
         // number boxes take both keys for their own per-character undo and mark them handled on the way down.
         UndoShortcuts.Register();
