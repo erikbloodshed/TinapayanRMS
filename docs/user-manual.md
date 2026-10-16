@@ -216,7 +216,7 @@ While a picker's list is open, **Ctrl+N** and **Ctrl+P** move down and up it, li
 
 **Commands**
 
-Type **:**, then a command, then **Enter**. A bar opens at the bottom of the window for it, and Esc closes it.
+Type **:**, then a command, then **Enter**. A bar opens at the bottom of the window for it, and Esc closes it. Enter closes it too and runs the command. If the command can't run, for example **:w** when there's nothing to save, the bar says why. That message goes away at your next key or click, or after a few seconds.
 
 - **:w** saves.
 - **:new** starts a new one.

@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Serilog;
 
 namespace TinapayanRMS.UI.Vim;
@@ -17,6 +18,7 @@ namespace TinapayanRMS.UI.Vim;
 internal sealed class VimOverlay : Adorner
 {
     private static readonly ConditionalWeakTable<Window, VimOverlay> Overlays = new();
+    private static readonly TimeSpan MessageShownFor = TimeSpan.FromSeconds(5);
 
     private readonly Window _window;
     private readonly FrameworkElement _content;
@@ -28,6 +30,9 @@ internal sealed class VimOverlay : Adorner
     // Where the keyboard was when the command line opened, and what the keys there are, for :help.
     private IInputElement? _returnFocus;
     private VimContexts _context = VimContexts.Other;
+
+    // Puts a command's message away when no key or click has first.
+    private DispatcherTimer? _messageTimer;
 
     private VimOverlay(FrameworkElement content, Window window)
         : base(content)
@@ -63,9 +68,11 @@ internal sealed class VimOverlay : Adorner
         layer.Add(overlay);
         Overlays.Add(window, overlay);
 
-        // Hints and the cheat sheet are for the keyboard; the mouse, or another window, puts them away.
+        // Hints and the cheat sheet are for the keyboard; the mouse, or another window, puts them away. A command's
+        // message goes with them, and with the next key, which goes on to do what it does.
         window.PreviewMouseDown += (_, _) => overlay.CloseCapture();
         window.Deactivated += (_, _) => overlay.CloseCapture();
+        window.AddHandler(PreviewKeyDownEvent, new KeyEventHandler((_, _) => overlay.HideMessage()), handledEventsToo: true);
         return overlay;
     }
 
@@ -94,15 +101,13 @@ internal sealed class VimOverlay : Adorner
     }
 
     /// <summary><c>:</c>: the command line, with the keyboard in it.</summary>
-    public void ShowCommandLine(DependencyObject? from, VimContexts context) => ShowCommandLine(from as IInputElement, context, string.Empty, string.Empty);
-
-    private void ShowCommandLine(IInputElement? returnFocus, VimContexts context, string text, string message)
+    public void ShowCommandLine(DependencyObject? from, VimContexts context)
     {
         CloseCapture();
-        _returnFocus = returnFocus;
+        _returnFocus = from as IInputElement;
         _context = context;
         _commandBar ??= Attach(new CommandBar(this));
-        _commandBar.Show(text, message);
+        _commandBar.Show();
     }
 
     /// <summary>A key pressed while the hints or the cheat sheet are up. True when it's taken.</summary>
@@ -160,9 +165,10 @@ internal sealed class VimOverlay : Adorner
         }
     }
 
-    /// <summary>Puts the hints and the cheat sheet away. The command line closes itself.</summary>
+    /// <summary>Puts the hints, the cheat sheet and a command's message away. The command line closes itself.</summary>
     public void CloseCapture()
     {
+        HideMessage();
         if (_hints is not null)
         {
             _hints.Visibility = Visibility.Collapsed;
@@ -180,18 +186,20 @@ internal sealed class VimOverlay : Adorner
         }
     }
 
-    /// <summary>Enter on the command line: runs what's typed, or says why it can't.</summary>
+    /// <summary>
+    /// Enter on the command line: closes it and runs what's typed, then says in its place why it couldn't, as Vim does.
+    /// </summary>
     private void Run(string text)
     {
+        // The keyboard goes back where it was first, so the command runs from there, as the key would have.
+        HideCommandLine(restoreFocus: true);
         var command = VimCommandLine.Parse(text, out var error);
         if (command is null)
         {
-            _commandBar!.Show(text, error);
+            ShowMessage(error);
             return;
         }
 
-        // The keyboard goes back where it was first, so the command runs from there, as the key would have.
-        HideCommandLine(restoreFocus: true);
         if (command.Kind == VimCommandKind.Help)
         {
             ShowCheatSheet(_context);
@@ -200,13 +208,36 @@ internal sealed class VimOverlay : Adorner
 
         if (VimCommands.Run(command, _window, _returnFocus as DependencyObject) is { } failure)
         {
-            ShowCommandLine(_returnFocus, _context, text, failure);
+            ShowMessage(failure);
+        }
+    }
+
+    /// <summary>A line along the bottom, where the command line was, until the next key or click, or a few seconds pass.</summary>
+    private void ShowMessage(string message)
+    {
+        _commandBar!.ShowMessage(message);
+        if (_messageTimer is null)
+        {
+            _messageTimer = new DispatcherTimer { Interval = MessageShownFor };
+            _messageTimer.Tick += (_, _) => HideMessage();
+        }
+
+        _messageTimer.Stop();
+        _messageTimer.Start();
+    }
+
+    private void HideMessage()
+    {
+        _messageTimer?.Stop();
+        if (_commandBar is { IsShowingMessage: true, Visibility: Visibility.Visible })
+        {
+            _commandBar.Visibility = Visibility.Collapsed;
         }
     }
 
     private void HideCommandLine(bool restoreFocus)
     {
-        if (_commandBar is not { Visibility: Visibility.Visible })
+        if (_commandBar is not { Visibility: Visibility.Visible, IsShowingMessage: false })
         {
             return;
         }
@@ -390,11 +421,15 @@ internal sealed class VimOverlay : Adorner
         }
     }
 
-    /// <summary>The command line: a <c>:</c> and a box along the bottom of the window, and a line for what went wrong.</summary>
+    /// <summary>
+    /// The command line: a <c>:</c> and a box along the bottom of the window. Once a command has run, the same bar shows
+    /// on its own what went wrong, with no box, and the keyboard back where it was.
+    /// </summary>
     private sealed class CommandBar : Border
     {
         private static readonly FontFamily Mono = new("Consolas");
 
+        private readonly TextBlock _prompt;
         private readonly TextBox _box;
         private readonly TextBlock _message;
 
@@ -406,7 +441,7 @@ internal sealed class VimOverlay : Adorner
             BorderThickness = new Thickness(0, 1, 0, 0);
             Padding = new Thickness(12, 6, 12, 6);
 
-            var prompt = new TextBlock { Text = ":", FontFamily = Mono, FontSize = 14, VerticalAlignment = VerticalAlignment.Center };
+            _prompt = new TextBlock { Text = ":", FontFamily = Mono, FontSize = 14, VerticalAlignment = VerticalAlignment.Center };
             _box = new TextBox
             {
                 FontFamily = Mono,
@@ -418,7 +453,8 @@ internal sealed class VimOverlay : Adorner
             };
             _message = new TextBlock
             {
-                Margin = new Thickness(16, 0, 0, 0),
+                FontFamily = Mono,
+                FontSize = 14,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 Foreground = BrushFor("ErrorForegroundBrush", Brushes.DarkRed),
@@ -427,10 +463,9 @@ internal sealed class VimOverlay : Adorner
             var layout = new Grid();
             layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             Grid.SetColumn(_box, 1);
-            Grid.SetColumn(_message, 2);
-            layout.Children.Add(prompt);
+            Grid.SetColumnSpan(_message, 2);
+            layout.Children.Add(_prompt);
             layout.Children.Add(_box);
             layout.Children.Add(_message);
             Child = layout;
@@ -454,14 +489,31 @@ internal sealed class VimOverlay : Adorner
             _box.LostKeyboardFocus += (_, _) => overlay.HideCommandLine(restoreFocus: false);
         }
 
-        public void Show(string text, string message)
+        /// <summary>Whether it's showing a command's message rather than taking one.</summary>
+        public bool IsShowingMessage => _message.Visibility == Visibility.Visible;
+
+        public void Show()
         {
-            _box.Text = text;
-            _message.Text = message;
+            _box.Text = string.Empty;
+            SetShowingMessage(false);
             Visibility = Visibility.Visible;
             UpdateLayout();
             _box.Focus();
-            _box.SelectAll();
+        }
+
+        /// <summary>Shows <paramref name="message"/> in place of the box. Nothing in it takes the keyboard or the mouse.</summary>
+        public void ShowMessage(string message)
+        {
+            _message.Text = message;
+            SetShowingMessage(true);
+            Visibility = Visibility.Visible;
+        }
+
+        private void SetShowingMessage(bool showing)
+        {
+            _prompt.Visibility = _box.Visibility = showing ? Visibility.Collapsed : Visibility.Visible;
+            _message.Visibility = showing ? Visibility.Visible : Visibility.Collapsed;
+            IsHitTestVisible = !showing;
         }
     }
 

@@ -828,7 +828,7 @@ Undo and redo follow the Memento pattern:
 
   So `gg`, `G`, and `j`/`k` from a hidden row pick their row by replacing `SelectedItems`: clear it, then add the row, as the screens' `SelectedTreeNode` setters do.
 - **Windows** take part through `IVimHost`, which `MainWindow` and `SettingsWindow` implement. It provides `gt`/`gT` (`VimTabs.Step`), Back and Forward, the screens the command line names, and Settings.
-- **The command line** (`:`) is parsed by `VimCommandLine` and run by `VimCommands`. A command runs on the screen found by walking `DataContext` up from the keyboard, through `IRecordScreen` (New, Save, Delete, `OpenByName`) and `IRevertScreen`. It goes through `ICommand.Execute`, as a button does, so its errors end up where they always do.
+- **The command line** (`:`) is parsed by `VimCommandLine` and run by `VimCommands`. A command runs on the screen found by walking `DataContext` up from the keyboard, through `IRecordScreen` (New, Save, Delete, `OpenByName`) and `IRevertScreen`. It goes through `ICommand.Execute`, as a button does, so its errors end up where they always do. Enter always closes the line first. A parse error, or the reason `VimCommands.Run` returns, then shows in the same bar as a message with no box (`VimOverlay.ShowMessage`), which the next key, click or a 5-second timer puts away.
 - **Overlays.** `VimOverlay` is one adorner per window, on the content's adorner layer. It holds:
   - the hint labels (`HintTargets`, `HintLabels`), all drawn in a single `OnRender`;
   - the command bar;
