@@ -113,18 +113,39 @@ public sealed class ProductVersionRow : ReactiveObject
 }
 
 /// <summary>
+/// One version on the History tab's chart: its base cost, suggested price and current price as they were when it was
+/// saved, at the screen's cost basis. Doubles for the chart, which leaves a gap at NaN: a version with no current price.
+/// </summary>
+public sealed record VersionTrendPoint(int Number, double BaseCost, double SuggestedPrice, double CurrentPrice)
+{
+    /// <summary>What the chart's axis shows under it: "V3".</summary>
+    public string Label => $"V{Number}";
+}
+
+/// <summary>
+/// One of Compare With's choices, what the picked version's changes are measured against: the version before it
+/// (<see cref="Previous"/>), the product as it's saved now (<see cref="Current"/>), or another version
+/// (<see cref="VersionId"/>). Equal by value, so the choice picked is found again in the list built for a new read.
+/// </summary>
+public sealed record VersionComparison(string Label, int? VersionId = null)
+{
+    public static VersionComparison Previous { get; } = new("The version before it");
+
+    public static VersionComparison Current { get; } = new("The product as saved now");
+
+    public static VersionComparison With(ProductVersionRow row) => new($"{row.Title}, {row.SavedText}", row.Id);
+
+    public override string ToString() => Label;
+}
+
+/// <summary>
 /// The Products screen's History tab: the product's versions, newest first, the one picked, and what changed in it,
-/// against the version before it or against the product as it's saved now. ProductsViewModel reads the versions and
-/// hands them over (<see cref="Show"/>); Restore is the screen's own, since it puts the version into the form.
+/// against the version before it, the product as it's saved now, or any other version. ProductsViewModel reads the
+/// versions and hands them over (<see cref="Show"/>); Restore is the screen's own, since it puts the version into the form.
 /// </summary>
 public sealed class ProductVersionHistory : ReactiveObject
 {
-    /// <summary>What a version's changes are measured against: the version before it, or the product now.</summary>
-    public static IReadOnlyList<string> CompareChoices { get; } = ["The version before it", "The product as saved now"];
-
-    public const int CompareWithPrevious = 0;
-
-    public const int CompareWithCurrent = 1;
+    private static readonly IReadOnlyList<VersionComparison> FixedChoices = [VersionComparison.Previous, VersionComparison.Current];
 
     private int _productId;
     private CostBasis _basis;
@@ -148,14 +169,30 @@ public sealed class ProductVersionHistory : ReactiveObject
         }
     }
 
-    private int _compareIndex;
-    /// <summary><see cref="CompareWithPrevious"/> or <see cref="CompareWithCurrent"/>, picked under the table.</summary>
-    public int CompareIndex
+    private IReadOnlyList<VersionComparison> _compareChoices = FixedChoices;
+    /// <summary>Compare With's choices: the version before it, the product as saved now, then each version, newest first.</summary>
+    public IReadOnlyList<VersionComparison> CompareChoices
     {
-        get => _compareIndex;
+        get => _compareChoices;
+        private set => this.RaiseAndSetIfChanged(ref _compareChoices, value);
+    }
+
+    private VersionComparison _compareWith = VersionComparison.Previous;
+    /// <summary>
+    /// What the picked version is compared with, picked under the table. Null is ignored: the picker sends it while its
+    /// choices are replaced.
+    /// </summary>
+    public VersionComparison? CompareWith
+    {
+        get => _compareWith;
         set
         {
-            this.RaiseAndSetIfChanged(ref _compareIndex, value);
+            if (value is null)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _compareWith, value);
             RefreshChanges();
         }
     }
@@ -175,6 +212,25 @@ public sealed class ProductVersionHistory : ReactiveObject
         get => _changesCaption;
         private set => this.RaiseAndSetIfChanged(ref _changesCaption, value);
     }
+
+    private IReadOnlyList<VersionTrendPoint> _trend = [];
+    /// <summary>The chart's points, oldest version first: how the product's cost and prices moved from one version to the next.</summary>
+    public IReadOnlyList<VersionTrendPoint> Trend
+    {
+        get => _trend;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _trend, value);
+            this.RaisePropertyChanged(nameof(IsTrendShown));
+            this.RaisePropertyChanged(nameof(IsTrendHintShown));
+        }
+    }
+
+    /// <summary>The chart shows from the second version on: one point is no trend.</summary>
+    public bool IsTrendShown => Trend.Count >= 2;
+
+    /// <summary>Until then, a line in its place says when it will.</summary>
+    public bool IsTrendHintShown => !IsTrendShown;
 
     private bool _isEmpty = true;
     /// <summary>No version to show: the product hasn't been saved since versions began to be kept.</summary>
@@ -216,6 +272,8 @@ public sealed class ProductVersionHistory : ReactiveObject
 
         ProductId = productId;
         IsEmpty = Rows.Count == 0;
+        RefreshTrend();
+        ShowCompareChoices();
         SelectedRow = Rows.FirstOrDefault(r => r.Id == pickedId) ?? Rows.FirstOrDefault();
     }
 
@@ -227,6 +285,8 @@ public sealed class ProductVersionHistory : ReactiveObject
         {
             row.Price(_productId, basis, _materialsNow, _componentCostsNow);
         }
+
+        RefreshTrend();
     }
 
     /// <summary>Nothing showing, until the next product's versions are read.</summary>
@@ -236,7 +296,30 @@ public sealed class ProductVersionHistory : ReactiveObject
         _current = null;
         Rows.Clear();
         IsEmpty = true;
+        RefreshTrend();
+        ShowCompareChoices();
         SelectedRow = null;
+    }
+
+    private void RefreshTrend() =>
+        Trend =
+        [
+            .. Rows.Reverse().Select(r => new VersionTrendPoint(
+                r.Number,
+                (double)r.BaseCostThen,
+                (double)r.SuggestedPriceThen,
+                r.CurrentPrice is { } price ? (double)price : double.NaN)),
+        ];
+
+    /// <summary>
+    /// The choices for the versions showing. The one picked stays when it's still among them (another version of the
+    /// same product), else it's the version before it again.
+    /// </summary>
+    private void ShowCompareChoices()
+    {
+        CompareChoices = [.. FixedChoices, .. Rows.Select(VersionComparison.With)];
+        _compareWith = CompareChoices.Contains(_compareWith) ? _compareWith : VersionComparison.Previous;
+        this.RaisePropertyChanged(nameof(CompareWith));
     }
 
     private void RefreshChanges()
@@ -248,7 +331,24 @@ public sealed class ProductVersionHistory : ReactiveObject
             return;
         }
 
-        if (CompareIndex == CompareWithCurrent)
+        if (_compareWith.VersionId is { } otherId && Rows.FirstOrDefault(r => r.Id == otherId) is { } other)
+        {
+            if (other == row)
+            {
+                Changes = [];
+                ChangesCaption = $"Pick another version in Compare With to see what's different from {row.Title.ToLowerInvariant()}.";
+                return;
+            }
+
+            var (older, newer) = other.Number < row.Number ? (other, row) : (row, other);
+            Changes = ProductVersionRules.Changes(older.Content, newer.Content);
+            ChangesCaption = Changes.Count == 0
+                ? $"{older.Title} and {newer.Title.ToLowerInvariant()} have the same recipe and price."
+                : $"From {older.Title.ToLowerInvariant()} to {newer.Title.ToLowerInvariant()}:";
+            return;
+        }
+
+        if (_compareWith == VersionComparison.Current)
         {
             Changes = _current is null ? [] : ProductVersionRules.Changes(row.Content, _current);
             ChangesCaption = Changes.Count == 0

@@ -54,6 +54,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     private readonly IValidator<SubAssembly> _subAssemblyValidator;
     private readonly IValidator<SubAssemblyRole> _roleValidator;
     private readonly IViewStateStore _viewStateStore;
+    private readonly ProductVersionRecorder _versionRecorder;
     private readonly SourceCache<StandaloneSubAssemblyRow, int> _rowCache = new(r => r.Id);
     private readonly ReadOnlyObservableCollection<StandaloneSubAssemblyRow> _rows;
     private readonly ReadOnlyObservableCollection<StandaloneSubAssemblyRow> _visibleRows;
@@ -391,10 +392,12 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         IValidator<SubAssembly> subAssemblyValidator,
         IValidator<SubAssemblyRole> roleValidator,
         IViewStateStore viewStateStore,
+        ProductVersionRecorder versionRecorder,
         ILogger logger)
         : base(logger)
     {
         _subAssemblyRepository = subAssemblyRepository;
+        _versionRecorder = versionRecorder;
         _lineRepository = lineRepository;
         _roleRepository = roleRepository;
         _subAssemblyValidator = subAssemblyValidator;
@@ -610,6 +613,22 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 return;
             }
 
+            // The products using it as they're saved now, so each one this Save changes gets a version
+            // (ProductVersionRecorder). A failure to read or record them leaves the Save alone, and says so after it.
+            Exception? versionFailure = null;
+            var usingProducts = ProductVersionCapture.Empty;
+            if (_editingId != 0)
+            {
+                try
+                {
+                    usingProducts = await _versionRecorder.CaptureAsync([_editingId], [], CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    versionFailure = ex;
+                }
+            }
+
             int id;
             if (IsPackaging)
             {
@@ -640,12 +659,29 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                     CancellationToken.None);
             }
 
+            IReadOnlyList<string> versioned = [];
+            try
+            {
+                versioned = await _versionRecorder.RecordChangesAsync(
+                    usingProducts, $"{name} changed on Sub-Assemblies", DateTime.Now, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                versionFailure ??= ex;
+            }
+
             // The list picks up the new totals; then the form reloads what was saved.
             await LoadCommand.Execute();
             var saved = Rows.FirstOrDefault(r => r.Id == id);
             ApplyRefresh(() => SelectedRow = saved);
             await LoadIntoFormAsync(saved);
-            SuccessMessage = $"{name} was saved.";
+            SuccessMessage = ProductVersionRecorder.RecordedMessage(versioned) is { } recorded
+                ? $"{name} was saved. {recorded}"
+                : $"{name} was saved.";
+            if (versionFailure is not null)
+            {
+                ShowFailure(versionFailure, $"{name} was saved, but versions of the products using it couldn't be recorded");
+            }
         }),
         History.WhenAnyValue(h => h.IsDirty));
 

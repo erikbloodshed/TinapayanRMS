@@ -42,6 +42,38 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             null,
             cancellationToken);
 
+    public Task<IReadOnlyList<int>> GetProductsReadingAsync(
+        IReadOnlyCollection<int> subAssemblyIds, IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
+        subAssemblyIds.Count == 0 && productIds.Count == 0
+            ? Task.FromResult<IReadOnlyList<int>>([])
+            : dbContextFactory.QueryAsync<int>(
+                // Packaging links can't go round in a loop (PackagingLinkRules), so the chain ends.
+                """
+                WITH Seeds AS (
+                    SELECT CAST(value AS int) AS ProductId FROM STRING_SPLIT(@productIds, ',') WHERE value <> ''
+                ),
+                SubAssemblyIds AS (
+                    SELECT CAST(value AS int) AS Id FROM STRING_SPLIT(@subAssemblyIds, ',') WHERE value <> ''
+                    UNION
+                    SELECT u.SubAssemblyId FROM ProductSubAssemblyUsages u JOIN Seeds s ON s.ProductId = u.ProductId
+                ),
+                Readers AS (
+                    SELECT ProductId FROM Seeds
+                    UNION
+                    SELECT u.ProductId FROM ProductSubAssemblyUsages u JOIN SubAssemblyIds s ON s.Id = u.SubAssemblyId
+                    UNION
+                    SELECT l.ProductId FROM PackagingLinks l JOIN SubAssemblyIds s ON s.Id = l.LinkedSubAssemblyId
+                ),
+                Chain AS (
+                    SELECT ProductId FROM Readers
+                    UNION ALL
+                    SELECT l.ProductId FROM PackagingLinks l JOIN Chain c ON c.ProductId = l.LinkedProductId
+                )
+                SELECT DISTINCT p.Id FROM Chain c JOIN Products p ON p.Id = c.ProductId ORDER BY p.Id
+                """,
+                new { subAssemblyIds = DapperReads.IdList(subAssemblyIds), productIds = DapperReads.IdList(productIds) },
+                cancellationToken);
+
     private Task<IReadOnlyList<Product>> GetWithCategoryAsync(string filterAndOrder, object? parameters, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<Product>>(
             async dbContext => (await dbContext.Connection().QueryAsync<Product, ProductCategory?, Product>(

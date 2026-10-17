@@ -229,6 +229,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new SubAssemblyValidator(),
             new SubAssemblyRoleValidator(),
             new InMemoryViewStateStore(),
+            VersionRecorders.Create(factory),
             new LoggerConfiguration().CreateLogger());
     }
 

@@ -67,6 +67,7 @@ public static class CompositionRoot
                 services.AddSingleton<IDatabaseBackups>(provider => new DatabaseBackups(
                     provider.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>(), DatabaseBackups.DefaultFolder));
                 services.AddSingleton<SavedProductReader>();
+                services.AddSingleton<ProductVersionRecorder>();
                 services.AddSingleton<IViewStateStore>(new JsonViewStateStore(JsonViewStateStore.DefaultFilePath));
 
                 services.AddSingleton(Log.Logger);

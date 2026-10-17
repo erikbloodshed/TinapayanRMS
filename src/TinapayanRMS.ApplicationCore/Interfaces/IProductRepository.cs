@@ -140,6 +140,16 @@ public interface IProductRepository
     /// <summary>Every composite's lines, without their products: which product goes into which, for the loop check.</summary>
     Task<IReadOnlyList<ProductComponent>> GetAllComponentsAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The ids of the products, deleted or not, whose saved recipe or packaging reads through these sub-assemblies, or
+    /// through <paramref name="productIds"/>' sections and packaging: those products themselves, every product that uses
+    /// one of the sub-assemblies (their own or the products' sections), every product whose packaging links one of them
+    /// as a set, and every product whose packaging links one of those products, however many links deep. What a save of
+    /// them can change besides itself, for the version history.
+    /// </summary>
+    Task<IReadOnlyList<int>> GetProductsReadingAsync(
+        IReadOnlyCollection<int> subAssemblyIds, IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
+
     /// <summary>Adds the product and stamps its UpdatedAt.</summary>
     Task AddAsync(Product product, CancellationToken cancellationToken);
 

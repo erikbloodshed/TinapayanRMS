@@ -86,12 +86,54 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         latest.BaseCostThen.Should().Be(5m);
         latest.BaseCostToday.Should().Be(10m);
 
+        // The chart: oldest first, at the costs then, with a gap for a version with no current price.
+        viewModel.VersionHistory.IsTrendShown.Should().BeTrue();
+        viewModel.VersionHistory.Trend.Select(p => (p.Label, p.BaseCost)).Should().Equal(("V1", 10d), ("V2", 5d));
+        viewModel.VersionHistory.Trend.Should().OnlyContain(p => double.IsNaN(p.CurrentPrice));
+
         viewModel.VersionHistory.SelectedRow.Should().BeSameAs(latest, "the newest is picked first");
         viewModel.VersionHistory.Changes.Should().Equal("Topping: Sugar 100 g → 50 g");
 
         viewModel.VersionHistory.SelectedRow = first;
-        viewModel.VersionHistory.CompareIndex = ProductVersionHistory.CompareWithCurrent;
+        viewModel.VersionHistory.CompareWith = VersionComparison.Current;
         viewModel.VersionHistory.Changes.Should().Equal("Topping: Sugar 100 g → 50 g");
+    }
+
+    [Fact]
+    public async Task A_version_can_be_compared_with_any_other()
+    {
+        var (viewModel, _) = await OpenToppedProductAsync();
+        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 50m);
+        await viewModel.SaveCommand.Execute();
+        Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
+        await viewModel.SaveCommand.Execute();
+        await OpenHistoryAsync(viewModel, rows: 3);
+        var history = viewModel.VersionHistory;
+        var (third, first) = (history.Rows[0], history.Rows[2]);
+
+        history.CompareChoices.Select(c => c.Label).Should().Equal(
+            "The version before it", "The product as saved now", $"Version 3, {third.SavedText}", $"Version 2, {history.Rows[1].SavedText}", $"Version 1, {first.SavedText}");
+
+        // Either way round, it reads from the older to the newer.
+        history.SelectedRow = first;
+        history.CompareWith = history.CompareChoices.Single(c => c.VersionId == third.Id);
+        history.ChangesCaption.Should().Be("From version 1 to version 3:");
+        history.Changes.Should().Equal("Current Price: set to 25.00", "Topping: Sugar 100 g → 50 g");
+        history.SelectedRow = third;
+        history.CompareWith = VersionComparison.With(first);
+        history.ChangesCaption.Should().Be("From version 1 to version 3:");
+        history.Changes.Should().Equal("Current Price: set to 25.00", "Topping: Sugar 100 g → 50 g");
+
+        history.CompareWith = VersionComparison.With(third);
+        history.Changes.Should().BeEmpty();
+        history.ChangesCaption.Should().Be("Pick another version in Compare With to see what's different from version 3.");
+
+        // A read again (a Save) keeps the choice; another product's versions go back to the version before it.
+        await viewModel.LoadCommand.Execute();
+        await WaitUntilAsync(() => history.Rows.Count == 3 && history.SelectedRow is not null, () => $"rows={history.Rows.Count}");
+        history.CompareWith.Should().Be(VersionComparison.With(third));
+        history.Clear();
+        history.CompareWith.Should().Be(VersionComparison.Previous);
     }
 
     [Fact]
@@ -211,6 +253,111 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await OpenHistoryAsync(viewModel, rows: 3);
 
         viewModel.VersionHistory.Rows[0].CurrentPrice.Should().Be(30m);
+    }
+
+    [Fact]
+    public async Task Saving_lines_another_product_shares_records_a_version_of_that_product_too()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
+        var (creamLoafId, doughId) = await AddProductWithSubAssemblyAsync("Cream Loaf", doughRoleId, [new RecipeLine(flourId, 1000m)]);
+        var miniId = await AddProductAsync("Cream Loaf Mini");
+        await SaveRecipeAsync(miniId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m)]));
+        var viewModel = await OpenAsync(miniId, vm => vm.UsageEdits.Count == 1);
+        viewModel.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
+
+        await viewModel.EditUsageCommand.Execute(viewModel.UsageEdits.Single());
+        Edit(viewModel, () => viewModel.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m }));
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SuccessMessage.Should().Be("A version was recorded for Cream Loaf.");
+        var creamLoaf = await VersionsAsync(creamLoafId);
+        creamLoaf.Select(v => v.Note).Should().Equal("Changed when Cream Loaf Mini was saved", ProductVersionRules.BaselineNote);
+        ProductVersionContent.FromJson(creamLoaf[0].Content).Sections.Single().Lines.Should().HaveCount(2);
+        (await VersionsAsync(miniId)).Should().HaveCount(2, "its own Save records it as ever: how it was, and how it is");
+    }
+
+    [Fact]
+    public async Task A_version_recorded_from_another_screen_shows_when_the_screen_is_shown_again()
+    {
+        var (viewModel, seeded) = await OpenToppedProductAsync();
+        Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
+        await viewModel.SaveCommand.Execute();
+        await OpenHistoryAsync(viewModel, rows: 2);
+
+        // As a Sub-Assemblies Save records one; showing the screen runs LoadCommand.
+        await new ProductVersionRepository(CreateDbContextFactory()).AddAsync(
+            seeded.ProductId,
+            ProductVersionContent.FromJson((await VersionsAsync(seeded.ProductId))[0].Content) with { CurrentPrice = 30m },
+            DateTime.Now,
+            "From elsewhere",
+            Cancellation);
+        await viewModel.LoadCommand.Execute();
+
+        await WaitUntilAsync(
+            () => viewModel.VersionHistory.Rows.Count == 3,
+            () => $"rows={viewModel.VersionHistory.Rows.Count}, error={viewModel.ErrorMessage}");
+        viewModel.VersionHistory.Rows[0].Note.Should().Be("From elsewhere");
+    }
+
+    [Fact]
+    public async Task A_clone_or_a_variant_starts_its_history_with_where_it_came_from()
+    {
+        var (viewModel, _) = await OpenToppedProductAsync();
+        Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
+        await viewModel.SaveCommand.Execute();
+
+        // The source as saved is its version 2.
+        viewModel.EditingCloneName = "Ube Roll Copy";
+        await viewModel.CloneCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        var cloneId = viewModel.SelectedProduct!.Id;
+        var clone = (await VersionsAsync(cloneId)).Should().ContainSingle().Subject;
+        clone.Note.Should().Be("Cloned from Ube Roll, version 2");
+        ProductVersionContent.FromJson(clone.Content).CurrentPrice.Should().Be(25m);
+
+        // A product with no versions has no number to give.
+        var plainId = await AddProductAsync("Pan de Coco");
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == plainId);
+        await WaitUntilAsync(() => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == plainId, () => $"ready={viewModel.AreDetailsReady}");
+        viewModel.EditingCloneName = "Pan de Coco Variant";
+        await viewModel.CreateVariantCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        (await VersionsAsync(viewModel.SelectedProduct!.Id)).Single().Note.Should().Be("Variant of Pan de Coco");
+
+        // The clone's first Save adds only what it changed: its history began when it was made.
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == cloneId);
+        await WaitUntilAsync(() => viewModel.AreDetailsReady && viewModel.FormLines.Count == 1, () => $"lines={viewModel.FormLines.Count}");
+        Edit(viewModel, () => viewModel.EditingCurrentPrice = 28m);
+        await viewModel.SaveCommand.Execute();
+        (await VersionsAsync(cloneId)).Select(v => v.Number).Should().Equal(2, 1);
+    }
+
+    [Fact]
+    public async Task Picking_another_product_while_History_shows_reads_its_versions_and_the_first_ones_again_on_the_way_back()
+    {
+        var (viewModel, seeded) = await OpenToppedProductAsync();
+        Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
+        await viewModel.SaveCommand.Execute();
+        var otherId = await AddProductAsync("Pan de Sal");
+        await viewModel.LoadCommand.Execute();
+        await OpenHistoryAsync(viewModel, rows: 2);
+
+        // The tab stays on History through both picks (found in the app 2026-10-17: coming back, it was empty).
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == otherId);
+        await WaitUntilAsync(
+            () => viewModel.AreDetailsReady && viewModel.VersionHistory.ProductId == otherId,
+            () => $"ready={viewModel.AreDetailsReady}, showing={viewModel.VersionHistory.ProductId}, error={viewModel.ErrorMessage}");
+        viewModel.VersionHistory.IsEmpty.Should().BeTrue("Pan de Sal hasn't been saved since versions began to be kept");
+
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == seeded.ProductId);
+        await WaitUntilAsync(
+            () => viewModel.VersionHistory.ProductId == seeded.ProductId && viewModel.VersionHistory.Rows.Count == 2,
+            () => $"showing={viewModel.VersionHistory.ProductId}, rows={viewModel.VersionHistory.Rows.Count}, error={viewModel.ErrorMessage}");
+        viewModel.SelectedDetailsTab.Should().Be(ProductsViewModel.HistoryTab);
     }
 
     [Fact]

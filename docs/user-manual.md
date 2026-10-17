@@ -691,7 +691,7 @@ The Clone tab is shown for saved products only. Type a **New Product Name**, the
 - **Clone**: the new product links the same sub-assemblies at the same piece sizes, and gets its **own copy of the packaging**.
 - **Create Variant**: the same, except the packaging is **linked**, so the new product follows every change made to this one's packaging. Use this for a smaller or bigger version of the same product. For a boxed version, re-point its packaging at a packaging set.
 
-With both, the product's own sub-assemblies are copied to the new product. The category, Quantity Required, Current Price and costing percentages are copied too. The new product starts in Research and Development, and you can change its piece sizes.
+With both, the product's own sub-assemblies are copied to the new product. The category, Quantity Required, Current Price and costing percentages are copied too. The new product starts in Research and Development, and you can change its piece sizes. Its History tab starts with one version that says where it came from (see [History tab](#history-tab)).
 
 A composite product's clone or variant is a composite too, holding the same products at the same quantities. Its own sections are copied as any product's are.
 
@@ -701,7 +701,13 @@ The History tab keeps a product's earlier versions, so you can see how its recip
 
 **When a version is recorded.** Each **Save** that changes the product's recipe, packaging, costing percentages, Quantity Required or Current Price records a version. A Save that only renames the product, or changes its description or category, doesn't. Nor does a change in what its materials cost: that's what the **Today** columns show. The first time you save a product that has no versions yet, two are recorded: how it was before ("Before version history began") and how it is now.
 
-A sub-assembly the product links can also be changed on the Sub-Assemblies screen. That change shows up in the next version you save.
+**Changes made from somewhere else are recorded too**, with a note that says where they came from:
+
+- Saving a sub-assembly on the **Sub-Assemblies** screen records a version of every product it changes ("House Dough changed on Sub-Assemblies"). The green notice names them: "House Dough was saved. A version was recorded for Cheese Roll and Pandesal."
+- Saving a product whose changes reach other products records a version of each of those too ("Changed when Cream Loaf Mini was saved"). That happens when you change the lines of a sub-assembly it shares with other products, or packaging another product links.
+- A product with no versions yet gets two, as on its own first Save: how it was before, and how it is now.
+
+**A clone or a variant starts with one version**, the product as it was made, noted with where it came from: "Cloned from Almond Cheese Bread, version 4" or "Variant of Almond Cheese Bread, version 4". The version number is there when the product it came from matched its latest version.
 
 **The table** lists the versions, newest first:
 
@@ -720,6 +726,9 @@ The figures follow the screen's buffered or unbuffered costs, as the Costing tab
 
 - **The version before it**: what that Save changed.
 - **The product as saved now**: everything that's different between that version and today's recipe.
+- **Any other version**, listed by number and date, such as "Version 2, Oct 17, 2026, 8:03 AM": everything that's different between the two. The list always reads from the older one to the newer one, whichever of the two you picked in the table.
+
+**Cost Over Time**, beside the changes, is a chart of each version's **Base Cost**, **Suggested Price** and **Current Price** when it was saved, oldest on the left (V1, V2, and so on). Point at a dot to see its figure. A version with no Current Price leaves a gap in that line. The chart appears once a product has two versions, and follows the screen's buffered or unbuffered costs.
 
 **Print Version** shows the picked version's whole recipe in the **Print** tab: every section with its ingredients, the packaging and the costing, at what its materials cost when it was saved. The title says which version it is ("Almond Cheese Bread (Version 2)"), and the footer says it's from the version history. You can print it from there, or just read it. **Print** in the header does the same while the History tab is showing. Nothing in the form changes.
 

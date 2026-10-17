@@ -2,8 +2,18 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
-             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
-             xmlns:vm="clr-namespace:TinapayanRMS.UI.ViewModels">
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
+    <UserControl.Resources>
+        <!--
+            The chart's three series: the dataviz palette's first three hues in its fixed order (blue, orange, aqua), which
+            pass its colour-blind checks against the card's Latte Base. Two sit under 3:1 against it, so they never carry a
+            figure alone: the legend, the tooltips and the table above do.
+        -->
+        <SolidColorBrush x:Key="TrendBaseCostBrush" Color="#2A78D6" />
+        <SolidColorBrush x:Key="TrendSuggestedPriceBrush" Color="#EB6834" />
+        <SolidColorBrush x:Key="TrendCurrentPriceBrush" Color="#1BAF7A" />
+    </UserControl.Resources>
+
     <!--
         The product's versions (ProductVersionHistory) in the order they're used: the table, what changed in the version
         picked, then Restore. The table takes the tab's whole width, since its eight columns need it on a small screen
@@ -16,7 +26,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" MinHeight="120" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" MinHeight="170" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
@@ -70,44 +80,134 @@
                            Text="No versions yet. The next Save that changes this product's recipe, packaging, costing or price records how it was before and how it is after." />
             </Grid>
 
-            <!-- What changed in the version picked: the heading and Compare With on one line, then the list -->
-            <StackPanel Grid.Row="3" Margin="0,16,0,0">
+            <!--
+                Under the table, side by side: what changed in the version picked (the heading, Compare With on its own line,
+                then the list), and the chart of its cost and prices from version to version. Half the width each, so Compare
+                With takes its line's width rather than a fixed one.
+            -->
+            <Grid Grid.Row="3" Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="24" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="240" />
-                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
                     <TextBlock Text="Changes" Style="{StaticResource SectionHeaderStyle}" />
-                    <TextBlock Grid.Column="1" Text="Compare With" Style="{StaticResource FormLabelStyle}" />
-                    <syncfusion:ComboBoxAdv Grid.Column="2"
-                                            VerticalAlignment="Center"
-                                            ItemsSource="{x:Static vm:ProductVersionHistory.CompareChoices}"
-                                            SelectedIndex="{Binding VersionHistory.CompareIndex, Mode=TwoWay}" />
+                    <Grid Grid.Row="1" Margin="0,6,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Compare With" Style="{StaticResource FormLabelStyle}" />
+                        <!-- The version before it, the product as saved now, or any version (VersionComparison) -->
+                        <syncfusion:ComboBoxAdv Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                ItemsSource="{Binding VersionHistory.CompareChoices}"
+                                                DisplayMemberPath="Label"
+                                                SelectedItem="{Binding VersionHistory.CompareWith, Mode=TwoWay}" />
+                    </Grid>
+
+                    <TextBlock Grid.Row="2"
+                               Style="{StaticResource CaptionStyle}"
+                               Margin="0,0,0,6"
+                               TextWrapping="Wrap"
+                               Text="{Binding VersionHistory.ChangesCaption}" />
+
+                    <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding VersionHistory.Changes}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="16" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="•" />
+                                        <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </Grid>
 
-                <TextBlock Style="{StaticResource CaptionStyle}"
-                           Margin="0,0,0,6"
-                           TextWrapping="Wrap"
-                           Text="{Binding VersionHistory.ChangesCaption}" />
+                <!--
+                    The figures then, oldest version on the left, on one peso axis. The table above has the same figures, so
+                    the series' colours (checked for colour-blind readers, 2026-10-17) needn't carry them alone; a legend and
+                    a tooltip on each point name them too. A version with no current price leaves a gap in that line.
+                -->
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Cost Over Time" Style="{StaticResource SectionHeaderStyle}" />
+                    <syncfusion:SfChart Grid.Row="1"
+                                        Margin="0,6,0,0"
+                                        Visibility="{Binding VersionHistory.IsTrendShown, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <syncfusion:SfChart.PrimaryAxis>
+                            <syncfusion:CategoryAxis ShowGridLines="False" />
+                        </syncfusion:SfChart.PrimaryAxis>
+                        <syncfusion:SfChart.SecondaryAxis>
+                            <syncfusion:NumericalAxis LabelFormat="N2" />
+                        </syncfusion:SfChart.SecondaryAxis>
+                        <syncfusion:SfChart.Legend>
+                            <syncfusion:ChartLegend DockPosition="Top" />
+                        </syncfusion:SfChart.Legend>
+                        <syncfusion:LineSeries ItemsSource="{Binding VersionHistory.Trend}"
+                                               XBindingPath="Label"
+                                               YBindingPath="BaseCost"
+                                               Label="Base Cost"
+                                               Interior="{StaticResource TrendBaseCostBrush}"
+                                               StrokeThickness="2"
+                                               ShowTooltip="True">
+                            <syncfusion:LineSeries.AdornmentsInfo>
+                                <syncfusion:ChartAdornmentInfo ShowMarker="True" Symbol="Ellipse" SymbolWidth="8" SymbolHeight="8"
+                                                               SymbolInterior="{StaticResource TrendBaseCostBrush}" />
+                            </syncfusion:LineSeries.AdornmentsInfo>
+                        </syncfusion:LineSeries>
+                        <syncfusion:LineSeries ItemsSource="{Binding VersionHistory.Trend}"
+                                               XBindingPath="Label"
+                                               YBindingPath="SuggestedPrice"
+                                               Label="Suggested Price"
+                                               Interior="{StaticResource TrendSuggestedPriceBrush}"
+                                               StrokeThickness="2"
+                                               ShowTooltip="True">
+                            <syncfusion:LineSeries.AdornmentsInfo>
+                                <syncfusion:ChartAdornmentInfo ShowMarker="True" Symbol="Ellipse" SymbolWidth="8" SymbolHeight="8"
+                                                               SymbolInterior="{StaticResource TrendSuggestedPriceBrush}" />
+                            </syncfusion:LineSeries.AdornmentsInfo>
+                        </syncfusion:LineSeries>
+                        <syncfusion:LineSeries ItemsSource="{Binding VersionHistory.Trend}"
+                                               XBindingPath="Label"
+                                               YBindingPath="CurrentPrice"
+                                               Label="Current Price"
+                                               Interior="{StaticResource TrendCurrentPriceBrush}"
+                                               StrokeThickness="2"
+                                               ShowTooltip="True">
+                            <syncfusion:LineSeries.AdornmentsInfo>
+                                <syncfusion:ChartAdornmentInfo ShowMarker="True" Symbol="Ellipse" SymbolWidth="8" SymbolHeight="8"
+                                                               SymbolInterior="{StaticResource TrendCurrentPriceBrush}" />
+                            </syncfusion:LineSeries.AdornmentsInfo>
+                        </syncfusion:LineSeries>
+                    </syncfusion:SfChart>
 
-                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="132">
-                    <ItemsControl ItemsSource="{Binding VersionHistory.Changes}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Margin="0,0,0,4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="16" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="•" />
-                                    <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" />
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </StackPanel>
+                    <!-- In the chart's place until there are two versions to draw a line between -->
+                    <TextBlock Grid.Row="1"
+                               Style="{StaticResource CaptionStyle}"
+                               Margin="0,6,0,0"
+                               TextWrapping="Wrap"
+                               Visibility="{Binding VersionHistory.IsTrendHintShown, Converter={StaticResource BooleanToVisibilityConverter}}"
+                               Text="The chart shows how the cost and prices moved once there are two versions." />
+                </Grid>
+            </Grid>
 
             <!-- Print Version is the header's Print, which prints the version picked while this tab shows -->
             <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,12,0,0">

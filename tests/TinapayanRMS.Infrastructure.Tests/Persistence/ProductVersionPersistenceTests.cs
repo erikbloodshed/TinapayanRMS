@@ -142,4 +142,45 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
 
         (await act.Should().ThrowAsync<DbUpdateException>()).WithInnerException<SqlException>();
     }
+
+    [Fact]
+    public async Task The_products_reading_a_sub_assembly_are_those_linking_it_and_those_whose_packaging_reads_theirs()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
+        var (ownerId, doughId) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
+        var linkerId = await AddProductAsync("Pandesal x 8");
+        await SaveRecipeAsync(linkerId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 60m)]));
+        var otherId = await AddProductAsync("Ensaymada");
+        var setRoleId = await AddRoleAsync("Packaging", sortOrder: 9, isPackaging: true);
+
+        // Packaging that reads Pandesal x 8's, one that reads that one's, and a set only Box Pack links.
+        var packagingReaderId = await AddProductAsync("Pandesal Gift Bag");
+        var secondReaderId = await AddProductAsync("Pandesal Gift Box");
+        var boxPackId = await AddProductAsync("Box Pack");
+        var set = new SubAssembly { Name = "Box Set", RoleId = setRoleId };
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.SubAssemblies.Add(set);
+            await dbContext.SaveChangesAsync(Cancellation);
+            dbContext.PackagingLinks.AddRange(
+                new PackagingLink { ProductId = packagingReaderId, LinkedProductId = linkerId },
+                new PackagingLink { ProductId = secondReaderId, LinkedProductId = packagingReaderId },
+                new PackagingLink { ProductId = boxPackId, LinkedSubAssemblyId = set.Id });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var products = new ProductRepository(CreateDbContextFactory());
+        var setId = set.Id;
+
+        (await products.GetProductsReadingAsync([doughId], [], Cancellation)).Should().BeEquivalentTo(
+            [ownerId, linkerId, packagingReaderId, secondReaderId], "Ensaymada and Box Pack read nothing of Pandesal Dough");
+        (await products.GetProductsReadingAsync([], [ownerId], Cancellation)).Should().BeEquivalentTo(
+            [ownerId, linkerId, packagingReaderId, secondReaderId], "Pandesal's own section is shared with Pandesal x 8");
+        (await products.GetProductsReadingAsync([], [packagingReaderId], Cancellation)).Should().BeEquivalentTo(
+            [packagingReaderId, secondReaderId], "only packaging reads through Pandesal Gift Bag");
+        (await products.GetProductsReadingAsync([setId], [], Cancellation)).Should().BeEquivalentTo([boxPackId]);
+        (await products.GetProductsReadingAsync([], [otherId], Cancellation)).Should().Equal(otherId);
+        (await products.GetProductsReadingAsync([], [], Cancellation)).Should().BeEmpty();
+    }
 }
