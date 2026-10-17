@@ -100,6 +100,7 @@ Other terms you'll see on a product:
 - **Stage**: every product is either in **Research and Development** (still being worked out) or in **Production** (made and sold). A new product goes in Production, unless you change that in Settings → Costing Defaults.
 - **Clone** and **Create Variant** start a new product from an existing one. See [Clone tab](#clone-tab).
 - **Scaling** works out the ingredients and packaging for any number of sellable units. See [Scaling tab](#scaling-tab).
+- **Versions**: each Save that changes a product's recipe or price is kept as a version you can compare with and go back to. See [History tab](#history-tab).
 
 ### Composite products
 
@@ -510,7 +511,7 @@ A sub-assembly can't be switched between a recipe role and the Packaging role on
 
 ## 7. Products
 
-The Products screen has the product list on the left. On the right are the selected product's header, its details, and four tabs: **Recipe**, **Costing**, **Scaling** and **Clone**.
+The Products screen has the product list on the left. On the right are the selected product's header, its details, and five tabs: **Recipe**, **Costing**, **Scaling**, **Clone** and **History**.
 
 ### The list
 
@@ -694,11 +695,49 @@ With both, the product's own sub-assemblies are copied to the new product. The c
 
 A composite product's clone or variant is a composite too, holding the same products at the same quantities. Its own sections are copied as any product's are.
 
+### History tab
+
+The History tab keeps a product's earlier versions, so you can see how its recipe and price changed and go back to an old one. It's shown for saved products only.
+
+**When a version is recorded.** Each **Save** that changes the product's recipe, packaging, costing percentages, Quantity Required or Current Price records a version. A Save that only renames the product, or changes its description or category, doesn't. Nor does a change in what its materials cost: that's what the **Today** columns show. The first time you save a product that has no versions yet, two are recorded: how it was before ("Before version history began") and how it is now.
+
+A sub-assembly the product links can also be changed on the Sub-Assemblies screen. That change shows up in the next version you save.
+
+**The table** lists the versions, newest first:
+
+| Column | What it shows |
+|---|---|
+| Version | 1 for the first, then 2, 3 and so on. |
+| Saved | When the Save was made. |
+| Note | Anything you want to remember about it, such as "Cheaper butter". Click the cell and type; it's saved when you leave the cell, up to 200 characters. |
+| Base Cost Then, Suggested Price Then | What the product cost, and the price it worked out, when it was saved. |
+| Base Cost Today, Suggested Price Today | The same recipe at what its materials cost now. |
+| Current Price | The price you charged then. |
+
+The figures follow the screen's buffered or unbuffered costs, as the Costing tab does.
+
+**Changes.** Pick a version to see what changed in it, one line each, such as "Dough: Bread Flour 500 g → 450 g", "Packaging: Paper Bag added, 1 pc" or "Markup %: 30 → 35". Use **Compare With** to choose what it's compared with:
+
+- **The version before it**: what that Save changed.
+- **The product as saved now**: everything that's different between that version and today's recipe.
+
+**Print Version** shows the picked version's whole recipe in the **Print** tab: every section with its ingredients, the packaging and the costing, at what its materials cost when it was saved. The title says which version it is ("Almond Cheese Bread (Version 2)"), and the footer says it's from the version history. You can print it from there, or just read it. **Print** in the header does the same while the History tab is showing. Nothing in the form changes.
+
+**Restore** puts the picked version's sections, packaging, products (for a composite), costing percentages, Quantity Required and Current Price back into the form. The product's name, description, category and stage stay as they are. Nothing is saved yet: press **Save** to keep it, or **Undo** to put the form back as it was. Saving a restored version records it as a new version.
+
+- A section that was the product's own comes back with its old lines.
+- A section that links a sub-assembly links it again **as it is now**. Restore never changes a sub-assembly that other products may share. If its lines have changed since, the green notice says so.
+- A linked sub-assembly that has been deleted since comes back as a new section with the old lines.
+- Packaging links what it linked, if that still exists. Otherwise the lines it showed come back as the product's own.
+- If a material, role or product the version needs has been deleted, Restore refuses and names it, and nothing in the form changes.
+
+A product moved to the Deleted folder keeps its history. **Delete Permanently** deletes the history with it.
+
 ---
 
 ## 8. Printing recipes and costings
 
-Press **Print** in the Products header to open the **Print** tab. It shows a preview of the product's recipe and costing as the screen shows them, including changes you haven't saved yet. On the Scaling tab, it prints the scaled recipe instead (see [Printing a scaled recipe](#printing-a-scaled-recipe)).
+Press **Print** in the Products header to open the **Print** tab. It shows a preview of the product's recipe and costing as the screen shows them, including changes you haven't saved yet. On the Scaling tab, it prints the scaled recipe instead (see [Printing a scaled recipe](#printing-a-scaled-recipe)). On the History tab, it prints the version picked there, at its costs then (see [History tab](#history-tab)).
 
 - **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
 - **Print**: the drop-down chooses **This product**, the folder last asked for, or **All products**.
@@ -1007,6 +1046,13 @@ Open the product and compare the header's **Markup %**, which is what the curren
 ### Bring back a deleted product
 
 Open the **Deleted** folder at the bottom of the Products list, right-click the product and choose **Restore**. It goes back to its folder as it was when you deleted it.
+
+### Go back to an earlier recipe
+
+1. Open the product and its **History** tab.
+2. Pick the version, and read its **Changes** to check it's the one you want. Set **Compare With** to **The product as saved now** to see everything that would change, or press **Print Version** to see its whole recipe.
+3. Press **Restore**. The version is now in the form, not yet saved.
+4. Check the Recipe and Costing tabs, then press **Save**. Or press **Undo** to put the form back.
 
 ### Move a product into production
 

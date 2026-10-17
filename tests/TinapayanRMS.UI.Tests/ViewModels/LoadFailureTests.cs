@@ -191,6 +191,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
             new ProductCategoryRepository(factory),
+            new ProductVersionRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),
             new ProductCategoryValidator(),

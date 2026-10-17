@@ -38,6 +38,7 @@ internal static class Columns
             ["Id", "ProductId", "LaborPercent", "OverheadPercent", "AdministrativePercent", "MarginPercent", "VatPercent"],
         [typeof(CostingDefaults)] = ["Id", "LaborPercent", "OverheadPercent", "AdministrativePercent", "MarginPercent", "VatPercent", "ShrinkagePercent", "NewProductStage", "CostBufferPercent"],
         [typeof(PackagingLink)] = ["Id", "ProductId", "LinkedProductId", "LinkedSubAssemblyId"],
+        [typeof(ProductVersion)] = ["Id", "ProductId", "Number", "SavedAt", "Note", "Content"],
     };
 
     /// <summary><typeparamref name="T"/>'s columns qualified by <paramref name="alias"/>, for a SELECT list.</summary>

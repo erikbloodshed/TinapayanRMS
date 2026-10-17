@@ -170,6 +170,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
             new ProductCategoryRepository(factory),
+            new ProductVersionRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),
             new ProductCategoryValidator(),

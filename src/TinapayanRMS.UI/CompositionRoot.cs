@@ -61,6 +61,7 @@ public static class CompositionRoot
                 services.AddSingleton<ICostingParametersRepository, CostingParametersRepository>();
                 services.AddSingleton<ICostingDefaultsRepository, CostingDefaultsRepository>();
                 services.AddSingleton<IPackagingLinkRepository, PackagingLinkRepository>();
+                services.AddSingleton<IProductVersionRepository, ProductVersionRepository>();
                 services.AddSingleton<IProductCloner, ProductCloner>();
                 services.AddSingleton<ICostRecalculator, CostRecalculator>();
                 services.AddSingleton<IDatabaseBackups>(provider => new DatabaseBackups(

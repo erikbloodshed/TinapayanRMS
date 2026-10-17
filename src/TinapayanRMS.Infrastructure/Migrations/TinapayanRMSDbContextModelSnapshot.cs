@@ -17,7 +17,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -379,6 +379,42 @@ namespace TinapayanRMS.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "[AuthoredValue] >= 0");
 
                             t.HasCheckConstraint("CK_ProductSubAssemblyUsages_ShrinkagePercent", "[ShrinkagePercent] >= 0 AND [ShrinkagePercent] < 100");
+                        });
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductVersion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("SavedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId", "Number")
+                        .IsUnique();
+
+                    b.ToTable("ProductVersions", t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductVersions_Number", "[Number] >= 1");
                         });
                 });
 
@@ -978,6 +1014,17 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("SubAssembly");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductVersion", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterial", b =>

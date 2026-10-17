@@ -50,6 +50,8 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<PackagingLink> PackagingLinks => Set<PackagingLink>();
 
+    public DbSet<ProductVersion> ProductVersions => Set<ProductVersion>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TinapayanRMSDbContext).Assembly);

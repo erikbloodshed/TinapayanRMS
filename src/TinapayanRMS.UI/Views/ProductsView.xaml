@@ -24,8 +24,13 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- ErrorMessage as a toast, over everything: it spans the whole Grid and puts itself in its bottom-right corner -->
+        <!--
+            ErrorMessage and SuccessMessage as toasts, over everything: each spans the whole Grid and puts itself in its
+            bottom-right corner. The success toast came with the History tab (2026-10-17), whose Restore says what it put
+            back; Revert's and a relink's messages had been set here all along with nothing to show them.
+        -->
         <controls:ErrorToast Grid.ColumnSpan="3" />
+        <controls:SuccessToast Grid.ColumnSpan="3" />
 
         <p:ProductListCard Grid.Column="0" />
 
@@ -118,6 +123,16 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,14,12">
                             <p:CloneCard HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="420" />
                         </ScrollViewer>
+                    </syncfusion:TabItemExt>
+
+                    <!--
+                        The product's versions, a saved product's only, as Clone. No ScrollViewer, as on Scaling: the table
+                        scrolls itself, and the changes beside it scroll on their own.
+                    -->
+                    <syncfusion:TabItemExt Header="History"
+                                           CanClose="False"
+                                           Visibility="{Binding ShowLinks, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <p:HistoryCard />
                     </syncfusion:TabItemExt>
                 </syncfusion:TabControlExt>
             </Border>

@@ -630,6 +630,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>Recipe 0, Costing 1, Scaling 2, then Clone.</summary>
     public const int LinksTab = 3;
 
+    /// <summary>After Clone: the product's versions (ProductVersionHistory). A saved product's only, as Clone is.</summary>
+    public const int HistoryTab = 4;
 
     private readonly IProductRepository _productRepository;
     private readonly IProductSubAssemblyUsageRepository _usageRepository;
@@ -641,6 +643,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
     private readonly IIngredientBomLineRepository _ingredientBomLineRepository;
+    private readonly IProductVersionRepository _versionRepository;
 
     // Reads the product opened here, as Reports and Print read theirs, from the repositories above.
     private readonly SavedProductReader _savedProducts;
@@ -1968,6 +1971,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductCloner.CreateVariantAsync).</summary>
     public ReactiveCommand<RxVoid, RxVoid> CreateVariantCommand { get; }
 
+    /// <summary>The History tab: the product's versions, read while the tab shows (<see cref="RequestVersions"/>).</summary>
+    public ProductVersionHistory VersionHistory { get; } = new();
+
+    /// <summary>
+    /// Restore on the History tab: the picked version's recipe, packaging, costing and price into the form, as unsaved
+    /// edits in one undo step (<see cref="RestoreVersionAsync"/>).
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> RestoreVersionCommand { get; }
+
+    /// <summary>A product whose versions the History tab should read: pushed as the tab shows, and after a Save.</summary>
+    private readonly Subject<int> _versionReads = new();
+
     public ProductsViewModel(
         IProductRepository productRepository,
         IProductSubAssemblyUsageRepository usageRepository,
@@ -1982,6 +1997,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         IRawMaterialRepository rawMaterialRepository,
         IIngredientBomLineRepository ingredientBomLineRepository,
         IProductCategoryRepository categoryRepository,
+        IProductVersionRepository versionRepository,
         IValidator<Product> productValidator,
         IValidator<CostingParameters> costingParametersValidator,
         IValidator<ProductCategory> categoryValidator,
@@ -1990,6 +2006,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         : base(logger)
     {
         _viewStateStore = viewStateStore;
+        _versionRepository = versionRepository;
         _productRepository = productRepository;
         _usageRepository = usageRepository;
         _packagingLineRepository = packagingLineRepository;
@@ -2067,12 +2084,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 product is null ? $"Goes in {ProductFolderNode.StageTitle(stage)}" : null)
             .ToProperty(this, x => x.NewProductTag);
 
-        // A hidden tab can't stay the one showing: leaving a saved product while on Clone goes
+        // A hidden tab can't stay the one showing: leaving a saved product while on Clone or History goes
         // back to Recipe. Subscribed before ShowLinks, so the tab strip moves before the tab hides; a
         // TabControlExt whose selected tab hides picks a neighbour itself.
         this.WhenAnyValue(x => x.SelectedProduct)
-            .Where(product => product is null && SelectedDetailsTab == LinksTab)
+            .Where(product => product is null && SelectedDetailsTab is LinksTab or HistoryTab)
             .Subscribe(_ => SelectedDetailsTab = RecipeTab);
+
+        // The History tab reads the product's versions while it shows, once per product: as it's picked, and as another
+        // product's details arrive under it. A Save reads them again (RequestVersions(force: true)).
+        this.WhenAnyValue(x => x.SelectedDetailsTab, x => x.AreDetailsReady, x => x.SelectedProduct)
+            .Subscribe(_ => RequestVersions());
+        LoadLatest(_versionReads, LoadVersionsAsync);
 
         // The Scaling tab is worked out while it shows, and again as anything it scales changes: every change to the
         // recipe, the packaging, a composite's products, the quantity required or the cost basis gives new Costs.
@@ -2589,6 +2612,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 return;
             }
 
+            // A saved product with no versions yet: how it stood until now is its first, so there's one to go back to.
+            if (_editingId != 0)
+            {
+                await RecordVersionBeforeHistoryAsync(_editingId);
+            }
+
             var id = await _productRepository.SaveAsync(
                 product,
                 IsSameRecipe(recipe, _savedRecipe) ? null : recipe,
@@ -2604,7 +2633,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // The list picks up the new name; then the form reloads what was saved, which is what the
             // next Save compares against.
             await LoadCommand.Execute();
-            await ReloadSavedProductAsync(id);
+            if (await ReloadSavedProductAsync(id) is { } saved)
+            {
+                await RecordVersionAsync(saved.Product, saved.Detail);
+            }
         }),
         History.WhenAnyValue(h => h.IsDirty));
 
@@ -2630,6 +2662,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 SuccessMessage = $"{product.Name} was put back as it was last saved.";
             }));
 
+        // Restore puts the picked version into the form, as Revert puts the saved product there, but as an undo step of
+        // unsaved edits rather than by reloading: Save keeps it, and Undo takes it back.
+        RestoreVersionCommand = ReactiveCommand.CreateFromTask(
+            () => RunSafelyAsync(() => VersionHistory.SelectedRow is { } row ? RestoreVersionAsync(row) : Task.CompletedTask),
+            VersionHistory.WhenAnyValue(h => h.SelectedRow).Select(row => row is not null));
+
         // Print shows the product as the screen does, unsaved edits and all (the user's choice, 2026-09-27). A form left
         // open is part of that, as it's part of what Save writes, so it's applied first; a rule refusing it shows its
         // message, and the Print tab doesn't open. It stays enabled while a picked product's details are on their way,
@@ -2642,7 +2680,21 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     return Task.CompletedTask;
                 }
 
-                ApplyOpenForm();
+                // On the History tab it prints the version picked there (PreparePrintout), so the form isn't applied: its
+                // pages aren't the form's.
+                if (SelectedDetailsTab == HistoryTab)
+                {
+                    if (VersionHistory.SelectedRow is null)
+                    {
+                        ErrorMessage = "Pick a version in the History tab's table to print it.";
+                        return Task.CompletedTask;
+                    }
+                }
+                else
+                {
+                    ApplyOpenForm();
+                }
+
                 _printRequests.OnNext(PrintScope.ThisProduct);
                 return Task.CompletedTask;
             }));
@@ -2949,6 +3001,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         CloseUsageForm();
         SelectedLineEdit = null;
+        VersionHistory.Clear();
         ClearDetails(keepRecipeTabs);
     }
 
@@ -4150,7 +4203,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// pass. Picked with the detail still to read, the same product closed its form (ResetDetails) and drew the
     /// screen that way until the read came back and opened it again: a flicker on every Save.
     /// </summary>
-    private async Task ReloadSavedProductAsync(int id)
+    /// <returns>The product and its detail as read, which Save records as a version; null when it's gone.</returns>
+    private async Task<(Product Product, ProductDetail Detail)?> ReloadSavedProductAsync(int id)
     {
         var savedRead = Task.Run(() => _productRepository.GetByIdAsync(id, CancellationToken.None));
         var detailRead = Task.Run(() => _savedProducts.ReadDetailAsync(id, CancellationToken.None));
@@ -4159,7 +4213,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var detail = await detailRead;
         if (saved is null)
         {
-            return;
+            return null;
         }
 
         _productCache.AddOrUpdate(saved);
@@ -4173,7 +4227,383 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             _preloadedDetail = null;
         }
+
+        return (saved, detail);
     }
+
+    /// <summary>
+    /// Records the product as Save has just left it as its next version, unless its recipe and price are the latest's
+    /// (IProductVersionRepository.AddAsync), and reads the History tab again if it shows. The Save itself has gone
+    /// through by now, so a version that can't be recorded says so without taking the Save back; the next Save
+    /// records it, since its recipe still differs from the latest.
+    /// </summary>
+    private async Task RecordVersionAsync(Product product, ProductDetail detail)
+    {
+        try
+        {
+            var content = ProductVersionSnapshot.From(product, detail);
+            await Task.Run(() => _versionRepository.AddAsync(product.Id, content, DateTime.Now, null, CancellationToken.None));
+        }
+        catch (Exception ex)
+        {
+            ShowFailure(ex, $"{product.Name} was saved, but its version couldn't be recorded");
+            return;
+        }
+
+        // Read again now if the History tab shows; otherwise the versions it holds are out of date, and go, so showing it
+        // reads them (a Save made from the Recipe tab left the tab without the new version, found in the app 2026-10-17).
+        if (SelectedDetailsTab == HistoryTab)
+        {
+            RequestVersions(force: true);
+        }
+        else
+        {
+            VersionHistory.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Before the first Save since versions began to be kept: the product as it's saved now becomes its first version,
+    /// dated when it was last saved, priced at what its materials cost now. Nothing when it has versions already.
+    /// </summary>
+    private async Task RecordVersionBeforeHistoryAsync(int productId)
+    {
+        if (await Task.Run(() => _versionRepository.HasAnyAsync(productId, CancellationToken.None)))
+        {
+            return;
+        }
+
+        var productRead = Task.Run(() => _productRepository.GetByIdAsync(productId, CancellationToken.None));
+        var detailRead = Task.Run(() => _savedProducts.ReadDetailAsync(productId, CancellationToken.None));
+        await Task.WhenAll(productRead, detailRead);
+        if (await productRead is not { } product)
+        {
+            return;
+        }
+
+        var content = ProductVersionSnapshot.From(product, await detailRead);
+        await Task.Run(() => _versionRepository.AddAsync(
+            productId, content, product.UpdatedAt ?? DateTime.Now, ProductVersionRules.BaselineNote, CancellationToken.None));
+    }
+
+    /// <summary>
+    /// Reads the picked product's versions for the History tab, when it shows and they aren't showing already;
+    /// <paramref name="force"/> reads them again anyway (a Save has just recorded one).
+    /// </summary>
+    private void RequestVersions(bool force = false)
+    {
+        if (SelectedDetailsTab == HistoryTab
+            && AreDetailsReady
+            && SelectedProduct is { } product
+            && product.Id == _detailProductId
+            && (force || VersionHistory.ProductId != product.Id))
+        {
+            _versionReads.OnNext(product.Id);
+        }
+    }
+
+    /// <summary>
+    /// The product's versions, each priced then and today (ProductVersionHistory.Show): the versions, the product as it's
+    /// saved now (what a version is compared with), and its products' costs now, read off the UI thread; today's materials
+    /// are the screen's own.
+    /// </summary>
+    private async Task LoadVersionsAsync(int productId, CancellationToken cancellationToken)
+    {
+        var versionsRead = Task.Run(() => _versionRepository.GetForProductAsync(productId, cancellationToken), cancellationToken);
+        var productRead = Task.Run(() => _productRepository.GetByIdAsync(productId, cancellationToken), cancellationToken);
+        var detailRead = Task.Run(() => _savedProducts.ReadDetailAsync(productId, cancellationToken), cancellationToken);
+        await Task.WhenAll(versionsRead, productRead, detailRead);
+        if (await productRead is not { } product)
+        {
+            return;
+        }
+
+        var versions = await versionsRead;
+        List<(ProductVersion Version, ProductVersionContent Content)> contents =
+            [.. versions.Select(v => (v, ProductVersionContent.FromJson(v.Content)))];
+        IReadOnlyCollection<int> componentIds = [.. contents.SelectMany(c => c.Content.Components.Select(p => p.ProductId)).Distinct()];
+        var componentCostsNow = await Task.Run(() => _savedProducts.ReadComponentCostsAsync(componentIds, cancellationToken), cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // The product picked since, or the tab left: what was read is someone else's, or not wanted.
+        if (SelectedProduct?.Id != productId)
+        {
+            return;
+        }
+
+        Dictionary<int, RawMaterial> materialsNow = [];
+        foreach (var material in Ingredients.Concat(PackagingMaterials))
+        {
+            materialsNow.TryAdd(material.Id, material);
+        }
+
+        VersionHistory.Show(
+            productId,
+            [.. contents.Select(c => new ProductVersionRow(c.Version, c.Content, VersionNoteTyped))],
+            ProductVersionSnapshot.From(product, await detailRead),
+            materialsNow,
+            componentCostsNow,
+            CostBasis);
+    }
+
+    /// <summary>A note typed into the History tab's table, saved as the cell is left; one refused goes back as it was.</summary>
+    private void VersionNoteTyped(ProductVersionRow row, string? previous) =>
+        _ = RunSafelyAsync(async () =>
+        {
+            try
+            {
+                await _versionRepository.SetNoteAsync(row.Id, row.Note, CancellationToken.None);
+                var stored = ProductVersionRules.NormalizeNote(row.Note);
+                if (!string.Equals(stored, row.Note, StringComparison.Ordinal))
+                {
+                    row.RevertNote(stored);
+                }
+            }
+            catch (Exception)
+            {
+                row.RevertNote(previous);
+                throw;
+            }
+        });
+
+    /// <summary>
+    /// Puts <paramref name="row"/>'s version into the form as unsaved edits, in one undo step: its sections, packaging,
+    /// products, costing percentages, quantity required, current price and whether a composite includes its products'
+    /// packaging. The name, description, category and stage stay. A section of the product's own keeps its sub-assembly
+    /// when the product still owns it; a linked one is linked again as it is now, since Save never writes a version's lines
+    /// into a sub-assembly others may share; one deleted since comes back as a new section with the version's lines (its
+    /// add-ins among them). Packaging links what it linked while that's still there, else takes the lines it showed as the
+    /// product's own. Refused, with nothing changed, while a material, role or product it needs is gone.
+    /// </summary>
+    private async Task RestoreVersionAsync(ProductVersionRow row)
+    {
+        if (!AreDetailsReady || SelectedProduct is not { } product || VersionHistory.ProductId != product.Id)
+        {
+            return;
+        }
+
+        var content = row.Content;
+        if (content.IsComposite != product.IsComposite)
+        {
+            throw new BusinessRuleException($"{row.Title} is of another kind of product, so it can't be restored here.");
+        }
+
+        // What it linked, as it is now: its linked sections' sub-assemblies and its packaging set, and their lines.
+        IReadOnlyCollection<int> linkedIds =
+        [
+            .. content.Sections.Where(s => !s.IsOwn).Select(s => s.SubAssemblyId)
+                .Concat(content.PackagingLink?.SubAssemblyId is { } linkedSetId ? [linkedSetId] : Enumerable.Empty<int>())
+                .Distinct(),
+        ];
+        var subAssembliesRead = Task.Run(() => _subAssemblyRepository.GetByIdsAsync(linkedIds, CancellationToken.None));
+        var linesRead = Task.Run(() => _subAssemblyLineRepository.GetForSubAssembliesAsync(linkedIds, CancellationToken.None));
+        await Task.WhenAll(subAssembliesRead, linesRead);
+        var subAssembliesNow = (await subAssembliesRead).ToDictionary(s => s.Id);
+        var linesNow = (await linesRead).ToLookup(l => l.SubAssemblyId);
+
+        PackagingLinkTarget? link = null;
+        if (content.PackagingLink is { } versionLink)
+        {
+            if (versionLink.SubAssemblyId is { } setId && subAssembliesNow.TryGetValue(setId, out var set))
+            {
+                link = PackagingLinkTarget.ForSet(setId, set.Name);
+            }
+            else if (versionLink.ProductId is { } linkedProductId && Products.FirstOrDefault(p => p.Id == linkedProductId) is { } linkedProduct)
+            {
+                link = PackagingLinkTarget.ForProduct(linkedProductId, linkedProduct.Name);
+            }
+        }
+
+        // Everything it needs that's gone, named, before anything changes.
+        var materialNames = content.Materials.ToDictionary(m => m.Id, m => m.Name);
+        string MaterialName(int id) => materialNames.GetValueOrDefault(id) ?? $"Material {id}";
+        var ingredientsById = Ingredients.ToDictionary(m => m.Id);
+        var packagingById = PackagingMaterials.ToDictionary(m => m.Id);
+        bool IsRelinked(VersionSection section) => !section.IsOwn && subAssembliesNow.ContainsKey(section.SubAssemblyId);
+        List<string> missing = [];
+        foreach (var section in content.Sections)
+        {
+            var relinked = IsRelinked(section);
+            if (!relinked && Roles.All(r => r.Id != section.Role.Id))
+            {
+                missing.Add($"the {section.Role.Name} role");
+            }
+
+            missing.AddRange((relinked ? Enumerable.Empty<int>() : section.Lines.Select(l => l.IngredientId))
+                .Concat(section.AddIns.Select(a => a.IngredientId))
+                .Where(id => !ingredientsById.ContainsKey(id))
+                .Select(MaterialName));
+        }
+
+        if (link is null)
+        {
+            missing.AddRange(content.PackagingLines.Where(l => !packagingById.ContainsKey(l.MaterialId)).Select(l => MaterialName(l.MaterialId)));
+        }
+
+        missing.AddRange(content.Components.Where(c => Products.All(p => p.Id != c.ProductId)).Select(c => c.ProductName));
+        if (missing.Distinct().ToList() is { Count: > 0 } gone)
+        {
+            throw new BusinessRuleException(
+                $"{row.Title} can't be restored: it needs {string.Join(", ", gone)}, which {(gone.Count == 1 ? "is" : "are")} no longer there.");
+        }
+
+        // The lines a link shows: those showing already when it's the link the form has, else as it has them now.
+        IReadOnlyList<PackagingLineState> packagingLines;
+        if (link is null)
+        {
+            packagingLines = [.. content.PackagingLines.Select(l => OwnPackagingLineOf(l, content, packagingById))];
+        }
+        else if (link.Key == _packagingLinkTarget?.Key)
+        {
+            packagingLines = [.. LineEdits.Select(CaptureLine)];
+        }
+        else if (link.SubAssemblyId is { } setId)
+        {
+            packagingLines = [.. (await Task.Run(() => _subAssemblyRepository.GetPackagingLinesAsync(setId, CancellationToken.None)))
+                .Select(l => new PackagingLineState(l.PackagingMaterialId, l.UnitId, l.QtyPerSet))];
+        }
+        else
+        {
+            packagingLines = [.. (await Task.Run(() => _packagingLineRepository.GetEffectiveForProductAsync(link.ProductId!.Value, CancellationToken.None)))
+                .Select(l => PackagingLineRow.FromSaved(l))
+                .Select(r => new PackagingLineState(r.PackagingMaterialId, r.UnitId, r.QtyPerUnit))];
+        }
+
+        // Another product picked while that was read: the version isn't this one's.
+        if (SelectedProduct?.Id != product.Id || !AreDetailsReady)
+        {
+            return;
+        }
+
+        HashSet<int> ownedNow = [.. _savedRecipe.New.Select(n => n.Id).Where(id => id != 0)];
+        List<string> changedSinceLinks = [];
+        List<ProductUsageEdit> sections = [];
+        foreach (var section in content.Sections)
+        {
+            if (IsRelinked(section))
+            {
+                var linked = subAssembliesNow[section.SubAssemblyId];
+                var current = linesNow[linked.Id].ToList();
+                if (!HasSameLines(current, section.Lines))
+                {
+                    changedSinceLinks.Add(linked.Name);
+                }
+
+                var linkedRole = Roles.FirstOrDefault(r => r.Id == linked.RoleId) ?? linked.Role;
+                sections.Add(new ProductUsageEdit(
+                    linked.Id,
+                    linkedRole,
+                    [.. current.Select(l => new SubAssemblyLineEdit(
+                        ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
+                    section.AuthoredField,
+                    section.AuthoredValue,
+                    section.ShrinkagePercent,
+                    linked.Name,
+                    [.. section.AddIns.Select(a => new SubAssemblyLineEdit(ingredientsById[a.IngredientId], a.Grams))],
+                    SectionLabelOf(linked.Name, linkedRole)));
+                continue;
+            }
+
+            // The product's own, or a linked one deleted since: the version's lines, and a linked one's add-ins with them,
+            // since a section of its own has none.
+            var keepsId = section.IsOwn && ownedNow.Contains(section.SubAssemblyId);
+            sections.Add(new ProductUsageEdit(
+                keepsId ? section.SubAssemblyId : 0,
+                Roles.First(r => r.Id == section.Role.Id),
+                [
+                    .. section.Lines.Select(l => new SubAssemblyLineEdit(ingredientsById[l.IngredientId], l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)),
+                    .. section.AddIns.Select(a => new SubAssemblyLineEdit(ingredientsById[a.IngredientId], a.Grams)),
+                ],
+                section.AuthoredField,
+                section.AuthoredValue,
+                section.ShrinkagePercent,
+                linkedName: null,
+                name: SubAssemblyRules.SectionLabel(section.SubAssemblyName, content.ProductName, section.Role.Name),
+                isOwn: section.IsOwn && !keepsId));
+        }
+
+        sections.Sort(ProductUsageEdit.RecipeOrder);
+        var costing = content.Costing ?? new VersionCosting(0m, 0m, 0m, 0m, 0m);
+        AsUndoStep(() =>
+        {
+            // The form goes, as any restore closes it: what it held comes back with Undo.
+            CloseUsageForm();
+            RestoreSnapshot(
+                CaptureSnapshot() with
+                {
+                    CurrentPrice = content.CurrentPrice,
+                    QuantityRequired = content.QuantityRequired,
+                    IncludesComponentPackaging = content.IncludesComponentPackaging,
+                    Costing = (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent, costing.VatPercent),
+                    Usages = sections,
+                    SelectedTab = sections.Count > 0 ? new RecipeTabChoice(RecipeTabKind.Usage, 0)
+                        : product.IsComposite ? new RecipeTabChoice(RecipeTabKind.Components, -1)
+                        : new RecipeTabChoice(RecipeTabKind.Packaging, -1),
+                    HasAddSubAssemblyTab = false,
+                    HasPackaging = link is not null || packagingLines.Count > 0,
+                    PackagingLink = link,
+                    IsPackagingMoving = false,
+                    Lines = packagingLines,
+                    Components = [.. content.Components.Select(c => new ComponentLineState(c.ProductId, c.Quantity))],
+                    IsUsageFormOpen = false,
+                    IsAddingUsage = false,
+                    EditingUsageIndex = null,
+                    FormLines = [],
+                    FormAddIns = [],
+                    FormPackagingLines = [],
+                },
+                null);
+
+            // The section tab showing opens its form, as showing it would: the restore puts tabs back without opening any,
+            // and a section's tab with its form closed showed an empty form (no lines, a 0 g batch).
+            if (SelectedRecipeTab is SubAssemblyRecipeTab { Usage: var shown })
+            {
+                OpenUsageForm(shown);
+            }
+
+            // The form closing and opening isn't the user's change, as it isn't when a tab change does it: only the recipe,
+            // packaging, costing and price the version put back count for Save. Without this, a version the same as the
+            // saved product (one whose only difference is a linked sub-assembly's lines, kept as they are now) left Save lit.
+            RebaseSettledForm();
+        });
+
+        List<string> notes = [$"{row.Title} is in the form. Save to keep it, or Undo to put the form back."];
+        if (changedSinceLinks.Count > 0)
+        {
+            notes.Add($"{string.Join(", ", changedSinceLinks)} {(changedSinceLinks.Count == 1 ? "has" : "have")} changed on Sub-Assemblies since, and {(changedSinceLinks.Count == 1 ? "is" : "are")} linked as {(changedSinceLinks.Count == 1 ? "it is" : "they are")} now.");
+        }
+
+        if (content.PackagingLink is { } wasLinked && link is null)
+        {
+            notes.Add($"{wasLinked.Name} is gone, so the packaging it showed comes back as the product's own.");
+        }
+
+        SuccessMessage = string.Join(" ", notes);
+    }
+
+    /// <summary>
+    /// A version's packaging line as the product's own: in the unit it was in, or in base units when the material has lost
+    /// that unit since.
+    /// </summary>
+    private static PackagingLineState OwnPackagingLineOf(
+        VersionPackagingLine line, ProductVersionContent content, Dictionary<int, RawMaterial> packagingById)
+    {
+        if (line.UnitId is { } unitId && packagingById[line.MaterialId].Units.All(u => u.Id != unitId))
+        {
+            var baseUnitsPerUnit = content.Materials.FirstOrDefault(m => m.Id == line.MaterialId)?.Units.FirstOrDefault(u => u.Id == unitId)?.BaseUnitsPerUnit ?? 1m;
+            return new PackagingLineState(line.MaterialId, null, UnitConversionRules.ToBaseQuantity(line.QtyPerUnit, baseUnitsPerUnit));
+        }
+
+        return new PackagingLineState(line.MaterialId, line.UnitId, line.QtyPerUnit);
+    }
+
+    /// <summary>Whether a sub-assembly's lines now are the ones a version saw: the same ingredients, grams and base ticks, in order.</summary>
+    private static bool HasSameLines(List<SubAssemblyLine> now, IReadOnlyList<VersionLine> then) =>
+        now.Count == then.Count
+        && now.Zip(then).All(pair =>
+            pair.First.IngredientId == pair.Second.IngredientId
+            && pair.First.Grams == pair.Second.Grams
+            && pair.First.IsFormulaBase == pair.Second.IsFormulaBase);
 
     /// <summary>The add form, fresh for its mode: a new sub-assembly's name, role and lines, or the pick of another product's.</summary>
     private void StartUsageFormMode()
@@ -5339,6 +5769,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         RecomputeCosts();
         RecomputeUsageForm();
+        VersionHistory.Reprice(CostBasis);
     }
 
     /// <summary>The cost summary, from the recipe and packaging as they are now and the costing fields.</summary>
@@ -5474,6 +5905,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             return (null, null);
         }
 
+        // With the History tab showing, the pages are the version picked there, as the Scaling tab's are the recipe scaled.
+        if (SelectedDetailsTab == HistoryTab)
+        {
+            return VersionHistory.SelectedRow is { } row && SelectedProduct is { } product
+                ? (VersionPrintout(row, product), null)
+                : (null, null);
+        }
+
         try
         {
             ApplyOpenForm();
@@ -5517,6 +5956,26 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 ScalingTotalCost)
             : null,
     };
+
+    /// <summary>
+    /// A version from the History tab on paper (the user's request, 2026-10-17: "is there a way to preview or show the
+    /// recipe at the history i currently selected?"): its sections, packaging and costing as that Save left them, priced
+    /// at its costs then, as the table's Then columns are, at the screen's cost basis. Titled with the version, dated when
+    /// it was saved, and marked in the footer as from the history; the category and stage are the product's now, which a
+    /// version doesn't keep.
+    /// </summary>
+    private ProductPrintout VersionPrintout(ProductVersionRow row, Product product)
+    {
+        var (versionProduct, detail) = ProductVersionSnapshot.ToDetail(product.Id, row.Content);
+        return SavedProductReader.Build(versionProduct, detail, CostBasis).ToPrintout(DateTime.Now) with
+        {
+            ProductName = $"{row.Content.ProductName} ({row.Title})",
+            CategoryName = product.Category?.Name ?? ProductFolderNode.UncategorizedTitle,
+            StageTitle = ProductFolderNode.StageTitle(product.Stage),
+            LastUpdatedText = row.SavedText,
+            SaveNote = ProductPrintout.VersionNote,
+        };
+    }
 
     // Segoe Fluent Icons glyphs for the list's menu, the ones the screen's buttons use where there's one.
     private const string CompositeGlyph = "";
@@ -5949,5 +6408,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _categoryCache.Dispose();
         _subAssemblyOpenRequests.Dispose();
         _printRequests.Dispose();
+        _versionReads.Dispose();
     }
 }

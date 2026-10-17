@@ -38,6 +38,9 @@ public sealed record ProductPrintout(
     /// <summary>The footer's note for a saved product with changes Save hasn't written yet.</summary>
     public const string UnsavedChangesNote = "Includes unsaved changes";
 
+    /// <summary>The footer's note for a version from the History tab, which isn't the product as it is now.</summary>
+    public const string VersionNote = "From the version history, at its costs then";
+
     /// <summary>A composite: its recipe is the products it holds (<see cref="Components"/>).</summary>
     public bool IsComposite => Components is not null;
 
