@@ -2635,12 +2635,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
             // A saved product with no versions yet: how it stood until now is its first, so there's one to go back to.
             // And the products sharing its sections' lines or linking its packaging, as they're saved now, so each one
-            // this Save changes gets a version too (ProductVersionRecorder); reading them can't stop the Save.
+            // this Save changes gets a version too (ProductVersionRecorder); reading them can't stop the Save. Only linked
+            // lines edited here and the packaging reach them, so a Save of neither reads none (2026-10-17: a price-only Save
+            // spent half a second reading the 39 products sharing its dough, twice).
             Exception? sharingFailure = null;
             var sharingProducts = ProductVersionCapture.Empty;
             if (_editingId != 0)
             {
                 await RecordVersionBeforeHistoryAsync(_editingId);
+            }
+
+            if (_editingId != 0 && (UsageEdits.Any(u => u.AreLinkedLinesEdited) || ChangedLines() is not null || ChangedPackagingLink() is not null))
+            {
                 var editingId = _editingId;
                 try
                 {

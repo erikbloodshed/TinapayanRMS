@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
@@ -70,6 +71,49 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
         viewModel.SuccessMessage.Should().Be("House Dough was saved.");
         (await new ProductVersionRepository(CreateDbContextFactory()).GetForProductAsync(pandesalId, Cancellation))
             .Should().BeEmpty("a sub-assembly's name isn't part of a product's recipe");
+    }
+
+    [Fact]
+    public async Task Recording_the_products_a_sub_assembly_changes_takes_as_many_commands_for_six_as_for_two()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
+        var (_, doughId) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
+        var (_, rollDoughId) = await AddProductWithSubAssemblyAsync("Spanish Bread", doughRoleId, [new RecipeLine(flourId, 400m)]);
+        await LinkProductsAsync(doughId, "Pandesal x", count: 1);
+        await LinkProductsAsync(rollDoughId, "Spanish Bread x", count: 5);
+
+        var forTwo = await CommandsRecordingAsync(doughId);
+        var forSix = await CommandsRecordingAsync(rollDoughId);
+
+        forTwo.Recorded.Should().HaveCount(2);
+        forSix.Recorded.Should().HaveCount(6);
+        forSix.Commands.Should().Be(forTwo.Commands, "the versions are written together, not a product at a time");
+    }
+
+    private async Task LinkProductsAsync(int subAssemblyId, string name, int count)
+    {
+        for (var i = 1; i <= count; i++)
+        {
+            var productId = await AddProductAsync($"{name} {i}");
+            await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(subAssemblyId, UsageAuthoredField.WeightPerPiece, 60m)]));
+        }
+    }
+
+    /// <summary>The commands recording the products takes once the sub-assembly's lines change, and whose versions it recorded.</summary>
+    private async Task<(int Commands, IReadOnlyList<string> Recorded)> CommandsRecordingAsync(int subAssemblyId)
+    {
+        var recorder = VersionRecorders.Create(CreateDbContextFactory());
+        var before = await recorder.CaptureAsync([subAssemblyId], [], Cancellation);
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == subAssemblyId)
+                .ExecuteUpdateAsync(s => s.SetProperty(l => l.Grams, l => l.Grams - 50m), Cancellation);
+        }
+
+        using var counter = SqlCommandCounter.Start();
+        var recorded = await recorder.RecordChangesAsync(before, "Dough changed", DateTime.Now, Cancellation);
+        return (counter.Commands, recorded);
     }
 
     private static decimal GramsOf(ProductVersion version) =>

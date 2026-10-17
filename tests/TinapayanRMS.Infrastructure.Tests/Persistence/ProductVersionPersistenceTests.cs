@@ -75,6 +75,57 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
     }
 
     [Fact]
+    public async Task Many_products_are_recorded_at_once_each_after_its_own_latest_with_a_baseline_for_one_with_none()
+    {
+        var pandesalId = await AddProductAsync("Pandesal");
+        var ensaymadaId = await AddProductAsync("Ensaymada");
+        var unchangedId = await AddProductAsync("Spanish Bread");
+        var goneId = await AddProductAsync("Cheese Roll");
+        var repository = CreateRepository();
+        await repository.AddAsync(pandesalId, Recipe(500m), new DateTime(2026, 10, 1), null, Cancellation);
+        await repository.AddAsync(unchangedId, Recipe(400m), new DateTime(2026, 10, 1), null, Cancellation);
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.Products.Where(p => p.Id == goneId).ExecuteDeleteAsync(Cancellation);
+        }
+
+        var savedAt = new DateTime(2026, 10, 2);
+        ProductVersionDraft Draft(int productId, decimal flourGrams) => new(productId, Recipe(flourGrams), savedAt, "Dough changed")
+        {
+            Baseline = new(productId, Recipe(flourGrams + 50m), new DateTime(2026, 9, 1), ProductVersionRules.BaselineNote),
+        };
+
+        var recorded = await repository.AddRangeAsync(
+            [Draft(pandesalId, 450m), Draft(ensaymadaId, 450m), Draft(unchangedId, 400m), Draft(goneId, 450m)], Cancellation);
+
+        recorded.Select(v => v?.Number).Should().Equal(2, 2, null, null);
+        var pandesal = await repository.GetForProductAsync(pandesalId, Cancellation);
+        pandesal.Select(v => v.Note).Should().Equal(new[] { "Dough changed", null }, "Pandesal has versions, so its baseline isn't wanted");
+        var ensaymada = await repository.GetForProductAsync(ensaymadaId, Cancellation);
+        ensaymada.Select(v => (v.Number, v.Note, v.SavedAt)).Should().Equal(
+            (2, "Dough changed", savedAt), (1, ProductVersionRules.BaselineNote, new DateTime(2026, 9, 1)));
+        (await repository.GetForProductAsync(unchangedId, Cancellation)).Should().ContainSingle("its recipe is the latest's");
+    }
+
+    [Fact]
+    public async Task A_note_too_long_refuses_every_draft_with_it()
+    {
+        var pandesalId = await AddProductAsync("Pandesal");
+        var ensaymadaId = await AddProductAsync("Ensaymada");
+        var repository = CreateRepository();
+
+        var add = () => repository.AddRangeAsync(
+            [
+                new ProductVersionDraft(pandesalId, Recipe(500m), DateTime.Now, null),
+                new ProductVersionDraft(ensaymadaId, Recipe(500m), DateTime.Now, new string('x', ProductVersionRules.MaxNoteLength + 1)),
+            ],
+            Cancellation);
+
+        await add.Should().ThrowAsync<BusinessRuleException>();
+        (await repository.HasAnyAsync(pandesalId, Cancellation)).Should().BeFalse("nothing is written unless every draft is");
+    }
+
+    [Fact]
     public async Task A_product_with_no_versions_has_none()
     {
         var productId = await AddProductAsync("Pandesal");

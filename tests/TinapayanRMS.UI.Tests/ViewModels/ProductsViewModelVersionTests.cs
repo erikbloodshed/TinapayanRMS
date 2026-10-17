@@ -418,6 +418,42 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         (await VersionsAsync(seeded.ProductId))[0].Note.Should().Be("New price for October");
     }
 
+    [Fact]
+    public async Task A_Save_of_the_products_own_figures_reads_none_of_the_products_sharing_its_dough()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
+        var (pandesalId, doughId) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
+        var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [new RecipeLine(flourId, 400m)]);
+        for (var i = 1; i <= 3; i++)
+        {
+            var linkerId = await AddProductAsync($"Pandesal x {i}");
+            await SaveRecipeAsync(linkerId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 60m)]));
+        }
+
+        var shared = await CommandsSavingPriceAsync(pandesalId);
+        var alone = await CommandsSavingPriceAsync(ensaymadaId);
+
+        shared.Should().Be(alone, "a new price changes no other product, so the three sharing Pandesal's dough aren't read");
+    }
+
+    /// <summary>The commands a Save of a new current price takes, with the product's History tab hidden.</summary>
+    private async Task<int> CommandsSavingPriceAsync(int productId)
+    {
+        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 1);
+        Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
+        int commands;
+        using (var counter = SqlCommandCounter.Start())
+        {
+            await viewModel.SaveCommand.Execute();
+            commands = counter.Commands;
+        }
+
+        viewModel.ErrorMessage.Should().BeNull();
+        (await VersionsAsync(productId)).Should().HaveCount(2, "its first Save records how it was, then the new price");
+        return commands;
+    }
+
     private static void Edit(ProductsViewModel viewModel, Action change)
     {
         var recorder = (IUndoRecorder)viewModel;

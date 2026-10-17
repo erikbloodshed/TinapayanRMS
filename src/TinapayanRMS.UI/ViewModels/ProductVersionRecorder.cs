@@ -43,8 +43,8 @@ public sealed class ProductVersionRecorder(
 
     /// <summary>
     /// Reads the captured products again and records a version, noted <paramref name="note"/> and dated
-    /// <paramref name="savedAt"/>, of each one whose recipe or price differs from how it was captured. Returns the names
-    /// of the products that got one, by name.
+    /// <paramref name="savedAt"/>, of each one whose recipe or price differs from how it was captured, all in one write
+    /// (IProductVersionRepository.AddRangeAsync). Returns the names of the products that got one, by name.
     /// </summary>
     public async Task<IReadOnlyList<string>> RecordChangesAsync(
         ProductVersionCapture before, string note, DateTime savedAt, CancellationToken cancellationToken)
@@ -55,28 +55,32 @@ public sealed class ProductVersionRecorder(
         }
 
         var after = await SnapshotAsync([.. before.Products.Keys], cancellationToken);
-        List<string> recorded = [];
+        List<ProductVersionDraft> changed = [];
         foreach (var (productId, now) in after)
         {
             var was = before.Products[productId];
-            if (ProductVersionRules.IsSameRecipe(was.Content, now.Content))
+            if (!ProductVersionRules.IsSameRecipe(was.Content, now.Content))
             {
-                continue;
-            }
-
-            if (!await versionRepository.HasAnyAsync(productId, cancellationToken))
-            {
-                await versionRepository.AddAsync(
-                    productId, was.Content, was.UpdatedAt ?? savedAt, ProductVersionRules.BaselineNote, cancellationToken);
-            }
-
-            if (await versionRepository.AddAsync(productId, now.Content, savedAt, note, cancellationToken) is not null)
-            {
-                recorded.Add(now.Content.ProductName);
+                changed.Add(new ProductVersionDraft(productId, now.Content, savedAt, note)
+                {
+                    Baseline = new(productId, was.Content, was.UpdatedAt ?? savedAt, ProductVersionRules.BaselineNote),
+                });
             }
         }
 
-        return [.. recorded.Order(StringComparer.CurrentCultureIgnoreCase)];
+        if (changed.Count == 0)
+        {
+            return [];
+        }
+
+        var recorded = await versionRepository.AddRangeAsync(changed, cancellationToken);
+        return
+        [
+            .. changed.Zip(recorded)
+                .Where(c => c.Second is not null)
+                .Select(c => c.First.Content.ProductName)
+                .Order(StringComparer.CurrentCultureIgnoreCase),
+        ];
     }
 
     /// <summary>
