@@ -1,16 +1,16 @@
 using System.IO;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using TinapayanRMS.ApplicationCore.Rules;
 
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// What a screen tells the user when something failed, and how it's logged (2026-10-03). A rule's refusal is shown in its
-/// own words. What the database said is put plainly, by its error number: its own text is technical, and the same
+/// own words. What the database said is put plainly, by its error code: its own text is technical, and the same
 /// exception type covers very different things (a duplicate name, a row still in use, a server that isn't running), which
-/// one fixed message each for DbUpdateException and SqlException used to read as "That name is already in use." and
-/// "This item is currently in use elsewhere and can't be deleted." whatever had happened. Anything else is a bug: it's
+/// one fixed message each for DbUpdateException and the driver's exception used to read as "That name is already in use."
+/// and "This item is currently in use elsewhere and can't be deleted." whatever had happened. Anything else is a bug: it's
 /// still shown, so nothing fails silently, and it's logged as an error with its stack.
 /// </summary>
 /// <param name="Text">What the screen's error notice says.</param>
@@ -24,7 +24,7 @@ public readonly record struct Failure(string Text, bool IsRejection)
 
     public const string InUseText = "This item is currently in use elsewhere and can't be deleted.";
 
-    public const string UnreachableText = "Couldn't reach the database. Check that SQL Server Express is running, then try again.";
+    public const string UnreachableText = "Couldn't reach the database. Check that PostgreSQL is running, then try again.";
 
     public const string TimedOutText = "The database didn't answer in time. Try again.";
 
@@ -34,22 +34,15 @@ public readonly record struct Failure(string Text, bool IsRejection)
 
     public const string FileInUseText = "Couldn't write the file. If it's open in another program, such as Excel, close it there and try again.";
 
-    public const string NotABackupText = "That file isn't a backup SQL Server can read, or it's damaged.";
-
-    public const string NoAccessText ="Windows didn't allow the app to use that file or folder. Pick another one.";
+    public const string NoAccessText = "Windows didn't allow the app to use that file or folder. Pick another one.";
 
     public static Failure Of(Exception exception) => exception switch
     {
         BusinessRuleException rule => new(rule.Message, IsRejection: true),
         DbUpdateConcurrencyException => new(
             "It was changed or deleted on another screen in the meantime. Open it again, then make the change.", IsRejection: true),
-        DbUpdateException { InnerException: SqlException sql } => Of(sql),
-
-        // SqlClient refuses a number with more digits than its column holds before sending it: "Parameter value
-        // '1000000000000000.0000' is out of range."
-        DbUpdateException { InnerException: ArgumentException argument } when argument.Message.Contains("out of range", StringComparison.OrdinalIgnoreCase) =>
-            new(TooLargeText, IsRejection: true),
-        SqlException sql => Of(sql),
+        DbUpdateException { InnerException: NpgsqlException npgsql } => Of(npgsql),
+        NpgsqlException npgsql => Of(npgsql),
         TimeoutException => new(TimedOutText, IsRejection: false),
 
         // A file the app writes or reads, such as an exported workbook: the user can close it elsewhere or pick another place.
@@ -59,73 +52,50 @@ public readonly record struct Failure(string Text, bool IsRejection)
     };
 
     /// <summary>
-    /// SQL Server's error numbers: 2601 and 2627 a unique index, 547 a foreign key or check constraint (raised by
-    /// ExecuteDeleteAsync directly, or by SaveChanges inside a DbUpdateException), 515 a missing value, 8115 a number too
-    /// large for its column, 8152 and 2628 text too long, 1205 a deadlock, -2 a timeout, 207 and 208 a column or table the
-    /// database doesn't have yet.
+    /// What the server refused, by its SQLSTATE code; a command that ran out of time (Npgsql wraps the TimeoutException);
+    /// and anything else Npgsql throws without the server's word for it, which is a connection that couldn't be made or
+    /// was lost.
     /// </summary>
-    private static Failure Of(SqlException sql) => BackupFailureOf(sql) ?? sql.Number switch
+    private static Failure Of(NpgsqlException npgsql) => npgsql switch
     {
-        2601 or 2627 => new(DuplicateText(sql.Message), IsRejection: true),
-        547 when sql.Message.Contains("DELETE statement", StringComparison.OrdinalIgnoreCase) => new(InUseText, IsRejection: true),
-        547 when sql.Message.Contains("CHECK constraint", StringComparison.OrdinalIgnoreCase) =>
-            new("One of the values isn't allowed, so the change wasn't saved.", IsRejection: true),
-        547 => new("Something this refers to no longer exists. It may have been deleted on another screen.", IsRejection: true),
-        515 => new("A required value is missing, so the change wasn't saved.", IsRejection: true),
-        8115 => new(TooLargeText, IsRejection: true),
-        8152 or 2628 => new("Some text is too long to save.", IsRejection: true),
-        1205 => new("The database was busy with another change. Try again.", IsRejection: false),
-        -2 => new(TimedOutText, IsRejection: false),
-        207 or 208 => new(OutOfDateText, IsRejection: false),
-        _ when IsConnectionFailure(sql) => new(UnreachableText, IsRejection: false),
-        _ => new($"The database reported a problem: {FirstLine(sql.Message)}", IsRejection: false),
+        PostgresException postgres => Of(postgres),
+        { InnerException: TimeoutException } => new(TimedOutText, IsRejection: false),
+        _ => new(UnreachableText, IsRejection: false),
     };
 
     /// <summary>
-    /// What a BACKUP or RESTORE refused (Settings → Database). SQL Server reports the reason, then 3013 "BACKUP DATABASE is
-    /// terminating abnormally", so every error in the exception is looked at, not only the first: 3201 a file or folder it
-    /// can't open, 262/3110/15247 an account without the right, 3101 a database another program has open, 3241/3242/3243/3254/
-    /// 3183/3189/3203 a file that isn't a readable backup, 3169 a backup from a newer SQL Server, 3023 another backup
-    /// running. Null for anything else.
+    /// PostgreSQL's error codes: 23505 a unique index, 23001 a Restrict foreign key refusing a delete and 23503 any other
+    /// foreign key (raised by ExecuteDeleteAsync directly, or by SaveChanges inside a DbUpdateException), 23514 a check constraint, 23502 a missing value, 22003 a number too large
+    /// for its column, 22001 text too long, 40P01 and 40001 a deadlock or a clash with another change, 57014 a command
+    /// cancelled for taking too long, 42703 and 42P01 a column or table the database doesn't have yet, and classes 08, 28
+    /// and 57P0 a connection refused or lost, 3D000 a database that isn't there.
     /// </summary>
-    private static Failure? BackupFailureOf(SqlException sql)
+    private static Failure Of(PostgresException postgres) => postgres.SqlState switch
     {
-        foreach (SqlError error in sql.Errors)
-        {
-            switch (error.Number)
-            {
-                case 3201:
-                    return new("SQL Server couldn't open the backup file or its folder. Check the file is still there, then try again.", IsRejection: false);
-                case 262 or 3110 or 15247:
-                    return new(
-                        "Your Windows account isn't allowed to back up or restore the database. Ask whoever set up SQL Server to give it the dbcreator role.",
-                        IsRejection: true);
-                case 3101:
-                    return new("Another program is using the database, so it couldn't be restored. Close it, then try again.", IsRejection: true);
-                case 3241 or 3242 or 3243 or 3254 or 3183 or 3189 or 3203:
-                    return new(NotABackupText, IsRejection: true);
-                case 3169:
-                    return new("That backup was made by a newer version of SQL Server than this computer has, so it can't be restored here.", IsRejection: true);
-                case 3023:
-                    return new("Another backup was being taken. Try again in a moment.", IsRejection: false);
-            }
-        }
+        PostgresErrorCodes.UniqueViolation => new(DuplicateText(postgres.ConstraintName), IsRejection: true),
+        PostgresErrorCodes.RestrictViolation => new(InUseText, IsRejection: true),
+        PostgresErrorCodes.ForeignKeyViolation when postgres.MessageText.StartsWith("update or delete", StringComparison.OrdinalIgnoreCase) =>
+            new(InUseText, IsRejection: true),
+        PostgresErrorCodes.ForeignKeyViolation =>
+            new("Something this refers to no longer exists. It may have been deleted on another screen.", IsRejection: true),
+        PostgresErrorCodes.CheckViolation => new("One of the values isn't allowed, so the change wasn't saved.", IsRejection: true),
+        PostgresErrorCodes.NotNullViolation => new("A required value is missing, so the change wasn't saved.", IsRejection: true),
+        PostgresErrorCodes.NumericValueOutOfRange => new(TooLargeText, IsRejection: true),
+        PostgresErrorCodes.StringDataRightTruncation => new("Some text is too long to save.", IsRejection: true),
+        PostgresErrorCodes.DeadlockDetected or PostgresErrorCodes.SerializationFailure =>
+            new("The database was busy with another change. Try again.", IsRejection: false),
+        PostgresErrorCodes.QueryCanceled => new(TimedOutText, IsRejection: false),
+        PostgresErrorCodes.UndefinedColumn or PostgresErrorCodes.UndefinedTable => new(OutOfDateText, IsRejection: false),
+        PostgresErrorCodes.InvalidCatalogName => new(UnreachableText, IsRejection: false),
+        { } code when code.StartsWith("08", StringComparison.Ordinal) || code.StartsWith("28", StringComparison.Ordinal)
+            || code.StartsWith("57P0", StringComparison.Ordinal) => new(UnreachableText, IsRejection: false),
+        _ => new($"The database reported a problem: {FirstLine(postgres.MessageText)}", IsRejection: false),
+    };
 
-        return null;
-    }
-
-    /// <summary>
-    /// A server not found or not running (-1, 2, 53, and the network's own numbers), a database it won't open (4060, 4064), a
-    /// login it refuses (18456), or a connection broken mid-way, which SQL Server raises at severity 20 or above.
-    /// </summary>
-    private static bool IsConnectionFailure(SqlException sql) =>
-        sql.Class >= 20
-        || sql.Number is -1 or 2 or 53 or 64 or 121 or 233 or 1231 or 4060 or 4064 or 18456 or 10053 or 10054 or 10060 or 10061 or 11001;
-
-    /// <summary>Which unique index refused it, by its name: IX_Products_Name, IX_UnitsOfMeasure_Abbreviation, or another.</summary>
-    private static string DuplicateText(string message) =>
-        message.Contains("_Name'", StringComparison.OrdinalIgnoreCase) ? DuplicateNameText
-        : message.Contains("_Abbreviation'", StringComparison.OrdinalIgnoreCase) ? "That abbreviation is already in use."
+    /// <summary>Which unique index refused it, by its name: ix_products_name, ix_units_of_measure_abbreviation, or another.</summary>
+    private static string DuplicateText(string? index) =>
+        index?.EndsWith("_name", StringComparison.OrdinalIgnoreCase) == true ? DuplicateNameText
+        : index?.EndsWith("_abbreviation", StringComparison.OrdinalIgnoreCase) == true ? "That abbreviation is already in use."
         : "That's already there, and it can only be there once.";
 
     private static string FirstLine(string message)

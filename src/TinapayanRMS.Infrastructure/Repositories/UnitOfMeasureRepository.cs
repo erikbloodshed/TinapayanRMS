@@ -10,7 +10,7 @@ public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> db
 {
     public Task<IReadOnlyList<UnitOfMeasure>> GetAllAsync(CancellationToken cancellationToken) =>
         dbContextFactory.QueryAsync<UnitOfMeasure>(
-            $"SELECT {Columns.Of<UnitOfMeasure>("u")} FROM UnitsOfMeasure u ORDER BY u.Name", null, cancellationToken);
+            $"SELECT {Columns.Of<UnitOfMeasure>("u")} FROM units_of_measure u ORDER BY u.name", null, cancellationToken);
 
     public async Task AddAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken)
     {

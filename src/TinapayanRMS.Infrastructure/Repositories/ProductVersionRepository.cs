@@ -10,15 +10,15 @@ public class ProductVersionRepository(IDbContextFactory<TinapayanRMSDbContext> d
 {
     public Task<IReadOnlyList<ProductVersion>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
         dbContextFactory.QueryAsync<ProductVersion>(
-            $"SELECT {Columns.Of<ProductVersion>("v")} FROM ProductVersions v WHERE v.ProductId = @productId ORDER BY v.Number DESC",
+            $"SELECT {Columns.Of<ProductVersion>("v")} FROM product_versions v WHERE v.product_id = @productId ORDER BY v.number DESC",
             new { productId },
             cancellationToken);
 
-    public async Task<bool> HasAnyAsync(int productId, CancellationToken cancellationToken) =>
-        await dbContextFactory.QuerySingleOrDefaultAsync<int>(
-            "SELECT CASE WHEN EXISTS (SELECT 1 FROM ProductVersions v WHERE v.ProductId = @productId) THEN 1 ELSE 0 END",
+    public Task<bool> HasAnyAsync(int productId, CancellationToken cancellationToken) =>
+        dbContextFactory.QuerySingleOrDefaultAsync<bool>(
+            "SELECT EXISTS (SELECT 1 FROM product_versions v WHERE v.product_id = @productId)",
             new { productId },
-            cancellationToken) == 1;
+            cancellationToken);
 
     public async Task<ProductVersion?> AddAsync(
         int productId, ProductVersionContent content, DateTime savedAt, string? note, CancellationToken cancellationToken)

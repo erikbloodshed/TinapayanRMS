@@ -98,7 +98,8 @@ public sealed class ProductVersionRecorder(
             return;
         }
 
-        var latest = (await versionRepository.GetForProductAsync(sourceProductId, cancellationToken)).FirstOrDefault();
+        var versions = await versionRepository.GetForProductAsync(sourceProductId, cancellationToken);
+        var latest = versions.Count > 0 ? versions[0] : null;
         var note = latest is not null && IsLatest(latest, source.Content)
             ? $"{madeAs} {source.Content.ProductName}, version {latest.Number}"
             : $"{madeAs} {source.Content.ProductName}";

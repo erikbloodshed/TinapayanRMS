@@ -12,23 +12,23 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 {
     private static readonly string ProductWithCategorySql = $"""
         SELECT {Columns.Of<Product>("p")}, {Columns.Of<ProductCategory>("c")}
-        FROM Products p
-        LEFT JOIN ProductCategories c ON c.Id = p.CategoryId
+        FROM products p
+        LEFT JOIN product_categories c ON c.id = p.category_id
         """;
 
     public Task<IReadOnlyList<Product>> GetAllAsync(CancellationToken cancellationToken) =>
-        GetWithCategoryAsync("WHERE p.DeletedAt IS NULL\nORDER BY p.Name", null, cancellationToken);
+        GetWithCategoryAsync("WHERE p.deleted_at IS NULL\nORDER BY p.name", null, cancellationToken);
 
     public Task<IReadOnlyList<Product>> GetDeletedAsync(CancellationToken cancellationToken) =>
-        GetWithCategoryAsync("WHERE p.DeletedAt IS NOT NULL\nORDER BY p.Name", null, cancellationToken);
+        GetWithCategoryAsync("WHERE p.deleted_at IS NOT NULL\nORDER BY p.name", null, cancellationToken);
 
     public async Task<Product?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
-        (await GetWithCategoryAsync("WHERE p.Id = @id", new { id }, cancellationToken)).SingleOrDefault();
+        (await GetWithCategoryAsync("WHERE p.id = @id", new { id }, cancellationToken)).SingleOrDefault();
 
     public async Task<IReadOnlyList<Product>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken) =>
         ids.Count == 0
             ? []
-            : await GetWithCategoryAsync($"WHERE p.Id IN ({DapperReads.IdsTable})\nORDER BY p.Name", new { ids = DapperReads.IdList(ids) }, cancellationToken);
+            : await GetWithCategoryAsync($"WHERE p.id IN ({DapperReads.IdsTable})\nORDER BY p.name", new { ids = DapperReads.IdList(ids) }, cancellationToken);
 
     public Task<IReadOnlyList<ProductComponent>> GetComponentsAsync(int productId, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(dbContext => ProductComponentRepository.GetForProductAsync(dbContext, productId, cancellationToken), cancellationToken);
@@ -38,7 +38,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 
     public Task<IReadOnlyList<ProductComponent>> GetAllComponentsAsync(CancellationToken cancellationToken) =>
         dbContextFactory.QueryAsync<ProductComponent>(
-            $"SELECT {Columns.Of<ProductComponent>("pc")} FROM ProductComponents pc ORDER BY pc.ProductId, pc.SortOrder, pc.Id",
+            $"SELECT {Columns.Of<ProductComponent>("pc")} FROM product_components pc ORDER BY pc.product_id, pc.sort_order, pc.id",
             null,
             cancellationToken);
 
@@ -49,27 +49,27 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             : dbContextFactory.QueryAsync<int>(
                 // Packaging links can't go round in a loop (PackagingLinkRules), so the chain ends.
                 """
-                WITH Seeds AS (
-                    SELECT CAST(value AS int) AS ProductId FROM STRING_SPLIT(@productIds, ',') WHERE value <> ''
+                WITH RECURSIVE seeds AS (
+                    SELECT unnest(@productIds) AS product_id
                 ),
-                SubAssemblyIds AS (
-                    SELECT CAST(value AS int) AS Id FROM STRING_SPLIT(@subAssemblyIds, ',') WHERE value <> ''
+                sub_assembly_ids AS (
+                    SELECT unnest(@subAssemblyIds) AS id
                     UNION
-                    SELECT u.SubAssemblyId FROM ProductSubAssemblyUsages u JOIN Seeds s ON s.ProductId = u.ProductId
+                    SELECT u.sub_assembly_id FROM product_sub_assembly_usages u JOIN seeds s ON s.product_id = u.product_id
                 ),
-                Readers AS (
-                    SELECT ProductId FROM Seeds
+                readers AS (
+                    SELECT product_id FROM seeds
                     UNION
-                    SELECT u.ProductId FROM ProductSubAssemblyUsages u JOIN SubAssemblyIds s ON s.Id = u.SubAssemblyId
+                    SELECT u.product_id FROM product_sub_assembly_usages u JOIN sub_assembly_ids s ON s.id = u.sub_assembly_id
                     UNION
-                    SELECT l.ProductId FROM PackagingLinks l JOIN SubAssemblyIds s ON s.Id = l.LinkedSubAssemblyId
+                    SELECT l.product_id FROM packaging_links l JOIN sub_assembly_ids s ON s.id = l.linked_sub_assembly_id
                 ),
-                Chain AS (
-                    SELECT ProductId FROM Readers
+                chain AS (
+                    SELECT product_id FROM readers
                     UNION ALL
-                    SELECT l.ProductId FROM PackagingLinks l JOIN Chain c ON c.ProductId = l.LinkedProductId
+                    SELECT l.product_id FROM packaging_links l JOIN chain c ON c.product_id = l.linked_product_id
                 )
-                SELECT DISTINCT p.Id FROM Chain c JOIN Products p ON p.Id = c.ProductId ORDER BY p.Id
+                SELECT DISTINCT p.id FROM chain c JOIN products p ON p.id = c.product_id ORDER BY p.id
                 """,
                 new { subAssemblyIds = DapperReads.IdList(subAssemblyIds), productIds = DapperReads.IdList(productIds) },
                 cancellationToken);

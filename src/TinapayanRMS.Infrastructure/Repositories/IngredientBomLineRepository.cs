@@ -17,10 +17,10 @@ public class IngredientBomLineRepository(IDbContextFactory<TinapayanRMSDbContext
                 dbContext.Command(
                     $"""
                     SELECT {Columns.Of<IngredientBomLine>("l")}, {Columns.Of<RawMaterial>("c")}
-                    FROM IngredientBomLines l
-                    JOIN RawMaterials c ON c.Id = l.ComponentIngredientId
-                    WHERE l.IngredientId = @ingredientId
-                    ORDER BY l.SortOrder, l.Id
+                    FROM ingredient_bom_lines l
+                    JOIN raw_materials c ON c.id = l.component_ingredient_id
+                    WHERE l.ingredient_id = @ingredientId
+                    ORDER BY l.sort_order, l.id
                     """,
                     new { ingredientId },
                     cancellationToken),
@@ -38,8 +38,8 @@ public class IngredientBomLineRepository(IDbContextFactory<TinapayanRMSDbContext
                 dbContext.Command(
                     $"""
                     SELECT {Columns.Of<IngredientBomLine>("l")}
-                    FROM IngredientBomLines l
-                    ORDER BY l.IngredientId, l.SortOrder, l.Id
+                    FROM ingredient_bom_lines l
+                    ORDER BY l.ingredient_id, l.sort_order, l.id
                     """,
                     null,
                     cancellationToken))).AsList(),

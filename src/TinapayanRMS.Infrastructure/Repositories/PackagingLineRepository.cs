@@ -11,7 +11,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
 {
     public Task<IReadOnlyList<PackagingLine>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(
-            dbContext => RawMaterialReads.GetPackagingLinesAsync(dbContext, "WHERE l.ProductId = @productId", new { productId }, cancellationToken),
+            dbContext => RawMaterialReads.GetPackagingLinesAsync(dbContext, "WHERE l.product_id = @productId", new { productId }, cancellationToken),
             cancellationToken);
 
     public async Task<IReadOnlyList<PackagingLine>> GetEffectiveForProductAsync(int productId, CancellationToken cancellationToken)
@@ -46,7 +46,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
     {
         // One row a product at most, so every link is a small read, and a chain costs nothing more to follow.
         var links = (await dbContext.QueryAsync<PackagingLink>(
-                $"SELECT {Columns.Of<PackagingLink>("l")} FROM PackagingLinks l", null, cancellationToken))
+                $"SELECT {Columns.Of<PackagingLink>("l")} FROM packaging_links l", null, cancellationToken))
             .ToDictionary(l => l.ProductId);
 
         var ends = productIds.Distinct().ToDictionary(id => id, id => ChainEnd(id, links));
@@ -56,7 +56,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
         var ownLines = ownerIds.Count == 0
             ? []
             : await RawMaterialReads.GetPackagingLinesAsync(
-                dbContext, $"WHERE l.ProductId IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(ownerIds) }, cancellationToken);
+                dbContext, $"WHERE l.product_id IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(ownerIds) }, cancellationToken);
         var setLines = setIds.Count == 0 ? [] : await RawMaterialReads.GetSetLinesAsync(dbContext, setIds, cancellationToken);
 
         var ownLinesByProduct = ownLines.ToLookup(l => l.ProductId);

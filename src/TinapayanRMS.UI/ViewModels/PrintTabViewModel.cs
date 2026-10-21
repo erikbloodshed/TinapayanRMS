@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
@@ -178,9 +178,9 @@ public sealed class PrintTabViewModel : ViewModelBase
         {
             // A newer choice, or the tab shown again, is preparing its own.
         }
-        catch (SqlException) when (preparing.IsCancellationRequested)
+        catch (NpgsqlException) when (preparing.IsCancellationRequested)
         {
-            // The same, cancelled in the middle of a read: SqlClient reports that as "Operation cancelled by user".
+            // The same, cancelled in the middle of a read, should Npgsql report it as its own exception rather than a cancellation.
         }
         finally
         {

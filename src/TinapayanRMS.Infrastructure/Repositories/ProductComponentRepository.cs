@@ -16,9 +16,9 @@ public static class ProductComponentRepository
 {
     private static readonly string ComponentsWithProductSql = $"""
         SELECT {Columns.Of<ProductComponent>("pc")}, {Columns.Of<Product>("p")}, {Columns.Of<ProductCategory>("c")}
-        FROM ProductComponents pc
-        JOIN Products p ON p.Id = pc.ComponentProductId
-        LEFT JOIN ProductCategories c ON c.Id = p.CategoryId
+        FROM product_components pc
+        JOIN products p ON p.id = pc.component_product_id
+        LEFT JOIN product_categories c ON c.id = p.category_id
         """;
 
     /// <summary>
@@ -28,7 +28,7 @@ public static class ProductComponentRepository
     internal static async Task<IReadOnlyList<ProductComponent>> GetForProductAsync(
         TinapayanRMSDbContext dbContext, int productId, CancellationToken cancellationToken) =>
         (await dbContext.Connection().QueryAsync<ProductComponent, Product, ProductCategory?, ProductComponent>(
-            dbContext.Command($"{ComponentsWithProductSql}\nWHERE pc.ProductId = @productId\nORDER BY pc.SortOrder, pc.Id", new { productId }, cancellationToken),
+            dbContext.Command($"{ComponentsWithProductSql}\nWHERE pc.product_id = @productId\nORDER BY pc.sort_order, pc.id", new { productId }, cancellationToken),
             WithProduct,
             splitOn: "Id,Id")).AsList();
 
@@ -39,7 +39,7 @@ public static class ProductComponentRepository
             ? []
             : (await dbContext.Connection().QueryAsync<ProductComponent, Product, ProductCategory?, ProductComponent>(
                 dbContext.Command(
-                    $"{ComponentsWithProductSql}\nWHERE pc.ProductId IN ({DapperReads.IdsTable})\nORDER BY pc.ProductId, pc.SortOrder, pc.Id",
+                    $"{ComponentsWithProductSql}\nWHERE pc.product_id IN ({DapperReads.IdsTable})\nORDER BY pc.product_id, pc.sort_order, pc.id",
                     new { ids = DapperReads.IdList(productIds) },
                     cancellationToken),
                 WithProduct,

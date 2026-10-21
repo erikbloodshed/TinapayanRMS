@@ -10,7 +10,7 @@ public class CostingDefaultsRepository(IDbContextFactory<TinapayanRMSDbContext> 
 {
     public async Task<CostingDefaults> GetAsync(CancellationToken cancellationToken) =>
         await dbContextFactory.QuerySingleOrDefaultAsync<CostingDefaults>(
-            $"SELECT {Columns.Of<CostingDefaults>("d")} FROM CostingDefaults d WHERE d.Id = @id",
+            $"SELECT {Columns.Of<CostingDefaults>("d")} FROM costing_defaults d WHERE d.id = @id",
             new { id = CostingDefaults.SingletonId },
             cancellationToken)
         ?? new CostingDefaults();

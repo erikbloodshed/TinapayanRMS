@@ -4,6 +4,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
     <UseWPF>true</UseWPF>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 

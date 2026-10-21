@@ -1,6 +1,6 @@
 using System.IO;
 using AwesomeAssertions;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -13,7 +13,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>
 /// What a screen's error notice says for each kind of failure, from real database errors (2026-10-03). Until then every
-/// DbUpdateException read "That name is already in use." and every SqlException "This item is currently in use elsewhere
+/// DbUpdateException read "That name is already in use." and every driver exception "This item is currently in use elsewhere
 /// and can't be deleted.", whatever had happened, and a database that couldn't be reached among them.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
@@ -115,8 +115,9 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
     {
         var failure = await FailureOfAsync(async () =>
         {
-            await using var connection = new SqlConnection(
-                @"Server=.\NO_SUCH_INSTANCE;Database=TinapayanRMS;Trusted_Connection=True;TrustServerCertificate=True;Connect Timeout=2");
+            // Nothing listens on port 1, so the connection is refused. Windows tries a refused connection again for about two
+            // seconds before it gives up, so the timeout leaves it longer than that.
+            await using var connection = new NpgsqlConnection("Host=localhost;Port=1;Database=tinapayanrms;Username=tinapayanrms;Timeout=10");
             await connection.OpenAsync(Cancellation);
         });
 
@@ -127,6 +128,8 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
     public void A_timeout_says_the_database_didnt_answer()
     {
         Failure.Of(new TimeoutException("Execution Timeout Expired.")).Should().Be(new Failure(Failure.TimedOutText, IsRejection: false));
+        Failure.Of(new NpgsqlException("Exception while reading from stream", new TimeoutException("Timeout during reading attempt")))
+            .Should().Be(new Failure(Failure.TimedOutText, IsRejection: false), "Npgsql wraps a command's timeout in its own exception");
     }
 
     [Fact]

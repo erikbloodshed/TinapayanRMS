@@ -22,6 +22,6 @@ public class ProductVersionConfiguration : IEntityTypeConfiguration<ProductVersi
 
         builder.HasIndex(v => new { v.ProductId, v.Number }).IsUnique();
 
-        builder.ToTable(t => t.HasCheckConstraint("CK_ProductVersions_Number", "[Number] >= 1"));
+        builder.ToTable(t => t.HasCheckConstraint("CK_ProductVersions_Number", "number >= 1"));
     }
 }

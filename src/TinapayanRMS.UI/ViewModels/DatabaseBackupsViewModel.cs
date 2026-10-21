@@ -113,7 +113,7 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
             () => RunSafelyAsync(() => RestoreAsync(SelectedBackup!.Backup)),
             idleWithBackup);
 
-        // A file from elsewhere goes into the backups folder first, where SQL Server can read it. If it's then refused or
+        // A file from elsewhere goes into the backups folder first, to be restored from there. If it's then refused or
         // not restored after all, the copy goes again.
         RestoreFromFileCommand = ReactiveCommand.CreateFromTask(
             () => RunSafelyAsync(async () =>

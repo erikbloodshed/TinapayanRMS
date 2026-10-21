@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
 namespace TinapayanRMS.Infrastructure;
@@ -10,11 +9,9 @@ namespace TinapayanRMS.Infrastructure;
 /// </summary>
 public class TinapayanRMSDbContextFactory : IDesignTimeDbContextFactory<TinapayanRMSDbContext>
 {
-    public TinapayanRMSDbContext CreateDbContext(string[] args)
-    {
-        var optionsBuilder = new DbContextOptionsBuilder<TinapayanRMSDbContext>();
-        optionsBuilder.UseSqlServer("Server=.\\SQLEXPRESS;Database=TinapayanRMS;Trusted_Connection=True;TrustServerCertificate=True;");
+    /// <summary>The dev database. No password: Npgsql reads it from the password file (%APPDATA%\postgresql\pgpass.conf).</summary>
+    public const string DevelopmentConnectionString = "Host=localhost;Database=tinapayanrms;Username=tinapayanrms";
 
-        return new TinapayanRMSDbContext(optionsBuilder.Options);
-    }
+    public TinapayanRMSDbContext CreateDbContext(string[] args) =>
+        new(TinapayanRMSDbContext.CreateOptions(DevelopmentConnectionString));
 }

@@ -1,5 +1,5 @@
 using AwesomeAssertions;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
@@ -191,7 +191,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
 
         var act = () => dbContext.SaveChangesAsync(Cancellation);
 
-        (await act.Should().ThrowAsync<DbUpdateException>()).WithInnerException<SqlException>();
+        (await act.Should().ThrowAsync<DbUpdateException>()).WithInnerException<PostgresException>();
     }
 
     [Fact]

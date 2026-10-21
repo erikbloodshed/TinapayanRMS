@@ -15,12 +15,20 @@ namespace TinapayanRMS.Infrastructure.Queries;
 internal static class DapperReads
 {
     /// <summary>
-    /// The ids in <c>@ids</c> (a <see cref="IdList"/>) as a one-column table, for <c>WHERE x IN (…)</c>. One
-    /// parameter however many ids, so it never runs into SQL Server's limit of 2,100 parameters.
+    /// Maps a snake_case column (<c>cost_per_base_unit</c>) to its PascalCase property or constructor parameter
+    /// (<c>CostPerBaseUnit</c>). Every read goes through <see cref="Connection"/> or <see cref="Command"/>, so this is set
+    /// before the first.
     /// </summary>
-    public const string IdsTable = "SELECT CAST(value AS int) FROM STRING_SPLIT(@ids, ',')";
+    static DapperReads() => DefaultTypeMap.MatchNamesWithUnderscores = true;
 
-    public static string IdList(IEnumerable<int> ids) => string.Join(',', ids);
+    /// <summary>
+    /// The ids in <c>@ids</c> (an <see cref="IdList"/>) as a one-column table, for <c>WHERE x IN (…)</c>. Npgsql sends
+    /// the array as one parameter however many ids there are, and Dapper leaves it whole for Npgsql rather than
+    /// expanding it into a list.
+    /// </summary>
+    public const string IdsTable = "SELECT unnest(@ids)";
+
+    public static int[] IdList(IEnumerable<int> ids) => [.. ids];
 
     public static DbConnection Connection(this TinapayanRMSDbContext dbContext) => dbContext.Database.GetDbConnection();
 

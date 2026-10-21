@@ -10,6 +10,24 @@ public class TinapayanRMSDbContext : DbContext
     {
     }
 
+    /// <summary>
+    /// Every string column's collation: case-insensitive but accent-sensitive, as SQL Server's default was until the move
+    /// to PostgreSQL (2026-10-21). The unique name indexes rely on it (a raw material "flour" is a duplicate of "Flour"),
+    /// and so does the order names sort in. PostgreSQL's own collations are case-sensitive, hence this ICU one.
+    /// </summary>
+    public const string CaseInsensitiveCollation = "case_insensitive";
+
+    /// <summary>
+    /// Points <paramref name="options"/> at PostgreSQL with snake_case table and column names. The app, `dotnet ef` and
+    /// the tests all come through here, so none of them can disagree with the names the Dapper reads are written against.
+    /// </summary>
+    public static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, string connectionString) =>
+        options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention();
+
+    /// <summary>The options <see cref="Configure"/> builds, for a context made by hand rather than by the factory.</summary>
+    public static DbContextOptions<TinapayanRMSDbContext> CreateOptions(string connectionString) =>
+        (DbContextOptions<TinapayanRMSDbContext>)Configure(new DbContextOptionsBuilder<TinapayanRMSDbContext>(), connectionString).Options;
+
     public DbSet<UnitOfMeasure> UnitsOfMeasure => Set<UnitOfMeasure>();
 
     public DbSet<RawMaterialCategory> RawMaterialCategories => Set<RawMaterialCategory>();
@@ -54,6 +72,7 @@ public class TinapayanRMSDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasCollation(CaseInsensitiveCollation, locale: "und-u-ks-level2", provider: "icu", deterministic: false);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TinapayanRMSDbContext).Assembly);
     }
 
@@ -103,17 +122,21 @@ public class TinapayanRMSDbContext : DbContext
     public const int DecimalScale = 4;
 
     /// <summary>
-    /// <paramref name="value"/> as a <see cref="DecimalScale"/>-place column stores it, rounded half away from zero as SQL
-    /// Server rounds. For a figure worked out in memory and compared with the stored one, such as a sub-assembly's totals:
+    /// <paramref name="value"/> as a <see cref="DecimalScale"/>-place column stores it, rounded half away from zero as
+    /// PostgreSQL rounds a numeric. For a figure worked out in memory and compared with the stored one, such as a sub-assembly's totals:
     /// at full precision they never compare equal, and every save would write them again.
     /// </summary>
     public static decimal Stored(decimal value) => decimal.Round(value, DecimalScale, MidpointRounding.AwayFromZero);
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
-        // Every decimal column defaults to this precision unless a configuration overrides it,
-        // so a future column can't silently fall back to SQL Server's decimal(18,2) default and
-        // truncate a fractional cost (e.g. a ribbon's ₱0.045/cm).
+        // Every decimal column is numeric(18,4) unless a configuration overrides it. Npgsql's default is an
+        // unconstrained numeric, which would store each cost at whatever scale the division behind it left.
         configurationBuilder.Properties<decimal>().HavePrecision(18, DecimalScale);
+        configurationBuilder.Properties<string>().UseCollation(CaseInsensitiveCollation);
+
+        // The shop's local time, stamped with DateTime.Now. Npgsql maps a DateTime to timestamptz by default, which only
+        // takes UTC values.
+        configurationBuilder.Properties<DateTime>().HaveColumnType("timestamp without time zone");
     }
 }

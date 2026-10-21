@@ -10,13 +10,13 @@ internal static class SubAssemblyReads
     public static readonly string ColumnsWithRole = $"{Columns.Of<SubAssembly>("s")}, {Columns.Of<SubAssemblyRole>("r")}";
 
     /// <summary>Joins <c>s</c>'s role.</summary>
-    public const string RoleJoin = "JOIN SubAssemblyRoles r ON r.Id = s.RoleId";
+    public const string RoleJoin = "JOIN sub_assembly_roles r ON r.id = s.role_id";
 
     /// <summary>The sub-assemblies <paramref name="filterAndOrder"/> (a WHERE and ORDER BY over <c>s</c> and <c>r</c>) selects.</summary>
     public static async Task<IReadOnlyList<SubAssembly>> GetWithRoleAsync(
         TinapayanRMSDbContext dbContext, string filterAndOrder, object? parameters, CancellationToken cancellationToken) =>
         (await dbContext.Connection().QueryAsync<SubAssembly, SubAssemblyRole, SubAssembly>(
-            dbContext.Command($"SELECT {ColumnsWithRole}\nFROM SubAssemblies s\n{RoleJoin}\n{filterAndOrder}", parameters, cancellationToken),
+            dbContext.Command($"SELECT {ColumnsWithRole}\nFROM sub_assemblies s\n{RoleJoin}\n{filterAndOrder}", parameters, cancellationToken),
             WithRole,
             splitOn: "Id")).AsList();
 

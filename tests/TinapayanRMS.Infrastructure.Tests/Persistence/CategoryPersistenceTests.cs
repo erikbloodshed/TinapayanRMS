@@ -189,8 +189,8 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         var act = () => CreateRepository().DeleteAsync(category.Id, Cancellation);
 
         // ExecuteDeleteAsync issues a raw DELETE outside EF Core's change tracker, so an
-        // FK violation surfaces as the driver's own SqlException, not a DbUpdateException.
-        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+        // FK violation surfaces as the driver's own PostgresException, not a DbUpdateException.
+        await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
     [Fact]
@@ -213,6 +213,6 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
 
         var act = () => CreateRepository().DeleteAsync(category.Id, Cancellation);
 
-        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+        await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 }

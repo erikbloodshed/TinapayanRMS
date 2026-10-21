@@ -325,10 +325,12 @@ Backups of all of the app's data: every raw material, price, sub-assembly, produ
 - **Restore** puts the backup picked in the list back, in place of all of the app's data. It asks first, saying when the backup was taken. Then it takes a safety backup of the data as it is, puts the backup back, and the app closes and opens again. Anything saved since the backup was taken is lost, and so is anything not yet saved on another screen.
   - A backup from an earlier version of TinapayanRMS is brought up to date as it's restored.
   - A backup from a later version is refused, and nothing changes. Update the app first.
-  - If anything goes wrong part-way, the safety backup is put back, so the data is as it was.
+  - A backup is checked and brought up to date before it takes the data's place. If it's refused, or anything goes wrong part-way, the data stays as it was.
 - **Restore from File…** restores a backup file from elsewhere, such as a USB stick or another computer. Pick the file, and it's copied into the folder and restored as above.
 
 A backup or a restore can take a little while. The tab says what it's doing until it's done.
+
+Backups are *.backup* files. The *.bak* files the app made before 21 October 2026, when it kept its data in SQL Server, aren't listed and can't be restored. Everything they held was carried over into the app's data on that day.
 
 ---
 
@@ -1152,7 +1154,7 @@ A composite product's own sections can only be in a role with **Product-owned** 
 The product picker leaves out the composite itself, and any composite that already holds it. Otherwise the composite would end up holding itself.
 
 **"Couldn't reach the database."**
-The app keeps its data in SQL Server Express on this computer, and it isn't answering. Check that the **SQL Server (SQLEXPRESS)** service is running in Windows' **Services**, then try again. The screen you're on keeps working: switch to another tab and back, or pick the record again, once the database is running.
+The app keeps its data in PostgreSQL on this computer, and it isn't answering. Check that the **postgresql-x64-18** service is running in Windows' **Services**, then try again. The screen you're on keeps working: switch to another tab and back, or pick the record again, once the database is running.
 
 **"The database didn't answer in time."** or **"The database was busy with another change."**
 Nothing was saved. Try again.
@@ -1166,17 +1168,23 @@ The file you're saving over is open, usually in Excel. Close it there and try ag
 **"Windows didn't allow the app to use that file or folder. Pick another one."**
 The folder is protected, such as a system folder. Save in Documents, on the Desktop or on a USB stick instead.
 
-**"Your Windows account isn't allowed to back up or restore the database."**
-Backups are taken by SQL Server, which checks the Windows account using the app. Ask whoever set up SQL Server to give your account the dbcreator role.
+**"Backups need PostgreSQL's pg_dump and pg_restore, and they weren't found on this computer."**
+Backups are taken by PostgreSQL's own tools, which come with PostgreSQL. Ask whoever set up the computer to install PostgreSQL's command-line tools, or to tell the app where they are.
 
-**"That file isn't a backup SQL Server can read, or it's damaged."** or **"That file isn't a backup of a whole database, so it can't be restored."**
+**"That file isn't a backup of a whole database, so it can't be restored."**
 The file picked isn't one of the app's backups, or it was damaged, for example by a USB stick pulled out while copying. Nothing was changed. Try another backup.
+
+**"That backup was made by a newer version of PostgreSQL than this computer has, so it can't be restored here."**
+The backup came from a computer with a newer PostgreSQL. Ask whoever set up this computer to update PostgreSQL, then restore it again. Nothing was changed.
 
 **"That backup was made by a later version of TinapayanRMS, so this version can't use it."**
 Update the app on this computer to the version the backup came from, then restore it again. Nothing was changed.
 
-**"The backups folder … was made by another Windows user, without the access SQL Server needs."**
-Ask whoever looks after the computer to give the two accounts the message names **Modify** on that folder, in the folder's **Properties**, **Security** tab.
+**"Another program kept using the database, so it couldn't be restored."**
+Something else, such as another copy of the app or pgAdmin, had the database open. Close it, then restore again. Nothing was changed.
+
+**"The backups folder … was made by another Windows user, without the access everyone needs."**
+Ask whoever looks after the computer to give **Users** **Modify** on that folder, in the folder's **Properties**, **Security** tab.
 
 **"A number is too large to save."**
 A figure has more digits than the app keeps, for example a price typed with too many zeros. Check what you typed.

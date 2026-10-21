@@ -11,7 +11,7 @@ public class RawMaterialCategoryRepository(IDbContextFactory<TinapayanRMSDbConte
     // Type is stored by name; Dapper parses it back into the enum.
     public Task<IReadOnlyList<RawMaterialCategory>> GetAllAsync(CancellationToken cancellationToken) =>
         dbContextFactory.QueryAsync<RawMaterialCategory>(
-            $"SELECT {Columns.Of<RawMaterialCategory>("c")} FROM RawMaterialCategories c ORDER BY c.Name", null, cancellationToken);
+            $"SELECT {Columns.Of<RawMaterialCategory>("c")} FROM raw_material_categories c ORDER BY c.name", null, cancellationToken);
 
     public async Task AddAsync(RawMaterialCategory category, CancellationToken cancellationToken)
     {

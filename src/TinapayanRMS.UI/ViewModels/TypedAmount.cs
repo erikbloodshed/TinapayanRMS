@@ -10,7 +10,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// </summary>
 public sealed record TypedAmount(decimal Amount, decimal Percent, decimal OfCost)
 {
-    /// <summary>The costing columns' scale (decimal(18,4)): a percentage typed as an amount is kept as it will be saved.</summary>
+    /// <summary>The costing columns' scale (numeric(18,4)): a percentage typed as an amount is kept as it will be saved.</summary>
     private const int PercentDecimals = 4;
 
     /// <summary>What the value box shows: the amount typed, while it still stands, or else the one worked out.</summary>

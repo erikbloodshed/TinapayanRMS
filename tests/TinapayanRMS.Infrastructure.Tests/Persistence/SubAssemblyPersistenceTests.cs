@@ -410,7 +410,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         await using var dbContext = CreateDbContext();
         var act = () => dbContext.RawMaterials.Where(i => i.Id == sugarId).ExecuteDeleteAsync(Cancellation);
 
-        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+        await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
     [Fact]
@@ -423,8 +423,8 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var act = () => CreateRoleRepository().DeleteAsync(roleId, Cancellation);
 
         // ExecuteDeleteAsync issues a raw DELETE outside EF Core's change tracker, so an
-        // FK violation surfaces as the driver's own SqlException, not a DbUpdateException.
-        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+        // FK violation surfaces as the driver's own PostgresException, not a DbUpdateException.
+        await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
     [Fact]

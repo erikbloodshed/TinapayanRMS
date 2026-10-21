@@ -230,7 +230,7 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
     }
 
     private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
-        new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(fixture.ConnectionString).Options;
+        TinapayanRMSDbContext.CreateOptions(fixture.ConnectionString);
 
     private sealed class TestDbContextFactory(DbContextOptions<TinapayanRMSDbContext> options) : IDbContextFactory<TinapayanRMSDbContext>
     {

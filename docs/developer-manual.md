@@ -1,6 +1,6 @@
 # TinapayanRMS Developer Manual
 
-TinapayanRMS is the recipe and costing app of Tinapayan Festival Bakeshoppe. It's a Windows desktop app built with WPF, Syncfusion and ReactiveUI on .NET 10, and it keeps its data in SQL Server through EF Core and Dapper. The shop records what its raw materials cost. The app works out what every recipe, product and selling price comes to, and when a price changes it carries the change up to every product that uses it.
+TinapayanRMS is the recipe and costing app of Tinapayan Festival Bakeshoppe. It's a Windows desktop app built with WPF, Syncfusion and ReactiveUI on .NET 10, and it keeps its data in PostgreSQL through EF Core and Dapper. The shop records what its raw materials cost. The app works out what every recipe, product and selling price comes to, and when a price changes it carries the change up to every product that uses it.
 
 This manual is for developers who build, maintain or extend the app. It explains how the code is organised, which patterns it follows and why, and what you need to know and install before you change it. It assumes you know C#, but not this codebase.
 
@@ -43,7 +43,7 @@ PLAN.md is long: about 1,150 lines of very long bullets. List its sections with 
 - **Products.** A recipe of sub-assemblies, each cut into pieces of a set size, plus packaging and costing percentages. The app works out the cost and a cost-plus selling price per sellable unit. A *composite* product holds other products, such as a gift box of assorted breads.
 - **Reports, printing and scaling.** The Product Cost Summary and Raw Materials Price Summary reports, printed recipes and costings, and a recipe scaled to any number of units.
 
-It's a single-user desktop app. There's no server, no login and no network service of its own. The database is a local SQL Server Express instance, reached with Windows authentication.
+It's a single-user desktop app. There's no server, no login and no network service of its own. The database is a local PostgreSQL server, reached as the `tinapayanrms` role with the password in the password file.
 
 ### Screens
 
@@ -99,8 +99,8 @@ You'll be productive sooner if you're comfortable with the following.
 | MVVM with ReactiveUI 26 and Rx | `ReactiveObject`, `RaiseAndSetIfChanged`, `WhenAnyValue`, `ToProperty` (`ObservableAsPropertyHelper`), `ReactiveCommand`, `Interaction`, `Subject`, Rx operators | `ViewModels/` |
 | DynamicData | `SourceCache<T, TKey>`, `Connect().SortAndBind(...)` | List ViewModels |
 | EF Core 10 | `DbContext`, `IEntityTypeConfiguration<T>`, migrations, change tracking, transactions, `ExecuteDeleteAsync` | Writes and the schema, in `Infrastructure` |
-| Dapper and T-SQL | Multi-mapped joins (`splitOn`), CTEs, `STRING_SPLIT` | Reads, in `Infrastructure` |
-| SQL Server | Named instances, Windows authentication, `sqlcmd` | Setup, tests, debugging |
+| Dapper and PostgreSQL SQL | Multi-mapped joins (`splitOn`), recursive CTEs (`WITH RECURSIVE`), arrays with `unnest` | Reads, in `Infrastructure` |
+| PostgreSQL | Roles and the password file, snake_case names, `psql`, `pg_dump` and `pg_restore`, ICU collations | Setup, tests, backups, debugging |
 | Syncfusion Essential Studio for WPF | `SfDataGrid`, `SfTreeView`, `SfTreeGrid`, `ComboBoxAdv`, `TabControlExt`, `ButtonAdv`, `DoubleTextBox` and its kin, `SfNavigationDrawer`, `ChromelessWindow`, `SfSkinManager`, `PrintPreview` | Every view |
 | FluentValidation | `AbstractValidator<T>` | `ApplicationCore/Validators` |
 | .NET Generic Host and DI | `HostBuilder`, service lifetimes | `CompositionRoot.cs` |
@@ -117,7 +117,7 @@ You'll be productive sooner if you're comfortable with the following.
 |---|---|---|
 | Windows | 10 or 11 | WPF only runs on Windows. Icons use Segoe Fluent Icons (Windows 11), and fall back to Segoe MDL2 Assets on Windows 10. |
 | .NET SDK | 10.0.401, or a later 10.0 feature band | Pinned in [global.json](../global.json) with `rollForward: latestFeature`. |
-| SQL Server Express | Instance `.\SQLEXPRESS` (service `MSSQL$SQLEXPRESS`) | Reached with Windows authentication. Your Windows account must be able to create databases, because the tests create their own. `sqlcmd` is useful. LocalDB isn't used. |
+| PostgreSQL | 18 (EDB's Windows installer, service `postgresql-x64-18`, `localhost:5432`) | Reached as the `tinapayanrms` role, which must be able to create databases (`CREATEDB`), because the tests create their own. Its password goes in the password file, `%APPDATA%\postgresql\pgpass.conf`, so no connection string carries one. The installer's `bin` folder holds `psql`, and the `pg_dump` and `pg_restore` the backups run. |
 | `dotnet-ef` | 10.0.x, matching EF Core 10.0.12 | `dotnet tool install --global dotnet-ef --version 10.0.12` |
 | Syncfusion licence key | Essential Studio 35.x | Set as the `SYNCFUSION_LICENSE_KEY` user environment variable. The app won't start without it, and the UI tests that build Syncfusion controls are skipped without it. The build doesn't need it. A key covers one major version, so moving `SyncfusionVersion` to a new major version needs a new key. A program started before the variable changed, such as the IDE and its terminals, keeps the old value until it's restarted. |
 | An IDE | Any with .NET 10 support | Visual Studio, VS Code with the C# Dev Kit, or Rider. Git ignores `.vs/`, `.vscode/` and `.idea/`. |
@@ -134,9 +134,13 @@ Docker isn't used anywhere in this project.
 Run every command from the repository root.
 
 1. **Check the SDK.** `dotnet --version` should print 10.0.401 or later.
-2. **Check SQL Server Express:**
+2. **Set up PostgreSQL.** Install PostgreSQL 18, then, as the `postgres` superuser, create the app's role, and put its password in the password file (one line, `localhost:5432:*:tinapayanrms:<password>`):
    ```powershell
-   sqlcmd -S ".\SQLEXPRESS" -E -Q "SELECT @@VERSION"
+   $psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
+   & $psql -h localhost -U postgres -c "CREATE ROLE tinapayanrms LOGIN CREATEDB PASSWORD '<password>'"
+   New-Item -ItemType Directory -Force "$env:APPDATA\postgresql" | Out-Null
+   Add-Content "$env:APPDATA\postgresql\pgpass.conf" "localhost:5432:*:tinapayanrms:<password>"
+   & $psql -h localhost -U tinapayanrms -d postgres -c "SELECT version()"
    ```
 3. **Set the Syncfusion licence key** as a user environment variable, then restart your terminal and IDE so they see it:
    ```powershell
@@ -144,16 +148,12 @@ Run every command from the repository root.
    ```
 4. **Install the EF Core tools:** `dotnet tool install --global dotnet-ef --version 10.0.12`.
 5. **Build:** `dotnet build TinapayanRMS.slnx`.
-6. **Create the database.** This creates `TinapayanRMS` on `.\SQLEXPRESS` and applies every migration, including the rows the migrations seed, such as the starting sub-assembly roles:
+6. **Create the database.** This creates `tinapayanrms` and applies every migration, including the rows the migrations seed, such as the starting sub-assembly roles:
    ```powershell
    dotnet ef database update --project src/TinapayanRMS.Infrastructure
    ```
-   SQL Server Express turns `AUTO_CLOSE` on for the databases it creates. That makes the first read after a pause slow, so turn it off:
-   ```powershell
-   sqlcmd -S ".\SQLEXPRESS" -E -Q "ALTER DATABASE TinapayanRMS SET AUTO_CLOSE OFF"
-   ```
 7. **Run the app:** `dotnet run --project src/TinapayanRMS.UI`. With an empty database, follow the user manual's [First-time setup](user-manual.md#3-first-time-setup).
-8. **Run the tests:** `dotnet test --solution TinapayanRMS.slnx`. The first run creates the test databases `TinapayanRMS_Test_Infrastructure` and `TinapayanRMS_Test_UI`. The tests never touch `TinapayanRMS`.
+8. **Run the tests:** `dotnet test --solution TinapayanRMS.slnx`. The first run creates the test databases `tinapayanrms_test_infrastructure` and `tinapayanrms_test_ui`. The tests never touch `tinapayanrms`.
 
 ### Connection strings
 
@@ -163,13 +163,15 @@ Run every command from the repository root.
 | `dotnet ef` | Hard-coded in the design-time factory, [TinapayanRMSDbContextFactory](../src/TinapayanRMS.Infrastructure/TinapayanRMSDbContextFactory.cs) |
 | The tests | The app's `appsettings.json`, which `TinapayanRMS.Tests.Common` copies into each test project's output. Each project swaps in its own database name. |
 
-If your SQL Server instance isn't `.\SQLEXPRESS`, change the first two.
+Both are `Host=localhost;Database=tinapayanrms;Username=tinapayanrms`, with no password: Npgsql reads it from the password file. If your server, port or role differ, change both. A connection string may carry a `Password` instead, and the backups pass it on to `pg_dump` and `pg_restore`, but it's then in a file anyone with the folder can read.
+
+The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\<version>\bin`, newest version first, then on the `PATH`. Set `Backups:ToolsFolder` in `appsettings.json` to use another folder.
 
 ### Where the app writes
 
-- **Logs**: `logs/tinapayanrms-<date>.log` beside the executable. In a debug build that's `src/TinapayanRMS.UI/bin/Debug/net10.0-windows10.0.19041.0/logs/`. There's one file a day, and the last 31 are kept.
+- **Logs**: `logs/tinapayanrms-<date>.log` beside the executable. In a debug build that's `src/TinapayanRMS.UI/bin/Debug/net10.0-windows10.0.19041.0/win-x64/logs/`. There's one file a day, and the last 31 are kept.
 - **View state**: `%LocalAppData%\TinapayanRMS\view-state.json` remembers which tree folders were left open (on Sub-Assemblies, which were left closed), and whether the Vim keys are on (`"vim-keys": ["on"]`). It's safe to delete.
-- **Backups**: `%ProgramData%\TinapayanRMS\Backups`, one folder for every Windows user of the computer. SQL Server writes the `.bak` files itself, as its service account (`NT SERVICE\MSSQL$SQLEXPRESS`), which can't write into a user's profile. So the app creates this folder and, as its owner, gives the service account and `BUILTIN\Users` Modify on it, inherited by every file ([BackupFolder](../src/TinapayanRMS.Infrastructure/Services/BackupFolder.cs)). The tests use `%ProgramData%\TinapayanRMS\Test Backups\<guid>` and delete it afterwards.
+- **Backups**: `%ProgramData%\TinapayanRMS\Backups`, one folder for every Windows user of the computer. `pg_dump` writes the `.backup` files as the user running the app. The app creates this folder and, as its owner, gives `BUILTIN\Users` Modify on it, inherited by every file, so anyone using the app can copy, restore and delete any backup ([BackupFolder](../src/TinapayanRMS.Infrastructure/Services/BackupFolder.cs)). The `.bak` files SQL Server wrote before the move to PostgreSQL (2026-10-21) are no longer listed and can't be restored. The tests use `%ProgramData%\TinapayanRMS\Test Backups\<guid>` and delete it afterwards.
 
 ### Command reference
 
@@ -185,7 +187,7 @@ If your SQL Server instance isn't `.\SQLEXPRESS`, change the first two.
 | Add a migration | `dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure` |
 | Check the model matches the migrations | `dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infrastructure` |
 | Apply migrations | `dotnet ef database update --project src/TinapayanRMS.Infrastructure` |
-| Query the database | `sqlcmd -S ".\SQLEXPRESS" -E -d TinapayanRMS -Q "SELECT Name, CostPerBaseUnit FROM RawMaterials"` |
+| Query the database | `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U tinapayanrms -d tinapayanrms -c "SELECT name, cost_per_base_unit FROM raw_materials"` |
 
 The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test.runner`). VSTest-style flags such as `--filter` and `--collect` don't work: use the `--filter-*` options and `--coverage` instead.
 
@@ -212,7 +214,7 @@ A change is done when:
 |---|---|---|---|
 | `src/TinapayanRMS.Domain` | `net10.0` | Nothing | `Entities/`, `Enums/` |
 | `src/TinapayanRMS.ApplicationCore` | `net10.0` | Domain; FluentValidation | `Interfaces/`, `Rules/`, `Validators/` |
-| `src/TinapayanRMS.Infrastructure` | `net10.0` | Domain, ApplicationCore; EF Core (SQL Server), Dapper | `TinapayanRMSDbContext` and its design-time factory at the root; `Configurations/`, `Migrations/`, `Queries/`, `Repositories/`, `Services/` |
+| `src/TinapayanRMS.Infrastructure` | `net10.0` | Domain, ApplicationCore; EF Core (Npgsql, with EFCore.NamingConventions), Dapper | `TinapayanRMSDbContext` and its design-time factory at the root; `Configurations/`, `Migrations/`, `Queries/`, `Repositories/`, `Services/` |
 | `src/TinapayanRMS.UI` | `net10.0-windows10.0.19041.0` | All three; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion | App startup at the root; `Views/`, `ViewModels/`, `Controls/`, `Converters/`, `Printing/`, `Exporting/`, `Vim/`, `Themes/`, `Assets/Icons/` |
 | `tests/TinapayanRMS.ApplicationCore.Tests` | `net10.0` | Domain, ApplicationCore | Rule and validator tests, with no database |
 | `tests/TinapayanRMS.Infrastructure.Tests` | `net10.0` | Infrastructure, Tests.Common | Persistence tests against the project's own database |
@@ -247,7 +249,7 @@ A ViewModel file can also hold the small row and edit types that only its screen
 
 - [Directory.Build.props](../Directory.Build.props) sets `net10.0`, `ImplicitUsings`, `Nullable`, the `WindowsTargetFramework` property, and `AnalysisLevel` `latest-recommended` (the SDK's built-in analyzers at their Recommended rule set).
 - [tests/Directory.Build.props](../tests/Directory.Build.props) imports it. It gives every project whose name ends in `.Tests` the xUnit v3, AwesomeAssertions, test SDK and coverage packages, and a global `using Xunit`.
-- [Directory.Packages.props](../Directory.Packages.props) turns on Central Package Management. Versions live only there, so a `PackageReference` never has a `Version`. The EF Core and Syncfusion versions are the `EFCoreVersion` and `SyncfusionVersion` properties. Every Syncfusion package must be on the same version, so upgrade them together. Transitive pinning is on, so the "Transitive pins" group can lift a vulnerable transitive dependency (currently `System.Security.Cryptography.Pkcs`, which `Microsoft.Data.SqlClient` brings) to a fixed version. `dotnet list TinapayanRMS.slnx package --include-transitive --vulnerable` lists what still needs one.
+- [Directory.Packages.props](../Directory.Packages.props) turns on Central Package Management. Versions live only there, so a `PackageReference` never has a `Version`. The EF Core and Syncfusion versions are the `EFCoreVersion` and `SyncfusionVersion` properties. Every Syncfusion package must be on the same version, so upgrade them together. Transitive pinning is on, so the "Transitive pins" group can lift a transitive dependency to a fixed version: currently `Microsoft.EntityFrameworkCore.Relational`, which `Npgsql.EntityFrameworkCore.PostgreSQL` asks for only at 10.0.4, held at `EFCoreVersion` so every project gets one EF Core. `dotnet list TinapayanRMS.slnx package --include-transitive --vulnerable` lists what still needs one.
 - [.editorconfig](../.editorconfig) marks `Migrations/` as generated code, turns off CA1707 (underscores in names) in `tests/`, and turns off CA1716 everywhere.
 - Warnings aren't treated as errors, but the build is kept free of them.
 
@@ -407,7 +409,7 @@ PER PRODUCT
 
 | Entity | What it is | Worth knowing |
 |---|---|---|
-| `RawMaterial` | An ingredient or a packaging material | `Type` and `Source` never change once saved. Names are unique across both types. `CostPerBaseUnit` and `BufferedCostPerBaseUnit` are stored as `decimal(28,20)`. Check constraints back up the type and source rules. |
+| `RawMaterial` | An ingredient or a packaging material | `Type` and `Source` never change once saved. Names are unique across both types. `CostPerBaseUnit` and `BufferedCostPerBaseUnit` are stored as `numeric(28,20)`. Check constraints back up the type and source rules. |
 | `RawMaterialUnit` | An alternative unit, defined in base units | Never the base unit itself: a line or price with no unit is in the base unit. Correcting a multiplier reprices the material. A unit in use can't be deleted. |
 | `RawMaterialBrandPrice` | A purchased material's price for one brand, in one unit | The Raw Materials Save replaces them as a set. |
 | `RawMaterialPriceHistory` | A price the material was costed at | A log. Nothing reads it to cost anything. |
@@ -469,7 +471,7 @@ Three layers check the same rules, each for a different reason.
 |---|---|---|---|
 | Form pre-checks | FluentValidation validators in `ApplicationCore/Validators`, which a ViewModel runs before it saves | An immediate, friendly message | `ErrorMessage` is set, and nothing reaches the repository |
 | Business rules (the authority) | Static `*Rules` methods, which the repositories call before they write anything destructive | The real guarantee, whichever code path writes | A `BusinessRuleException`, whose message `RunSafelyAsync` shows exactly as written |
-| The database (a backstop) | Unique indexes, check constraints and `Restrict` foreign keys, in `Infrastructure/Configurations` | Integrity even if a code path forgets a check | A `DbUpdateException` or a `SqlException`, which [Failure](../src/TinapayanRMS.UI/ViewModels/Failure.cs) puts plainly by SQL Server's error number: "That name is already in use.", "This item is currently in use elsewhere and can't be deleted.", and so on |
+| The database (a backstop) | Unique indexes, check constraints and `Restrict` foreign keys, in `Infrastructure/Configurations` | Integrity even if a code path forgets a check | A `DbUpdateException` or a `PostgresException`, which [Failure](../src/TinapayanRMS.UI/ViewModels/Failure.cs) puts plainly by PostgreSQL's error code (SQLSTATE): "That name is already in use.", "This item is currently in use elsewhere and can't be deleted.", and so on |
 
 The database's messages say what kind of thing went wrong, never which rule. So a rule that a user can break must be checked first in a `*Rules` method, with a message that says what's wrong. Validators exist only for entities that have a Save form. A set of lines saved together (BOM lines, recipe lines, packaging lines) gets its checks across rows from its Rules class instead.
 
@@ -552,9 +554,9 @@ A made or linked ingredient's costs are worked out by **`IngredientCostRules.Rec
 ### Precision and rounding
 
 - Every cost is a `decimal` at full precision through the whole cascade. Round only for display, and for the final selling price.
-- `TinapayanRMSDbContext.ConfigureConventions` makes every `decimal` column `decimal(18,4)`, so a new column can't fall back to SQL Server's `decimal(18,2)`. The two costs per base unit are `decimal(28,20)`, so a buffered cost typed per bag comes back exactly as typed after it's divided down to the gram.
-- A value that goes through a `decimal(18,4)` column comes back rounded to 4 places: 1/6 becomes 0.1667. A test that reads a value back from the database asserts the rounded value.
-- A stored figure worked out in memory is set at its column's scale, after it's worked out at full precision: a cost per base unit through `RawMaterialRules.StoredCost` (20 places), a sub-assembly's totals through `TinapayanRMSDbContext.Stored` (4), each rounded half away from zero as SQL Server rounds. At full precision, a cost that doesn't come out even (170 ÷ 240) never equals the stored one, so a Save that changed nothing would read it as changed, log a price again and move the cost's date.
+- `TinapayanRMSDbContext.ConfigureConventions` makes every `decimal` column `numeric(18,4)`, so a new column can't fall back to Npgsql's unconstrained `numeric`, which would keep whatever scale a division left. The two costs per base unit are `numeric(28,20)`, so a buffered cost typed per bag comes back exactly as typed after it's divided down to the gram.
+- A value that goes through a `numeric(18,4)` column comes back rounded to 4 places: 1/6 becomes 0.1667. A test that reads a value back from the database asserts the rounded value.
+- A stored figure worked out in memory is set at its column's scale, after it's worked out at full precision: a cost per base unit through `RawMaterialRules.StoredCost` (20 places), a sub-assembly's totals through `TinapayanRMSDbContext.Stored` (4), each rounded half away from zero as PostgreSQL rounds a `numeric`. At full precision, a cost that doesn't come out even (170 ÷ 240) never equals the stored one, so a Save that changed nothing would read it as changed, log a price again and move the cost's date.
 - On screen: 2 decimals for the Products screen's per-piece costing figures and for prices, and 4 for a cost per base unit and for a recipe tab's cost per piece. Grid quantities show 1 decimal and accept up to 4. No amount shows a currency symbol.
 
 ### Buffered and unbuffered costs
@@ -574,25 +576,25 @@ A read, from [ProductCategoryRepository](../src/TinapayanRMS.Infrastructure/Repo
 ```csharp
 public Task<IReadOnlyList<ProductCategory>> GetAllAsync(CancellationToken cancellationToken) =>
     dbContextFactory.QueryAsync<ProductCategory>(
-        $"SELECT {Columns.Of<ProductCategory>("c")} FROM ProductCategories c ORDER BY c.Name", null, cancellationToken);
+        $"SELECT {Columns.Of<ProductCategory>("c")} FROM product_categories c ORDER BY c.name", null, cancellationToken);
 ```
 
 The read helpers are in `Infrastructure/Queries`:
 
 - **[DapperReads](../src/TinapayanRMS.Infrastructure/Queries/DapperReads.cs)** borrows a DbContext's connection, so reads use the same connection string as EF Core. `QueryAsync` and `QuerySingleOrDefaultAsync` run either on the factory, in a context of their own, or on a save's context. On a context that holds a transaction, a read joins that transaction (`DapperReads.Command`). `ReadAsync` gives a read that needs several queries, such as a multi-mapped join, a context of its own.
-- **[Columns](../src/TinapayanRMS.Infrastructure/Queries/Columns.cs)** lists every entity's columns, `Id` first, because a multi-mapped join splits on `Id`. `Columns.Of<T>(alias)` writes the SELECT list.
+- **[Columns](../src/TinapayanRMS.Infrastructure/Queries/Columns.cs)** lists every entity's columns by their snake_case names, `id` first, because a multi-mapped join splits on `Id` (Dapper matches it without regard to case). Dapper maps `cost_per_base_unit` back to `CostPerBaseUnit`, since `DapperReads` turns on `MatchNamesWithUnderscores`. `Columns.Of<T>(alias)` writes the SELECT list.
 - **`RawMaterialReads` and `SubAssemblyReads`** load the shared graphs: materials with their category, base unit and units; sub-assemblies with their role and owner.
 
 The rules for reads:
 
 - **`Columns` must list exactly EF Core's columns.** A property it leaves out comes back as its default value, with no error. [ColumnsTests](../tests/TinapayanRMS.Infrastructure.Tests/Queries/ColumnsTests.cs) compares every list with EF Core's model, so a new or renamed property fails that test until `Columns` has it. (That's what Infrastructure's `InternalsVisibleTo` is for.)
-- **Table names are the `DbSet` names, written into the SQL.** Renaming a table means updating that SQL by hand; the persistence tests will catch any you miss.
+- **Every name in the SQL is snake_case**: EF Core names each table after its `DbSet` and each column after its property, in snake_case (`UseSnakeCaseNamingConvention`, in `TinapayanRMSDbContext.Configure`), so `RawMaterials.CostPerBaseUnit` is `raw_materials.cost_per_base_unit`. Nothing needs quoting. Renaming a table or column means updating that SQL by hand; the persistence tests will catch any you miss. A column alias is snake_case too (`AS product_id`).
 - **Read many records in one query, never one query each.** A read for several products (or anything else) is a plural method, such as `GetForProductsAsync(ids)`, rather than a loop of single reads: Reports once made nine queries a product.
-- **A list of ids is one parameter:** `WHERE x.Id IN ({DapperReads.IdsTable})` with `new { ids = DapperReads.IdList(ids) }`. It's split by `STRING_SPLIT`, so it never hits SQL Server's limit of 2,100 parameters.
+- **A list of ids is one parameter:** `WHERE x.id IN ({DapperReads.IdsTable})` with `new { ids = DapperReads.IdList(ids) }`: an `int[]` that Npgsql sends as one array parameter, which `unnest` turns back into rows. Dapper leaves an array whole for Npgsql rather than expanding it into a list.
 - **An optional navigation is a `LEFT JOIN`.** Dapper returns null for a split whose `Id` is null.
 - **A collection navigation, such as a material's `Units`, is a second query stitched on by id,** not a join, because Dapper's multi-mapping over several result sets is synchronous only.
 - **There's no identity resolution.** A material on two lines is two objects.
-- **Every read has an explicit `ORDER BY`.** Lines are read `ORDER BY SortOrder, Id`.
+- **Every read has an explicit `ORDER BY`.** Lines are read `ORDER BY sort_order, id`.
 - Dapper maps a `date` column to `DateOnly`, and an enum stored as a string back to the enum, on its own.
 
 Never write through Dapper. A Dapper write would skip the cost propagators and the `CostUpdatedAt` stamp, leaving stored costs stale.
@@ -600,7 +602,7 @@ Never write through Dapper. A Dapper write would skip the cost propagators and t
 ### Writing safely
 
 - **Update by loading, then applying.** An `UpdateAsync` loads the tracked entity, copies across only the fields a user can edit, and saves. Never call `dbContext.Update(incoming)` on an object the caller built: it marks every property as modified, and silently overwrites the stored costs. If an edited field feeds a stored figure (a unit's multiplier feeds the cost), the same method recomputes that figure.
-- **Delete with `ExecuteDeleteAsync`.** It runs at once, outside the change tracker, so a foreign key's refusal arrives as a `SqlException`, not a `DbUpdateException`. `RunSafelyAsync` shows it as "This item is currently in use elsewhere and can't be deleted." A test of it expects `SqlException`. It also runs inside the context's transaction when there is one, so a set of lines replaced with it commits or rolls back with the rest.
+- **Delete with `ExecuteDeleteAsync`.** It runs at once, outside the change tracker, so a foreign key's refusal arrives as a `PostgresException`, not a `DbUpdateException`. `RunSafelyAsync` shows it as "This item is currently in use elsewhere and can't be deleted." A test of it expects `PostgresException`. It also runs inside the context's transaction when there is one, so a set of lines replaced with it commits or rolls back with the rest.
 - **Replace a set of lines whole.** The `SetLinesAsync` methods first check every incoming row, and every record the rows refer to. Only then do they delete the old rows with `ExecuteDeleteAsync`, insert the new ones with `SortOrder` set to each row's position, recompute any totals and save. A rejected set leaves the old lines untouched. The set a method replaces must match exactly what the UI edits as one unit.
 - **One Save, one transaction.** `RawMaterialRepository.SaveAsync` and `ProductRepository.SaveAsync` write everything a screen's form holds in one context and one transaction. Each step is an `internal static` method that takes the context, so steps from several repositories compose. Each step saves as it goes, so the checks of later steps see what earlier ones wrote. A part passed as `null` means "leave it as saved". The caller's entity is copied, never attached, so a rolled-back save never leaves an id on it. The cost cascade runs once, at the end, on the same context and in the same transaction, so it commits with the save or not at all.
 - **Save inputs are immutable records:** `RecipeDraft`, `NewSubAssemblyDraft`, `LinkedUsageDraft`, `PackagingLinkDraft`, `ProductMove`, `RawMaterialMove` and the `RecipeLine` record struct, all in `ApplicationCore/Interfaces`.
@@ -640,23 +642,24 @@ await using (var transaction = await dbContext.Database.BeginTransactionAsync(ca
 - **`IngredientDependencies`**: loads the ingredient dependency graph, made of BOM edges and link edges, for the cycle checks.
 - **`ProductCloner`** (`IProductCloner`): Clone and Create Variant. Both link the sub-assemblies the source links and copy the source's own ones. A clone copies the packaging; a variant links it.
 - **`JsonViewStateStore`** (`IViewStateStore`): the view-state file. A missing or broken file reads as empty, and a failed write is dropped.
-- **`DatabaseBackups`** (`IDatabaseBackups`): Settings' Database tab and the daily automatic backup. It runs `BACKUP DATABASE … COPY_ONLY, CHECKSUM` and `RESTORE DATABASE … REPLACE` on its own non-pooled connections to `master`, one at a time (a `SemaphoreSlim`, since SQL Server refuses two backups of a database at once). A restore checks the file first (`RESTORE HEADERONLY`, `FILELISTONLY`, `VERIFYONLY`), takes a safety backup, puts everyone out of the database (`SINGLE_USER WITH ROLLBACK IMMEDIATE`), restores with its files moved onto the database's own, and brings an older backup up to date with `MigrateAsync`. A backup from a later version, or of another database, is refused (`BackupRules.UpdatesNeeded`). Whatever fails after the safety backup puts the safety backup back. A new backup or a file copied in never reuses a name in the folder: names go to the second and `WITH INIT` would overwrite, so `BackupRules.FreeFileNameFor` moves the time on a second while the name is taken. The app then restarts, since every singleton ViewModel holds data from before. `Failure` puts SQL Server's backup errors plainly, looking at every error in the exception, since 3013 follows the real one.
+- **`DatabaseBackups`** (`IDatabaseBackups`): Settings' Database tab and the daily automatic backup, taken by PostgreSQL's own tools through [PostgresTools](../src/TinapayanRMS.Infrastructure/Services/PostgresTools.cs). A backup is `pg_dump --format=custom` into a `.backup` file. Backups and restores take turns (a `SemaphoreSlim`), since the day's automatic backup can start while Settings is taking one. A restore reads the file first with `pg_restore --list` (`BackupRules.TryReadArchiveListing`): a file that isn't a backup, or is from a newer PostgreSQL, is refused before anything changes. It then takes a safety backup and restores into a scratch database, `<database>_restoring` (`--no-owner --no-privileges --exit-on-error --single-transaction`). There it brings an older backup up to date with `MigrateAsync`, and refuses one from a later version, or of another app (`BackupRules.UpdatesNeeded`). Only then does it swap the scratch database in: it closes the database to new connections, ends the app's own, renames the database to `<database>_replaced` and the scratch database to its name, and drops the one it replaced. So a backup that's refused or fails part-way never touches the data. Every statement runs on its own unpooled connection to the `postgres` maintenance database. A new backup or a file copied in never reuses a name in the folder: names go to the second, so `BackupRules.FreeFileNameFor` moves the time on a second while the name is taken. The app then restarts, since every singleton ViewModel holds data from before.
 
 ### Schema conventions
 
 - There's one `IEntityTypeConfiguration<T>` per entity in `Configurations/`, and `OnModelCreating` applies them all from the assembly.
-- Every `DbSet` name is its table's name.
-- Every name a user chooses (materials, categories, products, sub-assemblies, roles, units) has a unique index.
+- Every table is its `DbSet`'s name in snake_case, and every column its property's.
+- Every name a user chooses (materials, categories, products, sub-assemblies, roles, units) has a unique index. Every text column has the `case_insensitive` ICU collation (`TinapayanRMSDbContext.CaseInsensitiveCollation`, set in `ConfigureConventions`), so "flour" is a duplicate of "Flour" and names sort without regard to case, as they did on SQL Server.
 - Enums are stored as strings (`HasConversion<string>()`), so the data reads clearly and Dapper maps them back by name.
 - Owned children cascade on delete (lines, units, prices, costing parameters). References are `Restrict`, so a material that a line uses can't be deleted. A product's category is `SetNull`.
 - Check constraints back up the rules. They're named `CK_<Table>_<Rule>`.
 - Every line table has a `SortOrder`, because users drag lines into order.
 - Where the CLR default is a meaningful value, a column default is paired with `HasSentinel`, as on `Product.QuantityRequired` and `Product.Stage`.
-- On a unique index over a nullable column, EF Core adds `WHERE [Column] IS NOT NULL`, so null rows may repeat. Add `.HasFilter(null)` if null rows must collide too. (`sqlcmd` writes to a table with a filtered index need `SET QUOTED_IDENTIFIER ON;` first.)
+- Every `DateTime` column is `timestamp without time zone` (`ConfigureConventions`): the app stamps the shop's local time with `DateTime.Now`, and Npgsql's default, `timestamptz`, takes only UTC. PostgreSQL keeps a time to the microsecond.
+- On a unique index over a nullable column, PostgreSQL lets null rows repeat. Add `.AreNullsDistinct(false)` if null rows must collide too.
 
 ### Migrations
 
-Migrations come only from `dotnet ef migrations add`. Never write or edit one by hand. (A few early migrations carry hand-added data-conversion SQL from before this rule.)
+Migrations come only from `dotnet ef migrations add`. Never write or edit one by hand. (The SQL Server migrations, some with hand-added data-conversion SQL from before this rule, were replaced by one `InitialCreate` for PostgreSQL on 2026-10-21.)
 
 1. Change the entity, its configuration, and its `Columns` list.
 2. `dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure`.
@@ -708,7 +711,7 @@ Each screen puts an `ErrorToast` over its content, and a `SuccessToast` where it
 **[ViewModelBase](../src/TinapayanRMS.UI/ViewModels/ViewModelBase.cs)** is the base of every screen's ViewModel. It provides:
 
 - `ErrorMessage` and `SuccessMessage`, which the toasts show.
-- **`RunSafelyAsync(action)`**, which clears both messages and runs the action. Whatever the action throws becomes `ErrorMessage`, in the words [Failure](../src/TinapayanRMS.UI/ViewModels/Failure.cs) gives it: a `BusinessRuleException`'s message as written; what the database refused or couldn't do, put plainly by its error number (a duplicate name, something in use, a database that can't be reached); a file that couldn't be written or opened (`IOException`, `UnauthorizedAccessException`); and anything else, a bug, as "Something went wrong, and the details went to the log: …". A refusal is logged as a warning, anything else as an error with its stack. Nothing reaches ReactiveUI, which would hand it to `App`.
+- **`RunSafelyAsync(action)`**, which clears both messages and runs the action. Whatever the action throws becomes `ErrorMessage`, in the words [Failure](../src/TinapayanRMS.UI/ViewModels/Failure.cs) gives it: a `BusinessRuleException`'s message as written; what the database refused or couldn't do, put plainly by its error code (a duplicate name, something in use, a database that can't be reached); a file that couldn't be written or opened (`IOException`, `UnauthorizedAccessException`); and anything else, a bug, as "Something went wrong, and the details went to the log: …". A refusal is logged as a warning, anything else as an error with its stack. Nothing reaches ReactiveUI, which would hand it to `App`.
 - **`LoadSafelyAsync(load)`**, which every `LoadCommand` runs its body in. A load that fails shows why in the same words, without clearing the notices (a screen loads after its own Save, and mustn't take that Save's message away), and a later load that works clears it.
 - **`LoadLatest(values, load)`**, for a load driven by a selection: each value's load runs as it comes, a newer value cancels a load still running, and one that fails shows why while the next value loads as usual. Never write `Observable.Switch(...).Subscribe()` for this by hand: an exception that reaches `Switch` ends the subscription, and from then on no pick loads anything.
 - **`ShowFailure(exception, context)`**, for a failure that code catches itself, such as a read nothing awaits.
@@ -969,16 +972,16 @@ The What-If Prices screen's **Print Report** goes through the same dialog, with 
 
 ### How the tests work
 
-- **Nothing is mocked.** Rules are tested as pure functions. Repositories, services and ViewModels are tested on a real SQL Server database that Respawn resets before every test. Grid behaviours are tested in real `SfDataGrid`s in windows placed off-screen.
-- **Each database-backed project has its own database**: `TinapayanRMS_Test_Infrastructure` and `TinapayanRMS_Test_UI`. `dotnet test --solution` runs the projects side by side, and a shared database would be reset under the other project's running test.
-- **Each database is migrated once per test run**, by the fixture's `MigrateAsync`, and its `AUTO_CLOSE` is turned off.
-- **Respawn clears every table** except `__EFMigrationsHistory` before each test. That includes rows the migrations seeded, so a test creates every row it needs.
+- **Nothing is mocked.** Rules are tested as pure functions. Repositories, services and ViewModels are tested on a real PostgreSQL database that Respawn resets before every test. Grid behaviours are tested in real `SfDataGrid`s in windows placed off-screen.
+- **Each database-backed project has its own database**: `tinapayanrms_test_infrastructure` and `tinapayanrms_test_ui`. `dotnet test --solution` runs the projects side by side, and a shared database would be reset under the other project's running test.
+- **Each database is migrated once per test run**, by the fixture's `MigrateAsync`.
+- **Respawn clears every table** except `__EFMigrationsHistory` before each test (it truncates them, and tries again if PostgreSQL ends the truncate as a deadlock with a read the last test left running). That includes rows the migrations seeded, so a test creates every row it needs.
 
 | Project | What it tests | Needs |
 |---|---|---|
 | `ApplicationCore.Tests` | `Rules/` and `Validators/`, as pure functions | Nothing |
-| `Infrastructure.Tests` | `Persistence/` (repositories and the cascade), `Queries/` (`ColumnsTests`), `Services/` (`JsonViewStateStoreTests`) | SQL Server Express |
-| `UI.Tests` | `ViewModels/` on real repositories, `Controls/` in off-screen grids, `Printing/`, `Converters/`, `CompositionRootTests` | SQL Server Express; the licence key for the tests that build Syncfusion controls |
+| `Infrastructure.Tests` | `Persistence/` (repositories and the cascade), `Queries/` (`ColumnsTests`), `Services/` (`JsonViewStateStoreTests`, and `DatabaseBackupsTests`, which run the real `pg_dump` and `pg_restore`) | PostgreSQL, with its command-line tools |
+| `UI.Tests` | `ViewModels/` on real repositories, `Controls/` in off-screen grids, `Printing/`, `Converters/`, `CompositionRootTests` | PostgreSQL; the licence key for the tests that build Syncfusion controls |
 | `Tests.Common` | Nothing: it's the shared fixture library | — |
 
 ### The database fixtures
@@ -986,7 +989,7 @@ The What-If Prices screen's **Print Report** goes through the same dialog, with 
 - **[DatabaseFixtureBase](../tests/TinapayanRMS.Tests.Common/Fixtures/DatabaseFixtureBase.cs)** (in Tests.Common) reads the app's connection string, swaps in the project's database name, migrates the database, and resets it with Respawn.
 - **`DatabaseFixture`** and **`DatabaseCollection`** are defined in each project's own `Fixtures/` folder, because xUnit only finds a collection definition in the tests' own assembly. Each `DatabaseFixture` is one line that names its database.
 - **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`.
-- **[ThrowawayDatabase](../tests/TinapayanRMS.Tests.Common/Fixtures/ThrowawayDatabase.cs)** is a migrated database of one test's own on the same server, dropped when the test is done. The backup tests restore over it, which would put every other test out of the shared database.
+- **[ThrowawayDatabase](../tests/TinapayanRMS.Tests.Common/Fixtures/ThrowawayDatabase.cs)** is a migrated database of one test's own on the same server (`tinapayanrms_test_backup_` and eight characters of a GUID), dropped when the test is done. The backup tests restore over it, which would put every other test out of the shared database.
 - **Every concrete test class must carry `[Collection(DatabaseCollection.Name)]`.** It's deliberately left off the base class: xUnit isn't guaranteed to honour it there, and without it tests could run in parallel against the one database.
 
 ### Writing tests
@@ -1084,7 +1087,7 @@ A test that creates WPF objects runs on an STA thread:
 - `StaThread.RunThemed(() => …)` when it themes a window. All such tests share one STA thread, with the app's theme settings, because SfSkinManager ties a theme's resources to the thread that loaded them.
 - `VersionRecorders.Create(factory)` (in UI.Tests' `Fixtures/`) builds a `ProductVersionRecorder` over real repositories, for a test that constructs `SubAssembliesViewModel`.
 - `FailingDbContextFactory` (in UI.Tests' `Fixtures/`) wraps a factory and refuses every context while its `Fail` is set: for a test that a screen survives a database that stops answering, and recovers once it answers. A test that a write is all or nothing fails it part-way with an EF Core save interceptor instead (`CostCascadeTransactionPersistenceTests`).
-- `SqlCommandCounter` (also in UI.Tests' `Fixtures/`) counts the SQL commands sent from where it's started: for a test that a read's round trips don't grow with what it reads.
+- `SqlCommandCounter` (also in UI.Tests' `Fixtures/`) counts the SQL commands sent from where it's started (the activities Npgsql reports on its `Npgsql` ActivitySource): for a test that a read's round trips don't grow with what it reads.
 - `OffscreenGrid.Run(create, test)` shows a real grid off-screen. Its test classes carry `[Collection(OffscreenGridCollection.Name)]`, so that only one off-screen window is up at a time.
 
 ### Naming
@@ -1104,7 +1107,7 @@ Coverage comes from Microsoft's MTP coverage extension (see the [command referen
 - **Use modern C# 14 and .NET 10 idioms**: primary constructors (every repository has one), collection expressions, `record` and `record struct` for immutable shapes (drafts, snapshots, printouts), `required` members, file-scoped namespaces and pattern matching.
 - **Nullable reference types are on everywhere.** Treat their warnings as real.
 - **Everything that touches the database is `async`** and takes a `CancellationToken`. ViewModels pass `CancellationToken.None`.
-- **A rule throws `BusinessRuleException` with a message written for the shop's staff**, because `RunSafelyAsync` shows it exactly as written. That goes for a repository's checks and a screen's own form checks too. A plain `InvalidOperationException` reads as a bug: EF Core and SqlClient throw those for failures.
+- **A rule throws `BusinessRuleException` with a message written for the shop's staff**, because `RunSafelyAsync` shows it exactly as written. That goes for a repository's checks and a screen's own form checks too. A plain `InvalidOperationException` reads as a bug: EF Core and Npgsql throw those for failures.
 - **Strings**: compare names with `StringComparison.OrdinalIgnoreCase`; sort for display with `StringComparer.CurrentCultureIgnoreCase`; format display dates with `CultureInfo.CurrentCulture`, and log output with `CultureInfo.InvariantCulture`.
 - **Correctness and performance come before brevity.** Query only the rows and columns you need, rather than loading more and filtering in memory. Avoid needless intermediate collections in hot paths such as the cascade.
 - **Comments explain why.** Types and non-obvious members have XML doc comments that give their domain meaning. Inline comments record a decision and its reason, often with its date. Match the comment density of the code around yours.
@@ -1204,16 +1207,16 @@ Respawn picks up the new table by itself.
 | Symptom | Cause | Fix |
 |---|---|---|
 | The app closes at startup, and the log says `SYNCFUSION_LICENSE_KEY` isn't set | The variable isn't visible to the process | Set the user environment variable, then restart your terminal or IDE |
-| A screen says "Couldn't reach the database.", and the log has "A network-related or instance-specific error" | SQL Server Express isn't running, or the instance name differs | Start the `MSSQL$SQLEXPRESS` service, and check `appsettings.json` |
+| A screen says "Couldn't reach the database.", and the log has "Failed to connect" or "password authentication failed" | PostgreSQL isn't running, or the password file has no line for the server and role | Start the `postgresql-x64-18` service, and check `appsettings.json` and `%APPDATA%postgresqlpgpass.conf` |
 | A message at startup says the database is out of date | A migration hasn't been applied to it | `dotnet ef database update --project src/TinapayanRMS.Infrastructure` |
 | A message says something went wrong and the app is still running | An exception nothing else caught | Read the log for its stack |
-| Queries that take about 1 ms take 10–50 ms, and vary from run to run | SQL Server is short of memory: Windows trims its plan cache and data, so every query compiles again | Free memory, or give the instance a `min server memory`. Compare timings in one process, alternating before and after |
-| `dotnet ef` can't connect | The design-time factory's connection string is hard-coded | Use `.\SQLEXPRESS`, or edit `TinapayanRMSDbContextFactory` |
+| Timings vary widely from run to run | Other programs on the PC compete for memory and disk | Compare timings in one process, alternating before and after |
+| `dotnet ef` can't connect | The design-time factory's connection string is hard-coded | Check the password file, or edit `TinapayanRMSDbContextFactory.DevelopmentConnectionString` |
+| Settings → Database says backups need `pg_dump` and `pg_restore` | PostgreSQL's command-line tools aren't in `C:\Program Files\PostgreSQL\<version>\bin` or on the `PATH` | Install them, or set `Backups:ToolsFolder` in `appsettings.json` |
 | The build fails with `CS0103: The name 'InitializeComponent' does not exist`, or `CS2001` for `*.g.cs` files, all against a `*_wpftmp.csproj` | The WPF markup pass has gone stale | Run `dotnet clean src/TinapayanRMS.UI`, build the UI project on its own, then build the solution |
 | The build can't copy `TinapayanRMS.UI.exe` or a DLL | The app is running | Close it |
 | `--filter` isn't recognised, or zero tests ran | VSTest flags under Microsoft.Testing.Platform | Use `--filter-class`, `--filter-method` and `--coverage` |
 | Some UI tests are reported as skipped | No licence key | Set `SYNCFUSION_LICENSE_KEY` |
-| The first query after a pause is slow | `AUTO_CLOSE` is on | `ALTER DATABASE … SET AUTO_CLOSE OFF` |
 | A binding silently does nothing | A binding error | Check the Debug build's log for `WPF binding` warnings |
 | Every `SfDataGrid` suddenly looks unthemed | An `SfTreeGrid` is themed through its window | Theme it locally |
 | The UI freezes | Something blocks the UI thread | `dotnet-stack report -p <pid>`. Find the PID with `dotnet-trace ps`. |
@@ -1257,6 +1260,8 @@ Off-screen harnesses and UI-automation scripts have pitfalls that PLAN.md record
 - ReactiveUI: <https://www.reactiveui.net/docs/>
 - DynamicData: <https://github.com/reactivemarbles/DynamicData>
 - EF Core: <https://learn.microsoft.com/ef/core/>
+- Npgsql and its EF Core provider: <https://www.npgsql.org/efcore/>
+- PostgreSQL: <https://www.postgresql.org/docs/18/> (`pg_dump` and `pg_restore` under "Client Applications")
 - Dapper: <https://github.com/DapperLib/Dapper>
 - FluentValidation: <https://docs.fluentvalidation.net/>
 - Syncfusion WPF: <https://help.syncfusion.com/wpf/welcome-to-syncfusion-essential-wpf>

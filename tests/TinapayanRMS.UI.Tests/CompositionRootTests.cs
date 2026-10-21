@@ -17,7 +17,8 @@ public class CompositionRootTests
         var dbContextFactory = host.Services.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>();
         using var dbContext = dbContextFactory.CreateDbContext();
 
-        dbContext.Database.GetConnectionString().Should().Contain("Initial Catalog=TinapayanRMS");
+        dbContext.Database.GetConnectionString().Should().Contain("Database=tinapayanrms");
+        dbContext.Database.ProviderName.Should().Be("Npgsql.EntityFrameworkCore.PostgreSQL");
     }
 
     [Fact]

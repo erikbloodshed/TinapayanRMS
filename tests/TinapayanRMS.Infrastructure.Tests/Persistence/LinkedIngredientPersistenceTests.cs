@@ -318,8 +318,8 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
 
         var act = () => CreateRepository().DeleteAsync(eggId, Cancellation);
 
-        // FK violation surfaces as the driver's own SqlException, not a DbUpdateException.
-        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+        // FK violation surfaces as the driver's own PostgresException, not a DbUpdateException.
+        await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
     private async Task<int> TrayUnitOfMeasureIdAsync()

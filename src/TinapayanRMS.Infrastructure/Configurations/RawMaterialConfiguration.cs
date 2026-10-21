@@ -54,19 +54,19 @@ public class RawMaterialConfiguration : IEntityTypeConfiguration<RawMaterial>
         {
             table.HasCheckConstraint(
                 "CK_RawMaterials_BaseUnitMatchesType",
-                "([Type] = 'Ingredient' AND [BaseUnitId] IS NULL) OR ([Type] = 'Packaging' AND [BaseUnitId] IS NOT NULL)");
+                "(type = 'Ingredient' AND base_unit_id IS NULL) OR (type = 'Packaging' AND base_unit_id IS NOT NULL)");
             table.HasCheckConstraint(
                 "CK_RawMaterials_OnlyIngredientsAreMade",
-                "[Type] = 'Ingredient' OR [Source] = 'Purchased'");
+                "type = 'Ingredient' OR source = 'Purchased'");
             table.HasCheckConstraint(
                 "CK_RawMaterials_LinkMatchesSource",
-                "([Source] = 'Linked' AND [LinkedToId] IS NOT NULL"
-                + " AND [WeightSharePercent] > 0 AND [WeightSharePercent] <= 100"
-                + " AND [CostSharePercent] > 0 AND [CostSharePercent] <= 100)"
-                + " OR ([Source] <> 'Linked' AND [LinkedToId] IS NULL AND [WeightSharePercent] IS NULL AND [CostSharePercent] IS NULL)");
+                "(source = 'Linked' AND linked_to_id IS NOT NULL"
+                + " AND weight_share_percent > 0 AND weight_share_percent <= 100"
+                + " AND cost_share_percent > 0 AND cost_share_percent <= 100)"
+                + " OR (source <> 'Linked' AND linked_to_id IS NULL AND weight_share_percent IS NULL AND cost_share_percent IS NULL)");
             table.HasCheckConstraint(
                 "CK_RawMaterials_CostBufferPercent",
-                "[CostBufferPercent] >= 0 AND [CostBufferPercent] <= 100");
+                "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");
         });
     }
 }

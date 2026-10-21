@@ -14,17 +14,17 @@ internal static class RawMaterialReads
         $"{Columns.Of<RawMaterial>("m")}, {Columns.Of<RawMaterialCategory>("c")}, {Columns.Of<UnitOfMeasure>("b")}";
 
     private const string MaterialJoins = """
-        JOIN RawMaterialCategories c ON c.Id = m.CategoryId
-        LEFT JOIN UnitsOfMeasure b ON b.Id = m.BaseUnitId
+        JOIN raw_material_categories c ON c.id = m.category_id
+        LEFT JOIN units_of_measure b ON b.id = m.base_unit_id
         """;
 
     private static readonly string UnitSelect = $"""
         SELECT {Columns.Of<RawMaterialUnit>("u")}, {Columns.Of<UnitOfMeasure>("um")}
-        FROM RawMaterialUnits u
-        JOIN UnitsOfMeasure um ON um.Id = u.UnitOfMeasureId
+        FROM raw_material_units u
+        JOIN units_of_measure um ON um.id = u.unit_of_measure_id
         """;
 
-    private const string UnitOrder = "ORDER BY u.BaseUnitsPerUnit DESC, u.Id";
+    private const string UnitOrder = "ORDER BY u.base_units_per_unit DESC, u.id";
 
     /// <summary>
     /// The materials <paramref name="filterAndOrder"/> (a WHERE and ORDER BY over <c>m</c>) selects, with
@@ -34,7 +34,7 @@ internal static class RawMaterialReads
         TinapayanRMSDbContext dbContext, string filterAndOrder, object? parameters, CancellationToken cancellationToken)
     {
         var materials = (await dbContext.Connection().QueryAsync<RawMaterial, RawMaterialCategory, UnitOfMeasure?, RawMaterial>(
-            dbContext.Command($"SELECT {MaterialColumns}\nFROM RawMaterials m\n{MaterialJoins}\n{filterAndOrder}", parameters, cancellationToken),
+            dbContext.Command($"SELECT {MaterialColumns}\nFROM raw_materials m\n{MaterialJoins}\n{filterAndOrder}", parameters, cancellationToken),
             WithDetails,
             splitOn: "Id,Id")).AsList();
 
@@ -46,7 +46,7 @@ internal static class RawMaterialReads
     public static async Task<IReadOnlyList<RawMaterialUnit>> GetUnitsAsync(
         TinapayanRMSDbContext dbContext, int rawMaterialId, CancellationToken cancellationToken) =>
         (await dbContext.Connection().QueryAsync<RawMaterialUnit, UnitOfMeasure, RawMaterialUnit>(
-            dbContext.Command($"{UnitSelect}\nWHERE u.RawMaterialId = @rawMaterialId\n{UnitOrder}", new { rawMaterialId }, cancellationToken),
+            dbContext.Command($"{UnitSelect}\nWHERE u.raw_material_id = @rawMaterialId\n{UnitOrder}", new { rawMaterialId }, cancellationToken),
             WithUnitOfMeasure,
             splitOn: "Id")).AsList();
 
@@ -61,13 +61,13 @@ internal static class RawMaterialReads
             dbContext.Command(
                 $"""
                 SELECT {Columns.Of<PackagingLine>("l")}, {MaterialColumns}, {Columns.Of<RawMaterialUnit>("lu")}, {Columns.Of<UnitOfMeasure>("lum")}
-                FROM PackagingLines l
-                JOIN RawMaterials m ON m.Id = l.PackagingMaterialId
+                FROM packaging_lines l
+                JOIN raw_materials m ON m.id = l.packaging_material_id
                 {MaterialJoins}
-                LEFT JOIN RawMaterialUnits lu ON lu.Id = l.UnitId
-                LEFT JOIN UnitsOfMeasure lum ON lum.Id = lu.UnitOfMeasureId
+                LEFT JOIN raw_material_units lu ON lu.id = l.unit_id
+                LEFT JOIN units_of_measure lum ON lum.id = lu.unit_of_measure_id
                 {filter}
-                ORDER BY l.SortOrder, l.Id
+                ORDER BY l.sort_order, l.id
                 """,
                 parameters,
                 cancellationToken),
@@ -89,13 +89,13 @@ internal static class RawMaterialReads
     /// </summary>
     public static Task<IReadOnlyList<SubAssemblyPackagingLine>> GetSetLinesAsync(
         TinapayanRMSDbContext dbContext, int subAssemblyId, CancellationToken cancellationToken) =>
-        GetSetLinesAsync(dbContext, "WHERE l.SubAssemblyId = @subAssemblyId", new { subAssemblyId }, cancellationToken);
+        GetSetLinesAsync(dbContext, "WHERE l.sub_assembly_id = @subAssemblyId", new { subAssemblyId }, cancellationToken);
 
     /// <summary>Several packaging sets' lines at once, each set's in the order the user put them in, as GetSetLinesAsync reads one set's.</summary>
     public static Task<IReadOnlyList<SubAssemblyPackagingLine>> GetSetLinesAsync(
         TinapayanRMSDbContext dbContext, IReadOnlyCollection<int> subAssemblyIds, CancellationToken cancellationToken) =>
         GetSetLinesAsync(
-            dbContext, $"WHERE l.SubAssemblyId IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(subAssemblyIds) }, cancellationToken);
+            dbContext, $"WHERE l.sub_assembly_id IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(subAssemblyIds) }, cancellationToken);
 
     private static async Task<IReadOnlyList<SubAssemblyPackagingLine>> GetSetLinesAsync(
         TinapayanRMSDbContext dbContext, string filter, object parameters, CancellationToken cancellationToken)
@@ -104,13 +104,13 @@ internal static class RawMaterialReads
             dbContext.Command(
                 $"""
                 SELECT {Columns.Of<SubAssemblyPackagingLine>("l")}, {MaterialColumns}, {Columns.Of<RawMaterialUnit>("lu")}, {Columns.Of<UnitOfMeasure>("lum")}
-                FROM SubAssemblyPackagingLines l
-                JOIN RawMaterials m ON m.Id = l.PackagingMaterialId
+                FROM sub_assembly_packaging_lines l
+                JOIN raw_materials m ON m.id = l.packaging_material_id
                 {MaterialJoins}
-                LEFT JOIN RawMaterialUnits lu ON lu.Id = l.UnitId
-                LEFT JOIN UnitsOfMeasure lum ON lum.Id = lu.UnitOfMeasureId
+                LEFT JOIN raw_material_units lu ON lu.id = l.unit_id
+                LEFT JOIN units_of_measure lum ON lum.id = lu.unit_of_measure_id
                 {filter}
-                ORDER BY l.SubAssemblyId, l.SortOrder, l.Id
+                ORDER BY l.sub_assembly_id, l.sort_order, l.id
                 """,
                 parameters,
                 cancellationToken),
@@ -152,7 +152,7 @@ internal static class RawMaterialReads
 
         var units = await dbContext.Connection().QueryAsync<RawMaterialUnit, UnitOfMeasure, RawMaterialUnit>(
             dbContext.Command(
-                $"{UnitSelect}\nWHERE u.RawMaterialId IN ({DapperReads.IdsTable})\n{UnitOrder}",
+                $"{UnitSelect}\nWHERE u.raw_material_id IN ({DapperReads.IdsTable})\n{UnitOrder}",
                 new { ids = DapperReads.IdList(materials.Select(m => m.Id).Distinct()) },
                 cancellationToken),
             WithUnitOfMeasure,

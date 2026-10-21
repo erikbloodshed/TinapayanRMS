@@ -183,10 +183,9 @@ public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : P
             connectionString = dbContext.Database.GetConnectionString()!;
         }
 
-        return new FailingFactory(new DbContextOptionsBuilder<TinapayanRMSDbContext>()
-            .UseSqlServer(connectionString)
-            .AddInterceptors(new FailingSave(fails))
-            .Options);
+        var options = new DbContextOptionsBuilder<TinapayanRMSDbContext>();
+        TinapayanRMSDbContext.Configure(options, connectionString).AddInterceptors(new FailingSave(fails));
+        return new FailingFactory(options.Options);
     }
 
     private sealed class FailingFactory(DbContextOptions<TinapayanRMSDbContext> options) : IDbContextFactory<TinapayanRMSDbContext>
