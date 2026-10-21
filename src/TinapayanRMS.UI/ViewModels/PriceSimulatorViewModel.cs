@@ -13,8 +13,8 @@ using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI.ViewModels;
 
-/// <summary>A product on the What-If screen: its cost, suggested price and markup now, and with the price changes tried.</summary>
-public sealed class WhatIfProductRow(Product product, ProductCostSummary now, ProductCostSummary whatIf)
+/// <summary>A product on the Price Simulator screen: its cost, suggested price and markup now, and with the price changes tried.</summary>
+public sealed class PriceSimulatorProductRow(Product product, ProductCostSummary now, ProductCostSummary simulated)
 {
     public int ProductId => product.Id;
 
@@ -25,34 +25,34 @@ public sealed class WhatIfProductRow(Product product, ProductCostSummary now, Pr
     /// <summary>For one sellable unit, as everything on the row is.</summary>
     public decimal BaseCost => now.BaseCost;
 
-    public decimal WhatIfBaseCost => whatIf.BaseCost;
+    public decimal SimulatedBaseCost => simulated.BaseCost;
 
     /// <summary>How far the base cost moves, in percent.</summary>
-    public decimal ChangePercent => CostingRules.PercentOf(WhatIfBaseCost - BaseCost, BaseCost);
+    public decimal ChangePercent => CostingRules.PercentOf(SimulatedBaseCost - BaseCost, BaseCost);
 
     public decimal SuggestedPrice => now.SellingPrice;
 
-    public decimal WhatIfSuggestedPrice => whatIf.SellingPrice;
+    public decimal SimulatedSuggestedPrice => simulated.SellingPrice;
 
     /// <summary>What the current price earns now, as the Products header shows it; null without a current price.</summary>
     public decimal? MarkupPercent => now.CurrentMarkupPercent;
 
     /// <summary>What the same current price would earn with the changes.</summary>
-    public decimal? WhatIfMarkupPercent => whatIf.CurrentMarkupPercent;
+    public decimal? SimulatedMarkupPercent => simulated.CurrentMarkupPercent;
 
     /// <summary>Whether any change reaches it. Exact: both figures come from the same arithmetic, so an untouched product's are equal.</summary>
-    public bool IsAffected => WhatIfBaseCost != BaseCost;
+    public bool IsAffected => SimulatedBaseCost != BaseCost;
 }
 
 /// <summary>
-/// The What-If Prices screen (2026-10-03): try raw material price changes and see every product's cost, suggested price and
+/// The Price Simulator screen (2026-10-03): try raw material price changes and see every product's cost, suggested price and
 /// markup with them, beside what they are now. A change reaches made and linked ingredients as a real one would
 /// (IngredientCostRules.Reprice) and products through the same pricing as Reports (SavedProductReader). Nothing is saved:
 /// the changes last while the app is open.
 /// </summary>
-public sealed class WhatIfViewModel : ViewModelBase, IDisposable
+public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
 {
-    public const string ExportTitle = "What-If Prices";
+    public const string ExportTitle = "Price Simulator";
 
     private readonly IProductRepository _productRepository;
     private readonly IRawMaterialRepository _rawMaterialRepository;
@@ -62,23 +62,23 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
 
     private readonly Subject<RxVoid> _recalculations = new();
     private readonly Subject<int> _productOpenRequests = new();
-    private readonly HashSet<WhatIfPriceChange> _followed = [];
+    private readonly HashSet<SimulatedPriceChange> _followed = [];
 
     /// <summary>Everything the figures are worked out from, as last loaded; null before the first load.</summary>
     private Data? _data;
 
     /// <summary>Every product's rows from the last recalculation, before the Only affected filter.</summary>
-    private IReadOnlyList<WhatIfProductRow> _allRows = [];
+    private IReadOnlyList<PriceSimulatorProductRow> _allRows = [];
 
     /// <summary>
-    /// The last recalculation's products at the what-if prices, by id, and the changes it tried, each with the materials it
+    /// The last recalculation's products at the simulated prices, by id, and the changes it tried, each with the materials it
     /// reaches: what the report prints, so it always matches the table, even while a refused change waits to be put right.
     /// </summary>
-    private Dictionary<int, SavedProduct> _whatIf = [];
+    private Dictionary<int, SavedProduct> _simulated = [];
     private IReadOnlyList<(PrintedPriceChange Change, IReadOnlySet<int> Reaches)> _tried = [];
 
     /// <summary>The price changes being tried, as typed in the table.</summary>
-    public ObservableCollection<WhatIfPriceChange> Changes { get; } = [];
+    public ObservableCollection<SimulatedPriceChange> Changes { get; } = [];
 
     /// <summary>Purchased ingredients and packaging, by name: what a price change can be tried on.</summary>
     private IReadOnlyList<RawMaterial> _materials = [];
@@ -89,7 +89,7 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>The products, all of them or only those a change reaches.</summary>
-    public ObservableCollection<WhatIfProductRow> Products { get; } = [];
+    public ObservableCollection<PriceSimulatorProductRow> Products { get; } = [];
 
     /// <summary>The Products table's picked rows (its SelectedItems), Ctrl or Shift held for several: what Print Report's Selected products prints.</summary>
     public ObservableCollection<object> SelectedProducts { get; } = [];
@@ -98,7 +98,7 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
     /// The products as the table shows them, filtered and sorted, which the view supplies from its grid: what Print Report's
     /// All products shown prints, in that order. Until it does, <see cref="Products"/> as they are.
     /// </summary>
-    public Func<IReadOnlyList<WhatIfProductRow>> ShownProducts { get; set; }
+    public Func<IReadOnlyList<PriceSimulatorProductRow>> ShownProducts { get; set; }
 
     private bool _onlyAffected;
     public bool OnlyAffected
@@ -111,15 +111,15 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private WhatIfPriceChange? _selectedChange;
-    public WhatIfPriceChange? SelectedChange
+    private SimulatedPriceChange? _selectedChange;
+    public SimulatedPriceChange? SelectedChange
     {
         get => _selectedChange;
         set => this.RaiseAndSetIfChanged(ref _selectedChange, value);
     }
 
     /// <summary>The Price Changes table's add row's item.</summary>
-    public Func<WhatIfPriceChange> NewChange => () => new WhatIfPriceChange(Find);
+    public Func<SimulatedPriceChange> NewChange => () => new SimulatedPriceChange(Find);
 
     /// <summary>Runs whenever the tab is shown (MainWindow): today's products and prices, the changes kept.</summary>
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
@@ -131,7 +131,7 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
     /// <summary>The products as the table shows them, and the changes, to an Excel workbook.</summary>
     public ReactiveCommand<RxVoid, RxVoid> ExportCommand { get; }
 
-    /// <summary>Each product's recipe and costing at the what-if prices, beside today's, in a print preview (<see cref="ShowPrint"/>).</summary>
+    /// <summary>Each product's recipe and costing at the simulated prices, beside today's, in a print preview (<see cref="ShowPrint"/>).</summary>
     public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
 
     /// <summary>
@@ -146,7 +146,7 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
     /// <summary>The products asked to be opened, by id, which the main window opens on Products.</summary>
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
 
-    public WhatIfViewModel(
+    public PriceSimulatorViewModel(
         IProductRepository productRepository,
         IRawMaterialRepository rawMaterialRepository,
         IIngredientBomLineRepository bomLineRepository,
@@ -209,7 +209,7 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
         }
 
         // Read on the UI thread, since the rows are the table's; the pricing runs off it.
-        List<(WhatIfPriceChange Change, (int MaterialId, decimal Cost, decimal BufferedCost) Costs)> tried =
+        List<(SimulatedPriceChange Change, (int MaterialId, decimal Cost, decimal BufferedCost) Costs)> tried =
         [
             .. Changes.Select(change => (Change: change, Costs: change.NewCosts())).Where(t => t.Costs is not null).Select(t => (t.Change, t.Costs!.Value)),
         ];
@@ -220,21 +220,21 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
         }
 
         List<PrintedPriceChange> printed = [.. tried.Select(t => Printed(t.Change))];
-        var (rows, whatIfById, reaches) = await Task.Run(
+        var (rows, simulatedById, reaches) = await Task.Run(
             () =>
             {
                 var repriced = IngredientCostRules.Reprice(data.Materials, data.BomLines, newCosts.ToDictionary(c => c.MaterialId, c => (c.Cost, c.BufferedCost)));
                 var details = SavedProductReader.PricedAt(data.Details, repriced);
-                Dictionary<int, SavedProduct> whatIfById = [];
+                Dictionary<int, SavedProduct> simulatedById = [];
                 foreach (var product in data.Products)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    whatIfById[product.Id] = SavedProductReader.Build(product, details[product.Id], CostBasis.Buffered, repriced);
+                    simulatedById[product.Id] = SavedProductReader.Build(product, details[product.Id], CostBasis.Buffered, repriced);
                 }
 
-                IReadOnlyList<WhatIfProductRow> rows = [.. data.Products.Select(p => new WhatIfProductRow(p, data.Now[p.Id].Costs, whatIfById[p.Id].Costs))];
+                IReadOnlyList<PriceSimulatorProductRow> rows = [.. data.Products.Select(p => new PriceSimulatorProductRow(p, data.Now[p.Id].Costs, simulatedById[p.Id].Costs))];
                 List<IReadOnlySet<int>> reaches = [.. newCosts.Select(c => IngredientCostRules.ReachedBy(data.Materials.Values, data.BomLines, c.MaterialId))];
-                return (rows, whatIfById, reaches);
+                return (rows, simulatedById, reaches);
             },
             cancellationToken);
 
@@ -242,7 +242,7 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
         // newer figures nor, by finishing, clear the error the newer one showed.
         cancellationToken.ThrowIfCancellationRequested();
         _allRows = rows;
-        _whatIf = whatIfById;
+        _simulated = simulatedById;
         _tried = [.. printed.Zip(reaches)];
         ShowRows();
     }
@@ -253,7 +253,7 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void ShowRows()
     {
-        HashSet<int> picked = [.. SelectedProducts.OfType<WhatIfProductRow>().Select(r => r.ProductId)];
+        HashSet<int> picked = [.. SelectedProducts.OfType<PriceSimulatorProductRow>().Select(r => r.ProductId)];
         Products.Clear();
         foreach (var row in _allRows.Where(row => !OnlyAffected || row.IsAffected))
         {
@@ -274,8 +274,8 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<PrintChoice> PrintChoices(DateTime printedAt)
     {
         var shown = ShownProducts();
-        HashSet<int> picked = [.. SelectedProducts.OfType<WhatIfProductRow>().Select(r => r.ProductId)];
-        List<WhatIfProductRow> selected = [.. shown.Where(r => picked.Contains(r.ProductId))];
+        HashSet<int> picked = [.. SelectedProducts.OfType<PriceSimulatorProductRow>().Select(r => r.ProductId)];
+        List<PriceSimulatorProductRow> selected = [.. shown.Where(r => picked.Contains(r.ProductId))];
 
         List<PrintChoice> choices = [];
         if (selected.Count > 0)
@@ -287,24 +287,24 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
         return choices;
     }
 
-    private ProductPrintSet Report(IReadOnlyList<WhatIfProductRow> rows, DateTime printedAt)
+    private ProductPrintSet Report(IReadOnlyList<PriceSimulatorProductRow> rows, DateTime printedAt)
     {
         List<ProductPrintout> printouts = [];
         if (_data is { } data)
         {
             foreach (var row in rows)
             {
-                var materialIds = WhatIfReport.MaterialIdsOf(row.ProductId, data.Details);
+                var materialIds = PriceSimulatorReport.MaterialIdsOf(row.ProductId, data.Details);
                 IReadOnlyList<PrintedPriceChange> reaching = [.. _tried.Where(t => t.Reaches.Overlaps(materialIds)).Select(t => t.Change)];
-                printouts.Add(WhatIfReport.Printout(data.Now[row.ProductId], _whatIf[row.ProductId], reaching, printedAt));
+                printouts.Add(PriceSimulatorReport.Printout(data.Now[row.ProductId], _simulated[row.ProductId], reaching, printedAt));
             }
         }
 
-        return WhatIfReport.Set(printouts, [.. _tried.Select(t => t.Change)], printedAt);
+        return PriceSimulatorReport.Set(printouts, [.. _tried.Select(t => t.Change)], printedAt);
     }
 
     /// <summary>A price change as the table shows it, for the report. Only a row with its new price worked out is tried.</summary>
-    private static PrintedPriceChange Printed(WhatIfPriceChange change) =>
+    private static PrintedPriceChange Printed(SimulatedPriceChange change) =>
         new(change.Material!.Name, change.UnitName, change.CurrentPrice, change.ChangePercent, change.NewPrice!.Value);
 
     /// <summary>Every product, read and priced as saved, and every material, BOM line and brand price, read at once.</summary>
@@ -355,7 +355,7 @@ public sealed class WhatIfViewModel : ViewModelBase, IDisposable
 
     private void ChangeEdited(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(WhatIfPriceChange.MaterialId) or nameof(WhatIfPriceChange.NewPrice) or nameof(WhatIfPriceChange.ChangePercent))
+        if (e.PropertyName is nameof(SimulatedPriceChange.MaterialId) or nameof(SimulatedPriceChange.NewPrice) or nameof(SimulatedPriceChange.ChangePercent))
         {
             Recalculate();
         }

@@ -3,7 +3,7 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.ApplicationCore.Rules;
 
 /// <summary>
-/// A price change tried on the What-If screen (2026-10-03): a purchased material's price per its purchase unit, typed as a
+/// A price change tried on the Price Simulator screen (2026-10-03): a purchased material's price per its purchase unit, typed as a
 /// change in percent or as the new price, and the costs per base unit it would give the material. Nothing here is saved.
 /// </summary>
 public static class PriceChangeRules

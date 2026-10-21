@@ -1,4 +1,4 @@
-<UserControl x:Class="TinapayanRMS.UI.Views.WhatIfView"
+<UserControl x:Class="TinapayanRMS.UI.Views.PriceSimulatorView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -86,8 +86,8 @@
                         </syncfusion:GridMultiColumnDropDownList>
                         <syncfusion:GridTextColumn MappingName="UnitName" HeaderText="Per" Width="120" AllowEditing="False" AllowFocus="False" />
                         <controls:NumericColumn MappingName="CurrentPrice" HeaderText="Current Price" NumberDecimalDigits="2" Width="120" AllowEditing="False" AllowFocus="False" AllowNullValue="True" />
-                        <controls:NumericColumn MappingName="ChangePercent" HeaderText="Change %" NumberDecimalDigits="2" Width="110" AllowNullValue="True" />
                         <controls:NumericColumn MappingName="NewPrice" HeaderText="New Price" NumberDecimalDigits="2" Width="120" AllowNullValue="True" />
+                        <controls:NumericColumn MappingName="ChangePercent" HeaderText="Change %" NumberDecimalDigits="2" Width="110" AllowNullValue="True" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </DockPanel>
@@ -131,6 +131,7 @@
                                        ItemsSource="{Binding Products}"
                                        CellDoubleTapped="Products_CellDoubleTapped"
                                        controls:GridHeaderHeight.Lines="2"
+                                       controls:GridHeaderAlignment.IsBottom="True"
                                        controls:CheckboxFilterFill.IsEnabled="True"
                                        FrozenColumnCount="1"
                                        GridLinesVisibility="Both"
@@ -159,12 +160,12 @@
                         <syncfusion:GridTextColumn MappingName="ProductName" HeaderText="Product" Width="280" AllowFiltering="True" />
                         <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" MinimumWidth="120" AllowFiltering="True" />
                         <controls:NumericColumn MappingName="BaseCost" HeaderText="Base Cost" NumberDecimalDigits="2" />
-                        <controls:NumericColumn MappingName="WhatIfBaseCost" HeaderText="What-If Base Cost" NumberDecimalDigits="2" />
+                        <controls:NumericColumn MappingName="SimulatedBaseCost" HeaderText="Simulated Base Cost" NumberDecimalDigits="2" />
                         <controls:NumericColumn MappingName="ChangePercent" HeaderText="Change %" NumberDecimalDigits="2" />
                         <controls:NumericColumn MappingName="SuggestedPrice" HeaderText="Suggested Price" NumberDecimalDigits="2" />
-                        <controls:NumericColumn MappingName="WhatIfSuggestedPrice" HeaderText="What-If Suggested Price" NumberDecimalDigits="2" />
+                        <controls:NumericColumn MappingName="SimulatedSuggestedPrice" HeaderText="Simulated Suggested Price" NumberDecimalDigits="2" />
                         <controls:NumericColumn MappingName="MarkupPercent" HeaderText="Markup %" NumberDecimalDigits="2" AllowNullValue="True" />
-                        <controls:NumericColumn MappingName="WhatIfMarkupPercent" HeaderText="What-If Markup %" NumberDecimalDigits="2" AllowNullValue="True" />
+                        <controls:NumericColumn MappingName="SimulatedMarkupPercent" HeaderText="Simulated Markup %" NumberDecimalDigits="2" AllowNullValue="True" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </DockPanel>

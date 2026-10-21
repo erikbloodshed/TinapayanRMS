@@ -91,7 +91,7 @@ public static class CompositionRoot
                 services.AddSingleton<ProductsViewModel>();
                 services.AddSingleton<ReportsViewModel>();
                 services.AddSingleton<ProductionPlanViewModel>();
-                services.AddSingleton<WhatIfViewModel>();
+                services.AddSingleton<PriceSimulatorViewModel>();
                 services.AddSingleton<PrintTabViewModel>();
                 services.AddSingleton<UnitsOfMeasureViewModel>();
                 services.AddSingleton<CategoriesViewModel>();

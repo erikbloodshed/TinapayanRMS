@@ -54,10 +54,10 @@ public sealed record ProductPrintout(
     public const string UnbufferedNote = "Unbuffered costs";
 
     /// <summary>
-    /// The What-If report's own: what the product costs at today's prices, and the price changes that reach it, its other
-    /// figures being at the what-if prices (WhatIfReport, 2026-10-06). Null for every other printout.
+    /// The Price Simulator report's own: what the product costs at today's prices, and the price changes that reach it, its other
+    /// figures being at the simulated prices (PriceSimulatorReport, 2026-10-06). Null for every other printout.
     /// </summary>
-    public PrintedWhatIf? WhatIf { get; init; }
+    public PrintedSimulation? Simulation { get; init; }
 
     /// <summary>
     /// The Scaling tab, when Print was pressed with it showing: the pages are then the recipe scaled to its number of
@@ -96,8 +96,8 @@ public sealed record ProductPrintSet(string? Title, IReadOnlyList<ProductPrintou
     public PrintedPlan? Plan { get; init; }
 
     /// <summary>
-    /// The What-If report's price changes, every one tried, which its first page lists over its contents; null for any
-    /// other set. Its products' figures are at those prices (<see cref="ProductPrintout.WhatIf"/>).
+    /// The Price Simulator report's price changes, every one tried, which its first page lists over its contents; null for any
+    /// other set. Its products' figures are at those prices (<see cref="ProductPrintout.Simulation"/>).
     /// </summary>
     public IReadOnlyList<PrintedPriceChange>? PriceChanges { get; init; }
 
@@ -106,7 +106,7 @@ public sealed record ProductPrintSet(string? Title, IReadOnlyList<ProductPrintou
 }
 
 /// <summary>
-/// One of the sets a print dialog offers in its Print dropdown: the What-If report's "Selected products (3)" or "All
+/// One of the sets a print dialog offers in its Print dropdown: the Price Simulator report's "Selected products (3)" or "All
 /// products shown (24)".
 /// </summary>
 public sealed record PrintChoice(string Label, ProductPrintSet Set)
@@ -150,7 +150,7 @@ public sealed record PrintedSection(
     decimal CostPerPiece,
     bool HasPieceSize)
 {
-    /// <summary>On the What-If report, the batch's cost at today's prices, when a price change moves it; null otherwise.</summary>
+    /// <summary>On the Price Simulator report, the batch's cost at today's prices, when a price change moves it; null otherwise.</summary>
     public decimal? NowBatchCost { get; init; }
 
     /// <summary>The section as its recipe tab shows it, at <paramref name="basis"/>.</summary>
@@ -191,7 +191,7 @@ public sealed record PrintedSection(
 /// <param name="IsFormulaBase">Part of the formula's 100% base, usually the flour.</param>
 public sealed record PrintedLine(string Ingredient, decimal Grams, decimal? Percent, decimal CostPerGram, decimal Cost, bool IsFormulaBase)
 {
-    /// <summary>On the What-If report, what the line costs at today's prices, when a price change moves it; null otherwise.</summary>
+    /// <summary>On the Price Simulator report, what the line costs at today's prices, when a price change moves it; null otherwise.</summary>
     public decimal? NowCost { get; init; }
 }
 
@@ -232,7 +232,7 @@ public sealed record PrintedPackaging(string? LinkedTo, IReadOnlyList<PrintedPac
 /// </param>
 public sealed record PrintedComponent(string Product, int? Quantity, decimal RecipeCost, decimal Cost, decimal? PackagingCost = null)
 {
-    /// <summary>On the What-If report, what the line costs at today's prices, when a price change moves it; null otherwise.</summary>
+    /// <summary>On the Price Simulator report, what the line costs at today's prices, when a price change moves it; null otherwise.</summary>
     public decimal? NowCost { get; init; }
 
     /// <summary>The Products table's rows, leaving out any without a product, which isn't a line yet.</summary>
@@ -251,12 +251,12 @@ public sealed record PrintedComponent(string Product, int? Quantity, decimal Rec
 /// <param name="Cost">What the line costs for one sellable unit.</param>
 public sealed record PrintedPackagingLine(string Material, decimal? Qty, string Unit, decimal UnitCost, decimal Cost)
 {
-    /// <summary>On the What-If report, what the line costs at today's prices, when a price change moves it; null otherwise.</summary>
+    /// <summary>On the Price Simulator report, what the line costs at today's prices, when a price change moves it; null otherwise.</summary>
     public decimal? NowCost { get; init; }
 }
 
 /// <summary>
-/// One price change of the What-If screen on paper: a purchased material and the price it's tried at, per the unit it's
+/// One price change of the Price Simulator screen on paper: a purchased material and the price it's tried at, per the unit it's
 /// bought in, as the Price Changes table shows it.
 /// </summary>
 /// <param name="Per">The unit the prices are per: "sack".</param>
@@ -265,11 +265,11 @@ public sealed record PrintedPackagingLine(string Material, decimal? Qty, string 
 public sealed record PrintedPriceChange(string Material, string? Per, decimal? CurrentPrice, decimal? ChangePercent, decimal NewPrice);
 
 /// <summary>
-/// What the What-If report adds to a product's printout, whose other figures are at the what-if prices: its costs at
+/// What the Price Simulator report adds to a product's printout, whose other figures are at the simulated prices: its costs at
 /// today's prices, for the costing's Now column, and the price changes that reach it.
 /// </summary>
 /// <param name="Changes">The changes reaching the product, through its own ingredients and packaging or the products it holds; none when no change does.</param>
-public sealed record PrintedWhatIf(ProductCostSummary Now, IReadOnlyList<PrintedPriceChange> Changes);
+public sealed record PrintedSimulation(ProductCostSummary Now, IReadOnlyList<PrintedPriceChange> Changes);
 
 /// <summary>
 /// The Production Plan on paper: the products to make, then the mixing sheet and the purchase requisition as the screen shows

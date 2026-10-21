@@ -163,7 +163,7 @@ public class ExcelExportTests
         public decimal NewPrice { get; init; }
     }
 
-    /// <summary>A table like What-If's Price Changes: a material picked by id, shown by name.</summary>
+    /// <summary>A table like the Price Simulator's Price Changes: a material picked by id, shown by name.</summary>
     private static SfDataGrid PickerGrid()
     {
         var grid = new SfDataGrid

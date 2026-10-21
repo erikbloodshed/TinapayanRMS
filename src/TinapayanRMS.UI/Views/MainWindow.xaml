@@ -265,11 +265,11 @@
                                     <TextBlock Text="Production Plan" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ListBoxItem>
-                            <!-- What-If Prices: Lightbulb, an idea tried before it's real -->
-                            <ListBoxItem x:Name="WhatIfNavItem" AutomationProperties.Name="What-If Prices">
+                            <!-- Price Simulator: Lightbulb, an idea tried before it's real -->
+                            <ListBoxItem x:Name="PriceSimulatorNavItem" AutomationProperties.Name="Price Simulator">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xEA80;" Style="{StaticResource DrawerIconStyle}" />
-                                    <TextBlock Text="What-If Prices" VerticalAlignment="Center" />
+                                    <TextBlock Text="Price Simulator" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ListBoxItem>
                         </ListBox>
@@ -332,7 +332,7 @@
                     -->
                     <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" Visibility="Collapsed" />
                     <syncfusion:TabItemExt x:Name="ProductionPlanTab" Header="Production Plan" Visibility="Collapsed" />
-                    <syncfusion:TabItemExt x:Name="WhatIfTab" Header="What-If Prices" Visibility="Collapsed" />
+                    <syncfusion:TabItemExt x:Name="PriceSimulatorTab" Header="Price Simulator" Visibility="Collapsed" />
                     <!--
                         Print, opened by the Products header's Print and closed with its ✕ (hidden, as CloseMode says);
                         not in the menu, since it prints what Products has open. Hidden until then.

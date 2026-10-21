@@ -43,7 +43,7 @@ public partial class MainWindow : AppWindow, IVimHost
         ProductsViewModel productsViewModel,
         ReportsViewModel reportsViewModel,
         ProductionPlanViewModel productionPlanViewModel,
-        WhatIfViewModel whatIfViewModel,
+        PriceSimulatorViewModel priceSimulatorViewModel,
         UnitsOfMeasureViewModel unitsOfMeasureViewModel,
         CategoriesViewModel categoriesViewModel,
         ProductCategoriesViewModel productCategoriesViewModel,
@@ -68,7 +68,7 @@ public partial class MainWindow : AppWindow, IVimHost
         ProductsTab.Content = new ProductsView(productsViewModel);
         ReportsTab.Content = new ReportsView(reportsViewModel);
         ProductionPlanTab.Content = new ProductionPlanView(productionPlanViewModel);
-        WhatIfTab.Content = new WhatIfView(whatIfViewModel);
+        PriceSimulatorTab.Content = new PriceSimulatorView(priceSimulatorViewModel);
         var printView = new ProductPrintView(printTabViewModel);
         PrintTab.Content = printView;
         Closed += (_, _) => printView.Dispose();
@@ -78,14 +78,14 @@ public partial class MainWindow : AppWindow, IVimHost
         ProductsNavItem.Tag = ProductsTab;
         ReportsNavItem.Tag = ReportsTab;
         ProductionPlanNavItem.Tag = ProductionPlanTab;
-        WhatIfNavItem.Tag = WhatIfTab;
+        PriceSimulatorNavItem.Tag = PriceSimulatorTab;
 
         _loadCommands[RawMaterialsTab] = rawMaterialsViewModel.LoadCommand;
         _loadCommands[SubAssembliesTab] = subAssembliesViewModel.LoadCommand;
         _loadCommands[ProductsTab] = productsViewModel.LoadCommand;
         _loadCommands[ReportsTab] = reportsViewModel.LoadCommand;
         _loadCommands[ProductionPlanTab] = productionPlanViewModel.LoadCommand;
-        _loadCommands[WhatIfTab] = whatIfViewModel.LoadCommand;
+        _loadCommands[PriceSimulatorTab] = priceSimulatorViewModel.LoadCommand;
 
         // Print's load prepares its pages again: This product as Products shows it now, so the tab follows the edits made
         // there, and the product opened there, since it was last shown (the user's choice, 2026-09-27); a set as it's saved.
@@ -100,7 +100,7 @@ public partial class MainWindow : AppWindow, IVimHost
             () => productsViewModel.SelectedProduct?.Id, productsViewModel.OpenProduct, () => productsViewModel.History.IsDirty);
         _historyScreens[ReportsTab] = new(AppScreen.Reports, () => null, null, () => false);
         _historyScreens[ProductionPlanTab] = new(AppScreen.ProductionPlan, () => null, null, () => false);
-        _historyScreens[WhatIfTab] = new(AppScreen.WhatIf, () => null, null, () => false);
+        _historyScreens[PriceSimulatorTab] = new(AppScreen.PriceSimulator, () => null, null, () => false);
         _historyScreens[PrintTab] = new(AppScreen.Print, () => null, null, () => false);
 
         // A Print on Products (the header's, its open form applied, or a folder's or the list's): the Print tab with that
@@ -111,13 +111,13 @@ public partial class MainWindow : AppWindow, IVimHost
             ShowTab(PrintTab);
         });
 
-        // A Used By tile on Sub-Assemblies or Raw Materials, or a double-clicked row of Reports' Product Cost Summary or What-If, opens its
+        // A Used By tile on Sub-Assemblies or Raw Materials, or a double-clicked row of Reports' Product Cost Summary or the Price Simulator, opens its
         // product on Products. Picked before the tab shows, so a list not loaded yet has the product waiting for the load
         // that showing the tab starts.
         subAssembliesViewModel.ProductOpenRequests
             .Merge(rawMaterialsViewModel.ProductOpenRequests)
             .Merge(reportsViewModel.ProductOpenRequests)
-            .Merge(whatIfViewModel.ProductOpenRequests)
+            .Merge(priceSimulatorViewModel.ProductOpenRequests)
             .Subscribe(productId =>
             {
                 productsViewModel.OpenProduct(productId);

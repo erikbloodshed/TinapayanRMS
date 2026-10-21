@@ -14,11 +14,11 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>
-/// The What-If Prices screen against a real database: a price change reaches made and linked ingredients and composites as
+/// The Price Simulator screen against a real database: a price change reaches made and linked ingredients and composites as
 /// a real one would, an untouched product prices exactly as Reports does, and nothing is saved.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
-public class WhatIfViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
+public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     /// <summary>
     /// Egg at 0.014 a gram (priced per gram), egg white linked to it (70% of its weight, 30% of its cost), and flour at 0.05.
@@ -75,7 +75,7 @@ public class WhatIfViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
         {
             var report = reports.ProductCosts.Single(r => r.ProductId == row.ProductId);
             row.BaseCost.Should().Be(report.BaseCost);
-            row.WhatIfBaseCost.Should().Be(report.BaseCost);
+            row.SimulatedBaseCost.Should().Be(report.BaseCost);
             row.SuggestedPrice.Should().Be(report.SuggestedPrice);
             row.IsAffected.Should().BeFalse();
         }
@@ -102,11 +102,11 @@ public class WhatIfViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
         var meringue = Row(viewModel, bakery.MeringueId)!;
         var pandesal = Row(viewModel, bakery.PandesalId)!;
         var box = Row(viewModel, bakery.BoxId)!;
-        meringue.WhatIfBaseCost.Should().BeApproximately(meringue.BaseCost * 1.1m, 0.0000001m, "50 g of egg white, which costs 10% more with the egg");
+        meringue.SimulatedBaseCost.Should().BeApproximately(meringue.BaseCost * 1.1m, 0.0000001m, "50 g of egg white, which costs 10% more with the egg");
         meringue.ChangePercent.Should().BeApproximately(10m, 0.00001m);
         pandesal.IsAffected.Should().BeFalse();
-        pandesal.WhatIfBaseCost.Should().Be(pandesal.BaseCost);
-        box.WhatIfBaseCost.Should().BeApproximately(box.BaseCost + 2 * (meringue.WhatIfBaseCost - meringue.BaseCost), 0.0000001m,
+        pandesal.SimulatedBaseCost.Should().Be(pandesal.BaseCost);
+        box.SimulatedBaseCost.Should().BeApproximately(box.BaseCost + 2 * (meringue.SimulatedBaseCost - meringue.BaseCost), 0.0000001m,
             "the box holds two meringues");
 
         viewModel.OnlyAffected = true;
@@ -132,28 +132,28 @@ public class WhatIfViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
 
         var shown = choices.Should().ContainSingle("nothing is picked in the table").Subject;
         shown.Label.Should().Be("All products shown (3)");
-        shown.Set.Title.Should().Be(WhatIfReport.Title);
+        shown.Set.Title.Should().Be(PriceSimulatorReport.Title);
         var egg = new PrintedPriceChange("Egg", "gram", 0.014m, 10m, 0.0154m);
         shown.Set.PriceChanges.Should().Equal(egg);
         shown.Set.Products.Select(p => p.ProductName).Should().Equal(viewModel.Products.Select(r => r.ProductName), "in the table's order");
 
         var meringue = shown.Set.Products.Single(p => p.ProductName == "Meringue");
         var meringueRow = Row(viewModel, bakery.MeringueId)!;
-        meringue.WhatIf!.Changes.Should().Equal(egg);
-        meringue.WhatIf.Now.BaseCost.Should().Be(meringueRow.BaseCost);
-        meringue.Costs.BaseCost.Should().Be(meringueRow.WhatIfBaseCost);
+        meringue.Simulation!.Changes.Should().Equal(egg);
+        meringue.Simulation.Now.BaseCost.Should().Be(meringueRow.BaseCost);
+        meringue.Costs.BaseCost.Should().Be(meringueRow.SimulatedBaseCost);
         var white = meringue.Sections.Single().Lines.Single();
         white.Ingredient.Should().Be("Egg White");
         white.NowCost.Should().NotBeNull().And.BeLessThan(white.Cost, "the egg white costs more with the egg");
         meringue.Sections.Single().NowBatchCost.Should().NotBeNull();
 
         var pandesal = shown.Set.Products.Single(p => p.ProductName == "Pandesal");
-        pandesal.WhatIf!.Changes.Should().BeEmpty("no change reaches flour");
+        pandesal.Simulation!.Changes.Should().BeEmpty("no change reaches flour");
         pandesal.Sections.Single().Lines.Should().OnlyContain(l => l.NowCost == null);
         pandesal.Sections.Single().NowBatchCost.Should().BeNull();
 
         var box = shown.Set.Products.Single(p => p.ProductName == "Party Box");
-        box.WhatIf!.Changes.Should().Equal([egg], "it holds meringues");
+        box.Simulation!.Changes.Should().Equal([egg], "it holds meringues");
         box.Components!.Single(c => c.Product == "Meringue").NowCost.Should().NotBeNull();
         box.Components!.Single(c => c.Product == "Pandesal").NowCost.Should().BeNull();
     }
@@ -245,29 +245,29 @@ public class WhatIfViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
     }
 
     [Fact]
-    public async Task Export_asks_for_the_What_If_workbook()
+    public async Task Export_asks_for_the_Price_Simulator_workbook()
     {
         var viewModel = CreateViewModel();
         string? asked = null;
         viewModel.ExportToExcel.RegisterHandler(interaction =>
         {
             asked = interaction.Input;
-            interaction.SetOutput(@"C:\Reports\What-If Prices 2026-10-04.xlsx");
+            interaction.SetOutput(@"C:\Reports\Price Simulator 2026-10-04.xlsx");
         });
 
         await viewModel.ExportCommand.Execute();
 
-        asked.Should().Be(WhatIfViewModel.ExportTitle);
-        viewModel.SuccessMessage.Should().Be(@"Saved What-If Prices 2026-10-04.xlsx in C:\Reports.");
+        asked.Should().Be(PriceSimulatorViewModel.ExportTitle);
+        viewModel.SuccessMessage.Should().Be(@"Saved Price Simulator 2026-10-04.xlsx in C:\Reports.");
     }
 
-    private static WhatIfProductRow? Row(WhatIfViewModel viewModel, int productId) => viewModel.Products.FirstOrDefault(r => r.ProductId == productId);
+    private static PriceSimulatorProductRow? Row(PriceSimulatorViewModel viewModel, int productId) => viewModel.Products.FirstOrDefault(r => r.ProductId == productId);
 
-    private WhatIfViewModel CreateViewModel()
+    private PriceSimulatorViewModel CreateViewModel()
     {
         ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
-        return new WhatIfViewModel(
+        return new PriceSimulatorViewModel(
             new ProductRepository(factory),
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),

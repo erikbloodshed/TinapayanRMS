@@ -9,10 +9,10 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.UI.Views;
 
-/// <summary>The What-If Prices screen: price changes to try, and every product's figures with them.</summary>
-public partial class WhatIfView : UserControl
+/// <summary>The Price Simulator screen: price changes to try, and every product's figures with them.</summary>
+public partial class PriceSimulatorView : UserControl
 {
-    public WhatIfView(WhatIfViewModel viewModel)
+    public PriceSimulatorView(PriceSimulatorViewModel viewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
@@ -27,7 +27,7 @@ public partial class WhatIfView : UserControl
 
         // The report prints the products as the table shows them: its column filters applied, in its sort order.
         viewModel.ShownProducts = () => ProductsGrid.View is { } view
-            ? [.. view.Records.Select(record => record.Data).OfType<WhatIfProductRow>()]
+            ? [.. view.Records.Select(record => record.Data).OfType<PriceSimulatorProductRow>()]
             : viewModel.Products;
 
         // The report in a print pane of its own, themed as the main window is, after the button's click is over, as the
@@ -45,7 +45,7 @@ public partial class WhatIfView : UserControl
     /// <summary>Opens the double-clicked product once the press is over, as Reports does (ReportsView explains why).</summary>
     private void Products_CellDoubleTapped(object? sender, GridCellDoubleTappedEventArgs e)
     {
-        if (e.Record is WhatIfProductRow row && DataContext is WhatIfViewModel viewModel)
+        if (e.Record is PriceSimulatorProductRow row && DataContext is PriceSimulatorViewModel viewModel)
         {
             Dispatcher.BeginInvoke(() => viewModel.OpenProductCommand.Execute(row.ProductId).Subscribe(), DispatcherPriority.Input);
         }

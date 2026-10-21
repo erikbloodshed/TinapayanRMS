@@ -5,11 +5,11 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// A row of the What-If screen's Price Changes: a purchased material and the price it's tried at, typed as a change in
+/// A row of the Price Simulator screen's Price Changes: a purchased material and the price it's tried at, typed as a change in
 /// percent or as the new price per its purchase unit, the other worked out from it. Nothing is saved.
 /// </summary>
 /// <param name="find">The material with an id, and what it's bought in; null for one that isn't there.</param>
-public sealed class WhatIfPriceChange(Func<int, (RawMaterial Material, PurchaseUnit Unit)?> find) : ReactiveObject
+public sealed class SimulatedPriceChange(Func<int, (RawMaterial Material, PurchaseUnit Unit)?> find) : ReactiveObject
 {
     // Which of the two was typed last, the other following it; and set while the other is being worked out.
     private bool _percentTyped;
@@ -60,7 +60,7 @@ public sealed class WhatIfPriceChange(Func<int, (RawMaterial Material, PurchaseU
 
     /// <summary>
     /// Change % or New Price typed (or worked out, while following): the other follows, and only then is the change told,
-    /// since what hears of it reads the row straight away (the What-If screen works its figures out again).
+    /// since what hears of it reads the row straight away (the Price Simulator screen works its figures out again).
     /// </summary>
     private void Type(ref decimal? field, decimal? value, bool percentTyped, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
     {

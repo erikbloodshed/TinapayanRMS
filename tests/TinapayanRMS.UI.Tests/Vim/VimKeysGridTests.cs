@@ -279,6 +279,30 @@ public class VimKeysGridTests
         });
     }
 
+    /// <summary>
+    /// A column filter's search box types, though its pop-up hangs from the grid's heading: a letter there isn't the grid's
+    /// Normal-mode key. The filter control is put in the heading as Syncfusion's own funnel click does (GridHeaderCellControl's
+    /// OpenFilterPopUp), with its pop-up left shut, since one opened from an off-screen grid is moved onto a real screen.
+    /// </summary>
+    [Fact]
+    public void A_letter_types_in_a_column_filters_search_box()
+    {
+        RunWithVimKeys(FilteredGrid, grid =>
+        {
+            var heading = Descendants(grid).OfType<GridHeaderCellControl>().First(cell => cell.Column?.MappingName == nameof(Line.Name));
+            heading.ApplyTemplate();
+            var filterControl = new GridFilterControl();
+            ((Border)heading.Template.FindName("PART_FilterPopUpPresenter", heading)).Child = filterControl;
+            filterControl.ApplyTemplate();
+            var list = (CheckboxFilterControl)filterControl.Template.FindName("PART_CheckboxFilterControl", filterControl);
+            list.ApplyTemplate();
+            var searchBox = (TextBox)list.Template.FindName("PART_SearchTextBox", list);
+
+            TypeOne(searchBox, 'f').Should().BeFalse("the search box is typed into, not the grid's Normal mode");
+            TypeOne(grid, 'x').Should().BeTrue("on the grid itself, a letter is still a Normal-mode key");
+        });
+    }
+
     /// <summary>Runs <paramref name="test"/> on <paramref name="grid"/> with the Vim keys on, and off again after.</summary>
     private static void RunWithVimKeys(Func<SfDataGrid> create, Action<SfDataGrid> test) =>
         OffscreenGrid.Run(create, shown =>
@@ -389,4 +413,16 @@ public class VimKeysGridTests
         GridFillerRows.SetIsEnabled(grid, true);
         return grid;
     }
+
+    /// <summary>A read-only table whose Name column filters from a funnel in its heading, as Reports' and the Price Simulator's do.</summary>
+    private static SfDataGrid FilteredGrid() => new()
+    {
+        ItemsSource = new ObservableCollection<Line>([new Line { Name = "Flour" }, new Line { Name = "Sugar" }]),
+        AutoGenerateColumns = false,
+        AllowEditing = false,
+        SelectionMode = GridSelectionMode.Extended,
+        NavigationMode = NavigationMode.Row,
+        Height = 300,
+        Columns = { new GridTextColumn { MappingName = nameof(Line.Name), AllowFiltering = true } },
+    };
 }

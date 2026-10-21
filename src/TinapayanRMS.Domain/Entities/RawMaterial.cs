@@ -95,7 +95,7 @@ public class RawMaterial
     public List<RawMaterialUnit> Units { get; set; } = [];
 
     /// <summary>
-    /// A copy to give other costs to without touching this one, as the What-If screen prices with (2026-10-03). It shares
+    /// A copy to give other costs to without touching this one, as the Price Simulator screen prices with (2026-10-03). It shares
     /// this material's category, base unit and units, which no cost lives in. Every property comes with it, so one added
     /// later is never left behind.
     /// </summary>

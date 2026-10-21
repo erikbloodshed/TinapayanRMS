@@ -105,7 +105,7 @@ internal static class IngredientCostPropagator
         /// <summary>
         /// Recomputes one made or linked ingredient from its components' or linked-to ingredient's costs, which must already
         /// be correct (dependency order), reading each directly off the loaded ingredients rather than re-walking its own
-        /// tree (IngredientCostRules.Recompute, which the What-If screen shares). Returns whether anything stored changed:
+        /// tree (IngredientCostRules.Recompute, which the Price Simulator screen shares). Returns whether anything stored changed:
         /// a cost recomputed from unchanged inputs equals the stored one, so it isn't saved, or dated, again.
         /// </summary>
         public bool Recompute(int id)

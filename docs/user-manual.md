@@ -17,7 +17,7 @@ This manual is for the people who use the app day to day. It doesn't assume any 
 7. [Products](#7-products)
 8. [Printing recipes and costings](#8-printing-recipes-and-costings)
 9. [Reports](#9-reports)
-10. [What-If Prices](#10-what-if-prices)
+10. [Price Simulator](#10-price-simulator)
 11. [Production Plan](#11-production-plan)
 12. [How costs are worked out](#12-how-costs-are-worked-out)
 13. [How to…](#13-how-to)
@@ -141,7 +141,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 
 ### The main window
 
-- **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports**, **Production Plan** and **What-If Prices**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
+- **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports**, **Production Plan** and **Price Simulator**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
 - **Tabs**: each screen opens in a tab along the top. The app starts with **Raw Materials**, **Sub-Assemblies** and **Products** open; open the others from the menu. A tab you close can be opened again from the menu. Each tab keeps its place, such as the record you were looking at and anything you haven't saved, until you close the app.
 - **Back and Forward** (the arrows at the top right, next to the minimize button, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, like a web browser.
 - Changes made on one tab show up on another tab the next time you switch to it.
@@ -224,7 +224,7 @@ Type **:**, then a command, then **Enter**. A bar opens at the bottom of the win
 - **:delete** deletes the one open, asking first.
 - **:e** and a name opens the one whose name matches. For example, **:e pandesal** opens Pandesal on the Products screen.
 - **:revert** throws away a product's changes since the last Save.
-- **:raw**, **:sub**, **:products**, **:reports**, **:plan**, **:whatif** and **:print** switch screens.
+- **:raw**, **:sub**, **:products**, **:reports**, **:plan**, **:simulator** and **:print** switch screens.
 - **:settings** opens Settings.
 - **:help** lists every key.
 
@@ -563,7 +563,7 @@ Below the header are the fields you fill in:
 - It stays on when you open another product, until you switch it off or close the app. The app always starts on buffered costs.
 - **Print** uses whichever costs the screen shows (see [Printing](#8-printing-recipes-and-costings)).
 
-Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage and category are all kept. Until you restore it, no picker, report, print, What-If or Production Plan includes it.
+Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage and category are all kept. Until you restore it, no picker, report, print, Price Simulator or Production Plan includes it.
 
 - **Restore** (right-click it in the Deleted folder) puts it back in its folder and opens it. If its category was deleted in the meantime, it comes back in **Uncategorized**.
 - **Delete Permanently** asks first and can't be undone. The product's own sub-assemblies are deleted with it. Its linked sub-assemblies stay on the Sub-Assemblies screen. Deleting a composite product leaves the products it holds as they are.
@@ -764,7 +764,7 @@ While the Products screen shows unbuffered costs, everything printed, a single p
 
 Close the Print tab with its ✕.
 
-A production plan prints from the **Production Plan** screen's own **Print**: see [Production Plan](#11-production-plan). A report of what price changes would do prints from **What-If Prices**: see [Printing a What-If report](#printing-a-what-if-report).
+A production plan prints from the **Production Plan** screen's own **Print**: see [Production Plan](#11-production-plan). A report of what price changes would do prints from the **Price Simulator**: see [Printing a Price Simulator report](#printing-a-price-simulator-report).
 
 ### Printing a scaled recipe
 
@@ -832,9 +832,9 @@ If a file of that name is open in Excel, the app can't replace it. Close it in E
 
 ---
 
-## 10. What-If Prices
+## 10. Price Simulator
 
-**What-If Prices** shows what raw material price changes would do to every product, before they happen. Nothing on it is saved, and nothing else in the app changes: the changes you try last until you close the app.
+The **Price Simulator** shows what raw material price changes would do to every product, before they happen. Nothing on it is saved, and nothing else in the app changes: the changes you try last until you close the app.
 
 ### Price Changes
 
@@ -842,7 +842,7 @@ The top table holds the changes to try, one row per raw material:
 
 - **Raw Material**: pick a purchased ingredient or packaging material. Type to search the list.
 - **Per** and **Current Price**: the unit it's bought in and what one costs now. These come from its dearest brand on **Cost Setup**, which is the price its cost comes from. A material with no price yet shows its base unit and no price.
-- **Change %** or **New Price**: type either one, and the other is worked out. For example, a sack of flour at 1,250 up **10**% shows a new price of 1,375. A material with no price yet needs its new price typed.
+- **New Price** or **Change %**: type either one, and the other is worked out. For example, a sack of flour at 1,250 up **10**% shows a new price of 1,375. A material with no price yet needs its new price typed.
 
 **Remove Line** takes the picked row away, and **Clear All** takes them all away, so every figure is today's again.
 
@@ -852,15 +852,15 @@ A change moves the material's cost and its buffered cost by the same amount, as 
 
 The lower table shows every product for one sellable unit, at buffered costs, now and with the changes:
 
-- **Base Cost** and **What-If Base Cost**, and the **Change %** between them.
-- **Suggested Price** and **What-If Suggested Price**: the Costing tab's Total Selling Price.
-- **Markup %** and **What-If Markup %**: what the product's current price earns, now and with the changes. Blank for a product with no current price.
+- **Base Cost** and **Simulated Base Cost**, and the **Change %** between them.
+- **Suggested Price** and **Simulated Suggested Price**: the Costing tab's Total Selling Price.
+- **Markup %** and **Simulated Markup %**: what the product's current price earns, now and with the changes. Blank for a product with no current price.
 
-A composite product moves with the products it holds. Tick **Only affected products** to hide the products no change reaches. Sort by **What-If Markup %** to see which products would earn the least. Filter by product or category from the funnel in its heading, and double-click a product to open it.
+A composite product moves with the products it holds. Tick **Only affected products** to hide the products no change reaches. Sort by **Simulated Markup %** to see which products would earn the least. Filter by product or category from the funnel in its heading, and double-click a product to open it.
 
 **Export to Excel** saves the products as the table shows them, and the price changes, on two sheets of one workbook.
 
-### Printing a What-If report
+### Printing a Price Simulator report
 
 **Print Report** opens a print preview with each product's recipe and costing at the new prices, next to today's figures. Print it, or save it as a PDF with **Microsoft Print to PDF**.
 
@@ -869,11 +869,11 @@ To print only some products, click one in the **Products** table, or several wit
 - **Selected products**: only the ones you picked. The preview opens on this choice when you've picked any.
 - **All products shown**: every product the table shows, with **Only affected products** and the column filters applied, in the table's order.
 
-The first page lists the **Price Changes** tried, then every product with its **Base Cost**, **What-If Base Cost**, **Change %** and the page it starts on. Each product then starts on a new page, with:
+The first page lists the **Price Changes** tried, then every product with its **Base Cost**, **Simulated Base Cost**, **Change %** and the page it starts on. Each product then starts on a new page, with:
 
 - **Price Changes Applied**: the changes that reach the product. That includes changes reaching it through a made or linked ingredient, or through the products a composite holds. A product no change reaches says so.
 - **Recipe**: each sub-assembly's ingredients and the packaging, at the new prices. A line a change moves is in the accent colour, with what it costs today in the **Cost Now** column.
-- **Costing**: the Base Cost, Suggested Price and Markup at Current Price with the changes, with today's figure under each. The breakdown has **Now**, **What-If** and **Change** columns for every part, up to the Total Selling Price.
+- **Costing**: the Base Cost, Suggested Price and Markup at Current Price with the changes, with today's figure under each. The breakdown has **Now**, **Simulated** and **Change** columns for every part, up to the Total Selling Price.
 
 **Include** chooses **Recipe**, **Costing** or both. Without the costing, the report prints the recipes with no costs and no price changes.
 
@@ -1078,11 +1078,11 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 
 ### See what a price rise would do
 
-1. Open **What-If Prices** from the menu.
+1. Open the **Price Simulator** from the menu.
 2. In the top table, pick the raw material and type its **Change %**, such as **8**, or its **New Price**.
-3. Tick **Only affected products** and sort by **What-If Markup %**.
+3. Tick **Only affected products** and sort by **Simulated Markup %**.
 4. To see why a product moves, Ctrl-click it and any others, press **Print Report**, and read each product's ingredients and costing, now and with the change. Print it, or save it as a PDF.
-5. To make the price real, record it on **Raw Materials** as in [Record a price increase](#record-a-price-increase). What-If Prices never changes a price itself.
+5. To make the price real, record it on **Raw Materials** as in [Record a price increase](#record-a-price-increase). The Price Simulator never changes a price itself.
 
 ### Back up to a USB stick
 

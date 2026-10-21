@@ -904,6 +904,11 @@ public static class VimKeys
             {
                 case VimOverlay:
                     return new Place(PlaceKind.Overlay, null);
+
+                // A column filter's pop-up hangs from the funnel in the grid's heading, but isn't the grid: its search box is a
+                // field. The walk steps from the pop-up (the filter control's PART_FilterPopup) to the funnel, past the control.
+                case Popup { TemplatedParent: GridFilterControl }:
+                    return new Place(isText ? PlaceKind.Field : PlaceKind.Other, null);
                 case SfDataGrid grid:
                     return new Place(PlaceKind.Grid, grid);
                 case SfTreeView tree:

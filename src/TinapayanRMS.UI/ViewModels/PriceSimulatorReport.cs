@@ -1,24 +1,24 @@
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// The What-If screen's report on paper (2026-10-06): each product's recipe and costing at the what-if prices, the lines a
+/// The Price Simulator screen's report on paper (2026-10-06): each product's recipe and costing at the simulated prices, the lines a
 /// price change moves carrying their cost now beside it, and the changes that reach it; the set's first page lists every
-/// change tried. Nothing in it is WPF: it pairs a product priced now with the same product priced what-if.
+/// change tried. Nothing in it is WPF: it pairs a product priced now with the same product priced at simulated prices.
 /// </summary>
-public static class WhatIfReport
+public static class PriceSimulatorReport
 {
-    public const string Title = "What-If Prices";
+    public const string Title = "Price Simulator";
 
     /// <summary>
-    /// <paramref name="whatIf"/>'s printout with <paramref name="now"/>'s figures beside those a change moves. Both are the
+    /// <paramref name="simulated"/>'s printout with <paramref name="now"/>'s figures beside those a change moves. Both are the
     /// same product built from the same detail (SavedProductReader.Build), so their sections, lines, packaging and products
     /// come in the same order, and only their costs differ.
     /// </summary>
     /// <param name="reaching">The price changes that reach the product.</param>
-    public static ProductPrintout Printout(SavedProduct now, SavedProduct whatIf, IReadOnlyList<PrintedPriceChange> reaching, DateTime printedAt)
+    public static ProductPrintout Printout(SavedProduct now, SavedProduct simulated, IReadOnlyList<PrintedPriceChange> reaching, DateTime printedAt)
     {
         var was = now.ToPrintout(printedAt);
-        var printout = whatIf.ToPrintout(printedAt);
+        var printout = simulated.ToPrintout(printedAt);
         return printout with
         {
             Sections =
@@ -36,7 +36,7 @@ public static class WhatIfReport
             Components = printout.Components is { } components && was.Components is { } wasComponents
                 ? [.. components.Zip(wasComponents, (line, then) => line with { NowCost = Moved(line.Cost, then.Cost) })]
                 : printout.Components,
-            WhatIf = new PrintedWhatIf(now.Costs, reaching),
+            Simulation = new PrintedSimulation(now.Costs, reaching),
         };
     }
 
@@ -77,6 +77,6 @@ public static class WhatIfReport
     private static IReadOnlyList<PrintedLine> Lines(IReadOnlyList<PrintedLine> lines, IReadOnlyList<PrintedLine> then) =>
         [.. lines.Zip(then, (line, was) => line with { NowCost = Moved(line.Cost, was.Cost) })];
 
-    // Exact, as the What-If table's IsAffected is: both come from the same arithmetic, so an untouched figure is equal.
-    private static decimal? Moved(decimal whatIf, decimal now) => whatIf != now ? now : null;
+    // Exact, as the Price Simulator table's IsAffected is: both come from the same arithmetic, so an untouched figure is equal.
+    private static decimal? Moved(decimal simulated, decimal now) => simulated != now ? now : null;
 }
