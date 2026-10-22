@@ -7,6 +7,9 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishReadyToRun>true</PublishReadyToRun>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Made from Assets\Icons\tinapayan-rms-icon.png (see the developer manual). The .exe's icon, which Explorer and
+         shortcuts show. The windows don't take it from here: AppWindow sets each one's Icon from the same file. -->
+    <ApplicationIcon>Assets\Icons\tinapayan-rms-icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
