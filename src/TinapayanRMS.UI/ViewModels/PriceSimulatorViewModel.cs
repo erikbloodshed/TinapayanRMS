@@ -22,6 +22,14 @@ public sealed class PriceSimulatorProductRow(Product product, ProductCostSummary
 
     public string Category => product.Category?.Name ?? ProductFolderNode.UncategorizedTitle;
 
+    /// <summary>The ingredients and packaging, before labor, overhead and administrative: the Products header's Material Cost.</summary>
+    public decimal RawMaterialCost => now.Material;
+
+    public decimal SimulatedRawMaterialCost => simulated.Material;
+
+    /// <summary>How far the raw material cost moves, in percent.</summary>
+    public decimal RawMaterialChangePercent => CostingRules.PercentOf(SimulatedRawMaterialCost - RawMaterialCost, RawMaterialCost);
+
     /// <summary>For one sellable unit, as everything on the row is.</summary>
     public decimal BaseCost => now.BaseCost;
 

@@ -76,6 +76,8 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
             var report = reports.ProductCosts.Single(r => r.ProductId == row.ProductId);
             row.BaseCost.Should().Be(report.BaseCost);
             row.SimulatedBaseCost.Should().Be(report.BaseCost);
+            row.RawMaterialCost.Should().Be(report.IngredientsCost + report.PackagingCost);
+            row.SimulatedRawMaterialCost.Should().Be(row.RawMaterialCost);
             row.SuggestedPrice.Should().Be(report.SuggestedPrice);
             row.IsAffected.Should().BeFalse();
         }
@@ -104,8 +106,12 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         var box = Row(viewModel, bakery.BoxId)!;
         meringue.SimulatedBaseCost.Should().BeApproximately(meringue.BaseCost * 1.1m, 0.0000001m, "50 g of egg white, which costs 10% more with the egg");
         meringue.ChangePercent.Should().BeApproximately(10m, 0.00001m);
+        meringue.SimulatedRawMaterialCost.Should().BeApproximately(meringue.RawMaterialCost * 1.1m, 0.0000001m, "its only material is the egg white");
+        meringue.RawMaterialChangePercent.Should().BeApproximately(10m, 0.00001m);
         pandesal.IsAffected.Should().BeFalse();
         pandesal.SimulatedBaseCost.Should().Be(pandesal.BaseCost);
+        pandesal.SimulatedRawMaterialCost.Should().Be(pandesal.RawMaterialCost);
+        pandesal.RawMaterialChangePercent.Should().Be(0m);
         box.SimulatedBaseCost.Should().BeApproximately(box.BaseCost + 2 * (meringue.SimulatedBaseCost - meringue.BaseCost), 0.0000001m,
             "the box holds two meringues");
 

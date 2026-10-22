@@ -852,6 +852,7 @@ A change moves the material's cost and its buffered cost by the same amount, as 
 
 The lower table shows every product for one sellable unit, at buffered costs, now and with the changes:
 
+- **Raw Material Cost** and **Simulated Raw Material Cost**, and the **Change %** between them: the ingredients and packaging, before labor, overhead and administrative. This is the Products screen's **Material Cost**.
 - **Base Cost** and **Simulated Base Cost**, and the **Change %** between them.
 - **Suggested Price** and **Simulated Suggested Price**: the Costing tab's Total Selling Price.
 - **Markup %** and **Simulated Markup %**: what the product's current price earns, now and with the changes. Blank for a product with no current price.

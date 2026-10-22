@@ -159,6 +159,9 @@
                     <syncfusion:SfDataGrid.Columns>
                         <syncfusion:GridTextColumn MappingName="ProductName" HeaderText="Product" Width="280" AllowFiltering="True" />
                         <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" MinimumWidth="120" AllowFiltering="True" />
+                        <controls:NumericColumn MappingName="RawMaterialCost" HeaderText="Raw Material Cost" NumberDecimalDigits="2" />
+                        <controls:NumericColumn MappingName="SimulatedRawMaterialCost" HeaderText="Simulated Raw Material Cost" NumberDecimalDigits="2" />
+                        <controls:NumericColumn MappingName="RawMaterialChangePercent" HeaderText="Change %" NumberDecimalDigits="2" />
                         <controls:NumericColumn MappingName="BaseCost" HeaderText="Base Cost" NumberDecimalDigits="2" />
                         <controls:NumericColumn MappingName="SimulatedBaseCost" HeaderText="Simulated Base Cost" NumberDecimalDigits="2" />
                         <controls:NumericColumn MappingName="ChangePercent" HeaderText="Change %" NumberDecimalDigits="2" />
