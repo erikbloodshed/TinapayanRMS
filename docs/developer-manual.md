@@ -116,7 +116,7 @@ You'll be productive sooner if you're comfortable with the following.
 | Tool | Version | Notes |
 |---|---|---|
 | Windows | 10 or 11 | WPF only runs on Windows. Icons use Segoe Fluent Icons (Windows 11), and fall back to Segoe MDL2 Assets on Windows 10. |
-| .NET SDK | 10.0.401, or a later 10.0 feature band | Pinned in [global.json](../global.json) with `rollForward: latestFeature`. |
+| .NET SDK | 10.0.402, or a later 10.0 feature band | Pinned in [global.json](../global.json) with `rollForward: latestFeature`. |
 | PostgreSQL | 18 (EDB's Windows installer, service `postgresql-x64-18`, `localhost:5432`) | Reached as the `tinapayanrms` role, which must be able to create databases (`CREATEDB`), because the tests create their own. Its password goes in the password file, `%APPDATA%\postgresql\pgpass.conf`, so no connection string carries one. The installer's `bin` folder holds `psql`, and the `pg_dump` and `pg_restore` the backups run. |
 | `dotnet-ef` | 10.0.x, matching EF Core 10.0.12 | `dotnet tool install --global dotnet-ef --version 10.0.12` |
 | Syncfusion licence key | Essential Studio 35.x | Set as the `SYNCFUSION_LICENSE_KEY` user environment variable. The app won't start without it, and the UI tests that build Syncfusion controls are skipped without it. The build doesn't need it. A key covers one major version, so moving `SyncfusionVersion` to a new major version needs a new key. A program started before the variable changed, such as the IDE and its terminals, keeps the old value until it's restarted. |
@@ -133,7 +133,7 @@ Docker isn't used anywhere in this project.
 
 Run every command from the repository root.
 
-1. **Check the SDK.** `dotnet --version` should print 10.0.401 or later.
+1. **Check the SDK.** `dotnet --version` should print 10.0.402 or later.
 2. **Set up PostgreSQL.** Install PostgreSQL 18, then, as the `postgres` superuser, create the app's role, and put its password in the password file (one line, `localhost:5432:*:tinapayanrms:<password>`):
    ```powershell
    $psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
