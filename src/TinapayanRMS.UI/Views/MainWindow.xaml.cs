@@ -15,6 +15,9 @@ namespace TinapayanRMS.UI.Views;
 
 public partial class MainWindow : AppWindow, IVimHost
 {
+    // Each tab's screen, until the tab is first shown and the screen is made (see CreateScreen).
+    private readonly Dictionary<TabItemExt, Func<FrameworkElement>> _screenFactories = [];
+
     // Each tab's screen LoadCommand, run whenever that tab is shown (see LoadSelectedTab).
     private readonly Dictionary<TabItemExt, ReactiveCommand<RxVoid, RxVoid>> _loadCommands = [];
     private readonly HashSet<TabItemExt> _loadingTabs = [];
@@ -63,15 +66,18 @@ public partial class MainWindow : AppWindow, IVimHost
         _keyboardSettingsViewModel = keyboardSettingsViewModel;
         _databaseBackupsViewModel = databaseBackupsViewModel;
 
-        RawMaterialsTab.Content = new RawMaterialsView(rawMaterialsViewModel);
-        SubAssembliesTab.Content = new SubAssembliesView(subAssembliesViewModel);
-        ProductsTab.Content = new ProductsView(productsViewModel);
-        ReportsTab.Content = new ReportsView(reportsViewModel);
-        ProductionPlanTab.Content = new ProductionPlanView(productionPlanViewModel);
-        PriceSimulatorTab.Content = new PriceSimulatorView(priceSimulatorViewModel);
-        var printView = new ProductPrintView(printTabViewModel);
-        PrintTab.Content = printView;
-        Closed += (_, _) => printView.Dispose();
+        _screenFactories[RawMaterialsTab] = () => new RawMaterialsView(rawMaterialsViewModel);
+        _screenFactories[SubAssembliesTab] = () => new SubAssembliesView(subAssembliesViewModel);
+        _screenFactories[ProductsTab] = () => new ProductsView(productsViewModel);
+        _screenFactories[ReportsTab] = () => new ReportsView(reportsViewModel);
+        _screenFactories[ProductionPlanTab] = () => new ProductionPlanView(productionPlanViewModel);
+        _screenFactories[PriceSimulatorTab] = () => new PriceSimulatorView(priceSimulatorViewModel);
+        _screenFactories[PrintTab] = () => new ProductPrintView(printTabViewModel);
+        Closed += (_, _) => (PrintTab.Content as ProductPrintView)?.Dispose();
+
+        // The tab shown at startup: the first one open. Made here rather than on SelectionChanged, since the tab control
+        // can take in the selected tab's content before it raises that.
+        CreateScreen(MainTabControl.Items.OfType<TabItemExt>().First(tab => tab.Visibility == Visibility.Visible));
 
         RawMaterialsNavItem.Tag = RawMaterialsTab;
         SubAssembliesNavItem.Tag = SubAssembliesTab;
@@ -392,10 +398,35 @@ public partial class MainWindow : AppWindow, IVimHost
     private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // SelectionChanged bubbles, so a grid or picker inside a tab raises it here too.
-        if (ReferenceEquals(e.OriginalSource, MainTabControl) && IsLoaded)
+        if (!ReferenceEquals(e.OriginalSource, MainTabControl))
+        {
+            return;
+        }
+
+        // Before TabControlExt takes the tab's content in, which it does once this event has been raised.
+        if (MainTabControl.SelectedItem is TabItemExt shown)
+        {
+            CreateScreen(shown);
+        }
+
+        if (IsLoaded)
         {
             RecordHistoryStep(e);
             LoadSelectedTab();
+        }
+    }
+
+    /// <summary>
+    /// Makes a tab's screen the first time the tab is shown, and keeps it from then on. Making all seven at startup took
+    /// most of the time between the window appearing and the app being ready (2026-10-22), and a session seldom opens
+    /// them all. A screen's ViewModel exists from the start, so a link from another screen can open a record on one
+    /// that isn't made yet: the screen shows it once it's made and loaded.
+    /// </summary>
+    private void CreateScreen(TabItemExt tab)
+    {
+        if (_screenFactories.Remove(tab, out var create))
+        {
+            tab.Content = create();
         }
     }
 

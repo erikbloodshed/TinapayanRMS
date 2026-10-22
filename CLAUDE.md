@@ -20,9 +20,11 @@ dotnet run --project src/TinapayanRMS.UI                                        
 dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure
 dotnet ef database update --project src/TinapayanRMS.Infrastructure
 dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infrastructure
+dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels
 ```
 
 - **Migrations come only from `dotnet ef migrations add`.** Never write or edit one by hand. `TinapayanRMSDbContextFactory` provides the design-time DbContext.
+- **The app runs on a compiled EF Core model** (`Infrastructure/CompiledModels/`, found by EF without a `UseModel` call). Regenerate it with `dotnet ef dbcontext optimize` (above) after any model change, and never edit it by hand. `CompiledModelTests` fail while it's stale.
 - **Work counts as done** when the solution builds, all tests pass, and any new migration applies cleanly to the local database. A change users can see (a screen, button, field, rule or cost formula) also updates the user manual, `docs/user-manual.md`, in the same change. A change to anything the developer manual, `docs/developer-manual.md`, describes (the setup, commands, solution layout, architecture, a pattern or convention, or a type or file it names) also updates it in the same change.
 - **The app needs the `SYNCFUSION_LICENSE_KEY` user environment variable.** `App`'s static constructor throws at startup without it. The build doesn't need it.
 - **The app, the tests and `dotnet ef` need the local PostgreSQL 18 server** (service `postgresql-x64-18`, `localhost:5432`), reached as the `tinapayanrms` role. Its password is in `%APPDATA%\postgresql\pgpass.conf`, which Npgsql, `psql` and `pg_dump` all read, so no connection string carries one. The dev database is `tinapayanrms`. Query it with `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U tinapayanrms -d tinapayanrms` (`psql` isn't on the PATH). Every table and column name is snake_case (`raw_materials.cost_per_base_unit`). SQL Server Express and LocalDB are still installed, holding the data from before the move (2026-10-21), but are unused.

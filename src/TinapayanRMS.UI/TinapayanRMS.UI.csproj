@@ -5,6 +5,7 @@
     <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
     <UseWPF>true</UseWPF>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishReadyToRun>true</PublishReadyToRun>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 

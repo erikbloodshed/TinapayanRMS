@@ -314,6 +314,9 @@
                     sorting, sub-tab, focus and typed text are still there when you come back.
                     MainWindow.xaml.cs refreshes the screen's data on each return, and each
                     ViewModel's LoadCommand merges that data in without disturbing its state.
+
+                    The tabs start empty: MainWindow.xaml.cs makes each one's screen the first
+                    time it's shown (CreateScreen), so startup builds only the first.
                 -->
                 <syncfusion:TabControlExt x:Name="MainTabControl" Margin="0" CloseMode="Hide"
                                           Background="{StaticResource PageBackgroundBrush}"
