@@ -22,6 +22,14 @@ public partial class PriceSimulatorView : UserControl
         ProductsGrid.SelectedItems = viewModel.SelectedProducts;
         viewModel.RegisterNativeMessageBoxHandler();
 
+        // A scenario's name for Save Scenario, after the button's click is over, as Sub-Assemblies asks for a name.
+        viewModel.PromptForName.RegisterHandler(async interaction =>
+        {
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            var request = interaction.Input;
+            interaction.SetOutput(TextPromptWindow.Prompt(request.Title, request.Label, request.InitialValue, Window.GetWindow(this), request.Message));
+        });
+
         // The products as the table shows them, and the changes that made them.
         viewModel.RegisterExcelExport(this, _ => [new ExcelSheet("Products", ProductsGrid), new ExcelSheet("Price Changes", ChangesGrid)]);
 

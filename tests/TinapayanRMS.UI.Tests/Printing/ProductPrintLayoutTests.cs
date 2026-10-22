@@ -385,6 +385,9 @@ public class ProductPrintLayoutTests
         texts.Should().ContainInConsecutiveOrder("Material", "Qty", "Unit", "Unit Cost", "Cost", "Cost Now", "Gift Box", Figure(1m, "N1"), "pc", Figure(30m, "N4"), Figure(30m, "N4"), string.Empty);
 
         texts.Should().ContainInConsecutiveOrder("Base Cost", Figure(sample.Costs.BaseCost, "N2"), $"Now {Figure(sample.Simulation!.Now.BaseCost, "N2")}");
+        var keep = PriceChangeRules.PriceToKeepMarkup(sample.Costs.CurrentPrice, sample.Simulation.Now.BaseCost, sample.Costs.BaseCost)!.Value;
+        texts.Should().ContainInConsecutiveOrder(
+            "Current Price", Figure(sample.Costs.CurrentPrice!.Value, "N2"), $"{ProductPrintLayout.KeepMarkupNote} {Figure(keep, "N2")}");
         texts.Should().ContainInConsecutiveOrder("Component", "Now", "Simulated", "Change", "% of Price");
         texts.Should().ContainInConsecutiveOrder("Dough", Figure(2m, "N2"), Figure(2.5m, "N2"), "+0.50");
         texts.Should().ContainInConsecutiveOrder("Packaging", Figure(30m, "N2"), Figure(30m, "N2"), "—");
@@ -397,8 +400,9 @@ public class ProductPrintLayoutTests
         {
             Products = [SamplePrintouts.Simulation() with { Simulation = new PrintedSimulation(SamplePrintouts.Simulation().Costs, []) }],
         };
-        AllTexts(new ProductPrintLayout(untouched, includeRecipe: true, includeCosting: true, A4))
-            .Should().Contain("No price change reaches this product: its figures are today's.");
+        var untouchedTexts = AllTexts(new ProductPrintLayout(untouched, includeRecipe: true, includeCosting: true, A4));
+        untouchedTexts.Should().Contain("No price change reaches this product: its figures are today's.");
+        untouchedTexts.Should().NotContain(t => t.StartsWith(ProductPrintLayout.KeepMarkupNote, StringComparison.Ordinal), "its current price already keeps its markup");
 
         var kitchen = AllTexts(new ProductPrintLayout(SamplePrintouts.SimulationSet("Ube Roll"), includeRecipe: true, includeCosting: false, A4));
         kitchen.Should().ContainInConsecutiveOrder("Product", "Folder", "Page");

@@ -16,6 +16,26 @@ public class PriceChangeRulesTests
     }
 
     [Fact]
+    public void The_price_to_keep_a_markup_moves_with_the_base_cost_and_earns_the_same_markup()
+    {
+        // ₱10 on a ₱6 base cost, the base cost up 10% to ₱6.60: ₱11 keeps the markup, VAT and all.
+        PriceChangeRules.PriceToKeepMarkup(10m, 6m, 6.6m).Should().Be(11m);
+        PriceChangeRules.PriceToKeepMarkup(10m, 6m, 5.4m).Should().Be(9m, "a fall lowers it as much");
+        PriceChangeRules.PriceToKeepMarkup(10m, 6m, 6m).Should().Be(10m, "an untouched product keeps its price");
+
+        const decimal vat = 12m;
+        CostingRules.CalculateMarkupPercentFromPrice(6.6m, PriceChangeRules.PriceToKeepMarkup(10m, 6m, 6.6m)!.Value, vat)
+            .Should().BeApproximately(CostingRules.CalculateMarkupPercentFromPrice(6m, 10m, vat), 0.0000001m);
+    }
+
+    [Fact]
+    public void There_is_no_price_to_keep_a_markup_without_a_current_price_or_a_base_cost()
+    {
+        PriceChangeRules.PriceToKeepMarkup(null, 6m, 6.6m).Should().BeNull();
+        PriceChangeRules.PriceToKeepMarkup(10m, 0m, 6.6m).Should().BeNull();
+    }
+
+    [Fact]
     public void A_fall_of_100_percent_or_more_and_a_price_of_nothing_are_refused()
     {
         var all = () => PriceChangeRules.EnsureValidChange(-100m);

@@ -42,11 +42,20 @@ public sealed class PriceSimulatorProductRow(Product product, ProductCostSummary
 
     public decimal SimulatedSuggestedPrice => simulated.SellingPrice;
 
+    /// <summary>What the shop charges now, with VAT, as entered on the product; null when none is.</summary>
+    public decimal? CurrentPrice => now.CurrentPrice;
+
     /// <summary>What the current price earns now, as the Products header shows it; null without a current price.</summary>
     public decimal? MarkupPercent => now.CurrentMarkupPercent;
 
     /// <summary>What the same current price would earn with the changes.</summary>
     public decimal? SimulatedMarkupPercent => simulated.CurrentMarkupPercent;
+
+    /// <summary>
+    /// The price, with VAT, that earns today's markup with the changes (PriceChangeRules.PriceToKeepMarkup): the current
+    /// price, for a product no change reaches. Null without a current price.
+    /// </summary>
+    public decimal? PriceToKeepMarkup => PriceChangeRules.PriceToKeepMarkup(now.CurrentPrice, BaseCost, SimulatedBaseCost);
 
     /// <summary>Whether any change reaches it. Exact: both figures come from the same arithmetic, so an untouched product's are equal.</summary>
     public bool IsAffected => SimulatedBaseCost != BaseCost;
@@ -55,8 +64,8 @@ public sealed class PriceSimulatorProductRow(Product product, ProductCostSummary
 /// <summary>
 /// The Price Simulator screen (2026-10-03): try raw material price changes and see every product's cost, suggested price and
 /// markup with them, beside what they are now. A change reaches made and linked ingredients as a real one would
-/// (IngredientCostRules.Reprice) and products through the same pricing as Reports (SavedProductReader). Nothing is saved:
-/// the changes last while the app is open.
+/// (IngredientCostRules.Reprice) and products through the same pricing as Reports (SavedProductReader). No real price is
+/// changed. The changes last while the app is open, and can be saved under a name as a scenario (2026-10-22) to open again.
 /// </summary>
 public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
 {
@@ -66,7 +75,14 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IIngredientBomLineRepository _bomLineRepository;
     private readonly IRawMaterialBrandPriceRepository _brandPriceRepository;
+    private readonly IPriceScenarioRepository _scenarioRepository;
     private readonly SavedProductReader _savedProducts;
+
+    /// <summary>The scenario whose changes the table holds, as last opened or saved; null for none.</summary>
+    private PriceScenario? _openScenario;
+
+    /// <summary>The table's changes as last opened or saved, to tell whether it holds changes that aren't saved.</summary>
+    private IReadOnlyList<ScenarioLineKey> _savedLines = [];
 
     private readonly Subject<RxVoid> _recalculations = new();
     private readonly Subject<int> _productOpenRequests = new();
@@ -129,6 +145,47 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     /// <summary>The Price Changes table's add row's item.</summary>
     public Func<SimulatedPriceChange> NewChange => () => new SimulatedPriceChange(Find);
 
+    /// <summary>The saved scenarios, newest first.</summary>
+    private IReadOnlyList<PriceScenario> _scenarios = [];
+    public IReadOnlyList<PriceScenario> Scenarios
+    {
+        get => _scenarios;
+        private set => this.RaiseAndSetIfChanged(ref _scenarios, value);
+    }
+
+    private PriceScenario? _selectedScenario;
+    /// <summary>
+    /// The scenario the Scenarios list shows picked: the one open. Clicking another opens it (<see cref="OpenScenarioCommand"/>),
+    /// which sets this once it has, or puts the open one back when the user keeps the table instead. The list letting go
+    /// of its pick, as it can when its rows are replaced, closes nothing.
+    /// </summary>
+    public PriceScenario? SelectedScenario
+    {
+        get => _selectedScenario;
+        set
+        {
+            if (value is not null && !ReferenceEquals(value, _selectedScenario))
+            {
+                OpenScenarioCommand.Execute(value).Subscribe();
+            }
+        }
+    }
+
+    /// <summary>Whether the table holds price changes that no scenario has as they are: Open asks before replacing them.</summary>
+    public bool HasUnsavedChanges => !ScenarioLineKey.Of(ScenarioLines()).SequenceEqual(_savedLines);
+
+    /// <summary>Opens a saved scenario: its changes replace the table's, after asking when those aren't saved.</summary>
+    public ReactiveCommand<PriceScenario, RxVoid> OpenScenarioCommand { get; }
+
+    /// <summary>Saves the table's changes under a name asked for (<see cref="PromptForName"/>), the open scenario's to start with.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> SaveScenarioCommand { get; }
+
+    /// <summary>Deletes the open scenario, after asking. The changes stay in the table.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> DeleteScenarioCommand { get; }
+
+    /// <summary>Input: what to ask for. Output: the name typed, or null when cancelled. The View shows a TextPromptWindow.</summary>
+    public Interaction<TextPromptRequest, string?> PromptForName { get; } = new();
+
     /// <summary>Runs whenever the tab is shown (MainWindow): today's products and prices, the changes kept.</summary>
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
 
@@ -159,6 +216,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         IRawMaterialRepository rawMaterialRepository,
         IIngredientBomLineRepository bomLineRepository,
         IRawMaterialBrandPriceRepository brandPriceRepository,
+        IPriceScenarioRepository scenarioRepository,
         SavedProductReader savedProducts,
         ILogger logger)
         : base(logger)
@@ -167,6 +225,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         _rawMaterialRepository = rawMaterialRepository;
         _bomLineRepository = bomLineRepository;
         _brandPriceRepository = brandPriceRepository;
+        _scenarioRepository = scenarioRepository;
         _savedProducts = savedProducts;
         ShownProducts = () => Products;
 
@@ -176,6 +235,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         {
             _data = await Task.Run(ReadAsync);
             Materials = [.. _data.Materials.Values.Where(m => m.Source == RawMaterialSource.Purchased).OrderBy(m => m.Name)];
+            ShowScenarios(_data.Scenarios);
 
             // Each change is pointed at today's copy of its material and price; one whose material is gone goes.
             foreach (var change in Changes.ToList())
@@ -196,7 +256,17 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         RemoveChangeCommand = ReactiveCommand.Create(
             () => { Changes.Remove(SelectedChange!); },
             this.WhenAnyValue(x => x.SelectedChange).Select(change => change is not null));
-        ClearCommand = ReactiveCommand.Create(Changes.Clear);
+        // Starting over: the table empties, and no scenario is open any more.
+        ClearCommand = ReactiveCommand.Create(() =>
+        {
+            Changes.Clear();
+            ShowOpenScenario(null);
+        });
+        OpenScenarioCommand = ReactiveCommand.CreateFromTask<PriceScenario>(OpenScenarioAsync);
+        SaveScenarioCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(SaveScenarioAsync));
+        DeleteScenarioCommand = ReactiveCommand.CreateFromTask(
+            () => RunWithConfirmationAsync($"Delete the scenario {_selectedScenario!.Name}? The price changes stay in the table.", DeleteScenarioAsync),
+            this.WhenAnyValue(x => x.SelectedScenario).Select(scenario => scenario is not null));
         ExportCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(ExportTitle));
         PrintCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () => await ShowPrint.Handle(PrintChoices(DateTime.Now))));
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
@@ -222,10 +292,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
             .. Changes.Select(change => (Change: change, Costs: change.NewCosts())).Where(t => t.Costs is not null).Select(t => (t.Change, t.Costs!.Value)),
         ];
         List<(int MaterialId, decimal Cost, decimal BufferedCost)> newCosts = [.. tried.Select(t => t.Costs)];
-        if (newCosts.GroupBy(c => c.MaterialId).FirstOrDefault(g => g.Count() > 1) is { } repeated)
-        {
-            throw new BusinessRuleException($"{data.Materials[repeated.Key].Name} is in the table twice. Remove one of its rows.");
-        }
+        EnsureNoMaterialTwice(newCosts.Select(c => c.MaterialId));
 
         List<PrintedPriceChange> printed = [.. tried.Select(t => Printed(t.Change))];
         var (rows, simulatedById, reaches) = await Task.Run(
@@ -253,6 +320,148 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         _simulated = simulatedById;
         _tried = [.. printed.Zip(reaches)];
         ShowRows();
+    }
+
+    /// <summary>Refuses a material in the table twice, by name: which of its rows would count isn't clear.</summary>
+    private void EnsureNoMaterialTwice(IEnumerable<int> materialIds)
+    {
+        if (materialIds.GroupBy(id => id).FirstOrDefault(g => g.Count() > 1) is { } repeated)
+        {
+            var name = _data?.Materials.GetValueOrDefault(repeated.Key)?.Name ?? "A raw material";
+            throw new BusinessRuleException($"{name} is in the table twice. Remove one of its rows.");
+        }
+    }
+
+    /// <summary>The table's changes as a scenario keeps them, in its order: the rows with a material and a price or change typed.</summary>
+    private List<PriceScenarioLine> ScenarioLines() =>
+        [.. Changes.Select(change => change.ToScenarioLine()).OfType<PriceScenarioLine>()];
+
+    /// <summary>
+    /// Opens <paramref name="scenario"/>: its changes replace the table's, in its order. A percentage goes on each material's
+    /// price now, and a new price stays as it was saved. When the table holds changes that aren't saved, the user is
+    /// asked first, and keeping them picks the open scenario again in the list. A material no longer bought is left out.
+    /// </summary>
+    private async Task OpenScenarioAsync(PriceScenario scenario)
+    {
+        // The list's pick calls this while it's still setting it: going on after the pick is over lets the list take
+        // the scenario open back, when the user keeps the table instead.
+        await Task.Yield();
+        await RunSafelyAsync(async () =>
+        {
+            if (HasUnsavedChanges && !await ConfirmDelete.Handle(
+                    $"Open the scenario {scenario.Name}? The price changes in the table aren't saved, and it replaces them."))
+            {
+                ShowSelectedScenario(_openScenario);
+                return;
+            }
+
+            Changes.Clear();
+            List<string> leftOut = [];
+            foreach (var line in scenario.Lines)
+            {
+                var change = NewChange();
+                change.Open(line);
+                if (change.Material is null)
+                {
+                    leftOut.Add(_data?.Materials.GetValueOrDefault(line.RawMaterialId)?.Name ?? "a raw material deleted since");
+                    continue;
+                }
+
+                Changes.Add(change);
+            }
+
+            ShowOpenScenario(scenario);
+            if (leftOut.Count > 0)
+            {
+                SuccessMessage = $"Opened {scenario.Name}, leaving out {string.Join(", ", leftOut)}: no longer bought, so no price to change.";
+            }
+        });
+    }
+
+    /// <summary>
+    /// Saves the table's changes as a scenario, under a name asked for: the open scenario's, to start with. Saving under
+    /// another scenario's name replaces its changes, after asking. A change that can't be is refused as the figures refuse it.
+    /// </summary>
+    private async Task SaveScenarioAsync()
+    {
+        foreach (var change in Changes)
+        {
+            change.NewCosts();
+        }
+
+        var lines = ScenarioLines();
+        EnsureNoMaterialTwice(lines.Select(l => l.RawMaterialId));
+        if (lines.Count == 0)
+        {
+            throw new BusinessRuleException(PriceScenarioRules.NoChangesText);
+        }
+
+        var name = (await PromptForName.Handle(new TextPromptRequest(
+            "Save Scenario",
+            "Name",
+            _openScenario?.Name ?? string.Empty,
+            "Saves the price changes in the table under this name, to open here again. No real price changes.")))?.Trim();
+        if (name is null)
+        {
+            return;
+        }
+
+        if (Scenarios.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)) is { } other
+            && other.Id != _openScenario?.Id
+            && !await ConfirmDelete.Handle($"Replace the price changes saved as {other.Name} with the ones in the table?"))
+        {
+            return;
+        }
+
+        var id = await _scenarioRepository.SaveAsync(name, lines, DateTime.Now, CancellationToken.None);
+        ShowScenarios(await _scenarioRepository.GetAllAsync(CancellationToken.None));
+        var saved = Scenarios.Single(s => s.Id == id);
+        ShowOpenScenario(saved);
+        SuccessMessage = $"Saved the scenario {saved.Name}.";
+    }
+
+    private async Task DeleteScenarioAsync()
+    {
+        var scenario = _selectedScenario!;
+        await _scenarioRepository.DeleteAsync(scenario.Id, CancellationToken.None);
+        ShowOpenScenario(null);
+        ShowScenarios(await _scenarioRepository.GetAllAsync(CancellationToken.None));
+        SuccessMessage = $"Deleted the scenario {scenario.Name}.";
+    }
+
+    /// <summary>The scenarios as read, the open one pointed at its fresh copy; one deleted since is no longer open.</summary>
+    private void ShowScenarios(IReadOnlyList<PriceScenario> scenarios)
+    {
+        Scenarios = scenarios;
+        if (_openScenario is { } open)
+        {
+            var fresh = scenarios.FirstOrDefault(s => s.Id == open.Id);
+            _openScenario = fresh;
+            if (fresh is null)
+            {
+                _savedLines = [];
+            }
+        }
+
+        ShowSelectedScenario(_openScenario);
+    }
+
+    /// <summary>Makes <paramref name="scenario"/> the open one, with the table's changes as they are now its saved ones.</summary>
+    private void ShowOpenScenario(PriceScenario? scenario)
+    {
+        _openScenario = scenario;
+        _savedLines = scenario is null ? [] : ScenarioLineKey.Of(ScenarioLines());
+        ShowSelectedScenario(scenario);
+    }
+
+    /// <summary>
+    /// Shows <paramref name="scenario"/> picked in the list. Told every time, even when it hasn't changed: a pick the user took
+    /// back has to be undone in the list too.
+    /// </summary>
+    private void ShowSelectedScenario(PriceScenario? scenario)
+    {
+        _selectedScenario = scenario;
+        this.RaisePropertyChanged(nameof(SelectedScenario));
     }
 
     /// <summary>
@@ -322,7 +531,8 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         var materialsRead = _rawMaterialRepository.GetAllAsync(CancellationToken.None);
         var bomLinesRead = _bomLineRepository.GetAllAsync(CancellationToken.None);
         var pricesRead = _brandPriceRepository.GetAllAsync(CancellationToken.None);
-        await Task.WhenAll(productsRead, materialsRead, bomLinesRead, pricesRead);
+        var scenariosRead = _scenarioRepository.GetAllAsync(CancellationToken.None);
+        await Task.WhenAll(productsRead, materialsRead, bomLinesRead, pricesRead, scenariosRead);
 
         var products = await productsRead;
         var details = await _savedProducts.ReadDetailsAsync([.. products.Select(p => p.Id)], CancellationToken.None);
@@ -332,7 +542,8 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
             products.ToDictionary(p => p.Id, p => SavedProductReader.Build(p, details[p.Id], CostBasis.Buffered)),
             (await materialsRead).ToDictionary(m => m.Id),
             [.. await bomLinesRead],
-            (await pricesRead).ToLookup(p => p.RawMaterialId));
+            (await pricesRead).ToLookup(p => p.RawMaterialId),
+            await scenariosRead);
     }
 
     /// <summary>A purchased material by id, with what it's bought in; null for one that's gone or isn't purchased.</summary>
@@ -381,5 +592,13 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         IReadOnlyDictionary<int, SavedProduct> Now,
         IReadOnlyDictionary<int, RawMaterial> Materials,
         IReadOnlyList<IngredientBomLine> BomLines,
-        ILookup<int, RawMaterialBrandPrice> Prices);
+        ILookup<int, RawMaterialBrandPrice> Prices,
+        IReadOnlyList<PriceScenario> Scenarios);
+
+    /// <summary>A scenario line's material and what was typed for it, compared by value: what makes two tables the same.</summary>
+    private readonly record struct ScenarioLineKey(int MaterialId, decimal? ChangePercent, decimal? NewPrice)
+    {
+        public static IReadOnlyList<ScenarioLineKey> Of(IEnumerable<PriceScenarioLine> lines) =>
+            [.. lines.Select(l => new ScenarioLineKey(l.RawMaterialId, l.ChangePercent, l.NewPrice))];
+    }
 }

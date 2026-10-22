@@ -933,13 +933,21 @@ public sealed class ProductPrintLayout
 
     /// <summary>
     /// The Price Simulator report's headline figures: base cost, suggested price and the markup the current price earns, with the
-    /// price changes, each with today's under it; and the current price, which the changes don't move.
+    /// price changes, each with today's under it; and the current price, which the changes don't move, with the price that
+    /// keeps today's markup under it when the base cost moves (PriceChangeRules.PriceToKeepMarkup).
     /// </summary>
     private Grid SimulatedFigures(ProductCostSummary now, ProductCostSummary costs) => Figures(
     [
         ("Base Cost", Money(costs.BaseCost), null, $"Now {Money(now.BaseCost)}"),
         ("Suggested Price", Money(costs.SellingPrice), null, $"Now {Money(now.SellingPrice)}"),
-        ("Current Price", costs.CurrentPrice is { } price ? Money(price) : "—", null, null),
+        (
+            "Current Price",
+            costs.CurrentPrice is { } price ? Money(price) : "—",
+            null,
+            costs.BaseCost != now.BaseCost && PriceChangeRules.PriceToKeepMarkup(costs.CurrentPrice, now.BaseCost, costs.BaseCost) is { } keep
+                ? $"{KeepMarkupNote} {Money(keep)}"
+                : null
+        ),
         (
             "Markup at Current Price",
             MarkupText(costs.CurrentMarkupPercent),
@@ -947,6 +955,9 @@ public sealed class ProductPrintLayout
             $"Now {MarkupText(now.CurrentMarkupPercent)}"
         ),
     ]);
+
+    /// <summary>What heads the price that keeps today's markup, under a simulated Current Price: "To keep markup 11.00".</summary>
+    public const string KeepMarkupNote = "To keep markup";
 
     private static string MarkupText(decimal? markup) => markup is { } value ? value.ToString("N2", CultureInfo.CurrentCulture) + "%" : "—";
 

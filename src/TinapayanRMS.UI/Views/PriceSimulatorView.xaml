@@ -15,9 +15,72 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <!--
+            The saved scenarios on the left, the changes tried on the right. They share rows, so the two headings, captions
+            and tables line up whichever caption wraps further.
+        -->
         <Border Style="{StaticResource CardStyle}">
-            <DockPanel>
-                <Grid DockPanel.Dock="Top">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="400" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Scenarios" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                    <syncfusion:ButtonAdv Grid.Column="1"
+                                          Label="Save Scenario"
+                                          IconTemplate="{StaticResource SaveIconTemplate}"
+                                          Command="{Binding SaveScenarioCommand}"
+                                          ToolTip="Saves the price changes in the table under a name, to open here again. No real price changes."
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,8,0" />
+                    <syncfusion:ButtonAdv Grid.Column="2"
+                                          Label="Delete Scenario"
+                                          IconTemplate="{StaticResource DeleteIconTemplate}"
+                                          Command="{Binding DeleteScenarioCommand}"
+                                          ToolTip="Deletes the open scenario. Its price changes stay in the table."
+                                          VerticalAlignment="Center" />
+                </Grid>
+                <TextBlock Grid.Row="1"
+                           Style="{StaticResource CaptionStyle}"
+                           Margin="0,0,0,12"
+                           Text="The price changes saved under a name, newest first. Click one to open it: its changes replace the table's." />
+                <!-- Clicking a scenario opens it (PriceSimulatorViewModel.SelectedScenario), as tall as the table it fills -->
+                <syncfusion:SfDataGrid x:Name="ScenariosGrid"
+                                       Grid.Row="2"
+                                       ItemsSource="{Binding Scenarios}"
+                                       SelectedItem="{Binding SelectedScenario, Mode=TwoWay}"
+                                       AutomationProperties.Name="Scenarios"
+                                       GridLinesVisibility="Both"
+                                       CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                       CurrentCellBorderThickness="1"
+                                       controls:GridFillerRows.IsEnabled="True"
+                                       AutoGenerateColumns="False"
+                                       AllowEditing="False"
+                                       AllowSorting="False"
+                                       SelectionMode="Single"
+                                       NavigationMode="Row"
+                                       ColumnSizer="Star"
+                                       Height="200">
+                    <syncfusion:SfDataGrid.Columns>
+                        <syncfusion:GridDateTimeColumn MappingName="SavedAt" HeaderText="Saved" Pattern="CustomPattern" CustomPattern="MMM d, yyyy  h:mm tt" Width="170" />
+                        <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
+                    </syncfusion:SfDataGrid.Columns>
+                </syncfusion:SfDataGrid>
+
+                <Grid Grid.Column="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -34,14 +97,17 @@
                                           Label="Clear All"
                                           IconTemplate="{StaticResource CancelIconTemplate}"
                                           Command="{Binding ClearCommand}"
-                                          ToolTip="Takes every price change away, so the figures are today's again."
+                                          ToolTip="Takes every price change away, so the figures are today's again, and closes the open scenario."
                                           VerticalAlignment="Center" />
                 </Grid>
-                <TextBlock DockPanel.Dock="Top"
+                <TextBlock Grid.Row="1"
+                           Grid.Column="2"
                            Style="{StaticResource CaptionStyle}"
                            Margin="0,0,0,12"
-                           Text="Pick a raw material and type how much its price changes, in percent, or its new price; the other is worked out. Prices are per the unit it's bought in. Nothing here is saved: the changes last while the app is open." />
+                           Text="Pick a raw material and type how much its price changes, in percent, or its new price; the other is worked out. Prices are per the unit it's bought in. No real price changes here: the changes last while the app is open, and Save Scenario keeps them under a name to open again. A saved percentage goes on the price as it is when you open the scenario." />
                 <syncfusion:SfDataGrid x:Name="ChangesGrid"
+                                       Grid.Row="2"
+                                       Grid.Column="2"
                                        ItemsSource="{Binding Changes}"
                                        SelectedItem="{Binding SelectedChange, Mode=TwoWay}"
                                        controls:NumericEditing.IsEnabled="True"
@@ -90,7 +156,7 @@
                         <controls:NumericColumn MappingName="ChangePercent" HeaderText="Change %" NumberDecimalDigits="2" Width="110" AllowNullValue="True" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
-            </DockPanel>
+            </Grid>
         </Border>
 
         <Border Grid.Row="2" Style="{StaticResource CardStyle}">
@@ -126,11 +192,11 @@
                 <TextBlock DockPanel.Dock="Top"
                            Style="{StaticResource CaptionStyle}"
                            Margin="0,0,0,12"
-                           Text="Every product for one sellable unit, now and with the price changes, at buffered costs. A change reaches made and linked ingredients as a real one would, and moves a material's cost and buffered cost by the same amount. Markup % is what the product's current price earns. Double-click a product to open it. Click a product, or several with Ctrl or Shift held, for Print Report to print only those." />
+                           Text="Every product for one sellable unit, now and with the price changes, at buffered costs. A change reaches made and linked ingredients as a real one would, and moves a material's cost and buffered cost by the same amount. Markup % is what the product's current price earns, and Price to Keep Markup the price that earns today's markup with the changes. Double-click a product to open it. Click a product, or several with Ctrl or Shift held, for Print Report to print only those." />
                 <syncfusion:SfDataGrid x:Name="ProductsGrid"
                                        ItemsSource="{Binding Products}"
                                        CellDoubleTapped="Products_CellDoubleTapped"
-                                       controls:GridHeaderHeight.Lines="2"
+                                       controls:GridHeaderHeight.Lines="3"
                                        controls:GridHeaderAlignment.IsBottom="True"
                                        controls:CheckboxFilterFill.IsEnabled="True"
                                        FrozenColumnCount="1"
@@ -157,7 +223,7 @@
                         </DataTemplate>
                     </syncfusion:SfDataGrid.HeaderTemplate>
                     <syncfusion:SfDataGrid.Columns>
-                        <syncfusion:GridTextColumn MappingName="ProductName" HeaderText="Product" Width="280" AllowFiltering="True" />
+                        <syncfusion:GridTextColumn MappingName="ProductName" HeaderText="Product" Width="220" AllowFiltering="True" />
                         <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" MinimumWidth="120" AllowFiltering="True" />
                         <controls:NumericColumn MappingName="RawMaterialCost" HeaderText="Raw Material Cost" NumberDecimalDigits="2" />
                         <controls:NumericColumn MappingName="SimulatedRawMaterialCost" HeaderText="Simulated Raw Material Cost" NumberDecimalDigits="2" />
@@ -167,8 +233,10 @@
                         <controls:NumericColumn MappingName="ChangePercent" HeaderText="Change %" NumberDecimalDigits="2" />
                         <controls:NumericColumn MappingName="SuggestedPrice" HeaderText="Suggested Price" NumberDecimalDigits="2" />
                         <controls:NumericColumn MappingName="SimulatedSuggestedPrice" HeaderText="Simulated Suggested Price" NumberDecimalDigits="2" />
+                        <controls:NumericColumn MappingName="CurrentPrice" HeaderText="Current Price" NumberDecimalDigits="2" AllowNullValue="True" />
                         <controls:NumericColumn MappingName="MarkupPercent" HeaderText="Markup %" NumberDecimalDigits="2" AllowNullValue="True" />
                         <controls:NumericColumn MappingName="SimulatedMarkupPercent" HeaderText="Simulated Markup %" NumberDecimalDigits="2" AllowNullValue="True" />
+                        <controls:NumericColumn MappingName="PriceToKeepMarkup" HeaderText="Price to Keep Markup" NumberDecimalDigits="2" AllowNullValue="True" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </DockPanel>

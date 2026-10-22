@@ -239,6 +239,143 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
     }
 
     [Fact]
+    public async Task The_price_to_keep_markup_moves_the_current_price_with_the_base_cost()
+    {
+        var bakery = await AddBakeryAsync();
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.Products.Single(p => p.Id == bakery.MeringueId).CurrentPrice = 5m;
+            dbContext.Products.Single(p => p.Id == bakery.PandesalId).CurrentPrice = 3m;
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var viewModel = await CreateLoadedViewModelAsync();
+        AddChange(viewModel, bakery.EggId, percent: 10m);
+        await WaitUntilSettledAsync(() => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+
+        var meringue = Row(viewModel, bakery.MeringueId)!;
+        meringue.CurrentPrice.Should().Be(5m);
+        meringue.PriceToKeepMarkup.Should().NotBeNull().And.BeApproximately(5.5m, 0.0000001m, "its base cost is 10% up with the egg");
+        meringue.SimulatedMarkupPercent.Should().BeLessThan(meringue.MarkupPercent!.Value);
+        Row(viewModel, bakery.PandesalId)!.PriceToKeepMarkup.Should().Be(3m, "no change reaches it");
+        Row(viewModel, bakery.BoxId)!.PriceToKeepMarkup.Should().BeNull("it has no current price");
+    }
+
+    [Fact]
+    public async Task A_saved_scenario_opens_again_its_percentage_on_the_price_then_and_its_new_price_as_saved()
+    {
+        var bakery = await AddBakeryAsync();
+        var viewModel = await CreateLoadedViewModelAsync();
+        AddChange(viewModel, bakery.EggId, percent: 10m);
+        AddChange(viewModel, bakery.FlourId, newPrice: 0.06m);
+        viewModel.HasUnsavedChanges.Should().BeTrue();
+
+        await viewModel.SaveScenarioCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SuccessMessage.Should().Be("Saved the scenario Supplier A.");
+        var saved = viewModel.Scenarios.Should().ContainSingle().Subject;
+        viewModel.SelectedScenario.Should().BeSameAs(saved);
+        viewModel.HasUnsavedChanges.Should().BeFalse();
+
+        // The egg's price moves, then the app is opened again.
+        await SetPriceAsync(bakery.EggId, null, 0.02m);
+        var later = await CreateLoadedViewModelAsync();
+        later.Changes.Should().BeEmpty();
+        later.SelectedScenario.Should().BeNull();
+
+        await later.OpenScenarioCommand.Execute(later.Scenarios.Single());
+
+        later.SelectedScenario.Should().BeSameAs(later.Scenarios.Single());
+        later.Changes.Select(c => (c.MaterialId, c.CurrentPrice, c.ChangePercent, c.NewPrice)).Should().Equal(
+            (bakery.EggId, 0.02m, 10m, 0.022m),
+            (bakery.FlourId, (decimal?)null, (decimal?)null, 0.06m));
+        later.HasUnsavedChanges.Should().BeFalse();
+        await WaitUntilSettledAsync(() => Row(later, bakery.PandesalId)?.IsAffected == true, () => later.ErrorMessage ?? "not yet");
+    }
+
+    [Fact]
+    public async Task Opening_a_scenario_over_changes_not_saved_asks_and_keeping_them_leaves_the_table_as_it_was()
+    {
+        var bakery = await AddBakeryAsync();
+        var keep = true;
+        string? asked = null;
+        var viewModel = await CreateLoadedViewModelAsync(confirm: question =>
+        {
+            asked = question;
+            return !keep;
+        });
+        AddChange(viewModel, bakery.EggId, percent: 10m);
+        await viewModel.SaveScenarioCommand.Execute();
+        var scenario = viewModel.Scenarios.Single();
+        viewModel.ClearCommand.Execute().Subscribe();
+        viewModel.SelectedScenario.Should().BeNull("Clear All closes the scenario");
+        AddChange(viewModel, bakery.FlourId, newPrice: 0.06m);
+
+        await viewModel.OpenScenarioCommand.Execute(scenario);
+
+        asked.Should().Be("Open the scenario Supplier A? The price changes in the table aren't saved, and it replaces them.");
+        viewModel.Changes.Select(c => c.MaterialId).Should().Equal(bakery.FlourId);
+        viewModel.SelectedScenario.Should().BeNull();
+
+        keep = false;
+        await viewModel.OpenScenarioCommand.Execute(scenario);
+
+        viewModel.Changes.Select(c => (c.MaterialId, c.ChangePercent)).Should().Equal((bakery.EggId, (decimal?)10m));
+        viewModel.SelectedScenario.Should().BeSameAs(scenario);
+    }
+
+    [Fact]
+    public async Task Saving_under_another_scenarios_name_asks_before_replacing_its_changes()
+    {
+        var bakery = await AddBakeryAsync();
+        var replace = false;
+        string? asked = null;
+        var viewModel = await CreateLoadedViewModelAsync(name: "supplier a", confirm: question =>
+        {
+            asked = question;
+            return replace;
+        });
+        AddChange(viewModel, bakery.EggId, percent: 10m);
+        await viewModel.SaveScenarioCommand.Execute();
+        viewModel.ClearCommand.Execute().Subscribe();
+        AddChange(viewModel, bakery.EggId, percent: 20m);
+
+        await viewModel.SaveScenarioCommand.Execute();
+
+        asked.Should().Be("Replace the price changes saved as supplier a with the ones in the table?");
+        (await new PriceScenarioRepository(CreateDbContextFactory()).GetAllAsync(Cancellation)).Single().Lines.Single().ChangePercent.Should().Be(10m);
+
+        replace = true;
+        await viewModel.SaveScenarioCommand.Execute();
+
+        var saved = (await new PriceScenarioRepository(CreateDbContextFactory()).GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
+        saved.Lines.Single().ChangePercent.Should().Be(20m);
+        viewModel.SelectedScenario!.Id.Should().Be(saved.Id);
+    }
+
+    [Fact]
+    public async Task Deleting_the_open_scenario_keeps_its_changes_in_the_table_and_an_empty_table_cant_be_saved()
+    {
+        var bakery = await AddBakeryAsync();
+        var viewModel = await CreateLoadedViewModelAsync();
+        await viewModel.SaveScenarioCommand.Execute();
+        viewModel.ErrorMessage.Should().Be(PriceScenarioRules.NoChangesText);
+        viewModel.Scenarios.Should().BeEmpty();
+
+        AddChange(viewModel, bakery.EggId, percent: 10m);
+        await viewModel.SaveScenarioCommand.Execute();
+        await viewModel.DeleteScenarioCommand.Execute();
+
+        viewModel.SuccessMessage.Should().Be("Deleted the scenario Supplier A.");
+        viewModel.Scenarios.Should().BeEmpty();
+        viewModel.SelectedScenario.Should().BeNull();
+        viewModel.Changes.Should().ContainSingle();
+        viewModel.HasUnsavedChanges.Should().BeTrue("no scenario holds them now");
+        (await new PriceScenarioRepository(CreateDbContextFactory()).GetAllAsync(Cancellation)).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task A_double_clicked_product_asks_to_be_opened()
     {
         var viewModel = CreateViewModel();
@@ -278,8 +415,38 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
             new RawMaterialBrandPriceRepository(factory),
+            new PriceScenarioRepository(factory),
             SavedProducts(factory),
             new LoggerConfiguration().CreateLogger());
+    }
+
+    /// <summary>A screen loaded, answering Save Scenario's name with <paramref name="name"/> and every question with <paramref name="confirm"/>.</summary>
+    private async Task<PriceSimulatorViewModel> CreateLoadedViewModelAsync(string? name = "Supplier A", Func<string, bool>? confirm = null)
+    {
+        var viewModel = CreateViewModel();
+        viewModel.PromptForName.RegisterHandler(interaction => interaction.SetOutput(name));
+        viewModel.ConfirmDelete.RegisterHandler(interaction => interaction.SetOutput(confirm?.Invoke(interaction.Input) ?? true));
+        await viewModel.LoadCommand.Execute();
+        return viewModel;
+    }
+
+    /// <summary>A row added to the Price Changes table for <paramref name="materialId"/>, as the add row does, then typed.</summary>
+    private static SimulatedPriceChange AddChange(PriceSimulatorViewModel viewModel, int materialId, decimal? percent = null, decimal? newPrice = null)
+    {
+        var change = viewModel.NewChange();
+        viewModel.Changes.Add(change);
+        change.MaterialId = materialId;
+        if (percent is { } p)
+        {
+            change.ChangePercent = p;
+        }
+
+        if (newPrice is { } price)
+        {
+            change.NewPrice = price;
+        }
+
+        return change;
     }
 
     private ReportsViewModel CreateReportsViewModel()

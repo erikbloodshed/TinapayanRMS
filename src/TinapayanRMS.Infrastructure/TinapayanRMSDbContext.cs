@@ -70,6 +70,10 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<ProductVersion> ProductVersions => Set<ProductVersion>();
 
+    public DbSet<PriceScenario> PriceScenarios => Set<PriceScenario>();
+
+    public DbSet<PriceScenarioLine> PriceScenarioLines => Set<PriceScenarioLine>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasCollation(CaseInsensitiveCollation, locale: "und-u-ks-level2", provider: "icu", deterministic: false);

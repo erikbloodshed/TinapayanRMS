@@ -427,6 +427,7 @@ PER PRODUCT
 | `ProductComponent` | A product inside a composite | `Quantity` is at least 1, and a composite never contains itself (`CompositeProductRules.EnsureNoCycle`). |
 | `CostingParameters` | A product's five percentages | One per product. Never linked or shared. |
 | `ProductVersion` | One version in a product's history | `Number` is unique per product. `Content` is a self-contained JSON snapshot that points at nothing. Goes with the product only on a permanent delete. See [Product versions](#product-versions). |
+| `PriceScenario`, `PriceScenarioLine` | A set of Price Simulator price changes saved under a name, and one of its changes | Names are unique, ignoring case; saving under one replaces its lines (`IPriceScenarioRepository.SaveAsync`). A line stores exactly one of `ChangePercent` and `NewPrice`, whichever was typed (`PriceScenarioRules`, backed by check constraints). Deleting a raw material deletes its lines. Nothing reads a scenario to cost anything. See [The Price Simulator](#the-price-simulator). |
 | `CostingDefaults` | The stage and percentages a new product starts with, a new section's shrinkage and a new raw material's cost buffer | At most one row (Id 1). With no row, new products go in Production (`DefaultNewProductStage`), the costing reads as zero, the shrinkage as 3% (`DefaultShrinkagePercent`) and the cost buffer as 10% (`DefaultCostBufferPercent`). |
 | `UnitOfMeasure`, `RawMaterialCategory` | Lookups edited in Settings | A unit's name is stored in lowercase. A category is for one type of material. |
 
@@ -545,6 +546,7 @@ The cascade doesn't push changes live to other screens. A screen picks up new co
 | Labor, overhead, administrative | Each is its % of the sub-assembly cost alone, never of the packaging | `CostingRules.CalculateCostFromSubAssemblyPercent` |
 | Selling price | Base cost = sub-assemblies + packaging + labor + overhead + administrative; pre-VAT price = base cost × (1 + markup %); selling price = pre-VAT price × (1 + VAT %) | `CostingRules.CalculateSellingPrice` |
 | Markup at the current price | (current price ÷ (1 + VAT %) − base cost) ÷ base cost | `CostingRules.CalculateMarkupPercentFromPrice` |
+| Price to keep the markup (Price Simulator) | current price × simulated base cost ÷ base cost (VAT cancels out) | `PriceChangeRules.PriceToKeepMarkup` |
 | A composite's line | The product's recipe cost per sellable unit × quantity, plus its packaging cost when the composite includes it | `CompositeProductRules.CalculateComponentCost`, `CalculateComponentPackagingCost` |
 
 A made or linked ingredient's costs are worked out by **`IngredientCostRules.Recompute`**, which the cascade (`IngredientCostPropagator`) stores and the Price Simulator uses without storing (`IngredientCostRules.Reprice`: copies of the changed materials and of every ingredient depending on them, in dependency order). A simulated price change moves a material's cost and buffered cost by the same factor (`PriceChangeRules.CostsAfter`).
@@ -955,6 +957,17 @@ The Price Simulator screen's **Print Report** goes through the same dialog, with
 - `PriceSimulatorViewModel` keeps the last recalculation's simulated `SavedProduct`s and the changes it tried, so the report always matches the table. `PrintChoices` builds a `PrintChoice` for the rows picked in the grid (`SelectedProducts`, bound to the grid's `SelectedItems`, picked again by id after each recalculation) and one for every row shown. `ShownProducts` is the grid's `View.Records`, which the view supplies, so the report follows the column filters and sort.
 - A `ProductPrintSet` with `PriceChanges` set is a Price Simulator report. With the costing included, `ProductPrintLayout` gives its first page the price changes and a contents with each product's base cost now and simulated. Each product gets a Price Changes Applied table, a Cost Now column on every recipe, packaging and products table (moved lines in the accent), and a costing with Now, Simulated and Change columns. Without the costing it prints the recipes as a plain set does.
 - `PrintPreviewWindow(IReadOnlyList<PrintChoice>, Theme)` shows a Print dropdown when there's more than one choice, and Recipe and Costing tick boxes for products (the plan keeps its single Costs).
+
+### The Price Simulator
+
+`PriceSimulatorViewModel` prices every product now and with the table's changes (see [Formulas and where they live](#formulas-and-where-they-live) and [Printing](#printing)). Each `PriceSimulatorProductRow` also carries the product's current price and `PriceToKeepMarkup`.
+
+The table can be saved as a **scenario** ([PriceScenario](../src/TinapayanRMS.Domain/Entities/PriceScenario.cs)), kept in the database:
+
+- `SimulatedPriceChange.ToScenarioLine` gives a row's material and whichever of Change % and New Price was typed, and `Open(line)` types it back. So a percentage goes on the price as it is when the scenario is opened.
+- `HasUnsavedChanges` compares the table with what was last opened or saved, by value. Picking a scenario over unsaved changes asks first (`ConfirmDelete`). Keeping them picks the open scenario again in the list: `OpenScenarioAsync` starts with `Task.Yield`, so the list has finished its own pick before it's undone.
+- The scenarios are an `SfDataGrid` of two columns (Saved, Name; newest first, as `GetAllAsync` reads them) whose `SelectedItem` is `SelectedScenario`. Its setter only asks for a scenario to be opened, and ignores a null, which the grid can send when its rows are replaced. The ViewModel sets the field itself (`ShowSelectedScenario`), and always raises the change, so a pick the user took back is undone in the list too.
+- Save asks for a name through `PromptForName` (a `TextPromptWindow`), and asks again before replacing another scenario of that name.
 
 ### The Production Plan
 

@@ -6,7 +6,8 @@ namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// A row of the Price Simulator screen's Price Changes: a purchased material and the price it's tried at, typed as a change in
-/// percent or as the new price per its purchase unit, the other worked out from it. Nothing is saved.
+/// percent or as the new price per its purchase unit, the other worked out from it. Saved only as part of a scenario
+/// (ToScenarioLine), which changes no real price.
 /// </summary>
 /// <param name="find">The material with an id, and what it's bought in; null for one that isn't there.</param>
 public sealed class SimulatedPriceChange(Func<int, (RawMaterial Material, PurchaseUnit Unit)?> find) : ReactiveObject
@@ -108,6 +109,42 @@ public sealed class SimulatedPriceChange(Func<int, (RawMaterial Material, Purcha
         PriceChangeRules.EnsureValidNewPrice(newPrice);
         var (cost, bufferedCost) = PriceChangeRules.CostsAfter(material, unit.Price, newPrice, unit.BaseUnitsPerUnit);
         return (material.Id, cost, bufferedCost);
+    }
+
+    /// <summary>
+    /// What was typed for the row, as a saved scenario keeps it: the material and the one of Change % and New Price that
+    /// was typed. Null for a row with no purchased material picked, or nothing typed.
+    /// </summary>
+    public PriceScenarioLine? ToScenarioLine()
+    {
+        if (Material is null || MaterialId is not { } id)
+        {
+            return null;
+        }
+
+        return (_percentTyped, ChangePercent, NewPrice) switch
+        {
+            (true, { } percent, _) => new PriceScenarioLine { RawMaterialId = id, ChangePercent = percent },
+            (false, _, { } price) => new PriceScenarioLine { RawMaterialId = id, NewPrice = price },
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Fills the row from a saved scenario's line, as typing it would: a change in percent goes on the material's price
+    /// now, and a new price stays as it was saved.
+    /// </summary>
+    public void Open(PriceScenarioLine line)
+    {
+        MaterialId = line.RawMaterialId;
+        if (line.ChangePercent is { } percent)
+        {
+            ChangePercent = percent;
+        }
+        else
+        {
+            NewPrice = line.NewPrice;
+        }
     }
 
     /// <summary>Works out whichever of Change % and New Price wasn't typed, from the one that was and the current price.</summary>

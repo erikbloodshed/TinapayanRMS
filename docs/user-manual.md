@@ -834,7 +834,7 @@ If a file of that name is open in Excel, the app can't replace it. Close it in E
 
 ## 10. Price Simulator
 
-The **Price Simulator** shows what raw material price changes would do to every product, before they happen. Nothing on it is saved, and nothing else in the app changes: the changes you try last until you close the app.
+The **Price Simulator** shows what raw material price changes would do to every product, before they happen. It never changes a real price, and nothing else in the app changes. The changes you try last until you close the app, unless you save them as a scenario.
 
 ### Price Changes
 
@@ -848,6 +848,19 @@ The top table holds the changes to try, one row per raw material:
 
 A change moves the material's cost and its buffered cost by the same amount, as typing its Cost Buffer % again after a real price change would. It reaches every made ingredient using the material and every linked ingredient cut from it, as a real price change does. For example, a rise in eggs reaches egg white and the custard made with it.
 
+### Scenarios
+
+A scenario is the price changes in the table, saved under a name such as "Supplier A quote, Nov", so you can open them again another day. Scenarios are kept in the database, so everyone using the app sees them and backups include them.
+
+The **Scenarios** list, at the left of the Price Changes table, shows each scenario's **Saved** date and time and its **Name**, newest first. The open scenario is highlighted.
+
+- **Click a scenario** to open it. Its changes replace the table's. If the table has changes that aren't saved, you're asked first, and **No** leaves the table as it was.
+- **Save Scenario** asks for a name and saves the table's changes under it. To update the scenario that's open, press **Save Scenario** and keep its name. Typing the name of another scenario replaces that scenario's changes, after asking. Saving moves a scenario to the top of the list.
+- **Delete Scenario** deletes the open scenario, after asking. Its changes stay in the table.
+- **Clear All** empties the table and closes the open scenario.
+
+A scenario keeps what you typed. A **Change %** is applied to the price as it is when you open the scenario, and a **New Price** stays as you saved it. For example, flour saved at up **10**% and bought at 1,300 by the time you open it shows 1,430. Deleting a raw material takes it out of every scenario, and a material that's no longer bought is left out when the scenario opens.
+
 ### Products
 
 The lower table shows every product for one sellable unit, at buffered costs, now and with the changes:
@@ -855,7 +868,9 @@ The lower table shows every product for one sellable unit, at buffered costs, no
 - **Raw Material Cost** and **Simulated Raw Material Cost**, and the **Change %** between them: the ingredients and packaging, before labor, overhead and administrative. This is the Products screen's **Material Cost**.
 - **Base Cost** and **Simulated Base Cost**, and the **Change %** between them.
 - **Suggested Price** and **Simulated Suggested Price**: the Costing tab's Total Selling Price.
+- **Current Price**: what you charge now, VAT included, as entered on **Products**. Blank when none is entered.
 - **Markup %** and **Simulated Markup %**: what the product's current price earns, now and with the changes. Blank for a product with no current price.
+- **Price to Keep Markup**: the price that earns today's **Markup %** with the changes. It moves with the base cost: a base cost up 5% gives a price 5% higher. A product no change reaches keeps its current price. Blank for a product with no current price. The figure isn't rounded, so round it to a price you'd charge.
 
 A composite product moves with the products it holds. Tick **Only affected products** to hide the products no change reaches. Sort by **Simulated Markup %** to see which products would earn the least. Filter by product or category from the funnel in its heading, and double-click a product to open it.
 
@@ -874,7 +889,7 @@ The first page lists the **Price Changes** tried, then every product with its **
 
 - **Price Changes Applied**: the changes that reach the product. That includes changes reaching it through a made or linked ingredient, or through the products a composite holds. A product no change reaches says so.
 - **Recipe**: each sub-assembly's ingredients and the packaging, at the new prices. A line a change moves is in the accent colour, with what it costs today in the **Cost Now** column.
-- **Costing**: the Base Cost, Suggested Price and Markup at Current Price with the changes, with today's figure under each. The breakdown has **Now**, **Simulated** and **Change** columns for every part, up to the Total Selling Price.
+- **Costing**: the Base Cost, Suggested Price and Markup at Current Price with the changes, with today's figure under each. Under the **Current Price** of a product a change reaches is the price to keep today's markup, such as **To keep markup 61.28**. The breakdown has **Now**, **Simulated** and **Change** columns for every part, up to the Total Selling Price.
 
 **Include** chooses **Recipe**, **Costing** or both. Without the costing, the report prints the recipes with no costs and no price changes.
 
@@ -1082,8 +1097,10 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 1. Open the **Price Simulator** from the menu.
 2. In the top table, pick the raw material and type its **Change %**, such as **8**, or its **New Price**.
 3. Tick **Only affected products** and sort by **Simulated Markup %**.
-4. To see why a product moves, Ctrl-click it and any others, press **Print Report**, and read each product's ingredients and costing, now and with the change. Print it, or save it as a PDF.
-5. To make the price real, record it on **Raw Materials** as in [Record a price increase](#record-a-price-increase). The Price Simulator never changes a price itself.
+4. Read **Price to Keep Markup** for what to charge to keep each product's markup. Change a product's **Current Price** on **Products**.
+5. To see why a product moves, Ctrl-click it and any others, press **Print Report**, and read each product's ingredients and costing, now and with the change. Print it, or save it as a PDF.
+6. To keep the changes for another day, press **Save Scenario** and name it. Click it in the **Scenarios** list to open it again.
+7. To make the price real, record it on **Raw Materials** as in [Record a price increase](#record-a-price-increase). The Price Simulator never changes a price itself.
 
 ### Back up to a USB stick
 

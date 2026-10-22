@@ -40,6 +40,8 @@ internal static class Columns
         [typeof(CostingDefaults)] = ["id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent", "vat_percent", "shrinkage_percent", "new_product_stage", "cost_buffer_percent"],
         [typeof(PackagingLink)] = ["id", "product_id", "linked_product_id", "linked_sub_assembly_id"],
         [typeof(ProductVersion)] = ["id", "product_id", "number", "saved_at", "note", "content"],
+        [typeof(PriceScenario)] = ["id", "name", "saved_at"],
+        [typeof(PriceScenarioLine)] = ["id", "price_scenario_id", "raw_material_id", "change_percent", "new_price", "sort_order"],
     };
 
     /// <summary><typeparamref name="T"/>'s columns qualified by <paramref name="alias"/>, for a SELECT list.</summary>

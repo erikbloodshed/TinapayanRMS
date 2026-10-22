@@ -269,6 +269,87 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.PriceScenario", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name")
+                        .UseCollation("case_insensitive");
+
+                    b.Property<DateTime>("SavedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("saved_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_price_scenarios");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_price_scenarios_name");
+
+                    b.ToTable("price_scenarios", (string)null);
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.PriceScenarioLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("ChangePercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("change_percent");
+
+                    b.Property<decimal?>("NewPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("new_price");
+
+                    b.Property<int>("PriceScenarioId")
+                        .HasColumnType("integer")
+                        .HasColumnName("price_scenario_id");
+
+                    b.Property<int>("RawMaterialId")
+                        .HasColumnType("integer")
+                        .HasColumnName("raw_material_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("Id")
+                        .HasName("pk_price_scenario_lines");
+
+                    b.HasIndex("RawMaterialId")
+                        .HasDatabaseName("ix_price_scenario_lines_raw_material_id");
+
+                    b.HasIndex("PriceScenarioId", "RawMaterialId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_price_scenario_lines_price_scenario_id_raw_material_id");
+
+                    b.ToTable("price_scenario_lines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PriceScenarioLines_ChangePercent", "change_percent > -100");
+
+                            t.HasCheckConstraint("CK_PriceScenarioLines_NewPrice", "new_price > 0");
+
+                            t.HasCheckConstraint("CK_PriceScenarioLines_OneTyped", "(change_percent IS NULL) <> (new_price IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.Product", b =>
                 {
                     b.Property<int>("Id")
@@ -1183,6 +1264,27 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.PriceScenarioLine", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Entities.PriceScenario", "PriceScenario")
+                        .WithMany("Lines")
+                        .HasForeignKey("PriceScenarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_price_scenario_lines_price_scenarios_price_scenario_id");
+
+                    b.HasOne("TinapayanRMS.Domain.Entities.RawMaterial", "RawMaterial")
+                        .WithMany()
+                        .HasForeignKey("RawMaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_price_scenario_lines_raw_materials_raw_material_id");
+
+                    b.Navigation("PriceScenario");
+
+                    b.Navigation("RawMaterial");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.Product", b =>
                 {
                     b.HasOne("TinapayanRMS.Domain.Entities.ProductCategory", "Category")
@@ -1426,6 +1528,11 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("Ingredient");
 
                     b.Navigation("Usage");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.PriceScenario", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterial", b =>
