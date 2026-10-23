@@ -126,6 +126,51 @@ public class CostingRulesTests
     }
 
     [Fact]
+    public void CalculateSellingPrice_adds_the_wastage_on_the_sub_assemblies_to_the_base_cost()
+    {
+        // ₱100 of sub-assemblies at 3% wastage is ₱3 more. Labor 25% stays on the ₱100 (₱25), and the ₱4 of packaging
+        // takes no wastage: ₱100 + ₱3 + ₱4 + ₱25 = ₱132. A 30% markup and 12% VAT go on that as before.
+        var (baseCost, preVatPrice, sellingPrice) = CostingRules.CalculateSellingPrice(
+            subAssemblyCostPerPiece: 100m, packagingCostPerPiece: 4m, laborPercent: 25m, overheadPercent: 0m, administrativePercent: 0m,
+            marginPercent: 30m, vatPercent: 12m, wastagePercent: 3m);
+
+        baseCost.Should().Be(132m);
+        preVatPrice.Should().Be(171.6m);
+        sellingPrice.Should().Be(192.192m);
+    }
+
+    [Fact]
+    public void CalculateSellingPrice_adds_no_wastage_on_packaging_alone()
+    {
+        var (baseCost, _, _) = CostingRules.CalculateSellingPrice(
+            subAssemblyCostPerPiece: 0m, packagingCostPerPiece: 4m, laborPercent: 0m, overheadPercent: 0m, administrativePercent: 0m,
+            marginPercent: 0m, vatPercent: 0m, wastagePercent: 3m);
+
+        baseCost.Should().Be(4m);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    [InlineData(100)]
+    public void EnsureValidWastage_accepts_0_to_100(double wastagePercent)
+    {
+        var act = () => CostingRules.EnsureValidWastage((decimal)wastagePercent);
+
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(-0.01)]
+    [InlineData(100.01)]
+    public void EnsureValidWastage_refuses_a_wastage_outside_0_to_100(double wastagePercent)
+    {
+        var act = () => CostingRules.EnsureValidWastage((decimal)wastagePercent);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage("*wastage*");
+    }
+
+    [Fact]
     public void CalculateSellingPrice_charges_nothing_for_labor_overhead_or_administrative_on_packaging_alone()
     {
         var (baseCost, _, _) = CostingRules.CalculateSellingPrice(

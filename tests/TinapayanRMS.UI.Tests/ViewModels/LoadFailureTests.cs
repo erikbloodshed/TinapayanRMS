@@ -247,7 +247,8 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
                 new PackagingLineRepository(factory),
                 new CostingParametersRepository(factory),
                 new SubAssemblyLineRepository(factory),
-                productRepository),
+                productRepository,
+                new CostingDefaultsRepository(factory)),
             new LoggerConfiguration().CreateLogger());
     }
 }

@@ -70,6 +70,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task The_History_tab_shows_each_version_then_and_today_and_what_changed()
     {
+        await WithoutWastageAsync();
         var (viewModel, seeded) = await OpenToppedProductAsync();
         Edit(viewModel, () => viewModel.FormLines.Single().Grams = 50m);
         await viewModel.SaveCommand.Execute();
@@ -97,6 +98,27 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.VersionHistory.SelectedRow = first;
         viewModel.VersionHistory.CompareWith = VersionComparison.Current;
         viewModel.VersionHistory.Changes.Should().Equal("Topping: Sugar 100 g → 50 g");
+    }
+
+    [Fact]
+    public async Task A_version_keeps_the_wastage_it_was_priced_with_and_today_takes_the_wastage_now()
+    {
+        // Both versions are saved at the 3% wastage nothing in Settings gives.
+        var (viewModel, _) = await OpenToppedProductAsync();
+        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 50m);
+        await viewModel.SaveCommand.Execute();
+
+        await SetWastageAsync(10m);
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedDetailsTab = ProductsViewModel.HistoryTab;
+        await WaitUntilAsync(() => viewModel.VersionHistory.Rows.Count == 2, () => $"rows={viewModel.VersionHistory.Rows.Count}");
+
+        var (latest, first) = (viewModel.VersionHistory.Rows[0], viewModel.VersionHistory.Rows[1]);
+        first.BaseCostThen.Should().Be(10.3m, "100 g of sugar at 0.10, and the 3% wastage then");
+        first.BaseCostToday.Should().Be(11m, "the same 100 g, and today's 10%");
+        latest.BaseCostThen.Should().Be(5.15m);
+        latest.BaseCostToday.Should().Be(5.5m);
+        viewModel.VersionHistory.Changes.Should().Equal(["Topping: Sugar 100 g → 50 g"], "the wastage is the shop's, not a change of the product");
     }
 
     [Fact]
@@ -179,6 +201,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task Print_on_the_History_tab_prints_the_version_picked_at_its_costs_then()
     {
+        await WithoutWastageAsync();
         var (viewModel, seeded) = await OpenToppedProductAsync();
         Edit(viewModel, () => viewModel.FormLines.Single().Grams = 50m);
         await viewModel.SaveCommand.Execute();

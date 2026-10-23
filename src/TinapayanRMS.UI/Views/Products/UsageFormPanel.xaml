@@ -637,10 +637,9 @@
             </StackPanel>
 
             <!--
-                The piece size, as a summary beside the tables: what a piece and the whole batch cost, then the three
-                figures typed in (what the batch loses being made, then the weight per piece or the yield: type either
-                and the other follows from what the batch makes, the total weight less that shrinkage), then the two
-                weights they work out to.
+                The piece size, as a summary beside the tables: what a piece and the whole batch cost, then the two
+                figures typed in (the weight per piece or the yield: type either and the other follows from the batch's
+                total weight), then the weight they share out.
             -->
             <StackPanel Grid.Column="2" Width="230">
                 <Grid>
@@ -673,30 +672,13 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Shrinkage %" Style="{StaticResource ParamLabelStyle}" />
-                        <syncfusion:DoubleTextBox Grid.Column="1"
-                                                  Width="80"
-                                                  controls:FieldUndoStep.Recorder="{Binding}"
-                                                  MinValue="0"
-                                                  MaxValue="99.99"
-                                                  Value="{Binding EditingUsageShrinkagePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                  NumberDecimalDigits="2"
-                                                  ToolTip="How much of the batch's weight this product loses making it — baking a dough off, reducing a filling. The pieces come out of what's left, so the batch's cost is spread over fewer of them. A new section starts at the default in Settings → Costing Defaults; set it to 0 if nothing is lost." />
-                    </Grid>
-                </Border>
-                <Border Style="{StaticResource ParamRowStyle}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
                         <TextBlock Text="Weight/piece (g)" Style="{StaticResource ParamLabelStyle}" />
                         <syncfusion:DoubleTextBox Grid.Column="1"
                                                   Width="80"
                                                   controls:FieldUndoStep.Recorder="{Binding}"
                                                   Value="{Binding EditingUsageWeightPerPiece, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                   NumberDecimalDigits="2"
-                                                  ToolTip="What one finished piece weighs, out of the batch's final weight. Type it, and the yield is worked out." />
+                                                  ToolTip="What one piece takes of the batch's total weight. Type it, and the yield is worked out." />
                     </Grid>
                 </Border>
                 <Border Style="{StaticResource ParamRowStyle}">
@@ -722,7 +704,7 @@
                 -->
                 <TextBlock Text="Computed" Style="{StaticResource GroupHeadingStyle}" />
                 <Border Style="{StaticResource ParamRowStyle}"
-                        ToolTip="The batch that goes in: the sum of its lines, and of this product's add-ins to them.">
+                        ToolTip="The batch: the sum of its lines, and of this product's add-ins to them. The yield and the weight per piece share it out.">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -732,17 +714,7 @@
                         <TextBlock Grid.Column="1" Text="{Binding UsageFormTotalWeightText}" Style="{StaticResource ComputedValueStyle}" />
                     </Grid>
                 </Border>
-                <Border Style="{StaticResource ParamRowStyle}"
-                        ToolTip="What the batch makes: the total weight less its shrinkage. This is what the yield and the weight per piece share out.">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Final weight" Style="{StaticResource ParamLabelStyle}" />
-                        <TextBlock Grid.Column="1" Text="{Binding UsageFormFinalWeightText}" Style="{StaticResource ComputedValueStyle}" />
-                    </Grid>
-                </Border>
+
 
                 <TextBlock Text="{Binding UsageFormPieceSizeCaption}" Style="{StaticResource CaptionStyle}" Margin="0,8,0,0" />
             </StackPanel>

@@ -31,13 +31,13 @@ internal static class Columns
         [typeof(ProductCategory)] = ["id", "name"],
         [typeof(Product)] = ["id", "name", "description", "category_id", "quantity_required", "updated_at", "current_price", "stage", "is_composite", "includes_component_packaging", "deleted_at"],
         [typeof(ProductComponent)] = ["id", "product_id", "component_product_id", "quantity", "sort_order"],
-        [typeof(ProductSubAssemblyUsage)] = ["id", "product_id", "sub_assembly_id", "authored_field", "authored_value", "shrinkage_percent"],
+        [typeof(ProductSubAssemblyUsage)] = ["id", "product_id", "sub_assembly_id", "authored_field", "authored_value"],
         [typeof(UsageAddInLine)] = ["id", "usage_id", "ingredient_id", "grams", "sort_order"],
         [typeof(PackagingLine)] =
             ["id", "product_id", "packaging_material_id", "unit_id", "qty_per_unit", "units_per_packaging_unit", "authored_field", "sort_order"],
         [typeof(CostingParameters)] =
             ["id", "product_id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent", "vat_percent"],
-        [typeof(CostingDefaults)] = ["id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent", "vat_percent", "shrinkage_percent", "new_product_stage", "cost_buffer_percent"],
+        [typeof(CostingDefaults)] = ["id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent", "vat_percent", "wastage_percent", "new_product_stage", "cost_buffer_percent"],
         [typeof(PackagingLink)] = ["id", "product_id", "linked_product_id", "linked_sub_assembly_id"],
         [typeof(ProductVersion)] = ["id", "product_id", "number", "saved_at", "note", "content"],
         [typeof(PriceScenario)] = ["id", "name", "saved_at"],

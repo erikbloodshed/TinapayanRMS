@@ -466,7 +466,8 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         new PackagingLineRepository(factory),
         new CostingParametersRepository(factory),
         new SubAssemblyLineRepository(factory),
-        new ProductRepository(factory));
+        new ProductRepository(factory),
+        new CostingDefaultsRepository(factory));
 
     /// <summary>The figures are worked out in the background: waits until <paramref name="condition"/> has held for a moment.</summary>
     private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)

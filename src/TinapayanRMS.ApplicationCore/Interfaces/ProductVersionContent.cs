@@ -35,6 +35,13 @@ public sealed record ProductVersionContent
     /// <summary>Its costing percentages; null when it had none saved, which prices as all zero.</summary>
     public VersionCosting? Costing { get; init; }
 
+    /// <summary>
+    /// The shop-wide Wastage % it was priced with then (CostingDefaults.WastagePercent); null for a version saved before
+    /// there was one, which prices with none. Not part of its recipe (ProductVersionRules.IsSameRecipe): it's the shop's,
+    /// like a material's price. A version saved before then has a ShrinkagePercent on each section, which is ignored.
+    /// </summary>
+    public decimal? WastagePercent { get; init; }
+
     /// <summary>Its sub-assemblies, in the order they were read.</summary>
     public IReadOnlyList<VersionSection> Sections { get; init; } = [];
 
@@ -88,7 +95,6 @@ public sealed record VersionSection(
     VersionRole Role,
     UsageAuthoredField AuthoredField,
     decimal AuthoredValue,
-    decimal ShrinkagePercent,
     IReadOnlyList<VersionLine> Lines,
     IReadOnlyList<VersionAddIn> AddIns);
 

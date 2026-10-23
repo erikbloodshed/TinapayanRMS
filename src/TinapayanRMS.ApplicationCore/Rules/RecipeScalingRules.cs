@@ -20,24 +20,24 @@ public static class RecipeScalingRules
     /// one worked out from it: 85 pieces at a typed 60 g from 1,700 g is exactly 3 batches, where the worked-out yield,
     /// 28.3333…, would make it a hair over 3 and so 4. 0 for a section with no piece size yet, or a batch of nothing.
     /// </summary>
-    public static decimal BatchesFor(decimal pieces, UsageAuthoredField authoredField, decimal authoredValue, decimal finalWeight) =>
-        WholeBatches(BatchRatio(pieces, authoredField, authoredValue, finalWeight));
+    public static decimal BatchesFor(decimal pieces, UsageAuthoredField authoredField, decimal authoredValue, decimal totalWeight) =>
+        WholeBatches(BatchRatio(pieces, authoredField, authoredValue, totalWeight));
 
     /// <summary>
     /// The batches of a section <paramref name="pieces"/> take, not rounded: 160 pieces at 10 g from a 1,000 g batch are 1.6.
     /// The Production Plan adds these up across the products sharing a batch before rounding up once (<see cref="WholeBatches"/>).
     /// 0 for a section with no piece size yet, or a batch of nothing.
     /// </summary>
-    public static decimal BatchRatio(decimal pieces, UsageAuthoredField authoredField, decimal authoredValue, decimal finalWeight)
+    public static decimal BatchRatio(decimal pieces, UsageAuthoredField authoredField, decimal authoredValue, decimal totalWeight)
     {
-        if (pieces <= 0 || authoredValue <= 0 || finalWeight <= 0)
+        if (pieces <= 0 || authoredValue <= 0 || totalWeight <= 0)
         {
             return 0m;
         }
 
         return authoredField switch
         {
-            UsageAuthoredField.WeightPerPiece => pieces * authoredValue / finalWeight,
+            UsageAuthoredField.WeightPerPiece => pieces * authoredValue / totalWeight,
             UsageAuthoredField.Yield => pieces / authoredValue,
             _ => throw new ArgumentOutOfRangeException(nameof(authoredField)),
         };

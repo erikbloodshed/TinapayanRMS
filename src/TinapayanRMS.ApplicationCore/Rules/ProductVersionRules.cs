@@ -168,11 +168,6 @@ public static class ProductVersionRules
                 ? $"{title}: yield {Amount(was.AuthoredValue)} pcs → {Amount(now.AuthoredValue)} pcs"
                 : $"{title}: weight per piece {Amount(was.AuthoredValue)} g → {Amount(now.AuthoredValue)} g");
         }
-
-        if (was.ShrinkagePercent != now.ShrinkagePercent)
-        {
-            changes.Add($"{title}: shrinkage {Amount(was.ShrinkagePercent)}% → {Amount(now.ShrinkagePercent)}%");
-        }
     }
 
     private static string PieceSize(UsageAuthoredField field, decimal value) =>

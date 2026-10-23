@@ -4,19 +4,20 @@ namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>
 /// The stage a new product is filed in, the labor, overhead, administrative, markup and VAT percentages its costing
-/// starts with, the shrinkage a new Recipe Structure section starts with, and the cost buffer a new raw material starts
-/// with, set in Settings. One row at most (Id 1); none until they're first saved, which reads as new products in
-/// <see cref="DefaultNewProductStage"/>, the costing at zero, the shrinkage at <see cref="DefaultShrinkagePercent"/> and
-/// the buffer at <see cref="DefaultCostBufferPercent"/>. A product keeps its own stage and CostingParameters, a section
-/// its own shrinkage and a material its own buffer: changing these never touches a saved one.
+/// starts with, the cost buffer a new raw material starts with, and the shop-wide wastage every product's costing adds,
+/// set in Settings. One row at most (Id 1); none until they're first saved, which reads as new products in
+/// <see cref="DefaultNewProductStage"/>, the costing at zero, the buffer at <see cref="DefaultCostBufferPercent"/> and the
+/// wastage at <see cref="DefaultWastagePercent"/>. A product keeps its own stage and CostingParameters and a material its
+/// own buffer: changing those defaults never touches a saved one. The wastage is different: it isn't a starting value
+/// but the one figure every product is priced with, so changing it reprices them all.
 /// </summary>
 public class CostingDefaults
 {
     /// <summary>The one row's id.</summary>
     public const int SingletonId = 1;
 
-    /// <summary>The shrinkage a new section starts with until Settings says otherwise.</summary>
-    public const decimal DefaultShrinkagePercent = 3m;
+    /// <summary>The shop-wide wastage until Settings says otherwise.</summary>
+    public const decimal DefaultWastagePercent = 3m;
 
     /// <summary>The cost buffer a new raw material starts with until Settings says otherwise.</summary>
     public const decimal DefaultCostBufferPercent = 10m;
@@ -37,8 +38,12 @@ public class CostingDefaults
 
     public decimal VatPercent { get; set; }
 
-    /// <summary>A new Recipe Structure section's Shrinkage %, as ProductSubAssemblyUsage.ShrinkagePercent: 0 to under 100.</summary>
-    public decimal ShrinkagePercent { get; set; } = DefaultShrinkagePercent;
+    /// <summary>
+    /// The shop-wide Wastage %, 0 to 100: a cost allowance for what's lost making a product, added to every product's
+    /// costing as a percentage of its ingredient (sub-assembly) cost, packaging left out (CostingRules.CalculateSellingPrice).
+    /// Added once, on the product's whole recipe cost, never again at each level of a composite.
+    /// </summary>
+    public decimal WastagePercent { get; set; } = DefaultWastagePercent;
 
     /// <summary>
     /// A new raw material's Cost Buffer %, as RawMaterial.CostBufferPercent: 0 to 100. Only a purchased one keeps it: a

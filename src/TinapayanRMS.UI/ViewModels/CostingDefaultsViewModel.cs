@@ -10,9 +10,10 @@ namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// The Settings dialog's Costing Defaults tab: the stage New files a new product in, the labor, overhead, administrative,
-/// markup and VAT percentages its costing starts with, the Shrinkage % a new Recipe Structure section starts with
-/// (ProductsViewModel), and the Cost Buffer % a new raw material starts with (RawMaterialsViewModel). Saving them changes
-/// no saved product or material. Its second card works every stored cost out again (RecalculateCostsCommand).
+/// markup and VAT percentages its costing starts with, the Cost Buffer % a new raw material starts with
+/// (RawMaterialsViewModel), and the shop-wide Wastage % every product is priced with. Saving the defaults changes no saved
+/// product or material, but the wastage reprices every product. Its second card works every stored cost out again
+/// (RecalculateCostsCommand).
 /// </summary>
 public sealed class CostingDefaultsViewModel : ViewModelBase
 {
@@ -68,12 +69,12 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingVatPercent, value);
     }
 
-    private decimal _editingShrinkagePercent = CostingDefaults.DefaultShrinkagePercent;
-    /// <summary>What a new section's Shrinkage % starts at: 0 to under 100, as a section's own.</summary>
-    public decimal EditingShrinkagePercent
+    private decimal _editingWastagePercent = CostingDefaults.DefaultWastagePercent;
+    /// <summary>The shop-wide Wastage %, 0 to 100: a share of every product's ingredient cost, added to its costing.</summary>
+    public decimal EditingWastagePercent
     {
-        get => _editingShrinkagePercent;
-        set => this.RaiseAndSetIfChanged(ref _editingShrinkagePercent, value);
+        get => _editingWastagePercent;
+        set => this.RaiseAndSetIfChanged(ref _editingWastagePercent, value);
     }
 
     private decimal _editingCostBufferPercent = CostingDefaults.DefaultCostBufferPercent;
@@ -112,7 +113,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
             EditingAdministrativePercent = defaults.AdministrativePercent;
             EditingMarginPercent = defaults.MarginPercent;
             EditingVatPercent = defaults.VatPercent;
-            EditingShrinkagePercent = defaults.ShrinkagePercent;
+            EditingWastagePercent = defaults.WastagePercent;
             EditingCostBufferPercent = defaults.CostBufferPercent;
         }));
 
@@ -142,11 +143,11 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
                     AdministrativePercent = EditingAdministrativePercent,
                     MarginPercent = EditingMarginPercent,
                     VatPercent = EditingVatPercent,
-                    ShrinkagePercent = EditingShrinkagePercent,
+                    WastagePercent = EditingWastagePercent,
                     CostBufferPercent = EditingCostBufferPercent,
                 },
                 CancellationToken.None);
-            SuccessMessage = "Costing defaults saved. New products, sections and raw materials start with them.";
+            SuccessMessage = "Costing defaults saved. New products and raw materials start with them, and every product is priced with the wastage.";
         }));
 
         RecalculateCostsCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>

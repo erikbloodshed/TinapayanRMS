@@ -94,11 +94,14 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
             ("Ensaymada × 1", 2.50m, 2.50m), ("Cheese Roll × 2", 5m, 10m));
         composite.Costs.SubAssemblies.Should().Be(single.Costs.SubAssemblies + 2 * roll.Costs.SubAssemblies);
 
-        // Labor, overhead and administrative are percentages of the recipe cost, packaging passes straight through, and
-        // markup and VAT multiply, so a composite of products at their own percentages, with no packaging, is priced at
-        // exactly what they're priced at together: 2.50 → 5.096, 5.00 → 10.192, and 12.50 → 25.48.
+        // Wastage, labor, overhead and administrative are percentages of the recipe cost, packaging passes straight
+        // through, and markup and VAT multiply, so a composite of products at their own percentages, with no packaging, is
+        // priced at exactly what they're priced at together. The products bring their recipe cost before their wastage, so
+        // the composite adds the 3% once, on all 12.50 of it, never again on top of theirs: 0.375, as theirs add up to.
+        composite.Costs.Wastage.Should().Be(0.375m);
+        composite.Costs.Wastage.Should().Be(single.Costs.Wastage + 2 * roll.Costs.Wastage);
         composite.Costs.SellingPrice.Should().Be(single.Costs.SellingPrice + 2 * roll.Costs.SellingPrice);
-        composite.Costs.SellingPrice.Should().Be(25.48m);
+        composite.Costs.SellingPrice.Should().Be(26.026m);
     }
 
     [Fact]
@@ -268,6 +271,7 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
             packagingLineRepository,
             new CostingParametersRepository(factory),
             new SubAssemblyLineRepository(factory),
-            new ProductRepository(factory));
+            new ProductRepository(factory),
+            new CostingDefaultsRepository(factory));
     }
 }

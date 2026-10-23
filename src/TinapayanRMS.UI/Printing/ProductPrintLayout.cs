@@ -542,6 +542,7 @@ public sealed class ProductPrintLayout
             Add(_ => PartRow(line.Name, [Money(line.Cost), Share(line.Share)], isLast), table: table, keepTogether: CostingGroup);
         }
 
+        AddCost($"Wastage ({costs.WastagePercent:0.##}% of {costs.PartsBase})", costs.Wastage, costs.WastageShare);
         AddCost(costs.PackagingTitle, costs.Packaging, costs.PackagingShare);
         AddCost($"Labor ({costs.LaborPercent:0.##}% of {costs.PartsBase})", costs.Labor, costs.LaborShare);
         AddCost($"Overhead ({costs.OverheadPercent:0.##}% of {costs.PartsBase})", costs.Overhead, costs.OverheadShare);
@@ -584,6 +585,7 @@ public sealed class ProductPrintLayout
             Add(_ => PartRow(line.Name, [Money(was), Money(line.Cost), Change(was, line.Cost), Share(line.Share)], isLast), table: table, keepTogether: CostingGroup);
         }
 
+        AddCost($"Wastage ({costs.WastagePercent:0.##}% of {costs.PartsBase})", now.Wastage, costs.Wastage, costs.WastageShare);
         AddCost(costs.PackagingTitle, now.Packaging, costs.Packaging, costs.PackagingShare);
         AddCost($"Labor ({costs.LaborPercent:0.##}% of {costs.PartsBase})", now.Labor, costs.Labor, costs.LaborShare);
         AddCost($"Overhead ({costs.OverheadPercent:0.##}% of {costs.PartsBase})", now.Overhead, costs.Overhead, costs.OverheadShare);
@@ -1183,12 +1185,6 @@ public sealed class ProductPrintLayout
         }
 
         List<string> parts = [];
-        if (section.ShrinkagePercent > 0)
-        {
-            parts.Add($"Shrinkage {section.ShrinkagePercent:0.##}%");
-            parts.Add($"Final weight {section.FinalWeight:#,0.##} g");
-        }
-
         parts.Add($"Weight per piece {section.WeightPerPiece:#,0.##} g");
         parts.Add($"Yield {section.Yield:#,0.##} pcs");
         if (withCost)

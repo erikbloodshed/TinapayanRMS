@@ -19,7 +19,7 @@ public class CostingDefaultsRepository(IDbContextFactory<TinapayanRMSDbContext> 
     {
         CostingRules.EnsureValidParameters(
             defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent);
-        ProductRules.EnsureValidDefaultShrinkage(defaults.ShrinkagePercent);
+        CostingRules.EnsureValidWastage(defaults.WastagePercent);
         RawMaterialRules.EnsureValidCostBuffer(defaults.CostBufferPercent);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -35,7 +35,7 @@ public class CostingDefaultsRepository(IDbContextFactory<TinapayanRMSDbContext> 
         existing.AdministrativePercent = defaults.AdministrativePercent;
         existing.MarginPercent = defaults.MarginPercent;
         existing.VatPercent = defaults.VatPercent;
-        existing.ShrinkagePercent = defaults.ShrinkagePercent;
+        existing.WastagePercent = defaults.WastagePercent;
         existing.NewProductStage = defaults.NewProductStage;
         existing.CostBufferPercent = defaults.CostBufferPercent;
 

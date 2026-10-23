@@ -19,7 +19,7 @@ public class ProductRulesTests
     public void EnsureValidUsages_accepts_a_section_that_has_no_piece_size_yet()
     {
         // 0 is "not sized yet": a section goes into the recipe before how much of it a piece takes is known.
-        var act = () => ProductRules.EnsureValidUsages([(SubAssemblyId: 1, AuthoredValue: 0m, ShrinkagePercent: 0m)]);
+        var act = () => ProductRules.EnsureValidUsages([(SubAssemblyId: 1, AuthoredValue: 0m)]);
 
         act.Should().NotThrow();
     }
@@ -27,7 +27,7 @@ public class ProductRulesTests
     [Fact]
     public void EnsureValidUsages_rejects_a_negative_piece_size()
     {
-        var act = () => ProductRules.EnsureValidUsages([(SubAssemblyId: 1, AuthoredValue: -1m, ShrinkagePercent: 0m)]);
+        var act = () => ProductRules.EnsureValidUsages([(SubAssemblyId: 1, AuthoredValue: -1m)]);
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*can't be negative*");
     }
@@ -37,8 +37,8 @@ public class ProductRulesTests
     {
         var act = () => ProductRules.EnsureValidUsages(
         [
-            (SubAssemblyId: 1, AuthoredValue: 10m, ShrinkagePercent: 0m),
-            (SubAssemblyId: 1, AuthoredValue: 20m, ShrinkagePercent: 0m),
+            (SubAssemblyId: 1, AuthoredValue: 10m),
+            (SubAssemblyId: 1, AuthoredValue: 20m),
         ]);
 
         act.Should().Throw<InvalidOperationException>();
@@ -49,101 +49,53 @@ public class ProductRulesTests
     {
         var act = () => ProductRules.EnsureValidUsages(
         [
-            (SubAssemblyId: 1, AuthoredValue: 10m, ShrinkagePercent: 12m),
-            (SubAssemblyId: 2, AuthoredValue: 20m, ShrinkagePercent: 0m),
+            (SubAssemblyId: 1, AuthoredValue: 10m),
+            (SubAssemblyId: 2, AuthoredValue: 20m),
         ]);
 
         act.Should().NotThrow();
     }
 
-    [Theory]
-    [InlineData(-0.01)]
-    [InlineData(100)]
-    [InlineData(150)]
-    public void EnsureValidUsages_rejects_a_shrinkage_outside_0_to_under_100(double shrinkagePercent)
-    {
-        // 100% or more would leave nothing to cut pieces from, and a negative would make a batch heavier than
-        // what went into it.
-        var act = () => ProductRules.EnsureValidUsages(
-            [(SubAssemblyId: 1, AuthoredValue: 60m, ShrinkagePercent: (decimal)shrinkagePercent)]);
-
-        act.Should().Throw<InvalidOperationException>().WithMessage("*shrinkage*");
-    }
-
     [Fact]
-    public void CalculateFinalWeight_takes_the_shrinkage_off_the_batch()
+    public void The_pieces_share_out_the_whole_batch()
     {
-        // A 1,700 g dough batch that loses a tenth of itself baking comes out at 1,530 g.
-        ProductRules.CalculateFinalWeight(totalWeight: 1700m, shrinkagePercent: 10m).Should().Be(1530m);
-    }
+        // 1,700 g of dough at a typed 60 g a piece makes 28.33 pieces: nothing is taken off the batch first, since what's
+        // lost making it is a cost on the product (CostingDefaults.WastagePercent), not a smaller batch.
+        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(UsageAuthoredField.WeightPerPiece, 60m, totalWeight: 1700m);
 
-    [Fact]
-    public void CalculateFinalWeight_leaves_a_batch_that_loses_nothing_alone()
-    {
-        ProductRules.CalculateFinalWeight(totalWeight: 1700m, shrinkagePercent: 0m).Should().Be(1700m);
-    }
-
-    [Fact]
-    public void Shrinkage_cuts_the_yield_and_leaves_the_typed_weight_per_piece_alone()
-    {
-        // 1,700 g of dough at 10% comes out at 1,530 g. A 60 g finished piece is 25.5 of them, not 28.33.
-        var finalWeight = ProductRules.CalculateFinalWeight(totalWeight: 1700m, shrinkagePercent: 10m);
-
-        ProductRules.ResolvePieceSize(UsageAuthoredField.WeightPerPiece, 60m, finalWeight).Should().Be((60m, 25.5m));
-    }
-
-    [Fact]
-    public void Shrinkage_makes_each_piece_heavier_when_the_yield_is_the_typed_figure()
-    {
-        // The same 1,530 g cut into a typed 24 pieces: each finished piece weighs 63.75 g.
-        var finalWeight = ProductRules.CalculateFinalWeight(totalWeight: 1700m, shrinkagePercent: 10m);
-
-        ProductRules.ResolvePieceSize(UsageAuthoredField.Yield, 24m, finalWeight).Should().Be((63.75m, 24m));
-    }
-
-    [Fact]
-    public void Shrinkage_makes_every_piece_dearer_because_the_batch_still_costs_the_same()
-    {
-        // A 100 g filling batch costing 24 keeps its cost when it reduces to 80 g, so a 10 g piece of what's
-        // left carries 3.00 rather than 2.40 — and the batch's cost over its yield comes to the same thing.
-        var finalWeight = ProductRules.CalculateFinalWeight(totalWeight: 100m, shrinkagePercent: 20m);
-        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(UsageAuthoredField.WeightPerPiece, 10m, finalWeight);
-
-        var costPerPiece = ProductRules.CalculateUsageCostPerPiece(subAssemblyTotalCost: 24m, weightPerPiece, finalWeight);
-
-        costPerPiece.Should().Be(3m);
-        costPerPiece.Should().Be(24m / yield);
+        weightPerPiece.Should().Be(60m);
+        yield.Should().BeApproximately(28.3333m, 0.0001m);
     }
 
     [Fact]
     public void ResolvePieceSize_works_out_the_yield_from_a_typed_weight_per_piece()
     {
         // 100g filling batch, used at 10g/piece -> 10 pieces.
-        ProductRules.ResolvePieceSize(UsageAuthoredField.WeightPerPiece, 10m, finalWeight: 100m).Should().Be((10m, 10m));
+        ProductRules.ResolvePieceSize(UsageAuthoredField.WeightPerPiece, 10m, totalWeight: 100m).Should().Be((10m, 10m));
     }
 
     [Fact]
     public void ResolvePieceSize_works_out_the_weight_per_piece_from_a_typed_yield()
     {
         // A 1,200 g dough batch that makes 24 pieces -> 50 g a piece.
-        ProductRules.ResolvePieceSize(UsageAuthoredField.Yield, 24m, finalWeight: 1200m).Should().Be((50m, 24m));
+        ProductRules.ResolvePieceSize(UsageAuthoredField.Yield, 24m, totalWeight: 1200m).Should().Be((50m, 24m));
     }
 
     [Fact]
     public void When_the_batch_changes_the_typed_figure_stays_put_and_the_other_follows()
     {
         // The batch grows from 1,200 g to 1,500 g.
-        ProductRules.ResolvePieceSize(UsageAuthoredField.WeightPerPiece, 50m, finalWeight: 1500m)
+        ProductRules.ResolvePieceSize(UsageAuthoredField.WeightPerPiece, 50m, totalWeight: 1500m)
             .Should().Be((50m, 30m), "a typed 50 g piece stays 50 g, so the batch makes more pieces");
-        ProductRules.ResolvePieceSize(UsageAuthoredField.Yield, 24m, finalWeight: 1500m)
+        ProductRules.ResolvePieceSize(UsageAuthoredField.Yield, 24m, totalWeight: 1500m)
             .Should().Be((62.5m, 24m), "a typed 24 pieces stays 24, so each piece gets heavier");
     }
 
     [Fact]
     public void ResolvePieceSize_has_no_other_figure_for_a_batch_that_weighs_nothing_yet()
     {
-        ProductRules.ResolvePieceSize(UsageAuthoredField.WeightPerPiece, 10m, finalWeight: 0m).Should().Be((10m, 0m));
-        ProductRules.ResolvePieceSize(UsageAuthoredField.Yield, 24m, finalWeight: 0m).Should().Be((0m, 24m));
+        ProductRules.ResolvePieceSize(UsageAuthoredField.WeightPerPiece, 10m, totalWeight: 0m).Should().Be((10m, 0m));
+        ProductRules.ResolvePieceSize(UsageAuthoredField.Yield, 24m, totalWeight: 0m).Should().Be((0m, 24m));
     }
 
     [Fact]
@@ -158,7 +110,7 @@ public class ProductRulesTests
     public void CalculateUsageCostPerPiece_matches_the_worked_example()
     {
         // 100g/₱24 filling used at 10g/piece -> ₱2.40/piece.
-        ProductRules.CalculateUsageCostPerPiece(subAssemblyTotalCost: 24m, weightPerPiece: 10m, finalWeight: 100m)
+        ProductRules.CalculateUsageCostPerPiece(subAssemblyTotalCost: 24m, weightPerPiece: 10m, totalWeight: 100m)
             .Should().Be(2.4m);
     }
 
@@ -167,7 +119,7 @@ public class ProductRulesTests
     {
         // A 1,200 g dough batch used at 50 g a piece: each piece takes 1/24 of every line.
         // 300 g of flour in the batch is 12.5 g in a piece.
-        ProductRules.CalculateLineGramsPerPiece(lineGrams: 300m, weightPerPiece: 50m, finalWeight: 1200m)
+        ProductRules.CalculateLineGramsPerPiece(lineGrams: 300m, weightPerPiece: 50m, totalWeight: 1200m)
             .Should().Be(12.5m);
     }
 
@@ -175,7 +127,7 @@ public class ProductRulesTests
     public void CalculateLineCostPerPiece_takes_the_pieces_share_of_the_lines_cost()
     {
         // 300 g of flour at ₱0.05 a gram costs ₱15 in the batch; a 50 g piece of a 1,200 g batch takes ₱0.625.
-        ProductRules.CalculateLineCostPerPiece(lineGrams: 300m, ingredientCostPerGram: 0.05m, weightPerPiece: 50m, finalWeight: 1200m)
+        ProductRules.CalculateLineCostPerPiece(lineGrams: 300m, ingredientCostPerGram: 0.05m, weightPerPiece: 50m, totalWeight: 1200m)
             .Should().Be(0.625m);
     }
 

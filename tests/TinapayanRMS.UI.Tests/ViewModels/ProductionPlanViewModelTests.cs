@@ -152,7 +152,8 @@ public class ProductionPlanViewModelTests(DatabaseFixture fixture) : Persistence
                 new PackagingLineRepository(factory),
                 new CostingParametersRepository(factory),
                 new SubAssemblyLineRepository(factory),
-                new ProductRepository(factory)),
+                new ProductRepository(factory),
+                new CostingDefaultsRepository(factory)),
             store,
             new LoggerConfiguration().CreateLogger());
     }

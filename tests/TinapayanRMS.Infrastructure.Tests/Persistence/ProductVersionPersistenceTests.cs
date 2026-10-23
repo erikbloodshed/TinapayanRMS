@@ -33,7 +33,6 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
                 new VersionRole(1, "Dough", 1, false, false),
                 UsageAuthoredField.WeightPerPiece,
                 60m,
-                0m,
                 [new VersionLine(1, flourGrams, true, null)],
                 []),
         ],

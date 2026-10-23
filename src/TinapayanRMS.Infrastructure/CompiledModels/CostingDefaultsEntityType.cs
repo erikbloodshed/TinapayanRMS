@@ -104,17 +104,6 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
             overheadPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
             overheadPercent.AddAnnotation("Relational:ColumnName", "overhead_percent");
 
-            var shrinkagePercent = runtimeEntityType.AddProperty(
-                "ShrinkagePercent",
-                typeof(decimal),
-                propertyInfo: typeof(CostingDefaults).GetProperty("ShrinkagePercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-                fieldInfo: typeof(CostingDefaults).GetField("<ShrinkagePercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-                precision: 18,
-                scale: 4,
-                sentinel: 0m);
-            shrinkagePercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
-            shrinkagePercent.AddAnnotation("Relational:ColumnName", "shrinkage_percent");
-
             var vatPercent = runtimeEntityType.AddProperty(
                 "VatPercent",
                 typeof(decimal),
@@ -125,6 +114,19 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 sentinel: 0m);
             vatPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
             vatPercent.AddAnnotation("Relational:ColumnName", "vat_percent");
+
+            var wastagePercent = runtimeEntityType.AddProperty(
+                "WastagePercent",
+                typeof(decimal),
+                propertyInfo: typeof(CostingDefaults).GetProperty("WastagePercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                fieldInfo: typeof(CostingDefaults).GetField("<WastagePercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                valueGenerated: ValueGenerated.OnAdd,
+                precision: 18,
+                scale: 4,
+                sentinel: -1m);
+            wastagePercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+            wastagePercent.AddAnnotation("Relational:ColumnName", "wastage_percent");
+            wastagePercent.AddAnnotation("Relational:DefaultValue", 3m);
 
             var key = runtimeEntityType.AddKey(
                 new[] { id });

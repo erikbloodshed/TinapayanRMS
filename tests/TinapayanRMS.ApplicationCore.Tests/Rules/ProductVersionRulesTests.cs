@@ -25,7 +25,7 @@ public class ProductVersionRulesTests
     ];
 
     private static VersionSection DoughSection(params VersionLine[] lines) =>
-        new(100, "Pandesal Dough", false, Dough, UsageAuthoredField.WeightPerPiece, 60m, 3m, lines, []);
+        new(100, "Pandesal Dough", false, Dough, UsageAuthoredField.WeightPerPiece, 60m, lines, []);
 
     private static ProductVersionContent Pandesal(params VersionSection[] sections) => new()
     {
@@ -73,22 +73,27 @@ public class ProductVersionRulesTests
     }
 
     [Fact]
-    public void Piece_size_and_shrinkage_are_listed()
+    public void The_piece_size_is_listed()
     {
         var later = Base with
         {
-            Sections = [Base.Sections[0] with { AuthoredValue = 55m, ShrinkagePercent = 5m }],
+            Sections = [Base.Sections[0] with { AuthoredValue = 55m }],
         };
 
-        ProductVersionRules.Changes(Base, later).Should().Equal(
-            "Dough: weight per piece 60 g → 55 g",
-            "Dough: shrinkage 3% → 5%");
+        ProductVersionRules.Changes(Base, later).Should().Equal("Dough: weight per piece 60 g → 55 g");
+    }
+
+    [Fact]
+    public void The_shop_wide_wastage_isnt_part_of_a_versions_recipe()
+    {
+        // It's the shop's, set in Settings, like a material's price: a change of it alone records no version.
+        ProductVersionRules.IsSameRecipe(Base with { WastagePercent = 3m }, Base with { WastagePercent = 5m }).Should().BeTrue();
     }
 
     [Fact]
     public void A_section_rewritten_as_a_new_one_of_the_products_own_is_the_same_section()
     {
-        var own = new VersionSection(7, "Pandesal Filling", true, Filling, UsageAuthoredField.Yield, 1m, 0m, [new VersionLine(Sugar, 30m, false, null)], []);
+        var own = new VersionSection(7, "Pandesal Filling", true, Filling, UsageAuthoredField.Yield, 1m, [new VersionLine(Sugar, 30m, false, null)], []);
         var before = Base with { Sections = [.. Base.Sections, own] };
         var after = Base with { Sections = [.. Base.Sections, own with { SubAssemblyId = 9 }] };
 
@@ -98,7 +103,7 @@ public class ProductVersionRulesTests
     [Fact]
     public void A_section_added_and_removed_are_listed_by_role()
     {
-        var own = new VersionSection(7, "Pandesal Filling", true, Filling, UsageAuthoredField.Yield, 1m, 0m, [new VersionLine(Sugar, 30m, false, null)], []);
+        var own = new VersionSection(7, "Pandesal Filling", true, Filling, UsageAuthoredField.Yield, 1m, [new VersionLine(Sugar, 30m, false, null)], []);
         var withFilling = Base with { Sections = [.. Base.Sections, own] };
 
         ProductVersionRules.Changes(Base, withFilling).Should().Equal("Filling added");
@@ -170,6 +175,26 @@ public class ProductVersionRulesTests
         read.Materials.Should().HaveCount(Materials.Count);
         read.Materials.Single(m => m.Id == Bag).Units.Single().BaseUnitsPerUnit.Should().Be(100m);
         read.Sections.Single().AuthoredField.Should().Be(UsageAuthoredField.WeightPerPiece);
+    }
+
+    [Fact]
+    public void A_snapshot_keeps_the_wastage_it_was_priced_with()
+    {
+        ProductVersionContent.FromJson((Base with { WastagePercent = 3m }).ToJson()).WastagePercent.Should().Be(3m);
+    }
+
+    [Fact]
+    public void A_snapshot_saved_with_shrinkage_before_there_was_wastage_still_reads()
+    {
+        // Until 2026-10-23 each section had a ShrinkagePercent, and there was no WastagePercent: the one is ignored, and
+        // the other reads as none, so the version prices with no wastage.
+        var json = Base.ToJson().Replace("\"AuthoredValue\":60", "\"AuthoredValue\":60,\"ShrinkagePercent\":3", StringComparison.Ordinal);
+        json.Should().Contain("ShrinkagePercent");
+
+        var read = ProductVersionContent.FromJson(json);
+
+        ProductVersionRules.IsSameRecipe(Base, read).Should().BeTrue();
+        read.WastagePercent.Should().BeNull();
     }
 
     [Fact]

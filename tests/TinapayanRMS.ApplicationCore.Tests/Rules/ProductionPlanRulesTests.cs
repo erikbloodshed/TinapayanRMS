@@ -84,14 +84,14 @@ public class ProductionPlanRulesTests
     }
 
     [Fact]
-    public void Shrinkage_and_a_typed_yield_count_as_the_Scaling_tab_counts_them()
+    public void A_typed_weight_and_a_typed_yield_count_as_the_Scaling_tab_counts_them()
     {
         var plan = Plan(
-            [(1, 45m), (2, 50m)],
+            [(1, 50m), (2, 50m)],
             new()
             {
-                // 1,000 g losing 10% leaves 900 g: 45 pieces of 20 g are exactly 1 batch.
-                [1] = Recipe(Section(Dough, [(Flour, 1000m)], weightPerPiece: 20m, shrinkagePercent: 10m)),
+                // 50 pieces of 20 g from 1,000 g are exactly 1 batch.
+                [1] = Recipe(Section(Dough, [(Flour, 1000m)], weightPerPiece: 20m)),
 
                 // A filling yielding 24 pieces a batch: 50 pieces take 3.
                 [2] = Recipe(Section(Filling, [(Sugar, 600m)], yield: 24m)),
@@ -203,13 +203,11 @@ public class ProductionPlanRulesTests
         IReadOnlyList<(int, decimal)> lines,
         decimal? weightPerPiece = null,
         decimal? yield = null,
-        decimal shrinkagePercent = 0m,
         IReadOnlyList<(int, decimal)>? addIns = null) =>
         new(
             subAssemblyId,
             lines,
             addIns ?? [],
             yield is null ? UsageAuthoredField.WeightPerPiece : UsageAuthoredField.Yield,
-            yield ?? weightPerPiece ?? 0m,
-            shrinkagePercent);
+            yield ?? weightPerPiece ?? 0m);
 }

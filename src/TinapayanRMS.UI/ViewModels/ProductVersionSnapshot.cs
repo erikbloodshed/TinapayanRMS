@@ -41,7 +41,6 @@ public static class ProductVersionSnapshot
                 new VersionRole(role.Id, role.Name, role.SortOrder, role.IsPackaging, role.IsProductOwned),
                 usage.AuthoredField,
                 usage.AuthoredValue,
-                usage.ShrinkagePercent,
                 [.. lines.Select(l => new VersionLine(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
                 [.. addIns.Select(a => new VersionAddIn(a.IngredientId, a.Grams))]));
         }
@@ -67,6 +66,7 @@ public static class ProductVersionSnapshot
                 ? null
                 : new VersionCosting(
                     costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent, costing.VatPercent),
+            WastagePercent = detail.WastagePercent,
             Sections = sections,
             PackagingLink = detail.PackagingLink is { } link
                 ? new VersionPackagingLink(
@@ -92,11 +92,15 @@ public static class ProductVersionSnapshot
 
     /// <summary>
     /// <paramref name="content"/> as a product and its detail, for SavedProductReader.Build: <paramref name="productId"/>'s,
-    /// with its materials at their costs then and its products at what they brought then. Pass
-    /// <paramref name="componentCostsNow"/> for each product's cost as it is now instead, where it's known.
+    /// with its materials at their costs then, its products at what they brought then and the wastage it had then. Pass
+    /// <paramref name="componentCostsNow"/> for each product's cost as it is now instead, where it's known, and
+    /// <paramref name="wastagePercentNow"/> for the wastage as it is now.
     /// </summary>
     public static (Product Product, ProductDetail Detail) ToDetail(
-        int productId, ProductVersionContent content, IReadOnlyDictionary<int, ComponentCosts>? componentCostsNow = null)
+        int productId,
+        ProductVersionContent content,
+        IReadOnlyDictionary<int, ComponentCosts>? componentCostsNow = null,
+        decimal? wastagePercentNow = null)
     {
         var materials = content.Materials.ToDictionary(m => m.Id, ToRawMaterial);
         RawMaterial MaterialOf(int id) => materials.GetValueOrDefault(id) ?? new RawMaterial { Id = id, Name = $"Material {id}" };
@@ -143,7 +147,6 @@ public static class ProductVersionSnapshot
                 },
                 AuthoredField = section.AuthoredField,
                 AuthoredValue = section.AuthoredValue,
-                ShrinkagePercent = section.ShrinkagePercent,
             });
             lines.AddRange(section.Lines.Select((l, sortOrder) => new SubAssemblyLine
             {
@@ -204,6 +207,7 @@ public static class ProductVersionSnapshot
 
         var detail = new ProductDetail(link, usages, packaging, costing, lines, addIns)
         {
+            WastagePercent = wastagePercentNow ?? content.WastagePercent ?? 0m,
             Components =
             [
                 .. content.Components.Select((component, sortOrder) => new SavedComponent(

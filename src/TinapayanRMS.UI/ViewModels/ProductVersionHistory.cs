@@ -103,11 +103,12 @@ public sealed class ProductVersionRow : ReactiveObject
         int productId,
         CostBasis basis,
         IReadOnlyDictionary<int, RawMaterial> materialsNow,
-        IReadOnlyDictionary<int, ComponentCosts> componentCostsNow)
+        IReadOnlyDictionary<int, ComponentCosts> componentCostsNow,
+        decimal wastagePercentNow)
     {
         var (product, detail) = ProductVersionSnapshot.ToDetail(productId, Content);
         Then = SavedProductReader.Build(product, detail, basis).Costs;
-        var (_, detailNow) = ProductVersionSnapshot.ToDetail(productId, Content, componentCostsNow);
+        var (_, detailNow) = ProductVersionSnapshot.ToDetail(productId, Content, componentCostsNow, wastagePercentNow);
         Today = SavedProductReader.Build(product, detailNow, basis, materialsNow).Costs;
     }
 }
@@ -150,6 +151,9 @@ public sealed class ProductVersionHistory : ReactiveObject
     private int _productId;
     private CostBasis _basis;
     private ProductVersionContent? _current;
+
+    /// <summary>The shop-wide wastage as it is now, which the product as it's saved now was read with: what today's figures add.</summary>
+    private decimal WastageNow => _current?.WastagePercent ?? 0m;
     private IReadOnlyDictionary<int, RawMaterial> _materialsNow = new Dictionary<int, RawMaterial>();
     private IReadOnlyDictionary<int, ComponentCosts> _componentCostsNow = new Dictionary<int, ComponentCosts>();
 
@@ -261,7 +265,7 @@ public sealed class ProductVersionHistory : ReactiveObject
         _basis = basis;
         foreach (var row in rows)
         {
-            row.Price(productId, basis, materialsNow, componentCostsNow);
+            row.Price(productId, basis, materialsNow, componentCostsNow, WastageNow);
         }
 
         Rows.Clear();
@@ -283,7 +287,7 @@ public sealed class ProductVersionHistory : ReactiveObject
         _basis = basis;
         foreach (var row in Rows)
         {
-            row.Price(_productId, basis, _materialsNow, _componentCostsNow);
+            row.Price(_productId, basis, _materialsNow, _componentCostsNow, WastageNow);
         }
 
         RefreshTrend();

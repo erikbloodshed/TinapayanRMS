@@ -75,12 +75,12 @@ The [user manual](user-manual.md) describes every screen. Read its [Key ideas](u
 | Sub-assembly | `SubAssembly` | A recipe of ingredient lines (`SubAssemblyLine`), or a packaging set of packaging lines (`SubAssemblyPackagingLine`). It stores its `TotalWeight` and `TotalCost`. |
 | Role | `SubAssemblyRole` | What a sub-assembly is in a recipe (Dough, Filling, …). Roles set the order of a product's recipe tabs. `IsPackaging` marks the role packaging sets go in. `IsProductOwned` makes a section made in a product that product's own. |
 | Standalone or own | `SubAssembly.OwnerProductId` | A standalone sub-assembly (null owner) lives on the Sub-Assemblies screen, and products link it. An own sub-assembly belongs to one product and is edited in that product's recipe. |
-| Usage | `ProductSubAssemblyUsage` | One sub-assembly in a product's recipe, with the product's own piece size and shrinkage. The piece size is either a weight per piece or a yield: one is typed and the other is worked out. |
+| Usage | `ProductSubAssemblyUsage` | One sub-assembly in a product's recipe, with the product's own piece size. The piece size is either a weight per piece or a yield: one is typed and the other is worked out from the batch's total weight. |
 | Add-in | `UsageAddInLine` | A product's own extra ingredient on top of a sub-assembly it links. |
 | Packaging line, packaging link | `PackagingLine`, `PackagingLink` | A packaging material used by one sellable unit; or a link that reads a product's packaging from another product or from a packaging set. |
 | Quantity Required | `Product.QuantityRequired` | Pieces per sellable unit: 8 for a Box of 8. A recipe is written per piece, and costing is per sellable unit. |
 | Composite product | `Product.IsComposite`, `ProductComponent` | A product made of other products, plus its own packaging and sections in product-owned roles. |
-| Costing parameters, costing defaults | `CostingParameters`, `CostingDefaults` | A product's labor, overhead, administrative, markup and VAT percentages; and the values a new product starts with (its stage among them), with the shrinkage a new Recipe Structure section and the cost buffer a new raw material start with. |
+| Costing parameters, costing defaults | `CostingParameters`, `CostingDefaults` | A product's labor, overhead, administrative, markup and VAT percentages; and the values a new product starts with (its stage among them), with the cost buffer a new raw material starts with and the shop-wide Wastage % every product is priced with. |
 | Stage | `ProductStage` | Research and Development, or Production: the Products tree's two top folders. |
 | Baker's percentage | `SubAssemblyLine.IsFormulaBase`, `AuthoredBakersPercent` | A line's weight as a percentage of the total weight of the lines ticked as the formula's base. |
 
@@ -109,7 +109,7 @@ You'll be productive sooner if you're comfortable with the following.
 | AwesomeAssertions | `Should()` assertions. It's a fork of FluentAssertions 7, with the same API. | `tests/` |
 | Respawn | Resetting a database between tests | The test fixtures |
 | MSBuild | `Directory.Build.props`, Central Package Management | The build |
-| The domain | Recipe costing in a bakery: bills of materials, yield, shrinkage, baker's percentage, cost-plus pricing | Read the user manual's [Key ideas](user-manual.md#1-key-ideas) and [How costs are worked out](user-manual.md#12-how-costs-are-worked-out) |
+| The domain | Recipe costing in a bakery: bills of materials, yield, wastage, baker's percentage, cost-plus pricing | Read the user manual's [Key ideas](user-manual.md#1-key-ideas) and [How costs are worked out](user-manual.md#12-how-costs-are-worked-out) |
 
 ### Software
 
@@ -423,7 +423,7 @@ PER PRODUCT
 | `SubAssemblyPackagingLine` | A packaging material in a packaging set | Costed on read. |
 | `Product` | A sellable product | Names are unique, deleted products' included. `IsComposite` is fixed once saved. `QuantityRequired` is at least 1, and exactly 1 for a composite. Deleting one only stamps `DeletedAt` (a soft delete): see [Deleted products](#deleted-products). |
 | `ProductCategory` | Breads, Cakes, … | A list of its own, separate from raw material categories. |
-| `ProductSubAssemblyUsage` | A sub-assembly in a product's recipe | Stores only the typed piece-size figure (`AuthoredField`, `AuthoredValue`) and `ShrinkagePercent`. |
+| `ProductSubAssemblyUsage` | A sub-assembly in a product's recipe | Stores only the typed piece-size figure (`AuthoredField`, `AuthoredValue`). |
 | `UsageAddInLine` | A product's extra ingredient on a linked usage | Never changes the sub-assembly that the usage links. |
 | `PackagingLine` | A packaging material per sellable unit | Stores both reciprocal quantities and which one was typed (`AuthoredField`). |
 | `PackagingLink` | A product's packaging, read from another product or from a set | Exactly one target, and no loops (`PackagingLinkRules`). |
@@ -431,7 +431,7 @@ PER PRODUCT
 | `CostingParameters` | A product's five percentages | One per product. Never linked or shared. |
 | `ProductVersion` | One version in a product's history | `Number` is unique per product. `Content` is a self-contained JSON snapshot that points at nothing. Goes with the product only on a permanent delete. See [Product versions](#product-versions). |
 | `PriceScenario`, `PriceScenarioLine` | A set of Price Simulator price changes saved under a name, and one of its changes | Names are unique, ignoring case; saving under one replaces its lines (`IPriceScenarioRepository.SaveAsync`). A line stores exactly one of `ChangePercent` and `NewPrice`, whichever was typed (`PriceScenarioRules`, backed by check constraints). Deleting a raw material deletes its lines. Nothing reads a scenario to cost anything. See [The Price Simulator](#the-price-simulator). |
-| `CostingDefaults` | The stage and percentages a new product starts with, a new section's shrinkage and a new raw material's cost buffer | At most one row (Id 1). With no row, new products go in Production (`DefaultNewProductStage`), the costing reads as zero, the shrinkage as 3% (`DefaultShrinkagePercent`) and the cost buffer as 10% (`DefaultCostBufferPercent`). |
+| `CostingDefaults` | The stage and percentages a new product starts with, a new raw material's cost buffer, and the shop-wide `WastagePercent` | At most one row (Id 1). With no row, new products go in Production (`DefaultNewProductStage`), the costing reads as zero, the cost buffer as 10% (`DefaultCostBufferPercent`) and the wastage as 3% (`DefaultWastagePercent`). Unlike the rest, the wastage isn't a starting value: `SavedProductReader` stamps it on every `ProductDetail` it reads, and the Products screen keeps it from each load, so changing it reprices every product. |
 | `UnitOfMeasure`, `RawMaterialCategory` | Lookups edited in Settings | A unit's name is stored in lowercase. A category is for one type of material. |
 
 ### Deleted products
@@ -492,9 +492,9 @@ Before you change any cost path, read the user manual's [How costs are worked ou
 | A material's `CostPerBaseUnit` and `BufferedCostPerBaseUnit` | Stored | The Raw Materials Save and the brand-price repository (purchased); `IngredientCostPropagator` (made and linked) |
 | A material's `CostUpdatedAt` | Stored | `TinapayanRMSDbContext.SaveChangesAsync`, from what actually changed |
 | A sub-assembly's `TotalWeight` and `TotalCost` | Stored | `SubAssemblyLineRepository.SetLinesAsync` when its lines are saved; `SubAssemblyCostPropagator` when an ingredient's cost changes |
-| A usage's worked-out piece size, final weight and cost per piece | Computed on read | `ProductRules` |
+| A usage's worked-out piece size and cost per piece | Computed on read | `ProductRules` |
 | Packaging line and packaging set costs | Computed on read | `ProductRules` |
-| A product's material cost, base cost, selling price and markup | Computed on read | `ProductRules`, `CostingRules` |
+| A product's material cost, wastage, base cost, selling price and markup | Computed on read | `ProductRules`, `CostingRules` |
 | What a product brings into a composite | Computed on read | `SavedProductReader`, `CompositeProductRules` |
 
 ### The cascade
@@ -541,13 +541,12 @@ The cascade doesn't push changes live to other screens. A screen picks up new co
 | Linked: cost per gram | The linked-to ingredient's cost × cost share % ÷ weight share %, for both costs | `RawMaterialRules.LinkedCost` |
 | Sub-assembly totals | Σ grams; Σ (grams × the ingredient's buffered cost per gram) | `SubAssemblyRules.CalculateTotals` |
 | A usage's batch | The sub-assembly's totals plus its add-ins | `ProductRules.CalculateEffectiveBatch` |
-| Final weight | Batch weight × (1 − shrinkage %) | `ProductRules.CalculateFinalWeight` |
-| Piece size | Yield = final weight ÷ weight per piece, or weight per piece = final weight ÷ yield, depending on which was typed | `ProductRules.ResolvePieceSize` |
-| Usage cost per piece | Batch cost × weight per piece ÷ final weight | `ProductRules.CalculateUsageCostPerPiece` |
+| Piece size | Yield = batch weight ÷ weight per piece, or weight per piece = batch weight ÷ yield, depending on which was typed | `ProductRules.ResolvePieceSize` |
+| Usage cost per piece | Batch cost × weight per piece ÷ batch weight | `ProductRules.CalculateUsageCostPerPiece` |
 | Packaging line cost | Cost per base unit × the quantity in base units | `ProductRules.CalculatePackagingLineCost` |
 | Material cost per sellable unit | Σ usage costs per piece × Quantity Required, + Σ packaging | `ProductRules.CalculateMaterialCost` |
-| Labor, overhead, administrative | Each is its % of the sub-assembly cost alone, never of the packaging | `CostingRules.CalculateCostFromSubAssemblyPercent` |
-| Selling price | Base cost = sub-assemblies + packaging + labor + overhead + administrative; pre-VAT price = base cost × (1 + markup %); selling price = pre-VAT price × (1 + VAT %) | `CostingRules.CalculateSellingPrice` |
+| Wastage, labor, overhead, administrative | Each is its % of the sub-assembly cost alone, never of the packaging. The Wastage % is the shop's (`CostingDefaults.WastagePercent`); a composite's products bring their cost before theirs, so it's added once | `CostingRules.CalculateCostFromSubAssemblyPercent` |
+| Selling price | Base cost = sub-assemblies + wastage + packaging + labor + overhead + administrative; pre-VAT price = base cost × (1 + markup %); selling price = pre-VAT price × (1 + VAT %) | `CostingRules.CalculateSellingPrice` |
 | Markup at the current price | (current price ÷ (1 + VAT %) − base cost) ÷ base cost | `CostingRules.CalculateMarkupPercentFromPrice` |
 | Price to keep the markup (Price Simulator) | current price × simulated base cost ÷ base cost (VAT cancels out) | `PriceChangeRules.PriceToKeepMarkup` |
 | A composite's line | The product's recipe cost per sellable unit × quantity, plus its packaging cost when the composite includes it | `CompositeProductRules.CalculateComponentCost`, `CalculateComponentPackagingCost` |
@@ -1024,7 +1023,7 @@ The table can be saved as a **scenario** ([PriceScenario](../src/TinapayanRMS.Do
 
 - **[DatabaseFixtureBase](../tests/TinapayanRMS.Tests.Common/Fixtures/DatabaseFixtureBase.cs)** (in Tests.Common) reads the app's connection string, swaps in the project's database name, migrates the database, and resets it with Respawn.
 - **`DatabaseFixture`** and **`DatabaseCollection`** are defined in each project's own `Fixtures/` folder, because xUnit only finds a collection definition in the tests' own assembly. Each `DatabaseFixture` is one line that names its database.
-- **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`.
+- **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`. With nothing saved in Settings, every product is priced with the 3% default wastage; a test whose figures are about something else calls `WithoutWastageAsync()` (or `SetWastageAsync`) before the screen or reader reads it.
 - **[ThrowawayDatabase](../tests/TinapayanRMS.Tests.Common/Fixtures/ThrowawayDatabase.cs)** is a migrated database of one test's own on the same server (`tinapayanrms_test_backup_` and eight characters of a GUID), dropped when the test is done. The backup tests restore over it, which would put every other test out of the shared database.
 - **Every concrete test class must carry `[Collection(DatabaseCollection.Name)]`.** It's deliberately left off the base class: xUnit isn't guaranteed to honour it there, and without it tests could run in parallel against the one database.
 

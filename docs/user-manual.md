@@ -73,6 +73,12 @@ The **buffered cost** is the cost with that cushion on top. **Recipes and produc
 
 For a purchased material, the buffered cost is a **fixed amount**. A new brand price doesn't move it on its own. See [Cost buffer](#cost-buffer) for how to update it.
 
+### Wastage
+
+**Wastage %** is a cost allowance for what's lost making a product: dough left in the mixer, a filling that cooks down, a tray that burns. It's one figure for the whole shop, set in Settings → Costing Defaults (3% unless you change it there). Every product adds it to its costing as a percentage of its **sub-assemblies (ingredients) cost**: 3% of 100.00 of ingredients is 3.00 more. Packaging isn't wasted, so it's left out.
+
+Wastage is a cost, not lost weight. A batch's pieces share out the whole batch, and the wastage goes on the product's Costing tab. A composite product adds it once, on everything it holds, so its products' ingredients are never charged wastage twice.
+
 ### Sub-assemblies and roles
 
 A **sub-assembly** is one part of a recipe that's made as a batch: a dough, a filling, a topping, a glaze. It's a list of ingredients in grams.
@@ -113,18 +119,18 @@ A **composite product** is made of two or more other products, such as a *Pasalu
 - A composite is always one sellable unit, so it has no **Quantity Required**.
 - You choose whether a product is a composite when you make it. That can't change once it's saved.
 
-### Piece size: weight per piece, yield and shrinkage
+### Piece size: weight per piece and yield
 
 For each sub-assembly in a product you say how much of the batch one piece takes. Type **either** figure, and the app works out the other:
 
-- **Weight/piece (g)**: what one finished piece weighs
+- **Weight/piece (g)**: how many grams of the batch one piece takes
 - **Yield (pcs)**: how many pieces one batch makes
 
-**Shrinkage %** is weight the batch loses while it's made, such as a dough baking off or a filling reducing. The pieces come out of what's left, the **final weight**. A section you add starts at the default shrinkage in Settings → Costing Defaults, 3% unless you change it there. Set it to 0 for a section that loses nothing.
+The pieces share out the whole batch: its **total weight**, the Grams column added up. What's lost making the product is costed as [wastage](#wastage), not taken off the batch.
 
 The figure you typed stays put. If the batch changes, the other figure is worked out again.
 
-A new section in a **product-owned** role, such as a Topping or a Filling, starts at a **Yield of 1**: one piece takes the whole batch. Its Weight/piece is then the final weight, which is the total of the Grams column when the shrinkage is 0, and it follows the lines as you type them and whenever you change them later. Type a weight per piece or a yield instead if the batch makes more than one piece. A section in any other role, and any section you link, starts with no piece size.
+A new section in a **product-owned** role, such as a Topping or a Filling, starts at a **Yield of 1**: one piece takes the whole batch. Its Weight/piece is then the total of the Grams column, and it follows the lines as you type them and whenever you change them later. Type a weight per piece or a yield instead if the batch makes more than one piece. A section in any other role, and any section you link, starts with no piece size.
 
 ### Baker's % and Absolute %
 
@@ -255,7 +261,7 @@ On a new database, set things up in this order. Each step uses what the one befo
 2. **Material categories** (Settings → Material Categories): how raw materials are grouped, such as Flour, Dairy, Boxes and Ribbons. Each category is for either ingredients or packaging.
 3. **Product categories** (Settings → Product Categories): how products are grouped, such as Breads, Cakes and Pastries.
 4. **Roles** (Settings → Roles): the parts of a recipe. Dough, Filling, Topping, Inclusion, Finishing and Packaging are there from the start.
-5. **Costing defaults** (Settings → Costing Defaults): the stage a new product goes in, the labour, overhead, administrative, markup and VAT percentages that it starts with, the shrinkage a new recipe section starts with, and the cost buffer a new raw material starts with.
+5. **Costing defaults** (Settings → Costing Defaults): the stage a new product goes in, the labour, overhead, administrative, markup and VAT percentages that it starts with, the cost buffer a new raw material starts with, and the shop's wastage.
 6. **Raw materials**: every purchased ingredient and packaging material with its prices, then the made and linked ingredients.
 7. **Sub-assemblies**: the doughs, fillings and packaging sets shared by more than one product.
 8. **Products**.
@@ -292,7 +298,7 @@ Each role has:
 - **Order**: where the role's sections go in a recipe. Lower numbers come first. A new role goes last. To change a role's place, pick it in the list and press **Move Up** or **Move Down** above the list. The roles are numbered 1, 2, 3… again after a move or a delete, so there are no gaps.
 - **Product-owned**: a section made in a product in this role stays that product's own. It's edited in the product's recipe instead of on the Sub-Assemblies screen, and other products can copy it but not link it. Turning this on or off for a role that's already used asks first, and says how many sub-assemblies will move.
   - These are also the only roles a composite product can have sections in. So Product-owned can't be turned off while a composite has a section in the role; the message names the composites. Take the section out there first.
-  - A section you make in a product in this role starts at a Yield of 1, so its Weight/piece is the whole batch (see [Piece size](#piece-size-weight-per-piece-yield-and-shrinkage)).
+  - A section you make in a product in this role starts at a Yield of 1, so its Weight/piece is the whole batch (see [Piece size](#piece-size-weight-per-piece-and-yield)).
 
 The **Packaging** role is special. Sub-assemblies in it are packaging sets. It can be renamed but not deleted, and it can't be product-owned.
 
@@ -305,14 +311,14 @@ A role can't be deleted while any sub-assembly uses it.
 Under it are the five percentages a **new** product's costing starts with:
 
 - **Labor %**, **Overhead %** and **Administrative %** (office, permits, bookkeeping): each is a percentage of the product's sub-assemblies (ingredients) cost.
-- **Markup %**: added on the base cost (materials, labour, overhead and administrative).
+- **Markup %**: added on the base cost (materials, wastage, labour, overhead and administrative).
 - **VAT %**: added on top of the marked-up price.
 
-Under them, **Shrinkage %** is what a section added to a product's Recipe Structure starts with: the weight its batch loses being made. It starts at 3%. It can be anything from 0 up to, but not including, 100.
+Under them, **Wastage %** is the shop's [wastage](#wastage): a percentage of every product's sub-assemblies (ingredients) cost, added to its costing. It starts at 3%, and can be anything from 0 to 100. Unlike the other figures here, it isn't where a new product starts: **every** product is priced with it, saved ones included, so changing it changes every product's costs and suggested price.
 
 Last, **Cost Buffer %** is what a new raw material's [cost buffer](#cost-buffer) starts with on the Raw Materials screen. It starts at 10%, and can be anything from 0 to 100. It only matters for a purchased material: a linked ingredient takes the buffer of the one it's linked to, and a made ingredient has none of its own.
 
-Each product keeps its own stage and percentages, each section its own shrinkage, and each raw material its own cost buffer, from its first Save. Changing the defaults doesn't change anything saved. A new product you haven't saved yet moves to the new stage, since you didn't pick one for it. A new raw material you haven't saved moves to the new cost buffer, unless you've typed one.
+Each product keeps its own stage and percentages, and each raw material its own cost buffer, from its first Save. Changing those defaults doesn't change anything saved. Changing the Wastage % does: it reprices every product. A new product you haven't saved yet moves to the new stage, since you didn't pick one for it. A new raw material you haven't saved moves to the new cost buffer, unless you've typed one.
 
 **Stored Costs**, to the right of the defaults, has a **Recalculate Costs** button. The app keeps every made and linked ingredient's cost, and every sub-assembly's total weight and cost, up to date as you save. You only need this button if the database was changed outside the app, for example by a script. It works all of those costs out again from what they're made of, and a green notice says how many were out of date. Purchased materials keep their prices.
 
@@ -558,7 +564,7 @@ Each product's name starts with a small full-colour picture of what it is: a rou
 The header has the product's name and **New**, **Save**, **Undo**, **Redo**, **Revert**, **Print**, **Unbuffered** and **Delete**. **New** starts a product. The arrow beside it also offers **New composite product**. Below them are these figures, all **per sellable unit**:
 
 - **Material Cost**: sub-assemblies plus packaging. For a composite product, its products' recipe cost and its own sub-assemblies, plus its own packaging, and its products' packaging too when it includes theirs.
-- **Base Cost**: materials plus labour, overhead and administrative.
+- **Base Cost**: materials plus wastage, labour, overhead and administrative.
 - **Current Price**: what the shop charges now.
 - **Markup %**: what the current price actually earns on the base cost, with VAT taken out. Compare it with the markup you set on the Costing tab.
 - **Last Updated**.
@@ -602,13 +608,11 @@ Each section's tab shows its form:
 - **Existing Sub-Assembly or Packaging** picker, when you're linking or copying.
 - **The lines table**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base**. Under it are **Insert Line**, **Remove Line** and the section's cost per piece.
 - **Batch parameters**:
-  - **Total weight**: the batch that goes in, including add-ins
-  - **Shrinkage %**
-  - **Final weight**: total weight less shrinkage
   - **Weight/piece (g)** and **Yield (pcs)**: type either one
+  - **Total weight**: the batch, including add-ins, which the pieces share out
 - **Cost/piece** and **Batch cost** tiles.
 
-You don't need a piece size to add a section or to save it. Its cost per piece reads 0 until you enter one. A new or copied section in a product-owned role already has one: a Yield of 1 (see [Piece size](#piece-size-weight-per-piece-yield-and-shrinkage)).
+You don't need a piece size to add a section or to save it. Its cost per piece reads 0 until you enter one. A new or copied section in a product-owned role already has one: a Yield of 1 (see [Piece size](#piece-size-weight-per-piece-and-yield)).
 
 A section's changes go into the recipe when you leave its tab, or when you press Save.
 
@@ -675,6 +679,7 @@ Under each metric is its share of the price. VAT has a percentage box only, with
 On the right, the **Costing Summary** lists each component with its amount and its **% of Price**:
 
 - **Sub-assemblies (ingredients)**, with each sub-assembly listed under it. For a composite product this row is **Products (ingredients)**, with each product and its quantity listed under it, such as *Ensaymada × 6*. When the composite has sections of its own, the row is **Products and sub-assemblies (ingredients)** and lists them after the products. Its Labor, Overhead and Admin are a percentage of that row.
+- **Wastage**, labelled with the shop's [Wastage %](#wastage): a percentage of the row above. It's set in Settings → Costing Defaults, not here.
 - **Packaging**. For a composite product that includes its products' packaging, this row is **Packaging (own and products')**.
 - **Labor**, **Overhead** and **Administrative**, each labelled with its percentage
 - **Subtotal (base cost)**
@@ -800,9 +805,10 @@ One row for every product, as it's saved:
 - **Product**, its **Stage** (Production or Research and Development) and its **Category**.
 - **Pieces**: how many pieces make one sellable unit (1 for a product sold by the piece). Every amount after it is for one sellable unit. Blank for a composite product, which is one unit made of other products.
 - **Ingredients Cost**: the recipe's cost, the **Sub-assemblies (ingredients)** row of the product's Costing tab. For a composite product, it's what its products bring (and its own sub-assemblies).
+- **Wastage Cost**: the Costing tab's **Wastage** row, the shop's Wastage % of the ingredients cost.
 - **Packaging Cost**: the **Packaging** row of the Costing tab. For a composite product that includes its products' packaging, theirs is counted too.
 - **Labor Cost**, **Overhead Cost** and **Admin Cost**: the Costing tab's Labor, Overhead and Admin metrics in pesos, each a percentage of the ingredients cost.
-- **Base Cost** and **Suggested Price**: as the product's Costing tab works them out. The base cost is the five costs before it added up, and the suggested price is the Costing tab's **Total Selling Price**.
+- **Base Cost** and **Suggested Price**: as the product's Costing tab works them out. The base cost is the six costs before it added up, and the suggested price is the Costing tab's **Total Selling Price**.
 - **Current Price**: what the shop charges now, as entered on the product. Blank if none is entered.
 - **Markup %**: what the current price earns on the base cost, as the product's header shows it. Blank without a current price.
 
@@ -878,7 +884,7 @@ A scenario keeps what you typed. A **Change %** is applied to the price as it is
 
 The lower table shows every product for one sellable unit, at buffered costs, now and with the changes:
 
-- **Raw Material Cost** and **Simulated Raw Material Cost**, and the **Change %** between them: the ingredients and packaging, before labor, overhead and administrative. This is the Products screen's **Material Cost**.
+- **Raw Material Cost** and **Simulated Raw Material Cost**, and the **Change %** between them: the ingredients and packaging, before wastage, labor, overhead and administrative. This is the Products screen's **Material Cost**.
 - **Base Cost** and **Simulated Base Cost**, and the **Change %** between them.
 - **Suggested Price** and **Simulated Suggested Price**: the Costing tab's Total Selling Price.
 - **Current Price**: what you charge now, VAT included, as entered on **Products**. Blank when none is entered.
@@ -985,42 +991,43 @@ This happens as soon as you save. A product already open on another tab shows th
 
 ### A product's sections
 
-- Final weight = batch weight (including add-ins) × (1 − Shrinkage %).
-- Cost per piece = batch cost × weight per piece ÷ final weight. This is the same as batch cost ÷ yield.
+- Cost per piece = batch cost × weight per piece ÷ batch weight (including add-ins). This is the same as batch cost ÷ yield.
 
 ### The selling price (cost-plus)
 
 All figures below are per sellable unit.
 
 1. **Sub-assemblies** = the sum of the sections' cost per piece × Quantity Required.
-2. **Packaging** = the sum of the packaging lines. They're already per sellable unit.
-3. **Labor**, **Overhead** and **Administrative** = their percentage **of the sub-assemblies alone**. Packaging isn't included.
-4. **Base cost** = sub-assemblies + packaging + labour + overhead + administrative.
-5. **Price before VAT** = base cost × (1 + Markup %).
-6. **Selling price** = price before VAT × (1 + VAT %).
+2. **Wastage** = the shop's Wastage % (Settings → Costing Defaults) **of the sub-assemblies alone**.
+3. **Packaging** = the sum of the packaging lines. They're already per sellable unit.
+4. **Labor**, **Overhead** and **Administrative** = their percentage **of the sub-assemblies alone**. Packaging and wastage aren't included.
+5. **Base cost** = sub-assemblies + wastage + packaging + labour + overhead + administrative.
+6. **Price before VAT** = base cost × (1 + Markup %).
+7. **Selling price** = price before VAT × (1 + VAT %).
 
 **Markup % at the current price**, in the header, works backwards from the current price: (current price ÷ (1 + VAT %) − base cost) ÷ base cost.
 
 ### A worked example
 
-Say a product's sections cost **20.00** a piece, its packaging costs **2.00**, and it's sold by the piece. Its costing is Labor 25%, Overhead 10%, Administrative 5%, Markup 30% and VAT 12%.
+Say a product's sections cost **20.00** a piece, its packaging costs **2.00**, and it's sold by the piece. The shop's wastage is 3%, and the product's costing is Labor 25%, Overhead 10%, Administrative 5%, Markup 30% and VAT 12%.
 
 | Step | Working | Amount |
 |---|---|---|
 | Sub-assemblies | 20.00 × 1 | 20.00 |
+| Wastage | 3% of 20.00 | 0.60 |
 | Packaging | | 2.00 |
 | Labor | 25% of 20.00 | 5.00 |
 | Overhead | 10% of 20.00 | 2.00 |
 | Administrative | 5% of 20.00 | 1.00 |
-| **Base cost** | 20 + 2 + 5 + 2 + 1 | **30.00** |
-| Markup | 30% of 30.00 | 9.00 |
-| Price before VAT | | 39.00 |
-| VAT | 12% of 39.00 | 4.68 |
-| **Selling price** | | **43.68** |
+| **Base cost** | 20 + 0.60 + 2 + 5 + 2 + 1 | **30.60** |
+| Markup | 30% of 30.60 | 9.18 |
+| Price before VAT | | 39.78 |
+| VAT | 12% of 39.78 | 4.77 |
+| **Selling price** | | **44.55** |
 
-If the shop actually charges **45.00**, the header's Markup % is (45.00 ÷ 1.12 − 30.00) ÷ 30.00 = **33.93%**.
+If the shop actually charges **45.00**, the header's Markup % is (45.00 ÷ 1.12 − 30.60) ÷ 30.60 = **31.30%**.
 
-A **section's cost per piece**, for comparison: a 1,000 g dough costing 50.00, with 10% shrinkage, has a final weight of 900 g. At 30 g a piece it yields 30 pieces, and each piece costs 50.00 × 30 ÷ 900 = **1.6667**.
+A **section's cost per piece**, for comparison: a 1,000 g dough costing 50.00, at 30 g a piece, yields 33.33 pieces, and each piece costs 50.00 × 30 ÷ 1,000 = **1.50**.
 
 ### A composite product
 
@@ -1028,7 +1035,7 @@ A composite product is priced like any other product, with its products in place
 
 1. **Products** = the sum of its lines. Each line is its Qty × the product's recipe cost for one sellable unit, which is the **Sub-assemblies** figure on that product's own Costing tab. The products' packaging isn't included here. The composite's own sections, such as a Topping, are added at their cost per piece, since one piece is one whole composite.
 2. **Packaging** = the composite's own packaging. With **Include each product's packaging** ticked, add each line's Qty × the product's **Packaging** figure on its own Costing tab. A composite held in another brings all of its packaging this way, its products' included if it includes theirs.
-3. **Labor**, **Overhead** and **Administrative** = their percentage of step 1: its products, and its own sections if it has any.
+3. **Wastage**, **Labor**, **Overhead** and **Administrative** = their percentage of step 1: its products, and its own sections if it has any. Each product brings its recipe cost before its wastage, so the wastage is added once, here, on the whole of step 1.
 4. Then the base cost, markup, VAT and selling price, as above.
 
 For example, a *Pasalubong Box* holds 6 Ensaymada, whose recipe costs **2.50** each, and 4 Cheese Rolls at **5.00** each. It has a gift box costing **12.00**, and the same percentages as the worked example above.
@@ -1036,21 +1043,22 @@ For example, a *Pasalubong Box* holds 6 Ensaymada, whose recipe costs **2.50** e
 | Step | Working | Amount |
 |---|---|---|
 | Products | 6 × 2.50 + 4 × 5.00 | 35.00 |
+| Wastage | 3% of 35.00 | 1.05 |
 | Packaging | the gift box | 12.00 |
 | Labor | 25% of 35.00 | 8.75 |
 | Overhead | 10% of 35.00 | 3.50 |
 | Administrative | 5% of 35.00 | 1.75 |
-| **Base cost** | 35 + 12 + 8.75 + 3.50 + 1.75 | **61.00** |
-| Markup | 30% of 61.00 | 18.30 |
-| Price before VAT | | 79.30 |
-| VAT | 12% of 79.30 | 9.52 |
-| **Selling price** | | **88.82** |
+| **Base cost** | 35 + 1.05 + 12 + 8.75 + 3.50 + 1.75 | **62.05** |
+| Markup | 30% of 62.05 | 18.62 |
+| Price before VAT | | 80.67 |
+| VAT | 12% of 80.67 | 9.68 |
+| **Selling price** | | **90.34** |
 
 With the same percentages as its products and no packaging or sections of its own, a composite is priced at exactly what its products are priced at together. If its products have packaging of their own, that holds only with **Include each product's packaging** ticked.
 
-Now suppose each Ensaymada goes into the box in its own bag, costing **1.50**, and **Include each product's packaging** is ticked. Packaging becomes 12.00 + 6 × 1.50 = **21.00**. Labor, Overhead and Administrative stay at 8.75, 3.50 and 1.75, since packaging isn't part of step 1. So the base cost is 35 + 21 + 8.75 + 3.50 + 1.75 = **70.00**, the price before VAT is 70.00 × 1.30 = 91.00, and the selling price is 91.00 × 1.12 = **101.92**.
+Now suppose each Ensaymada goes into the box in its own bag, costing **1.50**, and **Include each product's packaging** is ticked. Packaging becomes 12.00 + 6 × 1.50 = **21.00**. Wastage, Labor, Overhead and Administrative stay at 1.05, 8.75, 3.50 and 1.75, since packaging isn't part of step 1. So the base cost is 35 + 1.05 + 21 + 8.75 + 3.50 + 1.75 = **71.05**, the price before VAT is 71.05 × 1.30 = 92.37, and the selling price is 92.37 × 1.12 = **103.45**.
 
-Give the same box an icing topping that costs **5.00** for one box, and step 1 becomes 35.00 + 5.00 = **40.00**. Labor, Overhead and Administrative are then taken of 40.00. A composite held in another composite brings its whole step 1, topping included.
+Give the same box an icing topping that costs **5.00** for one box, and step 1 becomes 35.00 + 5.00 = **40.00**. Wastage, Labor, Overhead and Administrative are then taken of 40.00. A composite held in another composite brings its whole step 1, topping included.
 
 ### Rounding
 

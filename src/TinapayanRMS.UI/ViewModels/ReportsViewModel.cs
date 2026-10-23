@@ -37,6 +37,9 @@ public sealed class ProductCostRow(Product product, ProductCostSummary costs)
     /// <summary>All of the packaging, the Costing tab's Packaging row: a composite's products' too when it includes theirs.</summary>
     public decimal PackagingCost => costs.Packaging;
 
+    /// <summary>The shop-wide Wastage %'s share of the ingredients cost, in pesos: the Costing tab's Wastage row.</summary>
+    public decimal WastageCost => costs.Wastage;
+
     /// <summary>The Labor Metric's percentage of the ingredients cost, in pesos.</summary>
     public decimal LaborCost => costs.Labor;
 
@@ -46,7 +49,7 @@ public sealed class ProductCostRow(Product product, ProductCostSummary costs)
     /// <summary>The Admin Metric's percentage of the ingredients cost, in pesos.</summary>
     public decimal AdministrativeCost => costs.Administrative;
 
-    /// <summary>The five costs before it added up: ingredients, packaging, labor, overhead and administrative.</summary>
+    /// <summary>The six costs before it added up: ingredients, wastage, packaging, labor, overhead and administrative.</summary>
     public decimal BaseCost => costs.BaseCost;
 
     /// <summary>The selling price the costing works out, the Costing tab's Total Selling Price: a suggestion beside <see cref="CurrentPrice"/>.</summary>

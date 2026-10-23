@@ -12,8 +12,7 @@ public sealed record PlanSection(
     IReadOnlyList<(int IngredientId, decimal Grams)> Lines,
     IReadOnlyList<(int IngredientId, decimal Grams)> AddIns,
     UsageAuthoredField AuthoredField,
-    decimal AuthoredValue,
-    decimal ShrinkagePercent);
+    decimal AuthoredValue);
 
 /// <summary>A product's recipe for one sellable unit, as the plan needs it.</summary>
 /// <param name="PackagingPerUnit">Its packaging for one sellable unit, in each material's base unit.</param>
@@ -135,13 +134,12 @@ public static class ProductionPlanRules
             foreach (var section in recipe.Sections)
             {
                 var batchWeight = section.Lines.Sum(l => l.Grams) + section.AddIns.Sum(a => a.Grams);
-                var finalWeight = ProductRules.CalculateFinalWeight(batchWeight, section.ShrinkagePercent);
-                var ratio = RecipeScalingRules.BatchRatio(pieces, section.AuthoredField, section.AuthoredValue, finalWeight);
+                var ratio = RecipeScalingRules.BatchRatio(pieces, section.AuthoredField, section.AuthoredValue, batchWeight);
                 if (ratio == 0m)
                 {
                     if (pieces > 0)
                     {
-                        issues.Add(new PlanIssue(finalWeight > 0 ? PlanIssueKind.NoPieceSize : PlanIssueKind.NoLines, productId, section.SubAssemblyId));
+                        issues.Add(new PlanIssue(batchWeight > 0 ? PlanIssueKind.NoPieceSize : PlanIssueKind.NoLines, productId, section.SubAssemblyId));
                     }
 
                     continue;

@@ -129,7 +129,8 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
             new PackagingLineRepository(factory),
             new CostingParametersRepository(factory),
             new SubAssemblyLineRepository(factory),
-            productRepository);
+            productRepository,
+            new CostingDefaultsRepository(factory));
         var product = (await productRepository.GetByIdAsync(productId, Cancellation))!;
         var content = ProductVersionSnapshot.From(product, await reader.ReadDetailAsync(productId, Cancellation));
         await new ProductVersionRepository(factory).AddAsync(productId, content, DateTime.Now, null, Cancellation);

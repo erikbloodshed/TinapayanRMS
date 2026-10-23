@@ -22,7 +22,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 "TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage",
                 typeof(ProductSubAssemblyUsage),
                 baseEntityType,
-                propertyCount: 6,
+                propertyCount: 5,
                 navigationCount: 2,
                 foreignKeyCount: 2,
                 unnamedIndexCount: 2,
@@ -67,17 +67,6 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 sentinel: 0);
             productId.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
             productId.AddAnnotation("Relational:ColumnName", "product_id");
-
-            var shrinkagePercent = runtimeEntityType.AddProperty(
-                "ShrinkagePercent",
-                typeof(decimal),
-                propertyInfo: typeof(ProductSubAssemblyUsage).GetProperty("ShrinkagePercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-                fieldInfo: typeof(ProductSubAssemblyUsage).GetField("<ShrinkagePercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-                precision: 18,
-                scale: 4,
-                sentinel: 0m);
-            shrinkagePercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
-            shrinkagePercent.AddAnnotation("Relational:ColumnName", "shrinkage_percent");
 
             var subAssemblyId = runtimeEntityType.AddProperty(
                 "SubAssemblyId",

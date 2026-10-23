@@ -23,16 +23,8 @@ public class ProductSubAssemblyUsage
 
     /// <summary>
     /// The typed figure: grams per piece, or pieces per batch. Only this is stored; the other is worked
-    /// out from the sub-assembly's final weight on read (ProductRules.ResolvePieceSize), so the
+    /// out from the batch's total weight on read (ProductRules.ResolvePieceSize), so the
     /// typed one stays put when the batch changes.
     /// </summary>
     public decimal AuthoredValue { get; set; }
-
-    /// <summary>
-    /// How much of the batch's weight this product loses making it — baking a dough off, reducing a filling.
-    /// At least 0 and less than 100, as RawMaterial.WeightLossPercent is. Pieces are cut from what's left
-    /// (ProductRules.CalculateFinalWeight), so the yield and the cost per piece both follow it. Each product
-    /// sets its own: two products can bake the same dough to different weights.
-    /// </summary>
-    public decimal ShrinkagePercent { get; set; }
 }

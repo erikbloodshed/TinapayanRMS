@@ -17,6 +17,9 @@ public sealed record ProductDetail(
 {
     /// <summary>A composite's products, in its Products table's order, each with its recipe and packaging costs as saved; none for a product made of sub-assemblies.</summary>
     public IReadOnlyList<SavedComponent> Components { get; init; } = [];
+
+    /// <summary>The shop-wide Wastage % it's priced with (CostingDefaults.WastagePercent): today's, or a version's then.</summary>
+    public decimal WastagePercent { get; init; }
 }
 
 /// <summary>
@@ -104,11 +107,12 @@ public sealed class SavedProductReader(
     IPackagingLineRepository packagingLineRepository,
     ICostingParametersRepository costingParametersRepository,
     ISubAssemblyLineRepository subAssemblyLineRepository,
-    IProductRepository productRepository)
+    IProductRepository productRepository,
+    ICostingDefaultsRepository costingDefaultsRepository)
 {
     /// <summary>
     /// The product's saved detail: its packaging link and lines, its recipe with its sections' lines and add-ins, a
-    /// composite's products with their recipe costs, and its costing.
+    /// composite's products with their recipe costs, its costing, and the shop-wide wastage it's priced with.
     /// </summary>
     public async Task<ProductDetail> ReadDetailAsync(int productId, CancellationToken cancellationToken) =>
         (await ReadDetailsAsync([productId], cancellationToken))[productId];
@@ -145,7 +149,9 @@ public sealed class SavedProductReader(
         var addInsRead = usageRepository.GetAddInsForProductsAsync(ids, cancellationToken);
         var usagesRead = usageRepository.GetForProductsAsync(ids, cancellationToken);
         var sectionLinesRead = ReadSectionLinesAsync(usagesRead, cancellationToken);
-        await Task.WhenAll(linksRead, packagingRead, costingsRead, addInsRead, usagesRead, sectionLinesRead);
+        var defaultsRead = costingDefaultsRepository.GetAsync(cancellationToken);
+        await Task.WhenAll(linksRead, packagingRead, costingsRead, addInsRead, usagesRead, sectionLinesRead, defaultsRead);
+        var wastagePercent = (await defaultsRead).WastagePercent;
 
         var linksByProduct = (await linksRead).ToDictionary(l => l.ProductId);
         var packagingByProduct = await packagingRead;
@@ -184,6 +190,7 @@ public sealed class SavedProductReader(
                 [.. productUsages.Select(u => u.SubAssemblyId).Distinct().SelectMany(id => sectionLinesBySubAssembly[id])],
                 [.. addInsByProduct[productId]])
             {
+                WastagePercent = wastagePercent,
                 Components =
                 [
                     .. componentsByHolder.GetValueOrDefault(productId, [])
@@ -371,7 +378,8 @@ public sealed class SavedProductReader(
             product.CurrentPrice,
             product.IsComposite,
             product.IsComposite && sections.Count > 0,
-            product.IncludesComponentPackaging ? detail.Components.Sum(c => c.PackagingCostAt(basis)) : null);
+            product.IncludesComponentPackaging ? detail.Components.Sum(c => c.PackagingCostAt(basis)) : null,
+            detail.WastagePercent);
 
         return new SavedProduct(
             product,

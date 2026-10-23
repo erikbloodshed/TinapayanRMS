@@ -102,8 +102,8 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
         // A new sub-assembly has no id yet: a negative stand-in keeps it distinct from every other.
         ProductRules.EnsureValidUsages(
         [
-            .. recipe.New.Select((n, i) => (n.Id > 0 ? n.Id : -(i + 1), n.AuthoredValue, n.ShrinkagePercent)),
-            .. recipe.Linked.Select(l => (l.SubAssemblyId, l.AuthoredValue, l.ShrinkagePercent)),
+            .. recipe.New.Select((n, i) => (n.Id > 0 ? n.Id : -(i + 1), n.AuthoredValue)),
+            .. recipe.Linked.Select(l => (l.SubAssemblyId, l.AuthoredValue)),
         ]);
 
         // Read in the caller's transaction, so a product added or renamed by the same save is named as it now is.
@@ -264,7 +264,6 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 SubAssemblyId = subAssembly.Id,
                 AuthoredField = section.AuthoredField,
                 AuthoredValue = section.AuthoredValue,
-                ShrinkagePercent = section.ShrinkagePercent,
             });
         }
 
@@ -288,7 +287,6 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 SubAssemblyId = l.SubAssemblyId,
                 AuthoredField = l.AuthoredField,
                 AuthoredValue = l.AuthoredValue,
-                ShrinkagePercent = l.ShrinkagePercent,
             })),
         ];
 

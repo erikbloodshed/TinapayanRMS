@@ -64,15 +64,17 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("overhead_percent");
 
-                    b.Property<decimal>("ShrinkagePercent")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("shrinkage_percent");
-
                     b.Property<decimal>("VatPercent")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("vat_percent");
+
+                    b.Property<decimal>("WastagePercent")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasDefaultValue(3m)
+                        .HasColumnName("wastage_percent");
 
                     b.HasKey("Id")
                         .HasName("pk_costing_defaults");
@@ -81,9 +83,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("CK_CostingDefaults_CostBufferPercent", "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");
 
-                            t.HasCheckConstraint("CK_CostingDefaults_ShrinkagePercent", "shrinkage_percent >= 0 AND shrinkage_percent < 100");
-
                             t.HasCheckConstraint("CK_CostingDefaults_SingleRow", "id = 1");
+
+                            t.HasCheckConstraint("CK_CostingDefaults_WastagePercent", "wastage_percent >= 0 AND wastage_percent <= 100");
                         });
                 });
 
@@ -522,11 +524,6 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("product_id");
 
-                    b.Property<decimal>("ShrinkagePercent")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("shrinkage_percent");
-
                     b.Property<int>("SubAssemblyId")
                         .HasColumnType("integer")
                         .HasColumnName("sub_assembly_id");
@@ -544,8 +541,6 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.ToTable("product_sub_assembly_usages", null, t =>
                         {
                             t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "authored_value >= 0");
-
-                            t.HasCheckConstraint("CK_ProductSubAssemblyUsages_ShrinkagePercent", "shrinkage_percent >= 0 AND shrinkage_percent < 100");
                         });
                 });
 

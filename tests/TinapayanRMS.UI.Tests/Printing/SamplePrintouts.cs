@@ -29,8 +29,6 @@ internal static class SamplePrintouts
                 TotalWeight: 100m * lineCount,
                 TotalPercent: 10m * lineCount,
                 BatchCost: 5m * lineCount,
-                ShrinkagePercent: 10m,
-                FinalWeight: 90m * lineCount,
                 WeightPerPiece: 60m,
                 Yield: 1.5m * lineCount,
                 CostPerPiece: 2.5m,

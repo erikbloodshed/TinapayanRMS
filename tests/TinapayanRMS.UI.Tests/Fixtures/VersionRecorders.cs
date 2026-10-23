@@ -18,7 +18,8 @@ public static class VersionRecorders
                 new PackagingLineRepository(factory),
                 new CostingParametersRepository(factory),
                 new SubAssemblyLineRepository(factory),
-                productRepository),
+                productRepository,
+                new CostingDefaultsRepository(factory)),
             productRepository,
             new ProductVersionRepository(factory));
     }

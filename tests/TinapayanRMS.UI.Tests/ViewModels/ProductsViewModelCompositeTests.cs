@@ -145,7 +145,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
     [Fact]
     public async Task A_topping_over_the_whole_composite_adds_to_its_recipe_cost_on_a_tab_after_its_Products()
     {
-        await WithoutDefaultShrinkageAsync();
+        await WithoutWastageAsync();
         var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
         var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 3, isProductOwned: true);
         var icingId = await AddIngredientAsync("Icing", costPerGram: 0.1m);

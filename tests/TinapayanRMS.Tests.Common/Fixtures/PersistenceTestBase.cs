@@ -138,11 +138,15 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
     }
 
     /// <summary>
-    /// Settings' default shrinkage set to none, so a section added through the Products form makes its whole batch into
-    /// pieces, as a test's figures assume. Call it before the screen loads, which is when it reads the default.
+    /// Settings' shop-wide Wastage % set to <paramref name="wastagePercent"/>, which every product is priced with: 3% until
+    /// something is saved. The other defaults are left as a database with nothing saved has them. Set it before the screen
+    /// or reader that prices a product reads it.
     /// </summary>
-    protected Task WithoutDefaultShrinkageAsync() =>
-        new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(new CostingDefaults { ShrinkagePercent = 0m }, Cancellation);
+    protected Task SetWastageAsync(decimal wastagePercent) =>
+        new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(new CostingDefaults { WastagePercent = wastagePercent }, Cancellation);
+
+    /// <summary>No wastage on any product, as a test's figures assume when they're about something else.</summary>
+    protected Task WithoutWastageAsync() => SetWastageAsync(0m);
 
     /// <summary>A role for a test's sub-assemblies; <paramref name="isPackaging"/> makes it the role packaging sets go in.</summary>
     protected async Task<int> AddRoleAsync(string name, int sortOrder = 1, bool isPackaging = false, bool isProductOwned = false)
