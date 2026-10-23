@@ -21,4 +21,4 @@ dotnet test --solution TinapayanRMS.slnx
 dotnet run --project src/TinapayanRMS.UI
 ```
 
-Running the app needs the `SYNCFUSION_LICENSE_KEY` user environment variable set to a Syncfusion licence key.
+Building the app needs the `SYNCFUSION_LICENSE_KEY` user environment variable set to a Syncfusion licence key. The build compiles the key in, so the built app runs without the variable.

@@ -48,4 +48,15 @@
     <Resource Include="Assets\Icons\**\*.png;Assets\Icons\**\*.ico" />
   </ItemGroup>
 
+  <!-- The Syncfusion licence key, taken from the SYNCFUSION_LICENSE_KEY environment variable when the app is built, so
+       the installed app doesn't need the variable. App reads it back with the AssemblyMetadata key. -->
+  <ItemGroup Condition="'$(SYNCFUSION_LICENSE_KEY)' != ''">
+    <AssemblyMetadata Include="SyncfusionLicenseKey" Value="$(SYNCFUSION_LICENSE_KEY)" />
+  </ItemGroup>
+
+  <!-- A publish without the key would make an app that can't start. -->
+  <Target Name="RequireSyncfusionLicenseKey" BeforeTargets="PrepareForPublish" Condition="'$(SYNCFUSION_LICENSE_KEY)' == ''">
+    <Error Text="Set the SYNCFUSION_LICENSE_KEY environment variable before publishing. The key is compiled into the app." />
+  </Target>
+
 </Project>

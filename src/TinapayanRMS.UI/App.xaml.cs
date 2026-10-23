@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -61,8 +62,12 @@ public partial class App : Application
 
         try
         {
-            var licenseKey = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY")
-                ?? throw new InvalidOperationException("The SYNCFUSION_LICENSE_KEY environment variable is not set.");
+            // The build compiles the key in (see the UI project), so an installed app needs no environment variable.
+            var licenseKey = typeof(App).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                    .FirstOrDefault(a => a.Key == "SyncfusionLicenseKey")?.Value
+                ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY")
+                ?? throw new InvalidOperationException(
+                    "No Syncfusion licence key: it wasn't built into the app, and SYNCFUSION_LICENSE_KEY isn't set.");
 
             SyncfusionLicenseProvider.RegisterLicense(licenseKey);
         }
