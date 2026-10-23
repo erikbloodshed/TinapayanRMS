@@ -215,6 +215,19 @@ While a picker's list is open, **Ctrl+N** and **Ctrl+P** move down and up it, li
 - **r**: rename the list row, as the row's menu does.
 - **u**: undo. **Ctrl+R**: redo.
 
+**Working out a sum while you type**
+
+While you're typing in a table cell or a field (INSERT), press **Ctrl+R**, then **=**. A bar opens at the bottom of the window with an **=** in it. Type a sum and press **Enter**, and the answer goes into the cell, as if you'd typed it. For example, **5*(2+3)** types **25**.
+
+- Use **+** and **-**, **\*** to multiply, **/** to divide, **%** for the remainder, and brackets. Use a dot for decimals, as in **1.5**. Commas in figures such as **1,250** are fine.
+- Division keeps the decimals: **7/2** is 3.5.
+- The answer goes in where the cursor is, over any selected text, like typing does. When you click a cell, its whole value is selected, so the answer replaces it.
+- In a number cell or box, the answer is rounded to the number of decimals that cell or box takes. **20/3** in a cell that takes 2 decimals types 6.67.
+- **Ctrl+V** pastes into the sum, and **Backspace** takes the last character off it.
+- If the sum can't be worked out, for example **5*(2+3** with its closing bracket missing, the bar says why and stays open, so you can fix it. **Esc** closes the bar and leaves the cell as it was. Clicking anywhere closes it too.
+- After Tab or Enter has taken you to the next cell, Ctrl+R = works there too, and the answer starts that cell's typing.
+- Only the answer is kept, not the sum.
+
 **Commands**
 
 Type **:**, then a command, then **Enter**. A bar opens at the bottom of the window for it, and Esc closes it. Enter closes it too and runs the command. If the command can't run, for example **:w** when there's nothing to save, the bar says why. That message goes away at your next key or click, or after a few seconds.

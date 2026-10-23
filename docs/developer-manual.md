@@ -874,6 +874,11 @@ Undo and redo follow the Memento pattern:
   So `gg`, `G`, and `j`/`k` from a hidden row pick their row by replacing `SelectedItems`: clear it, then add the row, as the screens' `SelectedTreeNode` setters do.
 - **Windows** take part through `IVimHost`, which `MainWindow` and `SettingsWindow` implement. It provides `gt`/`gT` (`VimTabs.Step`), Back and Forward, the screens the command line names, and Settings.
 - **The command line** (`:`) is parsed by `VimCommandLine` and run by `VimCommands`. A command runs on the screen found by walking `DataContext` up from the keyboard, through `IRecordScreen` (New, Save, Delete, `OpenByName`) and `IRevertScreen`. It goes through `ICommand.Execute`, as a button does, so its errors end up where they always do. Enter always closes the line first. A parse error, or the reason `VimCommands.Run` returns, then shows in the same bar as a message with no box (`VimOverlay.ShowMessage`), which the next key, click or a 5-second timer puts away.
+- **The expression register** (Ctrl+R then `=` in Insert, as Vim's) types the answer to a sum into the box the keyboard is in.
+  - Ctrl+R in Insert sets `_awaitingRegister`, shown as `"` in the indicator, as Vim shows it. The next character names the register: `=` opens the expression line (`VimOverlay.ShowExpressionLine`), and any other character is dropped. A key that types nothing (an arrow, Enter, Tab) cancels the wait and does what it does. Ctrl+R in Normal is still redo.
+  - The keyboard never leaves the cell. Moving focus to a box in the bar would end the cell's edit (`GridEditCommit.CommitWhenFocusLeaves`) and lose the caret. So the overlay captures keys as the hints do (`Capturing`, `TakeKey`, `TakeText`), and the bar draws the sum as text. Space comes through `TakeKey`, because `DoubleTextBox` handles Space on key-down, so no text input follows it. Every other key is taken and ignored, so an arrow or Tab can't move the cell from under the sum.
+  - `VimExpression.Evaluate` is a recursive-descent parser over `decimal` (`+ - * / %`, brackets, unary signs, comma-grouped thousands). Division is decimal, unlike Vim's whole-number division. A sum it can't work out keeps the line open with the reason after it.
+  - `VimKeys.TypeAnswer` types the answer a character at a time through `TextCompositionManager.StartComposition`, with `_raising` set. So a number box applies its own mask, limits and decimals, and `GridUndoSteps` sees an ordinary edit. The answer is first rounded (half away from zero) to the decimals the box takes (`DecimalsTaken`: `MaximumNumberDecimalDigits`, which `NumericEditRenderer` sets for a `TypedDecimalDigits` column, else `NumberDecimalDigits`), since the mask would otherwise cut it short. A grid in Insert between cells has no editor yet, so its current cell's edit is begun first (which `GridCellEditing` can still refuse), and the answer is typed once the editor has the keyboard.
 - **Overlays.** `VimOverlay` is one adorner per window, on the content's adorner layer. It holds:
   - the hint labels (`HintTargets`, `HintLabels`), all drawn in a single `OnRender`;
   - the command bar;
@@ -883,7 +888,7 @@ Undo and redo follow the Memento pattern:
 - **To add a key**, add a `VimKeyBinding` to `VimKeymap` (keys, action, contexts, description). Then handle its `VimAction` in `VimKeys.Perform`, or in the `In*` method for its place. The cheat sheet picks it up.
 - **Slow keys.** Debug builds log any key the layer takes more than 4 ms to handle (`The Vim key … took … ms`). Most of that time is the screen's own response, such as a picked row loading its form.
 - **Tests** are in `UI.Tests/Vim/`.
-  - The parser, keymap, command line and labels are tested without WPF.
+  - The parser, keymap, command line, expression evaluator (`VimExpressionTests`) and labels are tested without WPF.
   - `VimKeysGridTests` raises text input and key presses on a real off-screen grid.
   - `VimKeysPickerTests` checks a hint reaches a real off-screen picker, including one a Shift+Tab has left unfocusable.
   - These tests switch the static `VimKeys.State` on and off, so they run in `OffscreenGridCollection`.
