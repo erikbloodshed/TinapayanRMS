@@ -167,22 +167,39 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Products" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Products" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                        <!-- While the figures are unbuffered, so none is taken for the usual, buffered one, as on Products -->
+                        <Border Style="{StaticResource LinkedBadgeStyle}"
+                                ToolTip="Every figure in this table, the report and the export is at the materials' true costs, without their cost buffers. Buffered switches back."
+                                Visibility="{Binding IsUnbuffered, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="Unbuffered costs" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
+                        </Border>
+                    </StackPanel>
                     <!-- Syncfusion has no check box of its own outside its grids and ribbon; the Keyboard tab uses WPF's too -->
                     <CheckBox Grid.Column="1"
                               Content="Only affected products"
                               IsChecked="{Binding OnlyAffected, Mode=TwoWay}"
                               VerticalAlignment="Center"
                               Margin="0,0,12,0" />
+                    <!-- Named for the costs it switches to: Unbuffered, then Buffered. The badge beside the heading says which show. -->
                     <syncfusion:ButtonAdv Grid.Column="2"
+                                          Label="{Binding CostBasisButtonLabel}"
+                                          IconTemplate="{StaticResource CalculateIconTemplate}"
+                                          Command="{Binding ToggleCostBasisCommand}"
+                                          ToolTip="{Binding CostBasisButtonTooltip}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,8,0" />
+                    <syncfusion:ButtonAdv Grid.Column="3"
                                           Label="Print Report"
                                           IconTemplate="{StaticResource PrintIconTemplate}"
                                           Command="{Binding PrintCommand}"
                                           ToolTip="Previews and prints each product's recipe and costing with the price changes, beside today's: the products picked in the table, or every product it shows."
                                           VerticalAlignment="Center"
                                           Margin="0,0,8,0" />
-                    <syncfusion:ButtonAdv Grid.Column="3"
+                    <syncfusion:ButtonAdv Grid.Column="4"
                                           Label="Export to Excel"
                                           IconTemplate="{StaticResource ExportIconTemplate}"
                                           Command="{Binding ExportCommand}"
@@ -192,7 +209,7 @@
                 <TextBlock DockPanel.Dock="Top"
                            Style="{StaticResource CaptionStyle}"
                            Margin="0,0,0,12"
-                           Text="Every product for one sellable unit, now and with the price changes, at buffered costs. A change reaches made and linked ingredients as a real one would, and moves a material's cost and buffered cost by the same amount. Markup % is what the product's current price earns, and Price to Keep Markup the price that earns today's markup with the changes. Double-click a product to open it. Click a product, or several with Ctrl or Shift held, for Print Report to print only those." />
+                           Text="Every product for one sellable unit, now and with the price changes, at buffered costs; Unbuffered shows them at the materials' true costs instead, and Print Report and Export to Excel follow. A change reaches made and linked ingredients as a real one would, and moves a material's cost and buffered cost by the same amount. Markup % is what the product's current price earns, and Price to Keep Markup the price that earns today's markup with the changes. Double-click a product to open it. Click a product, or several with Ctrl or Shift held, for Print Report to print only those." />
                 <syncfusion:SfDataGrid x:Name="ProductsGrid"
                                        ItemsSource="{Binding Products}"
                                        CellDoubleTapped="Products_CellDoubleTapped"

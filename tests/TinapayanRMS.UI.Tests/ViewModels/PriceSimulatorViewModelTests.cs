@@ -376,6 +376,64 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
     }
 
     [Fact]
+    public async Task Unbuffered_prices_every_figure_and_the_report_at_true_costs_and_Buffered_switches_back()
+    {
+        var bakery = await AddBakeryAsync();
+        await SetPriceAsync(bakery.FlourId, null, 0.05m);
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.RawMaterials.Single(m => m.Id == bakery.FlourId).BufferedCostPerBaseUnit = 0.06m;
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var viewModel = await CreateLoadedViewModelAsync();
+        AddChange(viewModel, bakery.FlourId, percent: 10m);
+        await WaitUntilSettledAsync(() => Row(viewModel, bakery.PandesalId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+        var buffered = Row(viewModel, bakery.PandesalId)!;
+        viewModel.CostBasisButtonLabel.Should().Be("Unbuffered");
+        viewModel.IsUnbuffered.Should().BeFalse();
+
+        await viewModel.ToggleCostBasisCommand.Execute();
+
+        viewModel.IsUnbuffered.Should().BeTrue();
+        viewModel.CostBasisButtonLabel.Should().Be("Buffered");
+        await WaitUntilSettledAsync(() => !ReferenceEquals(Row(viewModel, bakery.PandesalId), buffered), () => "still buffered");
+        var unbuffered = Row(viewModel, bakery.PandesalId)!;
+        unbuffered.RawMaterialCost.Should().BeApproximately(buffered.RawMaterialCost * 0.05m / 0.06m, 0.0000001m, "flour at 0.05 a gram, not its buffered 0.06");
+        unbuffered.BaseCost.Should().BeApproximately(buffered.BaseCost * 0.05m / 0.06m, 0.0000001m);
+        unbuffered.SimulatedBaseCost.Should().BeApproximately(unbuffered.BaseCost * 1.1m, 0.0000001m, "the change moves the true cost by the same 10%");
+        Row(viewModel, bakery.MeringueId)!.BaseCost.Should().Be(Row(viewModel, bakery.MeringueId)!.SimulatedBaseCost, "no change reaches it");
+
+        var pandesal = viewModel.PrintChoices(DateTime.Now).Single().Set.Products.Single(p => p.ProductName == "Pandesal");
+        pandesal.CostBasis.Should().Be(CostBasis.Unbuffered, "the page says it's unbuffered");
+        pandesal.Costs.BaseCost.Should().Be(unbuffered.SimulatedBaseCost);
+        pandesal.Simulation!.Now.BaseCost.Should().Be(unbuffered.BaseCost);
+
+        await viewModel.ToggleCostBasisCommand.Execute();
+
+        await WaitUntilSettledAsync(() => Row(viewModel, bakery.PandesalId)?.BaseCost == buffered.BaseCost, () => "still unbuffered");
+        Row(viewModel, bakery.PandesalId)!.SimulatedBaseCost.Should().Be(buffered.SimulatedBaseCost);
+        viewModel.HasUnsavedChanges.Should().BeTrue("the switch is no change to the scenario");
+    }
+
+    [Fact]
+    public async Task Export_while_unbuffered_suggests_a_workbook_that_says_so()
+    {
+        var viewModel = CreateViewModel();
+        string? asked = null;
+        viewModel.ExportToExcel.RegisterHandler(interaction =>
+        {
+            asked = interaction.Input;
+            interaction.SetOutput(null);
+        });
+
+        await viewModel.ToggleCostBasisCommand.Execute();
+        await viewModel.ExportCommand.Execute();
+
+        asked.Should().Be("Price Simulator (Unbuffered)");
+    }
+
+    [Fact]
     public async Task A_double_clicked_product_asks_to_be_opened()
     {
         var viewModel = CreateViewModel();

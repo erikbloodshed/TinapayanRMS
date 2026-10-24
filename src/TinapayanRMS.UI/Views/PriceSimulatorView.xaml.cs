@@ -30,8 +30,12 @@ public partial class PriceSimulatorView : UserControl
             interaction.SetOutput(TextPromptWindow.Prompt(request.Title, request.Label, request.InitialValue, Window.GetWindow(this), request.Message));
         });
 
-        // The products as the table shows them, and the changes that made them.
-        viewModel.RegisterExcelExport(this, _ => [new ExcelSheet("Products", ProductsGrid), new ExcelSheet("Price Changes", ChangesGrid)]);
+        // The products as the table shows them, and the changes that made them. The sheet says when the figures are unbuffered.
+        viewModel.RegisterExcelExport(this, _ =>
+        [
+            new ExcelSheet(viewModel.IsUnbuffered ? "Products (Unbuffered)" : "Products", ProductsGrid),
+            new ExcelSheet("Price Changes", ChangesGrid),
+        ]);
 
         // The report prints the products as the table shows them: its column filters applied, in its sort order.
         viewModel.ShownProducts = () => ProductsGrid.View is { } view

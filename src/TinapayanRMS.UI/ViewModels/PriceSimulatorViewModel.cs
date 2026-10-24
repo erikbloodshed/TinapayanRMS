@@ -98,8 +98,45 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     /// The last recalculation's products at the simulated prices, by id, and the changes it tried, each with the materials it
     /// reaches: what the report prints, so it always matches the table, even while a refused change waits to be put right.
     /// </summary>
+    private IReadOnlyDictionary<int, SavedProduct> _now = new Dictionary<int, SavedProduct>();
     private Dictionary<int, SavedProduct> _simulated = [];
     private IReadOnlyList<(PrintedPriceChange Change, IReadOnlySet<int> Reaches)> _tried = [];
+
+    private CostBasis _costBasis;
+    /// <summary>
+    /// Which of the materials' costs every figure is at (2026-10-24, at the user's request): buffered, as always, until the
+    /// Products card's Unbuffered button (<see cref="ToggleCostBasisCommand"/>) switches to their true costs, as the Products
+    /// screen's does. The table, Print Report and Export to Excel all follow it. For the session only: nothing is saved, and
+    /// it isn't part of a scenario.
+    /// </summary>
+    public CostBasis CostBasis
+    {
+        get => _costBasis;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _costBasis, value);
+            this.RaisePropertyChanged(nameof(IsUnbuffered));
+            this.RaisePropertyChanged(nameof(CostBasisButtonLabel));
+            this.RaisePropertyChanged(nameof(CostBasisButtonTooltip));
+        }
+    }
+
+    /// <summary>The figures are at the materials' true costs: the Products card's badge says so.</summary>
+    public bool IsUnbuffered => CostBasis == CostBasis.Unbuffered;
+
+    /// <summary>The switch, named for the costs a click switches to, as on Products: "Unbuffered", then "Buffered".</summary>
+    public string CostBasisButtonLabel => IsUnbuffered ? "Buffered" : "Unbuffered";
+
+    /// <summary>What the switch does from here.</summary>
+    public string CostBasisButtonTooltip => IsUnbuffered
+        ? "Shows every product's figures, now and simulated, at the materials' buffered costs again, as Print Report and Export to Excel will. Nothing is saved."
+        : "Shows every product's figures, now and simulated, at the materials' true costs, without their cost buffers, as Print Report and Export to Excel will. Nothing is saved.";
+
+    /// <summary>Unbuffered or Buffered, pressed: every product is priced again at the other of the materials' costs, from what's already read.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ToggleCostBasisCommand { get; }
+
+    /// <summary>The workbook Export to Excel suggests: "Price Simulator", with " (Unbuffered)" while the figures are.</summary>
+    public string ExportTitleNow => IsUnbuffered ? $"{ExportTitle} (Unbuffered)" : ExportTitle;
 
     /// <summary>The price changes being tried, as typed in the table.</summary>
     public ObservableCollection<SimulatedPriceChange> Changes { get; } = [];
@@ -267,7 +304,12 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         DeleteScenarioCommand = ReactiveCommand.CreateFromTask(
             () => RunWithConfirmationAsync($"Delete the scenario {_selectedScenario!.Name}? The price changes stay in the table.", DeleteScenarioAsync),
             this.WhenAnyValue(x => x.SelectedScenario).Select(scenario => scenario is not null));
-        ExportCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(ExportTitle));
+        ExportCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(ExportTitleNow));
+        ToggleCostBasisCommand = ReactiveCommand.Create(() =>
+        {
+            CostBasis = IsUnbuffered ? CostBasis.Buffered : CostBasis.Unbuffered;
+            Recalculate();
+        });
         PrintCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () => await ShowPrint.Handle(PrintChoices(DateTime.Now))));
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
 
@@ -287,6 +329,8 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         }
 
         // Read on the UI thread, since the rows are the table's; the pricing runs off it.
+        var basis = CostBasis;
+        var now = data.NowAt(basis);
         List<(SimulatedPriceChange Change, (int MaterialId, decimal Cost, decimal BufferedCost) Costs)> tried =
         [
             .. Changes.Select(change => (Change: change, Costs: change.NewCosts())).Where(t => t.Costs is not null).Select(t => (t.Change, t.Costs!.Value)),
@@ -304,10 +348,10 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
                 foreach (var product in data.Products)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    simulatedById[product.Id] = SavedProductReader.Build(product, details[product.Id], CostBasis.Buffered, repriced);
+                    simulatedById[product.Id] = SavedProductReader.Build(product, details[product.Id], basis, repriced);
                 }
 
-                IReadOnlyList<PriceSimulatorProductRow> rows = [.. data.Products.Select(p => new PriceSimulatorProductRow(p, data.Now[p.Id].Costs, simulatedById[p.Id].Costs))];
+                IReadOnlyList<PriceSimulatorProductRow> rows = [.. data.Products.Select(p => new PriceSimulatorProductRow(p, now[p.Id].Costs, simulatedById[p.Id].Costs))];
                 List<IReadOnlySet<int>> reaches = [.. newCosts.Select(c => IngredientCostRules.ReachedBy(data.Materials.Values, data.BomLines, c.MaterialId))];
                 return (rows, simulatedById, reaches);
             },
@@ -317,6 +361,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         // newer figures nor, by finishing, clear the error the newer one showed.
         cancellationToken.ThrowIfCancellationRequested();
         _allRows = rows;
+        _now = now;
         _simulated = simulatedById;
         _tried = [.. printed.Zip(reaches)];
         ShowRows();
@@ -513,7 +558,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
             {
                 var materialIds = PriceSimulatorReport.MaterialIdsOf(row.ProductId, data.Details);
                 IReadOnlyList<PrintedPriceChange> reaching = [.. _tried.Where(t => t.Reaches.Overlaps(materialIds)).Select(t => t.Change)];
-                printouts.Add(PriceSimulatorReport.Printout(data.Now[row.ProductId], _simulated[row.ProductId], reaching, printedAt));
+                printouts.Add(PriceSimulatorReport.Printout(_now[row.ProductId], _simulated[row.ProductId], reaching, printedAt));
             }
         }
 
@@ -540,6 +585,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
             products,
             details,
             products.ToDictionary(p => p.Id, p => SavedProductReader.Build(p, details[p.Id], CostBasis.Buffered)),
+            products.ToDictionary(p => p.Id, p => SavedProductReader.Build(p, details[p.Id], CostBasis.Unbuffered)),
             (await materialsRead).ToDictionary(m => m.Id),
             [.. await bomLinesRead],
             (await pricesRead).ToLookup(p => p.RawMaterialId),
@@ -586,14 +632,20 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         _productOpenRequests.Dispose();
     }
 
+    /// <summary>What everything is worked out from. Each product is priced as saved at both bases once, so a switch reads nothing again.</summary>
     private sealed record Data(
         IReadOnlyList<Product> Products,
         IReadOnlyDictionary<int, ProductDetail> Details,
-        IReadOnlyDictionary<int, SavedProduct> Now,
+        IReadOnlyDictionary<int, SavedProduct> NowBuffered,
+        IReadOnlyDictionary<int, SavedProduct> NowUnbuffered,
         IReadOnlyDictionary<int, RawMaterial> Materials,
         IReadOnlyList<IngredientBomLine> BomLines,
         ILookup<int, RawMaterialBrandPrice> Prices,
-        IReadOnlyList<PriceScenario> Scenarios);
+        IReadOnlyList<PriceScenario> Scenarios)
+    {
+        /// <summary>Every product as saved, priced at <paramref name="basis"/>.</summary>
+        public IReadOnlyDictionary<int, SavedProduct> NowAt(CostBasis basis) => basis == CostBasis.Unbuffered ? NowUnbuffered : NowBuffered;
+    }
 
     /// <summary>A scenario line's material and what was typed for it, compared by value: what makes two tables the same.</summary>
     private readonly record struct ScenarioLineKey(int MaterialId, decimal? ChangePercent, decimal? NewPrice)

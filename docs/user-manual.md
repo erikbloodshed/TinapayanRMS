@@ -69,7 +69,7 @@ Every ingredient has a **source**, which is set when it's created and can't be c
 
 A **cost buffer %** is a cushion on top of what a purchased material really costs. It covers price swings, waste and variation in yield.
 
-The **buffered cost** is the cost with that cushion on top. **Recipes and products are always costed at buffered costs.** To see what a product costs without the cushion, press **Unbuffered** in the Products header (see [The header](#the-header-1)).
+The **buffered cost** is the cost with that cushion on top. **Recipes and products are always costed at buffered costs.** To see what a product costs without the cushion, press **Unbuffered** in the Products header (see [The header](#the-header-1)), or on the Price Simulator (see [Buffered and unbuffered costs](#buffered-and-unbuffered-costs)).
 
 For a purchased material, the buffered cost is a **fixed amount**. A new brand price doesn't move it on its own. See [Cost buffer](#cost-buffer) for how to update it.
 
@@ -884,7 +884,7 @@ A scenario keeps what you typed. A **Change %** is applied to the price as it is
 
 ### Products
 
-The lower table shows every product for one sellable unit, at buffered costs, now and with the changes:
+The lower table shows every product for one sellable unit, at buffered costs, now and with the changes. To see them at the materials' true costs, without their cost buffers, see [Buffered and unbuffered costs](#buffered-and-unbuffered-costs) below.
 
 - **Raw Material Cost** and **Simulated Raw Material Cost**, and the **Change %** between them: the ingredients and packaging, before wastage, labor, overhead and administrative. This is the Products screen's **Material Cost**.
 - **Base Cost** and **Simulated Base Cost**, and the **Change %** between them.
@@ -896,6 +896,14 @@ The lower table shows every product for one sellable unit, at buffered costs, no
 A composite product moves with the products it holds. Tick **Only affected products** to hide the products no change reaches. Sort by **Simulated Markup %** to see which products would earn the least. Filter by product or category from the funnel in its heading, and double-click a product to open it.
 
 **Export to Excel** saves the products as the table shows them, and the price changes, on two sheets of one workbook.
+
+### Buffered and unbuffered costs
+
+The figures start at the materials' buffered costs, as everywhere else in the app. **Unbuffered**, at the top of the **Products** table, switches every figure, now and simulated, to the materials' true costs. An **Unbuffered costs** badge then appears next to the **Products** heading, and the button reads **Buffered**, which switches back. It works the same way as the **Unbuffered** button on the Products screen.
+
+- A price change moves a material's true cost and its buffered cost by the same percent, so a 10% rise in flour is a 10% rise either way.
+- **Print Report** and **Export to Excel** follow the switch. Each page of an unbuffered report says **Unbuffered costs**. The workbook is named **Price Simulator (Unbuffered)**, with a **Products (Unbuffered)** sheet.
+- Nothing is saved. A scenario doesn't remember the switch, switching doesn't count as a change to the open scenario, and the screen starts on buffered costs each time you open the app.
 
 ### Printing a Price Simulator report
 
