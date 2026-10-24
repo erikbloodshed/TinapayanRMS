@@ -235,16 +235,21 @@ public class RawMaterialValidatorTests
         result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.LinkedToId) && e.ErrorMessage == "Pick the ingredient it's linked to.");
     }
 
-    [Theory]
-    [InlineData(null, 30d, nameof(RawMaterial.WeightSharePercent))]
-    [InlineData(0d, 30d, nameof(RawMaterial.WeightSharePercent))]
-    [InlineData(101d, 30d, nameof(RawMaterial.WeightSharePercent))]
-    [InlineData(70d, null, nameof(RawMaterial.CostSharePercent))]
-    [InlineData(70d, -1d, nameof(RawMaterial.CostSharePercent))]
-    [InlineData(70d, 100.5d, nameof(RawMaterial.CostSharePercent))]
-    public void Rejects_a_missing_or_out_of_range_share(double? weightShare, double? costShare, string propertyName)
+    public static TheoryData<decimal?, decimal?, string> SharesMissingOrOutOfRange => new()
     {
-        var result = _validator.Validate(EggWhite(weightShare: (decimal?)weightShare, costShare: (decimal?)costShare));
+        { null, 30m, nameof(RawMaterial.WeightSharePercent) },
+        { 0m, 30m, nameof(RawMaterial.WeightSharePercent) },
+        { 101m, 30m, nameof(RawMaterial.WeightSharePercent) },
+        { 70m, null, nameof(RawMaterial.CostSharePercent) },
+        { 70m, -1m, nameof(RawMaterial.CostSharePercent) },
+        { 70m, 100.5m, nameof(RawMaterial.CostSharePercent) },
+    };
+
+    [Theory]
+    [MemberData(nameof(SharesMissingOrOutOfRange))]
+    public void Rejects_a_missing_or_out_of_range_share(decimal? weightShare, decimal? costShare, string propertyName)
+    {
+        var result = _validator.Validate(EggWhite(weightShare: weightShare, costShare: costShare));
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == propertyName);

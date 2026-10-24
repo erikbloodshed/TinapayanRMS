@@ -273,7 +273,7 @@
                                           MinValue="0"
                                           MaxValue="99.99"
                                           controls:FieldUndoStep.Recorder="{Binding}"
-                                          Value="{Binding EditingWeightLossPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}"
+                                          Value="{Binding EditingWeightLossPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}"
                                           ToolTip="How much of the batch's weight is lost while making it: the cost is spread over what's left. A new made ingredient starts at 3%."
                                           Visibility="{Binding IsEditingMade, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </Grid>

@@ -565,13 +565,16 @@ public class VimKeysGridTests
 
     private static int CurrentColumn(SfDataGrid grid) => grid.SelectionController.CurrentCellManager.CurrentRowColumnIndex.ColumnIndex;
 
-    /// <summary>A 300 px lines table, editable, with an add row and filler rows, as the app's are.</summary>
+    /// <summary>
+    /// A 300 px lines table, editable, with an add row and filler rows, its columns declared as the app's are (a
+    /// NumericColumn for the grams, which takes 2 decimals).
+    /// </summary>
     private static SfDataGrid LinesGrid(int lineCount = 2)
     {
         var grid = new SfDataGrid
         {
             ItemsSource = new ObservableCollection<Line>(Enumerable.Range(1, lineCount).Select(i => new Line { Name = $"Line {i}", Grams = i * 100m })),
-            AutoGenerateColumns = true,
+            AutoGenerateColumns = false,
             AllowEditing = true,
             AllowDeleting = true,
             EditTrigger = EditTrigger.OnTap,
@@ -579,6 +582,8 @@ public class VimKeysGridTests
             SelectionMode = GridSelectionMode.Single,
             Height = 300,
         };
+        grid.Columns.Add(new GridTextColumn { MappingName = nameof(Line.Name) });
+        grid.Columns.Add(new NumericColumn { MappingName = nameof(Line.Grams), NumberDecimalDigits = 2 });
 
         GridAddNewRow.SetDropWhenUntouched(grid, true);
         GridEditCommit.SetOnFocusLeave(grid, true);

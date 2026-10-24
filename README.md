@@ -8,7 +8,7 @@ Read the **[User Manual](docs/user-manual.md)**. It explains every screen, how t
 
 ## Developing
 
-TinapayanRMS is a Windows desktop app built with WPF, Syncfusion and ReactiveUI on .NET 10, with PostgreSQL through EF Core.
+TinapayanRMS is a Windows desktop app built with WPF, Syncfusion and ReactiveUI on .NET 11, with PostgreSQL through EF Core.
 
 Read the **[Developer Manual](docs/developer-manual.md)**. It covers what you need to know and install, how to set up and run the app, the architecture and the patterns the code follows, and how to test and make common changes.
 

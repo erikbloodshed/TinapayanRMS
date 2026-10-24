@@ -19,6 +19,8 @@
             <converters:EmptyStateVisibilityConverter x:Key="EmptyStateVisibilityConverter" />
             <converters:NotNullToVisibilityConverter x:Key="NotNullToVisibilityConverter" />
             <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+            <!-- Every two-way number box bound to a decimal: its double goes in as the decimal it shows (DecimalValueConverter) -->
+            <converters:DecimalValueConverter x:Key="DecimalValueConverter" />
 
             <!--
                 The Unit cell of every packaging grid (a product's Packaging tab, the Add Sub-Assembly form, and a

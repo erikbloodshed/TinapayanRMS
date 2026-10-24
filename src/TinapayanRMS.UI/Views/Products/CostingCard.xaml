@@ -95,11 +95,11 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock Text="Labor Metric" Style="{StaticResource FormLabelStyle}" ToolTip="{Binding MetricBaseTooltip}" />
-                        <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingLaborPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
+                        <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingLaborPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
                         <syncfusion:DoubleTextBox Grid.Column="3"
                                                   NumberDecimalDigits="2"
                                                   MinValue="0"
-                                                  Value="{Binding EditingLaborAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  Value="{Binding EditingLaborAmount, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                   controls:FieldUndoStep.Recorder="{Binding}"
                                                   ToolTip="{Binding CostUnitCaption, StringFormat='The labor cost, {0}. Typing it sets the percentage.'}" />
                         <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.LaborShare, StringFormat='{}{0:N1}% of the price'}" />
@@ -119,11 +119,11 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock Text="Overhead Metric" Style="{StaticResource FormLabelStyle}" ToolTip="{Binding MetricBaseTooltip}" />
-                        <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingOverheadPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
+                        <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingOverheadPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
                         <syncfusion:DoubleTextBox Grid.Column="3"
                                                   NumberDecimalDigits="2"
                                                   MinValue="0"
-                                                  Value="{Binding EditingOverheadAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  Value="{Binding EditingOverheadAmount, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                   controls:FieldUndoStep.Recorder="{Binding}"
                                                   ToolTip="{Binding CostUnitCaption, StringFormat='The overhead cost, {0}. Typing it sets the percentage.'}" />
                         <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.OverheadShare, StringFormat='{}{0:N1}% of the price'}" />
@@ -143,11 +143,11 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock Text="Admin Metric" Style="{StaticResource FormLabelStyle}" ToolTip="{Binding MetricBaseTooltip, StringFormat='Administrative: office, permits, bookkeeping. {0}'}" />
-                        <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingAdministrativePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
+                        <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingAdministrativePercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
                         <syncfusion:DoubleTextBox Grid.Column="3"
                                                   NumberDecimalDigits="2"
                                                   MinValue="0"
-                                                  Value="{Binding EditingAdministrativeAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  Value="{Binding EditingAdministrativeAmount, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                   controls:FieldUndoStep.Recorder="{Binding}"
                                                   ToolTip="{Binding CostUnitCaption, StringFormat='The administrative cost, {0}. Typing it sets the percentage.'}" />
                         <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.AdministrativeShare, StringFormat='{}{0:N1}% of the price'}" />
@@ -167,11 +167,11 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock Text="Markup Metric" Style="{StaticResource FormLabelStyle}" ToolTip="On the base cost: materials, wastage, labor, overhead and administrative" />
-                        <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingMarginPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
+                        <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingMarginPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
                         <syncfusion:DoubleTextBox Grid.Column="3"
                                                   NumberDecimalDigits="2"
                                                   MinValue="0"
-                                                  Value="{Binding EditingMarkupAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  Value="{Binding EditingMarkupAmount, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                   controls:FieldUndoStep.Recorder="{Binding}"
                                                   ToolTip="{Binding CostUnitCaption, StringFormat='The markup, {0}, before VAT. Typing it sets the percentage.'}" />
                         <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Style="{StaticResource TileCaptionStyle}" Text="{Binding Costs.MarkupShare, StringFormat='{}{0:N1}% of the price'}" />
@@ -191,7 +191,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock Text="VAT %" Style="{StaticResource FormLabelStyle}" ToolTip="On top of the marked-up price" />
-                        <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
+                        <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding EditingVatPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
                         <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Style="{StaticResource TileCaptionStyle}">
                             <Run Text="{Binding Costs.Vat, StringFormat='{}{0:N2}', Mode=OneWay}" /><Run Text="{Binding Costs.VatShare, StringFormat=' · {0:N1}% of the price', Mode=OneWay}" />
                         </TextBlock>

@@ -63,31 +63,31 @@
                             <syncfusion:DoubleTextBox Grid.Row="2"
                                                       Grid.Column="1"
                                                       MinValue="0"
-                                                      Value="{Binding EditingLaborPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                      Value="{Binding EditingLaborPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Grid.Row="4" Text="Overhead %" Style="{StaticResource FormLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece" />
                             <syncfusion:DoubleTextBox Grid.Row="4"
                                                       Grid.Column="1"
                                                       MinValue="0"
-                                                      Value="{Binding EditingOverheadPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                      Value="{Binding EditingOverheadPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Grid.Row="6" Text="Administrative %" Style="{StaticResource FormLabelStyle}" ToolTip="Of the sub-assemblies (ingredients) cost per piece: office, permits, bookkeeping" />
                             <syncfusion:DoubleTextBox Grid.Row="6"
                                                       Grid.Column="1"
                                                       MinValue="0"
-                                                      Value="{Binding EditingAdministrativePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                      Value="{Binding EditingAdministrativePercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Grid.Row="8" Text="Markup %" Style="{StaticResource FormLabelStyle}" ToolTip="On the base cost: materials, wastage, labor, overhead and administrative" />
                             <syncfusion:DoubleTextBox Grid.Row="8"
                                                       Grid.Column="1"
                                                       MinValue="0"
-                                                      Value="{Binding EditingMarginPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                      Value="{Binding EditingMarginPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Grid.Row="10" Text="VAT %" Style="{StaticResource FormLabelStyle}" ToolTip="On top of the marked-up price" />
                             <syncfusion:DoubleTextBox Grid.Row="10"
                                                       Grid.Column="1"
                                                       MinValue="0"
-                                                      Value="{Binding EditingVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                      Value="{Binding EditingVatPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Grid.Row="12" Text="Wastage %" Style="{StaticResource FormLabelStyle}" ToolTip="Every product's, not just new ones: what's lost making a product, as a cost on top of its sub-assemblies (ingredients). 3% adds ₱3 to ₱100 of ingredients. Packaging isn't wasted, so it's left out." />
                             <syncfusion:DoubleTextBox Grid.Row="12"
@@ -95,7 +95,7 @@
                                                       MinValue="0"
                                                       MaxValue="100"
                                                       NumberDecimalDigits="2"
-                                                      Value="{Binding EditingWastagePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                      Value="{Binding EditingWastagePercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Grid.Row="14" Text="Cost Buffer %" Style="{StaticResource FormLabelStyle}" ToolTip="What a new raw material's Cost Buffer % starts at: a cushion on top of its cost for price swings and waste" />
                             <syncfusion:DoubleTextBox Grid.Row="14"
@@ -103,7 +103,7 @@
                                                       MinValue="0"
                                                       MaxValue="100"
                                                       NumberDecimalDigits="2"
-                                                      Value="{Binding EditingCostBufferPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                      Value="{Binding EditingCostBufferPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
 
                         <syncfusion:ButtonAdv Label="Save"

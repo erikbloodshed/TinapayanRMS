@@ -1,6 +1,6 @@
 # TinapayanRMS Developer Manual
 
-TinapayanRMS is the recipe and costing app of Tinapayan Festival Bakeshoppe. It's a Windows desktop app built with WPF, Syncfusion and ReactiveUI on .NET 10, and it keeps its data in PostgreSQL through EF Core and Dapper. The shop records what its raw materials cost. The app works out what every recipe, product and selling price comes to, and when a price changes it carries the change up to every product that uses it.
+TinapayanRMS is the recipe and costing app of Tinapayan Festival Bakeshoppe. It's a Windows desktop app built with WPF, Syncfusion and ReactiveUI on .NET 11, and it keeps its data in PostgreSQL through EF Core and Dapper. The shop records what its raw materials cost. The app works out what every recipe, product and selling price comes to, and when a price changes it carries the change up to every product that uses it.
 
 This manual is for developers who build, maintain or extend the app. It explains how the code is organised, which patterns it follows and why, and what you need to know and install before you change it. It assumes you know C#, but not this codebase.
 
@@ -94,11 +94,11 @@ You'll be productive sooner if you're comfortable with the following.
 
 | Area | What to know | Where it's used |
 |---|---|---|
-| C# 14 and .NET 10 | Primary constructors, records and `record struct`, `required` members, collection expressions, pattern matching, nullable reference types, `async`/`await` | Everywhere |
+| C# 15 and .NET 11 | Primary constructors, records and `record struct`, `required` members, collection expressions, pattern matching, nullable reference types, `async`/`await` | Everywhere |
 | WPF and XAML | Data binding and `DataContext` inheritance, dependency and attached properties, resources, styles and templates, routed events, the `Dispatcher` and STA threads | `src/TinapayanRMS.UI` |
 | MVVM with ReactiveUI 26 and Rx | `ReactiveObject`, `RaiseAndSetIfChanged`, `WhenAnyValue`, `ToProperty` (`ObservableAsPropertyHelper`), `ReactiveCommand`, `Interaction`, `Subject`, Rx operators | `ViewModels/` |
 | DynamicData | `SourceCache<T, TKey>`, `Connect().SortAndBind(...)` | List ViewModels |
-| EF Core 10 | `DbContext`, `IEntityTypeConfiguration<T>`, migrations, change tracking, transactions, `ExecuteDeleteAsync` | Writes and the schema, in `Infrastructure` |
+| EF Core 11 | `DbContext`, `IEntityTypeConfiguration<T>`, migrations, change tracking, transactions, `ExecuteDeleteAsync` | Writes and the schema, in `Infrastructure` |
 | Dapper and PostgreSQL SQL | Multi-mapped joins (`splitOn`), recursive CTEs (`WITH RECURSIVE`), arrays with `unnest` | Reads, in `Infrastructure` |
 | PostgreSQL | Roles and the password file, snake_case names, `psql`, `pg_dump` and `pg_restore`, ICU collations | Setup, tests, backups, debugging |
 | Syncfusion Essential Studio for WPF | `SfDataGrid`, `SfTreeView`, `SfTreeGrid`, `ComboBoxAdv`, `TabControlExt`, `ButtonAdv`, `DoubleTextBox` and its kin, `SfNavigationDrawer`, `ChromelessWindow`, `SfSkinManager`, `PrintPreview` | Every view |
@@ -116,11 +116,11 @@ You'll be productive sooner if you're comfortable with the following.
 | Tool | Version | Notes |
 |---|---|---|
 | Windows | 10 or 11 | WPF only runs on Windows. Icons use Segoe Fluent Icons (Windows 11), and fall back to Segoe MDL2 Assets on Windows 10. |
-| .NET SDK | 10.0.402, or a later 10.0 feature band | Pinned in [global.json](../global.json) with `rollForward: latestFeature`. |
+| .NET SDK | 11.0.100-rc.2.26504.105 (a preview), or a later 11.0 feature band | Pinned in [global.json](../global.json) with `allowPrerelease` and `rollForward: latestFeature`. |
 | PostgreSQL | 18 (EDB's Windows installer, service `postgresql-x64-18`, `localhost:5432`) | Reached as the `tinapayanrms` role, which must be able to create databases (`CREATEDB`), because the tests create their own. Its password goes in the password file, `%APPDATA%\postgresql\pgpass.conf`, so no connection string carries one. The installer's `bin` folder holds `psql`, and the `pg_dump` and `pg_restore` the backups run. |
-| `dotnet-ef` | 10.0.x, matching EF Core 10.0.12 | `dotnet tool install --global dotnet-ef --version 10.0.12` |
+| `dotnet-ef` | 11.0.0-rc.2.26504.105, matching EF Core | `dotnet tool update --global dotnet-ef --version 11.0.0-rc.2.26504.105` (it installs the tool if it isn't there) |
 | Syncfusion licence key | Essential Studio 35.x | Set as the `SYNCFUSION_LICENSE_KEY` user environment variable. The build compiles it into the app, so the app runs on a computer without the variable, but an app built without it won't start, and `dotnet publish` fails without it. The UI tests that build Syncfusion controls read the variable themselves and are skipped without it. After changing the key, rebuild. A key covers one major version, so moving `SyncfusionVersion` to a new major version needs a new key. A program started before the variable changed, such as the IDE and its terminals, keeps the old value until it's restarted. |
-| An IDE | Any with .NET 10 support | Visual Studio, VS Code with the C# Dev Kit, or Rider. Git ignores `.vs/`, `.vscode/` and `.idea/`. |
+| An IDE | Any with .NET 11 support | Visual Studio, VS Code with the C# Dev Kit, or Rider. Git ignores `.vs/`, `.vscode/` and `.idea/`. |
 | Optional tools | | `ilspycmd` (decompiles Syncfusion's assemblies), and `dotnet-stack`, `dotnet-dump` and `dotnet-trace` (diagnose the running app). Syncfusion's Essential Studio installer puts the demo source of every control in `C:\Users\Public\Documents\Syncfusion\WPF\<version>\SampleBrowser\`. |
 
 Docker isn't used anywhere in this project.
@@ -133,7 +133,7 @@ Docker isn't used anywhere in this project.
 
 Run every command from the repository root.
 
-1. **Check the SDK.** `dotnet --version` should print 10.0.402 or later.
+1. **Check the SDK.** `dotnet --version` should print 11.0.100-rc.2.26504.105 or later.
 2. **Set up PostgreSQL.** Install PostgreSQL 18, then, as the `postgres` superuser, create the app's role, and put its password in the password file (one line, `localhost:5432:*:tinapayanrms:<password>`):
    ```powershell
    $psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
@@ -146,7 +146,7 @@ Run every command from the repository root.
    ```powershell
    [Environment]::SetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", "<your key>", "User")
    ```
-4. **Install the EF Core tools:** `dotnet tool install --global dotnet-ef --version 10.0.12`.
+4. **Install the EF Core tools:** `dotnet tool update --global dotnet-ef --version 11.0.0-rc.2.26504.105`.
 5. **Build:** `dotnet build TinapayanRMS.slnx`.
 6. **Create the database.** This creates `tinapayanrms` and applies every migration, including the rows the migrations seed, such as the starting sub-assembly roles:
    ```powershell
@@ -169,7 +169,7 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 
 ### Where the app writes
 
-- **Logs**: `logs/tinapayanrms-<date>.log` beside the executable. In a debug build that's `src/TinapayanRMS.UI/bin/Debug/net10.0-windows10.0.19041.0/win-x64/logs/`. There's one file a day, and the last 31 are kept.
+- **Logs**: `logs/tinapayanrms-<date>.log` beside the executable. In a debug build that's `src/TinapayanRMS.UI/bin/Debug/net11.0-windows10.0.19041.0/win-x64/logs/`. There's one file a day, and the last 31 are kept.
 - **View state**: `%LocalAppData%\TinapayanRMS\view-state.json` remembers which tree folders were left open (on Sub-Assemblies, which were left closed), and whether the Vim keys are on (`"vim-keys": ["on"]`). It's safe to delete.
 - **Backups**: `%ProgramData%\TinapayanRMS\Backups`, one folder for every Windows user of the computer. `pg_dump` writes the `.backup` files as the user running the app. The app creates this folder and, as its owner, gives `BUILTIN\Users` Modify on it, inherited by every file, so anyone using the app can copy, restore and delete any backup ([BackupFolder](../src/TinapayanRMS.Infrastructure/Services/BackupFolder.cs)). The `.bak` files SQL Server wrote before the move to PostgreSQL (2026-10-21) are no longer listed and can't be restored. The tests use `%ProgramData%\TinapayanRMS\Test Backups\<guid>` and delete it afterwards.
 
@@ -188,7 +188,7 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 | Check the model matches the migrations | `dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infrastructure` |
 | Apply migrations | `dotnet ef database update --project src/TinapayanRMS.Infrastructure` |
 | Regenerate the compiled model, after any model change | `dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels` |
-| Publish the app (ReadyToRun, to `src/TinapayanRMS.UI/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/`) | `dotnet publish src/TinapayanRMS.UI` |
+| Publish the app (ReadyToRun, to `src/TinapayanRMS.UI/bin/Release/net11.0-windows10.0.19041.0/win-x64/publish/`) | `dotnet publish src/TinapayanRMS.UI` |
 | Query the database | `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U tinapayanrms -d tinapayanrms -c "SELECT name, cost_per_base_unit FROM raw_materials"` |
 
 The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test.runner`). VSTest-style flags such as `--filter` and `--collect` don't work: use the `--filter-*` options and `--coverage` instead.
@@ -214,16 +214,16 @@ A change is done when:
 
 | Project | Target framework | References | Contents |
 |---|---|---|---|
-| `src/TinapayanRMS.Domain` | `net10.0` | Nothing | `Entities/`, `Enums/` |
-| `src/TinapayanRMS.ApplicationCore` | `net10.0` | Domain; FluentValidation | `Interfaces/`, `Rules/`, `Validators/` |
-| `src/TinapayanRMS.Infrastructure` | `net10.0` | Domain, ApplicationCore; EF Core (Npgsql, with EFCore.NamingConventions), Dapper | `TinapayanRMSDbContext` and its design-time factory at the root; `Configurations/`, `Migrations/`, `CompiledModels/`, `Queries/`, `Repositories/`, `Services/` |
-| `src/TinapayanRMS.UI` | `net10.0-windows10.0.19041.0` | All three; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion | App startup at the root; `Views/`, `ViewModels/`, `Controls/`, `Converters/`, `Printing/`, `Exporting/`, `Vim/`, `Themes/`, `Assets/Icons/` |
-| `tests/TinapayanRMS.ApplicationCore.Tests` | `net10.0` | Domain, ApplicationCore | Rule and validator tests, with no database |
-| `tests/TinapayanRMS.Infrastructure.Tests` | `net10.0` | Infrastructure, Tests.Common | Persistence tests against the project's own database |
-| `tests/TinapayanRMS.UI.Tests` | `net10.0-windows10.0.19041.0` | UI, Tests.Common | ViewModel, control, printing, export, converter and Vim-key tests |
-| `tests/TinapayanRMS.Tests.Common` | `net10.0` | Infrastructure; Respawn | The shared database fixtures. It's a plain library, not a test project. |
+| `src/TinapayanRMS.Domain` | `net11.0` | Nothing | `Entities/`, `Enums/` |
+| `src/TinapayanRMS.ApplicationCore` | `net11.0` | Domain; FluentValidation | `Interfaces/`, `Rules/`, `Validators/` |
+| `src/TinapayanRMS.Infrastructure` | `net11.0` | Domain, ApplicationCore; EF Core (Npgsql, with EFCore.NamingConventions), Dapper | `TinapayanRMSDbContext` and its design-time factory at the root; `Configurations/`, `Migrations/`, `CompiledModels/`, `Queries/`, `Repositories/`, `Services/` |
+| `src/TinapayanRMS.UI` | `net11.0-windows10.0.19041.0` | All three; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion | App startup at the root; `Views/`, `ViewModels/`, `Controls/`, `Converters/`, `Printing/`, `Exporting/`, `Vim/`, `Themes/`, `Assets/Icons/` |
+| `tests/TinapayanRMS.ApplicationCore.Tests` | `net11.0` | Domain, ApplicationCore | Rule and validator tests, with no database |
+| `tests/TinapayanRMS.Infrastructure.Tests` | `net11.0` | Infrastructure, Tests.Common | Persistence tests against the project's own database |
+| `tests/TinapayanRMS.UI.Tests` | `net11.0-windows10.0.19041.0` | UI, Tests.Common | ViewModel, control, printing, export, converter and Vim-key tests |
+| `tests/TinapayanRMS.Tests.Common` | `net11.0` | Infrastructure; Respawn | The shared database fixtures. It's a plain library, not a test project. |
 
-The two UI projects target Windows SDK 10.0.19041 because ReactiveUI.WPF needs it. The bare `net10.0-windows` moniker resolves to `windows7.0`, which is too low.
+The two UI projects target Windows SDK 10.0.19041 because ReactiveUI.WPF needs it. The bare `net11.0-windows` moniker resolves to `windows7.0`, which is too low.
 
 ### Folders are namespaces
 
@@ -249,9 +249,9 @@ A ViewModel file can also hold the small row and edit types that only its screen
 
 ### Build configuration
 
-- [Directory.Build.props](../Directory.Build.props) sets `net10.0`, `ImplicitUsings`, `Nullable`, the `WindowsTargetFramework` property, and `AnalysisLevel` `latest-recommended` (the SDK's built-in analyzers at their Recommended rule set).
+- [Directory.Build.props](../Directory.Build.props) sets `net11.0`, `ImplicitUsings`, `Nullable`, the `WindowsTargetFramework` property, and `AnalysisLevel` `latest-recommended` (the SDK's built-in analyzers at their Recommended rule set).
 - [tests/Directory.Build.props](../tests/Directory.Build.props) imports it. It gives every project whose name ends in `.Tests` the xUnit v3, AwesomeAssertions, test SDK and coverage packages, and a global `using Xunit`.
-- [Directory.Packages.props](../Directory.Packages.props) turns on Central Package Management. Versions live only there, so a `PackageReference` never has a `Version`. The EF Core and Syncfusion versions are the `EFCoreVersion` and `SyncfusionVersion` properties. Every Syncfusion package must be on the same version, so upgrade them together. Transitive pinning is on, so the "Transitive pins" group can lift a transitive dependency to a fixed version: currently `Microsoft.EntityFrameworkCore.Relational`, which `Npgsql.EntityFrameworkCore.PostgreSQL` asks for only at 10.0.4, held at `EFCoreVersion` so every project gets one EF Core. `dotnet list TinapayanRMS.slnx package --include-transitive --vulnerable` lists what still needs one.
+- [Directory.Packages.props](../Directory.Packages.props) turns on Central Package Management. Versions live only there, so a `PackageReference` never has a `Version`. The EF Core, Microsoft.Extensions and Syncfusion versions are the `EFCoreVersion`, `MicrosoftExtensionsVersion` and `SyncfusionVersion` properties. Every Syncfusion package must be on the same version, so upgrade them together. Transitive pinning is on, so the "Transitive pins" group can lift a transitive dependency to a fixed version: currently `Microsoft.EntityFrameworkCore.Relational`, held at `EFCoreVersion` so every project gets one EF Core. `EFCore.NamingConventions` has no .NET 11 release yet, and its 10.0.1 asks for EF Core 10. It works on EF Core 11 (the snake_case names, the model-changes check and the compiled model all hold), so move it to its 11.x when there is one. `dotnet list TinapayanRMS.slnx package --include-transitive --vulnerable` lists what still needs one.
 - [.editorconfig](../.editorconfig) marks `Migrations/` as generated code, turns off CA1707 (underscores in names) in `tests/`, and turns off CA1716 everywhere. The files in `CompiledModels/` carry their own `<auto-generated />` header, so the analyzers skip them too.
 - Warnings aren't treated as errors, but the build is kept free of them.
 - The UI project sets `PublishReadyToRun`, with its `win-x64` runtime identifier, so `dotnet publish` precompiles every assembly the app ships, and less code waits on the JIT at startup. `dotnet build` and `dotnet run` ignore it.
@@ -563,6 +563,7 @@ A made or linked ingredient's costs are worked out by **`IngredientCostRules.Rec
 - A value that goes through a `numeric(18,4)` column comes back rounded to 4 places: 1/6 becomes 0.1667. A test that reads a value back from the database asserts the rounded value.
 - A stored figure worked out in memory is set at its column's scale, after it's worked out at full precision: a cost per base unit through `RawMaterialRules.StoredCost` (20 places), a sub-assembly's totals through `TinapayanRMSDbContext.Stored` (4), each rounded half away from zero as PostgreSQL rounds a `numeric`. At full precision, a cost that doesn't come out even (170 ÷ 240) never equals the stored one, so a Save that changed nothing would read it as changed, log a price again and move the cost's date.
 - On screen: 2 decimals for the Products screen's per-piece costing figures and for prices, and 4 for a cost per base unit and for a recipe tab's cost per piece. Grid quantities show 1 decimal and accept up to 4. No amount shows a currency symbol.
+- **A `double` never becomes a `decimal` by a plain conversion.** Since .NET 11 a cast, `Convert.ToDecimal` or `new decimal(double)` keeps the double's exact binary value, so 28.35 becomes 28.349999999999997868371792719, where .NET 10 rounded it to 15 digits. The number boxes and grid editors hold a `double`, so every typed figure crosses over: a two-way box binding takes `DecimalValueConverter`, and a grid's `NumericColumn` parses its edit as a decimal (`ParsingMode` `Decimal`). Both go through the number's text, so 28.35 typed is 28.35. Anywhere else, write the value as a `decimal` from the start, or go through its text the same way (`DecimalValueConverter.ToDecimal`).
 
 ### Buffered and unbuffered costs
 
@@ -915,7 +916,7 @@ The app extends Syncfusion's controls with **attached behaviours** in `Controls/
 | `AutoCompleteDropDown.IsEnabled` | A grid with a drop-down column that's typed into | Fixes Syncfusion's drop-down cell. Pair it with `AllowNullInput="True"` on the column. The pick reaches the row only when the edit is committed: the renderer makes each drop-down column's `UpdateTrigger` Explicit before every edit, so no column needs to set it. A commit with text that names nothing in the list keeps the row's value (`AutoCompleteDropDownRenderer.UpdateSource`). |
 | `GridAutoRowHeight.IsEnabled` | A grid with a `TextWrapping="Wrap"` column | Grows each line to fit its wrapped text, never below `RowHeight` (`QueryRowHeight` and `GridColumnSizer.GetAutoRowHeight`, measuring only the wrapped columns). It gives the sizer a drawn cell's font, padding and border first, since the sizer measures in its own 12 px font. It asks again when the lines change, the grid's width does, or the rows are sorted. A grid with a `DetailsViewDefinition` never raises `QueryRowHeight` (Syncfusion's `RowGenerator.QueryRowHeight` returns early), so its lines are measured the same way and given their heights in `VisualContainer.RowHeights` directly, passing over the details rows. On the Mixing Sheet. |
 | `OptionalColumns.IsOptional`, `CostBasisColumns` | Grid columns | Show or hide columns from the screen's state. A grid's columns aren't in the visual tree, so they can't bind to it themselves. |
-| `NumericColumn`, `NumericEditing.IsEnabled` | Number columns; their grid | Thousands separators and right alignment. `TypedDecimalDigits` accepts more decimals than the column shows. |
+| `NumericColumn`, `NumericEditing.IsEnabled` | Number columns; their grid | Thousands separators and right alignment. An edit is parsed as a decimal (`ParsingMode` `Decimal`), so 6.67 typed is 6.67 (see [Precision and rounding](#precision-and-rounding)). `TypedDecimalDigits` accepts more decimals than the column shows. |
 | `MouseWheelForwarding`, `FocusScrolling` | Stacked grids; tall pages | Keep the page scrolling under the mouse, and stop a click from scrolling the page |
 | `CategoryTextCommit.Screen` | A Category picker | Offers to add a typed name that isn't a category yet |
 | `ReadOnlyText.IsGreyed` | A `DoubleTextBox` | Greys out a number that can't be typed |
@@ -943,6 +944,7 @@ The app extends Syncfusion's controls with **attached behaviours** in `Controls/
 - **To learn how a control is meant to be used**, start with its `syncfusion-wpf-*` skill in `.claude/skills/`. Then read the Sample Browser source in `C:\Users\Public\Documents\Syncfusion\WPF\34.2.2\SampleBrowser\` (a v34 install, older than the packages), and grep file contents there, because the demo file names often don't name the control. Only then decompile the assembly with `ilspycmd`: the packages are in `%UserProfile%\.nuget\packages\syncfusion.*\<version>\lib\`.
 - **Known traps:**
   - Bind an editable `DoubleTextBox`'s `Value` with `UpdateSourceTrigger=PropertyChanged`. Otherwise the ViewModel only sees the value when the box loses focus, and the buttons and figures that depend on it lag behind.
+  - A two-way `DoubleTextBox` or `PercentTextBox` bound to a `decimal` takes `Converter={StaticResource DecimalValueConverter}` on its binding. Without it, WPF's own conversion keeps the box's `double` at its exact binary value, so 28.35 typed reaches the ViewModel as 28.349999999999997868371792719 (see [Precision and rounding](#precision-and-rounding)).
   - A `DoubleTextBox` bound to a `decimal?` needs `TargetNullValue={x:Null}` on its binding.
   - A `ButtonAdv` takes its icon from `IconTemplate`, not `SmallIcon` or `LargeIcon`. Always set its `Label`, which otherwise reads "Button".
   - An `SfTreeGrid` must be themed on its own (its own `SfSkinManager.Theme` and `SizeMode`), never through its window. Otherwise it un-themes every `SfDataGrid` in the window. `TreeGridThemeScopeTests` checks this.
@@ -1133,6 +1135,20 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
 
 Some loads start from a selection, with nothing to await. Tests of those wait until a condition has held for a moment: see the helpers in `ProductsViewModelRefreshTests`.
 
+A theory's `decimal` values with decimals go in `TheoryData`, written as `decimal` literals (`0.0525m`), with `[MemberData]`, never in `[InlineData]`. An attribute can't hold a `decimal`, so `[InlineData(0.0525)]` passes a `double`, which since .NET 11 arrives as 0.0524999999999999980571097069. Whole numbers are safe in `[InlineData]`. See `StandardUnitRulesTests`:
+
+```csharp
+public static TheoryData<string, string, decimal> MassUnits => new()
+{
+    { "pound", "lb", 453.5924m },
+    { "ounce", "oz", 28.3495m },
+};
+
+[Theory]
+[MemberData(nameof(MassUnits))]
+public void A_mass_unit_of_an_ingredient_is_fixed_in_grams(string name, string abbreviation, decimal grams)
+```
+
 A test that creates WPF objects runs on an STA thread:
 
 - `StaThread.Run(() => …)` for plain WPF objects.
@@ -1157,7 +1173,7 @@ Coverage comes from Microsoft's MTP coverage extension (see the [command referen
 
 ### Code
 
-- **Use modern C# 14 and .NET 10 idioms**: primary constructors (every repository has one), collection expressions, `record` and `record struct` for immutable shapes (drafts, snapshots, printouts), `required` members, file-scoped namespaces and pattern matching.
+- **Use modern C# 15 and .NET 11 idioms**: primary constructors (every repository has one), collection expressions, `record` and `record struct` for immutable shapes (drafts, snapshots, printouts), `required` members, file-scoped namespaces and pattern matching.
 - **Nullable reference types are on everywhere.** Treat their warnings as real.
 - **Everything that touches the database is `async`** and takes a `CancellationToken`. ViewModels pass `CancellationToken.None`.
 - **A rule throws `BusinessRuleException` with a message written for the shop's staff**, because `RunSafelyAsync` shows it exactly as written. That goes for a repository's checks and a screen's own form checks too. A plain `InvalidOperationException` reads as a bug: EF Core and Npgsql throw those for failures.
@@ -1290,6 +1306,7 @@ Off-screen harnesses and UI-automation scripts have pitfalls that PLAN.md record
 - Bring the app to the foreground before you send keystrokes, and check it's still there, or the keys go to whatever window is in front.
 - UI Automation's `FocusedElement` reports the window, not the grid, while an `SfDataGrid` has the keyboard. Judge a grid's focus from the screen instead, for example by whether the current cell's border moves with the keys.
 - `new App()` posts WPF's startup to the dispatcher, so a harness that runs the dispatcher also runs `OnStartup`, which shows the real main window. Collect what it posts and abort it first.
+- A file-based harness also needs `#:property PublishAot=false` (WPF can't be trimmed), a `DispatcherSynchronizationContext` on its thread (or a ViewModel's `await` comes back on the thread pool and the screen stays empty), and the UI assembly as `Application.ResourceAssembly`, where a view's `/Assets/...` images are.
 
 ---
 

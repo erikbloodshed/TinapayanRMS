@@ -106,7 +106,7 @@
                 -->
                 <syncfusion:DoubleTextBox Grid.Row="1"
                                           Grid.Column="0"
-                                          Value="{Binding TypedCostBufferPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}"
+                                          Value="{Binding TypedCostBufferPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}"
                                           MinValue="0"
                                           MaxValue="100"
                                           ToolTip="The cushion on top of the dearest brand, for price swings, waste and yield variation. Typing it works out the Buffered Cost; typing the Buffered Cost works it out." />
@@ -116,7 +116,7 @@
                                           Grid.Column="2"
                                           controls:FieldUndoStep.Recorder="{Binding}"
                                           controls:FieldUndoStep.LandsOnLeave="True"
-                                          Value="{Binding EditingBufferedCostInUnit, Mode=TwoWay, UpdateSourceTrigger=LostFocus, TargetNullValue={x:Null}}"
+                                          Value="{Binding EditingBufferedCostInUnit, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=LostFocus, TargetNullValue={x:Null}}"
                                           NumberDecimalDigits="-1"
                                           MinimumNumberDecimalDigits="2"
                                           MaximumNumberDecimalDigits="10"

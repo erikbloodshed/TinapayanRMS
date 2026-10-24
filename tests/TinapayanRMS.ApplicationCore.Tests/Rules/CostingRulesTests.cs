@@ -160,12 +160,13 @@ public class CostingRulesTests
         act.Should().NotThrow();
     }
 
+    public static TheoryData<decimal> WastagesOutOfRange => [-0.01m, 100.01m];
+
     [Theory]
-    [InlineData(-0.01)]
-    [InlineData(100.01)]
-    public void EnsureValidWastage_refuses_a_wastage_outside_0_to_100(double wastagePercent)
+    [MemberData(nameof(WastagesOutOfRange))]
+    public void EnsureValidWastage_refuses_a_wastage_outside_0_to_100(decimal wastagePercent)
     {
-        var act = () => CostingRules.EnsureValidWastage((decimal)wastagePercent);
+        var act = () => CostingRules.EnsureValidWastage(wastagePercent);
 
         act.Should().Throw<BusinessRuleException>().WithMessage("*wastage*");
     }

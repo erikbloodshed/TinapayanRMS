@@ -9,12 +9,17 @@ public class StandardUnitRulesTests
 {
     private static UnitOfMeasure Unit(string name, string abbreviation) => new() { Name = name, Abbreviation = abbreviation };
 
+    public static TheoryData<string, string, decimal> MassUnits => new()
+    {
+        { "kilogram", "kg", 1000m },
+        { "kilo", "kls", 1000m },
+        { "gram", "g", 1m },
+        { "pound", "lb", 453.5924m },
+        { "ounce", "oz", 28.3495m },
+    };
+
     [Theory]
-    [InlineData("kilogram", "kg", 1000)]
-    [InlineData("kilo", "kls", 1000)]
-    [InlineData("gram", "g", 1)]
-    [InlineData("pound", "lb", 453.5924)]
-    [InlineData("ounce", "oz", 28.3495)]
+    [MemberData(nameof(MassUnits))]
     public void A_mass_unit_of_an_ingredient_is_fixed_in_grams(string name, string abbreviation, decimal grams)
     {
         StandardUnitRules.BaseUnitsPerUnit(Unit(name, abbreviation), RawMaterialType.Ingredient, baseUnit: null).Should().Be(grams);
@@ -36,12 +41,17 @@ public class StandardUnitRulesTests
         StandardUnitRules.BaseUnitsPerUnit(Unit(name, abbreviation), RawMaterialType.Ingredient, baseUnit: null).Should().BeNull();
     }
 
+    public static TheoryData<string, string, string, string, decimal> PackagingUnits => new()
+    {
+        { "inch", "in", "millimeter", "mm", 25.4m },
+        { "inch", "in", "centimeter", "cm", 2.54m },
+        { "meter", "m", "centimeter", "cm", 100m },
+        { "liter", "l", "milliliter", "ml", 1000m },
+        { "kilogram", "kg", "gram", "g", 1000m },
+    };
+
     [Theory]
-    [InlineData("inch", "in", "millimeter", "mm", 25.4)]
-    [InlineData("inch", "in", "centimeter", "cm", 2.54)]
-    [InlineData("meter", "m", "centimeter", "cm", 100)]
-    [InlineData("liter", "l", "milliliter", "ml", 1000)]
-    [InlineData("kilogram", "kg", "gram", "g", 1000)]
+    [MemberData(nameof(PackagingUnits))]
     public void A_packaging_unit_is_fixed_in_a_base_unit_of_the_same_kind(
         string name, string abbreviation, string baseName, string baseAbbreviation, decimal expected)
     {

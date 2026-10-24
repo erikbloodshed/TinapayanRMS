@@ -143,22 +143,27 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*linked to*");
     }
 
+    public static TheoryData<decimal?, decimal?> SharesMissingOrOutOfRange => new()
+    {
+        { null, 30m },
+        { 0m, 30m },
+        { -5m, 30m },
+        { 100.01m, 30m },
+        { 70m, null },
+        { 70m, 0m },
+        { 70m, 101m },
+    };
+
     [Theory]
-    [InlineData(null, 30d)]
-    [InlineData(0d, 30d)]
-    [InlineData(-5d, 30d)]
-    [InlineData(100.01d, 30d)]
-    [InlineData(70d, null)]
-    [InlineData(70d, 0d)]
-    [InlineData(70d, 101d)]
-    public void EnsureFieldsMatchSource_rejects_a_missing_or_out_of_range_share(double? weightShare, double? costShare)
+    [MemberData(nameof(SharesMissingOrOutOfRange))]
+    public void EnsureFieldsMatchSource_rejects_a_missing_or_out_of_range_share(decimal? weightShare, decimal? costShare)
     {
         var eggWhite = new RawMaterial
         {
             Source = RawMaterialSource.Linked,
             LinkedToId = 1,
-            WeightSharePercent = (decimal?)weightShare,
-            CostSharePercent = (decimal?)costShare,
+            WeightSharePercent = weightShare,
+            CostSharePercent = costShare,
         };
 
         var act = () => RawMaterialRules.EnsureFieldsMatchSource(eggWhite);
@@ -369,9 +374,10 @@ public class RawMaterialRulesTests
         flour.CostPerBaseUnit.Should().Be(0.04m);
     }
 
+    public static TheoryData<decimal> NewPrices => [0.08m, 0.02m];
+
     [Theory]
-    [InlineData(0.08)]
-    [InlineData(0.02)]
+    [MemberData(nameof(NewPrices))]
     public void ApplyBrandPrices_leaves_a_buffered_cost_it_already_has_whatever_the_new_price(decimal price)
     {
         var flour = new RawMaterial { Source = RawMaterialSource.Purchased, CostBufferPercent = 5m, CostPerBaseUnit = 0.05m, BufferedCostPerBaseUnit = 0.0525m };
@@ -393,14 +399,19 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("Buffered cost can't be negative.");
     }
 
+    public static TheoryData<CostBasis, decimal> CostsAtEachBasis => new()
+    {
+        { CostBasis.Buffered, 0.0525m },
+        { CostBasis.Unbuffered, 0.05m },
+    };
+
     [Theory]
-    [InlineData(CostBasis.Buffered, 0.0525)]
-    [InlineData(CostBasis.Unbuffered, 0.05)]
-    public void CostPerBaseUnitAt_reads_the_buffered_or_the_true_cost(CostBasis basis, double expected)
+    [MemberData(nameof(CostsAtEachBasis))]
+    public void CostPerBaseUnitAt_reads_the_buffered_or_the_true_cost(CostBasis basis, decimal expected)
     {
         var flour = new RawMaterial { CostPerBaseUnit = 0.05m, BufferedCostPerBaseUnit = 0.0525m };
 
-        RawMaterialRules.CostPerBaseUnitAt(flour, basis).Should().Be((decimal)expected);
+        RawMaterialRules.CostPerBaseUnitAt(flour, basis).Should().Be(expected);
     }
 
     [Fact]
@@ -466,11 +477,16 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("Two prices without a brand*");
     }
 
+    public static TheoryData<decimal, decimal, decimal> BufferedCosts => new()
+    {
+        { 10m, 0m, 10m },
+        { 10m, 5m, 10.5m },
+        { 0.05m, 5m, 0.0525m },
+        { 10m, 100m, 20m },
+    };
+
     [Theory]
-    [InlineData(10, 0, 10)]
-    [InlineData(10, 5, 10.5)]
-    [InlineData(0.05, 5, 0.0525)]
-    [InlineData(10, 100, 20)]
+    [MemberData(nameof(BufferedCosts))]
     public void BufferedCost_adds_the_buffer_percent_to_the_cost(decimal cost, decimal bufferPercent, decimal expected)
     {
         RawMaterialRules.BufferedCost(cost, bufferPercent).Should().Be(expected);
@@ -491,10 +507,15 @@ public class RawMaterialRulesTests
         RawMaterialRules.StoredCostBufferPercent(RawMaterialSource.Purchased, inheritedBuffer: null, sent: 5m).Should().Be(5m);
     }
 
+    public static TheoryData<decimal, decimal, decimal> BufferPercents => new()
+    {
+        { 930m, 976.5m, 5m },
+        { 930m, 930m, 0m },
+        { 10m, 20m, 100m },
+    };
+
     [Theory]
-    [InlineData(930, 976.5, 5)]
-    [InlineData(930, 930, 0)]
-    [InlineData(10, 20, 100)]
+    [MemberData(nameof(BufferPercents))]
     public void CostBufferPercentOf_works_out_the_buffer_from_the_buffered_cost(decimal cost, decimal bufferedCost, decimal expected)
     {
         RawMaterialRules.CostBufferPercentOf(cost, bufferedCost).Should().Be(expected);
@@ -519,9 +540,10 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
+    public static TheoryData<decimal> BuffersOutOfRange => [-1m, 100.01m];
+
     [Theory]
-    [InlineData(-1)]
-    [InlineData(100.01)]
+    [MemberData(nameof(BuffersOutOfRange))]
     public void EnsureValidCostBuffer_rejects_a_buffer_outside_0_to_100_percent(decimal bufferPercent)
     {
         var act = () => RawMaterialRules.EnsureValidCostBuffer(bufferPercent);

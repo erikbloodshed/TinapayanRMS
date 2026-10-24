@@ -3,25 +3,29 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <!-- Lets a PackageVersion below override a vulnerable transitive dependency. -->
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
-    <EFCoreVersion>10.0.13</EFCoreVersion>
+    <EFCoreVersion>11.0.0-rc.2.26504.105</EFCoreVersion>
+    <!-- Microsoft.Extensions.* ships with the .NET runtime: keep it on the same release. -->
+    <MicrosoftExtensionsVersion>11.0.0-rc.2.26504.105</MicrosoftExtensionsVersion>
     <!-- Every Syncfusion package must be on the same version: upgrade them together. -->
     <SyncfusionVersion>35.1.41</SyncfusionVersion>
   </PropertyGroup>
   <ItemGroup Label="Application">
     <PackageVersion Include="Dapper" Version="2.1.89" />
     <PackageVersion Include="DynamicData" Version="9.5.0" />
+    <!-- No .NET 11 release yet. 10.0.1 asks for EF Core [10.0.1, 11.0.0), but works on EF Core 11: the snake_case names,
+         the model-changes check and the compiled model all hold. Move to its 11.x when there is one. -->
     <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
     <PackageVersion Include="FluentValidation" Version="12.2.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EFCoreVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
-    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="11.0.0-rc.2" />
     <PackageVersion Include="ReactiveUI.WPF" Version="26.0.1" />
     <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageVersion Include="System.Reactive" Version="7.0.0" />
   </ItemGroup>
   <ItemGroup Label="Transitive pins">
-    <!-- Npgsql.EntityFrameworkCore.PostgreSQL asks only for EF Core 10.0.4: keep every project on EFCoreVersion. -->
+    <!-- EFCore.NamingConventions asks for EF Core 10: keep every project on EFCoreVersion, the one Npgsql's provider takes. -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="$(EFCoreVersion)" />
   </ItemGroup>
   <ItemGroup Label="Syncfusion">
@@ -39,7 +43,7 @@
   </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="$(MicrosoftExtensionsVersion)" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
