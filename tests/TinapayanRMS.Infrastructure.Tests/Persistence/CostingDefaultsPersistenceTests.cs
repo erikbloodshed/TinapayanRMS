@@ -9,26 +9,26 @@ using TinapayanRMS.Tests.Common.Fixtures;
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
 /// <summary>
-/// The stage and costing a new product, the shrinkage a new section and the cost buffer a new raw material start with,
-/// set in Settings: one row, reading as new products in Production, the costing at zero, the shrinkage at 3% and the
-/// buffer at 10% until first saved.
+/// The stage and costing a new product and the cost buffer a new raw material start with, and the shop-wide wastage, set
+/// in Settings: one row, reading as new products in Production, the costing at zero, the wastage at 3% and the buffer at
+/// 10% until first saved.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private CostingDefaultsRepository CreateRepository() => new(CreateDbContextFactory());
 
-    private static CostingDefaults Defaults(decimal labor, decimal overhead, decimal administrative, decimal margin, decimal vat, decimal shrinkage = 3m) =>
-        new() { LaborPercent = labor, OverheadPercent = overhead, AdministrativePercent = administrative, MarginPercent = margin, VatPercent = vat, ShrinkagePercent = shrinkage };
+    private static CostingDefaults Defaults(decimal labor, decimal overhead, decimal administrative, decimal margin, decimal vat, decimal wastage = 3m) =>
+        new() { LaborPercent = labor, OverheadPercent = overhead, AdministrativePercent = administrative, MarginPercent = margin, VatPercent = vat, WastagePercent = wastage };
 
     [Fact]
-    public async Task GetAsync_reads_the_costing_at_zero_and_the_shrinkage_at_3_percent_before_anything_is_saved()
+    public async Task GetAsync_reads_the_costing_at_zero_and_the_wastage_at_3_percent_before_anything_is_saved()
     {
         var defaults = await CreateRepository().GetAsync(Cancellation);
 
         new[] { defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent }
             .Should().OnlyContain(p => p == 0m);
-        defaults.ShrinkagePercent.Should().Be(3m);
+        defaults.WastagePercent.Should().Be(3m);
         defaults.NewProductStage.Should().Be(ProductStage.Production);
         defaults.CostBufferPercent.Should().Be(10m);
     }
@@ -65,21 +65,24 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
     }
 
     [Fact]
-    public async Task SetAsync_keeps_the_shrinkage_typed_even_a_first_save_of_none()
+    public async Task SetAsync_keeps_the_wastage_typed_even_a_first_save_of_none()
     {
-        await CreateRepository().SetAsync(Defaults(0m, 0m, 0m, 0m, 0m, shrinkage: 0m), Cancellation);
-        (await CreateRepository().GetAsync(Cancellation)).ShrinkagePercent.Should().Be(0m, "the column has no store default to put 3% in its place");
+        await CreateRepository().SetAsync(Defaults(0m, 0m, 0m, 0m, 0m, wastage: 0m), Cancellation);
+        (await CreateRepository().GetAsync(Cancellation)).WastagePercent.Should().Be(0m, "a wastage of 0 isn't left for the store default to make 3%");
 
-        await CreateRepository().SetAsync(Defaults(0m, 0m, 0m, 0m, 0m, shrinkage: 5.5m), Cancellation);
-        (await CreateRepository().GetAsync(Cancellation)).ShrinkagePercent.Should().Be(5.5m);
+        await CreateRepository().SetAsync(Defaults(0m, 0m, 0m, 0m, 0m, wastage: 5.5m), Cancellation);
+        (await CreateRepository().GetAsync(Cancellation)).WastagePercent.Should().Be(5.5m);
+
+        await CreateRepository().SetAsync(Defaults(0m, 0m, 0m, 0m, 0m, wastage: 100m), Cancellation);
+        (await CreateRepository().GetAsync(Cancellation)).WastagePercent.Should().Be(100m);
     }
 
     [Theory]
     [InlineData(-1)]
-    [InlineData(100)]
-    public async Task SetAsync_refuses_a_shrinkage_a_section_couldnt_have(int shrinkage)
+    [InlineData(101)]
+    public async Task SetAsync_refuses_a_wastage_outside_0_to_100(int wastage)
     {
-        var act = () => CreateRepository().SetAsync(Defaults(0m, 0m, 0m, 0m, 0m, shrinkage: shrinkage), Cancellation);
+        var act = () => CreateRepository().SetAsync(Defaults(0m, 0m, 0m, 0m, 0m, wastage: wastage), Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }

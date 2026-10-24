@@ -37,7 +37,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingAdministrativePercent = 5m;
         viewModel.EditingMarginPercent = 40m;
         viewModel.EditingVatPercent = 12m;
-        viewModel.EditingShrinkagePercent = 4.5m;
+        viewModel.EditingWastagePercent = 4.5m;
         viewModel.EditingNewProductStage = ProductStage.ResearchAndDevelopment;
         viewModel.EditingCostBufferPercent = 8m;
 
@@ -49,7 +49,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         await reloaded.LoadCommand.Execute();
         (reloaded.EditingLaborPercent, reloaded.EditingOverheadPercent, reloaded.EditingAdministrativePercent, reloaded.EditingMarginPercent, reloaded.EditingVatPercent)
             .Should().Be((25m, 10m, 5m, 40m, 12m));
-        reloaded.EditingShrinkagePercent.Should().Be(4.5m);
+        reloaded.EditingWastagePercent.Should().Be(4.5m);
         reloaded.EditingNewProductStage.Should().Be(ProductStage.ResearchAndDevelopment);
         reloaded.EditingCostBufferPercent.Should().Be(8m);
     }
@@ -83,27 +83,27 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task Load_shows_a_shrinkage_of_3_percent_before_anything_is_saved()
+    public async Task Load_shows_a_wastage_of_3_percent_before_anything_is_saved()
     {
         var viewModel = CreateViewModel();
-        viewModel.EditingShrinkagePercent = 9m;
+        viewModel.EditingWastagePercent = 9m;
 
         await viewModel.LoadCommand.Execute();
 
-        viewModel.EditingShrinkagePercent.Should().Be(3m);
+        viewModel.EditingWastagePercent.Should().Be(3m);
     }
 
     [Fact]
-    public async Task Save_refuses_a_shrinkage_of_100_percent_and_saves_nothing()
+    public async Task Save_refuses_a_wastage_over_100_percent_and_saves_nothing()
     {
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.EditingShrinkagePercent = 100m;
+        viewModel.EditingWastagePercent = 101m;
 
         await viewModel.SaveCommand.Execute();
 
-        viewModel.ErrorMessage.Should().Be("The default shrinkage must be at least 0% and less than 100%.");
-        (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).ShrinkagePercent.Should().Be(3m);
+        viewModel.ErrorMessage.Should().Be("The wastage must be from 0% to 100%.");
+        (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).WastagePercent.Should().Be(3m);
     }
 
     [Fact]

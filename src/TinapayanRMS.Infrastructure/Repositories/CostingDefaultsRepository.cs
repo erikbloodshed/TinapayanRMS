@@ -10,7 +10,7 @@ public class CostingDefaultsRepository(IDbContextFactory<TinapayanRMSDbContext> 
 {
     public async Task<CostingDefaults> GetAsync(CancellationToken cancellationToken) =>
         await dbContextFactory.QuerySingleOrDefaultAsync<CostingDefaults>(
-            $"SELECT {Columns.Of<CostingDefaults>("d")} FROM CostingDefaults d WHERE d.Id = @id",
+            $"SELECT {Columns.Of<CostingDefaults>("d")} FROM costing_defaults d WHERE d.id = @id",
             new { id = CostingDefaults.SingletonId },
             cancellationToken)
         ?? new CostingDefaults();
@@ -19,7 +19,7 @@ public class CostingDefaultsRepository(IDbContextFactory<TinapayanRMSDbContext> 
     {
         CostingRules.EnsureValidParameters(
             defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent);
-        ProductRules.EnsureValidDefaultShrinkage(defaults.ShrinkagePercent);
+        CostingRules.EnsureValidWastage(defaults.WastagePercent);
         RawMaterialRules.EnsureValidCostBuffer(defaults.CostBufferPercent);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -35,7 +35,7 @@ public class CostingDefaultsRepository(IDbContextFactory<TinapayanRMSDbContext> 
         existing.AdministrativePercent = defaults.AdministrativePercent;
         existing.MarginPercent = defaults.MarginPercent;
         existing.VatPercent = defaults.VatPercent;
-        existing.ShrinkagePercent = defaults.ShrinkagePercent;
+        existing.WastagePercent = defaults.WastagePercent;
         existing.NewProductStage = defaults.NewProductStage;
         existing.CostBufferPercent = defaults.CostBufferPercent;
 

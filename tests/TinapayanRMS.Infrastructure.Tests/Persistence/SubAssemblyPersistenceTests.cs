@@ -50,7 +50,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
         var productId = await AddProductAsync("Pandesal");
 
-        await SaveRecipeAsync(productId, new RecipeDraft([New(roleId, [(flourId, 800m), (sugarId, 200m)], 50m) with { ShrinkagePercent = 10m }], []));
+        await SaveRecipeAsync(productId, new RecipeDraft([New(roleId, [(flourId, 800m), (sugarId, 200m)], 50m)], []));
 
         var subAssembly = await GetSubAssemblyAsync(await SubAssemblyIdAsync(productId, roleId));
         subAssembly.Name.Should().Be("Pandesal Dough");
@@ -60,7 +60,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         usage.SubAssemblyId.Should().Be(subAssembly.Id);
         usage.AuthoredField.Should().Be(UsageAuthoredField.WeightPerPiece);
         usage.AuthoredValue.Should().Be(50m, "the piece size is the product's, on its usage");
-        usage.ShrinkagePercent.Should().Be(10m);
+
         usage.SubAssembly!.Role!.Name.Should().Be("Dough");
         (await CreateSubAssemblyRepository().GetStandaloneAsync(Cancellation)).Should().ContainSingle(s => s.Id == subAssembly.Id, "it's on the Sub-Assemblies screen");
         (await CreateSubAssemblyRepository().GetStandaloneLinkedByAsync(Cancellation))[subAssembly.Id]
@@ -410,7 +410,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         await using var dbContext = CreateDbContext();
         var act = () => dbContext.RawMaterials.Where(i => i.Id == sugarId).ExecuteDeleteAsync(Cancellation);
 
-        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+        await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
     [Fact]
@@ -423,8 +423,8 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var act = () => CreateRoleRepository().DeleteAsync(roleId, Cancellation);
 
         // ExecuteDeleteAsync issues a raw DELETE outside EF Core's change tracker, so an
-        // FK violation surfaces as the driver's own SqlException, not a DbUpdateException.
-        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+        // FK violation surfaces as the driver's own PostgresException, not a DbUpdateException.
+        await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
     [Fact]

@@ -12,11 +12,11 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
 {
     public Task<IReadOnlyList<RawMaterial>> GetAllAsync(CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(
-            dbContext => RawMaterialReads.GetWithDetailsAsync(dbContext, "ORDER BY m.Name", null, cancellationToken), cancellationToken);
+            dbContext => RawMaterialReads.GetWithDetailsAsync(dbContext, "ORDER BY m.name", null, cancellationToken), cancellationToken);
 
     public async Task<RawMaterial?> GetByIdAsync(int id, CancellationToken cancellationToken) =>
         (await dbContextFactory.ReadAsync(
-            dbContext => RawMaterialReads.GetWithDetailsAsync(dbContext, "WHERE m.Id = @id", new { id }, cancellationToken), cancellationToken))
+            dbContext => RawMaterialReads.GetWithDetailsAsync(dbContext, "WHERE m.id = @id", new { id }, cancellationToken), cancellationToken))
         .SingleOrDefault();
 
     public async Task<IReadOnlyList<LinkingProduct>> GetUsedByAsync(int id, CancellationToken cancellationToken) =>
@@ -30,65 +30,71 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     private sealed record UsedByRow(int Id, string Name, string? CategoryName, DateTime? DeletedAt, bool IsComposite);
 
     /// <summary>
-    /// GetUsedByAsync's products. Feeds is the material and every ingredient whose cost it feeds: a made one with it in its
-    /// BOM, a linked one cut from it, and on up (both kinds are rejected when they'd close a loop). A recipe takes an
+    /// GetUsedByAsync's products. feeds is the material and every ingredient whose cost it feeds: a made one with it in its
+    /// BOM, a linked one cut from it, and on up (both kinds are rejected when they'd close a loop). PostgreSQL lets a
+    /// recursive query name itself only once in its recursive part, so feeds follows both kinds of link through one union
+    /// of them. A recipe takes an
     /// ingredient through a sub-assembly's lines or a usage's add-ins, and a composite through the products it holds, and
     /// on up (a composite can't end up containing itself). Packaging is read as a product sees it: its own lines unless
     /// its packaging links, a set's lines when it links a set, and another product's packaging when it links that
     /// product, followed down the chain (PackagingLineRepository.ResolveEffectiveAsync). A composite's products bring
-    /// their packaging only when it includes theirs (Products.IncludesComponentPackaging), and then all of it, so
-    /// PackagingCosts climbs from every product whose packaging cost the material is in to each composite like that
-    /// holding it, and on up. A packaging link takes only the lines, so PackagingUsers doesn't climb through composites.
+    /// their packaging only when it includes theirs (products.includes_component_packaging), and then all of it, so
+    /// packaging_costs climbs from every product whose packaging cost the material is in to each composite like that
+    /// holding it, and on up. A packaging link takes only the lines, so packaging_users doesn't climb through composites.
     /// </summary>
     private const string UsedBySql = """
-        WITH Feeds AS (
-            SELECT @id AS Id
+        WITH RECURSIVE feeds AS (
+            SELECT @id AS id
             UNION ALL
-            SELECT b.IngredientId FROM IngredientBomLines b JOIN Feeds f ON f.Id = b.ComponentIngredientId
-            UNION ALL
-            SELECT m.Id FROM RawMaterials m JOIN Feeds f ON f.Id = m.LinkedToId
+            SELECT e.id
+            FROM feeds f
+            JOIN (
+                SELECT b.component_ingredient_id AS source_id, b.ingredient_id AS id FROM ingredient_bom_lines b
+                UNION ALL
+                SELECT m.linked_to_id, m.id FROM raw_materials m WHERE m.linked_to_id IS NOT NULL
+            ) e ON e.source_id = f.id
         ),
-        SectionUsers AS (
-            SELECT u.ProductId
-            FROM ProductSubAssemblyUsages u
-            JOIN SubAssemblyLines l ON l.SubAssemblyId = u.SubAssemblyId
-            WHERE l.IngredientId IN (SELECT Id FROM Feeds)
+        section_users AS (
+            SELECT u.product_id
+            FROM product_sub_assembly_usages u
+            JOIN sub_assembly_lines l ON l.sub_assembly_id = u.sub_assembly_id
+            WHERE l.ingredient_id IN (SELECT id FROM feeds)
             UNION
-            SELECT u.ProductId
-            FROM ProductSubAssemblyUsages u
-            JOIN UsageAddInLines a ON a.UsageId = u.Id
-            WHERE a.IngredientId IN (SELECT Id FROM Feeds)
+            SELECT u.product_id
+            FROM product_sub_assembly_usages u
+            JOIN usage_add_in_lines a ON a.usage_id = u.id
+            WHERE a.ingredient_id IN (SELECT id FROM feeds)
         ),
-        RecipeUsers AS (
-            SELECT ProductId FROM SectionUsers
+        recipe_users AS (
+            SELECT product_id FROM section_users
             UNION ALL
-            SELECT c.ProductId FROM ProductComponents c JOIN RecipeUsers r ON r.ProductId = c.ComponentProductId
+            SELECT c.product_id FROM product_components c JOIN recipe_users r ON r.product_id = c.component_product_id
         ),
-        PackagingUsers AS (
-            SELECT l.ProductId
-            FROM PackagingLines l
-            WHERE l.PackagingMaterialId = @id
-                AND NOT EXISTS (SELECT 1 FROM PackagingLinks k WHERE k.ProductId = l.ProductId)
+        packaging_users AS (
+            SELECT l.product_id
+            FROM packaging_lines l
+            WHERE l.packaging_material_id = @id
+                AND NOT EXISTS (SELECT 1 FROM packaging_links k WHERE k.product_id = l.product_id)
             UNION ALL
-            SELECT k.ProductId
-            FROM PackagingLinks k
-            WHERE EXISTS (SELECT 1 FROM SubAssemblyPackagingLines s WHERE s.SubAssemblyId = k.LinkedSubAssemblyId AND s.PackagingMaterialId = @id)
+            SELECT k.product_id
+            FROM packaging_links k
+            WHERE EXISTS (SELECT 1 FROM sub_assembly_packaging_lines s WHERE s.sub_assembly_id = k.linked_sub_assembly_id AND s.packaging_material_id = @id)
             UNION ALL
-            SELECT k.ProductId FROM PackagingLinks k JOIN PackagingUsers p ON p.ProductId = k.LinkedProductId
+            SELECT k.product_id FROM packaging_links k JOIN packaging_users p ON p.product_id = k.linked_product_id
         ),
-        PackagingCosts AS (
-            SELECT ProductId FROM PackagingUsers
+        packaging_costs AS (
+            SELECT product_id FROM packaging_users
             UNION ALL
-            SELECT c.ProductId
-            FROM ProductComponents c
-            JOIN PackagingCosts p ON p.ProductId = c.ComponentProductId
-            JOIN Products h ON h.Id = c.ProductId
-            WHERE h.IncludesComponentPackaging = 1
+            SELECT c.product_id
+            FROM product_components c
+            JOIN packaging_costs p ON p.product_id = c.component_product_id
+            JOIN products h ON h.id = c.product_id
+            WHERE h.includes_component_packaging
         )
-        SELECT p.Id, p.Name, c.Name AS CategoryName, p.DeletedAt, p.IsComposite
-        FROM Products p
-        LEFT JOIN ProductCategories c ON c.Id = p.CategoryId
-        WHERE p.Id IN (SELECT ProductId FROM RecipeUsers) OR p.Id IN (SELECT ProductId FROM PackagingCosts)
+        SELECT p.id, p.name, c.name AS category_name, p.deleted_at, p.is_composite
+        FROM products p
+        LEFT JOIN product_categories c ON c.id = p.category_id
+        WHERE p.id IN (SELECT product_id FROM recipe_users) OR p.id IN (SELECT product_id FROM packaging_costs)
         """;
 
     public async Task AddAsync(RawMaterial material, CancellationToken cancellationToken)

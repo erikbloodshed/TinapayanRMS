@@ -448,7 +448,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         await SaveRecipeAsync(sourceId, new RecipeDraft(
             [
                 Own(doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m),
-                Own(fillingRoleId, [(cheeseId, 100m)], sectionName: "Cheese", weightPerPiece: 12m) with { ShrinkagePercent = 5m },
+                Own(fillingRoleId, [(cheeseId, 100m)], sectionName: "Cheese", weightPerPiece: 12m),
             ],
             []));
         var doughId = await SubAssemblyIdAsync(sourceId, doughRoleId);
@@ -467,7 +467,6 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         filling.SubAssembly.OwnerProductId.Should().Be(newId);
         filling.SubAssembly.TotalWeight.Should().Be(100m);
         filling.AuthoredValue.Should().Be(12m);
-        filling.ShrinkagePercent.Should().Be(5m);
         (await FindAsync(sourceFillingId))!.OwnerProductId.Should().Be(sourceId, "the source's own is untouched");
     }
 }

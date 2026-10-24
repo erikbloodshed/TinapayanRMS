@@ -45,7 +45,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         // As the migration added the column to the products already there: the row names no stage.
         await using (var dbContext = CreateDbContext())
         {
-            await dbContext.Database.ExecuteSqlRawAsync("INSERT INTO Products (Name) VALUES (N'Pandesal')", Cancellation);
+            await dbContext.Database.ExecuteSqlRawAsync("INSERT INTO products (name, is_composite, includes_component_packaging) VALUES ('Pandesal', false, false)", Cancellation);
         }
 
         (await CreateRepository().GetAllAsync(Cancellation)).Should().ContainSingle().Which.Stage.Should().Be(ProductStage.Production);

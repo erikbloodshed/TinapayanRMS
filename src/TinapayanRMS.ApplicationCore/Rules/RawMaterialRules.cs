@@ -224,7 +224,7 @@ public static class RawMaterialRules
     public const int StoredCostScale = 20;
 
     /// <summary>
-    /// <paramref name="cost"/> as the database stores it: to 20 places, rounded half away from zero as SQL Server rounds it.
+    /// <paramref name="cost"/> as the database stores it: to 20 places, rounded half away from zero as PostgreSQL rounds a numeric.
     /// A stored cost is always set through this. Worked out in memory, a cost that doesn't come out even carries up to 28
     /// places (₱170 a pack of 240 is ₱0.708333… a piece), and compared with the stored one it read as changed when nothing
     /// had: a Save logged the same price in price history again, and moved the cost's date (found 2026-10-03).

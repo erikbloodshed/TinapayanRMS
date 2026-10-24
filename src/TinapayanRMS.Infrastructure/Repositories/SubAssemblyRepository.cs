@@ -14,10 +14,10 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     /// sub-assembly.
     /// </summary>
     private const string RecipeLinksSql = """
-        SELECT u.SubAssemblyId, p.Id AS ProductId, p.Name AS ProductName, c.Name AS CategoryName, p.DeletedAt, p.IsComposite
-        FROM ProductSubAssemblyUsages u
-        JOIN Products p ON p.Id = u.ProductId
-        LEFT JOIN ProductCategories c ON c.Id = p.CategoryId
+        SELECT u.sub_assembly_id, p.id AS product_id, p.name AS product_name, c.name AS category_name, p.deleted_at, p.is_composite
+        FROM product_sub_assembly_usages u
+        JOIN products p ON p.id = u.product_id
+        LEFT JOIN product_categories c ON c.id = p.category_id
         """;
 
     public async Task<IReadOnlyList<SubAssembly>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken)
@@ -29,7 +29,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
 
         return await dbContextFactory.ReadAsync(
             dbContext => SubAssemblyReads.GetWithRoleAsync(
-                dbContext, $"WHERE s.Id IN ({DapperReads.IdsTable})\nORDER BY s.Id", new { ids = DapperReads.IdList(ids) }, cancellationToken),
+                dbContext, $"WHERE s.id IN ({DapperReads.IdsTable})\nORDER BY s.id", new { ids = DapperReads.IdList(ids) }, cancellationToken),
             cancellationToken);
     }
 
@@ -39,12 +39,12 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             async dbContext => (await dbContext.Connection().QueryAsync<SubAssembly, SubAssemblyRole, Product?, SubAssembly>(
                 dbContext.Command(
                     $"""
-                    SELECT {SubAssemblyReads.ColumnsWithRole}, o.Id, o.Name
-                    FROM SubAssemblies s
+                    SELECT {SubAssemblyReads.ColumnsWithRole}, o.id, o.name
+                    FROM sub_assemblies s
                     {SubAssemblyReads.RoleJoin}
-                    LEFT JOIN Products o ON o.Id = s.OwnerProductId
-                    WHERE s.TotalWeight > 0 AND r.IsPackaging = 0
-                    ORDER BY s.Name
+                    LEFT JOIN products o ON o.id = s.owner_product_id
+                    WHERE s.total_weight > 0 AND NOT r.is_packaging
+                    ORDER BY s.name
                     """,
                     null,
                     cancellationToken),
@@ -58,7 +58,7 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
 
     public Task<IReadOnlyList<SubAssembly>> GetStandaloneAsync(CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(
-            dbContext => SubAssemblyReads.GetWithRoleAsync(dbContext, "WHERE s.OwnerProductId IS NULL\nORDER BY s.Name", null, cancellationToken),
+            dbContext => SubAssemblyReads.GetWithRoleAsync(dbContext, "WHERE s.owner_product_id IS NULL\nORDER BY s.name", null, cancellationToken),
             cancellationToken);
 
     /// <summary>The recipes linking a sub-assembly, and the products whose packaging links a set, in one query.</summary>
@@ -68,11 +68,11 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             $"""
             {RecipeLinksSql}
             UNION ALL
-            SELECT l.LinkedSubAssemblyId AS SubAssemblyId, p.Id AS ProductId, p.Name AS ProductName, c.Name AS CategoryName, p.DeletedAt, p.IsComposite
-            FROM PackagingLinks l
-            JOIN Products p ON p.Id = l.ProductId
-            LEFT JOIN ProductCategories c ON c.Id = p.CategoryId
-            WHERE l.LinkedSubAssemblyId IS NOT NULL
+            SELECT l.linked_sub_assembly_id AS sub_assembly_id, p.id AS product_id, p.name AS product_name, c.name AS category_name, p.deleted_at, p.is_composite
+            FROM packaging_links l
+            JOIN products p ON p.id = l.product_id
+            LEFT JOIN product_categories c ON c.id = p.category_id
+            WHERE l.linked_sub_assembly_id IS NOT NULL
             """,
             null,
             cancellationToken));

@@ -265,11 +265,11 @@
                                     <TextBlock Text="Production Plan" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ListBoxItem>
-                            <!-- What-If Prices: Lightbulb, an idea tried before it's real -->
-                            <ListBoxItem x:Name="WhatIfNavItem" AutomationProperties.Name="What-If Prices">
+                            <!-- Price Simulator: Lightbulb, an idea tried before it's real -->
+                            <ListBoxItem x:Name="PriceSimulatorNavItem" AutomationProperties.Name="Price Simulator">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xEA80;" Style="{StaticResource DrawerIconStyle}" />
-                                    <TextBlock Text="What-If Prices" VerticalAlignment="Center" />
+                                    <TextBlock Text="Price Simulator" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ListBoxItem>
                         </ListBox>
@@ -314,6 +314,9 @@
                     sorting, sub-tab, focus and typed text are still there when you come back.
                     MainWindow.xaml.cs refreshes the screen's data on each return, and each
                     ViewModel's LoadCommand merges that data in without disturbing its state.
+
+                    The tabs start empty: MainWindow.xaml.cs makes each one's screen the first
+                    time it's shown (CreateScreen), so startup builds only the first.
                 -->
                 <syncfusion:TabControlExt x:Name="MainTabControl" Margin="0" CloseMode="Hide"
                                           Background="{StaticResource PageBackgroundBrush}"
@@ -332,7 +335,7 @@
                     -->
                     <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" Visibility="Collapsed" />
                     <syncfusion:TabItemExt x:Name="ProductionPlanTab" Header="Production Plan" Visibility="Collapsed" />
-                    <syncfusion:TabItemExt x:Name="WhatIfTab" Header="What-If Prices" Visibility="Collapsed" />
+                    <syncfusion:TabItemExt x:Name="PriceSimulatorTab" Header="Price Simulator" Visibility="Collapsed" />
                     <!--
                         Print, opened by the Products header's Print and closed with its ✕ (hidden, as CloseMode says);
                         not in the menu, since it prints what Products has open. Hidden until then.

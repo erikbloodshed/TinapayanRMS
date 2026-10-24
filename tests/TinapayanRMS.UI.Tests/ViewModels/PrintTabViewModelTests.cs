@@ -247,7 +247,8 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             packagingLineRepository,
             new CostingParametersRepository(factory),
             new SubAssemblyLineRepository(factory),
-            new ProductRepository(factory));
+            new ProductRepository(factory),
+            new CostingDefaultsRepository(factory));
     }
 
     /// <summary>The Products screen, loaded, with <paramref name="productName"/> open when one is given.</summary>
@@ -286,6 +287,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
             new ProductCategoryRepository(factory),
+            new ProductVersionRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),
             new ProductCategoryValidator(),

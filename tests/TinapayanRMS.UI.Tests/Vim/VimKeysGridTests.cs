@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -279,6 +280,201 @@ public class VimKeysGridTests
         });
     }
 
+    /// <summary>
+    /// A column filter's search box types, though its pop-up hangs from the grid's heading: a letter there isn't the grid's
+    /// Normal-mode key. The filter control is put in the heading as Syncfusion's own funnel click does (GridHeaderCellControl's
+    /// OpenFilterPopUp), with its pop-up left shut, since one opened from an off-screen grid is moved onto a real screen.
+    /// </summary>
+    [Fact]
+    public void A_letter_types_in_a_column_filters_search_box()
+    {
+        RunWithVimKeys(FilteredGrid, grid =>
+        {
+            var heading = Descendants(grid).OfType<GridHeaderCellControl>().First(cell => cell.Column?.MappingName == nameof(Line.Name));
+            heading.ApplyTemplate();
+            var filterControl = new GridFilterControl();
+            ((Border)heading.Template.FindName("PART_FilterPopUpPresenter", heading)).Child = filterControl;
+            filterControl.ApplyTemplate();
+            var list = (CheckboxFilterControl)filterControl.Template.FindName("PART_CheckboxFilterControl", filterControl);
+            list.ApplyTemplate();
+            var searchBox = (TextBox)list.Template.FindName("PART_SearchTextBox", list);
+
+            TypeOne(searchBox, 'f').Should().BeFalse("the search box is typed into, not the grid's Normal mode");
+            TypeOne(grid, 'x').Should().BeTrue("on the grid itself, a letter is still a Normal-mode key");
+        });
+    }
+
+    [Fact]
+    public void Ctrl_r_then_equals_types_the_answer_to_a_sum_into_the_cell()
+    {
+        RunWithVimKeys(() => LinesGrid(), grid =>
+        {
+            var lines = (ObservableCollection<Line>)grid.ItemsSource;
+            var editor = EditGrams(grid);
+
+            PressWithControl(editor, Key.R).Should().BeTrue("Ctrl+R in Insert waits for a register");
+            VimKeys.State.Indicator.Should().Be("INSERT \"");
+            TypeOne(editor, '=').Should().BeTrue();
+            VimKeys.State.Mode.Should().Be(VimMode.Command);
+
+            Type(editor, "5*");
+            Press(editor, Key.Space).Should().BeTrue("a space goes in the sum, not the number box");
+            Type(editor, "(2+3)");
+            Bar(grid).Should().Be("=5* (2+3)▏");
+            editor.IsKeyboardFocusWithin.Should().BeTrue("the keyboard stays in the cell while the sum is typed");
+
+            Press(editor, Key.Enter).Should().BeTrue();
+            VimKeys.State.Mode.Should().Be(VimMode.Insert);
+            grid.SelectionController.CurrentCellManager.CurrentCell.IsEditing.Should().BeTrue("the answer is typed, not committed");
+
+            Press(editor, Key.Escape);
+            lines[0].Grams.Should().Be(25m);
+        });
+    }
+
+    [Fact]
+    public void The_answer_is_rounded_to_the_decimals_the_cell_takes()
+    {
+        RunWithVimKeys(() => LinesGrid(), grid =>
+        {
+            var editor = EditGrams(grid);
+
+            TypeSum(editor, "20/3");
+            Press(editor, Key.Escape);
+
+            ((ObservableCollection<Line>)grid.ItemsSource)[0].Grams.Should().Be(6.67m, "the column shows and takes 2 decimals");
+        });
+    }
+
+    [Fact]
+    public void A_sum_that_cant_be_worked_out_keeps_the_line_up_saying_why()
+    {
+        RunWithVimKeys(() => LinesGrid(), grid =>
+        {
+            var editor = EditGrams(grid);
+
+            TypeSum(editor, "5*(2+3");
+
+            VimKeys.State.Mode.Should().Be(VimMode.Command, "the line stays up to be put right");
+            Bar(grid).Should().Contain("a ) is missing");
+
+            Type(editor, ")");
+            Press(editor, Key.Enter);
+            Press(editor, Key.Escape);
+            ((ObservableCollection<Line>)grid.ItemsSource)[0].Grams.Should().Be(25m);
+        });
+    }
+
+    [Fact]
+    public void Esc_puts_the_sum_away_leaving_the_cell_as_it_was()
+    {
+        RunWithVimKeys(() => LinesGrid(), grid =>
+        {
+            var editor = EditGrams(grid);
+            PressWithControl(editor, Key.R);
+            Type(editor, "=7*7");
+
+            Press(editor, Key.Escape).Should().BeTrue();
+
+            VimKeys.State.Mode.Should().Be(VimMode.Insert);
+            grid.SelectionController.CurrentCellManager.CurrentCell.IsEditing.Should().BeTrue("Esc on the line doesn't end the cell's edit");
+            Press(editor, Key.Escape);
+            ((ObservableCollection<Line>)grid.ItemsSource)[0].Grams.Should().Be(100m);
+        });
+    }
+
+    [Fact]
+    public void Between_cells_in_Insert_the_answer_begins_the_cells_edit()
+    {
+        RunWithVimKeys(() => LinesGrid(), grid =>
+        {
+            GridKeyboardFocus.PlaceCurrentCell(grid);
+            Type(grid, "i");
+            Press(Editor(grid), Key.Tab);
+            grid.SelectionController.CurrentCellManager.CurrentCell.IsEditing.Should().BeFalse();
+
+            TypeSum(grid, "4*30");
+
+            grid.SelectionController.CurrentCellManager.CurrentCell.IsEditing.Should().BeTrue();
+            Press(Editor(grid), Key.Escape);
+            ((ObservableCollection<Line>)grid.ItemsSource)[0].Grams.Should().Be(120m);
+            ((ObservableCollection<Line>)grid.ItemsSource)[0].Name.Should().Be("Line 1");
+        });
+    }
+
+    [Fact]
+    public void Another_character_after_ctrl_r_is_dropped()
+    {
+        RunWithVimKeys(() => LinesGrid(), grid =>
+        {
+            var editor = EditGrams(grid);
+
+            PressWithControl(editor, Key.R);
+            TypeOne(editor, 'a').Should().BeTrue("there's no register a");
+
+            VimKeys.State.Indicator.Should().Be("INSERT");
+            TypeOne(editor, '7').Should().BeFalse("the next key types again");
+        });
+    }
+
+    /// <summary>Begins the first line's Grams edit with <c>i</c>, everything in it selected as a click leaves it.</summary>
+    private static TextBox EditGrams(SfDataGrid grid)
+    {
+        GridKeyboardFocus.PlaceCurrentCell(grid);
+        grid.MoveCurrentCell(new(grid.GetFirstDataRowIndex(), grid.GetFirstColumnIndex() + 1));
+        Type(grid, "i");
+        var editor = Editor(grid);
+        editor.SelectAll();
+        return editor;
+    }
+
+    /// <summary>Ctrl+R, =, <paramref name="sum"/>, then Enter.</summary>
+    private static void TypeSum(UIElement target, string sum)
+    {
+        PressWithControl(target, Key.R);
+        Type(target, "=" + sum);
+        Press(target, Key.Enter);
+    }
+
+    /// <summary>What the line along the bottom of <paramref name="grid"/>'s window says while it takes a sum.</summary>
+    private static string Bar(SfDataGrid grid)
+    {
+        var layer = AdornerLayer.GetAdornerLayer(grid)!;
+        return Descendants(layer).OfType<TextBlock>()
+            .Where(text => text.IsVisible)
+            .Select(text => text.Text)
+            .Aggregate(string.Empty, (shown, text) => shown + text);
+    }
+
+    /// <summary>Presses <paramref name="key"/> with Ctrl held, as the keyboard reports it to the thread.</summary>
+    private static bool PressWithControl(UIElement target, Key key)
+    {
+        var held = new byte[256];
+        GetKeyboardState(held).Should().BeTrue();
+        var pressed = (byte[])held.Clone();
+        pressed[VkControl] = pressed[VkLeftControl] = 0x80;
+        SetKeyboardState(pressed);
+        try
+        {
+            return Press(target, key);
+        }
+        finally
+        {
+            SetKeyboardState(held);
+        }
+    }
+
+    private const int VkControl = 0x11;
+    private const int VkLeftControl = 0xA2;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool GetKeyboardState(byte[] keyState);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool SetKeyboardState(byte[] keyState);
+
     /// <summary>Runs <paramref name="test"/> on <paramref name="grid"/> with the Vim keys on, and off again after.</summary>
     private static void RunWithVimKeys(Func<SfDataGrid> create, Action<SfDataGrid> test) =>
         OffscreenGrid.Run(create, shown =>
@@ -389,4 +585,16 @@ public class VimKeysGridTests
         GridFillerRows.SetIsEnabled(grid, true);
         return grid;
     }
+
+    /// <summary>A read-only table whose Name column filters from a funnel in its heading, as Reports' and the Price Simulator's do.</summary>
+    private static SfDataGrid FilteredGrid() => new()
+    {
+        ItemsSource = new ObservableCollection<Line>([new Line { Name = "Flour" }, new Line { Name = "Sugar" }]),
+        AutoGenerateColumns = false,
+        AllowEditing = false,
+        SelectionMode = GridSelectionMode.Extended,
+        NavigationMode = NavigationMode.Row,
+        Height = 300,
+        Columns = { new GridTextColumn { MappingName = nameof(Line.Name), AllowFiltering = true } },
+    };
 }

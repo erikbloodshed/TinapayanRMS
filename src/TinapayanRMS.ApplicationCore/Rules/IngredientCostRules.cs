@@ -8,8 +8,8 @@ public readonly record struct IngredientCosts(decimal CostPerBaseUnit, decimal B
 
 /// <summary>
 /// How a made or linked ingredient's costs follow from what it's made of or cut from (2026-10-03, moved out of
-/// IngredientCostPropagator). The cascade stores what this works out; the What-If screen works it out over prices that
-/// aren't real (<see cref="Reprice"/>). One piece of code for both, so a what-if can never price an ingredient differently
+/// IngredientCostPropagator). The cascade stores what this works out; the Price Simulator screen works it out over prices that
+/// aren't real (<see cref="Reprice"/>). One piece of code for both, so a simulation can never price an ingredient differently
 /// from how a real price change would.
 /// </summary>
 public static class IngredientCostRules
@@ -64,7 +64,7 @@ public static class IngredientCostRules
 
     /// <summary>
     /// The materials a change to <paramref name="materialId"/>'s cost reaches: itself, and every made and linked
-    /// ingredient depending on it, however deeply, the ones <see cref="Reprice"/> works out again (the What-If report's
+    /// ingredient depending on it, however deeply, the ones <see cref="Reprice"/> works out again (the Price Simulator report's
     /// "price changes applied" to a product, 2026-10-06).
     /// </summary>
     public static IReadOnlySet<int> ReachedBy(IEnumerable<RawMaterial> materials, IEnumerable<IngredientBomLine> bomLines, int materialId) =>

@@ -210,7 +210,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     public async Task DeleteAsync_removes_an_ingredient_along_with_its_units_and_the_prices_recorded_in_them()
     {
         // Price history references the ingredient (Cascade) and one of its units (Restrict), and
-        // the units cascade from the ingredient too: SQL Server must accept removing all three.
+        // the units cascade from the ingredient too: the database must accept removing all three.
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
         await repository.AddAsync(new RawMaterial { Name = "Flour", CategoryId = categoryId, Source = RawMaterialSource.Purchased }, Cancellation);
@@ -290,7 +290,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
         var act = () => dbContext.SaveChangesAsync(Cancellation);
 
-        (await act.Should().ThrowAsync<DbUpdateException>()).WithInnerException<Microsoft.Data.SqlClient.SqlException>()
+        (await act.Should().ThrowAsync<DbUpdateException>()).WithInnerException<Npgsql.PostgresException>()
             .WithMessage("*CK_RawMaterials_BaseUnitMatchesType*");
     }
 

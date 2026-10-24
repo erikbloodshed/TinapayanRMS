@@ -267,6 +267,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
             new SubAssemblyValidator(),
             new SubAssemblyRoleValidator(),
             new InMemoryViewStateStore(),
+            VersionRecorders.Create(factory),
             new LoggerConfiguration().CreateLogger());
     }
 

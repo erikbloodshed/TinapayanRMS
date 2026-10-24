@@ -122,6 +122,7 @@
                                     <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" MinimumWidth="120" AllowFiltering="True" />
                                     <controls:NumericColumn MappingName="Pieces" HeaderText="Pieces" NumberDecimalDigits="0" Width="76" AllowNullValue="True" />
                                     <controls:NumericColumn MappingName="IngredientsCost" HeaderText="Ingredients Cost" NumberDecimalDigits="2" MinimumWidth="106" />
+                                    <controls:NumericColumn MappingName="WastageCost" HeaderText="Wastage Cost" NumberDecimalDigits="2" MinimumWidth="90" />
                                     <controls:NumericColumn MappingName="PackagingCost" HeaderText="Packaging Cost" NumberDecimalDigits="2" MinimumWidth="100" />
                                     <controls:NumericColumn MappingName="LaborCost" HeaderText="Labor Cost" NumberDecimalDigits="2" MinimumWidth="72" />
                                     <controls:NumericColumn MappingName="OverheadCost" HeaderText="Overhead Cost" NumberDecimalDigits="2" MinimumWidth="98" />

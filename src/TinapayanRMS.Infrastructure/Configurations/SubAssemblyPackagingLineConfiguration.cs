@@ -8,7 +8,7 @@ public class SubAssemblyPackagingLineConfiguration : IEntityTypeConfiguration<Su
 {
     public void Configure(EntityTypeBuilder<SubAssemblyPackagingLine> builder)
     {
-        builder.ToTable(t => t.HasCheckConstraint("CK_SubAssemblyPackagingLines_QtyPerSet", "[QtyPerSet] > 0"));
+        builder.ToTable(t => t.HasCheckConstraint("CK_SubAssemblyPackagingLines_QtyPerSet", "qty_per_set > 0"));
 
         // Deleting the set takes its own lines with it.
         builder.HasOne(l => l.SubAssembly)

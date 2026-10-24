@@ -14,9 +14,11 @@ namespace TinapayanRMS.UI.Tests.Controls;
 
 /// <summary>
 /// GridFillerRows' drawn rows (GridFillerLayer) look like the grid's own empty rows: a themed grid padded with them is
-/// rendered beside the same grid holding that many blank records, and the two must match pixel for pixel, at 100% and at
-/// the 125% the dev machine's primary monitor runs at, with and without a row header, and scrolled sideways with the
-/// columns passing under the row header.
+/// rendered beside the same grid holding that many blank records, the last cut off by the bottom edge in both, and the
+/// two must match pixel for pixel, at 100% and at the 125% the dev machine's primary monitor runs at, with and without a
+/// row header, scrolled sideways with the columns passing under the row header, and under an add row, as the lines tables
+/// the app types into are padded. A grid can't hold records below its add row, so there the blank one holds a blank
+/// record in the add row's place, and only what's under the add row is compared.
 /// </summary>
 public class GridFillerRowsDrawingTests
 {
@@ -36,18 +38,29 @@ public class GridFillerRowsDrawingTests
     /// </summary>
     private const int Tolerance = 2;
 
+    /// <summary>
+    /// How far a pixel may be off in the one pixel row where the grid's bottom edge cuts the last row partway across it.
+    /// The grid cuts its own last row with a clip on that row, and the layer with one in its drawing, and the two cover
+    /// that pixel a little differently: 3 or 4 levels apart where a line crosses it at 125%. The lines above it, checked
+    /// at <see cref="Tolerance"/>, are where a line out of place would show.
+    /// </summary>
+    private const int CutRowTolerance = 4;
+
     [Theory]
-    [InlineData(false, 96, false, false)]
-    [InlineData(true, 96, false, false)]
-    [InlineData(false, 120, false, false)]
-    [InlineData(true, 120, false, false)]
-    [InlineData(true, 96, true, false)]
-    [InlineData(true, 120, true, false)]
-    [InlineData(true, 96, false, true)]
-    [InlineData(true, 120, false, true)]
-    public void The_drawn_rows_match_blank_records(bool showRowHeader, int dpi, bool scrolled, bool resized) => StaThread.RunThemed(() =>
+    [InlineData(false, 96, false, false, false)]
+    [InlineData(true, 96, false, false, false)]
+    [InlineData(false, 120, false, false, false)]
+    [InlineData(true, 120, false, false, false)]
+    [InlineData(true, 96, true, false, false)]
+    [InlineData(true, 120, true, false, false)]
+    [InlineData(true, 96, false, true, false)]
+    [InlineData(true, 120, false, true, false)]
+    [InlineData(true, 96, false, false, true)]
+    [InlineData(true, 120, false, false, true)]
+    [InlineData(true, 120, true, false, true)]
+    public void The_drawn_rows_match_blank_records(bool showRowHeader, int dpi, bool scrolled, bool resized, bool addRow) => StaThread.RunThemed(() =>
     {
-        var padded = LinesGrid(showRowHeader, scrolled, blankRecords: 0);
+        var padded = LinesGrid(showRowHeader, scrolled, blankRecords: 0, addRow);
         var host = new StackPanel { Orientation = Orientation.Horizontal, Children = { padded } };
         var window = new Window
         {
@@ -65,10 +78,13 @@ public class GridFillerRowsDrawingTests
             SfSkinManager.SetTheme(window, new Theme("Windows11Light"));
             window.Show();
             OffscreenGrid.Pump();
-            var rowCount = OffscreenGrid.FillerLayer(padded).Layout.RowCount;
+            var layout = OffscreenGrid.FillerLayer(padded).Layout;
+            var rowCount = layout.RowCount;
             rowCount.Should().BeGreaterThan(0, "a 300 px grid with two lines has room for more");
+            (layout.Top + (rowCount * layout.RowHeight)).Should().BeGreaterThan(layout.Viewport.Bottom + 1, "the last row is cut off by the grid's bottom edge");
 
-            var blank = LinesGrid(showRowHeader, scrolled, rowCount);
+            var blank = LinesGrid(showRowHeader, scrolled, addRow ? rowCount + 1 : rowCount, addRow: false);
+            var fromRow = addRow ? UnderAddRow(padded, dpi) : 0;
             host.Children.Add(blank);
             OffscreenGrid.Pump();
             if (scrolled)
@@ -90,7 +106,7 @@ public class GridFillerRowsDrawingTests
                 padded.UpdateLayout();
                 OffscreenGrid.FillerLayer(padded).Layout.Columns.Should().NotEqual(before, "the drawn lines follow the column as it's dragged");
                 OffscreenGrid.Pump();
-                var dragging = Differences(Render(padded, dpi), Render(blank, dpi));
+                var dragging = Differences(Render(padded, dpi), Render(blank, dpi), fromRow, CutRow(padded, dpi));
                 dragging.Should().BeEmpty("mid-drag, these pixels differ: {0}", string.Join("; ", dragging));
 
                 foreach (var grid in new[] { padded, blank })
@@ -103,7 +119,7 @@ public class GridFillerRowsDrawingTests
             }
 
             OffscreenGrid.FillerLayer(padded).Layout.RowCount.Should().Be(rowCount);
-            var differences = Differences(Render(padded, dpi), Render(blank, dpi));
+            var differences = Differences(Render(padded, dpi), Render(blank, dpi), fromRow, CutRow(padded, dpi));
             differences.Should().BeEmpty("the drawn rows should look like blank records, and these pixels don't: {0}", string.Join("; ", differences));
         }
         finally
@@ -113,10 +129,11 @@ public class GridFillerRowsDrawingTests
     });
 
     /// <summary>
-    /// A 300 px lines table as the app's are, with two lines and <paramref name="blankRecords"/> empty ones under them, and
-    /// GridFillerRows on when it has none. Scrolled, its Name column is too wide for it, so it scrolls sideways.
+    /// A 300 px lines table as the app's are, with two lines and <paramref name="blankRecords"/> empty ones under them, an
+    /// add row under those when <paramref name="addRow"/>, and GridFillerRows on when it has no blank records. Scrolled,
+    /// its Name column is too wide for it, so it scrolls sideways.
     /// </summary>
-    private static SfDataGrid LinesGrid(bool showRowHeader, bool scrolled, int blankRecords)
+    private static SfDataGrid LinesGrid(bool showRowHeader, bool scrolled, int blankRecords, bool addRow)
     {
         var lines = new ObservableCollection<Line>
         {
@@ -132,7 +149,8 @@ public class GridFillerRowsDrawingTests
         {
             ItemsSource = lines,
             AutoGenerateColumns = false,
-            AllowEditing = false,
+            AllowEditing = addRow,
+            AddNewRowPosition = addRow ? AddNewRowPosition.Bottom : AddNewRowPosition.None,
             GridLinesVisibility = GridLinesVisibility.Both,
             ShowRowHeader = showRowHeader,
             AllowRowHoverHighlighting = false,
@@ -145,6 +163,9 @@ public class GridFillerRowsDrawingTests
         grid.Columns.Add(new GridTextColumn { MappingName = nameof(Line.Grams), Width = 90 });
         grid.Columns.Add(new GridTextColumn { MappingName = nameof(Line.Cost) });
         GridFillerRows.SetIsEnabled(grid, blankRecords == 0);
+
+        // The blank records run past the bottom edge as the drawn rows do, and a scroll bar for them would narrow the grid.
+        ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Hidden);
         return grid;
     }
 
@@ -164,16 +185,42 @@ public class GridFillerRowsDrawingTests
         return bitmap;
     }
 
-    /// <summary>The first 20 pixels further apart than <see cref="Tolerance"/>, as "x,y padded/blank" in ARGB.</summary>
-    private static List<string> Differences(BitmapSource padded, BitmapSource blank)
+    /// <summary>
+    /// The pixel row at <paramref name="dpi"/> where <paramref name="padded"/>'s bottom edge cuts its last drawn row
+    /// partway across, or -1 when the edge falls between pixel rows.
+    /// </summary>
+    private static int CutRow(SfDataGrid padded, int dpi)
+    {
+        var layer = OffscreenGrid.FillerLayer(padded);
+        var bottom = layer.TranslatePoint(new Point(0, layer.Layout.Viewport.Bottom), padded).Y * dpi / 96d;
+        return Math.Abs(bottom - Math.Round(bottom)) < 1e-6 ? -1 : (int)Math.Floor(bottom);
+    }
+
+    /// <summary>
+    /// The first pixel row at <paramref name="dpi"/> wholly under <paramref name="padded"/>'s add row, where its first
+    /// drawn row starts. The add row's own bottom line ends there.
+    /// </summary>
+    private static int UnderAddRow(SfDataGrid padded, int dpi)
+    {
+        var layer = OffscreenGrid.FillerLayer(padded);
+        var top = layer.TranslatePoint(new Point(0, layer.Layout.Top), padded).Y * dpi / 96d;
+        return (int)Math.Ceiling(top - 1e-6);
+    }
+
+    /// <summary>
+    /// The first 20 pixels from pixel row <paramref name="fromRow"/> down further apart than <see cref="Tolerance"/>
+    /// (<see cref="CutRowTolerance"/> in <paramref name="cutRow"/>), as "x,y padded/blank" in ARGB.
+    /// </summary>
+    private static List<string> Differences(BitmapSource padded, BitmapSource blank, int fromRow, int cutRow)
     {
         var (a, b) = (Pixels(padded), Pixels(blank));
         List<string> differences = [];
-        for (var i = 0; i < a.Length && differences.Count < 20; i += 4)
+        for (var i = fromRow * padded.PixelWidth * 4; i < a.Length && differences.Count < 20; i += 4)
         {
-            if (Enumerable.Range(i, 4).Any(c => Math.Abs(a[c] - b[c]) > Tolerance))
+            var pixel = i / 4;
+            var tolerance = pixel / padded.PixelWidth == cutRow ? CutRowTolerance : Tolerance;
+            if (Enumerable.Range(i, 4).Any(c => Math.Abs(a[c] - b[c]) > tolerance))
             {
-                var pixel = i / 4;
                 differences.Add($"{pixel % padded.PixelWidth},{pixel / padded.PixelWidth} {BitConverter.ToUInt32(a, i):X8}/{BitConverter.ToUInt32(b, i):X8}");
             }
         }

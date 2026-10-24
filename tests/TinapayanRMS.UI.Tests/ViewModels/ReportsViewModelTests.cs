@@ -37,13 +37,15 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
                 packagingLineRepository,
                 new CostingParametersRepository(factory),
                 new SubAssemblyLineRepository(factory),
-                new ProductRepository(factory)),
+                new ProductRepository(factory),
+                new CostingDefaultsRepository(factory)),
             new LoggerConfiguration().CreateLogger());
     }
 
     [Fact]
     public async Task The_product_cost_summary_counts_a_linked_usages_add_ins()
     {
+        await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var ubeId = await AddIngredientAsync("Ube Flavour", costPerGram: 0.8m);
@@ -75,7 +77,8 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
 
-        // A 1,000 g / ₱50 dough at 50 g a piece, a ₱30 gift box a piece, and 25% labor, 10% overhead and 5% admin.
+        // A 1,000 g / ₱50 dough at 50 g a piece, a ₱30 gift box a piece, and 25% labor, 10% overhead and 5% admin, at the
+        // 3% wastage nothing saved in Settings gives.
         var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", roleId, [(flourId, 1000m)], weightPerPiece: 50m);
         await using (var dbContext = CreateDbContext())
         {
@@ -103,11 +106,12 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
 
         var ensaymada = viewModel.ProductCosts.Should().ContainSingle(r => r.ProductName == "Ensaymada").Subject;
         ensaymada.IngredientsCost.Should().Be(2.5m, "50 g of a ₱50, 1,000 g dough");
+        ensaymada.WastageCost.Should().Be(0.075m, "3% of the ingredients");
         ensaymada.PackagingCost.Should().Be(30m, "one gift box");
         ensaymada.LaborCost.Should().Be(0.625m, "25% of the ingredients");
         ensaymada.OverheadCost.Should().Be(0.25m, "10% of the ingredients, not the packaging");
         ensaymada.AdministrativeCost.Should().Be(0.125m, "5% of the ingredients");
-        ensaymada.BaseCost.Should().Be(33.5m, "the five parts added up");
+        ensaymada.BaseCost.Should().Be(33.575m, "the six parts added up");
     }
 
     [Fact]

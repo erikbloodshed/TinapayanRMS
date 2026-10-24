@@ -396,6 +396,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
             new ProductCategoryRepository(factory),
+            new ProductVersionRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),
             new ProductCategoryValidator(),

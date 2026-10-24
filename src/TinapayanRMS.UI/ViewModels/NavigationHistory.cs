@@ -9,7 +9,7 @@ public enum AppScreen
     SubAssemblies,
     Products,
     Reports,
-    WhatIf,
+    PriceSimulator,
     ProductionPlan,
     Print,
 }

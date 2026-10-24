@@ -1,5 +1,5 @@
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using TinapayanRMS.Infrastructure;
 
 namespace TinapayanRMS.Tests.Common.Fixtures;
@@ -11,48 +11,61 @@ namespace TinapayanRMS.Tests.Common.Fixtures;
 /// </summary>
 public sealed class ThrowawayDatabase : IAsyncDisposable
 {
-    private readonly string _masterConnectionString;
+    private readonly string _maintenanceConnectionString;
 
-    private ThrowawayDatabase(string connectionString, string masterConnectionString)
+    private ThrowawayDatabase(string connectionString, string maintenanceConnectionString)
     {
         ConnectionString = connectionString;
-        _masterConnectionString = masterConnectionString;
+        _maintenanceConnectionString = maintenanceConnectionString;
     }
 
     public string ConnectionString { get; }
 
-    public string Name => new SqlConnectionStringBuilder(ConnectionString).InitialCatalog;
+    public string Name => new NpgsqlConnectionStringBuilder(ConnectionString).Database!;
 
-    /// <summary>A new, migrated database named TinapayanRMS_Test_Backup_ and eight characters of a GUID.</summary>
+    /// <summary>A new, migrated database named tinapayanrms_test_backup_ and eight characters of a GUID.</summary>
     /// <param name="like">A connection string to the server to make it on, such as the fixture's.</param>
     public static async Task<ThrowawayDatabase> CreateAsync(string like, CancellationToken cancellationToken)
     {
-        var builder = new SqlConnectionStringBuilder(like) { InitialCatalog = $"TinapayanRMS_Test_Backup_{Guid.NewGuid():N}"[..33] };
-        var master = new SqlConnectionStringBuilder(like) { InitialCatalog = "master", Pooling = false };
-        var database = new ThrowawayDatabase(builder.ConnectionString, master.ConnectionString);
+        var builder = new NpgsqlConnectionStringBuilder(like) { Database = $"tinapayanrms_test_backup_{Guid.NewGuid():N}"[..33] };
+        // Dropping a database checkpoints first on Windows, which after a busy test run can outlast the default 30 seconds.
+        var maintenance = new NpgsqlConnectionStringBuilder(like) { Database = "postgres", Pooling = false, CommandTimeout = 600 };
+        var database = new ThrowawayDatabase(builder.ConnectionString, maintenance.ConnectionString);
 
         await using var dbContext = database.CreateDbContext();
         await dbContext.Database.MigrateAsync(cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER DATABASE CURRENT SET AUTO_CLOSE OFF", cancellationToken);
         return database;
     }
 
-    public TinapayanRMSDbContext CreateDbContext() =>
-        new(new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer(ConnectionString).Options);
+    public TinapayanRMSDbContext CreateDbContext() => new(TinapayanRMSDbContext.CreateOptions(ConnectionString));
 
     public IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() => new Factory(this);
 
+    /// <summary>
+    /// Ends this account's connections to the database, then drops it. Not WITH (FORCE), which also tries to end an
+    /// autovacuum worker in it, and an account that isn't a superuser may not.
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
-        SqlConnection.ClearAllPools();
-        await using var connection = new SqlConnection(_masterConnectionString);
+        NpgsqlConnection.ClearAllPools();
+        await using var connection = new NpgsqlConnection(_maintenanceConnectionString);
         await connection.OpenAsync();
-        await using var command = new SqlCommand(
-            "IF DB_ID(@name) IS NOT NULL BEGIN "
-            + "DECLARE @sql nvarchar(max) = N'ALTER DATABASE ' + QUOTENAME(@name) + N' SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE ' + QUOTENAME(@name); "
-            + "EXEC (@sql); END",
-            connection);
-        command.Parameters.AddWithValue("@name", Name);
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            await using var disconnect = new NpgsqlCommand(
+                "SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity "
+                + "WHERE datname = @name AND pid <> pg_backend_pid() AND backend_type = 'client backend' AND usename = current_user",
+                connection);
+            disconnect.Parameters.AddWithValue("name", Name);
+            if ((long)(await disconnect.ExecuteScalarAsync())! == 0)
+            {
+                break;
+            }
+
+            await Task.Delay(100);
+        }
+
+        await using var command = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{Name}\"", connection);
         await command.ExecuteNonQueryAsync();
     }
 

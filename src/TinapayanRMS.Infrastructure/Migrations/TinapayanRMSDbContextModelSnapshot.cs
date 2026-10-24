@@ -2,8 +2,8 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TinapayanRMS.Infrastructure;
 
 #nullable disable
@@ -17,62 +17,75 @@ namespace TinapayanRMS.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
-                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+                .HasAnnotation("Npgsql:CollationDefinition:case_insensitive", "und-u-ks-level2,und-u-ks-level2,icu,False")
+                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.CostingDefaults", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
                     b.Property<decimal>("AdministrativePercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("administrative_percent");
 
                     b.Property<decimal>("CostBufferPercent")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)")
-                        .HasDefaultValue(10m);
+                        .HasColumnType("numeric(18,4)")
+                        .HasDefaultValue(10m)
+                        .HasColumnName("cost_buffer_percent");
 
                     b.Property<decimal>("LaborPercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("labor_percent");
 
                     b.Property<decimal>("MarginPercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("margin_percent");
 
                     b.Property<string>("NewProductStage")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasDefaultValue("Production");
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Production")
+                        .HasColumnName("new_product_stage");
 
                     b.Property<decimal>("OverheadPercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal>("ShrinkagePercent")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("overhead_percent");
 
                     b.Property<decimal>("VatPercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("vat_percent");
 
-                    b.HasKey("Id");
+                    b.Property<decimal>("WastagePercent")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasDefaultValue(3m)
+                        .HasColumnName("wastage_percent");
 
-                    b.ToTable("CostingDefaults", t =>
+                    b.HasKey("Id")
+                        .HasName("pk_costing_defaults");
+
+                    b.ToTable("costing_defaults", null, t =>
                         {
-                            t.HasCheckConstraint("CK_CostingDefaults_CostBufferPercent", "[CostBufferPercent] >= 0 AND [CostBufferPercent] <= 100");
+                            t.HasCheckConstraint("CK_CostingDefaults_CostBufferPercent", "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");
 
-                            t.HasCheckConstraint("CK_CostingDefaults_ShrinkagePercent", "[ShrinkagePercent] >= 0 AND [ShrinkagePercent] < 100");
+                            t.HasCheckConstraint("CK_CostingDefaults_SingleRow", "id = 1");
 
-                            t.HasCheckConstraint("CK_CostingDefaults_SingleRow", "[Id] = 1");
+                            t.HasCheckConstraint("CK_CostingDefaults_WastagePercent", "wastage_percent >= 0 AND wastage_percent <= 100");
                         });
                 });
 
@@ -80,144 +93,262 @@ namespace TinapayanRMS.Infrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("AdministrativePercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("administrative_percent");
 
                     b.Property<decimal>("LaborPercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("labor_percent");
 
                     b.Property<decimal>("MarginPercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("margin_percent");
 
                     b.Property<decimal>("OverheadPercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("overhead_percent");
 
                     b.Property<int>("ProductId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
 
                     b.Property<decimal>("VatPercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("vat_percent");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_costing_parameters");
 
                     b.HasIndex("ProductId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_costing_parameters_product_id");
 
-                    b.ToTable("CostingParameters");
+                    b.ToTable("costing_parameters", (string)null);
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.IngredientBomLine", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("ComponentIngredientId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("component_ingredient_id");
 
                     b.Property<decimal>("Grams")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("grams");
 
                     b.Property<int>("IngredientId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("ingredient_id");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_ingredient_bom_lines");
 
-                    b.HasIndex("ComponentIngredientId");
+                    b.HasIndex("ComponentIngredientId")
+                        .HasDatabaseName("ix_ingredient_bom_lines_component_ingredient_id");
 
                     b.HasIndex("IngredientId", "ComponentIngredientId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_ingredient_bom_lines_ingredient_id_component_ingredient_id");
 
-                    b.ToTable("IngredientBomLines");
+                    b.ToTable("ingredient_bom_lines", (string)null);
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.PackagingLine", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AuthoredField")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("authored_field");
 
                     b.Property<int>("PackagingMaterialId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("packaging_material_id");
 
                     b.Property<int>("ProductId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
 
                     b.Property<decimal>("QtyPerUnit")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("qty_per_unit");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
 
                     b.Property<int?>("UnitId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("unit_id");
 
                     b.Property<decimal>("UnitsPerPackagingUnit")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("units_per_packaging_unit");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_packaging_lines");
 
-                    b.HasIndex("PackagingMaterialId");
+                    b.HasIndex("PackagingMaterialId")
+                        .HasDatabaseName("ix_packaging_lines_packaging_material_id");
 
-                    b.HasIndex("UnitId");
+                    b.HasIndex("UnitId")
+                        .HasDatabaseName("ix_packaging_lines_unit_id");
 
                     b.HasIndex("ProductId", "PackagingMaterialId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_packaging_lines_product_id_packaging_material_id");
 
-                    b.ToTable("PackagingLines");
+                    b.ToTable("packaging_lines", (string)null);
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.PackagingLink", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int?>("LinkedProductId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("linked_product_id");
 
                     b.Property<int?>("LinkedSubAssemblyId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("linked_sub_assembly_id");
 
                     b.Property<int>("ProductId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_packaging_links");
 
-                    b.HasIndex("LinkedProductId");
+                    b.HasIndex("LinkedProductId")
+                        .HasDatabaseName("ix_packaging_links_linked_product_id");
 
-                    b.HasIndex("LinkedSubAssemblyId");
+                    b.HasIndex("LinkedSubAssemblyId")
+                        .HasDatabaseName("ix_packaging_links_linked_sub_assembly_id");
 
                     b.HasIndex("ProductId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_packaging_links_product_id");
 
-                    b.ToTable("PackagingLinks", t =>
+                    b.ToTable("packaging_links", null, t =>
                         {
-                            t.HasCheckConstraint("CK_PackagingLinks_OneTarget", "([LinkedProductId] IS NOT NULL AND [LinkedSubAssemblyId] IS NULL) OR ([LinkedProductId] IS NULL AND [LinkedSubAssemblyId] IS NOT NULL)");
+                            t.HasCheckConstraint("CK_PackagingLinks_OneTarget", "(linked_product_id IS NOT NULL AND linked_sub_assembly_id IS NULL) OR (linked_product_id IS NULL AND linked_sub_assembly_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.PriceScenario", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name")
+                        .UseCollation("case_insensitive");
+
+                    b.Property<DateTime>("SavedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("saved_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_price_scenarios");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_price_scenarios_name");
+
+                    b.ToTable("price_scenarios", (string)null);
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.PriceScenarioLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("ChangePercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("change_percent");
+
+                    b.Property<decimal?>("NewPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("new_price");
+
+                    b.Property<int>("PriceScenarioId")
+                        .HasColumnType("integer")
+                        .HasColumnName("price_scenario_id");
+
+                    b.Property<int>("RawMaterialId")
+                        .HasColumnType("integer")
+                        .HasColumnName("raw_material_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("Id")
+                        .HasName("pk_price_scenario_lines");
+
+                    b.HasIndex("RawMaterialId")
+                        .HasDatabaseName("ix_price_scenario_lines_raw_material_id");
+
+                    b.HasIndex("PriceScenarioId", "RawMaterialId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_price_scenario_lines_price_scenario_id_raw_material_id");
+
+                    b.ToTable("price_scenario_lines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PriceScenarioLines_ChangePercent", "change_percent > -100");
+
+                            t.HasCheckConstraint("CK_PriceScenarioLines_NewPrice", "new_price > 0");
+
+                            t.HasCheckConstraint("CK_PriceScenarioLines_OneTyped", "(change_percent IS NULL) <> (new_price IS NULL)");
                         });
                 });
 
@@ -225,64 +356,80 @@ namespace TinapayanRMS.Infrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int?>("CategoryId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("category_id");
 
                     b.Property<decimal?>("CurrentPrice")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("current_price");
 
                     b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("deleted_at");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description")
+                        .UseCollation("case_insensitive");
 
                     b.Property<bool>("IncludesComponentPackaging")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean")
+                        .HasColumnName("includes_component_packaging");
 
                     b.Property<bool>("IsComposite")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_composite");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name")
+                        .UseCollation("case_insensitive");
 
                     b.Property<int>("QuantityRequired")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("quantity_required");
 
                     b.Property<string>("Stage")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasDefaultValue("Production");
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Production")
+                        .HasColumnName("stage");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_products");
 
-                    b.HasIndex("CategoryId");
+                    b.HasIndex("CategoryId")
+                        .HasDatabaseName("ix_products_category_id");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_products_name");
 
-                    b.ToTable("Products", t =>
+                    b.ToTable("products", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Products_ComponentPackagingOnComposite", "[IsComposite] = 1 OR [IncludesComponentPackaging] = 0");
+                            t.HasCheckConstraint("CK_Products_ComponentPackagingOnComposite", "is_composite OR NOT includes_component_packaging");
 
-                            t.HasCheckConstraint("CK_Products_CompositeIsOneUnit", "[IsComposite] = 0 OR [QuantityRequired] = 1");
+                            t.HasCheckConstraint("CK_Products_CompositeIsOneUnit", "NOT is_composite OR quantity_required = 1");
 
-                            t.HasCheckConstraint("CK_Products_QuantityRequired", "[QuantityRequired] > 0");
+                            t.HasCheckConstraint("CK_Products_QuantityRequired", "quantity_required > 0");
                         });
                 });
 
@@ -290,55 +437,68 @@ namespace TinapayanRMS.Infrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name")
+                        .UseCollation("case_insensitive");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_product_categories");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_product_categories_name");
 
-                    b.ToTable("ProductCategories");
+                    b.ToTable("product_categories", (string)null);
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductComponent", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("ComponentProductId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("component_product_id");
 
                     b.Property<int>("ProductId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
 
                     b.Property<int>("Quantity")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_product_components");
 
-                    b.HasIndex("ComponentProductId");
+                    b.HasIndex("ComponentProductId")
+                        .HasDatabaseName("ix_product_components_component_product_id");
 
                     b.HasIndex("ProductId", "ComponentProductId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_product_components_product_id_component_product_id");
 
-                    b.ToTable("ProductComponents", t =>
+                    b.ToTable("product_components", null, t =>
                         {
-                            t.HasCheckConstraint("CK_ProductComponents_NotItself", "[ProductId] <> [ComponentProductId]");
+                            t.HasCheckConstraint("CK_ProductComponents_NotItself", "product_id <> component_product_id");
 
-                            t.HasCheckConstraint("CK_ProductComponents_Quantity", "[Quantity] > 0");
+                            t.HasCheckConstraint("CK_ProductComponents_Quantity", "quantity > 0");
                         });
                 });
 
@@ -346,39 +506,87 @@ namespace TinapayanRMS.Infrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AuthoredField")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("authored_field");
 
                     b.Property<decimal>("AuthoredValue")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("authored_value");
 
                     b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("ShrinkagePercent")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
 
                     b.Property<int>("SubAssemblyId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("sub_assembly_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_product_sub_assembly_usages");
 
-                    b.HasIndex("SubAssemblyId");
+                    b.HasIndex("SubAssemblyId")
+                        .HasDatabaseName("ix_product_sub_assembly_usages_sub_assembly_id");
 
                     b.HasIndex("ProductId", "SubAssemblyId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_product_sub_assembly_usages_product_id_sub_assembly_id");
 
-                    b.ToTable("ProductSubAssemblyUsages", t =>
+                    b.ToTable("product_sub_assembly_usages", null, t =>
                         {
-                            t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "[AuthoredValue] >= 0");
+                            t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "authored_value >= 0");
+                        });
+                });
 
-                            t.HasCheckConstraint("CK_ProductSubAssemblyUsages_ShrinkagePercent", "[ShrinkagePercent] >= 0 AND [ShrinkagePercent] < 100");
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductVersion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content")
+                        .UseCollation("case_insensitive");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note")
+                        .UseCollation("case_insensitive");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
+
+                    b.Property<DateTime>("SavedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("saved_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_product_versions");
+
+                    b.HasIndex("ProductId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_product_versions_product_id_number");
+
+                    b.ToTable("product_versions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductVersions_Number", "number >= 1");
                         });
                 });
 
@@ -386,84 +594,105 @@ namespace TinapayanRMS.Infrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int?>("BaseUnitId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("base_unit_id");
 
                     b.Property<decimal>("BufferedCostPerBaseUnit")
                         .HasPrecision(28, 20)
-                        .HasColumnType("decimal(28,20)");
+                        .HasColumnType("numeric(28,20)")
+                        .HasColumnName("buffered_cost_per_base_unit");
 
                     b.Property<int>("CategoryId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("category_id");
 
                     b.Property<decimal>("CostBufferPercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("cost_buffer_percent");
 
                     b.Property<decimal>("CostPerBaseUnit")
                         .HasPrecision(28, 20)
-                        .HasColumnType("decimal(28,20)");
+                        .HasColumnType("numeric(28,20)")
+                        .HasColumnName("cost_per_base_unit");
 
                     b.Property<decimal?>("CostSharePercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("cost_share_percent");
 
                     b.Property<DateTime?>("CostUpdatedAt")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("cost_updated_at");
 
                     b.Property<int?>("LinkedToId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("linked_to_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name")
+                        .UseCollation("case_insensitive");
 
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("type");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at");
 
                     b.Property<decimal?>("WeightLossPercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("weight_loss_percent");
 
                     b.Property<decimal?>("WeightSharePercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("weight_share_percent");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_raw_materials");
 
-                    b.HasIndex("BaseUnitId");
+                    b.HasIndex("BaseUnitId")
+                        .HasDatabaseName("ix_raw_materials_base_unit_id");
 
-                    b.HasIndex("CategoryId");
+                    b.HasIndex("CategoryId")
+                        .HasDatabaseName("ix_raw_materials_category_id");
 
-                    b.HasIndex("LinkedToId");
+                    b.HasIndex("LinkedToId")
+                        .HasDatabaseName("ix_raw_materials_linked_to_id");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_raw_materials_name");
 
-                    b.ToTable("RawMaterials", t =>
+                    b.ToTable("raw_materials", null, t =>
                         {
-                            t.HasCheckConstraint("CK_RawMaterials_BaseUnitMatchesType", "([Type] = 'Ingredient' AND [BaseUnitId] IS NULL) OR ([Type] = 'Packaging' AND [BaseUnitId] IS NOT NULL)");
+                            t.HasCheckConstraint("CK_RawMaterials_BaseUnitMatchesType", "(type = 'Ingredient' AND base_unit_id IS NULL) OR (type = 'Packaging' AND base_unit_id IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_RawMaterials_CostBufferPercent", "[CostBufferPercent] >= 0 AND [CostBufferPercent] <= 100");
+                            t.HasCheckConstraint("CK_RawMaterials_CostBufferPercent", "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");
 
-                            t.HasCheckConstraint("CK_RawMaterials_LinkMatchesSource", "([Source] = 'Linked' AND [LinkedToId] IS NOT NULL AND [WeightSharePercent] > 0 AND [WeightSharePercent] <= 100 AND [CostSharePercent] > 0 AND [CostSharePercent] <= 100) OR ([Source] <> 'Linked' AND [LinkedToId] IS NULL AND [WeightSharePercent] IS NULL AND [CostSharePercent] IS NULL)");
+                            t.HasCheckConstraint("CK_RawMaterials_LinkMatchesSource", "(source = 'Linked' AND linked_to_id IS NOT NULL AND weight_share_percent > 0 AND weight_share_percent <= 100 AND cost_share_percent > 0 AND cost_share_percent <= 100) OR (source <> 'Linked' AND linked_to_id IS NULL AND weight_share_percent IS NULL AND cost_share_percent IS NULL)");
 
-                            t.HasCheckConstraint("CK_RawMaterials_OnlyIngredientsAreMade", "[Type] = 'Ingredient' OR [Source] = 'Purchased'");
+                            t.HasCheckConstraint("CK_RawMaterials_OnlyIngredientsAreMade", "type = 'Ingredient' OR source = 'Purchased'");
                         });
                 });
 
@@ -471,33 +700,42 @@ namespace TinapayanRMS.Infrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Brand")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("brand")
+                        .UseCollation("case_insensitive");
 
                     b.Property<decimal>("Price")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("price");
 
                     b.Property<int>("RawMaterialId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("raw_material_id");
 
                     b.Property<int?>("UnitId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("unit_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_raw_material_brand_prices");
 
-                    b.HasIndex("RawMaterialId");
+                    b.HasIndex("RawMaterialId")
+                        .HasDatabaseName("ix_raw_material_brand_prices_raw_material_id");
 
-                    b.HasIndex("UnitId");
+                    b.HasIndex("UnitId")
+                        .HasDatabaseName("ix_raw_material_brand_prices_unit_id");
 
-                    b.ToTable("RawMaterialBrandPrices", t =>
+                    b.ToTable("raw_material_brand_prices", null, t =>
                         {
-                            t.HasCheckConstraint("CK_RawMaterialBrandPrices_Price", "[Price] > 0");
+                            t.HasCheckConstraint("CK_RawMaterialBrandPrices_Price", "price > 0");
                         });
                 });
 
@@ -505,209 +743,340 @@ namespace TinapayanRMS.Infrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name")
+                        .UseCollation("case_insensitive");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasDefaultValue("Ingredient");
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Ingredient")
+                        .HasColumnName("type");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_raw_material_categories");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_raw_material_categories_name");
 
-                    b.ToTable("RawMaterialCategories");
+                    b.ToTable("raw_material_categories", (string)null);
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterialPriceHistory", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Brand")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("brand")
+                        .UseCollation("case_insensitive");
 
                     b.Property<DateOnly>("Date")
-                        .HasColumnType("date");
+                        .HasColumnType("date")
+                        .HasColumnName("date");
 
                     b.Property<decimal>("Price")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("price");
 
                     b.Property<int>("RawMaterialId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("raw_material_id");
 
                     b.Property<int?>("UnitId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("unit_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_raw_material_price_histories");
 
-                    b.HasIndex("UnitId");
+                    b.HasIndex("UnitId")
+                        .HasDatabaseName("ix_raw_material_price_histories_unit_id");
 
-                    b.HasIndex("RawMaterialId", "Date");
+                    b.HasIndex("RawMaterialId", "Date")
+                        .HasDatabaseName("ix_raw_material_price_histories_raw_material_id_date");
 
-                    b.ToTable("RawMaterialPriceHistories");
+                    b.ToTable("raw_material_price_histories", (string)null);
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterialUnit", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("BaseUnitsPerUnit")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("base_units_per_unit");
 
                     b.Property<string>("Description")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description")
+                        .UseCollation("case_insensitive");
 
                     b.Property<int>("RawMaterialId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("raw_material_id");
 
                     b.Property<int>("UnitOfMeasureId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("unit_of_measure_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_raw_material_units");
 
-                    b.HasIndex("UnitOfMeasureId");
+                    b.HasIndex("UnitOfMeasureId")
+                        .HasDatabaseName("ix_raw_material_units_unit_of_measure_id");
 
                     b.HasIndex("RawMaterialId", "UnitOfMeasureId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_raw_material_units_raw_material_id_unit_of_measure_id");
 
-                    b.ToTable("RawMaterialUnits");
+                    b.ToTable("raw_material_units", (string)null);
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.SavedPlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("HalfBatches")
+                        .HasColumnType("boolean")
+                        .HasColumnName("half_batches");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name")
+                        .UseCollation("case_insensitive");
+
+                    b.Property<DateTime>("SavedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("saved_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_saved_plans");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_saved_plans_name");
+
+                    b.ToTable("saved_plans", (string)null);
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.SavedPlanLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
+
+                    b.Property<int>("SavedPlanId")
+                        .HasColumnType("integer")
+                        .HasColumnName("saved_plan_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<decimal>("Units")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("units");
+
+                    b.HasKey("Id")
+                        .HasName("pk_saved_plan_lines");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_saved_plan_lines_product_id");
+
+                    b.HasIndex("SavedPlanId")
+                        .HasDatabaseName("ix_saved_plan_lines_saved_plan_id");
+
+                    b.ToTable("saved_plan_lines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SavedPlanLines_Units", "units > 0");
+                        });
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssembly", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name")
+                        .UseCollation("case_insensitive");
 
                     b.Property<int?>("OwnerProductId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("owner_product_id");
 
                     b.Property<int>("RoleId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("role_id");
 
                     b.Property<decimal>("TotalCost")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("total_cost");
 
                     b.Property<decimal>("TotalWeight")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("total_weight");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_sub_assemblies");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_sub_assemblies_name");
 
-                    b.HasIndex("OwnerProductId");
+                    b.HasIndex("OwnerProductId")
+                        .HasDatabaseName("ix_sub_assemblies_owner_product_id");
 
-                    b.HasIndex("RoleId");
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("ix_sub_assemblies_role_id");
 
-                    b.ToTable("SubAssemblies");
+                    b.ToTable("sub_assemblies", (string)null);
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssemblyLine", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal?>("AuthoredBakersPercent")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("authored_bakers_percent");
 
                     b.Property<decimal>("Grams")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("grams");
 
                     b.Property<int>("IngredientId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("ingredient_id");
 
                     b.Property<bool>("IsFormulaBase")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_formula_base");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
 
                     b.Property<int>("SubAssemblyId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("sub_assembly_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_sub_assembly_lines");
 
-                    b.HasIndex("IngredientId");
+                    b.HasIndex("IngredientId")
+                        .HasDatabaseName("ix_sub_assembly_lines_ingredient_id");
 
                     b.HasIndex("SubAssemblyId", "IngredientId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_sub_assembly_lines_sub_assembly_id_ingredient_id");
 
-                    b.ToTable("SubAssemblyLines");
+                    b.ToTable("sub_assembly_lines", (string)null);
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssemblyPackagingLine", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("PackagingMaterialId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("packaging_material_id");
 
                     b.Property<decimal>("QtyPerSet")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("qty_per_set");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
 
                     b.Property<int>("SubAssemblyId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("sub_assembly_id");
 
                     b.Property<int?>("UnitId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("unit_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_sub_assembly_packaging_lines");
 
-                    b.HasIndex("PackagingMaterialId");
+                    b.HasIndex("PackagingMaterialId")
+                        .HasDatabaseName("ix_sub_assembly_packaging_lines_packaging_material_id");
 
-                    b.HasIndex("UnitId");
+                    b.HasIndex("UnitId")
+                        .HasDatabaseName("ix_sub_assembly_packaging_lines_unit_id");
 
                     b.HasIndex("SubAssemblyId", "PackagingMaterialId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_sub_assembly_packaging_lines_sub_assembly_id_packaging_mate");
 
-                    b.ToTable("SubAssemblyPackagingLines", t =>
+                    b.ToTable("sub_assembly_packaging_lines", null, t =>
                         {
-                            t.HasCheckConstraint("CK_SubAssemblyPackagingLines_QtyPerSet", "[QtyPerSet] > 0");
+                            t.HasCheckConstraint("CK_SubAssemblyPackagingLines_QtyPerSet", "qty_per_set > 0");
                         });
                 });
 
@@ -715,30 +1084,38 @@ namespace TinapayanRMS.Infrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<bool>("IsPackaging")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_packaging");
 
                     b.Property<bool>("IsProductOwned")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_product_owned");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name")
+                        .UseCollation("case_insensitive");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_sub_assembly_roles");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_sub_assembly_roles_name");
 
-                    b.ToTable("SubAssemblyRoles");
+                    b.ToTable("sub_assembly_roles", (string)null);
 
                     b.HasData(
                         new
@@ -795,60 +1172,76 @@ namespace TinapayanRMS.Infrastructure.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Abbreviation")
                         .IsRequired()
                         .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("abbreviation")
+                        .UseCollation("case_insensitive");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name")
+                        .UseCollation("case_insensitive");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_units_of_measure");
 
                     b.HasIndex("Abbreviation")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_units_of_measure_abbreviation");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_units_of_measure_name");
 
-                    b.ToTable("UnitsOfMeasure");
+                    b.ToTable("units_of_measure", (string)null);
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.UsageAddInLine", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("Grams")
                         .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("grams");
 
                     b.Property<int>("IngredientId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("ingredient_id");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
 
                     b.Property<int>("UsageId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer")
+                        .HasColumnName("usage_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_usage_add_in_lines");
 
-                    b.HasIndex("IngredientId");
+                    b.HasIndex("IngredientId")
+                        .HasDatabaseName("ix_usage_add_in_lines_ingredient_id");
 
                     b.HasIndex("UsageId", "IngredientId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_usage_add_in_lines_usage_id_ingredient_id");
 
-                    b.ToTable("UsageAddInLines");
+                    b.ToTable("usage_add_in_lines", (string)null);
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.CostingParameters", b =>
@@ -857,7 +1250,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_costing_parameters_products_product_id");
 
                     b.Navigation("Product");
                 });
@@ -868,13 +1262,15 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ComponentIngredientId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_ingredient_bom_lines_raw_materials_component_ingredient_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.RawMaterial", "Ingredient")
                         .WithMany()
                         .HasForeignKey("IngredientId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_ingredient_bom_lines_raw_materials_ingredient_id");
 
                     b.Navigation("ComponentIngredient");
 
@@ -887,18 +1283,21 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("PackagingMaterialId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_packaging_lines_raw_materials_packaging_material_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_packaging_lines_products_product_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.RawMaterialUnit", "Unit")
                         .WithMany()
                         .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_packaging_lines_raw_material_units_unit_id");
 
                     b.Navigation("PackagingMaterial");
 
@@ -912,18 +1311,21 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.HasOne("TinapayanRMS.Domain.Entities.Product", "LinkedProduct")
                         .WithMany()
                         .HasForeignKey("LinkedProductId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_packaging_links_products_linked_product_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.SubAssembly", "LinkedSubAssembly")
                         .WithMany()
                         .HasForeignKey("LinkedSubAssemblyId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_packaging_links_sub_assemblies_linked_sub_assembly_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_packaging_links_products_product_id");
 
                     b.Navigation("LinkedProduct");
 
@@ -932,12 +1334,34 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.PriceScenarioLine", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Entities.PriceScenario", "PriceScenario")
+                        .WithMany("Lines")
+                        .HasForeignKey("PriceScenarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_price_scenario_lines_price_scenarios_price_scenario_id");
+
+                    b.HasOne("TinapayanRMS.Domain.Entities.RawMaterial", "RawMaterial")
+                        .WithMany()
+                        .HasForeignKey("RawMaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_price_scenario_lines_raw_materials_raw_material_id");
+
+                    b.Navigation("PriceScenario");
+
+                    b.Navigation("RawMaterial");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.Product", b =>
                 {
                     b.HasOne("TinapayanRMS.Domain.Entities.ProductCategory", "Category")
                         .WithMany()
                         .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_products_product_categories_category_id");
 
                     b.Navigation("Category");
                 });
@@ -948,13 +1372,15 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ComponentProductId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_product_components_products_component_product_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_product_components_products_product_id");
 
                     b.Navigation("ComponentProduct");
 
@@ -967,17 +1393,31 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_product_sub_assembly_usages_products_product_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.SubAssembly", "SubAssembly")
                         .WithMany()
                         .HasForeignKey("SubAssemblyId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_product_sub_assembly_usages_sub_assemblies_sub_assembly_id");
 
                     b.Navigation("Product");
 
                     b.Navigation("SubAssembly");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductVersion", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_versions_products_product_id");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterial", b =>
@@ -985,18 +1425,21 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.HasOne("TinapayanRMS.Domain.Entities.UnitOfMeasure", "BaseUnit")
                         .WithMany()
                         .HasForeignKey("BaseUnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_raw_materials_units_of_measure_base_unit_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.RawMaterialCategory", "Category")
                         .WithMany()
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_raw_materials_raw_material_categories_category_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.RawMaterial", "LinkedTo")
                         .WithMany()
                         .HasForeignKey("LinkedToId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_raw_materials_raw_materials_linked_to_id");
 
                     b.Navigation("BaseUnit");
 
@@ -1011,12 +1454,14 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("RawMaterialId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_raw_material_brand_prices_raw_materials_raw_material_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.RawMaterialUnit", "Unit")
                         .WithMany()
                         .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_raw_material_brand_prices_raw_material_units_unit_id");
 
                     b.Navigation("RawMaterial");
 
@@ -1029,12 +1474,14 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("RawMaterialId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_raw_material_price_histories_raw_materials_raw_material_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.RawMaterialUnit", "Unit")
                         .WithMany()
                         .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_raw_material_price_histories_raw_material_units_unit_id");
 
                     b.Navigation("RawMaterial");
 
@@ -1047,17 +1494,40 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .WithMany("Units")
                         .HasForeignKey("RawMaterialId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_raw_material_units_raw_materials_raw_material_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.UnitOfMeasure", "UnitOfMeasure")
                         .WithMany()
                         .HasForeignKey("UnitOfMeasureId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_raw_material_units_units_of_measure_unit_of_measure_id");
 
                     b.Navigation("RawMaterial");
 
                     b.Navigation("UnitOfMeasure");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.SavedPlanLine", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_saved_plan_lines_products_product_id");
+
+                    b.HasOne("TinapayanRMS.Domain.Entities.SavedPlan", "SavedPlan")
+                        .WithMany("Lines")
+                        .HasForeignKey("SavedPlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_saved_plan_lines_saved_plans_saved_plan_id");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("SavedPlan");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssembly", b =>
@@ -1065,13 +1535,15 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.HasOne("TinapayanRMS.Domain.Entities.Product", "OwnerProduct")
                         .WithMany()
                         .HasForeignKey("OwnerProductId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_sub_assemblies_products_owner_product_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.SubAssemblyRole", "Role")
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_sub_assemblies_sub_assembly_roles_role_id");
 
                     b.Navigation("OwnerProduct");
 
@@ -1084,13 +1556,15 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("IngredientId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_sub_assembly_lines_raw_materials_ingredient_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.SubAssembly", "SubAssembly")
                         .WithMany()
                         .HasForeignKey("SubAssemblyId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_sub_assembly_lines_sub_assemblies_sub_assembly_id");
 
                     b.Navigation("Ingredient");
 
@@ -1103,18 +1577,21 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("PackagingMaterialId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_sub_assembly_packaging_lines_raw_materials_packaging_materi");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.SubAssembly", "SubAssembly")
                         .WithMany()
                         .HasForeignKey("SubAssemblyId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_sub_assembly_packaging_lines_sub_assemblies_sub_assembly_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.RawMaterialUnit", "Unit")
                         .WithMany()
                         .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_sub_assembly_packaging_lines_raw_material_units_unit_id");
 
                     b.Navigation("PackagingMaterial");
 
@@ -1129,22 +1606,34 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("IngredientId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_usage_add_in_lines_raw_materials_ingredient_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", "Usage")
                         .WithMany()
                         .HasForeignKey("UsageId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_usage_add_in_lines_product_sub_assembly_usages_usage_id");
 
                     b.Navigation("Ingredient");
 
                     b.Navigation("Usage");
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.PriceScenario", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterial", b =>
                 {
                     b.Navigation("Units");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.SavedPlan", b =>
+                {
+                    b.Navigation("Lines");
                 });
 #pragma warning restore 612, 618
         }

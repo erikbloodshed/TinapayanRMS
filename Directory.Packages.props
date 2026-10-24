@@ -5,23 +5,24 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <EFCoreVersion>10.0.13</EFCoreVersion>
     <!-- Every Syncfusion package must be on the same version: upgrade them together. -->
-    <SyncfusionVersion>35.1.40</SyncfusionVersion>
+    <SyncfusionVersion>35.1.41</SyncfusionVersion>
   </PropertyGroup>
   <ItemGroup Label="Application">
     <PackageVersion Include="Dapper" Version="2.1.89" />
     <PackageVersion Include="DynamicData" Version="9.5.0" />
+    <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
     <PackageVersion Include="FluentValidation" Version="12.2.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EFCoreVersion)" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(EFCoreVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="ReactiveUI.WPF" Version="26.0.1" />
     <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageVersion Include="System.Reactive" Version="7.0.0" />
   </ItemGroup>
   <ItemGroup Label="Transitive pins">
-    <!-- Microsoft.Data.SqlClient (via EF Core SqlServer) brings 9.0.11, which has known vulnerabilities. -->
-    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <!-- Npgsql.EntityFrameworkCore.PostgreSQL asks only for EF Core 10.0.4: keep every project on EFCoreVersion. -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="$(EFCoreVersion)" />
   </ItemGroup>
   <ItemGroup Label="Syncfusion">
     <PackageVersion Include="Syncfusion.DataGridExcelExport.WPF" Version="$(SyncfusionVersion)" />

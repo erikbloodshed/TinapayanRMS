@@ -4,6 +4,7 @@ using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Services;
@@ -68,7 +69,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
     {
         var viewModel = CreateViewModel();
         await viewModel.BackUpNowCommand.Execute();
-        var destination = Path.Combine(Path.GetTempPath(), $"stick {Guid.NewGuid():N}.bak");
+        var destination = Path.Combine(Path.GetTempPath(), $"stick {Guid.NewGuid():N}.backup");
         string? suggested = null;
         viewModel.ChooseCopyDestination.RegisterHandler(interaction =>
         {
@@ -131,7 +132,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
     public async Task A_file_that_isnt_a_backup_is_refused_and_its_copy_removed()
     {
         var viewModel = CreateViewModel();
-        var notABackup = Path.Combine(Path.GetTempPath(), $"prices {Guid.NewGuid():N}.bak");
+        var notABackup = Path.Combine(Path.GetTempPath(), $"prices {Guid.NewGuid():N}.backup");
         await File.WriteAllTextAsync(notABackup, "Pandesal, 4.50", Cancellation);
         viewModel.ChooseBackupFile.RegisterHandler(interaction => interaction.SetOutput(notABackup));
         viewModel.ConfirmDelete.RegisterHandler(interaction => interaction.SetOutput(true));
@@ -139,7 +140,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         {
             await viewModel.RestoreFromFileCommand.Execute();
 
-            viewModel.ErrorMessage.Should().Be(Failure.NotABackupText);
+            viewModel.ErrorMessage.Should().Be(BackupRules.NotADatabaseBackupText);
             _backups.List().Should().BeEmpty("the copy brought in to restore goes again");
             _restarts.Should().BeEmpty();
         }

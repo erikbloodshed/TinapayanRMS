@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// What a purchased material is bought in, as the What-If and Production Plan screens talk about it: the unit of its
+/// What a purchased material is bought in, as the Price Simulator and Production Plan screens talk about it: the unit of its
 /// dearest brand price, which its cost comes from (RawMaterialRules.ApplyBrandPrices), and that price; its base unit and
 /// no price while it has none.
 /// </summary>

@@ -26,15 +26,20 @@ public class CostingDefaultsConfiguration : IEntityTypeConfiguration<CostingDefa
         builder.Property(d => d.CostBufferPercent)
             .HasDefaultValue(CostingDefaults.DefaultCostBufferPercent)
             .HasSentinel(-1m);
+
+        // The same for the shop-wide wastage: the row saved before it was is given 3%, and 0 is written as typed.
+        builder.Property(d => d.WastagePercent)
+            .HasDefaultValue(CostingDefaults.DefaultWastagePercent)
+            .HasSentinel(-1m);
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("CK_CostingDefaults_SingleRow", $"[Id] = {CostingDefaults.SingletonId}");
+            t.HasCheckConstraint("CK_CostingDefaults_SingleRow", $"id = {CostingDefaults.SingletonId}");
 
-            // A section's own range (CK_ProductSubAssemblyUsages_ShrinkagePercent): a new section starts at it.
-            t.HasCheckConstraint("CK_CostingDefaults_ShrinkagePercent", "[ShrinkagePercent] >= 0 AND [ShrinkagePercent] < 100");
+            // A share of the ingredient cost added on top of it (CostingRules.EnsureValidWastage).
+            t.HasCheckConstraint("CK_CostingDefaults_WastagePercent", "wastage_percent >= 0 AND wastage_percent <= 100");
 
             // A material's own range (CK_RawMaterials_CostBufferPercent): a new one starts at it.
-            t.HasCheckConstraint("CK_CostingDefaults_CostBufferPercent", "[CostBufferPercent] >= 0 AND [CostBufferPercent] <= 100");
+            t.HasCheckConstraint("CK_CostingDefaults_CostBufferPercent", "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");
         });
     }
 }

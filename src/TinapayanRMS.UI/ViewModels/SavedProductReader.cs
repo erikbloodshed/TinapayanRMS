@@ -17,6 +17,9 @@ public sealed record ProductDetail(
 {
     /// <summary>A composite's products, in its Products table's order, each with its recipe and packaging costs as saved; none for a product made of sub-assemblies.</summary>
     public IReadOnlyList<SavedComponent> Components { get; init; } = [];
+
+    /// <summary>The shop-wide Wastage % it's priced with (CostingDefaults.WastagePercent): today's, or a version's then.</summary>
+    public decimal WastagePercent { get; init; }
 }
 
 /// <summary>
@@ -104,11 +107,12 @@ public sealed class SavedProductReader(
     IPackagingLineRepository packagingLineRepository,
     ICostingParametersRepository costingParametersRepository,
     ISubAssemblyLineRepository subAssemblyLineRepository,
-    IProductRepository productRepository)
+    IProductRepository productRepository,
+    ICostingDefaultsRepository costingDefaultsRepository)
 {
     /// <summary>
     /// The product's saved detail: its packaging link and lines, its recipe with its sections' lines and add-ins, a
-    /// composite's products with their recipe costs, and its costing.
+    /// composite's products with their recipe costs, its costing, and the shop-wide wastage it's priced with.
     /// </summary>
     public async Task<ProductDetail> ReadDetailAsync(int productId, CancellationToken cancellationToken) =>
         (await ReadDetailsAsync([productId], cancellationToken))[productId];
@@ -145,7 +149,9 @@ public sealed class SavedProductReader(
         var addInsRead = usageRepository.GetAddInsForProductsAsync(ids, cancellationToken);
         var usagesRead = usageRepository.GetForProductsAsync(ids, cancellationToken);
         var sectionLinesRead = ReadSectionLinesAsync(usagesRead, cancellationToken);
-        await Task.WhenAll(linksRead, packagingRead, costingsRead, addInsRead, usagesRead, sectionLinesRead);
+        var defaultsRead = costingDefaultsRepository.GetAsync(cancellationToken);
+        await Task.WhenAll(linksRead, packagingRead, costingsRead, addInsRead, usagesRead, sectionLinesRead, defaultsRead);
+        var wastagePercent = (await defaultsRead).WastagePercent;
 
         var linksByProduct = (await linksRead).ToDictionary(l => l.ProductId);
         var packagingByProduct = await packagingRead;
@@ -184,6 +190,7 @@ public sealed class SavedProductReader(
                 [.. productUsages.Select(u => u.SubAssemblyId).Distinct().SelectMany(id => sectionLinesBySubAssembly[id])],
                 [.. addInsByProduct[productId]])
             {
+                WastagePercent = wastagePercent,
                 Components =
                 [
                     .. componentsByHolder.GetValueOrDefault(productId, [])
@@ -241,7 +248,7 @@ public sealed class SavedProductReader(
 
     /// <summary>
     /// Its recipe and packaging costs at both bases, from one read: pricing it twice is only arithmetic. With
-    /// <paramref name="materialsById"/>, its materials at those costs instead (the What-If screen's).
+    /// <paramref name="materialsById"/>, its materials at those costs instead (the Price Simulator screen's).
     /// </summary>
     private static ComponentCosts ComponentCostsOf(Product product, ProductDetail detail, IReadOnlyDictionary<int, RawMaterial>? materialsById = null)
     {
@@ -252,7 +259,7 @@ public sealed class SavedProductReader(
 
     /// <summary>
     /// <paramref name="details"/> with every composite's products priced again with <paramref name="materialsById"/> in place
-    /// of the materials they were read with (the What-If screen, 2026-10-03): what a composite's products bring is worked out
+    /// of the materials they were read with (the Price Simulator screen, 2026-10-03): what a composite's products bring is worked out
     /// when they're read, so a different cost for one of their materials has to reach them here, however deeply they're held.
     /// A product holding none comes back as it was, since <see cref="Build"/> takes the materials for its own sections.
     /// </summary>
@@ -336,7 +343,7 @@ public sealed class SavedProductReader(
 
     /// <summary>
     /// The same, with <paramref name="materialsById"/> in place of the materials its sections and packaging were read with,
-    /// where it has them: the What-If screen's materials at costs that aren't real. A composite's products are priced as
+    /// where it has them: the Price Simulator screen's materials at costs that aren't real. A composite's products are priced as
     /// <paramref name="detail"/> has them, so give it a detail from <see cref="PricedAt"/>.
     /// </summary>
     public static SavedProduct Build(Product product, ProductDetail detail, CostBasis basis, IReadOnlyDictionary<int, RawMaterial>? materialsById)
@@ -371,7 +378,8 @@ public sealed class SavedProductReader(
             product.CurrentPrice,
             product.IsComposite,
             product.IsComposite && sections.Count > 0,
-            product.IncludesComponentPackaging ? detail.Components.Sum(c => c.PackagingCostAt(basis)) : null);
+            product.IncludesComponentPackaging ? detail.Components.Sum(c => c.PackagingCostAt(basis)) : null,
+            detail.WastagePercent);
 
         return new SavedProduct(
             product,

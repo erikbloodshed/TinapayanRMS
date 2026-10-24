@@ -148,8 +148,8 @@ public abstract class ViewModelBase : ReactiveObject
     /// load still running (Switch). A load that fails shows why and is logged, and the next value loads as usual: a failure
     /// reaching Switch would end the subscription, and from then on no pick would load anything until the app restarted
     /// (found 2026-10-03: one failed read left Products and Raw Materials ignoring every later pick, Save included). A load
-    /// cancelled by a newer value isn't a failure, whatever it threw on its way out (SqlClient reports a command cancelled
-    /// mid-read as a SqlException). Nothing picked loads nothing, so it leaves a failed load's error showing: the
+    /// cancelled by a newer value isn't a failure, whatever it threw on its way out (a driver can report a command cancelled
+    /// mid-read as its own exception). Nothing picked loads nothing, so it leaves a failed load's error showing: the
     /// failure itself can clear the pick, as Sub-Assemblies does.
     /// </summary>
     protected void LoadLatest<T>(IObservable<T> values, Func<T, CancellationToken, Task> load) =>

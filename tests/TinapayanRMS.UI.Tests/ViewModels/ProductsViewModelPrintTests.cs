@@ -238,6 +238,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
             new ProductCategoryRepository(factory),
+            new ProductVersionRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),
             new ProductCategoryValidator(),

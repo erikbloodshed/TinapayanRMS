@@ -104,10 +104,10 @@ public sealed class RecipeScaler(
     /// <summary>A section in the whole batches that make <paramref name="pieces"/>, its lines and add-ins that many times over.</summary>
     private ScalingRow ScaleSection(ProductUsageEdit section, decimal pieces)
     {
-        var batches = RecipeScalingRules.BatchesFor(pieces, section.AuthoredField, section.AuthoredValue, section.FinalWeight);
+        var batches = RecipeScalingRules.BatchesFor(pieces, section.AuthoredField, section.AuthoredValue, section.TotalWeight);
         if (batches == 0)
         {
-            return Group(section.SectionName, section.FinalWeight > 0 ? "No piece size yet" : "No lines yet", string.Empty, []);
+            return Group(section.SectionName, section.TotalWeight > 0 ? "No piece size yet" : "No lines yet", string.Empty, []);
         }
 
         List<ScalingRow> lines =

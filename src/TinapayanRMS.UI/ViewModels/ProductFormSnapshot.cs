@@ -100,7 +100,6 @@ public sealed record ProductFormSnapshot
     public required UsageAuthoredField UsageAuthoredField { get; init; }
     public required decimal UsageWeightPerPiece { get; init; }
     public required decimal UsageYield { get; init; }
-    public required decimal UsageShrinkagePercent { get; init; }
 
     /// <summary>
     /// True when two snapshots would look the same to the user, so nothing is worth recording. Written out
@@ -141,8 +140,7 @@ public sealed record ProductFormSnapshot
         && FormFormulaBase == other.FormFormulaBase
         && UsageAuthoredField == other.UsageAuthoredField
         && UsageWeightPerPiece == other.UsageWeightPerPiece
-        && UsageYield == other.UsageYield
-        && UsageShrinkagePercent == other.UsageShrinkagePercent;
+        && UsageYield == other.UsageYield;
 
     /// <summary>
     /// True when two snapshots would be saved the same, which is what the Save button is enabled by. It's
@@ -180,7 +178,6 @@ public sealed record ProductFormSnapshot
         UsageAuthoredField = form.UsageAuthoredField,
         UsageWeightPerPiece = form.UsageWeightPerPiece,
         UsageYield = form.UsageYield,
-        UsageShrinkagePercent = form.UsageShrinkagePercent,
     };
 
     /// <summary>
@@ -208,7 +205,6 @@ public sealed record ProductFormSnapshot
                 || a.LinkedName != b.LinkedName
                 || a.AuthoredField != b.AuthoredField
                 || a.AuthoredValue != b.AuthoredValue
-                || a.ShrinkagePercent != b.ShrinkagePercent
                 || !LinesShowSame(a.Lines, b.Lines)
                 || !LinesShowSame(a.AddIns, b.AddIns))
             {

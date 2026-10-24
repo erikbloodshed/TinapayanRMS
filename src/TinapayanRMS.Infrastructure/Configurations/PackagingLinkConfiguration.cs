@@ -31,7 +31,7 @@ public class PackagingLinkConfiguration : IEntityTypeConfiguration<PackagingLink
         // A link points at a product or at a set, never both or neither.
         builder.ToTable(t => t.HasCheckConstraint(
             "CK_PackagingLinks_OneTarget",
-            "([LinkedProductId] IS NOT NULL AND [LinkedSubAssemblyId] IS NULL) OR ([LinkedProductId] IS NULL AND [LinkedSubAssemblyId] IS NOT NULL)"));
+            "(linked_product_id IS NOT NULL AND linked_sub_assembly_id IS NULL) OR (linked_product_id IS NULL AND linked_sub_assembly_id IS NOT NULL)"));
 
         // A product has one packaging, so at most one link.
         builder.HasIndex(l => l.ProductId).IsUnique();

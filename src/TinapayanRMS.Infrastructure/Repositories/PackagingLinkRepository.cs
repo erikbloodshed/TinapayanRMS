@@ -12,12 +12,12 @@ public class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbContext> db
 {
     // ProductId is unique, so there's at most one link.
     public async Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
-        (await GetLinksAsync("l.ProductId = @productId", new { productId }, cancellationToken)).SingleOrDefault();
+        (await GetLinksAsync("l.product_id = @productId", new { productId }, cancellationToken)).SingleOrDefault();
 
     public async Task<IReadOnlyList<PackagingLink>> GetForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
         productIds.Count == 0
             ? []
-            : await GetLinksAsync($"l.ProductId IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(productIds) }, cancellationToken);
+            : await GetLinksAsync($"l.product_id IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(productIds) }, cancellationToken);
 
     /// <summary>The links <paramref name="filter"/> picks, each with the product or packaging set it's linked to.</summary>
     private Task<IReadOnlyList<PackagingLink>> GetLinksAsync(string filter, object parameters, CancellationToken cancellationToken) =>
@@ -26,11 +26,11 @@ public class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbContext> db
                 dbContext.Command(
                     $"""
                     SELECT {Columns.Of<PackagingLink>("l")}, {Columns.Of<Product>("p")}, {Columns.Of<SubAssembly>("s")}
-                    FROM PackagingLinks l
-                    LEFT JOIN Products p ON p.Id = l.LinkedProductId
-                    LEFT JOIN SubAssemblies s ON s.Id = l.LinkedSubAssemblyId
+                    FROM packaging_links l
+                    LEFT JOIN products p ON p.id = l.linked_product_id
+                    LEFT JOIN sub_assemblies s ON s.id = l.linked_sub_assembly_id
                     WHERE {filter}
-                    ORDER BY l.ProductId
+                    ORDER BY l.product_id
                     """,
                     parameters,
                     cancellationToken),

@@ -59,7 +59,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await using var dbContext = CreateDbContext();
         var act = () => dbContext.SubAssemblies.Where(s => s.Id == subAssemblyId).ExecuteDeleteAsync(Cancellation);
 
-        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+        await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         var line = lines.Should().ContainSingle().Subject;
         line.UnitsPerPackagingUnit.Should().Be(6m);
         // The repository computes the full-precision reciprocal (1/6 = 0.1666...), but the
-        // decimal(18,4) column rounds it to 4 places on the round trip through SQL Server.
+        // numeric(18,4) column rounds it to 4 places on the round trip through the database.
         line.QtyPerUnit.Should().Be(0.1667m);
         // The line's quantities are in the material's standard unit, which the Products grid shows.
         line.PackagingMaterial!.BaseUnit!.Id.Should().Be(pieceId);
@@ -193,7 +193,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await using var dbContext = CreateDbContext();
         var act = () => dbContext.RawMaterials.Where(m => m.Id == boxId).ExecuteDeleteAsync(Cancellation);
 
-        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+        await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
     [Fact]

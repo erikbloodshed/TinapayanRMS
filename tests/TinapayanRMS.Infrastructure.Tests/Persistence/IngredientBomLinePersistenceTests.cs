@@ -281,9 +281,9 @@ public class IngredientBomLinePersistenceTests(DatabaseFixture fixture) : Persis
         var act = () => dbContext.RawMaterials.Where(i => i.Id == sugarId).ExecuteDeleteAsync(Cancellation);
 
         // ExecuteDeleteAsync issues a raw DELETE outside EF Core's change tracker, so an
-        // FK violation surfaces as the driver's own SqlException, not a DbUpdateException
+        // FK violation surfaces as the driver's own PostgresException, not a DbUpdateException
         // (that wrapping only happens through SaveChangesAsync).
-        await act.Should().ThrowAsync<Microsoft.Data.SqlClient.SqlException>();
+        await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
     [Fact]

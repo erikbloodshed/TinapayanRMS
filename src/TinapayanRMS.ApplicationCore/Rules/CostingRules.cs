@@ -15,8 +15,17 @@ public static class CostingRules
         }
     }
 
+    /// <summary>The shop-wide Wastage % (CostingDefaults.WastagePercent): 0 to 100, a share of the ingredient cost added on top of it.</summary>
+    public static void EnsureValidWastage(decimal wastagePercent)
+    {
+        if (wastagePercent is < 0 or > 100)
+        {
+            throw new BusinessRuleException("The wastage must be from 0% to 100%.");
+        }
+    }
+
     /// <summary>
-    /// A cost entered as a percentage of the sub-assembly (ingredient) cost — labor, overhead,
+    /// A cost entered as a percentage of the sub-assembly (ingredient) cost — wastage, labor, overhead,
     /// administrative — in pesos per piece: 25% labor on ₱20 of sub-assemblies is ₱5. Packaging is
     /// deliberately left out of the base: what these three pay for is making the recipe, not wrapping it.
     /// </summary>
@@ -27,9 +36,11 @@ public static class CostingRules
     /// Cost-plus pricing: margin is a markup on cost (BaseCost × (1 + Margin%)), and VAT is
     /// added on top of that pre-VAT price (× (1 + VAT%)) as a separate step — never combined
     /// into one formula, so each input maps to exactly one step a shop owner can check by hand.
-    /// The base cost is the materials — the sub-assemblies plus the packaging — plus the labor, overhead
-    /// and administrative costs, each of those a percentage of the sub-assemblies alone
-    /// (CalculateCostFromSubAssemblyPercent).
+    /// The base cost is the materials — the sub-assemblies plus the packaging — plus the wastage, labor,
+    /// overhead and administrative costs, each of those a percentage of the sub-assemblies alone
+    /// (CalculateCostFromSubAssemblyPercent). The wastage is a cost allowance for what's lost making the
+    /// product (₱100 of ingredients at 3% is ₱3), added once here and never at each level of a composite;
+    /// labor, overhead and administrative are worked out on the ingredients before it.
     /// </summary>
     public static (decimal BaseCost, decimal PreVatPrice, decimal SellingPrice) CalculateSellingPrice(
         decimal subAssemblyCostPerPiece,
@@ -38,12 +49,14 @@ public static class CostingRules
         decimal overheadPercent,
         decimal administrativePercent,
         decimal marginPercent,
-        decimal vatPercent)
+        decimal vatPercent,
+        decimal wastagePercent = 0m)
     {
+        var wastageCost = CalculateCostFromSubAssemblyPercent(subAssemblyCostPerPiece, wastagePercent);
         var laborCost = CalculateCostFromSubAssemblyPercent(subAssemblyCostPerPiece, laborPercent);
         var overheadCost = CalculateCostFromSubAssemblyPercent(subAssemblyCostPerPiece, overheadPercent);
         var administrativeCost = CalculateCostFromSubAssemblyPercent(subAssemblyCostPerPiece, administrativePercent);
-        var baseCost = subAssemblyCostPerPiece + packagingCostPerPiece + laborCost + overheadCost + administrativeCost;
+        var baseCost = subAssemblyCostPerPiece + wastageCost + packagingCostPerPiece + laborCost + overheadCost + administrativeCost;
         var preVatPrice = baseCost * (1 + marginPercent / 100m);
         var sellingPrice = preVatPrice * (1 + vatPercent / 100m);
         return (baseCost, preVatPrice, sellingPrice);

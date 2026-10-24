@@ -1,8 +1,8 @@
 namespace TinapayanRMS.ApplicationCore.Interfaces;
 
 /// <summary>
-/// Backups of the app's database, as SQL Server's own full backup files in one folder that SQL Server can write to
-/// (Settings → Database, and the day's automatic one at startup). Taking one never changes the database; restoring one
+/// Backups of the app's database, as PostgreSQL's own backup files (pg_dump's custom format) in one folder (Settings →
+/// Database, and the day's automatic one at startup). Taking one never changes the database; restoring one
 /// replaces everything in it, after a safety backup of what was there.
 /// </summary>
 public interface IDatabaseBackups
@@ -22,7 +22,7 @@ public interface IDatabaseBackups
     /// </summary>
     Task<DatabaseBackup?> BackUpDailyIfDueAsync(DateTime now, CancellationToken cancellationToken);
 
-    /// <summary>Copies a backup file from elsewhere (a USB stick, another computer) into <see cref="Folder"/>, where SQL Server can read it.</summary>
+    /// <summary>Copies a backup file from elsewhere (a USB stick, another computer) into <see cref="Folder"/>, to restore it from there.</summary>
     Task<DatabaseBackup> CopyInAsync(string sourcePath, CancellationToken cancellationToken);
 
     /// <summary>Copies a backup out of <see cref="Folder"/> to <paramref name="destinationPath"/>, replacing a file there.</summary>

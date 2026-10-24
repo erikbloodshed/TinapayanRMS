@@ -36,8 +36,8 @@ public class VimCommandLineTests
     [InlineData("rep", AppScreen.Reports)]
     [InlineData("pl", AppScreen.ProductionPlan)]
     [InlineData("plan", AppScreen.ProductionPlan)]
-    [InlineData("wh", AppScreen.WhatIf)]
-    [InlineData("whatif", AppScreen.WhatIf)]
+    [InlineData("si", AppScreen.PriceSimulator)]
+    [InlineData("simulator", AppScreen.PriceSimulator)]
     [InlineData("pri", AppScreen.Print)]
     public void A_screen_is_named_by_its_command(string line, AppScreen screen)
     {

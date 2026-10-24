@@ -4,14 +4,15 @@ namespace TinapayanRMS.UI.Tests.Fixtures;
 
 /// <summary>
 /// Counts the SQL commands sent from where it's started, through every await and Task.Run after it, and from nowhere
-/// else: what SqlClient reports to its DiagnosticListener, kept apart per test by an AsyncLocal. For a test that a read's
-/// round trips don't grow with what it reads.
+/// else: the activities Npgsql starts for its commands, kept apart per test by an AsyncLocal. A physical connection
+/// being opened is an activity of its own ("CONNECT …"), and isn't a command. For a test that a read's round trips don't
+/// grow with what it reads.
 /// </summary>
 public sealed class SqlCommandCounter : IDisposable
 {
     private static readonly AsyncLocal<SqlCommandCounter?> Current = new();
 
-    private static readonly IDisposable Listening = DiagnosticListener.AllListeners.Subscribe(new ListenerObserver());
+    private static readonly ActivityListener Listener = Listen();
 
     private int _commands;
 
@@ -24,7 +25,7 @@ public sealed class SqlCommandCounter : IDisposable
     /// <summary>A counter for the code that runs from here on in this test's flow.</summary>
     public static SqlCommandCounter Start()
     {
-        GC.KeepAlive(Listening);
+        GC.KeepAlive(Listener);
         var counter = new SqlCommandCounter();
         Current.Value = counter;
         return counter;
@@ -38,41 +39,22 @@ public sealed class SqlCommandCounter : IDisposable
         }
     }
 
-    private sealed class ListenerObserver : IObserver<DiagnosticListener>
+    private static ActivityListener Listen()
     {
-        public void OnNext(DiagnosticListener value)
+        var listener = new ActivityListener
         {
-            if (value.Name == "SqlClientDiagnosticListener")
+            ShouldListenTo = source => source.Name == "Npgsql",
+            Sample = (ref ActivityCreationOptions<ActivityContext> options) => ActivitySamplingResult.AllData,
+            ActivityStarted = activity =>
             {
-                value.Subscribe(new EventObserver());
-            }
-        }
+                if (!activity.DisplayName.StartsWith("CONNECT ", StringComparison.Ordinal) && Current.Value is { } counter)
+                {
+                    Interlocked.Increment(ref counter._commands);
+                }
+            },
+        };
 
-        public void OnCompleted()
-        {
-        }
-
-        public void OnError(Exception error)
-        {
-        }
-    }
-
-    private sealed class EventObserver : IObserver<KeyValuePair<string, object?>>
-    {
-        public void OnNext(KeyValuePair<string, object?> value)
-        {
-            if (value.Key.EndsWith("WriteCommandBefore", StringComparison.Ordinal) && Current.Value is { } counter)
-            {
-                Interlocked.Increment(ref counter._commands);
-            }
-        }
-
-        public void OnCompleted()
-        {
-        }
-
-        public void OnError(Exception error)
-        {
-        }
+        ActivitySource.AddActivityListener(listener);
+        return listener;
     }
 }

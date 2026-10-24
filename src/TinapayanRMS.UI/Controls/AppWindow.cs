@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 using Syncfusion.Windows.Shared;
 
 namespace TinapayanRMS.UI.Controls;
@@ -23,11 +24,19 @@ namespace TinapayanRMS.UI.Controls;
 /// </summary>
 public class AppWindow : ChromelessWindow
 {
+    /// <summary>The app's icon, the one the .exe carries (ApplicationIcon), with a size for each place Windows shows it.</summary>
+    public static readonly Uri IconUri = new("pack://application:,,,/TinapayanRMS.UI;component/Assets/Icons/tinapayan-rms-icon.ico");
+
     public AppWindow()
     {
         UseNativeChrome = true;
         CornerRadius = new CornerRadius(0);
         ResizeBorderThickness = new Thickness(0);
+
+        // What the taskbar and Alt+Tab show for the window; the title bar doesn't draw it (each window's ShowIcon is off).
+        // WPF doesn't fall back to the .exe's icon: without this a window has Windows' blank default one. A frame of the
+        // .ico decoder, not a single image, so WPF picks the size closest to each it needs.
+        Icon = BitmapFrame.Create(IconUri);
     }
 
     /// <summary>

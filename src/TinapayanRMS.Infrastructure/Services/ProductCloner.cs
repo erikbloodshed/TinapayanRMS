@@ -134,7 +134,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
     }
 
     /// <summary>
-    /// The new product's recipe, at the source's piece sizes and shrinkage: its own copy of each of the source's own
+    /// The new product's recipe, at the source's piece sizes: its own copy of each of the source's own
     /// sub-assemblies (lines, role, and what it goes by there, named after the new product by SetRecipeAsync), and a
     /// link to every one the source links, with the source's add-ins on it as the new product's own.
     /// </summary>
@@ -165,14 +165,12 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                 {
                     // Its own whatever its role: the source's may have been unlinked in a role that isn't product-owned.
                     IsOwn = true,
-                    ShrinkagePercent = usage.ShrinkagePercent,
                 });
                 continue;
             }
 
             linked.Add(new LinkedUsageDraft(usage.SubAssemblyId, usage.AuthoredField, usage.AuthoredValue)
             {
-                ShrinkagePercent = usage.ShrinkagePercent,
                 AddIns = [.. addInsByUsage[usage.Id].Select(l => (l.IngredientId, l.Grams))],
             });
         }

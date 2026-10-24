@@ -19,7 +19,7 @@ public class ColumnsTests
     private static IModel CreateModel()
     {
         using var dbContext = new TinapayanRMSDbContext(
-            new DbContextOptionsBuilder<TinapayanRMSDbContext>().UseSqlServer("Server=unused").Options);
+            TinapayanRMSDbContext.CreateOptions("Host=unused"));
         return dbContext.GetService<IDesignTimeModel>().Model;
     }
 
@@ -30,7 +30,7 @@ public class ColumnsTests
     }
 
     [Fact]
-    public void Each_column_list_is_exactly_its_entitys_columns_with_Id_first()
+    public void Each_column_list_is_exactly_its_entitys_columns_with_id_first()
     {
         using var scope = new AssertionScope();
         foreach (var entityType in Model.GetEntityTypes())
@@ -40,7 +40,7 @@ public class ColumnsTests
 
             columns.Should().BeEquivalentTo(
                 entityType.GetProperties().Select(p => p.GetColumnName(table)), $"Columns lists {entityType.ClrType.Name}'s columns");
-            columns.FirstOrDefault().Should().Be("Id", $"a multi-mapped read splits {entityType.ClrType.Name} on its Id");
+            columns.FirstOrDefault().Should().Be("id", $"a multi-mapped read splits {entityType.ClrType.Name} on its id");
         }
     }
 }

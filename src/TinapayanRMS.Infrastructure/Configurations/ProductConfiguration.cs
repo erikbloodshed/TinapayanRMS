@@ -26,9 +26,9 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         // Only a composite has products to bring their packaging (CompositeProductRules.EnsureComponentPackagingOnComposite).
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("CK_Products_QuantityRequired", "[QuantityRequired] > 0");
-            t.HasCheckConstraint("CK_Products_CompositeIsOneUnit", "[IsComposite] = 0 OR [QuantityRequired] = 1");
-            t.HasCheckConstraint("CK_Products_ComponentPackagingOnComposite", "[IsComposite] = 1 OR [IncludesComponentPackaging] = 0");
+            t.HasCheckConstraint("CK_Products_QuantityRequired", "quantity_required > 0");
+            t.HasCheckConstraint("CK_Products_CompositeIsOneUnit", "NOT is_composite OR quantity_required = 1");
+            t.HasCheckConstraint("CK_Products_ComponentPackagingOnComposite", "is_composite OR NOT includes_component_packaging");
         });
 
         // The database default is only for the products there before stages were: the column is added to them as

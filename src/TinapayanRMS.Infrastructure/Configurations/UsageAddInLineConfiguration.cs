@@ -10,7 +10,7 @@ public class UsageAddInLineConfiguration : IEntityTypeConfiguration<UsageAddInLi
     {
         // Taking the sub-assembly out of the recipe takes this product's add-ins to it with it. The only
         // cascade path in is Products → ProductSubAssemblyUsages → UsageAddInLines, a chain rather than a
-        // second path, which SQL Server allows: a usage's own sub-assembly FK is Restrict.
+        // second path: a usage's own sub-assembly FK is Restrict.
         builder.HasOne(l => l.Usage)
             .WithMany()
             .HasForeignKey(l => l.UsageId)

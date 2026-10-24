@@ -252,7 +252,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
 
         var act = () => dbContext.SaveChangesAsync(Cancellation);
 
-        (await act.Should().ThrowAsync<DbUpdateException>()).WithInnerException<Microsoft.Data.SqlClient.SqlException>()
+        (await act.Should().ThrowAsync<DbUpdateException>()).WithInnerException<Npgsql.PostgresException>()
             .WithMessage("*CK_RawMaterials_OnlyIngredientsAreMade*");
     }
 

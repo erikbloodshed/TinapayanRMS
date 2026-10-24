@@ -3,7 +3,7 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.ApplicationCore.Rules;
 
 /// <summary>
-/// A price change tried on the What-If screen (2026-10-03): a purchased material's price per its purchase unit, typed as a
+/// A price change tried on the Price Simulator screen (2026-10-03): a purchased material's price per its purchase unit, typed as a
 /// change in percent or as the new price, and the costs per base unit it would give the material. Nothing here is saved.
 /// </summary>
 public static class PriceChangeRules
@@ -19,6 +19,15 @@ public static class PriceChangeRules
 
     /// <summary>The change from <paramref name="currentPrice"/> to <paramref name="newPrice"/>, in percent: 1,250 to 1,375 is 10%.</summary>
     public static decimal ChangePercent(decimal currentPrice, decimal newPrice) => CostingRules.PercentOf(newPrice - currentPrice, currentPrice);
+
+    /// <summary>
+    /// The price that earns the same markup on <paramref name="newBaseCost"/> as <paramref name="currentPrice"/> earns on
+    /// <paramref name="baseCost"/>: the price moves by the base cost's own factor, since the markup is on the base cost and
+    /// VAT goes on top (CostingRules.CalculateMarkupPercentFromPrice). A ₱10 price on a ₱6 base cost, the base cost up to
+    /// ₱6.60, is ₱11. Null without a current price, or with no base cost to keep a markup on. Not rounded.
+    /// </summary>
+    public static decimal? PriceToKeepMarkup(decimal? currentPrice, decimal baseCost, decimal newBaseCost) =>
+        currentPrice is { } price && baseCost > 0m ? price * newBaseCost / baseCost : null;
 
     public static void EnsureValidChange(decimal changePercent)
     {

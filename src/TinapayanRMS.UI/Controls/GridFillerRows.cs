@@ -26,8 +26,10 @@ public static class GridFillerRows
     public static void SetIsEnabled(DependencyObject element, bool value) => element.SetValue(IsEnabledProperty, value);
 
     /// <summary>
-    /// How many whole rows of <paramref name="rowHeight"/> fit in the space <paramref name="contentHeight"/> leaves
-    /// in <paramref name="viewportHeight"/>. A part of a row is left empty.
+    /// How many rows of <paramref name="rowHeight"/> it takes to fill the space <paramref name="contentHeight"/> leaves
+    /// in <paramref name="viewportHeight"/>: the last is cut off by the grid's bottom edge when only part of it fits, as
+    /// the grid's own last row is. (Until 2026-10-16 it was whole rows only, from when the rows were the grid's own and a
+    /// part of one would have made it scroll; drawn, they can't.)
     /// </summary>
     public static int FillerRowCount(double viewportHeight, double contentHeight, double rowHeight)
     {
@@ -36,8 +38,8 @@ public static class GridFillerRows
             return 0;
         }
 
-        // A hair over a whole number of rows, from fractional layout sizes, still counts as that many.
-        return Math.Max(0, (int)Math.Floor(((viewportHeight - contentHeight) / rowHeight) + 1e-6));
+        // A hair over a whole number of rows, from fractional layout sizes, doesn't start another.
+        return Math.Max(0, (int)Math.Ceiling(((viewportHeight - contentHeight) / rowHeight) - 1e-6));
     }
 
     private static void OnIsEnabledChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

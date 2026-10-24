@@ -15,8 +15,8 @@ public class ProductComponentConfiguration : IEntityTypeConfiguration<ProductCom
             .OnDelete(DeleteBehavior.Cascade);
 
         // A product in a composite can't be deleted until it's taken out there (ProductRepository.DeleteAsync names the
-        // composites first). It couldn't cascade anyway: that would be a second cascade path from Products to this table,
-        // which SQL Server refuses.
+        // composites first). It doesn't cascade: that would be a second cascade path from Products to this table,
+        // which SQL Server (the database until 2026-10-21) refused.
         builder.HasOne(c => c.ComponentProduct)
             .WithMany()
             .HasForeignKey(c => c.ComponentProductId)
@@ -27,8 +27,8 @@ public class ProductComponentConfiguration : IEntityTypeConfiguration<ProductCom
 
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("CK_ProductComponents_Quantity", "[Quantity] > 0");
-            t.HasCheckConstraint("CK_ProductComponents_NotItself", "[ProductId] <> [ComponentProductId]");
+            t.HasCheckConstraint("CK_ProductComponents_Quantity", "quantity > 0");
+            t.HasCheckConstraint("CK_ProductComponents_NotItself", "product_id <> component_product_id");
         });
     }
 }

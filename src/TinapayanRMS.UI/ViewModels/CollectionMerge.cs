@@ -35,10 +35,11 @@ public static class CollectionMerge
 
     /// <summary>
     /// Makes <paramref name="list"/> hold <paramref name="fresh"/>, in its order, while keeping the
-    /// existing object for every row whose values didn't change.
+    /// existing object for every row whose values didn't change. Rows sharing a key are matched in order.
     /// </summary>
-    public static void MergeFrom<T>(this ObservableCollection<T> list, IReadOnlyList<T> fresh, Func<T, int> key)
+    public static void MergeFrom<T, TKey>(this ObservableCollection<T> list, IReadOnlyList<T> fresh, Func<T, TKey> key)
     {
+        var keys = EqualityComparer<TKey>.Default;
         for (var i = 0; i < fresh.Count; i++)
         {
             var target = fresh[i];
@@ -47,7 +48,7 @@ public static class CollectionMerge
             var existingIndex = -1;
             for (var j = i; j < list.Count; j++)
             {
-                if (key(list[j]) == targetKey)
+                if (keys.Equals(key(list[j]), targetKey))
                 {
                     existingIndex = j;
                     break;

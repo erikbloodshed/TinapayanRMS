@@ -1,6 +1,6 @@
 # TinapayanRMS Developer Manual
 
-TinapayanRMS is the recipe and costing app of Tinapayan Festival Bakeshoppe. It's a Windows desktop app built with WPF, Syncfusion and ReactiveUI on .NET 10, and it keeps its data in SQL Server through EF Core and Dapper. The shop records what its raw materials cost. The app works out what every recipe, product and selling price comes to, and when a price changes it carries the change up to every product that uses it.
+TinapayanRMS is the recipe and costing app of Tinapayan Festival Bakeshoppe. It's a Windows desktop app built with WPF, Syncfusion and ReactiveUI on .NET 10, and it keeps its data in PostgreSQL through EF Core and Dapper. The shop records what its raw materials cost. The app works out what every recipe, product and selling price comes to, and when a price changes it carries the change up to every product that uses it.
 
 This manual is for developers who build, maintain or extend the app. It explains how the code is organised, which patterns it follows and why, and what you need to know and install before you change it. It assumes you know C#, but not this codebase.
 
@@ -43,7 +43,7 @@ PLAN.md is long: about 1,150 lines of very long bullets. List its sections with 
 - **Products.** A recipe of sub-assemblies, each cut into pieces of a set size, plus packaging and costing percentages. The app works out the cost and a cost-plus selling price per sellable unit. A *composite* product holds other products, such as a gift box of assorted breads.
 - **Reports, printing and scaling.** The Product Cost Summary and Raw Materials Price Summary reports, printed recipes and costings, and a recipe scaled to any number of units.
 
-It's a single-user desktop app. There's no server, no login and no network service of its own. The database is a local SQL Server Express instance, reached with Windows authentication.
+It's a single-user desktop app. There's no server, no login and no network service of its own. The database is a local PostgreSQL server, reached as the `tinapayanrms` role with the password in the password file.
 
 ### Screens
 
@@ -54,7 +54,7 @@ It's a single-user desktop app. There's no server, no login and no network servi
 | Products | `ProductsView`, with its cards in `Views/Products/` | `ProductsViewModel` |
 | Reports | `ReportsView` | `ReportsViewModel` |
 | Production Plan | `ProductionPlanView` | `ProductionPlanViewModel` |
-| What-If Prices | `WhatIfView` | `WhatIfViewModel` |
+| Price Simulator | `PriceSimulatorView` | `PriceSimulatorViewModel` |
 | Print (opened from Products) | `ProductPrintView` | `PrintTabViewModel` |
 | Settings dialog: Units of Measure, Categories, Product Categories, Roles, Costing Defaults, Keyboard | `SettingsWindow`, and one view per tab | `UnitsOfMeasureViewModel`, `CategoriesViewModel`, `ProductCategoriesViewModel`, `SubAssemblyRolesViewModel`, `CostingDefaultsViewModel`, `KeyboardSettingsViewModel` |
 
@@ -75,12 +75,12 @@ The [user manual](user-manual.md) describes every screen. Read its [Key ideas](u
 | Sub-assembly | `SubAssembly` | A recipe of ingredient lines (`SubAssemblyLine`), or a packaging set of packaging lines (`SubAssemblyPackagingLine`). It stores its `TotalWeight` and `TotalCost`. |
 | Role | `SubAssemblyRole` | What a sub-assembly is in a recipe (Dough, Filling, …). Roles set the order of a product's recipe tabs. `IsPackaging` marks the role packaging sets go in. `IsProductOwned` makes a section made in a product that product's own. |
 | Standalone or own | `SubAssembly.OwnerProductId` | A standalone sub-assembly (null owner) lives on the Sub-Assemblies screen, and products link it. An own sub-assembly belongs to one product and is edited in that product's recipe. |
-| Usage | `ProductSubAssemblyUsage` | One sub-assembly in a product's recipe, with the product's own piece size and shrinkage. The piece size is either a weight per piece or a yield: one is typed and the other is worked out. |
+| Usage | `ProductSubAssemblyUsage` | One sub-assembly in a product's recipe, with the product's own piece size. The piece size is either a weight per piece or a yield: one is typed and the other is worked out from the batch's total weight. |
 | Add-in | `UsageAddInLine` | A product's own extra ingredient on top of a sub-assembly it links. |
 | Packaging line, packaging link | `PackagingLine`, `PackagingLink` | A packaging material used by one sellable unit; or a link that reads a product's packaging from another product or from a packaging set. |
 | Quantity Required | `Product.QuantityRequired` | Pieces per sellable unit: 8 for a Box of 8. A recipe is written per piece, and costing is per sellable unit. |
 | Composite product | `Product.IsComposite`, `ProductComponent` | A product made of other products, plus its own packaging and sections in product-owned roles. |
-| Costing parameters, costing defaults | `CostingParameters`, `CostingDefaults` | A product's labor, overhead, administrative, markup and VAT percentages; and the values a new product starts with (its stage among them), with the shrinkage a new Recipe Structure section and the cost buffer a new raw material start with. |
+| Costing parameters, costing defaults | `CostingParameters`, `CostingDefaults` | A product's labor, overhead, administrative, markup and VAT percentages; and the values a new product starts with (its stage among them), with the cost buffer a new raw material starts with and the shop-wide Wastage % every product is priced with. |
 | Stage | `ProductStage` | Research and Development, or Production: the Products tree's two top folders. |
 | Baker's percentage | `SubAssemblyLine.IsFormulaBase`, `AuthoredBakersPercent` | A line's weight as a percentage of the total weight of the lines ticked as the formula's base. |
 
@@ -99,8 +99,8 @@ You'll be productive sooner if you're comfortable with the following.
 | MVVM with ReactiveUI 26 and Rx | `ReactiveObject`, `RaiseAndSetIfChanged`, `WhenAnyValue`, `ToProperty` (`ObservableAsPropertyHelper`), `ReactiveCommand`, `Interaction`, `Subject`, Rx operators | `ViewModels/` |
 | DynamicData | `SourceCache<T, TKey>`, `Connect().SortAndBind(...)` | List ViewModels |
 | EF Core 10 | `DbContext`, `IEntityTypeConfiguration<T>`, migrations, change tracking, transactions, `ExecuteDeleteAsync` | Writes and the schema, in `Infrastructure` |
-| Dapper and T-SQL | Multi-mapped joins (`splitOn`), CTEs, `STRING_SPLIT` | Reads, in `Infrastructure` |
-| SQL Server | Named instances, Windows authentication, `sqlcmd` | Setup, tests, debugging |
+| Dapper and PostgreSQL SQL | Multi-mapped joins (`splitOn`), recursive CTEs (`WITH RECURSIVE`), arrays with `unnest` | Reads, in `Infrastructure` |
+| PostgreSQL | Roles and the password file, snake_case names, `psql`, `pg_dump` and `pg_restore`, ICU collations | Setup, tests, backups, debugging |
 | Syncfusion Essential Studio for WPF | `SfDataGrid`, `SfTreeView`, `SfTreeGrid`, `ComboBoxAdv`, `TabControlExt`, `ButtonAdv`, `DoubleTextBox` and its kin, `SfNavigationDrawer`, `ChromelessWindow`, `SfSkinManager`, `PrintPreview` | Every view |
 | FluentValidation | `AbstractValidator<T>` | `ApplicationCore/Validators` |
 | .NET Generic Host and DI | `HostBuilder`, service lifetimes | `CompositionRoot.cs` |
@@ -109,17 +109,17 @@ You'll be productive sooner if you're comfortable with the following.
 | AwesomeAssertions | `Should()` assertions. It's a fork of FluentAssertions 7, with the same API. | `tests/` |
 | Respawn | Resetting a database between tests | The test fixtures |
 | MSBuild | `Directory.Build.props`, Central Package Management | The build |
-| The domain | Recipe costing in a bakery: bills of materials, yield, shrinkage, baker's percentage, cost-plus pricing | Read the user manual's [Key ideas](user-manual.md#1-key-ideas) and [How costs are worked out](user-manual.md#12-how-costs-are-worked-out) |
+| The domain | Recipe costing in a bakery: bills of materials, yield, wastage, baker's percentage, cost-plus pricing | Read the user manual's [Key ideas](user-manual.md#1-key-ideas) and [How costs are worked out](user-manual.md#12-how-costs-are-worked-out) |
 
 ### Software
 
 | Tool | Version | Notes |
 |---|---|---|
 | Windows | 10 or 11 | WPF only runs on Windows. Icons use Segoe Fluent Icons (Windows 11), and fall back to Segoe MDL2 Assets on Windows 10. |
-| .NET SDK | 10.0.401, or a later 10.0 feature band | Pinned in [global.json](../global.json) with `rollForward: latestFeature`. |
-| SQL Server Express | Instance `.\SQLEXPRESS` (service `MSSQL$SQLEXPRESS`) | Reached with Windows authentication. Your Windows account must be able to create databases, because the tests create their own. `sqlcmd` is useful. LocalDB isn't used. |
+| .NET SDK | 10.0.402, or a later 10.0 feature band | Pinned in [global.json](../global.json) with `rollForward: latestFeature`. |
+| PostgreSQL | 18 (EDB's Windows installer, service `postgresql-x64-18`, `localhost:5432`) | Reached as the `tinapayanrms` role, which must be able to create databases (`CREATEDB`), because the tests create their own. Its password goes in the password file, `%APPDATA%\postgresql\pgpass.conf`, so no connection string carries one. The installer's `bin` folder holds `psql`, and the `pg_dump` and `pg_restore` the backups run. |
 | `dotnet-ef` | 10.0.x, matching EF Core 10.0.12 | `dotnet tool install --global dotnet-ef --version 10.0.12` |
-| Syncfusion licence key | Essential Studio 35.x | Set as the `SYNCFUSION_LICENSE_KEY` user environment variable. The app won't start without it, and the UI tests that build Syncfusion controls are skipped without it. The build doesn't need it. A key covers one major version, so moving `SyncfusionVersion` to a new major version needs a new key. A program started before the variable changed, such as the IDE and its terminals, keeps the old value until it's restarted. |
+| Syncfusion licence key | Essential Studio 35.x | Set as the `SYNCFUSION_LICENSE_KEY` user environment variable. The build compiles it into the app, so the app runs on a computer without the variable, but an app built without it won't start, and `dotnet publish` fails without it. The UI tests that build Syncfusion controls read the variable themselves and are skipped without it. After changing the key, rebuild. A key covers one major version, so moving `SyncfusionVersion` to a new major version needs a new key. A program started before the variable changed, such as the IDE and its terminals, keeps the old value until it's restarted. |
 | An IDE | Any with .NET 10 support | Visual Studio, VS Code with the C# Dev Kit, or Rider. Git ignores `.vs/`, `.vscode/` and `.idea/`. |
 | Optional tools | | `ilspycmd` (decompiles Syncfusion's assemblies), and `dotnet-stack`, `dotnet-dump` and `dotnet-trace` (diagnose the running app). Syncfusion's Essential Studio installer puts the demo source of every control in `C:\Users\Public\Documents\Syncfusion\WPF\<version>\SampleBrowser\`. |
 
@@ -133,10 +133,14 @@ Docker isn't used anywhere in this project.
 
 Run every command from the repository root.
 
-1. **Check the SDK.** `dotnet --version` should print 10.0.401 or later.
-2. **Check SQL Server Express:**
+1. **Check the SDK.** `dotnet --version` should print 10.0.402 or later.
+2. **Set up PostgreSQL.** Install PostgreSQL 18, then, as the `postgres` superuser, create the app's role, and put its password in the password file (one line, `localhost:5432:*:tinapayanrms:<password>`):
    ```powershell
-   sqlcmd -S ".\SQLEXPRESS" -E -Q "SELECT @@VERSION"
+   $psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
+   & $psql -h localhost -U postgres -c "CREATE ROLE tinapayanrms LOGIN CREATEDB PASSWORD '<password>'"
+   New-Item -ItemType Directory -Force "$env:APPDATA\postgresql" | Out-Null
+   Add-Content "$env:APPDATA\postgresql\pgpass.conf" "localhost:5432:*:tinapayanrms:<password>"
+   & $psql -h localhost -U tinapayanrms -d postgres -c "SELECT version()"
    ```
 3. **Set the Syncfusion licence key** as a user environment variable, then restart your terminal and IDE so they see it:
    ```powershell
@@ -144,16 +148,12 @@ Run every command from the repository root.
    ```
 4. **Install the EF Core tools:** `dotnet tool install --global dotnet-ef --version 10.0.12`.
 5. **Build:** `dotnet build TinapayanRMS.slnx`.
-6. **Create the database.** This creates `TinapayanRMS` on `.\SQLEXPRESS` and applies every migration, including the rows the migrations seed, such as the starting sub-assembly roles:
+6. **Create the database.** This creates `tinapayanrms` and applies every migration, including the rows the migrations seed, such as the starting sub-assembly roles:
    ```powershell
    dotnet ef database update --project src/TinapayanRMS.Infrastructure
    ```
-   SQL Server Express turns `AUTO_CLOSE` on for the databases it creates. That makes the first read after a pause slow, so turn it off:
-   ```powershell
-   sqlcmd -S ".\SQLEXPRESS" -E -Q "ALTER DATABASE TinapayanRMS SET AUTO_CLOSE OFF"
-   ```
 7. **Run the app:** `dotnet run --project src/TinapayanRMS.UI`. With an empty database, follow the user manual's [First-time setup](user-manual.md#3-first-time-setup).
-8. **Run the tests:** `dotnet test --solution TinapayanRMS.slnx`. The first run creates the test databases `TinapayanRMS_Test_Infrastructure` and `TinapayanRMS_Test_UI`. The tests never touch `TinapayanRMS`.
+8. **Run the tests:** `dotnet test --solution TinapayanRMS.slnx`. The first run creates the test databases `tinapayanrms_test_infrastructure` and `tinapayanrms_test_ui`. The tests never touch `tinapayanrms`.
 
 ### Connection strings
 
@@ -163,13 +163,15 @@ Run every command from the repository root.
 | `dotnet ef` | Hard-coded in the design-time factory, [TinapayanRMSDbContextFactory](../src/TinapayanRMS.Infrastructure/TinapayanRMSDbContextFactory.cs) |
 | The tests | The app's `appsettings.json`, which `TinapayanRMS.Tests.Common` copies into each test project's output. Each project swaps in its own database name. |
 
-If your SQL Server instance isn't `.\SQLEXPRESS`, change the first two.
+Both are `Host=localhost;Database=tinapayanrms;Username=tinapayanrms`, with no password: Npgsql reads it from the password file. If your server, port or role differ, change both. A connection string may carry a `Password` instead, and the backups pass it on to `pg_dump` and `pg_restore`, but it's then in a file anyone with the folder can read.
+
+The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\<version>\bin`, newest version first, then on the `PATH`. Set `Backups:ToolsFolder` in `appsettings.json` to use another folder.
 
 ### Where the app writes
 
-- **Logs**: `logs/tinapayanrms-<date>.log` beside the executable. In a debug build that's `src/TinapayanRMS.UI/bin/Debug/net10.0-windows10.0.19041.0/logs/`. There's one file a day, and the last 31 are kept.
+- **Logs**: `logs/tinapayanrms-<date>.log` beside the executable. In a debug build that's `src/TinapayanRMS.UI/bin/Debug/net10.0-windows10.0.19041.0/win-x64/logs/`. There's one file a day, and the last 31 are kept.
 - **View state**: `%LocalAppData%\TinapayanRMS\view-state.json` remembers which tree folders were left open (on Sub-Assemblies, which were left closed), and whether the Vim keys are on (`"vim-keys": ["on"]`). It's safe to delete.
-- **Backups**: `%ProgramData%\TinapayanRMS\Backups`, one folder for every Windows user of the computer. SQL Server writes the `.bak` files itself, as its service account (`NT SERVICE\MSSQL$SQLEXPRESS`), which can't write into a user's profile. So the app creates this folder and, as its owner, gives the service account and `BUILTIN\Users` Modify on it, inherited by every file ([BackupFolder](../src/TinapayanRMS.Infrastructure/Services/BackupFolder.cs)). The tests use `%ProgramData%\TinapayanRMS\Test Backups\<guid>` and delete it afterwards.
+- **Backups**: `%ProgramData%\TinapayanRMS\Backups`, one folder for every Windows user of the computer. `pg_dump` writes the `.backup` files as the user running the app. The app creates this folder and, as its owner, gives `BUILTIN\Users` Modify on it, inherited by every file, so anyone using the app can copy, restore and delete any backup ([BackupFolder](../src/TinapayanRMS.Infrastructure/Services/BackupFolder.cs)). The `.bak` files SQL Server wrote before the move to PostgreSQL (2026-10-21) are no longer listed and can't be restored. The tests use `%ProgramData%\TinapayanRMS\Test Backups\<guid>` and delete it afterwards.
 
 ### Command reference
 
@@ -185,7 +187,9 @@ If your SQL Server instance isn't `.\SQLEXPRESS`, change the first two.
 | Add a migration | `dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure` |
 | Check the model matches the migrations | `dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infrastructure` |
 | Apply migrations | `dotnet ef database update --project src/TinapayanRMS.Infrastructure` |
-| Query the database | `sqlcmd -S ".\SQLEXPRESS" -E -d TinapayanRMS -Q "SELECT Name, CostPerBaseUnit FROM RawMaterials"` |
+| Regenerate the compiled model, after any model change | `dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels` |
+| Publish the app (ReadyToRun, to `src/TinapayanRMS.UI/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/`) | `dotnet publish src/TinapayanRMS.UI` |
+| Query the database | `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U tinapayanrms -d tinapayanrms -c "SELECT name, cost_per_base_unit FROM raw_materials"` |
 
 The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test.runner`). VSTest-style flags such as `--filter` and `--collect` don't work: use the `--filter-*` options and `--coverage` instead.
 
@@ -212,7 +216,7 @@ A change is done when:
 |---|---|---|---|
 | `src/TinapayanRMS.Domain` | `net10.0` | Nothing | `Entities/`, `Enums/` |
 | `src/TinapayanRMS.ApplicationCore` | `net10.0` | Domain; FluentValidation | `Interfaces/`, `Rules/`, `Validators/` |
-| `src/TinapayanRMS.Infrastructure` | `net10.0` | Domain, ApplicationCore; EF Core (SQL Server), Dapper | `TinapayanRMSDbContext` and its design-time factory at the root; `Configurations/`, `Migrations/`, `Queries/`, `Repositories/`, `Services/` |
+| `src/TinapayanRMS.Infrastructure` | `net10.0` | Domain, ApplicationCore; EF Core (Npgsql, with EFCore.NamingConventions), Dapper | `TinapayanRMSDbContext` and its design-time factory at the root; `Configurations/`, `Migrations/`, `CompiledModels/`, `Queries/`, `Repositories/`, `Services/` |
 | `src/TinapayanRMS.UI` | `net10.0-windows10.0.19041.0` | All three; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion | App startup at the root; `Views/`, `ViewModels/`, `Controls/`, `Converters/`, `Printing/`, `Exporting/`, `Vim/`, `Themes/`, `Assets/Icons/` |
 | `tests/TinapayanRMS.ApplicationCore.Tests` | `net10.0` | Domain, ApplicationCore | Rule and validator tests, with no database |
 | `tests/TinapayanRMS.Infrastructure.Tests` | `net10.0` | Infrastructure, Tests.Common | Persistence tests against the project's own database |
@@ -247,9 +251,10 @@ A ViewModel file can also hold the small row and edit types that only its screen
 
 - [Directory.Build.props](../Directory.Build.props) sets `net10.0`, `ImplicitUsings`, `Nullable`, the `WindowsTargetFramework` property, and `AnalysisLevel` `latest-recommended` (the SDK's built-in analyzers at their Recommended rule set).
 - [tests/Directory.Build.props](../tests/Directory.Build.props) imports it. It gives every project whose name ends in `.Tests` the xUnit v3, AwesomeAssertions, test SDK and coverage packages, and a global `using Xunit`.
-- [Directory.Packages.props](../Directory.Packages.props) turns on Central Package Management. Versions live only there, so a `PackageReference` never has a `Version`. The EF Core and Syncfusion versions are the `EFCoreVersion` and `SyncfusionVersion` properties. Every Syncfusion package must be on the same version, so upgrade them together. Transitive pinning is on, so the "Transitive pins" group can lift a vulnerable transitive dependency (currently `System.Security.Cryptography.Pkcs`, which `Microsoft.Data.SqlClient` brings) to a fixed version. `dotnet list TinapayanRMS.slnx package --include-transitive --vulnerable` lists what still needs one.
-- [.editorconfig](../.editorconfig) marks `Migrations/` as generated code, turns off CA1707 (underscores in names) in `tests/`, and turns off CA1716 everywhere.
+- [Directory.Packages.props](../Directory.Packages.props) turns on Central Package Management. Versions live only there, so a `PackageReference` never has a `Version`. The EF Core and Syncfusion versions are the `EFCoreVersion` and `SyncfusionVersion` properties. Every Syncfusion package must be on the same version, so upgrade them together. Transitive pinning is on, so the "Transitive pins" group can lift a transitive dependency to a fixed version: currently `Microsoft.EntityFrameworkCore.Relational`, which `Npgsql.EntityFrameworkCore.PostgreSQL` asks for only at 10.0.4, held at `EFCoreVersion` so every project gets one EF Core. `dotnet list TinapayanRMS.slnx package --include-transitive --vulnerable` lists what still needs one.
+- [.editorconfig](../.editorconfig) marks `Migrations/` as generated code, turns off CA1707 (underscores in names) in `tests/`, and turns off CA1716 everywhere. The files in `CompiledModels/` carry their own `<auto-generated />` header, so the analyzers skip them too.
 - Warnings aren't treated as errors, but the build is kept free of them.
+- The UI project sets `PublishReadyToRun`, with its `win-x64` runtime identifier, so `dotnet publish` precompiles every assembly the app ships, and less code waits on the JIT at startup. `dotnet build` and `dotnet run` ignore it.
 
 ### Other files at the root
 
@@ -309,10 +314,10 @@ Business and costing rules go in ApplicationCore, and EF Core and other I/O stay
 
 ### Startup
 
-1. **`App`'s static constructor** ([App.xaml.cs](../src/TinapayanRMS.UI/App.xaml.cs)) runs before anything touches a Syncfusion type. It builds the Serilog logger and, in Debug builds, adds the binding-error log. It registers the Syncfusion licence, and throws (after logging) if `SYNCFUSION_LICENSE_KEY` is missing. It also sets app-wide control defaults: 24 px text boxes and buttons, right-aligned number boxes, editable pickers that filter as you type, and the grid, picker and undo behaviours from `Controls/`.
+1. **`App`'s static constructor** ([App.xaml.cs](../src/TinapayanRMS.UI/App.xaml.cs)) runs before anything touches a Syncfusion type. It builds the Serilog logger and, in Debug builds, adds the binding-error log. It registers the Syncfusion licence: the key the build compiled in (the UI project's `SyncfusionLicenseKey` `AssemblyMetadata` item, taken from `SYNCFUSION_LICENSE_KEY`), or else the variable itself. It throws (after logging) with neither. It also sets app-wide control defaults: 24 px text boxes and buttons, right-aligned number boxes, editable pickers that filter as you type, and the grid, picker and undo behaviours from `Controls/`.
 2. **`App.OnStartup`** hooks unhandled-exception logging and registers the Windows11Light theme settings, with the accent recoloured to the app's Sky and every text size 2 px larger than the theme's default. It then builds and starts the host from `CompositionRoot.CreateHostBuilder`, resolves `MainWindow`, themes it with `SfSkinManager.SetTheme` and shows it.
-3. **`CompositionRoot.CreateHostBuilder`** ([CompositionRoot.cs](../src/TinapayanRMS.UI/CompositionRoot.cs)) initialises ReactiveUI, reads `appsettings.json` and registers everything: the DbContext factory, the propagators, the repositories, `SavedProductReader`, the view-state store, the logger, the validators, the ViewModels and `MainWindow`.
-4. **`MainWindow`'s constructor** ([MainWindow.xaml.cs](../src/TinapayanRMS.UI/Views/MainWindow.xaml.cs)) creates each screen's view around its ViewModel. It maps each tab to its screen's `LoadCommand` and to its Back and Forward handling, and wires up the requests that one screen makes of another. When the window has loaded, it loads the tab on show.
+3. **`CompositionRoot.CreateHostBuilder`** ([CompositionRoot.cs](../src/TinapayanRMS.UI/CompositionRoot.cs)) initialises ReactiveUI, reads `appsettings.json` and registers everything: the DbContext factory, the propagators, the repositories, `SavedProductReader`, `ProductVersionRecorder`, the view-state store, the logger, the validators, the ViewModels and `MainWindow`.
+4. **`MainWindow`'s constructor** ([MainWindow.xaml.cs](../src/TinapayanRMS.UI/Views/MainWindow.xaml.cs)) creates the first tab's view around its ViewModel. Every other tab's view is made the first time the tab is shown (`CreateScreen`). It maps each tab to its screen's `LoadCommand` and to its Back and Forward handling, and wires up the requests that one screen makes of another. When the window has loaded, it loads the tab on show.
 5. Once the window shows, **`App`** starts two things off the UI thread: a check for migrations the database doesn't have yet, and the day's automatic backup (`IDatabaseBackups.BackUpDailyIfDueAsync`), taken the first time the app starts each day. A backup that fails is only logged.
 6. **`App.OnExit`** disposes the host, which disposes the singleton ViewModels, and flushes the log. After a restore, `App.RestartAfterExit` has set it to start the app again, once the log is closed.
 
@@ -320,7 +325,7 @@ ReactiveUI 26 must be initialised exactly once per process, before any `Reactive
 
 ### Dependency injection and lifetimes
 
-Everything in the container is a **singleton**: the repositories, the services (`ProductCloner`, `CostRecalculator`, `SavedProductReader`), the validators, every ViewModel and `MainWindow`. A screen lives for the whole session, and so does its ViewModel.
+Everything in the container is a **singleton**: the repositories, the services (`ProductCloner`, `CostRecalculator`, `SavedProductReader`, `ProductVersionRecorder`), the validators, every ViewModel and `MainWindow`. A screen lives for the whole session, and so does its ViewModel.
 
 The DbContext is registered with **`AddDbContextFactory`**, never `AddDbContext`. A singleton can't hold a `DbContext`: two screens loading at once would share it, and EF Core throws when a second operation starts on a context that's still busy. That happened the first time the app ran. So every repository takes `IDbContextFactory<TinapayanRMSDbContext>` and creates a short-lived context for each call:
 
@@ -407,7 +412,7 @@ PER PRODUCT
 
 | Entity | What it is | Worth knowing |
 |---|---|---|
-| `RawMaterial` | An ingredient or a packaging material | `Type` and `Source` never change once saved. Names are unique across both types. `CostPerBaseUnit` and `BufferedCostPerBaseUnit` are stored as `decimal(28,20)`. Check constraints back up the type and source rules. |
+| `RawMaterial` | An ingredient or a packaging material | `Type` and `Source` never change once saved. Names are unique across both types. `CostPerBaseUnit` and `BufferedCostPerBaseUnit` are stored as `numeric(28,20)`. Check constraints back up the type and source rules. |
 | `RawMaterialUnit` | An alternative unit, defined in base units | Never the base unit itself: a line or price with no unit is in the base unit. Correcting a multiplier reprices the material. A unit in use can't be deleted. |
 | `RawMaterialBrandPrice` | A purchased material's price for one brand, in one unit | The Raw Materials Save replaces them as a set. |
 | `RawMaterialPriceHistory` | A price the material was costed at | A log. Nothing reads it to cost anything. |
@@ -418,24 +423,50 @@ PER PRODUCT
 | `SubAssemblyPackagingLine` | A packaging material in a packaging set | Costed on read. |
 | `Product` | A sellable product | Names are unique, deleted products' included. `IsComposite` is fixed once saved. `QuantityRequired` is at least 1, and exactly 1 for a composite. Deleting one only stamps `DeletedAt` (a soft delete): see [Deleted products](#deleted-products). |
 | `ProductCategory` | Breads, Cakes, … | A list of its own, separate from raw material categories. |
-| `ProductSubAssemblyUsage` | A sub-assembly in a product's recipe | Stores only the typed piece-size figure (`AuthoredField`, `AuthoredValue`) and `ShrinkagePercent`. |
+| `ProductSubAssemblyUsage` | A sub-assembly in a product's recipe | Stores only the typed piece-size figure (`AuthoredField`, `AuthoredValue`). |
 | `UsageAddInLine` | A product's extra ingredient on a linked usage | Never changes the sub-assembly that the usage links. |
 | `PackagingLine` | A packaging material per sellable unit | Stores both reciprocal quantities and which one was typed (`AuthoredField`). |
 | `PackagingLink` | A product's packaging, read from another product or from a set | Exactly one target, and no loops (`PackagingLinkRules`). |
 | `ProductComponent` | A product inside a composite | `Quantity` is at least 1, and a composite never contains itself (`CompositeProductRules.EnsureNoCycle`). |
 | `CostingParameters` | A product's five percentages | One per product. Never linked or shared. |
-| `CostingDefaults` | The stage and percentages a new product starts with, a new section's shrinkage and a new raw material's cost buffer | At most one row (Id 1). With no row, new products go in Production (`DefaultNewProductStage`), the costing reads as zero, the shrinkage as 3% (`DefaultShrinkagePercent`) and the cost buffer as 10% (`DefaultCostBufferPercent`). |
+| `ProductVersion` | One version in a product's history | `Number` is unique per product. `Content` is a self-contained JSON snapshot that points at nothing. Goes with the product only on a permanent delete. See [Product versions](#product-versions). |
+| `PriceScenario`, `PriceScenarioLine` | A set of Price Simulator price changes saved under a name, and one of its changes | Names are unique, ignoring case; saving under one replaces its lines (`IPriceScenarioRepository.SaveAsync`). A line stores exactly one of `ChangePercent` and `NewPrice`, whichever was typed (`PriceScenarioRules`, backed by check constraints). Deleting a raw material deletes its lines. Nothing reads a scenario to cost anything. See [The Price Simulator](#the-price-simulator). |
+| `SavedPlan`, `SavedPlanLine` | A Production Plan saved under a name, with its `HalfBatches`, and one of its products and units | Names are unique, ignoring case; saving under one replaces its lines (`ISavedPlanRepository.SaveAsync`). A line's `Units` is above 0 (`SavedPlanRules`, backed by `CK_SavedPlanLines_Units`). A product can be on two lines, as in the table. Deleting a product for good deletes its lines; a soft-deleted one is left out when the plan opens. See [The Production Plan](#the-production-plan). |
+| `CostingDefaults` | The stage and percentages a new product starts with, a new raw material's cost buffer, and the shop-wide `WastagePercent` | At most one row (Id 1). With no row, new products go in Production (`DefaultNewProductStage`), the costing reads as zero, the cost buffer as 10% (`DefaultCostBufferPercent`) and the wastage as 3% (`DefaultWastagePercent`). Unlike the rest, the wastage isn't a starting value: `SavedProductReader` stamps it on every `ProductDetail` it reads, and the Products screen keeps it from each load, so changing it reprices every product. |
 | `UnitOfMeasure`, `RawMaterialCategory` | Lookups edited in Settings | A unit's name is stored in lowercase. A category is for one type of material. |
 
 ### Deleted products
 
 A product is deleted in two steps, so a delete can be taken back. `IProductRepository.DeleteAsync` stamps `Product.DeletedAt` and changes nothing else, which moves the product to the Products list's **Deleted** folder. `RestoreAsync` clears it. `DeletePermanentlyAsync` is the hard delete, with its cascades.
 
-- **Reads leave deleted products out by default.** `GetAllAsync` returns the products in use, and `GetDeletedAsync` returns the deleted ones. `GetByIdAsync` and `GetByIdsAsync` return either, since a holder reads what it holds by id. Every screen except Products reads through `GetAllAsync`, so a deleted product is in no list, picker, report, print, What-If or plan. There's no global query filter: one would also drop the rows of the "in use" checks below.
+- **Reads leave deleted products out by default.** `GetAllAsync` returns the products in use, and `GetDeletedAsync` returns the deleted ones. `GetByIdAsync` and `GetByIdsAsync` return either, since a holder reads what it holds by id. Every screen except Products reads through `GetAllAsync`, so a deleted product is in no list, picker, report, print, the Price Simulator or plan. There's no global query filter: one would also drop the rows of the "in use" checks below.
 - **A deleted product still holds what it uses.** Its usages, packaging lines, links and composite lines stay, so a restore brings it back whole. The `Restrict` keys keep refusing deletes of what it uses. The checks that name products (`SubAssemblyRepository`'s Used By and refusals, `RawMaterialRepository.GetUsedByAsync`, a composite's role refusals) name it "Cheese Roll (deleted)", through `ProductRules.ListedName`.
 - **The checks on what leans on a product run for both deletes.** Neither a soft nor a hard delete goes through while another product, deleted or not, links its packaging or holds it in a composite (`ProductRepository.EnsureNothingLeansOnAsync`). Nothing in use ever leans on a deleted product, so a restore never needs a check.
 - **A deleted product can't be newly linked or held.** `PackagingLinkRepository` and `ProductComponentRepository.SetComponentsAsync` refuse it by name. Its name stays taken: Add, Update and Rename refuse it first (`ProductRules.EnsureNameNotHeldByDeleted`), so the message points to the Deleted folder instead of the unique index's "That name is already in use."
 - **On the Products screen**, `ProductsViewModel.DeletedProducts` feeds `ProductTree.DeletedFolder` and nothing else. A deleted row (`ProductLeafNode.IsDeleted`) is picked the way a folder is: the form doesn't open it. Its menu has Restore and Delete Permanently, and `ProductTree.MoveTo` refuses it as a drag source or a drop target. `OpenProduct` on a deleted id picks its row in the Deleted folder.
+
+### Product versions
+
+Every save that changes a product's recipe or price records a `ProductVersion`, which the History tab shows and can restore: the product's own Save on the Products screen, and a save elsewhere that reaches it (a sub-assembly it uses, or another product it shares lines or packaging with). So does making it as a clone or a variant.
+
+- **A version is a snapshot, not a set of rows.** [ProductVersionContent](../src/TinapayanRMS.ApplicationCore/Interfaces/ProductVersionContent.cs) holds the sections with their lines and add-ins, the packaging lines as they showed (resolved through any link), a composite's products with what each brought, the costing percentages, the price, and every material used with its costs at that moment. It's stored as JSON (`ToJson`/`FromJson`, with a `Schema` number for a later change of shape), and its ids are only for Restore and for pairing sections, so deleting anything later leaves old versions readable.
+- **It's taken after Save, in the UI layer.** Products are priced only in the UI (`SavedProductReader.Build`), so the snapshot can't be written in `ProductRepository.SaveAsync`'s transaction. `ProductsViewModel`'s Save reloads the product's `ProductDetail` as it always did, [ProductVersionSnapshot](../src/TinapayanRMS.UI/ViewModels/ProductVersionSnapshot.cs)`.From` turns it into the content, and `IProductVersionRepository.AddAsync` writes it. A failed write shows its message and doesn't undo the Save; the next Save records the version, since its recipe still differs from the latest.
+- **"Changed" has one definition.** `AddAsync` records nothing when `ProductVersionRules.IsSameRecipe` says the content matches the latest, and that is defined as `ProductVersionRules.Changes` finding nothing to list. So a version never appears with an empty list of changes, and a rename, a description, or a material's cost never makes one.
+- **The first Save of a product with no versions** first records the product as it stood (`RecordVersionBeforeHistoryAsync`, `ProductVersionRules.BaselineNote`), so there's something to go back to.
+- **A save also records the other products it changes.** [ProductVersionRecorder](../src/TinapayanRMS.UI/ViewModels/ProductVersionRecorder.cs) (a DI singleton; `ProductsViewModel` builds its own over its repositories, as it does its `SavedProductReader`) runs on both sides of a save:
+  - `CaptureAsync` before it. `IProductRepository.GetProductsReadingAsync` finds every product that reads through the saved sub-assemblies or product: those using the sub-assembly, those whose packaging links it as a set, and, through packaging links however deep, those whose packaging links one of them. Each is snapshotted as it's saved.
+  - `RecordChangesAsync` after it. Each is read again, and one whose recipe changed gets a version, noted with where the change came from. A product with no versions gets its baseline first. They're all written in one transaction by `IProductVersionRepository.AddRangeAsync`, which reads every product's latest version in one query. The number of commands doesn't grow with the products.
+  - Sub-Assemblies' Save passes the sub-assembly. The Products screen's Save passes the product, whose own sections bring in the products sharing them; the product itself is left out, since its own Save records it. It captures only when it writes something another product reads: a linked section's lines (`AreLinkedLinesEdited`), or the packaging lines or link. A Save of the product's own figures, costing or own sections can't change another product, so it reads none of them.
+  - Reading or recording can't stop or undo the save: a failure shows after it.
+  - `RecordedMessage` names the products in the success notice.
+  - `ProductsViewModel.LoadCommand` reads a showing History tab's versions again, and clears a hidden one's, so a version recorded from another screen shows.
+- **A clone or a variant gets its first version as it's made.** `MakeFromAsync` calls `ProductVersionRecorder.RecordMadeFromAsync`, noted `ProductsViewModel.ClonedFrom` or `VariantOf` plus the source's name. The source's latest version number goes in when its snapshot `IsSameRecipe` as that version. Its first Save then has a history, so it records no baseline.
+- **Figures are worked out on read, by the screen's own code.** `ProductVersionSnapshot.ToDetail` rebuilds a `ProductDetail` from the content and `SavedProductReader.Build` prices it: with its own materials for Then, and with the screen's current materials (`materialsById`, the Price Simulator's way in) and each held product's cost now (`ReadComponentCostsAsync`) for Today.
+- **The History tab reads lazily.** [ProductVersionHistory](../src/TinapayanRMS.UI/ViewModels/ProductVersionHistory.cs) holds the rows, the picked one and its changes. `ProductsViewModel.RequestVersions` pushes the product to a `LoadLatest` only while `HistoryTab` shows, once per product, and again after a Save.
+  - **Compare With** is a list of `VersionComparison` records: `Previous`, `Current`, then one per version (`With(row)`). They're equal by value, so the choice picked is found again in the list `Show` builds for a new read, and goes back to `Previous` for another product. The picker binds `SelectedItem`, and `CompareWith` ignores the null it sends while its list is replaced. Two versions are always compared from the older to the newer.
+  - **Cost Over Time** is an `SfChart` of `Trend`: one `VersionTrendPoint` per version, oldest first, with each one's Then figures as doubles. A missing current price is `NaN`, which the chart draws as a gap. It's rebuilt by `Show`, `Reprice` and `Clear`. Its three series brushes are in `HistoryCard.xaml`'s resources: the dataviz palette's first three hues, checked with its validator against the card's colour.
+- **Print shows the version picked while the History tab shows**, as it shows the scaled recipe on the Scaling tab: `PreparePrintout` returns `VersionPrintout`, the version's `ProductDetail` built and priced at its costs then, through `SavedProduct.ToPrintout`, titled with the version and footed with `ProductPrintout.VersionNote`. The form isn't applied, since the pages aren't the form's. The tab's Print Version button is the same `PrintCommand`.
+- **Restore is an undo step.** `RestoreVersionAsync` builds the version into the form's state and applies it through `RestoreSnapshot` inside `AsUndoStep`, so Save writes it and Undo takes it back, with no restore path of its own. A linked section is linked again with its current lines (Save never writes a version's lines into a shared sub-assembly). Anything it needs that's gone is named, and nothing changes.
 
 ### Where rules are enforced
 
@@ -445,7 +476,7 @@ Three layers check the same rules, each for a different reason.
 |---|---|---|---|
 | Form pre-checks | FluentValidation validators in `ApplicationCore/Validators`, which a ViewModel runs before it saves | An immediate, friendly message | `ErrorMessage` is set, and nothing reaches the repository |
 | Business rules (the authority) | Static `*Rules` methods, which the repositories call before they write anything destructive | The real guarantee, whichever code path writes | A `BusinessRuleException`, whose message `RunSafelyAsync` shows exactly as written |
-| The database (a backstop) | Unique indexes, check constraints and `Restrict` foreign keys, in `Infrastructure/Configurations` | Integrity even if a code path forgets a check | A `DbUpdateException` or a `SqlException`, which [Failure](../src/TinapayanRMS.UI/ViewModels/Failure.cs) puts plainly by SQL Server's error number: "That name is already in use.", "This item is currently in use elsewhere and can't be deleted.", and so on |
+| The database (a backstop) | Unique indexes, check constraints and `Restrict` foreign keys, in `Infrastructure/Configurations` | Integrity even if a code path forgets a check | A `DbUpdateException` or a `PostgresException`, which [Failure](../src/TinapayanRMS.UI/ViewModels/Failure.cs) puts plainly by PostgreSQL's error code (SQLSTATE): "That name is already in use.", "This item is currently in use elsewhere and can't be deleted.", and so on |
 
 The database's messages say what kind of thing went wrong, never which rule. So a rule that a user can break must be checked first in a `*Rules` method, with a message that says what's wrong. Validators exist only for entities that have a Save form. A set of lines saved together (BOM lines, recipe lines, packaging lines) gets its checks across rows from its Rules class instead.
 
@@ -462,9 +493,9 @@ Before you change any cost path, read the user manual's [How costs are worked ou
 | A material's `CostPerBaseUnit` and `BufferedCostPerBaseUnit` | Stored | The Raw Materials Save and the brand-price repository (purchased); `IngredientCostPropagator` (made and linked) |
 | A material's `CostUpdatedAt` | Stored | `TinapayanRMSDbContext.SaveChangesAsync`, from what actually changed |
 | A sub-assembly's `TotalWeight` and `TotalCost` | Stored | `SubAssemblyLineRepository.SetLinesAsync` when its lines are saved; `SubAssemblyCostPropagator` when an ingredient's cost changes |
-| A usage's worked-out piece size, final weight and cost per piece | Computed on read | `ProductRules` |
+| A usage's worked-out piece size and cost per piece | Computed on read | `ProductRules` |
 | Packaging line and packaging set costs | Computed on read | `ProductRules` |
-| A product's material cost, base cost, selling price and markup | Computed on read | `ProductRules`, `CostingRules` |
+| A product's material cost, wastage, base cost, selling price and markup | Computed on read | `ProductRules`, `CostingRules` |
 | What a product brings into a composite | Computed on read | `SavedProductReader`, `CompositeProductRules` |
 
 ### The cascade
@@ -511,31 +542,33 @@ The cascade doesn't push changes live to other screens. A screen picks up new co
 | Linked: cost per gram | The linked-to ingredient's cost × cost share % ÷ weight share %, for both costs | `RawMaterialRules.LinkedCost` |
 | Sub-assembly totals | Σ grams; Σ (grams × the ingredient's buffered cost per gram) | `SubAssemblyRules.CalculateTotals` |
 | A usage's batch | The sub-assembly's totals plus its add-ins | `ProductRules.CalculateEffectiveBatch` |
-| Final weight | Batch weight × (1 − shrinkage %) | `ProductRules.CalculateFinalWeight` |
-| Piece size | Yield = final weight ÷ weight per piece, or weight per piece = final weight ÷ yield, depending on which was typed | `ProductRules.ResolvePieceSize` |
-| Usage cost per piece | Batch cost × weight per piece ÷ final weight | `ProductRules.CalculateUsageCostPerPiece` |
+| Piece size | Yield = batch weight ÷ weight per piece, or weight per piece = batch weight ÷ yield, depending on which was typed | `ProductRules.ResolvePieceSize` |
+| Usage cost per piece | Batch cost × weight per piece ÷ batch weight | `ProductRules.CalculateUsageCostPerPiece` |
 | Packaging line cost | Cost per base unit × the quantity in base units | `ProductRules.CalculatePackagingLineCost` |
 | Material cost per sellable unit | Σ usage costs per piece × Quantity Required, + Σ packaging | `ProductRules.CalculateMaterialCost` |
-| Labor, overhead, administrative | Each is its % of the sub-assembly cost alone, never of the packaging | `CostingRules.CalculateCostFromSubAssemblyPercent` |
-| Selling price | Base cost = sub-assemblies + packaging + labor + overhead + administrative; pre-VAT price = base cost × (1 + markup %); selling price = pre-VAT price × (1 + VAT %) | `CostingRules.CalculateSellingPrice` |
+| Wastage, labor, overhead, administrative | Each is its % of the sub-assembly cost alone, never of the packaging. The Wastage % is the shop's (`CostingDefaults.WastagePercent`); a composite's products bring their cost before theirs, so it's added once | `CostingRules.CalculateCostFromSubAssemblyPercent` |
+| Selling price | Base cost = sub-assemblies + wastage + packaging + labor + overhead + administrative; pre-VAT price = base cost × (1 + markup %); selling price = pre-VAT price × (1 + VAT %) | `CostingRules.CalculateSellingPrice` |
 | Markup at the current price | (current price ÷ (1 + VAT %) − base cost) ÷ base cost | `CostingRules.CalculateMarkupPercentFromPrice` |
+| Price to keep the markup (Price Simulator) | current price × simulated base cost ÷ base cost (VAT cancels out) | `PriceChangeRules.PriceToKeepMarkup` |
 | A composite's line | The product's recipe cost per sellable unit × quantity, plus its packaging cost when the composite includes it | `CompositeProductRules.CalculateComponentCost`, `CalculateComponentPackagingCost` |
 
-A made or linked ingredient's costs are worked out by **`IngredientCostRules.Recompute`**, which the cascade (`IngredientCostPropagator`) stores and the What-If screen uses without storing (`IngredientCostRules.Reprice`: copies of the changed materials and of every ingredient depending on them, in dependency order). A what-if price change moves a material's cost and buffered cost by the same factor (`PriceChangeRules.CostsAfter`).
+A made or linked ingredient's costs are worked out by **`IngredientCostRules.Recompute`**, which the cascade (`IngredientCostPropagator`) stores and the Price Simulator uses without storing (`IngredientCostRules.Reprice`: copies of the changed materials and of every ingredient depending on them, in dependency order). A simulated price change moves a material's cost and buffered cost by the same factor (`PriceChangeRules.CostsAfter`).
 
-[SavedProductReader](../src/TinapayanRMS.UI/ViewModels/SavedProductReader.cs) is the one place where a saved product is read and priced. The Products screen, Reports and Print all go through it, so they always agree. It reads any number of products together (`ReadDetailsAsync`, `ReadAllAsync`) in about fifteen queries however many there are, on the repositories' plural reads: packaging link chains are followed in memory, and the products a composite holds are read with it and costed bottom-up. For the What-If screen, `Build` takes substitute materials (by id) for its sections and packaging, and `PricedAt` prices a composite's products again with them, however deep.
+[SavedProductReader](../src/TinapayanRMS.UI/ViewModels/SavedProductReader.cs) is the one place where a saved product is read and priced. The Products screen, Reports and Print all go through it, so they always agree. It reads any number of products together (`ReadDetailsAsync`, `ReadAllAsync`) in about fifteen queries however many there are, on the repositories' plural reads: packaging link chains are followed in memory, and the products a composite holds are read with it and costed bottom-up. For the Price Simulator, `Build` takes substitute materials (by id) for its sections and packaging, and `PricedAt` prices a composite's products again with them, however deep.
 
 ### Precision and rounding
 
 - Every cost is a `decimal` at full precision through the whole cascade. Round only for display, and for the final selling price.
-- `TinapayanRMSDbContext.ConfigureConventions` makes every `decimal` column `decimal(18,4)`, so a new column can't fall back to SQL Server's `decimal(18,2)`. The two costs per base unit are `decimal(28,20)`, so a buffered cost typed per bag comes back exactly as typed after it's divided down to the gram.
-- A value that goes through a `decimal(18,4)` column comes back rounded to 4 places: 1/6 becomes 0.1667. A test that reads a value back from the database asserts the rounded value.
-- A stored figure worked out in memory is set at its column's scale, after it's worked out at full precision: a cost per base unit through `RawMaterialRules.StoredCost` (20 places), a sub-assembly's totals through `TinapayanRMSDbContext.Stored` (4), each rounded half away from zero as SQL Server rounds. At full precision, a cost that doesn't come out even (170 ÷ 240) never equals the stored one, so a Save that changed nothing would read it as changed, log a price again and move the cost's date.
+- `TinapayanRMSDbContext.ConfigureConventions` makes every `decimal` column `numeric(18,4)`, so a new column can't fall back to Npgsql's unconstrained `numeric`, which would keep whatever scale a division left. The two costs per base unit are `numeric(28,20)`, so a buffered cost typed per bag comes back exactly as typed after it's divided down to the gram.
+- A value that goes through a `numeric(18,4)` column comes back rounded to 4 places: 1/6 becomes 0.1667. A test that reads a value back from the database asserts the rounded value.
+- A stored figure worked out in memory is set at its column's scale, after it's worked out at full precision: a cost per base unit through `RawMaterialRules.StoredCost` (20 places), a sub-assembly's totals through `TinapayanRMSDbContext.Stored` (4), each rounded half away from zero as PostgreSQL rounds a `numeric`. At full precision, a cost that doesn't come out even (170 ÷ 240) never equals the stored one, so a Save that changed nothing would read it as changed, log a price again and move the cost's date.
 - On screen: 2 decimals for the Products screen's per-piece costing figures and for prices, and 4 for a cost per base unit and for a recipe tab's cost per piece. Grid quantities show 1 decimal and accept up to 4. No amount shows a currency symbol.
 
 ### Buffered and unbuffered costs
 
 Everything is costed at the buffered cost. The Products screen's **Unbuffered** switch (`CostBasis.Unbuffered`) prices what it shows and prints from the true cost instead. It changes only which cost is read (`RawMaterialRules.CostPerBaseUnitAt`). Nothing stored changes, and the propagators don't know the switch exists.
+
+The Price Simulator has the same switch (`PriceSimulatorViewModel.CostBasis`, `ToggleCostBasisCommand`). It prices every product as saved at both bases on load (`Data.NowBuffered`, `NowUnbuffered`), so a switch only runs the recalculation again at the other basis and reads nothing. `SavedProductReader.PricedAt` already gives a composite's products both costs, so `Build(product, detail, basis, repriced)` picks the right one. The report's printouts carry the basis, so `ProductPrintLayout` marks them "Unbuffered costs" as it does for Products. The switch is session-only and isn't part of a scenario.
 
 ---
 
@@ -550,25 +583,25 @@ A read, from [ProductCategoryRepository](../src/TinapayanRMS.Infrastructure/Repo
 ```csharp
 public Task<IReadOnlyList<ProductCategory>> GetAllAsync(CancellationToken cancellationToken) =>
     dbContextFactory.QueryAsync<ProductCategory>(
-        $"SELECT {Columns.Of<ProductCategory>("c")} FROM ProductCategories c ORDER BY c.Name", null, cancellationToken);
+        $"SELECT {Columns.Of<ProductCategory>("c")} FROM product_categories c ORDER BY c.name", null, cancellationToken);
 ```
 
 The read helpers are in `Infrastructure/Queries`:
 
 - **[DapperReads](../src/TinapayanRMS.Infrastructure/Queries/DapperReads.cs)** borrows a DbContext's connection, so reads use the same connection string as EF Core. `QueryAsync` and `QuerySingleOrDefaultAsync` run either on the factory, in a context of their own, or on a save's context. On a context that holds a transaction, a read joins that transaction (`DapperReads.Command`). `ReadAsync` gives a read that needs several queries, such as a multi-mapped join, a context of its own.
-- **[Columns](../src/TinapayanRMS.Infrastructure/Queries/Columns.cs)** lists every entity's columns, `Id` first, because a multi-mapped join splits on `Id`. `Columns.Of<T>(alias)` writes the SELECT list.
+- **[Columns](../src/TinapayanRMS.Infrastructure/Queries/Columns.cs)** lists every entity's columns by their snake_case names, `id` first, because a multi-mapped join splits on `Id` (Dapper matches it without regard to case). Dapper maps `cost_per_base_unit` back to `CostPerBaseUnit`, since `DapperReads` turns on `MatchNamesWithUnderscores`. `Columns.Of<T>(alias)` writes the SELECT list.
 - **`RawMaterialReads` and `SubAssemblyReads`** load the shared graphs: materials with their category, base unit and units; sub-assemblies with their role and owner.
 
 The rules for reads:
 
 - **`Columns` must list exactly EF Core's columns.** A property it leaves out comes back as its default value, with no error. [ColumnsTests](../tests/TinapayanRMS.Infrastructure.Tests/Queries/ColumnsTests.cs) compares every list with EF Core's model, so a new or renamed property fails that test until `Columns` has it. (That's what Infrastructure's `InternalsVisibleTo` is for.)
-- **Table names are the `DbSet` names, written into the SQL.** Renaming a table means updating that SQL by hand; the persistence tests will catch any you miss.
+- **Every name in the SQL is snake_case**: EF Core names each table after its `DbSet` and each column after its property, in snake_case (`UseSnakeCaseNamingConvention`, in `TinapayanRMSDbContext.Configure`), so `RawMaterials.CostPerBaseUnit` is `raw_materials.cost_per_base_unit`. Nothing needs quoting. Renaming a table or column means updating that SQL by hand; the persistence tests will catch any you miss. A column alias is snake_case too (`AS product_id`).
 - **Read many records in one query, never one query each.** A read for several products (or anything else) is a plural method, such as `GetForProductsAsync(ids)`, rather than a loop of single reads: Reports once made nine queries a product.
-- **A list of ids is one parameter:** `WHERE x.Id IN ({DapperReads.IdsTable})` with `new { ids = DapperReads.IdList(ids) }`. It's split by `STRING_SPLIT`, so it never hits SQL Server's limit of 2,100 parameters.
+- **A list of ids is one parameter:** `WHERE x.id IN ({DapperReads.IdsTable})` with `new { ids = DapperReads.IdList(ids) }`: an `int[]` that Npgsql sends as one array parameter, which `unnest` turns back into rows. Dapper leaves an array whole for Npgsql rather than expanding it into a list.
 - **An optional navigation is a `LEFT JOIN`.** Dapper returns null for a split whose `Id` is null.
 - **A collection navigation, such as a material's `Units`, is a second query stitched on by id,** not a join, because Dapper's multi-mapping over several result sets is synchronous only.
 - **There's no identity resolution.** A material on two lines is two objects.
-- **Every read has an explicit `ORDER BY`.** Lines are read `ORDER BY SortOrder, Id`.
+- **Every read has an explicit `ORDER BY`.** Lines are read `ORDER BY sort_order, id`.
 - Dapper maps a `date` column to `DateOnly`, and an enum stored as a string back to the enum, on its own.
 
 Never write through Dapper. A Dapper write would skip the cost propagators and the `CostUpdatedAt` stamp, leaving stored costs stale.
@@ -576,7 +609,7 @@ Never write through Dapper. A Dapper write would skip the cost propagators and t
 ### Writing safely
 
 - **Update by loading, then applying.** An `UpdateAsync` loads the tracked entity, copies across only the fields a user can edit, and saves. Never call `dbContext.Update(incoming)` on an object the caller built: it marks every property as modified, and silently overwrites the stored costs. If an edited field feeds a stored figure (a unit's multiplier feeds the cost), the same method recomputes that figure.
-- **Delete with `ExecuteDeleteAsync`.** It runs at once, outside the change tracker, so a foreign key's refusal arrives as a `SqlException`, not a `DbUpdateException`. `RunSafelyAsync` shows it as "This item is currently in use elsewhere and can't be deleted." A test of it expects `SqlException`. It also runs inside the context's transaction when there is one, so a set of lines replaced with it commits or rolls back with the rest.
+- **Delete with `ExecuteDeleteAsync`.** It runs at once, outside the change tracker, so a foreign key's refusal arrives as a `PostgresException`, not a `DbUpdateException`. `RunSafelyAsync` shows it as "This item is currently in use elsewhere and can't be deleted." A test of it expects `PostgresException`. It also runs inside the context's transaction when there is one, so a set of lines replaced with it commits or rolls back with the rest.
 - **Replace a set of lines whole.** The `SetLinesAsync` methods first check every incoming row, and every record the rows refer to. Only then do they delete the old rows with `ExecuteDeleteAsync`, insert the new ones with `SortOrder` set to each row's position, recompute any totals and save. A rejected set leaves the old lines untouched. The set a method replaces must match exactly what the UI edits as one unit.
 - **One Save, one transaction.** `RawMaterialRepository.SaveAsync` and `ProductRepository.SaveAsync` write everything a screen's form holds in one context and one transaction. Each step is an `internal static` method that takes the context, so steps from several repositories compose. Each step saves as it goes, so the checks of later steps see what earlier ones wrote. A part passed as `null` means "leave it as saved". The caller's entity is copied, never attached, so a rolled-back save never leaves an id on it. The cost cascade runs once, at the end, on the same context and in the same transaction, so it commits with the save or not at all.
 - **Save inputs are immutable records:** `RecipeDraft`, `NewSubAssemblyDraft`, `LinkedUsageDraft`, `PackagingLinkDraft`, `ProductMove`, `RawMaterialMove` and the `RecipeLine` record struct, all in `ApplicationCore/Interfaces`.
@@ -616,30 +649,32 @@ await using (var transaction = await dbContext.Database.BeginTransactionAsync(ca
 - **`IngredientDependencies`**: loads the ingredient dependency graph, made of BOM edges and link edges, for the cycle checks.
 - **`ProductCloner`** (`IProductCloner`): Clone and Create Variant. Both link the sub-assemblies the source links and copy the source's own ones. A clone copies the packaging; a variant links it.
 - **`JsonViewStateStore`** (`IViewStateStore`): the view-state file. A missing or broken file reads as empty, and a failed write is dropped.
-- **`DatabaseBackups`** (`IDatabaseBackups`): Settings' Database tab and the daily automatic backup. It runs `BACKUP DATABASE … COPY_ONLY, CHECKSUM` and `RESTORE DATABASE … REPLACE` on its own non-pooled connections to `master`, one at a time (a `SemaphoreSlim`, since SQL Server refuses two backups of a database at once). A restore checks the file first (`RESTORE HEADERONLY`, `FILELISTONLY`, `VERIFYONLY`), takes a safety backup, puts everyone out of the database (`SINGLE_USER WITH ROLLBACK IMMEDIATE`), restores with its files moved onto the database's own, and brings an older backup up to date with `MigrateAsync`. A backup from a later version, or of another database, is refused (`BackupRules.UpdatesNeeded`). Whatever fails after the safety backup puts the safety backup back. A new backup or a file copied in never reuses a name in the folder: names go to the second and `WITH INIT` would overwrite, so `BackupRules.FreeFileNameFor` moves the time on a second while the name is taken. The app then restarts, since every singleton ViewModel holds data from before. `Failure` puts SQL Server's backup errors plainly, looking at every error in the exception, since 3013 follows the real one.
+- **`DatabaseBackups`** (`IDatabaseBackups`): Settings' Database tab and the daily automatic backup, taken by PostgreSQL's own tools through [PostgresTools](../src/TinapayanRMS.Infrastructure/Services/PostgresTools.cs). A backup is `pg_dump --format=custom` into a `.backup` file. Backups and restores take turns (a `SemaphoreSlim`), since the day's automatic backup can start while Settings is taking one. A restore reads the file first with `pg_restore --list` (`BackupRules.TryReadArchiveListing`): a file that isn't a backup, or is from a newer PostgreSQL, is refused before anything changes. It then takes a safety backup and restores into a scratch database, `<database>_restoring` (`--no-owner --no-privileges --exit-on-error --single-transaction`). There it brings an older backup up to date with `MigrateAsync`, and refuses one from a later version, or of another app (`BackupRules.UpdatesNeeded`). Only then does it swap the scratch database in: it closes the database to new connections, ends the app's own, renames the database to `<database>_replaced` and the scratch database to its name, and drops the one it replaced. So a backup that's refused or fails part-way never touches the data. Every statement runs on its own unpooled connection to the `postgres` maintenance database. A new backup or a file copied in never reuses a name in the folder: names go to the second, so `BackupRules.FreeFileNameFor` moves the time on a second while the name is taken. The app then restarts, since every singleton ViewModel holds data from before.
 
 ### Schema conventions
 
 - There's one `IEntityTypeConfiguration<T>` per entity in `Configurations/`, and `OnModelCreating` applies them all from the assembly.
-- Every `DbSet` name is its table's name.
-- Every name a user chooses (materials, categories, products, sub-assemblies, roles, units) has a unique index.
+- Every table is its `DbSet`'s name in snake_case, and every column its property's.
+- Every name a user chooses (materials, categories, products, sub-assemblies, roles, units) has a unique index. Every text column has the `case_insensitive` ICU collation (`TinapayanRMSDbContext.CaseInsensitiveCollation`, set in `ConfigureConventions`), so "flour" is a duplicate of "Flour" and names sort without regard to case, as they did on SQL Server.
 - Enums are stored as strings (`HasConversion<string>()`), so the data reads clearly and Dapper maps them back by name.
 - Owned children cascade on delete (lines, units, prices, costing parameters). References are `Restrict`, so a material that a line uses can't be deleted. A product's category is `SetNull`.
 - Check constraints back up the rules. They're named `CK_<Table>_<Rule>`.
 - Every line table has a `SortOrder`, because users drag lines into order.
 - Where the CLR default is a meaningful value, a column default is paired with `HasSentinel`, as on `Product.QuantityRequired` and `Product.Stage`.
-- On a unique index over a nullable column, EF Core adds `WHERE [Column] IS NOT NULL`, so null rows may repeat. Add `.HasFilter(null)` if null rows must collide too. (`sqlcmd` writes to a table with a filtered index need `SET QUOTED_IDENTIFIER ON;` first.)
+- Every `DateTime` column is `timestamp without time zone` (`ConfigureConventions`): the app stamps the shop's local time with `DateTime.Now`, and Npgsql's default, `timestamptz`, takes only UTC. PostgreSQL keeps a time to the microsecond.
+- On a unique index over a nullable column, PostgreSQL lets null rows repeat. Add `.AreNullsDistinct(false)` if null rows must collide too.
 
 ### Migrations
 
-Migrations come only from `dotnet ef migrations add`. Never write or edit one by hand. (A few early migrations carry hand-added data-conversion SQL from before this rule.)
+Migrations come only from `dotnet ef migrations add`. Never write or edit one by hand. (The SQL Server migrations, some with hand-added data-conversion SQL from before this rule, were replaced by one `InitialCreate` for PostgreSQL on 2026-10-21.)
 
 1. Change the entity, its configuration, and its `Columns` list.
 2. `dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure`.
 3. Read the generated `Up` and `Down` before you accept them.
 4. `dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infrastructure` should report no changes.
-5. `dotnet ef database update --project src/TinapayanRMS.Infrastructure`.
-6. Run the tests. The fixtures migrate the test databases themselves.
+5. Regenerate the compiled model (see [The compiled model](#the-compiled-model)).
+6. `dotnet ef database update --project src/TinapayanRMS.Infrastructure`.
+7. Run the tests. The fixtures migrate the test databases themselves.
 
 To discard a migration you've generated but haven't applied anywhere, run `dotnet ef migrations remove --project src/TinapayanRMS.Infrastructure`.
 
@@ -648,18 +683,29 @@ To discard a migration you've generated but haven't applied anywhere, run `dotne
 1. Rename the properties, and pin the old column names with `HasColumnName("OldName")`. Generate any other pending migration now; it carries no column change.
 2. Remove the pins and generate again. The only difference is now the column names, so EF Core emits an unambiguous `RenameColumn`.
 
+### The compiled model
+
+The app runs on a compiled EF Core model, the generated code in `Infrastructure/CompiledModels/`, so the first query doesn't spend time building the model from the configurations. EF Core finds it by itself, through the `[assembly: DbContextModel]` attribute in `TinapayanRMSDbContextAssemblyAttributes.cs`, so `TinapayanRMSDbContext.Configure` doesn't call `UseModel`. The app, the tests and the repositories all use it. The `dotnet ef` commands don't: `migrations add`, `has-pending-model-changes` and `dbcontext optimize` itself build the design-time model from `OnModelCreating`.
+
+- **Regenerate it after every model change**: an entity, a configuration, `ConfigureConventions` or `OnModelCreating`. Run `dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels`. It overwrites the folder, and the result is committed with the change. Never edit the generated files by hand.
+- **A stale one still builds and runs.** It finds properties by name, so it keeps mapping the model as it was. [CompiledModelTests](../tests/TinapayanRMS.Infrastructure.Tests/CompiledModels/CompiledModelTests.cs) fail until it's regenerated. They compare it with the model built from the configurations: the entities, properties, keys, relationships and indexes, and the tables, columns, types and constraints they map to.
+- **If the regeneration won't build**, for example because an entity class it names was deleted, delete `CompiledModels/` and run the command again.
+- A compiled model leaves out what only migrations use, such as column collations and seed data. Those come from the design-time model, so they don't need to match.
+
 ---
 
 ## 9. The UI layer
 
 ### The shell
 
-[MainWindow](../src/TinapayanRMS.UI/Views/MainWindow.xaml) is an `AppWindow`, which is a Syncfusion `ChromelessWindow`: the title bar is drawn in the theme, with Back and Forward on its right, just before Minimize. The hamburger button opens an `SfNavigationDrawer` menu with Raw Materials, Sub-Assemblies, Products, Reports, Production Plan and What-If Prices, and a Settings button at the bottom. The screens are the tabs of `MainTabControl`, a `TabControlExt` with two important settings:
+[MainWindow](../src/TinapayanRMS.UI/Views/MainWindow.xaml) is an `AppWindow`, which is a Syncfusion `ChromelessWindow`: the title bar is drawn in the theme, with Back and Forward on its right, just before Minimize. The hamburger button opens an `SfNavigationDrawer` menu with Raw Materials, Sub-Assemblies, Products, Reports, Production Plan and Price Simulator, and a Settings button at the bottom. The screens are the tabs of `MainTabControl`, a `TabControlExt` with two important settings:
 
 - **`CloseMode="Hide"`**: closing a tab hides it rather than deleting it, so the menu can always show it again.
 - **`IsDisableUnloadTabItemExtContent="True"`**: every tab's content stays loaded. Scroll positions, sort orders, sub-tabs and typed text survive a switch without any code.
 
-The app starts with only Raw Materials, Sub-Assemblies and Products open: Reports, Production Plan and What-If Prices start hidden (`Visibility="Collapsed"`), like a closed tab, until the menu shows them. The Print tab stays hidden until Products asks for it. The Settings dialog, `SettingsWindow`, is built afresh each time it opens, over the same singleton ViewModels. When it closes, it disposes its delete confirmations and releases its controls (grids, text boxes and picker filters), which would otherwise keep every closed dialog in memory. Then the main window reloads the screen on show, so its pickers include anything added in Settings.
+**A tab's screen is made the first time the tab is shown.** `MainWindow` keeps a factory for each tab (`_screenFactories`), and `CreateScreen` runs it from `MainTabControl.SelectionChanged`. `TabControlExt` takes in the shown tab's content only after it has raised that event, so the content is in place in time. The first tab's screen is made in the constructor, since the control can read it before any `SelectionChanged`. Making all seven at startup used to take most of the time between the window appearing and the app being ready. A ViewModel exists from the start, so a link from another screen can open a record on a screen that isn't made yet: the screen shows the record once it's made and loaded.
+
+The app starts with only Raw Materials, Sub-Assemblies and Products open: Reports, Production Plan and Price Simulator start hidden (`Visibility="Collapsed"`), like a closed tab, until the menu shows them. The Print tab stays hidden until Products asks for it. The Settings dialog, `SettingsWindow`, is built afresh each time it opens, over the same singleton ViewModels. When it closes, it disposes its delete confirmations and releases its controls (grids, text boxes and picker filters), which would otherwise keep every closed dialog in memory. Then the main window reloads the screen on show, so its pickers include anything added in Settings.
 
 ### Views and cards
 
@@ -684,7 +730,7 @@ Each screen puts an `ErrorToast` over its content, and a `SuccessToast` where it
 **[ViewModelBase](../src/TinapayanRMS.UI/ViewModels/ViewModelBase.cs)** is the base of every screen's ViewModel. It provides:
 
 - `ErrorMessage` and `SuccessMessage`, which the toasts show.
-- **`RunSafelyAsync(action)`**, which clears both messages and runs the action. Whatever the action throws becomes `ErrorMessage`, in the words [Failure](../src/TinapayanRMS.UI/ViewModels/Failure.cs) gives it: a `BusinessRuleException`'s message as written; what the database refused or couldn't do, put plainly by its error number (a duplicate name, something in use, a database that can't be reached); a file that couldn't be written or opened (`IOException`, `UnauthorizedAccessException`); and anything else, a bug, as "Something went wrong, and the details went to the log: …". A refusal is logged as a warning, anything else as an error with its stack. Nothing reaches ReactiveUI, which would hand it to `App`.
+- **`RunSafelyAsync(action)`**, which clears both messages and runs the action. Whatever the action throws becomes `ErrorMessage`, in the words [Failure](../src/TinapayanRMS.UI/ViewModels/Failure.cs) gives it: a `BusinessRuleException`'s message as written; what the database refused or couldn't do, put plainly by its error code (a duplicate name, something in use, a database that can't be reached); a file that couldn't be written or opened (`IOException`, `UnauthorizedAccessException`); and anything else, a bug, as "Something went wrong, and the details went to the log: …". A refusal is logged as a warning, anything else as an error with its stack. Nothing reaches ReactiveUI, which would hand it to `App`.
 - **`LoadSafelyAsync(load)`**, which every `LoadCommand` runs its body in. A load that fails shows why in the same words, without clearing the notices (a screen loads after its own Save, and mustn't take that Save's message away), and a later load that works clears it.
 - **`LoadLatest(values, load)`**, for a load driven by a selection: each value's load runs as it comes, a newer value cancels a load still running, and one that fails shows why while the next value loads as usual. Never write `Observable.Switch(...).Subscribe()` for this by hand: an exception that reaches `Switch` ends the subscription, and from then on no pick loads anything.
 - **`ShowFailure(exception, context)`**, for a failure that code catches itself, such as a read nothing awaits.
@@ -780,7 +826,7 @@ The rules for ViewModels:
 
 - **There's one load trigger: showing a tab.** `MainWindow.LoadSelectedTab` runs the shown tab's `LoadCommand` at startup and on every `MainTabControl.SelectionChanged`. It ignores `SelectionChanged` events that bubble up from grids and pickers, and skips a tab whose last load is still running. Views never load data on `Loaded`. The Settings dialog loads its lists when it opens.
 - **Every `LoadCommand` is a fetch-then-merge, never a clear-and-reload.** It awaits all its reads first, then records the ids of the selected row and of every picker's choice, then merges inside `ApplyRefresh` and picks everything again by id. A `ComboBoxAdv` can clear its own `SelectedItem` when its item is replaced mid-merge, which is why the ids are read before the merge.
-- **[CollectionMerge](../src/TinapayanRMS.UI/ViewModels/CollectionMerge.cs)** (`MergeFrom`) keeps the existing object for every row whose values haven't changed, because that object is what a grid's selection and scroll position and a picker's `SelectedItem` are tied to. `HasSameValues` compares scalar properties, plus those of referenced entities one level deep. A collection that a row owns (a material's `Units`) counts as part of the row.
+- **[CollectionMerge](../src/TinapayanRMS.UI/ViewModels/CollectionMerge.cs)** (`MergeFrom`) keeps the existing object for every row whose values haven't changed, because that object is what a grid's selection and scroll position and a picker's `SelectedItem` are tied to. An `ObservableCollection` merge takes a key of any type, and rows that share a key are matched in order. `HasSameValues` compares scalar properties, plus those of referenced entities one level deep. A collection that a row owns (a material's `Units`) counts as part of the row.
 - **Subscriptions driven by a selection skip while `IsRefreshing` is set.** Pointing a selection at its refreshed copy must not reload the form or throw away unsaved edits.
 - Save and Delete call the same `LoadCommand` afterwards, so the record you saved stays selected.
 - **A load that fails says so, and the screen keeps working.** `LoadSafelyAsync` and `LoadLatest` show the failure in the screen's error notice, and the next tab show or pick tries again. A selection's load that fails clears what it would have replaced rather than leave another record's details under the new pick.
@@ -810,6 +856,7 @@ Undo and redo follow the Memento pattern:
   - Keys that type nothing (Esc, Ctrl+R) come from `PreviewKeyDown`.
 - **Modes.**
   - Insert is the app as it always was. It applies when focus is in a `TextBoxBase` (a field, or a picker's text) or in a grid cell being edited.
+  - A column filter's pop-up isn't part of its grid. `VisualTreeWalk` steps out of a pop-up to its `PlacementTarget`, and the filter's pop-up is placed on the heading's funnel, so walking up from its search box would land in the grid and read as Normal, swallowing every letter. `PlaceOf` stops at the filter control's own pop-up (`Popup { TemplatedParent: GridFilterControl }`), so the search box is a field.
   - In a grid, Insert lasts until Esc (`_gridIsInsert`, set whenever a cell is seen being edited). Tab, Enter or an arrow ends the cell's edit, but the next letter or digit still goes through, so the grid starts that cell's edit itself. A grid reached from somewhere else takes the mode the keys were in (`Arrive`), so Tab from a field in Insert goes on typing. Esc on a cell that isn't being edited takes the grid back to Normal.
   - Normal applies everywhere else. It also applies to a field reached with `j`/`k` or left with Esc. In Normal, every printable character is handled, so none types or starts an edit.
   - Esc in a cell commits it through `GridEditCommit.Commit(grid, keepCurrentCell: true)` instead of cancelling it. Esc is handled only when it has something to do, so otherwise a dialog's Cancel still gets it.
@@ -828,7 +875,12 @@ Undo and redo follow the Memento pattern:
 
   So `gg`, `G`, and `j`/`k` from a hidden row pick their row by replacing `SelectedItems`: clear it, then add the row, as the screens' `SelectedTreeNode` setters do.
 - **Windows** take part through `IVimHost`, which `MainWindow` and `SettingsWindow` implement. It provides `gt`/`gT` (`VimTabs.Step`), Back and Forward, the screens the command line names, and Settings.
-- **The command line** (`:`) is parsed by `VimCommandLine` and run by `VimCommands`. A command runs on the screen found by walking `DataContext` up from the keyboard, through `IRecordScreen` (New, Save, Delete, `OpenByName`) and `IRevertScreen`. It goes through `ICommand.Execute`, as a button does, so its errors end up where they always do.
+- **The command line** (`:`) is parsed by `VimCommandLine` and run by `VimCommands`. A command runs on the screen found by walking `DataContext` up from the keyboard, through `IRecordScreen` (New, Save, Delete, `OpenByName`) and `IRevertScreen`. It goes through `ICommand.Execute`, as a button does, so its errors end up where they always do. Enter always closes the line first. A parse error, or the reason `VimCommands.Run` returns, then shows in the same bar as a message with no box (`VimOverlay.ShowMessage`), which the next key, click or a 5-second timer puts away.
+- **The expression register** (Ctrl+R then `=` in Insert, as Vim's) types the answer to a sum into the box the keyboard is in.
+  - Ctrl+R in Insert sets `_awaitingRegister`, shown as `"` in the indicator, as Vim shows it. The next character names the register: `=` opens the expression line (`VimOverlay.ShowExpressionLine`), and any other character is dropped. A key that types nothing (an arrow, Enter, Tab) cancels the wait and does what it does. Ctrl+R in Normal is still redo.
+  - The keyboard never leaves the cell. Moving focus to a box in the bar would end the cell's edit (`GridEditCommit.CommitWhenFocusLeaves`) and lose the caret. So the overlay captures keys as the hints do (`Capturing`, `TakeKey`, `TakeText`), and the bar draws the sum as text. Space comes through `TakeKey`, because `DoubleTextBox` handles Space on key-down, so no text input follows it. Every other key is taken and ignored, so an arrow or Tab can't move the cell from under the sum.
+  - `VimExpression.Evaluate` is a recursive-descent parser over `decimal` (`+ - * / %`, brackets, unary signs, comma-grouped thousands). Division is decimal, unlike Vim's whole-number division. A sum it can't work out keeps the line open with the reason after it.
+  - `VimKeys.TypeAnswer` types the answer a character at a time through `TextCompositionManager.StartComposition`, with `_raising` set. So a number box applies its own mask, limits and decimals, and `GridUndoSteps` sees an ordinary edit. The answer is first rounded (half away from zero) to the decimals the box takes (`DecimalsTaken`: `MaximumNumberDecimalDigits`, which `NumericEditRenderer` sets for a `TypedDecimalDigits` column, else `NumberDecimalDigits`), since the mask would otherwise cut it short. A grid in Insert between cells has no editor yet, so its current cell's edit is begun first (which `GridCellEditing` can still refuse), and the answer is typed once the editor has the keyboard.
 - **Overlays.** `VimOverlay` is one adorner per window, on the content's adorner layer. It holds:
   - the hint labels (`HintTargets`, `HintLabels`), all drawn in a single `OnRender`;
   - the command bar;
@@ -838,7 +890,7 @@ Undo and redo follow the Memento pattern:
 - **To add a key**, add a `VimKeyBinding` to `VimKeymap` (keys, action, contexts, description). Then handle its `VimAction` in `VimKeys.Perform`, or in the `In*` method for its place. The cheat sheet picks it up.
 - **Slow keys.** Debug builds log any key the layer takes more than 4 ms to handle (`The Vim key … took … ms`). Most of that time is the screen's own response, such as a picked row loading its form.
 - **Tests** are in `UI.Tests/Vim/`.
-  - The parser, keymap, command line and labels are tested without WPF.
+  - The parser, keymap, command line, expression evaluator (`VimExpressionTests`) and labels are tested without WPF.
   - `VimKeysGridTests` raises text input and key presses on a real off-screen grid.
   - `VimKeysPickerTests` checks a hint reaches a real off-screen picker, including one a Shift+Tab has left unfocusable.
   - These tests switch the static `VimKeys.State` on and off, so they run in `OffscreenGridCollection`.
@@ -853,17 +905,21 @@ The app extends Syncfusion's controls with **attached behaviours** in `Controls/
 | `GridRowReordering.IsEnabled` | An editable grid of lines | Lets rows be dragged into order. The collection's order is what's saved as `SortOrder`. |
 | `GridRowInserting.IsEnabled` | An editable grid of lines with an `ItemFactory` | Puts a blank line from the `ItemFactory` in above the current one, as one undo step, and opens its first column. It's run by the `GridRowInserting.InsertLine` routed command: a button with `CommandTarget` set to the grid, the Insert key, or Vim's `O`. It's on the ingredient line tables of Sub-Assemblies and of a product's section form, including its add-ins. |
 | `GridAddNewRow.ItemFactory` | An editable grid | Makes the add row edit a row the screen creates |
+| `GridAddNewRow.ItemDropped` | A grid with an `ItemFactory` | Tells the screen (an `Action<object>`) when the add row's row is thrown away rather than committed: Esc, an untouched row left, or the lines changed under it. It watches the view's `CurrentAddItem`. On the Production Plan, whose tables follow the add row's line. |
+| `GridAddNewRow.DropWhenUntouched` | An editable grid with row selection | Swaps in `UntouchedAddRowSelectionController`. It drops an add row nothing was typed into instead of adding an empty line. Tab from the last cell Tab can reach on a typed-into add row adds the line, as Enter does, and opens the next add row's first cell; the grid only ended the cell's edit there. |
 | `GridEditCommit` | An editable grid | Commits an open cell edit when focus leaves the grid, so Save sees it |
 | `GridCellEditing.IsEnabled` | A grid | Makes a column editable on some rows and not others |
 | `GridUndoSteps.Recorder`, `FieldUndoStep.Recorder` | A grid; a field | Undo steps (see above) |
+| `GridHeaderAlignment.IsBottom` | A grid whose headings wrap (`GridHeaderHeight.Lines`) | Puts the headings, and their sort arrows and filter funnels, at the bottom of the header row, so one-line headings line up with the last line of two-line ones. It sets each header cell as it loads rather than through a `HeaderStyle`, which would drop the theme's style unless it was `BasedOn` it. On the Price Simulator's Products table. |
 | `CheckboxFilterFill.IsEnabled` | A grid that filters | Widens a filter pop-up's list of values to the pop-up. The theme fixes it at 188px, which cut long names off. |
-| `AutoCompleteDropDown.IsEnabled` | A grid with a drop-down column that's typed into | Fixes Syncfusion's drop-down cell. Pair it with `AllowNullInput="True"` on the column. |
+| `AutoCompleteDropDown.IsEnabled` | A grid with a drop-down column that's typed into | Fixes Syncfusion's drop-down cell. Pair it with `AllowNullInput="True"` on the column. The pick reaches the row only when the edit is committed: the renderer makes each drop-down column's `UpdateTrigger` Explicit before every edit, so no column needs to set it. A commit with text that names nothing in the list keeps the row's value (`AutoCompleteDropDownRenderer.UpdateSource`). |
+| `GridAutoRowHeight.IsEnabled` | A grid with a `TextWrapping="Wrap"` column | Grows each line to fit its wrapped text, never below `RowHeight` (`QueryRowHeight` and `GridColumnSizer.GetAutoRowHeight`, measuring only the wrapped columns). It gives the sizer a drawn cell's font, padding and border first, since the sizer measures in its own 12 px font. It asks again when the lines change, the grid's width does, or the rows are sorted. A grid with a `DetailsViewDefinition` never raises `QueryRowHeight` (Syncfusion's `RowGenerator.QueryRowHeight` returns early), so its lines are measured the same way and given their heights in `VisualContainer.RowHeights` directly, passing over the details rows. On the Mixing Sheet. |
 | `OptionalColumns.IsOptional`, `CostBasisColumns` | Grid columns | Show or hide columns from the screen's state. A grid's columns aren't in the visual tree, so they can't bind to it themselves. |
 | `NumericColumn`, `NumericEditing.IsEnabled` | Number columns; their grid | Thousands separators and right alignment. `TypedDecimalDigits` accepts more decimals than the column shows. |
 | `MouseWheelForwarding`, `FocusScrolling` | Stacked grids; tall pages | Keep the page scrolling under the mouse, and stop a click from scrolling the page |
 | `CategoryTextCommit.Screen` | A Category picker | Offers to add a typed name that isn't a category yet |
 | `ReadOnlyText.IsGreyed` | A `DoubleTextBox` | Greys out a number that can't be typed |
-| `GridKeyboardFocus`, `GridHeaderHeight`, `PickerMatchHighlight`, `UndoShortcuts` | Every grid, picker or window (registered in `App`) | Focus sits on a cell, never the whole grid; header rows fit their text (two lines for a grid whose headings wrap, `GridHeaderHeight.Lines`); a picker highlights its best match for Enter or Tab; Ctrl+Z and Ctrl+Y |
+| `GridKeyboardFocus`, `GridHeaderHeight`, `PickerMatchHighlight`, `PickerSelectOnEntry`, `PickerRestoresPick`, `UndoShortcuts` | Every grid, picker or window (registered in `App`) | Focus sits on a cell, never the whole grid; header rows fit their text (two lines for a grid whose headings wrap, `GridHeaderHeight.Lines`); a picker highlights its best match for Enter or Tab; a picker selects its text when clicked or tabbed into, and a letter typed over a picked name stays; a picker emptied while bound to a value that can't be null (an enum) shows that value again once the keyboard leaves; Ctrl+Z and Ctrl+Y |
 | `AppWindow`, `ChromelessWindowDpi`, `ChromelessWindowMask`, `RestoreRendering` | Windows | The chromeless title bar, and fixes for its DPI changes, content mask and restore-from-taskbar flicker |
 | `ErrorToast`, `SuccessToast` | Each screen | Show `ErrorMessage` and `SuccessMessage` |
 
@@ -873,6 +929,7 @@ The app extends Syncfusion's controls with **attached behaviours** in `Controls/
 - **Colours** come from [Themes/Palette.xaml](../src/TinapayanRMS.UI/Themes/Palette.xaml), the Catppuccin Latte palette with derived Tint, Deep and Wash steps that make each hue readable as text or as a background. [App.xaml](../src/TinapayanRMS.UI/App.xaml) names them as design tokens (`PageBackgroundBrush`, `CardBackgroundBrush`, `AccentBrush`, `ErrorForegroundBrush`, …) and defines the shared styles (`CardStyle`, `SectionHeaderStyle`, `FormLabelStyle`, `FieldLabelStyle`, `FigureTileStyle`, …). Views use the tokens, never a hex colour or the raw palette.
 - **Icons** are Segoe Fluent Icons glyphs, through the `*IconTemplate` data templates and `IconGlyphStyle`. Don't add an icon package: one was tried, and its icons weren't crisp. WPF draws emoji as outlines only, so a full-colour picture is an icon file (below).
 - **Icon files**: an icon that has to be an image rather than a glyph (a downloaded `.png` or `.ico`) goes in [Assets/Icons/](../src/TinapayanRMS.UI/Assets/Icons/). The UI project compiles every `.png` and `.ico` there into the app as a WPF `Resource`, so a view refers to it as `/Assets/Icons/<name>.png`, and nothing needs adding to the `.csproj`. The folder holds no code, so it isn't a namespace. Windows scales the app by the display's setting (125% on the development PC), so an image is nearly always resized, and enlarging one blurs it. Download it larger than it's shown (64 px for 16), and set its `Width`, `Height` and `RenderOptions.BitmapScalingMode="HighQuality"`, as the Products list (64 px shown at 16) and the Used By tiles (128 px shown at 32) do for the product images (`Bread_`, `Loaf_`, `Cake_`, `Pastry_` and `Composite_64px.png` and `_128px.png`). Set `UseLayoutRounding="True"` on the `Image` too: the app doesn't round layout to whole pixels, and an image placed between them blurs.
+- **The app's icon** is `tinapayan-rms-icon.png` (1024 px) in the same folder, and `tinapayan-rms-icon.ico` made from it. The `.ico` is the `.exe`'s icon (`ApplicationIcon` in the UI project), which Explorer and shortcuts show. WPF doesn't hand it on to the windows, so `AppWindow`'s constructor sets each window's `Icon` from the same `.ico` (`AppWindow.IconUri`), for the taskbar and Alt+Tab. The title bars don't draw it (`ShowIcon="False"`). To change the icon, replace the `.png` and make the `.ico` again with 16, 20, 24, 32, 40, 48, 64, 128 and 256 px sizes. Those cover 100% to 200% display scaling: at 125%, Windows takes the 20 and 40 px ones for the window.
 - **Sizes**: every text box and button is 24 px tall, number boxes are right-aligned, and the body text is 14 px. `App` sets all of these.
 - **Forms**: an input's label goes on its left in a stacked form (`FormLabelStyle`, lined up with `SharedSizeGroup`). A row of fields side by side keeps each label above its field (`FieldLabelStyle`). A value that can never be typed is a `TextBlock`, not a read-only text box.
 - **Amounts** have no currency symbol, and use the decimals in [Precision and rounding](#precision-and-rounding).
@@ -912,24 +969,47 @@ Reports' tables go to an Excel workbook with **Export to Excel**. The parts, in 
 2. The view answers through `RegisterExcelExport(this, title => sheets)` (`ExcelExportHandlerRegistration`): it asks for a path with a Save dialog, then writes the `ExcelSheet`s it picks for that title. The grids are the view's, because the sort, the filters and the hidden columns the user chose live on them, not in the ViewModel.
 3. **`ExcelExport.Save`** writes each grid on a sheet of its own through Syncfusion's grid converter (`Syncfusion.DataGridExcelExport.WPF`, which brings XlsIO, licensed by the same key). It exports the grid's `View`, so the current sort and filters come with it. It also does three things the converter leaves undone:
    - it leaves out hidden columns by name (`ExcludeColumns`), since the converter writes them too;
-   - it gives each numeric column the grid's decimals with a thousands separator (`#,##0.00`), since the converter's own format has none;
+   - it writes each figure itself (`CellsExportingEventHandler`, `Handled`), with its own column's decimals and a thousands separator (`#,##0.00`), since the converter's own format has none. The column is looked up in the grid the cell came from (`GridViewDefinition.DataGrid` for a details row), so a details table keeps its own decimals;
    - it fits the columns to their contents, since the converter copies the grid's on-screen widths.
-   `GridFillerRows`' padding is only drawn, never rows of the grid, so it can't reach the file. Figures are written as numbers at full precision; the format only shows them rounded. The workbook is built in memory before the file is touched, so a file that can't be written is left as it was.
+   A grouped grid's groups go as their caption rows. A row's details (the Mixing Sheet's ingredients) go under it with their own bold heading row, outlined so Excel can fold them. `GridFillerRows`' padding is only drawn, never rows of the grid, so it can't reach the file. Figures are written as numbers at full precision; the format only shows them rounded. The workbook is built in memory before the file is touched, so a file that can't be written is left as it was.
 
 `ExcelExportTests` checks all of this against a real grid read back with XlsIO.
 
-The Production Plan prints through the same layout and manager: a `ProductPrintSet` made with `ProductPrintSet.Of(PrintedPlan, …)` holds no products, and `ProductPrintLayout.AddPlan` lays out what to make, the mixing sheet and the purchase requisition with the same headings, tables and footer. It opens in [PrintPreviewWindow](../src/TinapayanRMS.UI/Views/PrintPreviewWindow.xaml.cs), a dialog that themes itself before the pane goes in, so its opener mustn't theme it again.
+The Production Plan prints through the same layout and manager: a `ProductPrintSet` made with `ProductPrintSet.Of(PrintedPlan, …)` holds no products, and `ProductPrintLayout.AddPlan` lays out what to make (with sales and profit when the costs are in), the mixing sheet (each mix's ingredient lines under it) and the purchase requisition (with Cost and Buy Cost) with the same headings, tables and footer. It opens in [PrintPreviewWindow](../src/TinapayanRMS.UI/Views/PrintPreviewWindow.xaml.cs), a dialog that themes itself before the pane goes in, so its opener mustn't theme it again.
 
-The What-If Prices screen's **Print Report** goes through the same dialog, with each product's recipe and costing at the what-if prices beside today's:
+The Price Simulator screen's **Print Report** goes through the same dialog, with each product's recipe and costing at the simulated prices beside today's:
 
-- [WhatIfReport](../src/TinapayanRMS.UI/ViewModels/WhatIfReport.cs) pairs a product's `SavedProduct` priced now with the same product priced what-if. Both are built from one `ProductDetail`, so their sections, lines, packaging and products pair up by index. It sets `NowCost` on each line, and `NowBatchCost` on each section, whose cost a change moves, and puts `PrintedWhatIf` (today's `ProductCostSummary` and the changes reaching the product) on the printout. A change reaches a product when `IngredientCostRules.ReachedBy` (the material and every made or linked ingredient depending on it) meets `WhatIfReport.MaterialIdsOf` (its sections', add-ins' and packaging's materials, and those of the products a composite holds).
-- `WhatIfViewModel` keeps the last recalculation's what-if `SavedProduct`s and the changes it tried, so the report always matches the table. `PrintChoices` builds a `PrintChoice` for the rows picked in the grid (`SelectedProducts`, bound to the grid's `SelectedItems`, picked again by id after each recalculation) and one for every row shown. `ShownProducts` is the grid's `View.Records`, which the view supplies, so the report follows the column filters and sort.
-- A `ProductPrintSet` with `PriceChanges` set is a What-If report. With the costing included, `ProductPrintLayout` gives its first page the price changes and a contents with each product's base cost now and what-if. Each product gets a Price Changes Applied table, a Cost Now column on every recipe, packaging and products table (moved lines in the accent), and a costing with Now, What-If and Change columns. Without the costing it prints the recipes as a plain set does.
+- [PriceSimulatorReport](../src/TinapayanRMS.UI/ViewModels/PriceSimulatorReport.cs) pairs a product's `SavedProduct` priced now with the same product priced at simulated prices. Both are built from one `ProductDetail`, so their sections, lines, packaging and products pair up by index. It sets `NowCost` on each line, and `NowBatchCost` on each section, whose cost a change moves, and puts `PrintedSimulation` (today's `ProductCostSummary` and the changes reaching the product) on the printout. A change reaches a product when `IngredientCostRules.ReachedBy` (the material and every made or linked ingredient depending on it) meets `PriceSimulatorReport.MaterialIdsOf` (its sections', add-ins' and packaging's materials, and those of the products a composite holds).
+- `PriceSimulatorViewModel` keeps the last recalculation's `SavedProduct`s, now and simulated, at the basis it ran at, and the changes it tried, so the report always matches the table. `PrintChoices` builds a `PrintChoice` for the rows picked in the grid (`SelectedProducts`, bound to the grid's `SelectedItems`, picked again by id after each recalculation) and one for every row shown. `ShownProducts` is the grid's `View.Records`, which the view supplies, so the report follows the column filters and sort.
+- A `ProductPrintSet` with `PriceChanges` set is a Price Simulator report. With the costing included, `ProductPrintLayout` gives its first page the price changes and a contents with each product's base cost now and simulated. Each product gets a Price Changes Applied table, a Cost Now column on every recipe, packaging and products table (moved lines in the accent), and a costing with Now, Simulated and Change columns. Without the costing it prints the recipes as a plain set does.
 - `PrintPreviewWindow(IReadOnlyList<PrintChoice>, Theme)` shows a Print dropdown when there's more than one choice, and Recipe and Costing tick boxes for products (the plan keeps its single Costs).
+
+### The Price Simulator
+
+`PriceSimulatorViewModel` prices every product now and with the table's changes (see [Formulas and where they live](#formulas-and-where-they-live) and [Printing](#printing)). Each `PriceSimulatorProductRow` also carries the product's current price and `PriceToKeepMarkup`.
+
+The table can be saved as a **scenario** ([PriceScenario](../src/TinapayanRMS.Domain/Entities/PriceScenario.cs)), kept in the database:
+
+- `SimulatedPriceChange.ToScenarioLine` gives a row's material and whichever of Change % and New Price was typed, and `Open(line)` types it back. So a percentage goes on the price as it is when the scenario is opened.
+- `HasUnsavedChanges` compares the table with what was last opened or saved, by value. Picking a scenario over unsaved changes asks first (`ConfirmDelete`). Keeping them picks the open scenario again in the list: `OpenScenarioAsync` starts with `Task.Yield`, so the list has finished its own pick before it's undone.
+- The scenarios are an `SfDataGrid` of two columns (Saved, Name; newest first, as `GetAllAsync` reads them) whose `SelectedItem` is `SelectedScenario`. Its setter only asks for a scenario to be opened, and ignores a null, which the grid can send when its rows are replaced. The ViewModel sets the field itself (`ShowSelectedScenario`), and always raises the change, so a pick the user took back is undone in the list too.
+- Save asks for a name through `PromptForName` (a `TextPromptWindow`), and asks again before replacing another scenario of that name.
 
 ### The Production Plan
 
-[ProductionPlanRules](../src/TinapayanRMS.ApplicationCore/Rules/ProductionPlanRules.cs) is pure: from the products to make (`PlanRecipe`s, by id), it adds up each section's unrounded batches (`RecipeScalingRules.BatchRatio`) per sub-assembly and set of add-ins, rounds them up once (`WholeBatches`), then opens made ingredients into their BOMs and linked ones into what they're cut from, taking the largest of one ingredient's parts. [ProductionPlanBuilder](../src/TinapayanRMS.UI/ViewModels/ProductionPlanBuilder.cs) maps saved products (`SavedProduct`) to its inputs and names and costs its result. `ProductionPlanViewModel` keeps the plan in the view-state file under `production-plan`, as `"id:units"`.
+[ProductionPlanRules](../src/TinapayanRMS.ApplicationCore/Rules/ProductionPlanRules.cs) is pure: from the products to make (`PlanRecipe`s, by id), it adds up each section's unrounded batches (`RecipeScalingRules.BatchRatio`) per sub-assembly and set of add-ins, rounds them up once (`WholeBatches`, or `HalfBatches` with `halfBatches`), then opens made ingredients into their BOMs and linked ones into what they're cut from, taking the largest of one ingredient's parts. Each `PlannedMix` carries its per-batch `Lines` and each `PlannedUse` its unrounded `BatchesNeeded`, from which `SparePieces` works out what the rounding up leaves of each product. `PreparedLines` holds each made ingredient's BOM scaled to the grams to prepare, and `SalesOf` a line's sales and profit (VAT out, over the base cost). [ProductionPlanBuilder](../src/TinapayanRMS.UI/ViewModels/ProductionPlanBuilder.cs) names and costs its result: a `MixRow`'s `Spare` and `Ingredients` (`MixIngredientRow`), and a `PurchaseRequisitionRow`'s `BuyCost` (whole units at the dearest brand's price). Its input, `ProductionPlanSource`, holds the saved products (`SavedProduct`) already mapped to the rule's inputs. It's built once per load, so an edit only redoes the plan's own arithmetic. `PlanLineRow` takes each product's `ProductCostSummary` too, for its `Sales` and `Profit`, at the Current Price or else the worked-out selling price.
+
+`ProductionPlanViewModel` keeps the plan in the view-state file under `production-plan`, as `"id:units"`, the Half batches tick under `production-plan-half-batches`, and the open saved plan's id under `production-plan-open`. Saved plans ([SavedPlan](../src/TinapayanRMS.Domain/Entities/SavedPlan.cs), `ISavedPlanRepository`) work as the Price Simulator's scenarios do: a list whose `SelectedItem` is `SelectedPlan`, `OpenPlanAsync` starting with `Task.Yield`, `HasUnsavedChanges` by value (`PlanContents`), `PromptForName` for Save, and `ConfirmDelete` before replacing the table or another plan.
+
+The Mixing Sheet's rows open to their ingredients through a `DetailsViewDefinition` on `MixRow.Ingredients`. A merge replaces a changed row, which the grid shows closed, so `ProductionPlanView` remembers the mixes the user opened, by name, and opens them again after the change. It subscribes to `Mixes` before the grid does, so the grid closing a replaced row isn't taken for the user closing it.
+
+It's built to keep the UI thread free:
+
+- The Mixing Sheet and Purchase Requisition are merged with `CollectionMerge.MergeFrom` (a mix by its name, a material by its id), never cleared and refilled. Refilling a 90-row grid took about 30 ms of the UI thread.
+- A load puts the lines in, or points them at the fresh products (`PlanLineRow.FindProduct`), with `_restoring` set. That way the plan is kept and worked out once, not once per line.
+- The picker's `Products` list is only replaced when a product changed.
+
+The plan also follows the add row's line (`_newLine`, made by `NewLine`) while it's typed into, though it isn't in `Lines` until the add row is committed. It's let go when it's committed, or when the grid drops it (`DropNewLine`, through `GridAddNewRow.ItemDropped`).
 
 ### Logging and errors
 
@@ -945,24 +1025,24 @@ The What-If Prices screen's **Print Report** goes through the same dialog, with 
 
 ### How the tests work
 
-- **Nothing is mocked.** Rules are tested as pure functions. Repositories, services and ViewModels are tested on a real SQL Server database that Respawn resets before every test. Grid behaviours are tested in real `SfDataGrid`s in windows placed off-screen.
-- **Each database-backed project has its own database**: `TinapayanRMS_Test_Infrastructure` and `TinapayanRMS_Test_UI`. `dotnet test --solution` runs the projects side by side, and a shared database would be reset under the other project's running test.
-- **Each database is migrated once per test run**, by the fixture's `MigrateAsync`, and its `AUTO_CLOSE` is turned off.
-- **Respawn clears every table** except `__EFMigrationsHistory` before each test. That includes rows the migrations seeded, so a test creates every row it needs.
+- **Nothing is mocked.** Rules are tested as pure functions. Repositories, services and ViewModels are tested on a real PostgreSQL database that Respawn resets before every test. Grid behaviours are tested in real `SfDataGrid`s in windows placed off-screen.
+- **Each database-backed project has its own database**: `tinapayanrms_test_infrastructure` and `tinapayanrms_test_ui`. `dotnet test --solution` runs the projects side by side, and a shared database would be reset under the other project's running test.
+- **Each database is migrated once per test run**, by the fixture's `MigrateAsync`.
+- **Respawn clears every table** except `__EFMigrationsHistory` before each test (it truncates them, and tries again if PostgreSQL ends the truncate as a deadlock with a read the last test left running). That includes rows the migrations seeded, so a test creates every row it needs.
 
 | Project | What it tests | Needs |
 |---|---|---|
 | `ApplicationCore.Tests` | `Rules/` and `Validators/`, as pure functions | Nothing |
-| `Infrastructure.Tests` | `Persistence/` (repositories and the cascade), `Queries/` (`ColumnsTests`), `Services/` (`JsonViewStateStoreTests`) | SQL Server Express |
-| `UI.Tests` | `ViewModels/` on real repositories, `Controls/` in off-screen grids, `Printing/`, `Converters/`, `CompositionRootTests` | SQL Server Express; the licence key for the tests that build Syncfusion controls |
+| `Infrastructure.Tests` | `Persistence/` (repositories and the cascade), `Queries/` (`ColumnsTests`), `Services/` (`JsonViewStateStoreTests`, and `DatabaseBackupsTests`, which run the real `pg_dump` and `pg_restore`) | PostgreSQL, with its command-line tools |
+| `UI.Tests` | `ViewModels/` on real repositories, `Controls/` in off-screen grids, `Printing/`, `Converters/`, `CompositionRootTests` | PostgreSQL; the licence key for the tests that build Syncfusion controls |
 | `Tests.Common` | Nothing: it's the shared fixture library | — |
 
 ### The database fixtures
 
 - **[DatabaseFixtureBase](../tests/TinapayanRMS.Tests.Common/Fixtures/DatabaseFixtureBase.cs)** (in Tests.Common) reads the app's connection string, swaps in the project's database name, migrates the database, and resets it with Respawn.
 - **`DatabaseFixture`** and **`DatabaseCollection`** are defined in each project's own `Fixtures/` folder, because xUnit only finds a collection definition in the tests' own assembly. Each `DatabaseFixture` is one line that names its database.
-- **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`.
-- **[ThrowawayDatabase](../tests/TinapayanRMS.Tests.Common/Fixtures/ThrowawayDatabase.cs)** is a migrated database of one test's own on the same server, dropped when the test is done. The backup tests restore over it, which would put every other test out of the shared database.
+- **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`. With nothing saved in Settings, every product is priced with the 3% default wastage; a test whose figures are about something else calls `WithoutWastageAsync()` (or `SetWastageAsync`) before the screen or reader reads it.
+- **[ThrowawayDatabase](../tests/TinapayanRMS.Tests.Common/Fixtures/ThrowawayDatabase.cs)** is a migrated database of one test's own on the same server (`tinapayanrms_test_backup_` and eight characters of a GUID), dropped when the test is done. The backup tests restore over it, which would put every other test out of the shared database.
 - **Every concrete test class must carry `[Collection(DatabaseCollection.Name)]`.** It's deliberately left off the base class: xUnit isn't guaranteed to honour it there, and without it tests could run in parallel against the one database.
 
 ### Writing tests
@@ -1058,8 +1138,9 @@ A test that creates WPF objects runs on an STA thread:
 - `StaThread.Run(() => …)` for plain WPF objects.
 - `StaThread.RunLicensed(() => …)` when it builds Syncfusion controls. It's skipped if `SYNCFUSION_LICENSE_KEY` isn't set, because an unlicensed control shows a dialog.
 - `StaThread.RunThemed(() => …)` when it themes a window. All such tests share one STA thread, with the app's theme settings, because SfSkinManager ties a theme's resources to the thread that loaded them.
+- `VersionRecorders.Create(factory)` (in UI.Tests' `Fixtures/`) builds a `ProductVersionRecorder` over real repositories, for a test that constructs `SubAssembliesViewModel`.
 - `FailingDbContextFactory` (in UI.Tests' `Fixtures/`) wraps a factory and refuses every context while its `Fail` is set: for a test that a screen survives a database that stops answering, and recovers once it answers. A test that a write is all or nothing fails it part-way with an EF Core save interceptor instead (`CostCascadeTransactionPersistenceTests`).
-- `SqlCommandCounter` (also in UI.Tests' `Fixtures/`) counts the SQL commands sent from where it's started: for a test that a read's round trips don't grow with what it reads.
+- `SqlCommandCounter` (also in UI.Tests' `Fixtures/`) counts the SQL commands sent from where it's started (the activities Npgsql reports on its `Npgsql` ActivitySource): for a test that a read's round trips don't grow with what it reads.
 - `OffscreenGrid.Run(create, test)` shows a real grid off-screen. Its test classes carry `[Collection(OffscreenGridCollection.Name)]`, so that only one off-screen window is up at a time.
 
 ### Naming
@@ -1079,7 +1160,7 @@ Coverage comes from Microsoft's MTP coverage extension (see the [command referen
 - **Use modern C# 14 and .NET 10 idioms**: primary constructors (every repository has one), collection expressions, `record` and `record struct` for immutable shapes (drafts, snapshots, printouts), `required` members, file-scoped namespaces and pattern matching.
 - **Nullable reference types are on everywhere.** Treat their warnings as real.
 - **Everything that touches the database is `async`** and takes a `CancellationToken`. ViewModels pass `CancellationToken.None`.
-- **A rule throws `BusinessRuleException` with a message written for the shop's staff**, because `RunSafelyAsync` shows it exactly as written. That goes for a repository's checks and a screen's own form checks too. A plain `InvalidOperationException` reads as a bug: EF Core and SqlClient throw those for failures.
+- **A rule throws `BusinessRuleException` with a message written for the shop's staff**, because `RunSafelyAsync` shows it exactly as written. That goes for a repository's checks and a screen's own form checks too. A plain `InvalidOperationException` reads as a bug: EF Core and Npgsql throw those for failures.
 - **Strings**: compare names with `StringComparison.OrdinalIgnoreCase`; sort for display with `StringComparer.CurrentCultureIgnoreCase`; format display dates with `CultureInfo.CurrentCulture`, and log output with `CultureInfo.InvariantCulture`.
 - **Correctness and performance come before brevity.** Query only the rows and columns you need, rather than loading more and filtering in memory. Avoid needless intermediate collections in hot paths such as the cascade.
 - **Comments explain why.** Types and non-obvious members have XML doc comments that give their domain meaning. Inline comments record a decision and its reason, often with its date. Match the comment density of the code around yours.
@@ -1104,7 +1185,7 @@ Coverage comes from Microsoft's MTP coverage extension (see the [command referen
 3. Add the column to its entity's list in `Infrastructure/Queries/Columns.cs`. `ColumnsTests` fails until you do.
 4. Copy it in the repository's write path: the `UpdateAsync` that loads and then applies, and the field copy at the top of the aggregate `SaveAsync`, if there is one.
 5. Add any rule it needs to the right `*Rules` class (and its tests), and to the validator if a form edits it.
-6. Generate, read and apply the migration (see [Migrations](#migrations)).
+6. Generate, read and apply the migration, and regenerate the compiled model (see [Migrations](#migrations)).
 7. In the ViewModel, add the editing property, its load and save mapping, and its place in the form snapshot (so undo and the dirty check include it). Bind it in the view.
 8. Add tests: rules, persistence, and the ViewModel.
 9. Update the user manual if users can see the field, and PLAN.md's Domain Model section.
@@ -1142,7 +1223,7 @@ Respawn picks up the new table by itself.
 1. Write the ViewModel in `ViewModels/`, deriving from `ViewModelBase`. Make it `sealed`, and `IDisposable` if it owns a `SourceCache`. Give it a fetch-then-merge `LoadCommand`. Register it as a singleton in `CompositionRoot`.
 2. Write the view in `Views/`: a `UserControl` whose constructor takes the ViewModel, sets `DataContext` and calls `RegisterNativeMessageBoxHandler()`. Give it an `ErrorToast`.
 3. In `MainWindow.xaml`, add a `TabItemExt` to `MainTabControl`, and a `ListBoxItem` to the navigation menu with an `AutomationProperties.Name`.
-4. In `MainWindow.xaml.cs`, set the tab's content, add its `LoadCommand` to `_loadCommands`, and add its `HistoryScreen` to `_historyScreens`, with a new `AppScreen` value.
+4. In `MainWindow.xaml.cs`, add a factory for the tab's view to `_screenFactories`, its `LoadCommand` to `_loadCommands`, and add its `HistoryScreen` to `_historyScreens`, with a new `AppScreen` value.
 5. Add a resolve check to `CompositionRootTests`, and ViewModel tests.
 6. Add a section to the user manual.
 
@@ -1178,17 +1259,18 @@ Respawn picks up the new table by itself.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| The app closes at startup, and the log says `SYNCFUSION_LICENSE_KEY` isn't set | The variable isn't visible to the process | Set the user environment variable, then restart your terminal or IDE |
-| A screen says "Couldn't reach the database.", and the log has "A network-related or instance-specific error" | SQL Server Express isn't running, or the instance name differs | Start the `MSSQL$SQLEXPRESS` service, and check `appsettings.json` |
+| The app closes at startup, and the log says there's no Syncfusion licence key | It was built while `SYNCFUSION_LICENSE_KEY` wasn't visible to the build | Set the user environment variable, restart your terminal or IDE, then rebuild |
+| `dotnet publish` fails asking for `SYNCFUSION_LICENSE_KEY` | The variable isn't visible to the build, and an app published without it couldn't start | The same |
+| A screen says "Couldn't reach the database.", and the log has "Failed to connect" or "password authentication failed" | PostgreSQL isn't running, or the password file has no line for the server and role | Start the `postgresql-x64-18` service, and check `appsettings.json` and `%APPDATA%postgresqlpgpass.conf` |
 | A message at startup says the database is out of date | A migration hasn't been applied to it | `dotnet ef database update --project src/TinapayanRMS.Infrastructure` |
 | A message says something went wrong and the app is still running | An exception nothing else caught | Read the log for its stack |
-| Queries that take about 1 ms take 10–50 ms, and vary from run to run | SQL Server is short of memory: Windows trims its plan cache and data, so every query compiles again | Free memory, or give the instance a `min server memory`. Compare timings in one process, alternating before and after |
-| `dotnet ef` can't connect | The design-time factory's connection string is hard-coded | Use `.\SQLEXPRESS`, or edit `TinapayanRMSDbContextFactory` |
+| Timings vary widely from run to run | Other programs on the PC compete for memory and disk | Compare timings in one process, alternating before and after |
+| `dotnet ef` can't connect | The design-time factory's connection string is hard-coded | Check the password file, or edit `TinapayanRMSDbContextFactory.DevelopmentConnectionString` |
+| Settings → Database says backups need `pg_dump` and `pg_restore` | PostgreSQL's command-line tools aren't in `C:\Program Files\PostgreSQL\<version>\bin` or on the `PATH` | Install them, or set `Backups:ToolsFolder` in `appsettings.json` |
 | The build fails with `CS0103: The name 'InitializeComponent' does not exist`, or `CS2001` for `*.g.cs` files, all against a `*_wpftmp.csproj` | The WPF markup pass has gone stale | Run `dotnet clean src/TinapayanRMS.UI`, build the UI project on its own, then build the solution |
 | The build can't copy `TinapayanRMS.UI.exe` or a DLL | The app is running | Close it |
 | `--filter` isn't recognised, or zero tests ran | VSTest flags under Microsoft.Testing.Platform | Use `--filter-class`, `--filter-method` and `--coverage` |
 | Some UI tests are reported as skipped | No licence key | Set `SYNCFUSION_LICENSE_KEY` |
-| The first query after a pause is slow | `AUTO_CLOSE` is on | `ALTER DATABASE … SET AUTO_CLOSE OFF` |
 | A binding silently does nothing | A binding error | Check the Debug build's log for `WPF binding` warnings |
 | Every `SfDataGrid` suddenly looks unthemed | An `SfTreeGrid` is themed through its window | Theme it locally |
 | The UI freezes | Something blocks the UI thread | `dotnet-stack report -p <pid>`. Find the PID with `dotnet-trace ps`. |
@@ -1232,6 +1314,8 @@ Off-screen harnesses and UI-automation scripts have pitfalls that PLAN.md record
 - ReactiveUI: <https://www.reactiveui.net/docs/>
 - DynamicData: <https://github.com/reactivemarbles/DynamicData>
 - EF Core: <https://learn.microsoft.com/ef/core/>
+- Npgsql and its EF Core provider: <https://www.npgsql.org/efcore/>
+- PostgreSQL: <https://www.postgresql.org/docs/18/> (`pg_dump` and `pg_restore` under "Client Applications")
 - Dapper: <https://github.com/DapperLib/Dapper>
 - FluentValidation: <https://docs.fluentvalidation.net/>
 - Syncfusion WPF: <https://help.syncfusion.com/wpf/welcome-to-syncfusion-essential-wpf>

@@ -171,6 +171,7 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
             new PackagingLineRepository(factory),
             new CostingParametersRepository(factory),
             new SubAssemblyLineRepository(factory),
-            new ProductRepository(factory));
+            new ProductRepository(factory),
+            new CostingDefaultsRepository(factory));
     }
 }

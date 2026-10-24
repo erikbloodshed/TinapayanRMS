@@ -3,14 +3,24 @@ using TinapayanRMS.UI.Controls;
 
 namespace TinapayanRMS.UI.Tests.Controls;
 
-/// <summary>How many empty rows GridFillerRows draws under a grid's rows: whole rows only, never past its bottom edge.</summary>
+/// <summary>
+/// How many empty rows GridFillerRows draws under a grid's rows: enough to reach its bottom edge, the last cut off by it
+/// when only part fits, and none when the rows already reach it.
+/// </summary>
 public class GridFillerRowsTests
 {
     [Fact]
-    public void A_short_table_is_filled_with_the_whole_rows_that_fit()
+    public void A_short_table_is_filled_with_the_rows_that_fit()
     {
-        // A 280 px lines table: a 24 px header, two lines and the add-new row (96 px) leave room for 7 rows of 24 px.
-        GridFillerRows.FillerRowCount(viewportHeight: 280, contentHeight: 96, rowHeight: 24).Should().Be(7);
+        // A 264 px lines table: a 24 px header, a line and the add-new row (72 px) leave room for 8 rows of 24 px.
+        GridFillerRows.FillerRowCount(viewportHeight: 264, contentHeight: 72, rowHeight: 24).Should().Be(8);
+    }
+
+    [Fact]
+    public void Space_for_part_of_a_row_gets_a_row_the_bottom_edge_cuts_off()
+    {
+        GridFillerRows.FillerRowCount(viewportHeight: 250, contentHeight: 96, rowHeight: 24).Should().Be(7, "154 px holds six 24 px rows and 10 px of a seventh");
+        GridFillerRows.FillerRowCount(viewportHeight: 110, contentHeight: 96, rowHeight: 24).Should().Be(1);
     }
 
     [Fact]
@@ -26,16 +36,11 @@ public class GridFillerRowsTests
     }
 
     [Fact]
-    public void Space_for_less_than_a_row_is_left_empty()
-    {
-        GridFillerRows.FillerRowCount(viewportHeight: 250, contentHeight: 96, rowHeight: 24).Should().Be(6, "154 px holds six 24 px rows and 10 px of a seventh");
-        GridFillerRows.FillerRowCount(viewportHeight: 110, contentHeight: 96, rowHeight: 24).Should().Be(0);
-    }
-
-    [Fact]
-    public void A_hair_under_a_whole_row_from_fractional_layout_still_counts_it()
+    public void A_hair_either_side_of_whole_rows_from_fractional_layout_counts_as_whole_rows()
     {
         GridFillerRows.FillerRowCount(viewportHeight: 263.99999999, contentHeight: 72, rowHeight: 24).Should().Be(8);
+        GridFillerRows.FillerRowCount(viewportHeight: 264.00000001, contentHeight: 72, rowHeight: 24).Should().Be(8);
+        GridFillerRows.FillerRowCount(viewportHeight: 240.00000001, contentHeight: 240, rowHeight: 24).Should().Be(0);
     }
 
     [Fact]

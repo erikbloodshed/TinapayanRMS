@@ -21,10 +21,10 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
                 dbContext.Command(
                     $"""
                     SELECT {Columns.Of<SubAssemblyLine>("l")}, {Columns.Of<RawMaterial>("i")}
-                    FROM SubAssemblyLines l
-                    JOIN RawMaterials i ON i.Id = l.IngredientId
-                    WHERE l.SubAssemblyId IN ({DapperReads.IdsTable})
-                    ORDER BY l.SortOrder, l.Id
+                    FROM sub_assembly_lines l
+                    JOIN raw_materials i ON i.id = l.ingredient_id
+                    WHERE l.sub_assembly_id IN ({DapperReads.IdsTable})
+                    ORDER BY l.sort_order, l.id
                     """,
                     new { ids = DapperReads.IdList(subAssemblyIds) },
                     cancellationToken),

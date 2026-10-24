@@ -11,7 +11,7 @@ public class CostingParametersRepository(IDbContextFactory<TinapayanRMSDbContext
     // ProductId is unique, so there's at most one row.
     public Task<CostingParameters?> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
         dbContextFactory.QuerySingleOrDefaultAsync<CostingParameters>(
-            $"SELECT {Columns.Of<CostingParameters>("c")} FROM CostingParameters c WHERE c.ProductId = @productId",
+            $"SELECT {Columns.Of<CostingParameters>("c")} FROM costing_parameters c WHERE c.product_id = @productId",
             new { productId },
             cancellationToken);
 
@@ -19,7 +19,7 @@ public class CostingParametersRepository(IDbContextFactory<TinapayanRMSDbContext
         productIds.Count == 0
             ? []
             : await dbContextFactory.QueryAsync<CostingParameters>(
-                $"SELECT {Columns.Of<CostingParameters>("c")} FROM CostingParameters c WHERE c.ProductId IN ({DapperReads.IdsTable})",
+                $"SELECT {Columns.Of<CostingParameters>("c")} FROM costing_parameters c WHERE c.product_id IN ({DapperReads.IdsTable})",
                 new { ids = DapperReads.IdList(productIds) },
                 cancellationToken);
 

@@ -24,11 +24,6 @@ public class ProductSubAssemblyUsageConfiguration : IEntityTypeConfiguration<Pro
 
         // 0 means "not sized yet": a section goes into the recipe before how much of it a piece takes is
         // known (ProductRules.EnsureValidUsages). Only a negative piece size is refused.
-        builder.ToTable(t => t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "[AuthoredValue] >= 0"));
-
-        // Shrinkage is a share of the batch, so 100% or more would leave nothing to cut pieces from
-        // (ProductRules.CalculateFinalWeight). 0 is the usual case: nothing is lost making it.
-        builder.ToTable(t => t.HasCheckConstraint(
-            "CK_ProductSubAssemblyUsages_ShrinkagePercent", "[ShrinkagePercent] >= 0 AND [ShrinkagePercent] < 100"));
+        builder.ToTable(t => t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "authored_value >= 0"));
     }
 }

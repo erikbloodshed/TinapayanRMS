@@ -3,7 +3,6 @@ using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using AwesomeAssertions;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -18,12 +17,11 @@ using TinapayanRMS.Tests.Common.Fixtures;
 namespace TinapayanRMS.Infrastructure.Tests.Services;
 
 /// <summary>
-/// Real backups and restores by SQL Server, of a database of each test's own (ThrowawayDatabase) into a folder of its own
-/// under ProgramData, set up as the app's is. In the database collection, so they run one at a time with the other database
-/// tests: a restore clears every pooled connection.
+/// Real backups and restores by pg_dump and pg_restore, of a database of each test's own (ThrowawayDatabase) into a
+/// folder of its own under ProgramData, set up as the app's is. In the database collection, so they run one at a time with the other database tests: a restore
+/// clears every pooled connection.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
-[SupportedOSPlatform("windows")]
 public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -51,25 +49,41 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
     }
 
     [Fact]
-    public async Task A_backup_is_written_to_a_folder_SQL_Server_and_every_user_can_use()
+    [SupportedOSPlatform("windows")]
+    public async Task A_backup_is_written_to_a_folder_every_windows_user_can_use()
+    {
+        await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
+
+        var users = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
+        new DirectoryInfo(_folder).GetAccessControl().GetAccessRules(true, true, typeof(SecurityIdentifier)).OfType<FileSystemAccessRule>()
+            .Should().Contain(rule => rule.IdentityReference == users
+                && rule.AccessControlType == AccessControlType.Allow
+                && (rule.FileSystemRights & FileSystemRights.Modify) == FileSystemRights.Modify);
+    }
+
+    [Fact]
+    public async Task A_backup_is_written_to_the_folder_and_listed()
     {
         var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
 
         File.Exists(backup.Path).Should().BeTrue();
         backup.Kind.Should().Be(BackupKind.Manual);
         backup.SizeBytes.Should().BeGreaterThan(0);
-        Path.GetFileName(backup.Path).Should().StartWith(_database.Name + "_").And.EndWith("_manual.bak");
+        Path.GetFileName(backup.Path).Should().StartWith(_database.Name + "_").And.EndWith("_manual.backup");
         _backups.List().Should().ContainSingle().Which.Path.Should().Be(backup.Path);
+    }
 
-        var rules = new DirectoryInfo(_folder).GetAccessControl().GetAccessRules(true, true, typeof(SecurityIdentifier)).OfType<FileSystemAccessRule>().ToList();
-        var service = new NTAccount(BackupRules.ServiceAccountFor("SQLEXPRESS")).Translate(typeof(SecurityIdentifier));
-        var users = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
-        foreach (var account in new[] { service, users })
-        {
-            rules.Should().Contain(rule => rule.IdentityReference == account
-                && rule.AccessControlType == AccessControlType.Allow
-                && (rule.FileSystemRights & FileSystemRights.Modify) == FileSystemRights.Modify);
-        }
+    [Fact]
+    public async Task A_backup_says_which_database_it_is_of_and_when_it_was_taken()
+    {
+        // The listing gives the time to the second.
+        var before = DateTime.Now.AddSeconds(-1);
+        var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
+
+        var header = await _backups.InspectAsync(backup, Cancellation);
+
+        header.DatabaseName.Should().Be(_database.Name);
+        header.TakenAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(DateTime.Now);
     }
 
     [Fact]
@@ -88,6 +102,19 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
 
         // The safety backup is the data from just before: Cakes comes back with it.
         await _backups.RestoreAsync(restored.SafetyBackup, Cancellation);
+        (await CategoryNamesAsync()).Should().Equal("Breads", "Cakes");
+    }
+
+    [Fact]
+    public async Task A_restored_database_carries_on_numbering_where_the_backup_left_off()
+    {
+        await AddCategoryAsync("Breads");
+        var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
+        await _backups.RestoreAsync(backup, Cancellation);
+
+        var add = () => AddCategoryAsync("Cakes");
+
+        await add.Should().NotThrowAsync("the identity sequences come back with the data, so a new row doesn't take a restored row's id");
         (await CategoryNamesAsync()).Should().Equal("Breads", "Cakes");
     }
 
@@ -113,6 +140,11 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         await using (var dbContext = _database.CreateDbContext())
         {
             migrations = [.. dbContext.Database.GetMigrations()];
+        }
+
+        Assert.SkipWhen(migrations.Length < 2, "There's only one migration so far, so no earlier version of the database to back up.");
+        await using (var dbContext = _database.CreateDbContext())
+        {
             await dbContext.GetService<IMigrator>().MigrateAsync(migrations[^2], cancellationToken: Cancellation);
         }
 
@@ -135,9 +167,9 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
     public async Task A_backup_from_a_later_version_is_refused_and_nothing_changes()
     {
         await AddCategoryAsync("Breads");
-        await ExecuteAsync("INSERT INTO __EFMigrationsHistory (MigrationId, ProductVersion) VALUES ('99991231000000_FromTheFuture', '99.0.0')");
+        await ExecuteAsync("""INSERT INTO "__EFMigrationsHistory" (migration_id, product_version) VALUES ('99991231000000_FromTheFuture', '99.0.0')""");
         var later = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
-        await ExecuteAsync("DELETE FROM __EFMigrationsHistory WHERE MigrationId = '99991231000000_FromTheFuture'");
+        await ExecuteAsync("""DELETE FROM "__EFMigrationsHistory" WHERE migration_id = '99991231000000_FromTheFuture'""");
         await AddCategoryAsync("Cakes");
 
         var restore = () => _backups.RestoreAsync(later, Cancellation);
@@ -183,17 +215,22 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
     }
 
     [Fact]
-    public async Task A_file_that_isnt_a_backup_is_refused_by_SQL_Server()
+    public async Task A_file_that_isnt_a_backup_is_refused_before_anything_changes()
     {
-        var notABackup = Path.Combine(Path.GetTempPath(), $"not a backup {Guid.NewGuid():N}.bak");
+        await AddCategoryAsync("Breads");
+        var notABackup = Path.Combine(Path.GetTempPath(), $"not a backup {Guid.NewGuid():N}.backup");
         await File.WriteAllTextAsync(notABackup, "Pandesal, 4.50", Cancellation);
         try
         {
             var copy = await _backups.CopyInAsync(notABackup, Cancellation);
 
             var inspect = () => _backups.InspectAsync(copy, Cancellation);
+            var restore = () => _backups.RestoreAsync(copy, Cancellation);
 
-            await inspect.Should().ThrowAsync<SqlException>();
+            await inspect.Should().ThrowAsync<BusinessRuleException>().WithMessage(BackupRules.NotADatabaseBackupText);
+            await restore.Should().ThrowAsync<BusinessRuleException>().WithMessage(BackupRules.NotADatabaseBackupText);
+            (await CategoryNamesAsync()).Should().Equal("Breads");
+            _backups.List().Should().NotContain(b => b.Kind == BackupKind.BeforeRestore, "it's refused before the safety backup is taken");
         }
         finally
         {
@@ -206,7 +243,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
     {
         await AddCategoryAsync("Breads");
         var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
-        var onTheStick = Path.Combine(Path.GetTempPath(), $"stick {Guid.NewGuid():N}.bak");
+        var onTheStick = Path.Combine(Path.GetTempPath(), $"stick {Guid.NewGuid():N}.backup");
         try
         {
             await _backups.CopyToAsync(backup, onTheStick, Cancellation);
@@ -224,6 +261,25 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         {
             File.Delete(onTheStick);
         }
+    }
+
+    [Fact]
+    public async Task A_backup_of_another_database_restores_over_this_one()
+    {
+        await AddCategoryAsync("Breads");
+        await using var other = await ThrowawayDatabase.CreateAsync(fixture.ConnectionString, Cancellation);
+        await using (var dbContext = other.CreateDbContext())
+        {
+            dbContext.RawMaterialCategories.Add(new RawMaterialCategory { Name = "From the other computer", Type = RawMaterialType.Ingredient });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        using var otherBackups = new DatabaseBackups(other.CreateDbContextFactory(), _folder);
+        var fromElsewhere = await otherBackups.BackUpAsync(BackupKind.Manual, Cancellation);
+
+        await _backups.RestoreAsync(fromElsewhere, Cancellation);
+
+        (await CategoryNamesAsync()).Should().Equal("From the other computer");
     }
 
     [Fact]

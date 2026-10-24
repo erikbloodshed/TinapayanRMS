@@ -25,6 +25,6 @@ public class RawMaterialBrandPriceConfiguration : IEntityTypeConfiguration<RawMa
 
         builder.HasIndex(p => p.RawMaterialId);
 
-        builder.ToTable(t => t.HasCheckConstraint("CK_RawMaterialBrandPrices_Price", "[Price] > 0"));
+        builder.ToTable(t => t.HasCheckConstraint("CK_RawMaterialBrandPrices_Price", "price > 0"));
     }
 }

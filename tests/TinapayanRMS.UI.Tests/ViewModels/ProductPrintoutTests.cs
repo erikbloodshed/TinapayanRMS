@@ -32,7 +32,6 @@ public class ProductPrintoutTests
             ],
             UsageAuthoredField.WeightPerPiece,
             60m,
-            0m,
             linkedName: null);
 
         var section = PrintedSection.From(usage, CostBasis.Buffered);
@@ -61,7 +60,6 @@ public class ProductPrintoutTests
             ],
             UsageAuthoredField.WeightPerPiece,
             50m,
-            0m,
             linkedName: "Variety Bread Dough",
             addIns: [new SubAssemblyLineEdit(Ingredient("Ube Flavouring", 0.5m), 20m)]);
 
@@ -84,7 +82,6 @@ public class ProductPrintoutTests
             ],
             UsageAuthoredField.Yield,
             40m,
-            0m,
             linkedName: "Butter Glaze",
             addIns: [new SubAssemblyLineEdit(Ingredient("Cream", 0.3m), 500m)]);
 
@@ -97,7 +94,7 @@ public class ProductPrintoutTests
     }
 
     [Fact]
-    public void A_section_carries_its_batch_and_the_piece_cut_from_what_it_makes()
+    public void A_section_carries_its_batch_and_the_pieces_that_share_it_out()
     {
         var usage = new ProductUsageEdit(
             1,
@@ -108,15 +105,14 @@ public class ProductPrintoutTests
             ],
             UsageAuthoredField.WeightPerPiece,
             60m,
-            10m,
             linkedName: null);
 
         var section = PrintedSection.From(usage, CostBasis.Buffered);
 
         section.HasPieceSize.Should().BeTrue();
         (section.TotalWeight, section.BatchCost).Should().Be((1700m, 50m));
-        (section.ShrinkagePercent, section.FinalWeight).Should().Be((10m, 1530m), "a tenth of the 1,700 g batch bakes off");
-        (section.WeightPerPiece, section.Yield).Should().Be((60m, 25.5m), "the pieces are cut from the 1,530 g it makes");
+        section.WeightPerPiece.Should().Be(60m);
+        section.Yield.Should().BeApproximately(28.3333m, 0.0001m, "60 g pieces share out the whole 1,700 g batch");
         section.CostPerPiece.Should().Be(usage.CostPerPieceAt(CostBasis.Buffered)).And.BeGreaterThan(0m);
     }
 
@@ -128,7 +124,6 @@ public class ProductPrintoutTests
             Dough,
             [new SubAssemblyLineEdit(Ingredient("Flour", 0.05m), 1000m, isFormulaBase: true)],
             UsageAuthoredField.WeightPerPiece,
-            0m,
             0m,
             linkedName: null);
 

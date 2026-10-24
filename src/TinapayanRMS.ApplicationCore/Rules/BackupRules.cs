@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using TinapayanRMS.ApplicationCore.Interfaces;
 
@@ -5,19 +6,21 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 
 /// <summary>
 /// The database backups' rules (2026-10-03): how a backup file is named and read back, when the day's automatic backup is
-/// due and which old ones go, whose account SQL Server writes files as, where a restored backup's files go, and whether a
-/// restored database is one this version of the app can use.
+/// due and which old ones go, what a backup file says of itself, and whether a restored database is one this version of the
+/// app can use.
 /// </summary>
 public static class BackupRules
 {
     /// <summary>The automatic backups kept: two weeks of them. Manual and safety backups are kept until deleted by hand.</summary>
     public const int AutomaticBackupsKept = 14;
 
-    public const string Extension = ".bak";
+    /// <summary>pg_dump's custom format, the one pgAdmin names .backup too.</summary>
+    public const string Extension = ".backup";
 
     public const string NotADatabaseBackupText = "That file isn't a backup of a whole database, so it can't be restored.";
 
-    public const string FilesDontMatchText = "That backup's files don't match this database's, so it can't be restored here.";
+    public const string NewerPostgresText =
+        "That backup was made by a newer version of PostgreSQL than this computer has, so it can't be restored here. Nothing has changed.";
 
     public const string NotThisAppsText = "That backup isn't of TinapayanRMS's data, so it wasn't restored. Nothing has changed.";
 
@@ -27,6 +30,12 @@ public static class BackupRules
     /// <summary>To the second, so a file name sorts by when it was taken.</summary>
     private const string TimeFormat = "yyyyMMdd_HHmmss";
 
+    private const string ArchiveCreatedAt = "Archive created at ";
+
+    private const string ArchiveTimeFormat = "yyyy-MM-dd HH:mm:ss";
+
+    private const string DatabaseNameLabel = "dbname:";
+
     private static readonly Dictionary<BackupKind, string> Suffixes = new()
     {
         [BackupKind.Manual] = "manual",
@@ -35,14 +44,14 @@ public static class BackupRules
         [BackupKind.CopiedIn] = "copied-in",
     };
 
-    /// <summary>"TinapayanRMS_20261003_081512_manual.bak": the database, when, and what made it.</summary>
+    /// <summary>"tinapayanrms_20261003_081512_manual.backup": the database, when, and what made it.</summary>
     public static string FileNameFor(string databaseName, BackupKind kind, DateTime takenAt) =>
         $"{databaseName}_{takenAt.ToString(TimeFormat, CultureInfo.InvariantCulture)}_{Suffixes[kind]}{Extension}";
 
     /// <summary>
     /// <see cref="FileNameFor"/>'s name, a second later for each one <paramref name="isTaken"/> says is already in the folder.
     /// Names only go to the second, and two backups in the same second mustn't share a file: a restore's safety backup taken
-    /// within a second of the one before it overwrote it (BACKUP … WITH INIT), and the restore then put back the data it was
+    /// within a second of the one before it overwrote it, and the restore then put back the data it was
     /// replacing. Found by DatabaseBackupsTests (2026-10-07). Still a name <see cref="TryParse"/> reads, in order.
     /// </summary>
     public static string FreeFileNameFor(string databaseName, BackupKind kind, DateTime takenAt, Func<string, bool> isTaken)
@@ -109,50 +118,42 @@ public static class BackupRules
         backups.Where(backup => backup.Kind == BackupKind.Automatic && string.Equals(backup.DatabaseName, databaseName, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// The Windows account an instance of SQL Server writes backup files as: its service's own (NT SERVICE\MSSQL$SQLEXPRESS
-    /// for the SQLEXPRESS instance, NT SERVICE\MSSQLSERVER for a default one), which SQL Server's setup always gives it,
-    /// whatever account the service is set to log on as.
+    /// What <c>pg_restore --list</c> says a backup file holds, from the comment lines it starts with: the database it was
+    /// taken of (";     dbname: tinapayanrms") and when (";     Archive created at 2026-10-10 15:30:12 PST", in the
+    /// local time of the computer that took it). False when the listing has neither, which no pg_dump archive lacks.
     /// </summary>
-    public static string ServiceAccountFor(string? instanceName) =>
-        string.IsNullOrEmpty(instanceName) || instanceName.Equals("MSSQLSERVER", StringComparison.OrdinalIgnoreCase)
-            ? @"NT SERVICE\MSSQLSERVER"
-            : $@"NT SERVICE\MSSQL${instanceName}";
-
-    /// <summary>
-    /// Refuses a database on another computer: SQL Server reads and writes backup files on its own computer, where this
-    /// app's backups folder isn't.
-    /// </summary>
-    public static void EnsureLocalServer(string serverMachine, string localMachine)
+    public static bool TryReadArchiveListing(string listing, [NotNullWhen(true)] out BackupHeader? header)
     {
-        if (!serverMachine.Equals(localMachine, StringComparison.OrdinalIgnoreCase))
+        header = null;
+        string? databaseName = null;
+        DateTime? takenAt = null;
+        foreach (var rawLine in listing.Split('\n'))
         {
-            throw new BusinessRuleException(
-                $"Backups need SQL Server to be on this computer, and the database is on {serverMachine}. Back it up there instead.");
-        }
-    }
-
-    /// <summary>
-    /// Where a backup's two files go when it's restored over this database: its data file onto this database's data file,
-    /// its log onto this database's log, so a backup made on another computer, or of a copy, lands where this one is.
-    /// The app's database has one of each; a backup or a database with any other layout is refused.
-    /// </summary>
-    /// <param name="backupFiles">The backup's files by their logical names, as RESTORE FILELISTONLY lists them.</param>
-    /// <param name="databaseFiles">This database's files on disk, as sys.master_files lists them.</param>
-    public static IReadOnlyList<(string LogicalName, string PhysicalPath)> RestoreMoves(
-        IReadOnlyList<(string LogicalName, bool IsLog)> backupFiles,
-        IReadOnlyList<(string PhysicalPath, bool IsLog)> databaseFiles)
-    {
-        if (backupFiles.Count(f => !f.IsLog) != 1 || backupFiles.Count(f => f.IsLog) != 1
-            || databaseFiles.Count(f => !f.IsLog) != 1 || databaseFiles.Count(f => f.IsLog) != 1)
-        {
-            throw new BusinessRuleException(FilesDontMatchText);
+            var line = rawLine.TrimStart(';').Trim();
+            if (line.StartsWith(ArchiveCreatedAt, StringComparison.Ordinal)
+                && line.Length >= ArchiveCreatedAt.Length + ArchiveTimeFormat.Length
+                && DateTime.TryParseExact(
+                    line.Substring(ArchiveCreatedAt.Length, ArchiveTimeFormat.Length),
+                    ArchiveTimeFormat,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var created))
+            {
+                takenAt = created;
+            }
+            else if (line.StartsWith(DatabaseNameLabel, StringComparison.Ordinal))
+            {
+                databaseName = line[DatabaseNameLabel.Length..].Trim();
+            }
         }
 
-        return
-        [
-            (backupFiles.Single(f => !f.IsLog).LogicalName, databaseFiles.Single(f => !f.IsLog).PhysicalPath),
-            (backupFiles.Single(f => f.IsLog).LogicalName, databaseFiles.Single(f => f.IsLog).PhysicalPath),
-        ];
+        if (databaseName is null || takenAt is null)
+        {
+            return false;
+        }
+
+        header = new BackupHeader(databaseName, takenAt.Value);
+        return true;
     }
 
     /// <summary>

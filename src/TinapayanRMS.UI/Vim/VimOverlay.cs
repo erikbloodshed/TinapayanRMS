@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Serilog;
 
 namespace TinapayanRMS.UI.Vim;
@@ -17,6 +18,7 @@ namespace TinapayanRMS.UI.Vim;
 internal sealed class VimOverlay : Adorner
 {
     private static readonly ConditionalWeakTable<Window, VimOverlay> Overlays = new();
+    private static readonly TimeSpan MessageShownFor = TimeSpan.FromSeconds(5);
 
     private readonly Window _window;
     private readonly FrameworkElement _content;
@@ -28,6 +30,14 @@ internal sealed class VimOverlay : Adorner
     // Where the keyboard was when the command line opened, and what the keys there are, for :help.
     private IInputElement? _returnFocus;
     private VimContexts _context = VimContexts.Other;
+
+    // Puts a command's message away when no key or click has first.
+    private DispatcherTimer? _messageTimer;
+
+    // Ctrl+R =: the sum typed so far, the box the answer is typed into, and the grid it's a cell of (or null).
+    private string _sum = string.Empty;
+    private DependencyObject? _answerTarget;
+    private Syncfusion.UI.Xaml.Grid.SfDataGrid? _answerGrid;
 
     private VimOverlay(FrameworkElement content, Window window)
         : base(content)
@@ -41,6 +51,9 @@ internal sealed class VimOverlay : Adorner
     public static VimOverlay? Capturing { get; private set; }
 
     public bool IsShowingHints => _hints is { Visibility: Visibility.Visible };
+
+    /// <summary>Whether the line along the bottom is taking a sum (Ctrl+R =).</summary>
+    public bool IsShowingExpression => _commandBar is { IsShowingExpression: true };
 
     /// <summary>Whether this is <paramref name="window"/>'s overlay.</summary>
     public bool IsFor(object window) => ReferenceEquals(window, _window);
@@ -63,9 +76,11 @@ internal sealed class VimOverlay : Adorner
         layer.Add(overlay);
         Overlays.Add(window, overlay);
 
-        // Hints and the cheat sheet are for the keyboard; the mouse, or another window, puts them away.
+        // Hints and the cheat sheet are for the keyboard; the mouse, or another window, puts them away. A command's
+        // message goes with them, and with the next key, which goes on to do what it does.
         window.PreviewMouseDown += (_, _) => overlay.CloseCapture();
         window.Deactivated += (_, _) => overlay.CloseCapture();
+        window.AddHandler(PreviewKeyDownEvent, new KeyEventHandler((_, _) => overlay.HideMessage()), handledEventsToo: true);
         return overlay;
     }
 
@@ -94,20 +109,41 @@ internal sealed class VimOverlay : Adorner
     }
 
     /// <summary><c>:</c>: the command line, with the keyboard in it.</summary>
-    public void ShowCommandLine(DependencyObject? from, VimContexts context) => ShowCommandLine(from as IInputElement, context, string.Empty, string.Empty);
-
-    private void ShowCommandLine(IInputElement? returnFocus, VimContexts context, string text, string message)
+    public void ShowCommandLine(DependencyObject? from, VimContexts context)
     {
         CloseCapture();
-        _returnFocus = returnFocus;
+        _returnFocus = from as IInputElement;
         _context = context;
         _commandBar ??= Attach(new CommandBar(this));
-        _commandBar.Show(text, message);
+        _commandBar.Show();
+    }
+
+    /// <summary>
+    /// Ctrl+R = in Insert: a <c>=</c> along the bottom to type a sum after, as Vim's expression register. The keyboard
+    /// stays where it is, in <paramref name="target"/>: moving it to a box down there would end a cell's edit
+    /// (GridEditCommit) and lose the caret. So, as with the hints, the keys come here (TakeKey, TakeText) until Enter
+    /// types the answer into <paramref name="target"/>, or Esc, a click or another window puts the line away.
+    /// </summary>
+    public void ShowExpressionLine(DependencyObject? target, Syncfusion.UI.Xaml.Grid.SfDataGrid? grid)
+    {
+        CloseCapture();
+        _sum = string.Empty;
+        _answerTarget = target;
+        _answerGrid = grid;
+        _commandBar ??= Attach(new CommandBar(this));
+        _commandBar.ShowExpression(_sum);
+        Capturing = this;
+        VimKeys.ShowMode();
     }
 
     /// <summary>A key pressed while the hints or the cheat sheet are up. True when it's taken.</summary>
     public bool TakeKey(Key key, bool typesTextOrModifier)
     {
+        if (IsShowingExpression)
+        {
+            return TakeSumKey(key, typesTextOrModifier);
+        }
+
         // A letter comes on as text (TakeText); Shift on its own changes nothing.
         if (typesTextOrModifier)
         {
@@ -134,6 +170,17 @@ internal sealed class VimOverlay : Adorner
     /// <summary>A character typed while the hints or the cheat sheet are up.</summary>
     public void TakeText(char key)
     {
+        // A space comes as a key (TakeSumKey): a number box takes Space on its key press, so no text follows it there.
+        if (IsShowingExpression)
+        {
+            if (key != ' ')
+            {
+                SetSum(_sum + key);
+            }
+
+            return;
+        }
+
         if (IsShowingHints)
         {
             if (_hints!.Type(key) is { } picked)
@@ -160,9 +207,10 @@ internal sealed class VimOverlay : Adorner
         }
     }
 
-    /// <summary>Puts the hints and the cheat sheet away. The command line closes itself.</summary>
+    /// <summary>Puts the hints, the cheat sheet and a command's message away. The command line closes itself.</summary>
     public void CloseCapture()
     {
+        HideMessage();
         if (_hints is not null)
         {
             _hints.Visibility = Visibility.Collapsed;
@@ -173,6 +221,14 @@ internal sealed class VimOverlay : Adorner
             _cheatSheet.Visibility = Visibility.Collapsed;
         }
 
+        if (_commandBar is { IsShowingExpression: true })
+        {
+            _commandBar.Visibility = Visibility.Collapsed;
+        }
+
+        _answerTarget = null;
+        _answerGrid = null;
+
         if (ReferenceEquals(Capturing, this))
         {
             Capturing = null;
@@ -180,18 +236,20 @@ internal sealed class VimOverlay : Adorner
         }
     }
 
-    /// <summary>Enter on the command line: runs what's typed, or says why it can't.</summary>
+    /// <summary>
+    /// Enter on the command line: closes it and runs what's typed, then says in its place why it couldn't, as Vim does.
+    /// </summary>
     private void Run(string text)
     {
+        // The keyboard goes back where it was first, so the command runs from there, as the key would have.
+        HideCommandLine(restoreFocus: true);
         var command = VimCommandLine.Parse(text, out var error);
         if (command is null)
         {
-            _commandBar!.Show(text, error);
+            ShowMessage(error);
             return;
         }
 
-        // The keyboard goes back where it was first, so the command runs from there, as the key would have.
-        HideCommandLine(restoreFocus: true);
         if (command.Kind == VimCommandKind.Help)
         {
             ShowCheatSheet(_context);
@@ -200,13 +258,117 @@ internal sealed class VimOverlay : Adorner
 
         if (VimCommands.Run(command, _window, _returnFocus as DependencyObject) is { } failure)
         {
-            ShowCommandLine(_returnFocus, _context, text, failure);
+            ShowMessage(failure);
+        }
+    }
+
+    /// <summary>A line along the bottom, where the command line was, until the next key or click, or a few seconds pass.</summary>
+    private void ShowMessage(string message)
+    {
+        _commandBar!.ShowMessage(message);
+        if (_messageTimer is null)
+        {
+            _messageTimer = new DispatcherTimer { Interval = MessageShownFor };
+            _messageTimer.Tick += (_, _) => HideMessage();
+        }
+
+        _messageTimer.Stop();
+        _messageTimer.Start();
+    }
+
+    private void HideMessage()
+    {
+        _messageTimer?.Stop();
+        if (_commandBar is { IsShowingMessage: true, Visibility: Visibility.Visible })
+        {
+            _commandBar.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    /// <summary>
+    /// A key pressed while a sum is typed: Enter works it out, Esc puts the line away, Backspace takes a character off,
+    /// Ctrl+V pastes. Every other key is taken and does nothing, so an arrow or Tab can't move the cell from under it.
+    /// A character comes on as text (TakeText), except a space.
+    /// </summary>
+    private bool TakeSumKey(Key key, bool typesTextOrModifier)
+    {
+        if (key == Key.Space)
+        {
+            SetSum(_sum + ' ');
+            return true;
+        }
+
+        if (typesTextOrModifier)
+        {
+            return false;
+        }
+
+        switch (key)
+        {
+            case Key.Enter:
+                RunSum();
+                break;
+            case Key.Escape:
+                CloseCapture();
+                break;
+            case Key.Back when _sum.Length > 0:
+                SetSum(_sum[..^1]);
+                break;
+            case Key.V when Keyboard.Modifiers == ModifierKeys.Control:
+                SetSum(_sum + PastedLine());
+                break;
+        }
+
+        return true;
+    }
+
+    private void SetSum(string sum)
+    {
+        _sum = sum;
+        _commandBar?.ShowExpression(sum);
+    }
+
+    /// <summary>
+    /// Enter on a sum: works it out and types the answer into the box the keyboard is in. A sum that can't be worked out
+    /// keeps the line up, saying why, to be put right or put away.
+    /// </summary>
+    private void RunSum()
+    {
+        if (VimExpression.Evaluate(_sum, out var error) is not { } answer)
+        {
+            _commandBar!.ShowExpression(_sum, error);
+            return;
+        }
+
+        var target = _answerTarget;
+        var grid = _answerGrid;
+        CloseCapture();
+
+        // Enter is still on its way to the window, whose own handler puts a message away, so one is shown after it.
+        if (VimKeys.TypeAnswer(target, grid, answer) is { } failure)
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, () => ShowMessage(failure));
+        }
+    }
+
+    /// <summary>The clipboard's text up to its first line break, or nothing when it holds none or can't be read.</summary>
+    private static string PastedLine()
+    {
+        try
+        {
+            var text = Clipboard.ContainsText() ? Clipboard.GetText() : string.Empty;
+            var lineBreak = text.IndexOfAny(['\r', '\n']);
+            return lineBreak < 0 ? text : text[..lineBreak];
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            return string.Empty;
         }
     }
 
     private void HideCommandLine(bool restoreFocus)
     {
-        if (_commandBar is not { Visibility: Visibility.Visible })
+        if (_commandBar is not { IsShowingCommand: true })
         {
             return;
         }
@@ -390,13 +552,21 @@ internal sealed class VimOverlay : Adorner
         }
     }
 
-    /// <summary>The command line: a <c>:</c> and a box along the bottom of the window, and a line for what went wrong.</summary>
+    /// <summary>
+    /// The command line: a <c>:</c> and a box along the bottom of the window. Once a command has run, the same bar shows
+    /// on its own what went wrong, with no box, and the keyboard back where it was. For Ctrl+R = it shows a <c>=</c> and
+    /// the sum typed so far instead, drawn as text, not in the box: the keyboard stays in the cell the answer goes into.
+    /// </summary>
     private sealed class CommandBar : Border
     {
         private static readonly FontFamily Mono = new("Consolas");
 
+        private readonly TextBlock _prompt;
         private readonly TextBox _box;
         private readonly TextBlock _message;
+        private readonly TextBlock _expression;
+        private readonly Run _typed = new();
+        private readonly Run _error = new();
 
         public CommandBar(VimOverlay overlay)
         {
@@ -406,7 +576,7 @@ internal sealed class VimOverlay : Adorner
             BorderThickness = new Thickness(0, 1, 0, 0);
             Padding = new Thickness(12, 6, 12, 6);
 
-            var prompt = new TextBlock { Text = ":", FontFamily = Mono, FontSize = 14, VerticalAlignment = VerticalAlignment.Center };
+            _prompt = new TextBlock { Text = ":", FontFamily = Mono, FontSize = 14, VerticalAlignment = VerticalAlignment.Center };
             _box = new TextBox
             {
                 FontFamily = Mono,
@@ -418,20 +588,36 @@ internal sealed class VimOverlay : Adorner
             };
             _message = new TextBlock
             {
-                Margin = new Thickness(16, 0, 0, 0),
+                FontFamily = Mono,
+                FontSize = 14,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 Foreground = BrushFor("ErrorForegroundBrush", Brushes.DarkRed),
             };
 
+            // The sum, a bar where the next character goes (no box has the keyboard to draw a caret), and what's wrong.
+            _error.Foreground = BrushFor("ErrorForegroundBrush", Brushes.DarkRed);
+            _expression = new TextBlock
+            {
+                FontFamily = Mono,
+                FontSize = 14,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Visibility = Visibility.Collapsed,
+            };
+            _expression.Inlines.Add(_typed);
+            _expression.Inlines.Add(new Run("▏") { Foreground = BrushFor("MutedForegroundBrush", Brushes.Gray) });
+            _expression.Inlines.Add(_error);
+
             var layout = new Grid();
             layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             Grid.SetColumn(_box, 1);
-            Grid.SetColumn(_message, 2);
-            layout.Children.Add(prompt);
+            Grid.SetColumn(_expression, 1);
+            Grid.SetColumnSpan(_message, 2);
+            layout.Children.Add(_prompt);
             layout.Children.Add(_box);
+            layout.Children.Add(_expression);
             layout.Children.Add(_message);
             Child = layout;
 
@@ -454,14 +640,58 @@ internal sealed class VimOverlay : Adorner
             _box.LostKeyboardFocus += (_, _) => overlay.HideCommandLine(restoreFocus: false);
         }
 
-        public void Show(string text, string message)
+        private enum Part
         {
-            _box.Text = text;
-            _message.Text = message;
+            Command,
+            Expression,
+            Message,
+        }
+
+        /// <summary>Whether it's showing a command's message rather than taking one.</summary>
+        public bool IsShowingMessage => _message.Visibility == Visibility.Visible;
+
+        /// <summary>Whether it's up and taking a command after <c>:</c>.</summary>
+        public bool IsShowingCommand => Visibility == Visibility.Visible && _box.Visibility == Visibility.Visible;
+
+        /// <summary>Whether it's up and taking a sum after Ctrl+R =.</summary>
+        public bool IsShowingExpression => Visibility == Visibility.Visible && _expression.Visibility == Visibility.Visible;
+
+        public void Show()
+        {
+            _box.Text = string.Empty;
+            SetShowing(Part.Command);
             Visibility = Visibility.Visible;
             UpdateLayout();
             _box.Focus();
-            _box.SelectAll();
+        }
+
+        /// <summary>The sum typed so far after a <c>=</c>, and why it can't be worked out when Enter found it couldn't.</summary>
+        public void ShowExpression(string typed, string error = "")
+        {
+            _typed.Text = typed;
+            _error.Text = error.Length == 0 ? string.Empty : "   " + error;
+            SetShowing(Part.Expression);
+            Visibility = Visibility.Visible;
+        }
+
+        /// <summary>Shows <paramref name="message"/> in place of the box. Nothing in it takes the keyboard or the mouse.</summary>
+        public void ShowMessage(string message)
+        {
+            _message.Text = message;
+            SetShowing(Part.Message);
+            Visibility = Visibility.Visible;
+        }
+
+        private void SetShowing(Part part)
+        {
+            _prompt.Text = part == Part.Expression ? "=" : ":";
+            _prompt.Visibility = part == Part.Message ? Visibility.Collapsed : Visibility.Visible;
+            _box.Visibility = part == Part.Command ? Visibility.Visible : Visibility.Collapsed;
+            _expression.Visibility = part == Part.Expression ? Visibility.Visible : Visibility.Collapsed;
+            _message.Visibility = part == Part.Message ? Visibility.Visible : Visibility.Collapsed;
+
+            // Only the command line's box is clicked into; the sum is typed with the keyboard left in its cell.
+            IsHitTestVisible = part == Part.Command;
         }
     }
 

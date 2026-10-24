@@ -13,10 +13,10 @@ public class RawMaterialBrandPriceRepository(IDbContextFactory<TinapayanRMSDbCon
 {
     /// <summary>In the order they were added, each with its unit (if any) and that unit's unit of measure.</summary>
     public Task<IReadOnlyList<RawMaterialBrandPrice>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken) =>
-        ReadAsync("WHERE p.RawMaterialId = @rawMaterialId ORDER BY p.Id", new { rawMaterialId }, cancellationToken);
+        ReadAsync("WHERE p.raw_material_id = @rawMaterialId ORDER BY p.id", new { rawMaterialId }, cancellationToken);
 
     public Task<IReadOnlyList<RawMaterialBrandPrice>> GetAllAsync(CancellationToken cancellationToken) =>
-        ReadAsync("ORDER BY p.RawMaterialId, p.Id", null, cancellationToken);
+        ReadAsync("ORDER BY p.raw_material_id, p.id", null, cancellationToken);
 
     /// <summary>Brand prices with their unit and its unit of measure, filtered and ordered by <paramref name="whereAndOrder"/>.</summary>
     private Task<IReadOnlyList<RawMaterialBrandPrice>> ReadAsync(string whereAndOrder, object? parameters, CancellationToken cancellationToken) =>
@@ -25,9 +25,9 @@ public class RawMaterialBrandPriceRepository(IDbContextFactory<TinapayanRMSDbCon
                 dbContext.Command(
                     $"""
                     SELECT {Columns.Of<RawMaterialBrandPrice>("p")}, {Columns.Of<RawMaterialUnit>("u")}, {Columns.Of<UnitOfMeasure>("m")}
-                    FROM RawMaterialBrandPrices p
-                    LEFT JOIN RawMaterialUnits u ON u.Id = p.UnitId
-                    LEFT JOIN UnitsOfMeasure m ON m.Id = u.UnitOfMeasureId
+                    FROM raw_material_brand_prices p
+                    LEFT JOIN raw_material_units u ON u.id = p.unit_id
+                    LEFT JOIN units_of_measure m ON m.id = u.unit_of_measure_id
                     {whereAndOrder}
                     """,
                     parameters,

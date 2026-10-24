@@ -17,8 +17,8 @@ public class RawMaterialPriceHistoryConfiguration : IEntityTypeConfiguration<Raw
             .OnDelete(DeleteBehavior.Cascade);
 
         // A unit something was priced in can't be deleted while that price entry exists. Not
-        // Cascade: SQL Server rejects a second cascade path from RawMaterials (through
-        // RawMaterialUnits) to this table.
+        // Cascade: that would be a second cascade path from RawMaterials (through RawMaterialUnits)
+        // to this table, which SQL Server (the database until 2026-10-21) rejected.
         builder.HasOne(h => h.Unit)
             .WithMany()
             .HasForeignKey(h => h.UnitId)

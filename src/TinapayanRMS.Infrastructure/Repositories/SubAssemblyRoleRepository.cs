@@ -10,7 +10,7 @@ public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> 
 {
     public Task<IReadOnlyList<SubAssemblyRole>> GetAllAsync(CancellationToken cancellationToken) =>
         dbContextFactory.QueryAsync<SubAssemblyRole>(
-            $"SELECT {Columns.Of<SubAssemblyRole>("r")} FROM SubAssemblyRoles r ORDER BY r.SortOrder, r.Name", null, cancellationToken);
+            $"SELECT {Columns.Of<SubAssemblyRole>("r")} FROM sub_assembly_roles r ORDER BY r.sort_order, r.name", null, cancellationToken);
 
     public async Task AddAsync(SubAssemblyRole role, CancellationToken cancellationToken)
     {

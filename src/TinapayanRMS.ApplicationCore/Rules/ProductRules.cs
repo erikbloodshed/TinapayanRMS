@@ -23,36 +23,20 @@ public static class ProductRules
         }
     }
 
-    /// <summary>Shrinkage runs from 0 to under 100: a batch can't lose all of itself, or there'd be nothing left to cut pieces from.</summary>
-    public static bool IsValidShrinkage(decimal shrinkagePercent) => shrinkagePercent is >= 0 and < 100;
 
-    /// <summary>The shrinkage a new section starts with (Settings' Costing Defaults), held to a section's own range.</summary>
-    public static void EnsureValidDefaultShrinkage(decimal shrinkagePercent)
-    {
-        if (!IsValidShrinkage(shrinkagePercent))
-        {
-            throw new BusinessRuleException("The default shrinkage must be at least 0% and less than 100%.");
-        }
-    }
 
     /// <summary>
     /// A product's whole set of usages: an empty set is valid (PLAN.md doesn't require a product to
     /// have a usage at all times), and so is a piece size of 0 — a section can go into the recipe before
     /// anyone knows how much of it a piece takes (2026-09-20, at the user's request), and until it's
     /// known the section costs the product nothing per piece (ResolvePieceSize, CalculateUsageCostPerPiece).
-    /// A negative piece size is still nonsense, shrinkage runs from 0 to under 100 (a batch can't lose all
-    /// of itself, or there'd be nothing left to cut pieces from), and a product uses each sub-assembly once.
+    /// A negative piece size is still nonsense, and a product uses each sub-assembly once.
     /// </summary>
-    public static void EnsureValidUsages(IReadOnlyList<(int SubAssemblyId, decimal AuthoredValue, decimal ShrinkagePercent)> usages)
+    public static void EnsureValidUsages(IReadOnlyList<(int SubAssemblyId, decimal AuthoredValue)> usages)
     {
         if (usages.Any(u => u.AuthoredValue < 0))
         {
             throw new BusinessRuleException("A sub-assembly's weight per piece or yield can't be negative.");
-        }
-
-        if (usages.Any(u => !IsValidShrinkage(u.ShrinkagePercent)))
-        {
-            throw new BusinessRuleException("A sub-assembly's shrinkage must be at least 0% and less than 100%.");
         }
 
         if (usages.Select(u => u.SubAssemblyId).Distinct().Count() != usages.Count)
@@ -111,27 +95,16 @@ public static class ProductRules
     }
 
     /// <summary>
-    /// What a usage's batch weighs once it's made: what went in, less the share of it this product loses
-    /// baking or cooking it off (<paramref name="shrinkagePercent"/>, at least 0 and under 100 —
-    /// EnsureValidUsages). A 1,700 g batch at 10% comes out at 1,530 g. Pieces are cut from this, not from
-    /// the raw batch, so it's what ResolvePieceSize and CalculateUsageCostPerPiece divide; the batch's cost
-    /// doesn't change with it, so a batch that loses weight makes fewer, dearer pieces.
-    /// RawMaterial.WeightLossPercent is the same idea one layer down (IngredientBomRules.CalculateCost).
+    /// A usage's weight per piece and yield, from the one the user typed and what the batch weighs
+    /// (<paramref name="totalWeight"/>, its effective batch: CalculateEffectiveBatch): the typed one as it is, the
+    /// other worked out (Yield = TotalWeight / WeightPerPiece). Both are worked out on every read, so the typed
+    /// one stays put when the batch changes. A batch that weighs nothing yet (a new sub-assembly with no lines)
+    /// has no other figure: it comes out as 0. What's lost making a product is a cost (CostingDefaults.WastagePercent),
+    /// not a smaller batch: the pieces share out the whole of it.
     /// </summary>
-    public static decimal CalculateFinalWeight(decimal totalWeight, decimal shrinkagePercent) =>
-        totalWeight * (1 - shrinkagePercent / 100m);
-
-    /// <summary>
-    /// A usage's weight per piece and yield, from the one the user typed and what the batch weighs once
-    /// it's made (<paramref name="finalWeight"/>, from CalculateFinalWeight): the typed one as it is, the
-    /// other worked out (Yield = FinalWeight / WeightPerPiece). Both figures are the finished piece's, and
-    /// both are worked out on every read, so the typed one stays put when the batch or the shrinkage
-    /// changes. A batch that weighs nothing yet (a new sub-assembly with no lines) has no other figure: it
-    /// comes out as 0.
-    /// </summary>
-    public static (decimal WeightPerPiece, decimal Yield) ResolvePieceSize(UsageAuthoredField authoredField, decimal authoredValue, decimal finalWeight)
+    public static (decimal WeightPerPiece, decimal Yield) ResolvePieceSize(UsageAuthoredField authoredField, decimal authoredValue, decimal totalWeight)
     {
-        var other = finalWeight > 0 && authoredValue > 0 ? finalWeight / authoredValue : 0m;
+        var other = totalWeight > 0 && authoredValue > 0 ? totalWeight / authoredValue : 0m;
         return authoredField switch
         {
             UsageAuthoredField.WeightPerPiece => (authoredValue, other),
@@ -141,27 +114,26 @@ public static class ProductRules
     }
 
     /// <summary>
-    /// This usage's share of the sub-assembly's cost, per finished piece. The batch's whole cost is spread
-    /// over what comes out of it (<paramref name="finalWeight"/>), so this comes to the same thing as
-    /// TotalCost / Yield.
+    /// This usage's share of the sub-assembly's cost, per piece. The batch's whole cost is spread over its
+    /// weight (<paramref name="totalWeight"/>), so this comes to the same thing as TotalCost / Yield.
     /// </summary>
-    public static decimal CalculateUsageCostPerPiece(decimal subAssemblyTotalCost, decimal weightPerPiece, decimal finalWeight) =>
-        subAssemblyTotalCost * weightPerPiece / finalWeight;
+    public static decimal CalculateUsageCostPerPiece(decimal subAssemblyTotalCost, decimal weightPerPiece, decimal totalWeight) =>
+        subAssemblyTotalCost * weightPerPiece / totalWeight;
 
     /// <summary>
-    /// How many grams of one sub-assembly line go into one finished piece: the piece is weightPerPiece of
-    /// what the batch makes, so it takes that share of every line that went in. Pass the final weight, as
+    /// How many grams of one sub-assembly line go into one piece: the piece is weightPerPiece of the batch,
+    /// so it takes that share of every line that went in. Pass the effective batch's weight, as
     /// CalculateUsageCostPerPiece takes it.
     /// </summary>
-    public static decimal CalculateLineGramsPerPiece(decimal lineGrams, decimal weightPerPiece, decimal finalWeight) =>
-        lineGrams * weightPerPiece / finalWeight;
+    public static decimal CalculateLineGramsPerPiece(decimal lineGrams, decimal weightPerPiece, decimal totalWeight) =>
+        lineGrams * weightPerPiece / totalWeight;
 
     /// <summary>
     /// One sub-assembly line's cost per finished piece: the piece's share of the line's grams, at the
     /// ingredient's cost per gram. A usage's lines add up to its CalculateUsageCostPerPiece.
     /// </summary>
-    public static decimal CalculateLineCostPerPiece(decimal lineGrams, decimal ingredientCostPerGram, decimal weightPerPiece, decimal finalWeight) =>
-        lineGrams * ingredientCostPerGram * weightPerPiece / finalWeight;
+    public static decimal CalculateLineCostPerPiece(decimal lineGrams, decimal ingredientCostPerGram, decimal weightPerPiece, decimal totalWeight) =>
+        lineGrams * ingredientCostPerGram * weightPerPiece / totalWeight;
 
     /// <summary>
     /// A product's packaging lines. Unlike EnsureValidUsages and the ingredient/sub-assembly line rules,

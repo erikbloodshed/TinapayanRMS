@@ -42,7 +42,7 @@ public static class CompositionRoot
                 // screen, so there's no natural request scope to hand a single DbContext to.
                 // Each repository call creates and disposes its own short-lived context instead,
                 // which also makes concurrent calls from different screens safe.
-                services.AddDbContextFactory<TinapayanRMSDbContext>(options => options.UseSqlServer(connectionString));
+                services.AddDbContextFactory<TinapayanRMSDbContext>(options => TinapayanRMSDbContext.Configure(options, connectionString));
 
                 services.AddSingleton<IUnitOfMeasureRepository, UnitOfMeasureRepository>();
                 services.AddSingleton<IRawMaterialCategoryRepository, RawMaterialCategoryRepository>();
@@ -61,11 +61,17 @@ public static class CompositionRoot
                 services.AddSingleton<ICostingParametersRepository, CostingParametersRepository>();
                 services.AddSingleton<ICostingDefaultsRepository, CostingDefaultsRepository>();
                 services.AddSingleton<IPackagingLinkRepository, PackagingLinkRepository>();
+                services.AddSingleton<IProductVersionRepository, ProductVersionRepository>();
+                services.AddSingleton<IPriceScenarioRepository, PriceScenarioRepository>();
+                services.AddSingleton<ISavedPlanRepository, SavedPlanRepository>();
                 services.AddSingleton<IProductCloner, ProductCloner>();
                 services.AddSingleton<ICostRecalculator, CostRecalculator>();
+                // Backups:ToolsFolder, when set, is the folder holding pg_dump and pg_restore; otherwise they're looked for.
+                var backupToolsFolder = context.Configuration["Backups:ToolsFolder"];
                 services.AddSingleton<IDatabaseBackups>(provider => new DatabaseBackups(
-                    provider.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>(), DatabaseBackups.DefaultFolder));
+                    provider.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>(), DatabaseBackups.DefaultFolder, backupToolsFolder));
                 services.AddSingleton<SavedProductReader>();
+                services.AddSingleton<ProductVersionRecorder>();
                 services.AddSingleton<IViewStateStore>(new JsonViewStateStore(JsonViewStateStore.DefaultFilePath));
 
                 services.AddSingleton(Log.Logger);
@@ -87,7 +93,7 @@ public static class CompositionRoot
                 services.AddSingleton<ProductsViewModel>();
                 services.AddSingleton<ReportsViewModel>();
                 services.AddSingleton<ProductionPlanViewModel>();
-                services.AddSingleton<WhatIfViewModel>();
+                services.AddSingleton<PriceSimulatorViewModel>();
                 services.AddSingleton<PrintTabViewModel>();
                 services.AddSingleton<UnitsOfMeasureViewModel>();
                 services.AddSingleton<CategoriesViewModel>();

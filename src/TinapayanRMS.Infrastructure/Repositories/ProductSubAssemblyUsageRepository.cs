@@ -10,12 +10,12 @@ namespace TinapayanRMS.Infrastructure.Repositories;
 public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductSubAssemblyUsageRepository
 {
     public Task<IReadOnlyList<ProductSubAssemblyUsage>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
-        GetUsagesAsync("u.ProductId = @productId", new { productId }, cancellationToken);
+        GetUsagesAsync("u.product_id = @productId", new { productId }, cancellationToken);
 
     public async Task<IReadOnlyList<ProductSubAssemblyUsage>> GetForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
         productIds.Count == 0
             ? []
-            : await GetUsagesAsync($"u.ProductId IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(productIds) }, cancellationToken);
+            : await GetUsagesAsync($"u.product_id IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(productIds) }, cancellationToken);
 
     private Task<IReadOnlyList<ProductSubAssemblyUsage>> GetUsagesAsync(string filter, object parameters, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<ProductSubAssemblyUsage>>(
@@ -23,11 +23,11 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 dbContext.Command(
                     $"""
                     SELECT {Columns.Of<ProductSubAssemblyUsage>("u")}, {SubAssemblyReads.ColumnsWithRole}
-                    FROM ProductSubAssemblyUsages u
-                    JOIN SubAssemblies s ON s.Id = u.SubAssemblyId
+                    FROM product_sub_assembly_usages u
+                    JOIN sub_assemblies s ON s.id = u.sub_assembly_id
                     {SubAssemblyReads.RoleJoin}
                     WHERE {filter}
-                    ORDER BY u.ProductId, u.Id
+                    ORDER BY u.product_id, u.id
                     """,
                     parameters,
                     cancellationToken),
@@ -41,12 +41,12 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
 
     // The Ingredient comes with it: every add-in is priced from its BufferedCostPerBaseUnit on read.
     public Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductAsync(int productId, CancellationToken cancellationToken) =>
-        GetAddInsAsync("u.ProductId = @productId", new { productId }, cancellationToken);
+        GetAddInsAsync("u.product_id = @productId", new { productId }, cancellationToken);
 
     public async Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
         productIds.Count == 0
             ? []
-            : await GetAddInsAsync($"u.ProductId IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(productIds) }, cancellationToken);
+            : await GetAddInsAsync($"u.product_id IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(productIds) }, cancellationToken);
 
     private Task<IReadOnlyList<UsageAddInLine>> GetAddInsAsync(string filter, object parameters, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<UsageAddInLine>>(
@@ -54,11 +54,11 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 dbContext.Command(
                     $"""
                     SELECT {Columns.Of<UsageAddInLine>("l")}, {Columns.Of<RawMaterial>("i")}
-                    FROM UsageAddInLines l
-                    JOIN ProductSubAssemblyUsages u ON u.Id = l.UsageId
-                    JOIN RawMaterials i ON i.Id = l.IngredientId
+                    FROM usage_add_in_lines l
+                    JOIN product_sub_assembly_usages u ON u.id = l.usage_id
+                    JOIN raw_materials i ON i.id = l.ingredient_id
                     WHERE {filter}
-                    ORDER BY u.ProductId, l.SortOrder, l.Id
+                    ORDER BY u.product_id, l.sort_order, l.id
                     """,
                     parameters,
                     cancellationToken),
@@ -102,8 +102,8 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
         // A new sub-assembly has no id yet: a negative stand-in keeps it distinct from every other.
         ProductRules.EnsureValidUsages(
         [
-            .. recipe.New.Select((n, i) => (n.Id > 0 ? n.Id : -(i + 1), n.AuthoredValue, n.ShrinkagePercent)),
-            .. recipe.Linked.Select(l => (l.SubAssemblyId, l.AuthoredValue, l.ShrinkagePercent)),
+            .. recipe.New.Select((n, i) => (n.Id > 0 ? n.Id : -(i + 1), n.AuthoredValue)),
+            .. recipe.Linked.Select(l => (l.SubAssemblyId, l.AuthoredValue)),
         ]);
 
         // Read in the caller's transaction, so a product added or renamed by the same save is named as it now is.
@@ -264,7 +264,6 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 SubAssemblyId = subAssembly.Id,
                 AuthoredField = section.AuthoredField,
                 AuthoredValue = section.AuthoredValue,
-                ShrinkagePercent = section.ShrinkagePercent,
             });
         }
 
@@ -288,7 +287,6 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 SubAssemblyId = l.SubAssemblyId,
                 AuthoredField = l.AuthoredField,
                 AuthoredValue = l.AuthoredValue,
-                ShrinkagePercent = l.ShrinkagePercent,
             })),
         ];
 

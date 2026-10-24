@@ -9,7 +9,7 @@ namespace TinapayanRMS.Infrastructure.Repositories;
 public class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductCategoryRepository
 {
     public Task<IReadOnlyList<ProductCategory>> GetAllAsync(CancellationToken cancellationToken) =>
-        dbContextFactory.QueryAsync<ProductCategory>($"SELECT {Columns.Of<ProductCategory>("c")} FROM ProductCategories c ORDER BY c.Name", null, cancellationToken);
+        dbContextFactory.QueryAsync<ProductCategory>($"SELECT {Columns.Of<ProductCategory>("c")} FROM product_categories c ORDER BY c.name", null, cancellationToken);
 
     public async Task AddAsync(ProductCategory category, CancellationToken cancellationToken)
     {

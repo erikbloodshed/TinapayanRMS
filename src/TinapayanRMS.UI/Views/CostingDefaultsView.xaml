@@ -20,13 +20,13 @@
         -->
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <WrapPanel HorizontalAlignment="Left" VerticalAlignment="Top">
-                <!-- Where a new product goes, the five percentages as the Products screen's Costing tab labels them, a new section's shrinkage, then a new raw material's cost buffer -->
+                <!-- Where a new product goes, the five percentages as the Products screen's Costing tab labels them, the shop-wide wastage, then a new raw material's cost buffer -->
                 <Border Width="420" Style="{StaticResource CardStyle}" Margin="0,0,16,16" VerticalAlignment="Top">
                     <StackPanel>
                         <TextBlock Text="Costing Defaults" Style="{StaticResource SectionHeaderStyle}" />
                         <TextBlock Style="{StaticResource CaptionStyle}"
                                    Margin="0,0,0,12"
-                                   Text="Where a new product goes, what its costing starts with, what a new Recipe Structure section's shrinkage starts with, and what a new raw material's cost buffer starts with. Each keeps its own from its first Save: changing these doesn't change anything saved." />
+                                   Text="Where a new product goes, what its costing starts with, and what a new raw material's cost buffer starts with: each keeps its own from its first Save, so changing these doesn't change anything saved. Wastage % is different: every product is priced with it, so changing it reprices them all." />
 
                         <!-- One under another, each label on the left of its box (FormLabelStyle); the Auto column lines the boxes up -->
                         <Grid>
@@ -77,7 +77,7 @@
                                                       MinValue="0"
                                                       Value="{Binding EditingAdministrativePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                            <TextBlock Grid.Row="8" Text="Markup %" Style="{StaticResource FormLabelStyle}" ToolTip="On the base cost: materials, labor, overhead and administrative" />
+                            <TextBlock Grid.Row="8" Text="Markup %" Style="{StaticResource FormLabelStyle}" ToolTip="On the base cost: materials, wastage, labor, overhead and administrative" />
                             <syncfusion:DoubleTextBox Grid.Row="8"
                                                       Grid.Column="1"
                                                       MinValue="0"
@@ -89,13 +89,13 @@
                                                       MinValue="0"
                                                       Value="{Binding EditingVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                            <TextBlock Grid.Row="12" Text="Shrinkage %" Style="{StaticResource FormLabelStyle}" ToolTip="What a new Recipe Structure section's Shrinkage % starts at: the weight a batch loses being made" />
+                            <TextBlock Grid.Row="12" Text="Wastage %" Style="{StaticResource FormLabelStyle}" ToolTip="Every product's, not just new ones: what's lost making a product, as a cost on top of its sub-assemblies (ingredients). 3% adds ₱3 to ₱100 of ingredients. Packaging isn't wasted, so it's left out." />
                             <syncfusion:DoubleTextBox Grid.Row="12"
                                                       Grid.Column="1"
                                                       MinValue="0"
-                                                      MaxValue="99.99"
+                                                      MaxValue="100"
                                                       NumberDecimalDigits="2"
-                                                      Value="{Binding EditingShrinkagePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                      Value="{Binding EditingWastagePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Grid.Row="14" Text="Cost Buffer %" Style="{StaticResource FormLabelStyle}" ToolTip="What a new raw material's Cost Buffer % starts at: a cushion on top of its cost for price swings and waste" />
                             <syncfusion:DoubleTextBox Grid.Row="14"

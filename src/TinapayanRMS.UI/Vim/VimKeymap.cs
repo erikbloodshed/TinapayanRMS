@@ -128,6 +128,7 @@ public static class VimKeymap
         new("Ctrl+[", VimAction.None, VimContexts.Anywhere, "Esc, as in Vim"),
         new("Ctrl+N", VimAction.None, Controls | VimContexts.Table, "Down an open dropdown or suggestion list, as in Vim"),
         new("Ctrl+P", VimAction.None, Controls | VimContexts.Table, "Up an open dropdown or suggestion list, as in Vim"),
+        new("Ctrl+R =", VimAction.None, VimContexts.Field | VimContexts.Table, "While typing: work out a sum such as 5*(2+3), Enter types the answer"),
         new("f", VimAction.Hints, VimContexts.Anywhere, "Label what can be clicked; type a label to click it"),
         new("/", VimAction.Search, VimContexts.Anywhere, "Search the screen's list"),
         new("gt", VimAction.NextTab, VimContexts.Anywhere, "Next tab"),

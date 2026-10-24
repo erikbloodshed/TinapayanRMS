@@ -17,7 +17,7 @@ This manual is for the people who use the app day to day. It doesn't assume any 
 7. [Products](#7-products)
 8. [Printing recipes and costings](#8-printing-recipes-and-costings)
 9. [Reports](#9-reports)
-10. [What-If Prices](#10-what-if-prices)
+10. [Price Simulator](#10-price-simulator)
 11. [Production Plan](#11-production-plan)
 12. [How costs are worked out](#12-how-costs-are-worked-out)
 13. [How to…](#13-how-to)
@@ -69,9 +69,15 @@ Every ingredient has a **source**, which is set when it's created and can't be c
 
 A **cost buffer %** is a cushion on top of what a purchased material really costs. It covers price swings, waste and variation in yield.
 
-The **buffered cost** is the cost with that cushion on top. **Recipes and products are always costed at buffered costs.** To see what a product costs without the cushion, press **Unbuffered** in the Products header (see [The header](#the-header-1)).
+The **buffered cost** is the cost with that cushion on top. **Recipes and products are always costed at buffered costs.** To see what a product costs without the cushion, press **Unbuffered** in the Products header (see [The header](#the-header-1)), or on the Price Simulator (see [Buffered and unbuffered costs](#buffered-and-unbuffered-costs)).
 
 For a purchased material, the buffered cost is a **fixed amount**. A new brand price doesn't move it on its own. See [Cost buffer](#cost-buffer) for how to update it.
+
+### Wastage
+
+**Wastage %** is a cost allowance for what's lost making a product: dough left in the mixer, a filling that cooks down, a tray that burns. It's one figure for the whole shop, set in Settings → Costing Defaults (3% unless you change it there). Every product adds it to its costing as a percentage of its **sub-assemblies (ingredients) cost**: 3% of 100.00 of ingredients is 3.00 more. Packaging isn't wasted, so it's left out.
+
+Wastage is a cost, not lost weight. A batch's pieces share out the whole batch, and the wastage goes on the product's Costing tab. A composite product adds it once, on everything it holds, so its products' ingredients are never charged wastage twice.
 
 ### Sub-assemblies and roles
 
@@ -100,6 +106,7 @@ Other terms you'll see on a product:
 - **Stage**: every product is either in **Research and Development** (still being worked out) or in **Production** (made and sold). A new product goes in Production, unless you change that in Settings → Costing Defaults.
 - **Clone** and **Create Variant** start a new product from an existing one. See [Clone tab](#clone-tab).
 - **Scaling** works out the ingredients and packaging for any number of sellable units. See [Scaling tab](#scaling-tab).
+- **Versions**: each Save that changes a product's recipe or price is kept as a version you can compare with and go back to. See [History tab](#history-tab).
 
 ### Composite products
 
@@ -112,18 +119,18 @@ A **composite product** is made of two or more other products, such as a *Pasalu
 - A composite is always one sellable unit, so it has no **Quantity Required**.
 - You choose whether a product is a composite when you make it. That can't change once it's saved.
 
-### Piece size: weight per piece, yield and shrinkage
+### Piece size: weight per piece and yield
 
 For each sub-assembly in a product you say how much of the batch one piece takes. Type **either** figure, and the app works out the other:
 
-- **Weight/piece (g)**: what one finished piece weighs
+- **Weight/piece (g)**: how many grams of the batch one piece takes
 - **Yield (pcs)**: how many pieces one batch makes
 
-**Shrinkage %** is weight the batch loses while it's made, such as a dough baking off or a filling reducing. The pieces come out of what's left, the **final weight**. A section you add starts at the default shrinkage in Settings → Costing Defaults, 3% unless you change it there. Set it to 0 for a section that loses nothing.
+The pieces share out the whole batch: its **total weight**, the Grams column added up. What's lost making the product is costed as [wastage](#wastage), not taken off the batch.
 
 The figure you typed stays put. If the batch changes, the other figure is worked out again.
 
-A new section in a **product-owned** role, such as a Topping or a Filling, starts at a **Yield of 1**: one piece takes the whole batch. Its Weight/piece is then the final weight, which is the total of the Grams column when the shrinkage is 0, and it follows the lines as you type them and whenever you change them later. Type a weight per piece or a yield instead if the batch makes more than one piece. A section in any other role, and any section you link, starts with no piece size.
+A new section in a **product-owned** role, such as a Topping or a Filling, starts at a **Yield of 1**: one piece takes the whole batch. Its Weight/piece is then the total of the Grams column, and it follows the lines as you type them and whenever you change them later. Type a weight per piece or a yield instead if the batch makes more than one piece. A section in any other role, and any section you link, starts with no piece size.
 
 ### Baker's % and Absolute %
 
@@ -140,7 +147,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 
 ### The main window
 
-- **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports**, **Production Plan** and **What-If Prices**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
+- **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports**, **Production Plan** and **Price Simulator**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
 - **Tabs**: each screen opens in a tab along the top. The app starts with **Raw Materials**, **Sub-Assemblies** and **Products** open; open the others from the menu. A tab you close can be opened again from the menu. Each tab keeps its place, such as the record you were looking at and anything you haven't saved, until you close the app.
 - **Back and Forward** (the arrows at the top right, next to the minimize button, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, like a web browser.
 - Changes made on one tab show up on another tab the next time you switch to it.
@@ -159,7 +166,7 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 - **One Save saves the whole record**, including everything on its tabs. Until you press **Save**, nothing you type is stored.
 - **Undo** (**Ctrl+Z**) and **Redo** (**Ctrl+Y**) step back and forth through the changes you've made since opening the record.
 - **Revert**, on the Products screen only, puts the whole product back as it was last saved.
-- **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly or Packaging) can be typed into. Typing narrows the list to matching names and highlights the best match: the name you typed in full, or else the first name that starts with what you typed, or else the first that contains it. **Enter** or **Tab** picks the highlighted name, so "marg" and Enter picks Margarine. **Down** and **Up** move the highlight to the other names.
+- **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly or Packaging) can be typed into. Typing narrows the list to matching names and highlights the best match: the name you typed in full, or else the first name that starts with what you typed, or else the first that contains it. **Enter** or **Tab** picks the highlighted name, so "marg" and Enter picks Margarine. **Down** and **Up** move the highlight to the other names. Clicking or tabbing into a picker selects its text, so what you type replaces it. Click again to put the cursor where you click. A picker that can't be left empty, such as a raw material's **Type** or **Source**, shows its value again if you delete its text and move on.
 - **New** starts a blank record. **Delete** asks before deleting anything.
 - A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use. It also says when the app couldn't reach its database, or the database didn't answer in time. Nothing is saved then, and the screen keeps working: once the database answers again, try again, or pick the record again.
 - If something goes wrong that the app didn't expect, a message says what happened and that the app is still running, and the details go in the [log files](#14-troubleshooting-and-questions). Nothing you haven't saved is lost.
@@ -167,7 +174,9 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 ### Working in tables
 
 - Most tables are typed straight into. Click a cell and type. The empty row at the bottom adds a new line.
+- On that bottom row, **Tab** from its last cell adds the line, as **Enter** does, and opens the first cell of the next empty row, so you can type one line after another without reaching for the mouse.
 - Pickers inside tables, such as the ingredient or material pickers, suggest names as you type.
+- To change a line's ingredient, material or product, type over it. The line keeps what it had until you pick another, so its cost and the totals don't change while you type. Text that names nothing in the list leaves the line as it was, whether you press Esc, Tab, Enter or click away. To empty the cell, delete all its text.
 - **Drag a row**, by its left edge or any cell you aren't typing in, to change the order of recipe lines, bill of materials lines and packaging lines. The order is saved.
 - **Insert Line** puts a blank line in above the selected one, so you don't have to add it at the bottom and drag it up. The new line's Ingredient cell opens, ready to type. With no line selected, or the empty row at the bottom selected, the new line goes in at the bottom. You can also press **Insert** while the table has the cursor and you aren't typing in a cell. It's on the ingredient tables: a sub-assembly's lines on the Sub-Assemblies screen, and a product section's lines and add-ins (the add-ins button is **Insert Add-In**). A line you leave blank does no harm, because Save leaves it out. **Undo** or **Remove Line** takes it away.
 - **Remove Line** removes the selected line.
@@ -214,16 +223,29 @@ While a picker's list is open, **Ctrl+N** and **Ctrl+P** move down and up it, li
 - **r**: rename the list row, as the row's menu does.
 - **u**: undo. **Ctrl+R**: redo.
 
+**Working out a sum while you type**
+
+While you're typing in a table cell or a field (INSERT), press **Ctrl+R**, then **=**. A bar opens at the bottom of the window with an **=** in it. Type a sum and press **Enter**, and the answer goes into the cell, as if you'd typed it. For example, **5*(2+3)** types **25**.
+
+- Use **+** and **-**, **\*** to multiply, **/** to divide, **%** for the remainder, and brackets. Use a dot for decimals, as in **1.5**. Commas in figures such as **1,250** are fine.
+- Division keeps the decimals: **7/2** is 3.5.
+- The answer goes in where the cursor is, over any selected text, like typing does. When you click a cell, its whole value is selected, so the answer replaces it.
+- In a number cell or box, the answer is rounded to the number of decimals that cell or box takes. **20/3** in a cell that takes 2 decimals types 6.67.
+- **Ctrl+V** pastes into the sum, and **Backspace** takes the last character off it.
+- If the sum can't be worked out, for example **5*(2+3** with its closing bracket missing, the bar says why and stays open, so you can fix it. **Esc** closes the bar and leaves the cell as it was. Clicking anywhere closes it too.
+- After Tab or Enter has taken you to the next cell, Ctrl+R = works there too, and the answer starts that cell's typing.
+- Only the answer is kept, not the sum.
+
 **Commands**
 
-Type **:**, then a command, then **Enter**. A bar opens at the bottom of the window for it, and Esc closes it.
+Type **:**, then a command, then **Enter**. A bar opens at the bottom of the window for it, and Esc closes it. Enter closes it too and runs the command. If the command can't run, for example **:w** when there's nothing to save, the bar says why. That message goes away at your next key or click, or after a few seconds.
 
 - **:w** saves.
 - **:new** starts a new one.
 - **:delete** deletes the one open, asking first.
 - **:e** and a name opens the one whose name matches. For example, **:e pandesal** opens Pandesal on the Products screen.
 - **:revert** throws away a product's changes since the last Save.
-- **:raw**, **:sub**, **:products**, **:reports**, **:plan**, **:whatif** and **:print** switch screens.
+- **:raw**, **:sub**, **:products**, **:reports**, **:plan**, **:simulator** and **:print** switch screens.
 - **:settings** opens Settings.
 - **:help** lists every key.
 
@@ -241,7 +263,7 @@ On a new database, set things up in this order. Each step uses what the one befo
 2. **Material categories** (Settings → Material Categories): how raw materials are grouped, such as Flour, Dairy, Boxes and Ribbons. Each category is for either ingredients or packaging.
 3. **Product categories** (Settings → Product Categories): how products are grouped, such as Breads, Cakes and Pastries.
 4. **Roles** (Settings → Roles): the parts of a recipe. Dough, Filling, Topping, Inclusion, Finishing and Packaging are there from the start.
-5. **Costing defaults** (Settings → Costing Defaults): the stage a new product goes in, the labour, overhead, administrative, markup and VAT percentages that it starts with, the shrinkage a new recipe section starts with, and the cost buffer a new raw material starts with.
+5. **Costing defaults** (Settings → Costing Defaults): the stage a new product goes in, the labour, overhead, administrative, markup and VAT percentages that it starts with, the cost buffer a new raw material starts with, and the shop's wastage.
 6. **Raw materials**: every purchased ingredient and packaging material with its prices, then the made and linked ingredients.
 7. **Sub-assemblies**: the doughs, fillings and packaging sets shared by more than one product.
 8. **Products**.
@@ -278,7 +300,7 @@ Each role has:
 - **Order**: where the role's sections go in a recipe. Lower numbers come first. A new role goes last. To change a role's place, pick it in the list and press **Move Up** or **Move Down** above the list. The roles are numbered 1, 2, 3… again after a move or a delete, so there are no gaps.
 - **Product-owned**: a section made in a product in this role stays that product's own. It's edited in the product's recipe instead of on the Sub-Assemblies screen, and other products can copy it but not link it. Turning this on or off for a role that's already used asks first, and says how many sub-assemblies will move.
   - These are also the only roles a composite product can have sections in. So Product-owned can't be turned off while a composite has a section in the role; the message names the composites. Take the section out there first.
-  - A section you make in a product in this role starts at a Yield of 1, so its Weight/piece is the whole batch (see [Piece size](#piece-size-weight-per-piece-yield-and-shrinkage)).
+  - A section you make in a product in this role starts at a Yield of 1, so its Weight/piece is the whole batch (see [Piece size](#piece-size-weight-per-piece-and-yield)).
 
 The **Packaging** role is special. Sub-assemblies in it are packaging sets. It can be renamed but not deleted, and it can't be product-owned.
 
@@ -291,14 +313,14 @@ A role can't be deleted while any sub-assembly uses it.
 Under it are the five percentages a **new** product's costing starts with:
 
 - **Labor %**, **Overhead %** and **Administrative %** (office, permits, bookkeeping): each is a percentage of the product's sub-assemblies (ingredients) cost.
-- **Markup %**: added on the base cost (materials, labour, overhead and administrative).
+- **Markup %**: added on the base cost (materials, wastage, labour, overhead and administrative).
 - **VAT %**: added on top of the marked-up price.
 
-Under them, **Shrinkage %** is what a section added to a product's Recipe Structure starts with: the weight its batch loses being made. It starts at 3%. It can be anything from 0 up to, but not including, 100.
+Under them, **Wastage %** is the shop's [wastage](#wastage): a percentage of every product's sub-assemblies (ingredients) cost, added to its costing. It starts at 3%, and can be anything from 0 to 100. Unlike the other figures here, it isn't where a new product starts: **every** product is priced with it, saved ones included, so changing it changes every product's costs and suggested price.
 
 Last, **Cost Buffer %** is what a new raw material's [cost buffer](#cost-buffer) starts with on the Raw Materials screen. It starts at 10%, and can be anything from 0 to 100. It only matters for a purchased material: a linked ingredient takes the buffer of the one it's linked to, and a made ingredient has none of its own.
 
-Each product keeps its own stage and percentages, each section its own shrinkage, and each raw material its own cost buffer, from its first Save. Changing the defaults doesn't change anything saved. A new product you haven't saved yet moves to the new stage, since you didn't pick one for it. A new raw material you haven't saved moves to the new cost buffer, unless you've typed one.
+Each product keeps its own stage and percentages, and each raw material its own cost buffer, from its first Save. Changing those defaults doesn't change anything saved. Changing the Wastage % does: it reprices every product. A new product you haven't saved yet moves to the new stage, since you didn't pick one for it. A new raw material you haven't saved moves to the new cost buffer, unless you've typed one.
 
 **Stored Costs**, to the right of the defaults, has a **Recalculate Costs** button. The app keeps every made and linked ingredient's cost, and every sub-assembly's total weight and cost, up to date as you save. You only need this button if the database was changed outside the app, for example by a script. It works all of those costs out again from what they're made of, and a green notice says how many were out of date. Purchased materials keep their prices.
 
@@ -324,10 +346,12 @@ Backups of all of the app's data: every raw material, price, sub-assembly, produ
 - **Restore** puts the backup picked in the list back, in place of all of the app's data. It asks first, saying when the backup was taken. Then it takes a safety backup of the data as it is, puts the backup back, and the app closes and opens again. Anything saved since the backup was taken is lost, and so is anything not yet saved on another screen.
   - A backup from an earlier version of TinapayanRMS is brought up to date as it's restored.
   - A backup from a later version is refused, and nothing changes. Update the app first.
-  - If anything goes wrong part-way, the safety backup is put back, so the data is as it was.
+  - A backup is checked and brought up to date before it takes the data's place. If it's refused, or anything goes wrong part-way, the data stays as it was.
 - **Restore from File…** restores a backup file from elsewhere, such as a USB stick or another computer. Pick the file, and it's copied into the folder and restored as above.
 
 A backup or a restore can take a little while. The tab says what it's doing until it's done.
+
+Backups are *.backup* files. The *.bak* files the app made before 21 October 2026, when it kept its data in SQL Server, aren't listed and can't be restored. Everything they held was carried over into the app's data on that day.
 
 ---
 
@@ -510,7 +534,7 @@ A sub-assembly can't be switched between a recipe role and the Packaging role on
 
 ## 7. Products
 
-The Products screen has the product list on the left. On the right are the selected product's header, its details, and four tabs: **Recipe**, **Costing**, **Scaling** and **Clone**.
+The Products screen has the product list on the left. On the right are the selected product's header, its details, and five tabs: **Recipe**, **Costing**, **Scaling**, **Clone** and **History**.
 
 ### The list
 
@@ -542,7 +566,7 @@ Each product's name starts with a small full-colour picture of what it is: a rou
 The header has the product's name and **New**, **Save**, **Undo**, **Redo**, **Revert**, **Print**, **Unbuffered** and **Delete**. **New** starts a product. The arrow beside it also offers **New composite product**. Below them are these figures, all **per sellable unit**:
 
 - **Material Cost**: sub-assemblies plus packaging. For a composite product, its products' recipe cost and its own sub-assemblies, plus its own packaging, and its products' packaging too when it includes theirs.
-- **Base Cost**: materials plus labour, overhead and administrative.
+- **Base Cost**: materials plus wastage, labour, overhead and administrative.
 - **Current Price**: what the shop charges now.
 - **Markup %**: what the current price actually earns on the base cost, with VAT taken out. Compare it with the markup you set on the Costing tab.
 - **Last Updated**.
@@ -560,7 +584,7 @@ Below the header are the fields you fill in:
 - It stays on when you open another product, until you switch it off or close the app. The app always starts on buffered costs.
 - **Print** uses whichever costs the screen shows (see [Printing](#8-printing-recipes-and-costings)).
 
-Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage and category are all kept. Until you restore it, no picker, report, print, What-If or Production Plan includes it.
+Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage and category are all kept. Until you restore it, no picker, report, print, Price Simulator or Production Plan includes it.
 
 - **Restore** (right-click it in the Deleted folder) puts it back in its folder and opens it. If its category was deleted in the meantime, it comes back in **Uncategorized**.
 - **Delete Permanently** asks first and can't be undone. The product's own sub-assemblies are deleted with it. Its linked sub-assemblies stay on the Sub-Assemblies screen. Deleting a composite product leaves the products it holds as they are.
@@ -586,13 +610,11 @@ Each section's tab shows its form:
 - **Existing Sub-Assembly or Packaging** picker, when you're linking or copying.
 - **The lines table**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base**. Under it are **Insert Line**, **Remove Line** and the section's cost per piece.
 - **Batch parameters**:
-  - **Total weight**: the batch that goes in, including add-ins
-  - **Shrinkage %**
-  - **Final weight**: total weight less shrinkage
   - **Weight/piece (g)** and **Yield (pcs)**: type either one
+  - **Total weight**: the batch, including add-ins, which the pieces share out
 - **Cost/piece** and **Batch cost** tiles.
 
-You don't need a piece size to add a section or to save it. Its cost per piece reads 0 until you enter one. A new or copied section in a product-owned role already has one: a Yield of 1 (see [Piece size](#piece-size-weight-per-piece-yield-and-shrinkage)).
+You don't need a piece size to add a section or to save it. Its cost per piece reads 0 until you enter one. A new or copied section in a product-owned role already has one: a Yield of 1 (see [Piece size](#piece-size-weight-per-piece-and-yield)).
 
 A section's changes go into the recipe when you leave its tab, or when you press Save.
 
@@ -659,6 +681,7 @@ Under each metric is its share of the price. VAT has a percentage box only, with
 On the right, the **Costing Summary** lists each component with its amount and its **% of Price**:
 
 - **Sub-assemblies (ingredients)**, with each sub-assembly listed under it. For a composite product this row is **Products (ingredients)**, with each product and its quantity listed under it, such as *Ensaymada × 6*. When the composite has sections of its own, the row is **Products and sub-assemblies (ingredients)** and lists them after the products. Its Labor, Overhead and Admin are a percentage of that row.
+- **Wastage**, labelled with the shop's [Wastage %](#wastage): a percentage of the row above. It's set in Settings → Costing Defaults, not here.
 - **Packaging**. For a composite product that includes its products' packaging, this row is **Packaging (own and products')**.
 - **Labor**, **Overhead** and **Administrative**, each labelled with its percentage
 - **Subtotal (base cost)**
@@ -690,15 +713,62 @@ The Clone tab is shown for saved products only. Type a **New Product Name**, the
 - **Clone**: the new product links the same sub-assemblies at the same piece sizes, and gets its **own copy of the packaging**.
 - **Create Variant**: the same, except the packaging is **linked**, so the new product follows every change made to this one's packaging. Use this for a smaller or bigger version of the same product. For a boxed version, re-point its packaging at a packaging set.
 
-With both, the product's own sub-assemblies are copied to the new product. The category, Quantity Required, Current Price and costing percentages are copied too. The new product starts in Research and Development, and you can change its piece sizes.
+With both, the product's own sub-assemblies are copied to the new product. The category, Quantity Required, Current Price and costing percentages are copied too. The new product starts in Research and Development, and you can change its piece sizes. Its History tab starts with one version that says where it came from (see [History tab](#history-tab)).
 
 A composite product's clone or variant is a composite too, holding the same products at the same quantities. Its own sections are copied as any product's are.
+
+### History tab
+
+The History tab keeps a product's earlier versions, so you can see how its recipe and price changed and go back to an old one. It's shown for saved products only.
+
+**When a version is recorded.** Each **Save** that changes the product's recipe, packaging, costing percentages, Quantity Required or Current Price records a version. A Save that only renames the product, or changes its description or category, doesn't. Nor does a change in what its materials cost: that's what the **Today** columns show. The first time you save a product that has no versions yet, two are recorded: how it was before ("Before version history began") and how it is now.
+
+**Changes made from somewhere else are recorded too**, with a note that says where they came from:
+
+- Saving a sub-assembly on the **Sub-Assemblies** screen records a version of every product it changes ("House Dough changed on Sub-Assemblies"). The green notice names them: "House Dough was saved. A version was recorded for Cheese Roll and Pandesal."
+- Saving a product whose changes reach other products records a version of each of those too ("Changed when Cream Loaf Mini was saved"). That happens when you change the lines of a sub-assembly it shares with other products, or packaging another product links.
+- A product with no versions yet gets two, as on its own first Save: how it was before, and how it is now.
+
+**A clone or a variant starts with one version**, the product as it was made, noted with where it came from: "Cloned from Almond Cheese Bread, version 4" or "Variant of Almond Cheese Bread, version 4". The version number is there when the product it came from matched its latest version.
+
+**The table** lists the versions, newest first:
+
+| Column | What it shows |
+|---|---|
+| Version | 1 for the first, then 2, 3 and so on. |
+| Saved | When the Save was made. |
+| Note | Anything you want to remember about it, such as "Cheaper butter". Click the cell and type; it's saved when you leave the cell, up to 200 characters. |
+| Base Cost Then, Suggested Price Then | What the product cost, and the price it worked out, when it was saved. |
+| Base Cost Today, Suggested Price Today | The same recipe at what its materials cost now. |
+| Current Price | The price you charged then. |
+
+The figures follow the screen's buffered or unbuffered costs, as the Costing tab does.
+
+**Changes.** Pick a version to see what changed in it, one line each, such as "Dough: Bread Flour 500 g → 450 g", "Packaging: Paper Bag added, 1 pc" or "Markup %: 30 → 35". Use **Compare With** to choose what it's compared with:
+
+- **The version before it**: what that Save changed.
+- **The product as saved now**: everything that's different between that version and today's recipe.
+- **Any other version**, listed by number and date, such as "Version 2, Oct 17, 2026, 8:03 AM": everything that's different between the two. The list always reads from the older one to the newer one, whichever of the two you picked in the table.
+
+**Cost Over Time**, beside the changes, is a chart of each version's **Base Cost**, **Suggested Price** and **Current Price** when it was saved, oldest on the left (V1, V2, and so on). Point at a dot to see its figure. A version with no Current Price leaves a gap in that line. The chart appears once a product has two versions, and follows the screen's buffered or unbuffered costs.
+
+**Print Version** shows the picked version's whole recipe in the **Print** tab: every section with its ingredients, the packaging and the costing, at what its materials cost when it was saved. The title says which version it is ("Almond Cheese Bread (Version 2)"), and the footer says it's from the version history. You can print it from there, or just read it. **Print** in the header does the same while the History tab is showing. Nothing in the form changes.
+
+**Restore** puts the picked version's sections, packaging, products (for a composite), costing percentages, Quantity Required and Current Price back into the form. The product's name, description, category and stage stay as they are. Nothing is saved yet: press **Save** to keep it, or **Undo** to put the form back as it was. Saving a restored version records it as a new version.
+
+- A section that was the product's own comes back with its old lines.
+- A section that links a sub-assembly links it again **as it is now**. Restore never changes a sub-assembly that other products may share. If its lines have changed since, the green notice says so.
+- A linked sub-assembly that has been deleted since comes back as a new section with the old lines.
+- Packaging links what it linked, if that still exists. Otherwise the lines it showed come back as the product's own.
+- If a material, role or product the version needs has been deleted, Restore refuses and names it, and nothing in the form changes.
+
+A product moved to the Deleted folder keeps its history. **Delete Permanently** deletes the history with it.
 
 ---
 
 ## 8. Printing recipes and costings
 
-Press **Print** in the Products header to open the **Print** tab. It shows a preview of the product's recipe and costing as the screen shows them, including changes you haven't saved yet. On the Scaling tab, it prints the scaled recipe instead (see [Printing a scaled recipe](#printing-a-scaled-recipe)).
+Press **Print** in the Products header to open the **Print** tab. It shows a preview of the product's recipe and costing as the screen shows them, including changes you haven't saved yet. On the Scaling tab, it prints the scaled recipe instead (see [Printing a scaled recipe](#printing-a-scaled-recipe)). On the History tab, it prints the version picked there, at its costs then (see [History tab](#history-tab)).
 
 - **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
 - **Print**: the drop-down chooses **This product**, the folder last asked for, or **All products**.
@@ -714,7 +784,7 @@ While the Products screen shows unbuffered costs, everything printed, a single p
 
 Close the Print tab with its ✕.
 
-A production plan prints from the **Production Plan** screen's own **Print**: see [Production Plan](#11-production-plan). A report of what price changes would do prints from **What-If Prices**: see [Printing a What-If report](#printing-a-what-if-report).
+A production plan prints from the **Production Plan** screen's own **Print**: see [Production Plan](#11-production-plan). A report of what price changes would do prints from the **Price Simulator**: see [Printing a Price Simulator report](#printing-a-price-simulator-report).
 
 ### Printing a scaled recipe
 
@@ -737,9 +807,10 @@ One row for every product, as it's saved:
 - **Product**, its **Stage** (Production or Research and Development) and its **Category**.
 - **Pieces**: how many pieces make one sellable unit (1 for a product sold by the piece). Every amount after it is for one sellable unit. Blank for a composite product, which is one unit made of other products.
 - **Ingredients Cost**: the recipe's cost, the **Sub-assemblies (ingredients)** row of the product's Costing tab. For a composite product, it's what its products bring (and its own sub-assemblies).
+- **Wastage Cost**: the Costing tab's **Wastage** row, the shop's Wastage % of the ingredients cost.
 - **Packaging Cost**: the **Packaging** row of the Costing tab. For a composite product that includes its products' packaging, theirs is counted too.
 - **Labor Cost**, **Overhead Cost** and **Admin Cost**: the Costing tab's Labor, Overhead and Admin metrics in pesos, each a percentage of the ingredients cost.
-- **Base Cost** and **Suggested Price**: as the product's Costing tab works them out. The base cost is the five costs before it added up, and the suggested price is the Costing tab's **Total Selling Price**.
+- **Base Cost** and **Suggested Price**: as the product's Costing tab works them out. The base cost is the six costs before it added up, and the suggested price is the Costing tab's **Total Selling Price**.
 - **Current Price**: what the shop charges now, as entered on the product. Blank if none is entered.
 - **Markup %**: what the current price earns on the base cost, as the product's header shows it. Blank without a current price.
 
@@ -782,9 +853,9 @@ If a file of that name is open in Excel, the app can't replace it. Close it in E
 
 ---
 
-## 10. What-If Prices
+## 10. Price Simulator
 
-**What-If Prices** shows what raw material price changes would do to every product, before they happen. Nothing on it is saved, and nothing else in the app changes: the changes you try last until you close the app.
+The **Price Simulator** shows what raw material price changes would do to every product, before they happen. It never changes a real price, and nothing else in the app changes. The changes you try last until you close the app, unless you save them as a scenario.
 
 ### Price Changes
 
@@ -792,25 +863,49 @@ The top table holds the changes to try, one row per raw material:
 
 - **Raw Material**: pick a purchased ingredient or packaging material. Type to search the list.
 - **Per** and **Current Price**: the unit it's bought in and what one costs now. These come from its dearest brand on **Cost Setup**, which is the price its cost comes from. A material with no price yet shows its base unit and no price.
-- **Change %** or **New Price**: type either one, and the other is worked out. For example, a sack of flour at 1,250 up **10**% shows a new price of 1,375. A material with no price yet needs its new price typed.
+- **New Price** or **Change %**: type either one, and the other is worked out. For example, a sack of flour at 1,250 up **10**% shows a new price of 1,375. A material with no price yet needs its new price typed.
 
 **Remove Line** takes the picked row away, and **Clear All** takes them all away, so every figure is today's again.
 
 A change moves the material's cost and its buffered cost by the same amount, as typing its Cost Buffer % again after a real price change would. It reaches every made ingredient using the material and every linked ingredient cut from it, as a real price change does. For example, a rise in eggs reaches egg white and the custard made with it.
 
+### Scenarios
+
+A scenario is the price changes in the table, saved under a name such as "Supplier A quote, Nov", so you can open them again another day. Scenarios are kept in the database, so everyone using the app sees them and backups include them.
+
+The **Scenarios** list, at the left of the Price Changes table, shows each scenario's **Saved** date and time and its **Name**, newest first. The open scenario is highlighted.
+
+- **Click a scenario** to open it. Its changes replace the table's. If the table has changes that aren't saved, you're asked first, and **No** leaves the table as it was.
+- **Save Scenario** asks for a name and saves the table's changes under it. To update the scenario that's open, press **Save Scenario** and keep its name. Typing the name of another scenario replaces that scenario's changes, after asking. Saving moves a scenario to the top of the list.
+- **Delete Scenario** deletes the open scenario, after asking. Its changes stay in the table.
+- **Clear All** empties the table and closes the open scenario.
+
+A scenario keeps what you typed. A **Change %** is applied to the price as it is when you open the scenario, and a **New Price** stays as you saved it. For example, flour saved at up **10**% and bought at 1,300 by the time you open it shows 1,430. Deleting a raw material takes it out of every scenario, and a material that's no longer bought is left out when the scenario opens.
+
 ### Products
 
-The lower table shows every product for one sellable unit, at buffered costs, now and with the changes:
+The lower table shows every product for one sellable unit, at buffered costs, now and with the changes. To see them at the materials' true costs, without their cost buffers, see [Buffered and unbuffered costs](#buffered-and-unbuffered-costs) below.
 
-- **Base Cost** and **What-If Base Cost**, and the **Change %** between them.
-- **Suggested Price** and **What-If Suggested Price**: the Costing tab's Total Selling Price.
-- **Markup %** and **What-If Markup %**: what the product's current price earns, now and with the changes. Blank for a product with no current price.
+- **Raw Material Cost** and **Simulated Raw Material Cost**, and the **Change %** between them: the ingredients and packaging, before wastage, labor, overhead and administrative. This is the Products screen's **Material Cost**.
+- **Base Cost** and **Simulated Base Cost**, and the **Change %** between them.
+- **Suggested Price** and **Simulated Suggested Price**: the Costing tab's Total Selling Price.
+- **Current Price**: what you charge now, VAT included, as entered on **Products**. Blank when none is entered.
+- **Markup %** and **Simulated Markup %**: what the product's current price earns, now and with the changes. Blank for a product with no current price.
+- **Price to Keep Markup**: the price that earns today's **Markup %** with the changes. It moves with the base cost: a base cost up 5% gives a price 5% higher. A product no change reaches keeps its current price. Blank for a product with no current price. The figure isn't rounded, so round it to a price you'd charge.
 
-A composite product moves with the products it holds. Tick **Only affected products** to hide the products no change reaches. Sort by **What-If Markup %** to see which products would earn the least. Filter by product or category from the funnel in its heading, and double-click a product to open it.
+A composite product moves with the products it holds. Tick **Only affected products** to hide the products no change reaches. Sort by **Simulated Markup %** to see which products would earn the least. Filter by product or category from the funnel in its heading, and double-click a product to open it.
 
 **Export to Excel** saves the products as the table shows them, and the price changes, on two sheets of one workbook.
 
-### Printing a What-If report
+### Buffered and unbuffered costs
+
+The figures start at the materials' buffered costs, as everywhere else in the app. **Unbuffered**, at the top of the **Products** table, switches every figure, now and simulated, to the materials' true costs. An **Unbuffered costs** badge then appears next to the **Products** heading, and the button reads **Buffered**, which switches back. It works the same way as the **Unbuffered** button on the Products screen.
+
+- A price change moves a material's true cost and its buffered cost by the same percent, so a 10% rise in flour is a 10% rise either way.
+- **Print Report** and **Export to Excel** follow the switch. Each page of an unbuffered report says **Unbuffered costs**. The workbook is named **Price Simulator (Unbuffered)**, with a **Products (Unbuffered)** sheet.
+- Nothing is saved. A scenario doesn't remember the switch, switching doesn't count as a change to the open scenario, and the screen starts on buffered costs each time you open the app.
+
+### Printing a Price Simulator report
 
 **Print Report** opens a print preview with each product's recipe and costing at the new prices, next to today's figures. Print it, or save it as a PDF with **Microsoft Print to PDF**.
 
@@ -819,41 +914,61 @@ To print only some products, click one in the **Products** table, or several wit
 - **Selected products**: only the ones you picked. The preview opens on this choice when you've picked any.
 - **All products shown**: every product the table shows, with **Only affected products** and the column filters applied, in the table's order.
 
-The first page lists the **Price Changes** tried, then every product with its **Base Cost**, **What-If Base Cost**, **Change %** and the page it starts on. Each product then starts on a new page, with:
+The first page lists the **Price Changes** tried, then every product with its **Base Cost**, **Simulated Base Cost**, **Change %** and the page it starts on. Each product then starts on a new page, with:
 
 - **Price Changes Applied**: the changes that reach the product. That includes changes reaching it through a made or linked ingredient, or through the products a composite holds. A product no change reaches says so.
 - **Recipe**: each sub-assembly's ingredients and the packaging, at the new prices. A line a change moves is in the accent colour, with what it costs today in the **Cost Now** column.
-- **Costing**: the Base Cost, Suggested Price and Markup at Current Price with the changes, with today's figure under each. The breakdown has **Now**, **What-If** and **Change** columns for every part, up to the Total Selling Price.
+- **Costing**: the Base Cost, Suggested Price and Markup at Current Price with the changes, with today's figure under each. Under the **Current Price** of a product a change reaches is the price to keep today's markup, such as **To keep markup 61.28**. The breakdown has **Now**, **Simulated** and **Change** columns for every part, up to the Total Selling Price.
 
 **Include** chooses **Recipe**, **Costing** or both. Without the costing, the report prints the recipes with no costs and no price changes.
 
 ## 11. Production Plan
 
-**Production Plan** works out what to make and what to buy for a day's or a week's baking.
+**Production Plan** works out what to make and what to buy for a day's or a week's baking, and what it sells for.
+
+### Saved plans
+
+At the top left, **Saved Plans** lists the plans saved under a name, such as *Saturday* or *Fiesta order*, newest first.
+
+- **Save Plan** asks for a name and saves the products in the plan, and whether it's in half batches. With a saved plan open, the name starts as its own, so saving again updates it. Saving under another plan's name asks first, then replaces that plan.
+- Click a plan in the list to open it. Its products replace the ones in the table. If the table holds a plan that isn't saved, you're asked first. A product deleted since the plan was saved is left out, and a message says so.
+- **Delete Plan** deletes the open plan, after asking. Its products stay in the table.
+
+Saved plans are kept in the database, so everyone using the app on this computer sees them, and they're in every backup. A product deleted for good is taken out of every saved plan.
 
 ### The plan
 
-On the left, the **Plan** table lists the products to make:
+Under it, the **Plan** table lists the products to make:
 
 - **Product**: pick one. Type to search the list. Products in Research and Development can be planned too.
 - **Units**: how many sellable units to make. That's pieces for a product sold by the piece, or boxes for a Box of 8.
 - **Pieces**: what the units come to. A composite product shows none, since it's one unit of other products.
+- **Sales**: what the units sell for, at the product's **Current Price**, with VAT.
+- **Profit**: what they earn over the product's base cost (its ingredients, packaging, wastage, labor, overhead and administrative), once the VAT is taken out.
 
-A product listed twice is made once, its units added together. **Remove Line** takes the picked line out, and **Clear Plan** empties the table.
+Under the table are the plan's total **Sales**, **Profit** and **Profit Margin** (the profit as a share of the sales before VAT, as on the Products screen's Costing tab). A product with no Current Price is counted at the selling price its costing works out, and a note in orange names it.
 
-The plan is kept for you on this computer. It's there again the next time you open the app, worked out from the products and prices as they are then. A product deleted since is left out.
+A product listed twice is made once, its units added together. **Remove Line** takes the picked line out, and **Clear Plan** empties the table and closes the open saved plan.
+
+The Mixing Sheet and the Purchase Requisition change as you type. A new line on the table's bottom row counts as soon as its product and units are in, before you leave the row. Without Vim keys, press **Esc** twice to throw the new line away, and the tables go back to how they were. With Vim keys on, Esc keeps it, as it keeps whatever you typed in a cell.
+The plan in the table is kept for you on this computer, with the saved plan you have open. It's there again the next time you open the app, worked out from the products and prices as they are then. A product deleted since is left out.
 
 ### Mixing Sheet
 
 Each mix to make, in whole batches:
 
 - **Mix**: the sub-assembly, such as *Sweet Dough*, or a product's own section, such as *Ube Roll Filling*.
-- **For**: the products it's for, and how many pieces each takes from it.
-- **Batches** and **Weight (g)**: the whole batches to make, and what they weigh before baking.
+- **For**: the products it's for, and how many pieces each takes from it. A row grows to show the whole list when it runs to more than one line.
+- **Batches** and **Weight (g)**: the batches to make, and what they weigh before baking.
+- **Spare**: the batches are rounded up, so they make more than the plan needs. Spare is how many more pieces that is, such as **30 pcs**. For a mix shared by several products it says how many more of each, such as *Ube Roll 30 pcs or Cheese Roll 25 pcs*: it's the same dough either way.
+
+Click the arrow at the start of a row to open it and see what goes into the mix: each ingredient, its grams **Per Batch**, and the **Total (g)** for all the batches. A row stays open while you change the plan.
+
+Tick **Half batches** at the top when the kitchen can mix half a batch. Each mix is then rounded up to the next half batch instead of a whole one: 1.2 batches are 1.5, not 2. The tick is kept with the plan, and saved with a saved plan.
 
 Products sharing a sub-assembly share its batches: two products needing 0.4 of a batch each make 1 batch between them, not 2. A product that adds its own add-ins to a linked recipe needs batches with the add-ins in, so that's a mix of its own, its name followed by the add-ins.
 
-A made ingredient the mixes use, such as a syrup, is listed under the mixes with the grams to prepare. A composite product makes the products it holds, times how many of each it holds.
+A made ingredient the mixes use, such as a syrup, is listed under the mixes with the grams to prepare. Open its row to see what it's made from, in grams. A composite product makes the products it holds, times how many of each it holds.
 
 Under the table, a note in orange says what couldn't be planned, such as a section with no weight per piece or yield yet.
 
@@ -862,14 +977,17 @@ Under the table, a note in orange says what couldn't be planned, such as a secti
 Everything to buy for the plan, ingredients first, then packaging:
 
 - **Needed**, in the material's base unit (grams for an ingredient).
+- **Cost**: what the amount needed costs, at buffered costs.
 - **Buy** and **Per**: whole units to buy, in the unit of its dearest brand price, such as **2** *sack*. It's rounded up. A material with no price yet shows no Buy.
-- **Cost**: what the amount needed costs, at buffered costs. **Total Cost** is at the top.
+- **Buy Cost**: what the whole units to buy cost at that brand's price: the money to take to the market.
+
+**Total Cost** and **Buy Cost** for the whole plan are at the top.
 
 A made ingredient is bought as what it's made of. Egg white and yolk are bought as the eggs they come from: 300 g of white and 120 g of yolk take the same eggs, so only the larger amount of eggs is listed, and any whole egg the plan uses comes on top. Packaging is listed for every sellable unit. A composite product's products bring theirs only when it includes its products' packaging.
 
 ### Printing and exporting
 
-**Print** opens the plan in a print preview: what to make, the mixing sheet and the purchase requisition. Clear **Costs** at the bottom to print it without the costs, for the kitchen or the market. **Export to Excel** saves the mixing sheet and the purchase requisition on two sheets of one workbook.
+**Print** opens the plan in a print preview: what to make with its sales and profit, the mixing sheet with each mix's ingredients and spare pieces, and the purchase requisition with its Buy Cost. A saved plan that's open is named in the title. Clear **Costs** at the bottom to print it without the sales, profit and costs, for the kitchen or the market. **Export to Excel** saves the plan, the mixing sheet and the purchase requisition on three sheets of one workbook. Each mix's ingredients are listed under it, grouped so Excel can fold them away.
 
 ---
 
@@ -906,42 +1024,43 @@ This happens as soon as you save. A product already open on another tab shows th
 
 ### A product's sections
 
-- Final weight = batch weight (including add-ins) × (1 − Shrinkage %).
-- Cost per piece = batch cost × weight per piece ÷ final weight. This is the same as batch cost ÷ yield.
+- Cost per piece = batch cost × weight per piece ÷ batch weight (including add-ins). This is the same as batch cost ÷ yield.
 
 ### The selling price (cost-plus)
 
 All figures below are per sellable unit.
 
 1. **Sub-assemblies** = the sum of the sections' cost per piece × Quantity Required.
-2. **Packaging** = the sum of the packaging lines. They're already per sellable unit.
-3. **Labor**, **Overhead** and **Administrative** = their percentage **of the sub-assemblies alone**. Packaging isn't included.
-4. **Base cost** = sub-assemblies + packaging + labour + overhead + administrative.
-5. **Price before VAT** = base cost × (1 + Markup %).
-6. **Selling price** = price before VAT × (1 + VAT %).
+2. **Wastage** = the shop's Wastage % (Settings → Costing Defaults) **of the sub-assemblies alone**.
+3. **Packaging** = the sum of the packaging lines. They're already per sellable unit.
+4. **Labor**, **Overhead** and **Administrative** = their percentage **of the sub-assemblies alone**. Packaging and wastage aren't included.
+5. **Base cost** = sub-assemblies + wastage + packaging + labour + overhead + administrative.
+6. **Price before VAT** = base cost × (1 + Markup %).
+7. **Selling price** = price before VAT × (1 + VAT %).
 
 **Markup % at the current price**, in the header, works backwards from the current price: (current price ÷ (1 + VAT %) − base cost) ÷ base cost.
 
 ### A worked example
 
-Say a product's sections cost **20.00** a piece, its packaging costs **2.00**, and it's sold by the piece. Its costing is Labor 25%, Overhead 10%, Administrative 5%, Markup 30% and VAT 12%.
+Say a product's sections cost **20.00** a piece, its packaging costs **2.00**, and it's sold by the piece. The shop's wastage is 3%, and the product's costing is Labor 25%, Overhead 10%, Administrative 5%, Markup 30% and VAT 12%.
 
 | Step | Working | Amount |
 |---|---|---|
 | Sub-assemblies | 20.00 × 1 | 20.00 |
+| Wastage | 3% of 20.00 | 0.60 |
 | Packaging | | 2.00 |
 | Labor | 25% of 20.00 | 5.00 |
 | Overhead | 10% of 20.00 | 2.00 |
 | Administrative | 5% of 20.00 | 1.00 |
-| **Base cost** | 20 + 2 + 5 + 2 + 1 | **30.00** |
-| Markup | 30% of 30.00 | 9.00 |
-| Price before VAT | | 39.00 |
-| VAT | 12% of 39.00 | 4.68 |
-| **Selling price** | | **43.68** |
+| **Base cost** | 20 + 0.60 + 2 + 5 + 2 + 1 | **30.60** |
+| Markup | 30% of 30.60 | 9.18 |
+| Price before VAT | | 39.78 |
+| VAT | 12% of 39.78 | 4.77 |
+| **Selling price** | | **44.55** |
 
-If the shop actually charges **45.00**, the header's Markup % is (45.00 ÷ 1.12 − 30.00) ÷ 30.00 = **33.93%**.
+If the shop actually charges **45.00**, the header's Markup % is (45.00 ÷ 1.12 − 30.60) ÷ 30.60 = **31.30%**.
 
-A **section's cost per piece**, for comparison: a 1,000 g dough costing 50.00, with 10% shrinkage, has a final weight of 900 g. At 30 g a piece it yields 30 pieces, and each piece costs 50.00 × 30 ÷ 900 = **1.6667**.
+A **section's cost per piece**, for comparison: a 1,000 g dough costing 50.00, at 30 g a piece, yields 33.33 pieces, and each piece costs 50.00 × 30 ÷ 1,000 = **1.50**.
 
 ### A composite product
 
@@ -949,7 +1068,7 @@ A composite product is priced like any other product, with its products in place
 
 1. **Products** = the sum of its lines. Each line is its Qty × the product's recipe cost for one sellable unit, which is the **Sub-assemblies** figure on that product's own Costing tab. The products' packaging isn't included here. The composite's own sections, such as a Topping, are added at their cost per piece, since one piece is one whole composite.
 2. **Packaging** = the composite's own packaging. With **Include each product's packaging** ticked, add each line's Qty × the product's **Packaging** figure on its own Costing tab. A composite held in another brings all of its packaging this way, its products' included if it includes theirs.
-3. **Labor**, **Overhead** and **Administrative** = their percentage of step 1: its products, and its own sections if it has any.
+3. **Wastage**, **Labor**, **Overhead** and **Administrative** = their percentage of step 1: its products, and its own sections if it has any. Each product brings its recipe cost before its wastage, so the wastage is added once, here, on the whole of step 1.
 4. Then the base cost, markup, VAT and selling price, as above.
 
 For example, a *Pasalubong Box* holds 6 Ensaymada, whose recipe costs **2.50** each, and 4 Cheese Rolls at **5.00** each. It has a gift box costing **12.00**, and the same percentages as the worked example above.
@@ -957,21 +1076,22 @@ For example, a *Pasalubong Box* holds 6 Ensaymada, whose recipe costs **2.50** e
 | Step | Working | Amount |
 |---|---|---|
 | Products | 6 × 2.50 + 4 × 5.00 | 35.00 |
+| Wastage | 3% of 35.00 | 1.05 |
 | Packaging | the gift box | 12.00 |
 | Labor | 25% of 35.00 | 8.75 |
 | Overhead | 10% of 35.00 | 3.50 |
 | Administrative | 5% of 35.00 | 1.75 |
-| **Base cost** | 35 + 12 + 8.75 + 3.50 + 1.75 | **61.00** |
-| Markup | 30% of 61.00 | 18.30 |
-| Price before VAT | | 79.30 |
-| VAT | 12% of 79.30 | 9.52 |
-| **Selling price** | | **88.82** |
+| **Base cost** | 35 + 1.05 + 12 + 8.75 + 3.50 + 1.75 | **62.05** |
+| Markup | 30% of 62.05 | 18.62 |
+| Price before VAT | | 80.67 |
+| VAT | 12% of 80.67 | 9.68 |
+| **Selling price** | | **90.34** |
 
 With the same percentages as its products and no packaging or sections of its own, a composite is priced at exactly what its products are priced at together. If its products have packaging of their own, that holds only with **Include each product's packaging** ticked.
 
-Now suppose each Ensaymada goes into the box in its own bag, costing **1.50**, and **Include each product's packaging** is ticked. Packaging becomes 12.00 + 6 × 1.50 = **21.00**. Labor, Overhead and Administrative stay at 8.75, 3.50 and 1.75, since packaging isn't part of step 1. So the base cost is 35 + 21 + 8.75 + 3.50 + 1.75 = **70.00**, the price before VAT is 70.00 × 1.30 = 91.00, and the selling price is 91.00 × 1.12 = **101.92**.
+Now suppose each Ensaymada goes into the box in its own bag, costing **1.50**, and **Include each product's packaging** is ticked. Packaging becomes 12.00 + 6 × 1.50 = **21.00**. Wastage, Labor, Overhead and Administrative stay at 1.05, 8.75, 3.50 and 1.75, since packaging isn't part of step 1. So the base cost is 35 + 1.05 + 21 + 8.75 + 3.50 + 1.75 = **71.05**, the price before VAT is 71.05 × 1.30 = 92.37, and the selling price is 92.37 × 1.12 = **103.45**.
 
-Give the same box an icing topping that costs **5.00** for one box, and step 1 becomes 35.00 + 5.00 = **40.00**. Labor, Overhead and Administrative are then taken of 40.00. A composite held in another composite brings its whole step 1, topping included.
+Give the same box an icing topping that costs **5.00** for one box, and step 1 becomes 35.00 + 5.00 = **40.00**. Wastage, Labor, Overhead and Administrative are then taken of 40.00. A composite held in another composite brings its whole step 1, topping included.
 
 ### Rounding
 
@@ -1008,6 +1128,13 @@ Open the product and compare the header's **Markup %**, which is what the curren
 
 Open the **Deleted** folder at the bottom of the Products list, right-click the product and choose **Restore**. It goes back to its folder as it was when you deleted it.
 
+### Go back to an earlier recipe
+
+1. Open the product and its **History** tab.
+2. Pick the version, and read its **Changes** to check it's the one you want. Set **Compare With** to **The product as saved now** to see everything that would change, or press **Print Version** to see its whole recipe.
+3. Press **Restore**. The version is now in the form, not yet saved.
+4. Check the Recipe and Costing tabs, then press **Save**. Or press **Undo** to put the form back.
+
 ### Move a product into production
 
 Right-click it in the Products list and choose **Promote to Production**, or drag it into a Production folder. Right-click a category folder and choose **Promote All to Production** to promote every product in that folder.
@@ -1015,17 +1142,21 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 ### Plan a day's baking
 
 1. Open **Production Plan** from the menu.
-2. In the **Plan** table, pick each product and type how many to make.
-3. Check the **Mixing Sheet** for how many batches of each mix to make, and read any orange note under it.
-4. Press **Print**, clear **Costs** for the kitchen, and print. Or press **Export to Excel** to send the purchase requisition on.
+2. For a plan you make often, click it in **Saved Plans**. Otherwise, in the **Plan** table, pick each product and type how many to make.
+3. Check the **Mixing Sheet** for how many batches of each mix to make, and read any orange note under it. Open a mix's row to see its ingredients, and look at **Spare**: if a mix makes 30 pieces more than you need, you can add up to 30 to the plan for no extra mixing. Tick **Half batches** if the kitchen can mix half a batch.
+4. Check **Sales** and **Profit** under the Plan table, and the **Buy Cost** of the Purchase Requisition: the money to take to the market.
+5. To keep the plan for another day, press **Save Plan** and name it.
+6. Press **Print**, clear **Costs** for the kitchen, and print. Or press **Export to Excel** to send the purchase requisition on.
 
 ### See what a price rise would do
 
-1. Open **What-If Prices** from the menu.
+1. Open the **Price Simulator** from the menu.
 2. In the top table, pick the raw material and type its **Change %**, such as **8**, or its **New Price**.
-3. Tick **Only affected products** and sort by **What-If Markup %**.
-4. To see why a product moves, Ctrl-click it and any others, press **Print Report**, and read each product's ingredients and costing, now and with the change. Print it, or save it as a PDF.
-5. To make the price real, record it on **Raw Materials** as in [Record a price increase](#record-a-price-increase). What-If Prices never changes a price itself.
+3. Tick **Only affected products** and sort by **Simulated Markup %**.
+4. Read **Price to Keep Markup** for what to charge to keep each product's markup. Change a product's **Current Price** on **Products**.
+5. To see why a product moves, Ctrl-click it and any others, press **Print Report**, and read each product's ingredients and costing, now and with the change. Print it, or save it as a PDF.
+6. To keep the changes for another day, press **Save Scenario** and name it. Click it in the **Scenarios** list to open it again.
+7. To make the price real, record it on **Raw Materials** as in [Record a price increase](#record-a-price-increase). The Price Simulator never changes a price itself.
 
 ### Back up to a USB stick
 
@@ -1097,7 +1228,7 @@ A composite product's own sections can only be in a role with **Product-owned** 
 The product picker leaves out the composite itself, and any composite that already holds it. Otherwise the composite would end up holding itself.
 
 **"Couldn't reach the database."**
-The app keeps its data in SQL Server Express on this computer, and it isn't answering. Check that the **SQL Server (SQLEXPRESS)** service is running in Windows' **Services**, then try again. The screen you're on keeps working: switch to another tab and back, or pick the record again, once the database is running.
+The app keeps its data in PostgreSQL on this computer, and it isn't answering. Check that the **postgresql-x64-18** service is running in Windows' **Services**, then try again. The screen you're on keeps working: switch to another tab and back, or pick the record again, once the database is running.
 
 **"The database didn't answer in time."** or **"The database was busy with another change."**
 Nothing was saved. Try again.
@@ -1111,17 +1242,23 @@ The file you're saving over is open, usually in Excel. Close it there and try ag
 **"Windows didn't allow the app to use that file or folder. Pick another one."**
 The folder is protected, such as a system folder. Save in Documents, on the Desktop or on a USB stick instead.
 
-**"Your Windows account isn't allowed to back up or restore the database."**
-Backups are taken by SQL Server, which checks the Windows account using the app. Ask whoever set up SQL Server to give your account the dbcreator role.
+**"Backups need PostgreSQL's pg_dump and pg_restore, and they weren't found on this computer."**
+Backups are taken by PostgreSQL's own tools, which come with PostgreSQL. Ask whoever set up the computer to install PostgreSQL's command-line tools, or to tell the app where they are.
 
-**"That file isn't a backup SQL Server can read, or it's damaged."** or **"That file isn't a backup of a whole database, so it can't be restored."**
+**"That file isn't a backup of a whole database, so it can't be restored."**
 The file picked isn't one of the app's backups, or it was damaged, for example by a USB stick pulled out while copying. Nothing was changed. Try another backup.
+
+**"That backup was made by a newer version of PostgreSQL than this computer has, so it can't be restored here."**
+The backup came from a computer with a newer PostgreSQL. Ask whoever set up this computer to update PostgreSQL, then restore it again. Nothing was changed.
 
 **"That backup was made by a later version of TinapayanRMS, so this version can't use it."**
 Update the app on this computer to the version the backup came from, then restore it again. Nothing was changed.
 
-**"The backups folder … was made by another Windows user, without the access SQL Server needs."**
-Ask whoever looks after the computer to give the two accounts the message names **Modify** on that folder, in the folder's **Properties**, **Security** tab.
+**"Another program kept using the database, so it couldn't be restored."**
+Something else, such as another copy of the app or pgAdmin, had the database open. Close it, then restore again. Nothing was changed.
+
+**"The backups folder … was made by another Windows user, without the access everyone needs."**
+Ask whoever looks after the computer to give **Users** **Modify** on that folder, in the folder's **Properties**, **Security** tab.
 
 **"A number is too large to save."**
 A figure has more digits than the app keeps, for example a price typed with too many zeros. Check what you typed.

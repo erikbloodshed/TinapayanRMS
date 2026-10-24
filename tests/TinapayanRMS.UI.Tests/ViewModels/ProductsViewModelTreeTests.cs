@@ -657,6 +657,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
             new ProductCategoryRepository(factory),
+            new ProductVersionRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),
             new ProductCategoryValidator(),

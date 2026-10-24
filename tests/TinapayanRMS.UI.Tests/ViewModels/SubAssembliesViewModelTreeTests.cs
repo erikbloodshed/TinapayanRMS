@@ -551,6 +551,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
             new SubAssemblyValidator(),
             new SubAssemblyRoleValidator(),
             viewStateStore ?? new InMemoryViewStateStore(),
+            VersionRecorders.Create(factory),
             new LoggerConfiguration().CreateLogger());
     }
 

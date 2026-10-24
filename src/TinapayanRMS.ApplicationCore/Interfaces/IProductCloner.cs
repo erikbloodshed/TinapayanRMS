@@ -4,7 +4,7 @@ public interface IProductCloner
 {
     /// <summary>
     /// Creates a new product named newProductName: a one-time snapshot of sourceProductId as saved.
-    /// Its recipe links the sub-assemblies the source links, at the same piece sizes and shrinkage, with
+    /// Its recipe links the sub-assemblies the source links, at the same piece sizes, with
     /// the source's add-ins as its own, as CreateVariantAsync does. Then its packaging lines as the source
     /// shows them (resolved through a packaging link, never inherited as a link; a packaging set the source
     /// links stays linked), and its costing parameters. A composite's clone is a composite holding the same products at

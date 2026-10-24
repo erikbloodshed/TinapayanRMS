@@ -105,6 +105,22 @@ public class CollectionMergeTests
         list.Select(r => r.Id).Should().Equal(2);
     }
 
+    [Fact]
+    public void Merging_by_a_key_rows_share_matches_them_in_order()
+    {
+        var firstDough = Row(1, "Dough", 10m, "g");
+        var secondDough = Row(2, "Dough", 20m, "g");
+        var list = new ObservableCollection<TestRow> { firstDough, secondDough };
+
+        var repricedSecond = Row(2, "Dough", 25m, "g");
+        list.MergeFrom([Row(1, "Dough", 10m, "g"), repricedSecond, Row(3, "Filling", 5m, "g")], r => r.Name);
+
+        list.Should().HaveCount(3);
+        list[0].Should().BeSameAs(firstDough);
+        list[1].Should().BeSameAs(repricedSecond);
+        list[2].Name.Should().Be("Filling");
+    }
+
     private static TestRow Row(int id, string name, decimal cost, string unitName) =>
         new() { Id = id, Name = name, Cost = cost, Unit = new TestUnit { Id = 100, Name = unitName } };
 

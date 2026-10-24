@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -13,6 +14,7 @@ using Syncfusion.UI.Xaml.TreeGrid;
 using Syncfusion.UI.Xaml.TreeView;
 using Syncfusion.UI.Xaml.TreeView.Engine;
 using Syncfusion.Windows.Controls.Input;
+using Syncfusion.Windows.Shared;
 using Syncfusion.Windows.Tools.Controls;
 using TinapayanRMS.UI.Controls;
 
@@ -68,6 +70,10 @@ public static class VimKeys
     // Set while a key is raised on a control, so the handlers here leave it alone.
     [ThreadStatic]
     private static bool _raising;
+
+    // Set by Ctrl+R in Insert until the next character, which names the register (only = is one).
+    [ThreadStatic]
+    private static bool _awaitingRegister;
 
     // Set while j or k moves the keyboard, so the field it lands on stays in Normal.
     [ThreadStatic]
@@ -138,7 +144,7 @@ public static class VimKeys
 
     private static void OnEnabledChanged()
     {
-        Sequence.Clear();
+        ClearPending();
         VimOverlay.Capturing?.CloseCapture();
 
         // Worked out afresh from wherever the keyboard is now, in Insert if it's in a field and Normal in a grid.
@@ -197,6 +203,22 @@ public static class VimKeys
 
         var focused = e.OriginalSource as DependencyObject;
         var place = Track(focused);
+
+        // The character after Ctrl+R names the register. = (the expression register) is the only one there is; any
+        // other is dropped, as Vim drops a register it hasn't got.
+        if (_awaitingRegister)
+        {
+            ClearPending();
+            e.Handled = true;
+            if (key == '=' && IsTyping(place) && sender is Window registerWindow)
+            {
+                VimOverlay.For(registerWindow)?.ShowExpressionLine(focused, place.Kind == PlaceKind.Grid ? place.Container as SfDataGrid : null);
+            }
+
+            ShowMode();
+            return;
+        }
+
         if (IsTyping(place))
         {
             return;
@@ -263,6 +285,20 @@ public static class VimKeys
 
         if (IsTyping(place))
         {
+            // Ctrl+R in Insert waits for a register's name, as in Vim: = then takes a sum (OnPreviewTextInput). A key
+            // that types nothing (an arrow, Enter, Tab) drops it and does what it does.
+            if (key == Key.R && modifiers == ModifierKeys.Control)
+            {
+                ClearPending();
+                _awaitingRegister = true;
+                State.Pending = '"';
+                e.Handled = true;
+            }
+            else if (_awaitingRegister && !IsModifier(key) && !TypesText(key, modifiers))
+            {
+                ClearPending();
+            }
+
             return;
         }
 
@@ -628,6 +664,87 @@ public static class VimKeys
     }
 
     /// <summary>
+    /// Types the answer to a Ctrl+R = sum into <paramref name="target"/>, the box the keyboard is in, at its caret and
+    /// over what's selected, as typing it would. A grid in Insert between cells (after Tab or Enter) has no box yet, so
+    /// its current cell's edit is begun first, as a digit typed there would. Null when it's typed, otherwise why not.
+    /// </summary>
+    internal static string? TypeAnswer(DependencyObject? target, SfDataGrid? grid, decimal answer)
+    {
+        if (target is TextBoxBase box && (grid is null || IsEditing(grid)))
+        {
+            TypeInto(box, answer);
+            return null;
+        }
+
+        if (grid?.SelectionController?.CurrentCellManager is not { HasCurrentCell: true } cells)
+        {
+            return "Ctrl+R = types its answer into a cell or a box being typed into.";
+        }
+
+        // GridCellEditing's refusals still hold: a cell that can't be typed into begins no edit.
+        if (!IsEditing(grid) && !cells.BeginEdit())
+        {
+            return "This cell can't be typed into.";
+        }
+
+        // The cell's editor takes the keyboard once it has loaded, which is after this.
+        grid.Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+        {
+            if (Keyboard.FocusedElement is TextBoxBase editor && VisualTreeWalk.IsWithin(grid, editor))
+            {
+                TypeInto(editor, answer);
+            }
+        });
+        return null;
+    }
+
+    /// <summary>
+    /// Types <paramref name="answer"/> into <paramref name="box"/> a character at a time, through the input manager, so
+    /// a number box takes it as it takes keys: its own mask, limits and decimals, and an ordinary edit for undo. In a
+    /// number box it's first rounded to the decimals the box takes, as the mask would otherwise cut it short.
+    /// </summary>
+    private static void TypeInto(TextBoxBase box, decimal answer)
+    {
+        var text = VimExpression.Format(answer, DecimalsTaken(box), DecimalSeparator(box));
+        _raising = true;
+        try
+        {
+            foreach (var character in text)
+            {
+                TextCompositionManager.StartComposition(new TextComposition(InputManager.Current, box, character.ToString()));
+            }
+        }
+        finally
+        {
+            _raising = false;
+        }
+    }
+
+    /// <summary>
+    /// How many decimals <paramref name="box"/> takes when typed into: what caps the typing (MaximumNumberDecimalDigits,
+    /// which NumericEditRenderer sets for a column that takes more than it shows), else what it shows. Null for a box of
+    /// text, or a number box that sets neither, which keeps every decimal of the answer.
+    /// </summary>
+    private static int? DecimalsTaken(TextBoxBase box) => box switch
+    {
+        DoubleTextBox number when number.MaximumNumberDecimalDigits >= 0 => number.MaximumNumberDecimalDigits,
+        DoubleTextBox number when number.NumberDecimalDigits >= 0 => number.NumberDecimalDigits,
+        IntegerTextBox => 0,
+        CurrencyTextBox money when money.MaximumCurrencyDecimalDigits >= 0 => money.MaximumCurrencyDecimalDigits,
+        CurrencyTextBox money when money.CurrencyDecimalDigits >= 0 => money.CurrencyDecimalDigits,
+        PercentTextBox percent when percent.PercentDecimalDigits >= 0 => percent.PercentDecimalDigits,
+        _ => null,
+    };
+
+    /// <summary>The decimal point <paramref name="box"/> types: a number box's culture's, a box of text's <c>.</c>.</summary>
+    private static string DecimalSeparator(TextBoxBase box) => box switch
+    {
+        DoubleTextBox number => (number.NumberFormat ?? number.Culture?.NumberFormat ?? CultureInfo.CurrentCulture.NumberFormat).NumberDecimalSeparator,
+        EditorBase => CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator,
+        _ => ".",
+    };
+
+    /// <summary>
     /// Raises <paramref name="key"/> on <paramref name="target"/> as a real press reaches it: PreviewKeyDown, then KeyDown
     /// unless the preview was handled, as WPF's KeyboardDevice does (PostProcessInput).
     /// </summary>
@@ -904,6 +1021,11 @@ public static class VimKeys
             {
                 case VimOverlay:
                     return new Place(PlaceKind.Overlay, null);
+
+                // A column filter's pop-up hangs from the funnel in the grid's heading, but isn't the grid: its search box is a
+                // field. The walk steps from the pop-up (the filter control's PART_FilterPopup) to the funnel, past the control.
+                case Popup { TemplatedParent: GridFilterControl }:
+                    return new Place(isText ? PlaceKind.Field : PlaceKind.Other, null);
                 case SfDataGrid grid:
                     return new Place(PlaceKind.Grid, grid);
                 case SfTreeView tree:
@@ -996,13 +1118,14 @@ public static class VimKeys
     /// <summary>Shows the mode the keys are in now in the title bar.</summary>
     internal static void ShowMode() =>
         State.Mode = VimOverlay.Capturing is { IsShowingHints: true } ? VimMode.Hints
-            : _place.Kind == PlaceKind.Overlay ? VimMode.Command
+            : _place.Kind == PlaceKind.Overlay || VimOverlay.Capturing is { IsShowingExpression: true } ? VimMode.Command
             : IsTyping(_place) ? VimMode.Insert
             : VimMode.Normal;
 
     private static bool ClearPending()
     {
-        var had = Sequence.Clear();
+        var had = Sequence.Clear() | _awaitingRegister;
+        _awaitingRegister = false;
         State.Pending = '\0';
         return had;
     }

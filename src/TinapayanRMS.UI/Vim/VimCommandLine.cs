@@ -44,7 +44,7 @@ public static class VimCommandLine
         new("products", 3, VimCommandKind.Screen, AppScreen.Products, false, ":products", "Products"),
         new("reports", 3, VimCommandKind.Screen, AppScreen.Reports, false, ":reports", "Reports"),
         new("plan", 2, VimCommandKind.Screen, AppScreen.ProductionPlan, false, ":plan", "Production Plan"),
-        new("whatif", 2, VimCommandKind.Screen, AppScreen.WhatIf, false, ":whatif", "What-If Prices"),
+        new("simulator", 2, VimCommandKind.Screen, AppScreen.PriceSimulator, false, ":simulator", "Price Simulator"),
         new("print", 3, VimCommandKind.Screen, AppScreen.Print, false, ":print", "Print what Products has open"),
         new("settings", 3, VimCommandKind.Settings, default, false, ":settings", "Settings"),
         new("help", 1, VimCommandKind.Help, default, false, ":help", "These keys"),

@@ -14,8 +14,8 @@ public class IngredientBomLineConfiguration : IEntityTypeConfiguration<Ingredien
             .HasForeignKey(l => l.IngredientId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Deleting a component that's in use is blocked instead — and SQL Server
-        // rejects two Cascade paths from the same table to the same parent table anyway.
+        // Deleting a component that's in use is blocked instead. (SQL Server, the database until 2026-10-21,
+        // also rejected two Cascade paths from the same table to the same parent table.)
         builder.HasOne(l => l.ComponentIngredient)
             .WithMany()
             .HasForeignKey(l => l.ComponentIngredientId)

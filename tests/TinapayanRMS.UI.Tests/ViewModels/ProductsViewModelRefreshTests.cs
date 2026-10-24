@@ -30,6 +30,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task Reloading_updates_usage_costs_changed_on_another_tab_and_keeps_the_selection_and_unsaved_costing()
     {
+        await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Filling");
         var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.24m);
         var (productId, _) = await AddProductWithSubAssemblyAsync("Ube pandesal", roleId, [(ubeId, 100m)], weightPerPiece: 10m);
@@ -111,7 +112,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task One_Save_writes_a_new_product_with_a_sub_assembly_made_in_it()
     {
-        await WithoutDefaultShrinkageAsync();
+        await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Filling");
         await AddIngredientAsync("Ube", costPerGram: 0.24m);
         var viewModel = CreateViewModel();
@@ -544,7 +545,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task A_typed_yield_is_kept_and_the_weight_per_piece_follows_the_batch()
     {
-        await WithoutDefaultShrinkageAsync();
+        await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var productId = await AddProductAsync("Pandesal");
@@ -577,74 +578,55 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task Shrinkage_cuts_the_yield_and_makes_every_piece_dearer()
+    public async Task The_pieces_share_out_the_whole_batch_and_the_wastage_goes_on_the_costing()
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
-        var (productId, _) = await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 1700m)], weightPerPiece: 60m);
+        await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 1700m)], weightPerPiece: 60m);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single();
         await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
 
         await viewModel.EditUsageCommand.Execute(viewModel.UsageEdits.Single());
-        viewModel.EditingUsageYield.Should().Be(28.33m, "1,700 g at 60 g a piece, with nothing lost baking it");
+        viewModel.EditingUsageYield.Should().Be(28.33m, "1,700 g at 60 g a piece: nothing is taken off the batch");
+        viewModel.UsageFormTotalWeightText.Should().Be("1,700 g");
 
-        // A tenth of the batch bakes off: the typed weight per piece is the finished piece, so the yield drops.
-        viewModel.EditingUsageShrinkagePercent = 10m;
-
-        viewModel.EditingUsageWeightPerPiece.Should().Be(60m, "the typed figure stays put");
-        viewModel.EditingUsageYield.Should().Be(25.5m, "the pieces come out of the 1,530 g the batch makes");
-        viewModel.UsageFormTotalWeightText.Should().Be("1,700 g", "the lines that go in are unchanged");
-        viewModel.UsageFormFinalWeightText.Should().Be("1,530 g");
-
-        await viewModel.SaveCommand.Execute();
-
-        viewModel.ErrorMessage.Should().BeNull();
-        await using var dbContext = CreateDbContext();
-        var usage = await dbContext.ProductSubAssemblyUsages.SingleAsync(u => u.ProductId == productId, Cancellation);
-        usage.ShrinkagePercent.Should().Be(10m);
-        usage.AuthoredValue.Should().Be(60m, "shrinkage is its own figure, not a piece size");
-
-        // The batch still costs ₱85 (1,700 g of flour at ₱0.05), now spread over 25.5 pieces instead of 28.33.
-        viewModel.UsageEdits.Single().CostPerPieceAt(CostBasis.Buffered).Should().BeApproximately(85m / 25.5m, 0.0001m);
+        // A piece takes ₱3 of the ₱85 batch (60 g of ₱0.05 flour). The shop-wide 3% wastage goes on the costing, on top.
+        viewModel.Costs.SubAssemblies.Should().Be(3m);
+        viewModel.Costs.WastagePercent.Should().Be(3m, "nothing is saved in Settings yet");
+        viewModel.Costs.Wastage.Should().Be(0.09m);
+        viewModel.Costs.BaseCost.Should().Be(3.09m);
     }
 
     /// <summary>
-    /// A section added starts at Settings' default shrinkage (3% until it's changed there), whichever way it comes in:
-    /// the shrinkage is this product's, even for a linked one. A form still at it counts as untouched, so another way
-    /// picked on the drop-down changes that form in place rather than adding it.
+    /// The wastage is the shop's, not the product's: one changed in Settings reprices a product already open on the
+    /// screen's next load, and isn't an edit of it.
     /// </summary>
     [Fact]
-    public async Task The_add_form_starts_at_the_default_shrinkage_from_Settings()
+    public async Task A_wastage_changed_in_Settings_reprices_the_open_product_on_the_next_load()
     {
-        await AddRoleAsync("Dough");
-        var productId = await AddProductAsync("Pandesal");
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 1700m)], weightPerPiece: 60m);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
-        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == productId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+        viewModel.Costs.Wastage.Should().Be(0.09m);
 
-        await viewModel.AddUsageCommand.Execute(UsageFormMode.New);
-        viewModel.EditingUsageShrinkagePercent.Should().Be(3m, "nothing is saved in Settings yet");
+        await SetWastageAsync(10m);
+        await viewModel.LoadCommand.Execute();
+        await WaitUntilSettledAsync(() => viewModel.Costs.WastagePercent == 10m, () => $"wastage={viewModel.Costs.WastagePercent}");
 
-        await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
-        viewModel.RecipeTabs.OfType<AddSubAssemblyRecipeTab>().Should().ContainSingle("a form showing only what it opened with is changed in place");
-        viewModel.UsageEdits.Should().BeEmpty("nothing was entered to add");
-        viewModel.EditingUsageShrinkagePercent.Should().Be(3m);
-
-        await new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(new CostingDefaults { ShrinkagePercent = 8m }, Cancellation);
-        var reopened = CreateViewModel();
-        await reopened.LoadCommand.Execute();
-        reopened.SelectedProduct = reopened.Products.Single(p => p.Id == productId);
-        await WaitUntilSettledAsync(() => reopened.SelectedProduct?.Id == productId, () => $"selected={reopened.SelectedProduct?.Id}");
-        await reopened.AddUsageCommand.Execute(UsageFormMode.Link);
-        reopened.EditingUsageShrinkagePercent.Should().Be(8m, "the default saved in Settings");
+        viewModel.Costs.Wastage.Should().Be(0.3m, "10% of the ₱3 a piece takes");
+        viewModel.Costs.BaseCost.Should().Be(3.3m);
+        viewModel.History.IsDirty.Should().BeFalse("the shop's wastage isn't an edit of the product");
     }
 
     /// <summary>
     /// A section made in a product-owned role is written for the one piece it goes into, so its form starts at a yield
-    /// of 1 where any other starts with no size: the weight per piece is the whole batch, less its shrinkage, and
+    /// of 1 where any other starts with no size: the weight per piece is the whole batch, and
     /// follows the lines as they're typed and after it's saved, being the yield that's kept.
     /// </summary>
     [Fact]
@@ -668,12 +650,12 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingUsageWeightPerPiece.Should().Be(0m, "there's no batch yet");
 
         viewModel.FormLines.Add(new IngredientLineRow { IngredientId = cheeseId, Grams = 20m });
-        viewModel.EditingUsageWeightPerPiece.Should().Be(19.4m, "the 20 g that go in, less the default 3% shrinkage");
+        viewModel.EditingUsageWeightPerPiece.Should().Be(20m, "the 20 g that go in");
         viewModel.UsageFormCostPerPieceText.Should().Be("8.00", "one piece takes the whole batch");
 
         viewModel.FormLines.Single().Grams = 30m;
         viewModel.EditingUsageYield.Should().Be(1m);
-        viewModel.EditingUsageWeightPerPiece.Should().Be(29.1m);
+        viewModel.EditingUsageWeightPerPiece.Should().Be(30m);
         viewModel.UsageFormCostPerPieceText.Should().Be("12.00");
 
         await viewModel.SaveCommand.Execute();
@@ -795,7 +777,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task A_linked_sub_assembly_follows_its_changes_and_Make_a_Copy_saves_a_new_one_the_product_links()
     {
-        await WithoutDefaultShrinkageAsync();
+        await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
@@ -933,7 +915,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             new SubAssembly { Name = "Rich Dough", RoleId = roleId }, [(flourId, 1000m), (butterId, 200m)], Cancellation);
         var productId = await AddProductAsync("Cream Loaf");
         await SaveRecipeAsync(productId, new RecipeDraft(
-            [], [new LinkedUsageDraft(houseId, UsageAuthoredField.WeightPerPiece, 30m) { AddIns = [(butterId, 100m), (ubeId, 50m)], ShrinkagePercent = 5m }]));
+            [], [new LinkedUsageDraft(houseId, UsageAuthoredField.WeightPerPiece, 30m) { AddIns = [(butterId, 100m), (ubeId, 50m)] }]));
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
@@ -952,7 +934,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var relinked = viewModel.UsageEdits.Single();
         relinked.IsLinked.Should().BeTrue();
         relinked.LinkedName.Should().Be("Rich Dough");
-        (relinked.AuthoredField, relinked.AuthoredValue, relinked.ShrinkagePercent).Should().Be((UsageAuthoredField.WeightPerPiece, 30m, 5m));
+        (relinked.AuthoredField, relinked.AuthoredValue).Should().Be((UsageAuthoredField.WeightPerPiece, 30m));
         relinked.AddIns.Select(a => a.Ingredient.Id).Should().Equal([ubeId], "Rich Dough has butter already, so that add-in goes");
         viewModel.SuccessMessage.Should().Be("Now linked to Rich Dough. Butter left the add-ins: Rich Dough already has it.");
         viewModel.EditingUsage.Should().BeSameAs(relinked, "its tab's form follows it");
@@ -1328,7 +1310,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task A_sub_assembly_goes_in_and_saves_before_its_piece_size_is_known()
     {
-        await WithoutDefaultShrinkageAsync();
+        await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var productId = await AddProductAsync("Pan de Sal");
@@ -1663,7 +1645,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task A_standalone_sub_assembly_is_offered_to_link_and_shows_where_its_from()
     {
-        await WithoutDefaultShrinkageAsync();
+        await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Glaze");
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
         var glazeId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
@@ -1760,6 +1742,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task The_current_price_shows_the_markup_it_earns_as_it_is_typed_and_Save_keeps_it()
     {
+        await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Filling");
         var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.25m);
         await AddProductWithSubAssemblyAsync("Ube pandesal", roleId, [(ubeId, 100m)], weightPerPiece: 10m);
@@ -1800,6 +1783,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task Each_metric_s_value_follows_its_percentage_and_a_value_typed_sets_the_percentage_Save_keeps()
     {
+        await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Filling");
         var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.2m);
         await AddProductWithSubAssemblyAsync("Ube pandesal", roleId, [(ubeId, 100m)], weightPerPiece: 10m);
@@ -2175,6 +2159,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
             new ProductCategoryRepository(factory),
+            new ProductVersionRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
@@ -2311,7 +2296,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task Add_ins_go_into_a_linked_usages_batch_and_its_cost_per_piece()
     {
-        await WithoutDefaultShrinkageAsync();
+        await WithoutWastageAsync();
         var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -2504,7 +2489,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task Make_a_Copy_folds_the_add_ins_into_the_new_sections_lines()
     {
-        await WithoutDefaultShrinkageAsync();
+        await WithoutWastageAsync();
         var (linkerId, _, ubeId, flourId) = await SeedLinkableDoughAsync();
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -2551,7 +2536,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     [Fact]
     public async Task A_repriced_add_in_ingredient_reaches_the_usage_on_a_refresh()
     {
-        await WithoutDefaultShrinkageAsync();
+        await WithoutWastageAsync();
         var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -61,8 +62,12 @@ public partial class App : Application
 
         try
         {
-            var licenseKey = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY")
-                ?? throw new InvalidOperationException("The SYNCFUSION_LICENSE_KEY environment variable is not set.");
+            // The build compiles the key in (see the UI project), so an installed app needs no environment variable.
+            var licenseKey = typeof(App).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                    .FirstOrDefault(a => a.Key == "SyncfusionLicenseKey")?.Value
+                ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY")
+                ?? throw new InvalidOperationException(
+                    "No Syncfusion licence key: it wasn't built into the app, and SYNCFUSION_LICENSE_KEY isn't set.");
 
             SyncfusionLicenseProvider.RegisterLicense(licenseKey);
         }
@@ -113,6 +118,12 @@ public partial class App : Application
 
         // Every picker that filters as you type highlights the name its text matches, for Enter or Tab to pick.
         PickerMatchHighlight.Register();
+
+        // Every picker that's typed into selects its text as the keyboard enters it, by a click or by Tab.
+        PickerSelectOnEntry.Register();
+
+        // A picker emptied while bound to a value that can't be empty shows that value again once the keyboard leaves.
+        PickerRestoresPick.Register();
 
         // Ctrl+Z and Ctrl+Y for the screen the cursor is on. It goes here, on every window, because Syncfusion's
         // number boxes take both keys for their own per-character undo and mark them handled on the way down.

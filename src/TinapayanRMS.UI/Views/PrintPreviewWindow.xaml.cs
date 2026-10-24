@@ -10,7 +10,7 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Views;
 
 /// <summary>
-/// A printout previewed and printed in a dialog (2026-10-03): the Production Plan's, or the What-If report (2026-10-06),
+/// A printout previewed and printed in a dialog (2026-10-03): the Production Plan's, or the Price Simulator report (2026-10-06),
 /// neither of which is the Products screen's, so they don't go to the main window's Print tab. The window is themed before
 /// the pane goes into it: a PrintPreview already in a window when SfSkinManager themes the window throws
 /// (PrintPreviewThemeOrderTests), so whoever opens this mustn't theme it again.
@@ -25,7 +25,7 @@ public partial class PrintPreviewWindow : AppWindow
 
     /// <summary>
     /// <paramref name="choices"/>, the first showing, and a Print dropdown to show another when there's more than one: the
-    /// What-If report's selected products and all those shown. They're all the same kind of printout, under one title.
+    /// Price Simulator report's selected products and all those shown. They're all the same kind of printout, under one title.
     /// </summary>
     public PrintPreviewWindow(IReadOnlyList<PrintChoice> choices, Theme theme)
     {
