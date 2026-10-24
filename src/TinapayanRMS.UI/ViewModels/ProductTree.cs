@@ -10,7 +10,7 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>A row of the Products list's tree (ProductTree): a folder, or a product in one.</summary>
-public abstract class ProductTreeNode : ReactiveObject
+public closed class ProductTreeNode : ReactiveObject
 {
     public abstract string Title { get; }
 
@@ -362,7 +362,7 @@ public sealed class ProductTree : IDisposable
             ProductFolderNode { IsStage: true } stage => (stage.Stage, product.CategoryId),
             ProductFolderNode folder => (folder.Stage, folder.CategoryId),
             ProductLeafNode leaf => (leaf.Product.Stage, leaf.Product.CategoryId),
-            _ => null,
+            null => null,
         };
 
         return place is { } to && (to.Stage != product.Stage || to.CategoryId != product.CategoryId)

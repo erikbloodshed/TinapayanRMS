@@ -2543,8 +2543,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         RenameCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(RenameCategoryAsync);
         DeleteCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(DeleteCategoryAsync);
         ExpandAllCommand = ReactiveCommand.Create<ProductFolderNode?>(ProductTree.ExpandAll);
-        PrintFolderCommand = ReactiveCommand.Create<ProductFolderNode>(folder => _printRequests.OnNext(PrintScope.Folder(folder)));
-        PrintAllCommand = ReactiveCommand.Create(() => _printRequests.OnNext(PrintScope.AllProducts));
+        PrintFolderCommand = ReactiveCommand.Create<ProductFolderNode>(folder => _printRequests.OnNext(new PrintScope.Folder(folder)));
+        PrintAllCommand = ReactiveCommand.Create(() => _printRequests.OnNext(new PrintScope.AllProducts()));
         CollapseAllCommand = ReactiveCommand.Create<ProductFolderNode?>(ProductTree.CollapseAll);
 
         OpenSubAssemblyCommand = ReactiveCommand.Create<int>(_subAssemblyOpenRequests.OnNext);
@@ -2716,7 +2716,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     ApplyOpenForm();
                 }
 
-                _printRequests.OnNext(PrintScope.ThisProduct);
+                _printRequests.OnNext(new PrintScope.ThisProduct());
                 return Task.CompletedTask;
             }));
 
@@ -3813,13 +3813,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     private static PackagingLineState CaptureLine(PackagingLineRow row) => new(row.PackagingMaterialId, row.UnitId, row.QtyPerUnit);
 
-    private RecipeTabChoice CaptureTabChoice() => SelectedRecipeTab switch
+    private RecipeTabChoice? CaptureTabChoice() => SelectedRecipeTab switch
     {
-        SubAssemblyRecipeTab tab => new RecipeTabChoice(RecipeTabKind.Usage, RecipeTabs.OfType<SubAssemblyRecipeTab>().ToList().IndexOf(tab)),
-        AddSubAssemblyRecipeTab => new RecipeTabChoice(RecipeTabKind.AddSubAssembly, -1),
-        PackagingRecipeTab => new RecipeTabChoice(RecipeTabKind.Packaging, -1),
-        ComponentsRecipeTab => new RecipeTabChoice(RecipeTabKind.Components, -1),
-        _ => new RecipeTabChoice(RecipeTabKind.None, -1),
+        SubAssemblyRecipeTab tab => new RecipeTabChoice.Usage(RecipeTabs.OfType<SubAssemblyRecipeTab>().ToList().IndexOf(tab)),
+        AddSubAssemblyRecipeTab => new RecipeTabChoice.AddSubAssembly(),
+        PackagingRecipeTab => new RecipeTabChoice.Packaging(),
+        ComponentsRecipeTab => new RecipeTabChoice.Components(),
+        null => null,
     };
 
     /// <summary>
@@ -3898,12 +3898,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
                 SelectedRecipeTab = snapshot.SelectedTab switch
                 {
-                    { Kind: RecipeTabKind.Usage, UsageIndex: var index } =>
-                        RecipeTabs.OfType<SubAssemblyRecipeTab>().ElementAtOrDefault(index),
-                    { Kind: RecipeTabKind.AddSubAssembly } => RecipeTabs.Contains(AddSubAssemblyTab) ? AddSubAssemblyTab : null,
-                    { Kind: RecipeTabKind.Packaging } => PackagingTabIfShown,
-                    { Kind: RecipeTabKind.Components } => ComponentsTabIfShown,
-                    _ => null,
+                    RecipeTabChoice.Usage(var index) => RecipeTabs.OfType<SubAssemblyRecipeTab>().ElementAtOrDefault(index),
+                    RecipeTabChoice.AddSubAssembly => RecipeTabs.Contains(AddSubAssemblyTab) ? AddSubAssemblyTab : null,
+                    RecipeTabChoice.Packaging => PackagingTabIfShown,
+                    RecipeTabChoice.Components => ComponentsTabIfShown,
+                    null => null,
                 };
             }
             finally
@@ -4606,9 +4605,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     IncludesComponentPackaging = content.IncludesComponentPackaging,
                     Costing = (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent, costing.VatPercent),
                     Usages = sections,
-                    SelectedTab = sections.Count > 0 ? new RecipeTabChoice(RecipeTabKind.Usage, 0)
-                        : product.IsComposite ? new RecipeTabChoice(RecipeTabKind.Components, -1)
-                        : new RecipeTabChoice(RecipeTabKind.Packaging, -1),
+                    SelectedTab = sections.Count > 0 ? new RecipeTabChoice.Usage(0)
+                        : product.IsComposite ? new RecipeTabChoice.Components()
+                        : new RecipeTabChoice.Packaging(),
                     HasAddSubAssemblyTab = false,
                     HasPackaging = link is not null || packagingLines.Count > 0,
                     PackagingLink = link,
@@ -5548,12 +5547,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
                 break;
 
-            default:
-                if (tab is not null)
-                {
-                    _lastRecipeContentTab = tab;
-                }
+            case PackagingRecipeTab or ComponentsRecipeTab:
+                _lastRecipeContentTab = tab;
+                break;
 
+            case null:
                 break;
         }
 

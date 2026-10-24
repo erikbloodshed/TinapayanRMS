@@ -316,17 +316,21 @@ public static class ProductionPlanBuilder
 
     private static string NoteOf(PlanIssue issue, IReadOnlyDictionary<int, SavedProduct> products, Func<int, string> nameOf)
     {
-        var product = issue.ProductId is { } productId && products.TryGetValue(productId, out var saved) ? saved : null;
-        var section = product?.Sections.FirstOrDefault(s => s.SubAssemblyId == issue.SubAssemblyId)?.SectionName ?? "a sub-assembly";
-        return issue.Kind switch
+        string? ProductName(int productId) => products.GetValueOrDefault(productId)?.Product.Name;
+
+        string SectionOf(int productId, int subAssemblyId) =>
+            products.GetValueOrDefault(productId)?.Sections.FirstOrDefault(s => s.SubAssemblyId == subAssemblyId)?.SectionName ?? "a sub-assembly";
+
+        return issue switch
         {
-            PlanIssueKind.NoPieceSize => $"{product?.Product.Name}: its {section} has no weight per piece or yield yet, so it isn't planned.",
-            PlanIssueKind.NoLines => $"{product?.Product.Name}: its {section} has no ingredients yet, so it isn't planned.",
-            PlanIssueKind.HoldsItself => $"{product?.Product.Name} holds itself through the products in it, so they aren't all planned.",
-            PlanIssueKind.MissingProduct => "A product in the plan is no longer there, so it isn't planned.",
-            PlanIssueKind.MadeWithoutBom => $"{nameOf(issue.IngredientId!.Value)} is made, but has no ingredients listed, so it's listed to buy as it is.",
-            PlanIssueKind.BrokenLink => $"{nameOf(issue.IngredientId!.Value)} isn't linked to what it's cut from, so it's listed to buy as it is.",
-            _ => issue.Kind.ToString(),
+            PlanIssue.NoPieceSize(var productId, var subAssemblyId) =>
+                $"{ProductName(productId)}: its {SectionOf(productId, subAssemblyId)} has no weight per piece or yield yet, so it isn't planned.",
+            PlanIssue.NoLines(var productId, var subAssemblyId) =>
+                $"{ProductName(productId)}: its {SectionOf(productId, subAssemblyId)} has no ingredients yet, so it isn't planned.",
+            PlanIssue.HoldsItself(var productId) => $"{ProductName(productId)} holds itself through the products in it, so they aren't all planned.",
+            PlanIssue.MissingProduct => "A product in the plan is no longer there, so it isn't planned.",
+            PlanIssue.MadeWithoutBom(var ingredientId) => $"{nameOf(ingredientId)} is made, but has no ingredients listed, so it's listed to buy as it is.",
+            PlanIssue.BrokenLink(var ingredientId) => $"{nameOf(ingredientId)} isn't linked to what it's cut from, so it's listed to buy as it is.",
         };
     }
 }

@@ -2,18 +2,21 @@
 
 namespace TinapayanRMS.UI.ViewModels;
 
-/// <summary>Which of the recipe's tabs was showing, by kind, so a tab rebuilt from scratch can be found again.</summary>
-public enum RecipeTabKind
+/// <summary>
+/// Which of the recipe's tabs was showing, by kind, so a tab rebuilt from scratch can be found again: one case per
+/// kind of <see cref="RecipeTab"/>, and null for none.
+/// </summary>
+public closed record RecipeTabChoice
 {
-    None,
-    Usage,
-    AddSubAssembly,
-    Packaging,
-    Components,
-}
+    /// <summary>A sub-assembly's tab, the <paramref name="Index"/>th of them.</summary>
+    public sealed record Usage(int Index) : RecipeTabChoice;
 
-/// <param name="UsageIndex">Which sub-assembly's tab, for <see cref="RecipeTabKind.Usage"/>; -1 otherwise.</param>
-public readonly record struct RecipeTabChoice(RecipeTabKind Kind, int UsageIndex);
+    public sealed record AddSubAssembly : RecipeTabChoice;
+
+    public sealed record Packaging : RecipeTabChoice;
+
+    public sealed record Components : RecipeTabChoice;
+}
 
 /// <summary>
 /// One ingredient line as <see cref="IngredientLineRow.Restore"/> can put it back. Its ingredient travels as
@@ -65,7 +68,7 @@ public sealed record ProductFormSnapshot
     /// change to take back, and the move that does change something — leaving a tab applies its form — is caught
     /// by the section it applied.
     /// </summary>
-    public required RecipeTabChoice SelectedTab { get; init; }
+    public required RecipeTabChoice? SelectedTab { get; init; }
     public required bool HasAddSubAssemblyTab { get; init; }
 
     // Packaging

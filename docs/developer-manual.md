@@ -1174,6 +1174,11 @@ Coverage comes from Microsoft's MTP coverage extension (see the [command referen
 ### Code
 
 - **Use modern C# 15 and .NET 11 idioms**: primary constructors (every repository has one), collection expressions, `record` and `record struct` for immutable shapes (drafts, snapshots, printouts), `required` members, file-scoped namespaces and pattern matching.
+  - **A fixed set of cases is a `closed` class or record** (C# 15): the list trees' nodes, `RecipeTab`, `PlanIssue`, `PrintScope`, `RecipeTabChoice`. Each case is a sealed record nested in it, with only its own data, in place of a `Kind` enum and fields that only some kinds use. A switch over one names every case, and `null` when null can come, never `_`, so a new case is a CS8509 warning wherever it's missed.
+  - **No `union` for anything XAML binds.** A union is a struct holding its case in `Value`, which bindings don't see through.
+  - **A closed record that's shown seals its `ToString`** (`PrintScope`), or each case reads "Folder { Label = … }".
+  - **`BeEquivalentTo` over a closed base type** needs `o => o.ComparingByValue<TBase>()`, since the base has no members to compare.
+  - **`[with(comparer), ..]`** for a collection made with a comparer or capacity, and **labeled `break`/`continue`** in place of a flag or `goto` out of nested loops (IDE0410).
 - **Nullable reference types are on everywhere.** Treat their warnings as real.
 - **Everything that touches the database is `async`** and takes a `CancellationToken`. ViewModels pass `CancellationToken.None`.
 - **A rule throws `BusinessRuleException` with a message written for the shop's staff**, because `RunSafelyAsync` shows it exactly as written. That goes for a repository's checks and a screen's own form checks too. A plain `InvalidOperationException` reads as a bug: EF Core and Npgsql throw those for failures.

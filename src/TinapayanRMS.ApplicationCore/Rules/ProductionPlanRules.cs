@@ -48,29 +48,27 @@ public sealed record PlannedMix(
     IReadOnlyList<PlannedUse> Uses,
     IReadOnlyList<(int IngredientId, decimal Grams)> Lines);
 
-public enum PlanIssueKind
+/// <summary>Something the plan couldn't work out, each kind with the product, sub-assembly or ingredient it's about.</summary>
+public closed record PlanIssue
 {
     /// <summary>A section with no weight per piece or yield typed yet: nothing of it is planned.</summary>
-    NoPieceSize,
+    public sealed record NoPieceSize(int ProductId, int SubAssemblyId) : PlanIssue;
 
     /// <summary>A section with no lines: nothing of it is planned.</summary>
-    NoLines,
+    public sealed record NoLines(int ProductId, int SubAssemblyId) : PlanIssue;
 
     /// <summary>A composite holding itself, through the products in it.</summary>
-    HoldsItself,
+    public sealed record HoldsItself(int ProductId) : PlanIssue;
 
     /// <summary>A product in the plan, or held by a composite in it, that isn't there any more.</summary>
-    MissingProduct,
+    public sealed record MissingProduct(int ProductId) : PlanIssue;
 
     /// <summary>A made ingredient with no BOM lines: it's listed to buy as it is.</summary>
-    MadeWithoutBom,
+    public sealed record MadeWithoutBom(int IngredientId) : PlanIssue;
 
     /// <summary>A linked ingredient without what it's cut from: it's listed to buy as it is.</summary>
-    BrokenLink,
+    public sealed record BrokenLink(int IngredientId) : PlanIssue;
 }
-
-/// <summary>Something the plan couldn't work out, with the product, sub-assembly or ingredient it's about.</summary>
-public sealed record PlanIssue(PlanIssueKind Kind, int? ProductId = null, int? SubAssemblyId = null, int? IngredientId = null);
 
 /// <summary>A production plan worked out: the mixes to make, the made ingredients to prepare, and what to buy.</summary>
 /// <param name="Prepared">Grams of each made ingredient the mixes take, which are made from what's bought.</param>
@@ -129,13 +127,13 @@ public static class ProductionPlanRules
         {
             if (holders.Contains(productId))
             {
-                issues.Add(new PlanIssue(PlanIssueKind.HoldsItself, productId));
+                issues.Add(new PlanIssue.HoldsItself(productId));
                 return;
             }
 
             if (!recipes.TryGetValue(productId, out var recipe))
             {
-                issues.Add(new PlanIssue(PlanIssueKind.MissingProduct, productId));
+                issues.Add(new PlanIssue.MissingProduct(productId));
                 return;
             }
 
@@ -153,7 +151,9 @@ public static class ProductionPlanRules
                 {
                     if (pieces > 0)
                     {
-                        issues.Add(new PlanIssue(batchWeight > 0 ? PlanIssueKind.NoPieceSize : PlanIssueKind.NoLines, productId, section.SubAssemblyId));
+                        issues.Add(batchWeight > 0
+                            ? new PlanIssue.NoPieceSize(productId, section.SubAssemblyId)
+                            : new PlanIssue.NoLines(productId, section.SubAssemblyId));
                     }
 
                     continue;
@@ -300,7 +300,7 @@ public static class ProductionPlanRules
                     break;
 
                 case { Source: RawMaterialSource.Made }:
-                    issues.Add(new PlanIssue(PlanIssueKind.MadeWithoutBom, IngredientId: id));
+                    issues.Add(new PlanIssue.MadeWithoutBom(id));
                     Add(purchases, id, total);
                     break;
 
@@ -315,7 +315,7 @@ public static class ProductionPlanRules
                     break;
 
                 case { Source: RawMaterialSource.Linked }:
-                    issues.Add(new PlanIssue(PlanIssueKind.BrokenLink, IngredientId: id));
+                    issues.Add(new PlanIssue.BrokenLink(id));
                     Add(purchases, id, total);
                     break;
 

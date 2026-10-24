@@ -23,12 +23,22 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
+    public void Each_choice_reads_as_its_label()
+    {
+        // What a screen reader says for the dropdown's choice. A record case's own ToString would say "Folder { Label = … }".
+        PrintScope[] scopes = [new PrintScope.ThisProduct(), new PrintScope.Folder(ProductFolderNode.ForStage(ProductStage.Production)), new PrintScope.AllProducts()];
+
+        scopes.Select(s => s.ToString()).Should().Equal(scopes.Select(s => s.Label));
+        scopes.Select(s => s.Label).Should().NotContain(label => label.Contains('{'));
+    }
+
+    [Fact]
     public async Task A_category_folder_prints_its_products_in_the_lists_order_under_its_title()
     {
         var (breads, _) = await AddCatalogueAsync();
         var tab = CreatePrintTab(await OpenProductsAsync());
 
-        tab.Pick(PrintScope.Folder(ProductFolderNode.ForCategory(ProductStage.Production, breads)));
+        tab.Pick(new PrintScope.Folder(ProductFolderNode.ForCategory(ProductStage.Production, breads)));
         await tab.LoadCommand.Execute();
 
         tab.PrintSet!.Title.Should().Be("Breads · Production");
@@ -43,11 +53,11 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         await AddCatalogueAsync();
         var tab = CreatePrintTab(await OpenProductsAsync());
 
-        tab.Pick(PrintScope.Folder(ProductFolderNode.Uncategorized(ProductStage.Production)));
+        tab.Pick(new PrintScope.Folder(ProductFolderNode.Uncategorized(ProductStage.Production)));
         await tab.LoadCommand.Execute();
         tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal("Loaf");
 
-        tab.Pick(PrintScope.Folder(ProductFolderNode.ForStage(ProductStage.ResearchAndDevelopment)));
+        tab.Pick(new PrintScope.Folder(ProductFolderNode.ForStage(ProductStage.ResearchAndDevelopment)));
         await tab.LoadCommand.Execute();
         tab.PrintSet!.Title.Should().Be("Research and Development");
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Test Bread");
@@ -59,7 +69,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         await AddCatalogueAsync();
         var tab = CreatePrintTab(await OpenProductsAsync());
 
-        tab.Pick(PrintScope.AllProducts);
+        tab.Pick(new PrintScope.AllProducts());
         await tab.LoadCommand.Execute();
 
         tab.PrintSet!.Title.Should().Be("All Products");
@@ -73,8 +83,8 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var (breads, cakes) = await AddCatalogueAsync();
         var tab = CreatePrintTab(await OpenProductsAsync());
 
-        tab.Pick(PrintScope.Folder(ProductFolderNode.ForCategory(ProductStage.Production, breads)));
-        tab.Pick(PrintScope.Folder(ProductFolderNode.ForCategory(ProductStage.Production, cakes)));
+        tab.Pick(new PrintScope.Folder(ProductFolderNode.ForCategory(ProductStage.Production, breads)));
+        tab.Pick(new PrintScope.Folder(ProductFolderNode.ForCategory(ProductStage.Production, cakes)));
 
         tab.Scopes.Select(s => s.Label).Should().Equal("This product", "Cakes · Production", "All products");
         tab.SelectedScope.Label.Should().Be("Cakes · Production");
@@ -88,13 +98,13 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         products.EditingCurrentPrice = 45m;
         var tab = CreatePrintTab(products);
 
-        tab.Pick(PrintScope.AllProducts);
+        tab.Pick(new PrintScope.AllProducts());
         await tab.LoadCommand.Execute();
 
         tab.PrintSet!.Products.Single(p => p.ProductName == "Cheese Roll").Costs.CurrentPrice.Should().BeNull("it isn't saved");
         tab.Note.Should().Be("Cheese Roll has unsaved changes on Products; it's printed as saved.");
 
-        tab.Pick(PrintScope.ThisProduct);
+        tab.Pick(new PrintScope.ThisProduct());
         await tab.LoadCommand.Execute();
 
         tab.PrintSet!.Title.Should().BeNull();
@@ -140,11 +150,11 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         await products.ToggleCostBasisCommand.Execute();
         var tab = CreatePrintTab(products);
 
-        tab.Pick(PrintScope.ThisProduct);
+        tab.Pick(new PrintScope.ThisProduct());
         await tab.LoadCommand.Execute();
         var screen = tab.PrintSet!.Products.Single();
 
-        tab.Pick(PrintScope.AllProducts);
+        tab.Pick(new PrintScope.AllProducts());
         await tab.LoadCommand.Execute();
         var saved = tab.PrintSet!.Products.Single();
 

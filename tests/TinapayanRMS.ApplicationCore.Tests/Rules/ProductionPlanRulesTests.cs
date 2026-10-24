@@ -110,8 +110,8 @@ public class ProductionPlanRulesTests
 
         plan.Mixes.Should().BeEmpty();
         plan.Issues.Should().Equal(
-            new PlanIssue(PlanIssueKind.NoPieceSize, 1, Dough),
-            new PlanIssue(PlanIssueKind.NoLines, 1, Filling));
+            new PlanIssue.NoPieceSize(1, Dough),
+            new PlanIssue.NoLines(1, Filling));
     }
 
     [Fact]
@@ -181,7 +181,8 @@ public class ProductionPlanRulesTests
             Array.Empty<(int Made, (int, decimal) Line)>().ToLookup(b => b.Made, b => b.Line));
 
         plan.Purchases.Should().Equal(new Dictionary<int, decimal> { [Syrup] = 100m, [EggWhite] = 50m });
-        plan.Issues.Should().BeEquivalentTo([new PlanIssue(PlanIssueKind.MadeWithoutBom, IngredientId: Syrup), new PlanIssue(PlanIssueKind.BrokenLink, IngredientId: EggWhite)]);
+        plan.Issues.Should().BeEquivalentTo<PlanIssue>(
+            [new PlanIssue.MadeWithoutBom(Syrup), new PlanIssue.BrokenLink(EggWhite)], o => o.ComparingByValue<PlanIssue>());
     }
 
     [Fact]
@@ -189,7 +190,7 @@ public class ProductionPlanRulesTests
     {
         var plan = Plan([(9, 1m), (2, 1m)], new() { [2] = new PlanRecipe(1, [], [], [(2, 1)], false) });
 
-        plan.Issues.Should().Equal(new PlanIssue(PlanIssueKind.MissingProduct, 9), new PlanIssue(PlanIssueKind.HoldsItself, 2));
+        plan.Issues.Should().Equal(new PlanIssue.MissingProduct(9), new PlanIssue.HoldsItself(2));
         plan.Mixes.Should().BeEmpty();
     }
 

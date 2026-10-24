@@ -7,7 +7,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// recipe order (after a composite's Products), then New Sub-Assembly while one is being added, then Packaging while
 /// the product has any.
 /// </summary>
-public abstract class RecipeTab : ReactiveObject
+public closed class RecipeTab : ReactiveObject
 {
     public abstract string Header { get; }
 
