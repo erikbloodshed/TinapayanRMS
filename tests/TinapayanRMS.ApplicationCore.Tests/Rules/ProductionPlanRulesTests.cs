@@ -38,7 +38,7 @@ public class ProductionPlanRulesTests
         var mix = plan.Mixes.Should().ContainSingle().Subject;
         mix.Batches.Should().Be(3m);
         mix.BatchWeight.Should().Be(1700m);
-        mix.Uses.Should().Equal(new PlannedUse(1, 85m));
+        mix.Uses.Should().Equal(new PlannedUse(1, 85m, 3m));
         plan.Purchases.Should().Equal(new Dictionary<int, decimal> { [Flour] = 5100m });
         plan.Issues.Should().BeEmpty();
     }
@@ -124,7 +124,7 @@ public class ProductionPlanRulesTests
         var plain = Plan([(2, 10m)], new() { [1] = single, [2] = box });
         var bagged = Plan([(2, 10m)], new() { [1] = single, [2] = boxWithBags });
 
-        plain.Mixes.Single().Uses.Should().Equal(new PlannedUse(1, 60m));
+        plain.Mixes.Single().Uses.Should().Equal(new PlannedUse(1, 60m, 0.6m));
         plain.Purchases.Should().ContainKey(Box).WhoseValue.Should().Be(10m);
         plain.Purchases.Should().NotContainKey(Bag);
         bagged.Purchases[Bag].Should().Be(60m);
@@ -191,6 +191,83 @@ public class ProductionPlanRulesTests
 
         plan.Issues.Should().Equal(new PlanIssue(PlanIssueKind.MissingProduct, 9), new PlanIssue(PlanIssueKind.HoldsItself, 2));
         plan.Mixes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_mix_lists_what_goes_into_a_batch_its_lines_then_its_add_ins()
+    {
+        var plan = Plan(
+            [(1, 5m)],
+            new() { [1] = Recipe(Section(Dough, [(Flour, 1000m), (Sugar, 100m)], weightPerPiece: 240m, addIns: [(Ube, 100m)])) });
+
+        plan.Mixes.Single().Lines.Should().Equal((Flour, 1000m), (Sugar, 100m), (Ube, 100m));
+    }
+
+    [Fact]
+    public void With_half_batches_a_mix_is_rounded_up_to_the_next_half_batch()
+    {
+        // 120 pieces of 10 g from a 1,000 g dough are 1.2 batches: 1.5 in half batches, where whole ones make 2.
+        var recipes = new Dictionary<int, PlanRecipe> { [1] = Recipe(Section(Dough, [(Flour, 1000m)], weightPerPiece: 10m)) };
+
+        var whole = ProductionPlanRules.Plan([(1, 120m)], recipes, Ingredients, Boms);
+        var half = ProductionPlanRules.Plan([(1, 120m)], recipes, Ingredients, Boms, halfBatches: true);
+
+        whole.Mixes.Single().Batches.Should().Be(2m);
+        half.Mixes.Single().Batches.Should().Be(1.5m);
+        half.Purchases[Flour].Should().Be(1500m);
+    }
+
+    [Fact]
+    public void The_batches_rounded_up_leave_spare_pieces_for_each_product_the_mix_is_for()
+    {
+        // 40 pieces of 10 g and 40 of 20 g from a 1,000 g dough are 1.2 batches between them: 2 are made, and the 800 g
+        // to spare are 80 more of the first or 40 more of the second.
+        var plan = Plan(
+            [(1, 40m), (2, 40m)],
+            new()
+            {
+                [1] = Recipe(Section(Dough, [(Flour, 1000m)], weightPerPiece: 10m)),
+                [2] = Recipe(Section(Dough, [(Flour, 1000m)], weightPerPiece: 20m)),
+            });
+
+        var mix = plan.Mixes.Single();
+        mix.Batches.Should().Be(2m);
+        ProductionPlanRules.SparePieces(mix, 1).Should().Be(80m);
+        ProductionPlanRules.SparePieces(mix, 2).Should().Be(40m);
+        ProductionPlanRules.SparePieces(mix, 3).Should().Be(0m, "the mix isn't for it");
+    }
+
+    [Fact]
+    public void Exact_batches_leave_nothing_spare_and_a_part_of_a_piece_isnt_one()
+    {
+        // 85 pieces at 60 g from 1,700 g are exactly 3 batches; 7 pieces at 350 g are 2.45 batches of 1,000 g, so 3 are made
+        // and the 550 g left are 1.57 pieces' worth: 1 piece.
+        var exact = Plan([(1, 85m)], new() { [1] = Recipe(Section(Dough, [(Flour, 1700m)], weightPerPiece: 60m)) });
+        var rounded = Plan([(1, 7m)], new() { [1] = Recipe(Section(Dough, [(Flour, 1000m)], weightPerPiece: 350m)) });
+
+        ProductionPlanRules.SparePieces(exact.Mixes.Single(), 1).Should().Be(0m);
+        ProductionPlanRules.SparePieces(rounded.Mixes.Single(), 1).Should().Be(1m);
+    }
+
+    [Fact]
+    public void A_made_ingredient_to_prepare_lists_its_bom_scaled_to_the_grams_to_prepare()
+    {
+        // 400 g of glaze takes 200 g of syrup and 200 g of egg white; 200 g of syrup takes 250 g of sugar.
+        var plan = Plan([(1, 1m)], new() { [1] = Recipe(Section(Filling, [(Glaze, 400m)], yield: 1m)) });
+
+        plan.PreparedLines[Glaze].Should().Equal((Syrup, 200m), (EggWhite, 200m));
+        plan.PreparedLines[Syrup].Should().Equal((Sugar, 250m));
+    }
+
+    [Fact]
+    public void A_lines_sales_are_its_units_at_the_price_and_its_profit_is_over_the_base_cost_once_vat_is_out()
+    {
+        // 10 at 56 with 12% VAT sell for 560, 500 before VAT; at a base cost of 40 they cost 400, so 100 is profit.
+        var sales = ProductionPlanRules.SalesOf(10m, 56m, 12m, 40m);
+
+        sales.Sales.Should().Be(560m);
+        sales.SalesBeforeVat.Should().Be(500m);
+        sales.Profit.Should().Be(100m);
     }
 
     private static ProductionPlan Plan(IReadOnlyList<(int, decimal)> orders, Dictionary<int, PlanRecipe> recipes) =>

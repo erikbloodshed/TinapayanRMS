@@ -83,6 +83,18 @@ public class RecipeScalingRulesTests
     }
 
     [Fact]
+    public void HalfBatches_rounds_up_to_the_next_half_batch()
+    {
+        RecipeScalingRules.HalfBatches(1.2m).Should().Be(1.5m);
+        RecipeScalingRules.HalfBatches(1.6m).Should().Be(2m);
+        RecipeScalingRules.HalfBatches(2.50001m).Should().Be(2.5m, "a hair over a half batch is decimal noise");
+        RecipeScalingRules.HalfBatches(0.00001m).Should().Be(0.5m, "but a need too small to survive that is still half a batch");
+        RecipeScalingRules.HalfBatches(0m).Should().Be(0m);
+        RecipeScalingRules.BatchesToMake(1.2m, halfBatches: false).Should().Be(2m);
+        RecipeScalingRules.BatchesToMake(1.2m, halfBatches: true).Should().Be(1.5m);
+    }
+
+    [Fact]
     public void UnitsToBuy_rounds_up_to_whole_purchase_units()
     {
         RecipeScalingRules.UnitsToBuy(30000m, 25000m).Should().Be(2m);

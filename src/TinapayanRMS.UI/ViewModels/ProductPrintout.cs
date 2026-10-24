@@ -276,4 +276,26 @@ public sealed record PrintedPlan(
     IReadOnlyList<MixRow> Mixes,
     IReadOnlyList<PurchaseRequisitionRow> Requisition,
     decimal TotalCost,
-    IReadOnlyList<string> Notes);
+    IReadOnlyList<string> Notes)
+{
+    /// <summary>The saved plan open in the table, which the title names; null when none is.</summary>
+    public string? PlanName { get; init; }
+
+    /// <summary>Its mixes are in half batches.</summary>
+    public bool HalfBatches { get; init; }
+
+    /// <summary>What the whole purchase units to buy cost, at their brands' prices.</summary>
+    public decimal TotalBuyCost { get; init; }
+
+    /// <summary>What the products to make sell for, with VAT.</summary>
+    public decimal TotalSales { get; init; }
+
+    /// <summary>What they earn over their base cost, VAT out.</summary>
+    public decimal TotalProfit { get; init; }
+
+    /// <summary>The profit as a percentage of the sales before VAT.</summary>
+    public decimal ProfitMarginPercent { get; init; }
+
+    /// <summary>Which products are counted at their worked-out selling price, having no Current Price; null when none are.</summary>
+    public string? SalesNote { get; init; }
+}

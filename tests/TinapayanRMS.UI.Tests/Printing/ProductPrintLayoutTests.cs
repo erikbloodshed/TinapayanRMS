@@ -24,12 +24,25 @@ public class ProductPrintLayoutTests
 
         layout.DocumentName.Should().Be("Production Plan — Mixing Sheet and Purchase Requisition");
         texts.Should().ContainInConsecutiveOrder("To Make", "Product", "Units", "Pieces");
-        texts.Should().ContainInConsecutiveOrder("Mixing Sheet", "Mix", "Batches", "Weight");
-        texts.Should().Contain(t => t.StartsWith("Sweet Dough", StringComparison.Ordinal) && t.Contains("Ube Roll 40 pcs", StringComparison.Ordinal));
-        texts.Should().ContainInConsecutiveOrder("Purchase Requisition", "Raw Material", "Needed", "Buy", "Cost");
-        texts.Should().ContainInConsecutiveOrder("Bread Flour", "2,000 g", "1 sack", Figure(100m, "N2"));
-        texts.Should().ContainInConsecutiveOrder("Total", string.Empty, string.Empty, Figure(100m, "N2"));
+        texts.Should().ContainInConsecutiveOrder("Mixing Sheet", "Mix", "Batches", "Per Batch", "Weight");
+        texts.Should().Contain(t => t.StartsWith("Sweet Dough", StringComparison.Ordinal) && t.Contains("Ube Roll 40 pcs", StringComparison.Ordinal) && t.EndsWith("Spare 10 pcs", StringComparison.Ordinal));
+        texts.Should().ContainInConsecutiveOrder("Bread Flour", string.Empty, Figure(1000m, "N1"), Figure(2000m, "N1"));
+        texts.Should().ContainInConsecutiveOrder("Purchase Requisition", "Raw Material", "Needed", "Buy", "Cost", "Buy Cost");
+        texts.Should().ContainInConsecutiveOrder("Bread Flour", "2,000 g", "1 sack", Figure(100m, "N2"), Figure(1250m, "N2"));
+        texts.Should().ContainInConsecutiveOrder("Total", string.Empty, string.Empty, Figure(100m, "N2"), Figure(1250m, "N2"));
         texts.Should().Contain("Cheese Roll: its Filling has no weight per piece or yield yet, so it isn't planned.");
+    });
+
+    [Fact]
+    public void A_production_plan_prints_what_its_products_sell_for_and_earn_and_the_saved_plans_name() => StaThread.Run(() =>
+    {
+        var texts = AllTexts(new ProductPrintLayout(SamplePlan(), includeRecipe: true, includeCosting: true, A4));
+
+        texts.Should().Contain("Production Plan — Saturday");
+        texts.Should().ContainInConsecutiveOrder("To Make", "Product", "Units", "Pieces", "Sales", "Profit");
+        texts.Should().ContainInConsecutiveOrder("Total", string.Empty, string.Empty, Figure(480m, "N2"), Figure(80m, "N2"));
+        texts.Should().Contain(t => t.Contains("a profit margin of " + Figure(18.75m, "N1") + "%", StringComparison.Ordinal));
+        texts.Should().Contain(t => t.StartsWith("Each mix is made in half batches", StringComparison.Ordinal));
     });
 
     [Fact]
@@ -38,7 +51,7 @@ public class ProductPrintLayoutTests
         var texts = AllTexts(new ProductPrintLayout(SamplePlan(), includeRecipe: true, includeCosting: false, A4));
 
         texts.Should().ContainInConsecutiveOrder("Raw Material", "Needed", "Buy", "Bread Flour");
-        texts.Should().NotContain(["Cost", "Total"]);
+        texts.Should().NotContain(["Cost", "Buy Cost", "Total", "Sales", "Profit"]);
     });
 
     private static ProductPrintSet SamplePlan()
@@ -47,10 +60,18 @@ public class ProductPrintLayoutTests
         return ProductPrintSet.Of(
             new PrintedPlan(
                 [line],
-                [new MixRow("Sweet Dough", "Ube Roll 40 pcs", 2m, 2000m)],
-                [new PurchaseRequisitionRow(7, "Bread Flour", "Ingredient", 2000m, "g", 1m, "sack", 100m)],
+                [new MixRow("Sweet Dough", "Ube Roll 40 pcs", 2m, 2000m) { Spare = "10 pcs", Ingredients = [new MixIngredientRow("Bread Flour", 1000m, 2000m)] }],
+                [new PurchaseRequisitionRow(7, "Bread Flour", "Ingredient", 2000m, "g", 1m, "sack", 100m) { BuyCost = 1250m }],
                 100m,
-                ["Cheese Roll: its Filling has no weight per piece or yield yet, so it isn't planned."]),
+                ["Cheese Roll: its Filling has no weight per piece or yield yet, so it isn't planned."])
+            {
+                PlanName = "Saturday",
+                HalfBatches = true,
+                TotalBuyCost = 1250m,
+                TotalSales = 480m,
+                TotalProfit = 80m,
+                ProfitMarginPercent = 18.75m,
+            },
             new DateTime(2026, 10, 3, 8, 0, 0));
     }
 

@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Syncfusion.UI.Xaml.Grid;
@@ -53,6 +54,12 @@ public static class AutoCompleteDropDown
 /// <item>The pop-up is placed on the monitor the cell is on (<see cref="ScreenAwareDropDownControl"/>).</item>
 /// <item>Tab keeps the row picked in the open list, as Enter does; the grid moved on without it.</item>
 /// <item>The key that starts the edit is typed into the box; the base dropped it, so the first letter had to be typed twice.</item>
+/// <item>The pick reaches the row only when the edit is committed (Tab, Enter, a click away, Vim's Esc), never as it's
+/// typed: the column's UpdateTrigger is made Explicit (<see cref="OnInitializeEditElement"/>). Its default left the
+/// control to write each change, so typing over a name emptied the row as soon as the text matched nothing, and Esc
+/// had nothing to undo (2026-10-24).</item>
+/// <item>Text that names nothing in the list isn't a pick: committing it leaves the row's value as it was, rather than
+/// clearing it (<see cref="UpdateSource"/>). Text cleared still clears it, with the column's AllowNullInput.</item>
 /// </list>
 /// </summary>
 public sealed class AutoCompleteDropDownRenderer : GridCellMultiColumnDropDownRenderer
@@ -68,6 +75,13 @@ public sealed class AutoCompleteDropDownRenderer : GridCellMultiColumnDropDownRe
 
     public override void OnInitializeEditElement(DataColumnBase dataColumn, SfMultiColumnDropDownControl uiElement, object dataContext)
     {
+        // The base builds the edit binding from the column's UpdateTrigger (CreateEditBindingBase), and an Explicit one
+        // is pushed only in the commit's validation, through UpdateSource below. Set before the base, every edit.
+        if (dataColumn.GridColumn is { UpdateTrigger: not UpdateSourceTrigger.Explicit } gridColumn)
+        {
+            gridColumn.UpdateTrigger = UpdateSourceTrigger.Explicit;
+        }
+
         base.OnInitializeEditElement(dataColumn, uiElement, dataContext);
 
         // A fresh editor has nothing left over; one already used shows this row's pick, or nothing.
@@ -118,6 +132,24 @@ public sealed class AutoCompleteDropDownRenderer : GridCellMultiColumnDropDownRe
         }
 
         return base.ShouldGridTryToHandleKeyDown(e);
+    }
+
+    /// <summary>
+    /// Writes the pick to the row as the edit is committed, except when the box holds text naming nothing in the list
+    /// (2026-10-24, reported by the user on the Production Plan: retyping a line's product and leaving it emptied the
+    /// line's product). Typing clears the control's pick as soon as the text matches no name (AllowNullInput), and every
+    /// commit (Tab, Enter, a click away, Vim's Esc) then wrote that empty pick to the row. Now the row keeps its value,
+    /// and the cell shows it again as the edit ends. Only a column whose binding waits for the commit
+    /// (UpdateTrigger="Explicit") is protected throughout; with the default trigger the control writes as it's typed.
+    /// </summary>
+    public override void UpdateSource(FrameworkElement cellElement)
+    {
+        if (HasCurrentCellState && CurrentCellRendererElement is SfMultiColumnDropDownControl { SelectedItem: null } editor && !string.IsNullOrWhiteSpace(editor.Text))
+        {
+            return;
+        }
+
+        base.UpdateSource(cellElement);
     }
 
     private static string DisplayText(GridMultiColumnDropDownList column, object? value)

@@ -49,9 +49,10 @@ public sealed class ProductPrintLayout
     private static readonly GridLength[] ContentsColumns = [new(1, GridUnitType.Star), new(240), new(56)];
     private static readonly GridLength[] ScalingColumns = [new(1, GridUnitType.Star), new(130), new(90)];
     private static readonly GridLength[] ScalingColumnsWithoutCosts = [new(1, GridUnitType.Star), new(130)];
-    private static readonly GridLength[] PlanOrderColumns = [new(1, GridUnitType.Star), new(100), new(120)];
-    private static readonly GridLength[] MixColumns = [new(1, GridUnitType.Star), new(70), new(110)];
-    private static readonly GridLength[] RequisitionColumns = [new(1, GridUnitType.Star), new(110), new(130), new(90)];
+    private static readonly GridLength[] PlanOrderColumns = [new(1, GridUnitType.Star), new(70), new(90), new(100), new(100)];
+    private static readonly GridLength[] PlanOrderColumnsWithoutCosts = [new(1, GridUnitType.Star), new(100), new(120)];
+    private static readonly GridLength[] MixColumns = [new(1, GridUnitType.Star), new(64), new(90), new(100)];
+    private static readonly GridLength[] RequisitionColumns = [new(1, GridUnitType.Star), new(100), new(110), new(86), new(86)];
     private static readonly GridLength[] RequisitionColumnsWithoutCosts = [new(1, GridUnitType.Star), new(110), new(130)];
 
     // The Price Simulator report's (2026-10-06): its tables have a Cost Now column after their cost, and its costing sets today's
@@ -688,14 +689,16 @@ public sealed class ProductPrintLayout
 
     /// <summary>
     /// The Production Plan (2026-10-03): what to make, the mixing sheet and the purchase requisition, each a table continued under
-    /// its heading on a page it runs on to, and what the plan couldn't work out. Without the costs the purchase requisition has
-    /// no Cost column and no total, as the recipe has no costs.
+    /// its heading on a page it runs on to, and what the plan couldn't work out. Without the costs, what to make has no sales or
+    /// profit and the purchase requisition no Cost or Buy Cost columns and no total, as the recipe has no costs. Each mix lists
+    /// what goes into it, a batch's grams and all its batches' (2026-10-24).
     /// </summary>
     private void AddPlan(PrintedPlan plan, ref int table)
     {
         Add(_ => PlanTitle(plan), keepWithNext: true);
 
         var orders = ++table;
+        var orderColumns = _includeCosting ? PlanOrderColumns : PlanOrderColumnsWithoutCosts;
         Add(repeat => PartHeading(repeat ? "To Make (continued)" : "To Make"), keepWithNext: true, table: orders, repeats: true);
         if (plan.Orders.Count == 0)
         {
@@ -703,29 +706,70 @@ public sealed class ProductPrintLayout
             return;
         }
 
-        Add(_ => HeaderRow(PlanOrderColumns, ["Product", "Units", "Pieces"]), keepWithNext: true, table: orders, repeats: true);
+        Add(
+            _ => HeaderRow(orderColumns, _includeCosting ? ["Product", "Units", "Pieces", "Sales", "Profit"] : ["Product", "Units", "Pieces"]),
+            keepWithNext: true,
+            table: orders,
+            repeats: true);
         foreach (var line in plan.Orders)
         {
             Add(
-                _ => Row(PlanOrderColumns, [Label(line.ProductName), Figure($"{line.Units:#,0.##}"), Figure(line.PiecesText)]),
+                _ =>
+                {
+                    List<FrameworkElement> cells = [Label(line.ProductName), Figure($"{line.Units:#,0.##}"), Figure(line.PiecesText)];
+                    if (_includeCosting)
+                    {
+                        cells.Add(Figure(line.Sales is { } sales ? Money(sales) : string.Empty));
+                        cells.Add(Figure(line.Profit is { } profit ? Money(profit) : string.Empty));
+                    }
+
+                    return Row(orderColumns, cells);
+                },
                 table: orders);
+        }
+
+        if (_includeCosting)
+        {
+            Add(_ => TotalRow(orderColumns, "Total", string.Empty, string.Empty, Money(plan.TotalSales), Money(plan.TotalProfit)), table: orders);
+            Add(_ => Caption($"Sales are with VAT. Profit is over each product's base cost, VAT out: a profit margin of {Percent(plan.ProfitMarginPercent)}%."));
+            if (plan.SalesNote is { } salesNote)
+            {
+                Add(_ => Caption(salesNote));
+            }
         }
 
         var mixes = ++table;
         Add(repeat => PartHeading(repeat ? "Mixing Sheet (continued)" : "Mixing Sheet"), keepWithNext: true, table: mixes, repeats: true);
-        Add(_ => HeaderRow(MixColumns, ["Mix", "Batches", "Weight"]), keepWithNext: true, table: mixes, repeats: true);
+        Add(_ => HeaderRow(MixColumns, ["Mix", "Batches", "Per Batch", "Weight"]), keepWithNext: true, table: mixes, repeats: true);
         foreach (var mix in plan.Mixes)
         {
             Add(
-                _ => Row(MixColumns, [MixItem(mix), Figure(mix.Batches is { } batches ? $"{batches:#,0}" : string.Empty), Figure(Grams(mix.Grams))]),
+                _ => Row(MixColumns, [MixItem(mix), Figure(mix.Batches is { } batches ? $"{batches:#,0.#}" : string.Empty), Figure(string.Empty), Figure(Grams(mix.Grams))]),
+                keepWithNext: mix.Ingredients.Count > 0,
                 table: mixes);
+            for (var i = 0; i < mix.Ingredients.Count; i++)
+            {
+                var ingredient = mix.Ingredients[i];
+                var isLast = i == mix.Ingredients.Count - 1;
+                Add(
+                    _ => Row(
+                        MixColumns,
+                        [
+                            IndentedItem(ingredient.Name),
+                            Figure(string.Empty),
+                            Figure(ingredient.PerBatch is { } perBatch ? Grams(perBatch) : string.Empty, SmallSize, _muted),
+                            Figure(Grams(ingredient.Grams), SmallSize, _muted),
+                        ],
+                        rule: isLast),
+                    table: mixes);
+            }
         }
 
         var requisition = ++table;
         var columns = _includeCosting ? RequisitionColumns : RequisitionColumnsWithoutCosts;
         Add(repeat => PartHeading(repeat ? "Purchase Requisition (continued)" : "Purchase Requisition"), keepWithNext: true, table: requisition, repeats: true);
         Add(
-            _ => HeaderRow(columns, _includeCosting ? ["Raw Material", "Needed", "Buy", "Cost"] : ["Raw Material", "Needed", "Buy"]),
+            _ => HeaderRow(columns, _includeCosting ? ["Raw Material", "Needed", "Buy", "Cost", "Buy Cost"] : ["Raw Material", "Needed", "Buy"]),
             keepWithNext: true,
             table: requisition,
             repeats: true);
@@ -743,6 +787,7 @@ public sealed class ProductPrintLayout
                     if (_includeCosting)
                     {
                         cells.Add(Figure(row.Cost is { } cost ? Money(cost) : string.Empty));
+                        cells.Add(Figure(row.BuyCost is { } buyCost ? Money(buyCost) : string.Empty));
                     }
 
                     return Row(columns, cells);
@@ -752,7 +797,8 @@ public sealed class ProductPrintLayout
 
         if (_includeCosting)
         {
-            Add(_ => TotalRow(columns, "Total", string.Empty, string.Empty, Money(plan.TotalCost)), table: requisition);
+            Add(_ => TotalRow(columns, "Total", string.Empty, string.Empty, Money(plan.TotalCost), Money(plan.TotalBuyCost)), table: requisition);
+            Add(_ => Caption("Cost is what's needed, at buffered costs. Buy Cost is what the whole units to buy cost, at their brands' prices."));
         }
 
         foreach (var note in plan.Notes)
@@ -761,31 +807,45 @@ public sealed class ProductPrintLayout
         }
     }
 
-    /// <summary>The plan's title: how many products, the costs it's at, and when it was printed.</summary>
+    /// <summary>The plan's title, with the saved plan's name: how many products, the costs it's at, and when it was printed.</summary>
     private StackPanel PlanTitle(PrintedPlan plan)
     {
         var count = plan.Orders.Count;
+        var title = _set.Title ?? "Production Plan";
         var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 2) };
-        heading.Children.Add(Text(_set.Title ?? "Production Plan", TitleSize, weight: FontWeights.SemiBold, wrap: true));
+        heading.Children.Add(Text(plan.PlanName is { } name ? $"{title} — {name}" : title, TitleSize, weight: FontWeights.SemiBold, wrap: true));
         heading.Children.Add(Text(
             $"{count} {(count == 1 ? "product" : "products")} · Printed {Printed(_set.PrintedAt)}" + (_includeCosting ? " · Buffered costs" : string.Empty),
             BodySize,
             _muted,
             wrap: true));
         heading.Children.Add(Text(
-            "Each mix is made in whole batches, shared by the products it's for. A made ingredient is bought as what it's made of.",
+            $"Each mix is made in {(plan.HalfBatches ? "half" : "whole")} batches, shared by the products it's for. A made ingredient is bought as what it's made of.",
             SmallSize,
             _muted,
             wrap: true));
         return heading;
     }
 
-    /// <summary>A mix and, after it in small muted type, the products it's for.</summary>
+    /// <summary>A mix and, after it in small muted type, the products it's for and the pieces to spare.</summary>
     private TextBlock MixItem(MixRow mix)
     {
         var item = Label(string.Empty);
         item.Inlines.Add(new Run(mix.Name) { FontWeight = FontWeights.SemiBold });
         item.Inlines.Add(new Run($"   {mix.For}") { FontSize = SmallSize, Foreground = _muted });
+        if (mix.Spare.Length > 0)
+        {
+            item.Inlines.Add(new Run($" · Spare {mix.Spare}") { FontSize = SmallSize, Foreground = _muted });
+        }
+
+        return item;
+    }
+
+    /// <summary>An ingredient of a mix, in small type, indented one step under the mix's row.</summary>
+    private TextBlock IndentedItem(string name)
+    {
+        var item = Label(name, SmallSize);
+        item.Margin = new Thickness(CellPadding.Left + ScalingIndent, CellPadding.Top, CellPadding.Right, CellPadding.Bottom);
         return item;
     }
 

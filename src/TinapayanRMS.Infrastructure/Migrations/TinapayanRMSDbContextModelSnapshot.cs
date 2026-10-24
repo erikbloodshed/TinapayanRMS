@@ -858,6 +858,81 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.ToTable("raw_material_units", (string)null);
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.SavedPlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("HalfBatches")
+                        .HasColumnType("boolean")
+                        .HasColumnName("half_batches");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name")
+                        .UseCollation("case_insensitive");
+
+                    b.Property<DateTime>("SavedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("saved_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_saved_plans");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_saved_plans_name");
+
+                    b.ToTable("saved_plans", (string)null);
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.SavedPlanLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
+
+                    b.Property<int>("SavedPlanId")
+                        .HasColumnType("integer")
+                        .HasColumnName("saved_plan_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<decimal>("Units")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("units");
+
+                    b.HasKey("Id")
+                        .HasName("pk_saved_plan_lines");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_saved_plan_lines_product_id");
+
+                    b.HasIndex("SavedPlanId")
+                        .HasDatabaseName("ix_saved_plan_lines_saved_plan_id");
+
+                    b.ToTable("saved_plan_lines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SavedPlanLines_Units", "units > 0");
+                        });
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssembly", b =>
                 {
                     b.Property<int>("Id")
@@ -1434,6 +1509,27 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("UnitOfMeasure");
                 });
 
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.SavedPlanLine", b =>
+                {
+                    b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_saved_plan_lines_products_product_id");
+
+                    b.HasOne("TinapayanRMS.Domain.Entities.SavedPlan", "SavedPlan")
+                        .WithMany("Lines")
+                        .HasForeignKey("SavedPlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_saved_plan_lines_saved_plans_saved_plan_id");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("SavedPlan");
+                });
+
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssembly", b =>
                 {
                     b.HasOne("TinapayanRMS.Domain.Entities.Product", "OwnerProduct")
@@ -1533,6 +1629,11 @@ namespace TinapayanRMS.Infrastructure.Migrations
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterial", b =>
                 {
                     b.Navigation("Units");
+                });
+
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.SavedPlan", b =>
+                {
+                    b.Navigation("Lines");
                 });
 #pragma warning restore 612, 618
         }

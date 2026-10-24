@@ -28,21 +28,25 @@ public sealed record PlanRecipe(
 public sealed record PlanIngredient(int Id, RawMaterialSource Source, decimal WeightLossPercent, int? LinkedToId, decimal? WeightSharePercent);
 
 /// <summary>A product a mix is made for, and the pieces it takes from it.</summary>
-public sealed record PlannedUse(int ProductId, decimal Pieces);
+/// <param name="BatchesNeeded">The batches those pieces take, before rounding up: what its spare pieces are worked out from.</param>
+public sealed record PlannedUse(int ProductId, decimal Pieces, decimal BatchesNeeded);
 
 /// <summary>
-/// One mix to make: a sub-assembly, with the add-ins every product it's for puts in it (none for most), in whole batches.
+/// One mix to make: a sub-assembly, with the add-ins every product it's for puts in it (none for most), in whole batches,
+/// or half ones when the plan allows them.
 /// </summary>
 /// <param name="BatchesNeeded">The batches its products need between them, before rounding up.</param>
-/// <param name="Batches">The whole batches to make.</param>
+/// <param name="Batches">The batches to make: whole ones, or half ones when the plan allows them.</param>
 /// <param name="BatchWeight">What a batch weighs before it's baked: its lines and add-ins.</param>
+/// <param name="Lines">What goes into one batch (2026-10-24): the sub-assembly's lines, then the add-ins, in grams per batch.</param>
 public sealed record PlannedMix(
     int SubAssemblyId,
     IReadOnlyList<(int IngredientId, decimal Grams)> AddIns,
     decimal BatchesNeeded,
     decimal Batches,
     decimal BatchWeight,
-    IReadOnlyList<PlannedUse> Uses);
+    IReadOnlyList<PlannedUse> Uses,
+    IReadOnlyList<(int IngredientId, decimal Grams)> Lines);
 
 public enum PlanIssueKind
 {
@@ -71,11 +75,19 @@ public sealed record PlanIssue(PlanIssueKind Kind, int? ProductId = null, int? S
 /// <summary>A production plan worked out: the mixes to make, the made ingredients to prepare, and what to buy.</summary>
 /// <param name="Prepared">Grams of each made ingredient the mixes take, which are made from what's bought.</param>
 /// <param name="Purchases">Each purchased material's total in its base unit: grams of an ingredient, pieces or metres of packaging.</param>
+/// <param name="PreparedLines">What each made ingredient in <paramref name="Prepared"/> is made from: its BOM, scaled to the grams to prepare.</param>
 public sealed record ProductionPlan(
     IReadOnlyList<PlannedMix> Mixes,
     IReadOnlyDictionary<int, decimal> Prepared,
     IReadOnlyDictionary<int, decimal> Purchases,
-    IReadOnlyList<PlanIssue> Issues);
+    IReadOnlyList<PlanIssue> Issues,
+    IReadOnlyDictionary<int, IReadOnlyList<(int ComponentId, decimal Grams)>> PreparedLines);
+
+/// <summary>
+/// What a line of the plan sells for and earns (2026-10-24): its units at the price with VAT, the same less the VAT, and
+/// the profit on that over the product's base cost (its ingredients, packaging, wastage, labor, overhead and administrative).
+/// </summary>
+public sealed record PlanSales(decimal Sales, decimal SalesBeforeVat, decimal Profit);
 
 /// <summary>
 /// The Production Plan screen's arithmetic (2026-10-03): from the products to make, the whole batches of each mix and
@@ -85,7 +97,7 @@ public sealed record ProductionPlan(
 /// <item>Each section's batches are worked out as the Scaling tab works them out (RecipeScalingRules.BatchRatio), but
 /// added up across the products using the same sub-assembly with the same add-ins before being rounded up, once: two
 /// products needing 0.4 of a dough each make 1 batch, not 2. A product's own add-ins go into every batch, so a use with
-/// add-ins of its own is a mix of its own.</item>
+/// add-ins of its own is a mix of its own. With half batches allowed, a mix is rounded up to the next half batch instead.</item>
 /// <item>A made ingredient is opened into its BOM (RecipeScalingRules.ScaleBom), to any depth, and only what it's made of
 /// is bought.</item>
 /// <item>A linked ingredient is bought as what it's cut from: grams ÷ its weight share. The parts of one ingredient are
@@ -101,11 +113,13 @@ public static class ProductionPlanRules
     /// <param name="recipes">Every product's recipe, the ones composites hold included.</param>
     /// <param name="ingredients">Every ingredient, by id.</param>
     /// <param name="boms">Every made ingredient's BOM lines, by made ingredient: each component and its grams.</param>
+    /// <param name="halfBatches">Each mix is rounded up to half batches rather than whole ones (RecipeScalingRules.HalfBatches).</param>
     public static ProductionPlan Plan(
         IReadOnlyList<(int ProductId, decimal Units)> orders,
         IReadOnlyDictionary<int, PlanRecipe> recipes,
         IReadOnlyDictionary<int, PlanIngredient> ingredients,
-        ILookup<int, (int ComponentId, decimal Grams)> boms)
+        ILookup<int, (int ComponentId, decimal Grams)> boms,
+        bool halfBatches = false)
     {
         var mixes = new Dictionary<string, MixTotal>();
         var purchases = new Dictionary<int, decimal>();
@@ -153,7 +167,7 @@ public static class ProductionPlanRules
                 }
 
                 mix.Ratio += ratio;
-                mix.Uses.Add(new PlannedUse(productId, pieces));
+                mix.Uses.Add(new PlannedUse(productId, pieces, ratio));
             }
 
             if (includesPackaging)
@@ -170,23 +184,59 @@ public static class ProductionPlanRules
             Visit(productId, units, includesPackaging: true, []);
         }
 
-        // Each mix in whole batches, its lines and add-ins that many times over.
+        // Each mix in whole (or half) batches, its lines and add-ins that many times over.
         var direct = new Dictionary<int, decimal>();
         List<PlannedMix> planned = [];
         foreach (var mix in mixes.Values)
         {
-            var batches = RecipeScalingRules.WholeBatches(mix.Ratio);
-            foreach (var (ingredientId, grams) in mix.Section.Lines.Concat(mix.Section.AddIns))
+            var batches = RecipeScalingRules.BatchesToMake(mix.Ratio, halfBatches);
+            List<(int IngredientId, decimal Grams)> lines = [.. mix.Section.Lines, .. mix.Section.AddIns];
+            foreach (var (ingredientId, grams) in lines)
             {
                 Add(direct, ingredientId, grams * batches);
             }
 
-            planned.Add(new PlannedMix(mix.Section.SubAssemblyId, mix.Section.AddIns, mix.Ratio, batches, mix.BatchWeight, mix.Uses));
+            planned.Add(new PlannedMix(mix.Section.SubAssemblyId, mix.Section.AddIns, mix.Ratio, batches, mix.BatchWeight, mix.Uses, lines));
         }
 
-        var prepared = OpenIngredients(direct, ingredients, boms, purchases, issues);
-        return new ProductionPlan(planned, prepared, purchases, issues);
+        var preparedLines = new Dictionary<int, IReadOnlyList<(int ComponentId, decimal Grams)>>();
+        var prepared = OpenIngredients(direct, ingredients, boms, purchases, issues, preparedLines);
+        return new ProductionPlan(planned, prepared, purchases, issues, preparedLines);
     }
+
+    /// <summary>
+    /// The pieces of <paramref name="productId"/> that the batches of <paramref name="mix"/>, rounded up, make on top of what's
+    /// planned, in whole pieces (2026-10-24): 3 batches of a dough making 260 pieces a batch, for 750 pieces, leave 30.
+    /// What's spare is the same dough whichever product it goes to, so each product it's for has its own figure. 0 for a
+    /// product the mix isn't for.
+    /// </summary>
+    public static decimal SparePieces(PlannedMix mix, int productId)
+    {
+        var uses = mix.Uses.Where(u => u.ProductId == productId).ToList();
+        var batchesNeeded = uses.Sum(u => u.BatchesNeeded);
+        if (batchesNeeded <= 0m)
+        {
+            return 0m;
+        }
+
+        var spare = (mix.Batches - mix.BatchesNeeded) * uses.Sum(u => u.Pieces) / batchesNeeded;
+        return Math.Max(0m, Math.Floor(Math.Round(spare, SpareDecimals)));
+    }
+
+    /// <summary>
+    /// What <paramref name="units"/> sellable units sell for at <paramref name="price"/> (with VAT, at
+    /// <paramref name="vatPercent"/>), and the profit on them over <paramref name="baseCost"/> a unit. The VAT is taken out
+    /// first, since it's collected for the government, as CostingRules.CalculateMarkupPercentFromPrice takes it out.
+    /// </summary>
+    public static PlanSales SalesOf(decimal units, decimal price, decimal vatPercent, decimal baseCost)
+    {
+        var sales = units * price;
+        var beforeVat = sales / (1 + vatPercent / 100m);
+        return new PlanSales(sales, beforeVat, beforeVat - units * baseCost);
+    }
+
+    /// <summary>The places a spare count is rounded to before it's rounded down: decimal noise, so an exact 30 isn't 29.</summary>
+    private const int SpareDecimals = 4;
 
     /// <summary>
     /// Turns the grams of each ingredient the mixes take into what's bought: made ingredients opened into their BOMs and
@@ -198,7 +248,8 @@ public static class ProductionPlanRules
         IReadOnlyDictionary<int, PlanIngredient> ingredients,
         ILookup<int, (int ComponentId, decimal Grams)> boms,
         Dictionary<int, decimal> purchases,
-        List<PlanIssue> issues)
+        List<PlanIssue> issues,
+        Dictionary<int, IReadOnlyList<(int ComponentId, decimal Grams)>> preparedLines)
     {
         IReadOnlyList<int> DependenciesOf(int id) => ingredients.GetValueOrDefault(id) switch
         {
@@ -245,6 +296,7 @@ public static class ProductionPlanRules
                     }
 
                     Add(prepared, id, total);
+                    preparedLines[id] = [.. lines.Select((line, i) => (line.ComponentId, scaled[i]))];
                     break;
 
                 case { Source: RawMaterialSource.Made }:

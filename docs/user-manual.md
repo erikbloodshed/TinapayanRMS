@@ -174,7 +174,9 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 ### Working in tables
 
 - Most tables are typed straight into. Click a cell and type. The empty row at the bottom adds a new line.
+- On that bottom row, **Tab** from its last cell adds the line, as **Enter** does, and opens the first cell of the next empty row, so you can type one line after another without reaching for the mouse.
 - Pickers inside tables, such as the ingredient or material pickers, suggest names as you type.
+- To change a line's ingredient, material or product, type over it. The line keeps what it had until you pick another, so its cost and the totals don't change while you type. Text that names nothing in the list leaves the line as it was, whether you press Esc, Tab, Enter or click away. To empty the cell, delete all its text.
 - **Drag a row**, by its left edge or any cell you aren't typing in, to change the order of recipe lines, bill of materials lines and packaging lines. The order is saved.
 - **Insert Line** puts a blank line in above the selected one, so you don't have to add it at the bottom and drag it up. The new line's Ingredient cell opens, ready to type. With no line selected, or the empty row at the bottom selected, the new line goes in at the bottom. You can also press **Insert** while the table has the cursor and you aren't typing in a cell. It's on the ingredient tables: a sub-assembly's lines on the Sub-Assemblies screen, and a product section's lines and add-ins (the add-ins button is **Insert Add-In**). A line you leave blank does no harm, because Save leaves it out. **Undo** or **Remove Line** takes it away.
 - **Remove Line** removes the selected line.
@@ -914,31 +916,51 @@ The first page lists the **Price Changes** tried, then every product with its **
 
 ## 11. Production Plan
 
-**Production Plan** works out what to make and what to buy for a day's or a week's baking.
+**Production Plan** works out what to make and what to buy for a day's or a week's baking, and what it sells for.
+
+### Saved plans
+
+At the top left, **Saved Plans** lists the plans saved under a name, such as *Saturday* or *Fiesta order*, newest first.
+
+- **Save Plan** asks for a name and saves the products in the plan, and whether it's in half batches. With a saved plan open, the name starts as its own, so saving again updates it. Saving under another plan's name asks first, then replaces that plan.
+- Click a plan in the list to open it. Its products replace the ones in the table. If the table holds a plan that isn't saved, you're asked first. A product deleted since the plan was saved is left out, and a message says so.
+- **Delete Plan** deletes the open plan, after asking. Its products stay in the table.
+
+Saved plans are kept in the database, so everyone using the app on this computer sees them, and they're in every backup. A product deleted for good is taken out of every saved plan.
 
 ### The plan
 
-On the left, the **Plan** table lists the products to make:
+Under it, the **Plan** table lists the products to make:
 
 - **Product**: pick one. Type to search the list. Products in Research and Development can be planned too.
 - **Units**: how many sellable units to make. That's pieces for a product sold by the piece, or boxes for a Box of 8.
 - **Pieces**: what the units come to. A composite product shows none, since it's one unit of other products.
+- **Sales**: what the units sell for, at the product's **Current Price**, with VAT.
+- **Profit**: what they earn over the product's base cost (its ingredients, packaging, wastage, labor, overhead and administrative), once the VAT is taken out.
 
-A product listed twice is made once, its units added together. **Remove Line** takes the picked line out, and **Clear Plan** empties the table.
+Under the table are the plan's total **Sales**, **Profit** and **Profit Margin** (the profit as a share of the sales before VAT, as on the Products screen's Costing tab). A product with no Current Price is counted at the selling price its costing works out, and a note in orange names it.
 
-The plan is kept for you on this computer. It's there again the next time you open the app, worked out from the products and prices as they are then. A product deleted since is left out.
+A product listed twice is made once, its units added together. **Remove Line** takes the picked line out, and **Clear Plan** empties the table and closes the open saved plan.
+
+The Mixing Sheet and the Purchase Requisition change as you type. A new line on the table's bottom row counts as soon as its product and units are in, before you leave the row. Without Vim keys, press **Esc** twice to throw the new line away, and the tables go back to how they were. With Vim keys on, Esc keeps it, as it keeps whatever you typed in a cell.
+The plan in the table is kept for you on this computer, with the saved plan you have open. It's there again the next time you open the app, worked out from the products and prices as they are then. A product deleted since is left out.
 
 ### Mixing Sheet
 
 Each mix to make, in whole batches:
 
 - **Mix**: the sub-assembly, such as *Sweet Dough*, or a product's own section, such as *Ube Roll Filling*.
-- **For**: the products it's for, and how many pieces each takes from it.
-- **Batches** and **Weight (g)**: the whole batches to make, and what they weigh before baking.
+- **For**: the products it's for, and how many pieces each takes from it. A row grows to show the whole list when it runs to more than one line.
+- **Batches** and **Weight (g)**: the batches to make, and what they weigh before baking.
+- **Spare**: the batches are rounded up, so they make more than the plan needs. Spare is how many more pieces that is, such as **30 pcs**. For a mix shared by several products it says how many more of each, such as *Ube Roll 30 pcs or Cheese Roll 25 pcs*: it's the same dough either way.
+
+Click the arrow at the start of a row to open it and see what goes into the mix: each ingredient, its grams **Per Batch**, and the **Total (g)** for all the batches. A row stays open while you change the plan.
+
+Tick **Half batches** at the top when the kitchen can mix half a batch. Each mix is then rounded up to the next half batch instead of a whole one: 1.2 batches are 1.5, not 2. The tick is kept with the plan, and saved with a saved plan.
 
 Products sharing a sub-assembly share its batches: two products needing 0.4 of a batch each make 1 batch between them, not 2. A product that adds its own add-ins to a linked recipe needs batches with the add-ins in, so that's a mix of its own, its name followed by the add-ins.
 
-A made ingredient the mixes use, such as a syrup, is listed under the mixes with the grams to prepare. A composite product makes the products it holds, times how many of each it holds.
+A made ingredient the mixes use, such as a syrup, is listed under the mixes with the grams to prepare. Open its row to see what it's made from, in grams. A composite product makes the products it holds, times how many of each it holds.
 
 Under the table, a note in orange says what couldn't be planned, such as a section with no weight per piece or yield yet.
 
@@ -947,14 +969,17 @@ Under the table, a note in orange says what couldn't be planned, such as a secti
 Everything to buy for the plan, ingredients first, then packaging:
 
 - **Needed**, in the material's base unit (grams for an ingredient).
+- **Cost**: what the amount needed costs, at buffered costs.
 - **Buy** and **Per**: whole units to buy, in the unit of its dearest brand price, such as **2** *sack*. It's rounded up. A material with no price yet shows no Buy.
-- **Cost**: what the amount needed costs, at buffered costs. **Total Cost** is at the top.
+- **Buy Cost**: what the whole units to buy cost at that brand's price: the money to take to the market.
+
+**Total Cost** and **Buy Cost** for the whole plan are at the top.
 
 A made ingredient is bought as what it's made of. Egg white and yolk are bought as the eggs they come from: 300 g of white and 120 g of yolk take the same eggs, so only the larger amount of eggs is listed, and any whole egg the plan uses comes on top. Packaging is listed for every sellable unit. A composite product's products bring theirs only when it includes its products' packaging.
 
 ### Printing and exporting
 
-**Print** opens the plan in a print preview: what to make, the mixing sheet and the purchase requisition. Clear **Costs** at the bottom to print it without the costs, for the kitchen or the market. **Export to Excel** saves the mixing sheet and the purchase requisition on two sheets of one workbook.
+**Print** opens the plan in a print preview: what to make with its sales and profit, the mixing sheet with each mix's ingredients and spare pieces, and the purchase requisition with its Buy Cost. A saved plan that's open is named in the title. Clear **Costs** at the bottom to print it without the sales, profit and costs, for the kitchen or the market. **Export to Excel** saves the plan, the mixing sheet and the purchase requisition on three sheets of one workbook. Each mix's ingredients are listed under it, grouped so Excel can fold them away.
 
 ---
 
@@ -1109,9 +1134,11 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 ### Plan a day's baking
 
 1. Open **Production Plan** from the menu.
-2. In the **Plan** table, pick each product and type how many to make.
-3. Check the **Mixing Sheet** for how many batches of each mix to make, and read any orange note under it.
-4. Press **Print**, clear **Costs** for the kitchen, and print. Or press **Export to Excel** to send the purchase requisition on.
+2. For a plan you make often, click it in **Saved Plans**. Otherwise, in the **Plan** table, pick each product and type how many to make.
+3. Check the **Mixing Sheet** for how many batches of each mix to make, and read any orange note under it. Open a mix's row to see its ingredients, and look at **Spare**: if a mix makes 30 pieces more than you need, you can add up to 30 to the plan for no extra mixing. Tick **Half batches** if the kitchen can mix half a batch.
+4. Check **Sales** and **Profit** under the Plan table, and the **Buy Cost** of the Purchase Requisition: the money to take to the market.
+5. To keep the plan for another day, press **Save Plan** and name it.
+6. Press **Print**, clear **Costs** for the kitchen, and print. Or press **Export to Excel** to send the purchase requisition on.
 
 ### See what a price rise would do
 
