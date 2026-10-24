@@ -41,6 +41,45 @@ public static class StaThread
     }
 
     /// <summary>
+    /// Runs <paramref name="test"/> on an STA thread of its own with its dispatcher running, as the app's UI thread is, so
+    /// every await in it comes back to that thread, a ViewModel's own included. A ViewModel only ever runs on the UI
+    /// thread: without this, a background read's await came back on the thread pool and changed the screen's state while
+    /// the test was changing it too (ProductsViewModelCompositeTests, where a lost update left a line's cost unread).
+    /// </summary>
+    public static Task RunAsync(Func<Task> test)
+    {
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
+            dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    await test();
+                    done.SetResult();
+                }
+                catch (Exception ex)
+                {
+                    done.SetException(ex);
+                }
+                finally
+                {
+                    dispatcher.InvokeShutdown();
+                }
+            });
+            Dispatcher.Run();
+        })
+        {
+            IsBackground = true,
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return done.Task;
+    }
+
+    /// <summary>
     /// Runs <paramref name="test"/> on an STA thread with the Syncfusion license registered, as the app has it. Skipped
     /// without SYNCFUSION_LICENSE_KEY: an unlicensed Syncfusion control shows a dialog.
     /// </summary>

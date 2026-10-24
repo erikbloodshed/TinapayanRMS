@@ -61,7 +61,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
     private sealed record Bakery(int EggId, int WhiteId, int FlourId, int MeringueId, int PandesalId, int BoxId);
 
     [Fact]
-    public async Task With_no_changes_every_product_prices_as_Reports_does()
+    public Task With_no_changes_every_product_prices_as_Reports_does() => StaThread.RunAsync(async () =>
     {
         await AddBakeryAsync();
         var viewModel = CreateViewModel();
@@ -83,10 +83,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         }
 
         viewModel.Materials.Select(m => m.Name).Should().Equal("Egg", "Flour");
-    }
+    });
 
     [Fact]
-    public async Task A_rise_in_egg_reaches_the_linked_egg_white_its_products_and_the_composites_holding_them()
+    public Task A_rise_in_egg_reaches_the_linked_egg_white_its_products_and_the_composites_holding_them() => StaThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();
         var viewModel = CreateViewModel();
@@ -120,10 +120,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
 
         await using var dbContext = CreateDbContext();
         dbContext.RawMaterials.Single(m => m.Id == bakery.EggId).CostPerBaseUnit.Should().Be(0.014m, "nothing is saved");
-    }
+    });
 
     [Fact]
-    public async Task The_report_sets_each_product_beside_today_with_the_changes_that_reach_it()
+    public Task The_report_sets_each_product_beside_today_with_the_changes_that_reach_it() => StaThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();
         var viewModel = CreateViewModel();
@@ -162,10 +162,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         box.Simulation!.Changes.Should().Equal([egg], "it holds meringues");
         box.Components!.Single(c => c.Product == "Meringue").NowCost.Should().NotBeNull();
         box.Components!.Single(c => c.Product == "Pandesal").NowCost.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task Picked_products_print_on_their_own_in_the_tables_order_and_stay_picked_through_a_change()
+    public Task Picked_products_print_on_their_own_in_the_tables_order_and_stay_picked_through_a_change() => StaThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();
         var viewModel = CreateViewModel();
@@ -200,10 +200,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         viewModel.OnlyAffected = true;
         viewModel.SelectedProducts.Should().Equal(Row(viewModel, bakery.MeringueId)!);
         viewModel.PrintChoices(DateTime.Now).Select(c => c.Label).Should().Equal("Selected products (1)", "All products shown (2)");
-    }
+    });
 
     [Fact]
-    public async Task A_new_price_works_out_the_change_and_the_other_way_round()
+    public Task A_new_price_works_out_the_change_and_the_other_way_round() => StaThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();
         var viewModel = CreateViewModel();
@@ -217,10 +217,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
 
         change.ChangePercent = 50m;
         change.NewPrice.Should().Be(0.021m);
-    }
+    });
 
     [Fact]
-    public async Task A_price_that_cant_be_is_refused_and_says_why()
+    public Task A_price_that_cant_be_is_refused_and_says_why() => StaThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();
         var viewModel = CreateViewModel();
@@ -236,10 +236,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
 
         flour.NewPrice = 0.06m;
         await WaitUntilSettledAsync(() => viewModel.ErrorMessage is null && Row(viewModel, bakery.PandesalId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
-    }
+    });
 
     [Fact]
-    public async Task The_price_to_keep_markup_moves_the_current_price_with_the_base_cost()
+    public Task The_price_to_keep_markup_moves_the_current_price_with_the_base_cost() => StaThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();
         await using (var dbContext = CreateDbContext())
@@ -259,10 +259,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         meringue.SimulatedMarkupPercent.Should().BeLessThan(meringue.MarkupPercent!.Value);
         Row(viewModel, bakery.PandesalId)!.PriceToKeepMarkup.Should().Be(3m, "no change reaches it");
         Row(viewModel, bakery.BoxId)!.PriceToKeepMarkup.Should().BeNull("it has no current price");
-    }
+    });
 
     [Fact]
-    public async Task A_saved_scenario_opens_again_its_percentage_on_the_price_then_and_its_new_price_as_saved()
+    public Task A_saved_scenario_opens_again_its_percentage_on_the_price_then_and_its_new_price_as_saved() => StaThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();
         var viewModel = await CreateLoadedViewModelAsync();
@@ -292,10 +292,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
             (bakery.FlourId, (decimal?)null, (decimal?)null, 0.06m));
         later.HasUnsavedChanges.Should().BeFalse();
         await WaitUntilSettledAsync(() => Row(later, bakery.PandesalId)?.IsAffected == true, () => later.ErrorMessage ?? "not yet");
-    }
+    });
 
     [Fact]
-    public async Task Opening_a_scenario_over_changes_not_saved_asks_and_keeping_them_leaves_the_table_as_it_was()
+    public Task Opening_a_scenario_over_changes_not_saved_asks_and_keeping_them_leaves_the_table_as_it_was() => StaThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();
         var keep = true;
@@ -323,10 +323,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
 
         viewModel.Changes.Select(c => (c.MaterialId, c.ChangePercent)).Should().Equal((bakery.EggId, (decimal?)10m));
         viewModel.SelectedScenario.Should().BeSameAs(scenario);
-    }
+    });
 
     [Fact]
-    public async Task Saving_under_another_scenarios_name_asks_before_replacing_its_changes()
+    public Task Saving_under_another_scenarios_name_asks_before_replacing_its_changes() => StaThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();
         var replace = false;
@@ -352,10 +352,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         var saved = (await new PriceScenarioRepository(CreateDbContextFactory()).GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
         saved.Lines.Single().ChangePercent.Should().Be(20m);
         viewModel.SelectedScenario!.Id.Should().Be(saved.Id);
-    }
+    });
 
     [Fact]
-    public async Task Deleting_the_open_scenario_keeps_its_changes_in_the_table_and_an_empty_table_cant_be_saved()
+    public Task Deleting_the_open_scenario_keeps_its_changes_in_the_table_and_an_empty_table_cant_be_saved() => StaThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();
         var viewModel = await CreateLoadedViewModelAsync();
@@ -373,10 +373,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         viewModel.Changes.Should().ContainSingle();
         viewModel.HasUnsavedChanges.Should().BeTrue("no scenario holds them now");
         (await new PriceScenarioRepository(CreateDbContextFactory()).GetAllAsync(Cancellation)).Should().BeEmpty();
-    }
+    });
 
     [Fact]
-    public async Task Unbuffered_prices_every_figure_and_the_report_at_true_costs_and_Buffered_switches_back()
+    public Task Unbuffered_prices_every_figure_and_the_report_at_true_costs_and_Buffered_switches_back() => StaThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();
         await SetPriceAsync(bakery.FlourId, null, 0.05m);
@@ -414,10 +414,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         await WaitUntilSettledAsync(() => Row(viewModel, bakery.PandesalId)?.BaseCost == buffered.BaseCost, () => "still unbuffered");
         Row(viewModel, bakery.PandesalId)!.SimulatedBaseCost.Should().Be(buffered.SimulatedBaseCost);
         viewModel.HasUnsavedChanges.Should().BeTrue("the switch is no change to the scenario");
-    }
+    });
 
     [Fact]
-    public async Task Export_while_unbuffered_suggests_a_workbook_that_says_so()
+    public Task Export_while_unbuffered_suggests_a_workbook_that_says_so() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         string? asked = null;
@@ -431,10 +431,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         await viewModel.ExportCommand.Execute();
 
         asked.Should().Be("Price Simulator (Unbuffered)");
-    }
+    });
 
     [Fact]
-    public async Task A_double_clicked_product_asks_to_be_opened()
+    public Task A_double_clicked_product_asks_to_be_opened() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         List<int> opened = [];
@@ -443,10 +443,10 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         await viewModel.OpenProductCommand.Execute(42);
 
         opened.Should().Equal(42);
-    }
+    });
 
     [Fact]
-    public async Task Export_asks_for_the_Price_Simulator_workbook()
+    public Task Export_asks_for_the_Price_Simulator_workbook() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         string? asked = null;
@@ -460,7 +460,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
 
         asked.Should().Be(PriceSimulatorViewModel.ExportTitle);
         viewModel.SuccessMessage.Should().Be(@"Saved Price Simulator 2026-10-04.xlsx in C:\Reports.");
-    }
+    });
 
     private static PriceSimulatorProductRow? Row(PriceSimulatorViewModel viewModel, int productId) => viewModel.Products.FirstOrDefault(r => r.ProductId == productId);
 
