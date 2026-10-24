@@ -1142,7 +1142,7 @@ A test that creates WPF objects runs on an STA thread:
 - `VersionRecorders.Create(factory)` (in UI.Tests' `Fixtures/`) builds a `ProductVersionRecorder` over real repositories, for a test that constructs `SubAssembliesViewModel`.
 - `FailingDbContextFactory` (in UI.Tests' `Fixtures/`) wraps a factory and refuses every context while its `Fail` is set: for a test that a screen survives a database that stops answering, and recovers once it answers. A test that a write is all or nothing fails it part-way with an EF Core save interceptor instead (`CostCascadeTransactionPersistenceTests`).
 - `SqlCommandCounter` (also in UI.Tests' `Fixtures/`) counts the SQL commands sent from where it's started (the activities Npgsql reports on its `Npgsql` ActivitySource): for a test that a read's round trips don't grow with what it reads.
-- `OffscreenGrid.Run(create, test)` shows a real grid off-screen. Its test classes carry `[Collection(OffscreenGridCollection.Name)]`, so that only one off-screen window is up at a time.
+- `OffscreenGrid.Run(create, test)` shows a real grid off-screen. Every test class that builds a real `SfDataGrid` or `SfTreeGrid`, themed ones included, carries `[Collection(OffscreenGridCollection.Name)]`, so they run one at a time: their windows competed for focus, and Syncfusion keeps whether the current cell has been validated in one static flag for the whole process, so a grid beside an edit could make its commit skip writing the value.
 
 ### Naming
 

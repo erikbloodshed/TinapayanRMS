@@ -18,6 +18,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// grid is themed on its own (SfSkinManager.Theme set on it), which keeps its dictionaries in its own resources. The
 /// second half fails once Syncfusion's dictionary stops carrying the generic styles, when the local theme stops mattering.
 /// </summary>
+[Collection(OffscreenGridCollection.Name)]
 public class TreeGridThemeScopeTests
 {
     private sealed record Row(string Name);
