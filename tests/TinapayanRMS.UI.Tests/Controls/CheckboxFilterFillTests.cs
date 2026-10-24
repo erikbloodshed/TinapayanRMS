@@ -16,6 +16,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// beside the filter control, since SfSkinManager themes the grid's controls only once it meets a grid. The first check
 /// fails once Syncfusion's theme stops fixing the width, when the fix stops mattering.
 /// </summary>
+[Collection(OffscreenGridCollection.Name)]
 public class CheckboxFilterFillTests
 {
     [Fact]

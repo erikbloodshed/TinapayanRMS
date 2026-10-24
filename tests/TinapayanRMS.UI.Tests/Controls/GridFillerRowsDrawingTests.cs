@@ -20,6 +20,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// the app types into are padded. A grid can't hold records below its add row, so there the blank one holds a blank
 /// record in the add row's place, and only what's under the add row is compared.
 /// </summary>
+[Collection(OffscreenGridCollection.Name)]
 public class GridFillerRowsDrawingTests
 {
     public sealed class Line
