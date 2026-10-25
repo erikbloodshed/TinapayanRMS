@@ -34,8 +34,8 @@ public closed class ProductTreeNode : ReactiveObject
 
 /// <summary>
 /// The full-colour image the Products list puts before a product's name (Assets/Icons/*_64px.png, 2026-10-08, in place of
-/// the emoji chosen 2026-09-30): one each for Breads, Loaves, Cakes and Pastries, and a bag of breads for a composite
-/// whatever its category.
+/// the emoji chosen 2026-09-30): one each for Breads, Loaves, Cakes, Pastries and Rolls, and a bag of breads for a
+/// composite whatever its category.
 /// </summary>
 public enum ProductIcon
 {
@@ -44,6 +44,7 @@ public enum ProductIcon
     Loaves,
     Cakes,
     Pastries,
+    Rolls,
     Composite,
 }
 
@@ -212,6 +213,7 @@ public sealed class ProductLeafNode(Product product) : ProductTreeNode
                 "LOAVES" => ProductIcon.Loaves,
                 "CAKES" => ProductIcon.Cakes,
                 "PASTRIES" => ProductIcon.Pastries,
+                "ROLLS" => ProductIcon.Rolls,
                 _ => ProductIcon.None,
             };
 

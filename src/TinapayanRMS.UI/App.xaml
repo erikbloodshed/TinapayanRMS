@@ -282,11 +282,20 @@
 
             <!--
                 A product's icon, by what its category holds (ProductCategoryIconConverter): the downloaded full-colour
-                images (Assets/Icons) for cakes, pastries, loaves, breads and composites. Each 128 px file shrinks to 32 (40 px at 125%
+                images (Assets/Icons) for rolls, cakes, pastries, loaves, breads and composites. Each 128 px file shrinks to 32 (40 px at 125%
                 scaling), which stays sharp, rounded to whole pixels so it doesn't land between them and blur. Any other
                 product gets the navigation menu's Products glyph in the accent.
             -->
             <converters:ProductCategoryIconConverter x:Key="ProductCategoryIconConverter">
+                <converters:ProductCategoryIconConverter.Roll>
+                    <DataTemplate>
+                        <Image Source="/Assets/Icons/Roll_Cake_128px.png"
+                               Width="32"
+                               Height="32"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               UseLayoutRounding="True" />
+                    </DataTemplate>
+                </converters:ProductCategoryIconConverter.Roll>
                 <converters:ProductCategoryIconConverter.Cake>
                     <DataTemplate>
                         <Image Source="/Assets/Icons/Cake_128px.png"

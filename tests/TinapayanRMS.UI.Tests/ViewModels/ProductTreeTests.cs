@@ -38,6 +38,7 @@ public class ProductTreeTests
     [InlineData("Cakes", ProductIcon.Cakes)]
     [InlineData("Pastries", ProductIcon.Pastries)]
     [InlineData(" pastries ", ProductIcon.Pastries)]
+    [InlineData("Rolls", ProductIcon.Rolls)]
     [InlineData("Cookies", ProductIcon.None)]
     public void A_products_icon_is_its_categorys(string category, ProductIcon kind) =>
         new ProductLeafNode(ProductOf(1, "Pandesal", ProductStage.Production, new ProductCategory { Id = 9, Name = category }))

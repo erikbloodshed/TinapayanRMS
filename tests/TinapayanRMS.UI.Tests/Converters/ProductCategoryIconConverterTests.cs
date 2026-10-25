@@ -10,6 +10,10 @@ namespace TinapayanRMS.UI.Tests.Converters;
 public class ProductCategoryIconConverterTests
 {
     [Theory]
+    [InlineData("Rolls", BakeryKind.Roll)]
+    [InlineData("Swiss Roll", BakeryKind.Roll)]
+    [InlineData("Pianono", BakeryKind.Roll)]
+    [InlineData("Payroll", BakeryKind.Other)]
     [InlineData("Cakes", BakeryKind.Cake)]
     [InlineData("Chiffon Cakes", BakeryKind.Cake)]
     [InlineData("Cheesecakes", BakeryKind.Cake)]
@@ -33,8 +37,9 @@ public class ProductCategoryIconConverterTests
         ProductCategoryIconConverter.Classify(categoryName).Should().Be(expected);
 
     [Fact]
-    public void A_name_naming_two_kinds_is_a_cake_before_a_pastry_before_a_bread()
+    public void A_name_naming_two_kinds_is_a_roll_before_a_cake_before_a_pastry_before_a_bread()
     {
+        ProductCategoryIconConverter.Classify("Roll Cakes").Should().Be(BakeryKind.Roll);
         ProductCategoryIconConverter.Classify("Cakes and Breads").Should().Be(BakeryKind.Cake);
         ProductCategoryIconConverter.Classify("Breads and Pastries").Should().Be(BakeryKind.Pastry);
     }
