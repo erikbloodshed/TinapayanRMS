@@ -234,6 +234,10 @@
                                     <Setter TargetName="Icon" Property="Source" Value="/Assets/Icons/Pastry_64px.png" />
                                     <Setter TargetName="Icon" Property="Visibility" Value="Visible" />
                                 </DataTrigger>
+                                <DataTrigger Binding="{Binding IconKind}" Value="Rolls">
+                                    <Setter TargetName="Icon" Property="Source" Value="/Assets/Icons/Roll_Cake_64px.png" />
+                                    <Setter TargetName="Icon" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
                                 <DataTrigger Binding="{Binding IconKind}" Value="Composite">
                                     <Setter TargetName="Icon" Property="Source" Value="/Assets/Icons/Composite_64px.png" />
                                     <Setter TargetName="Icon" Property="Visibility" Value="Visible" />
