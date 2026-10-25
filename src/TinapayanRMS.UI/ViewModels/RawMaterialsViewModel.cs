@@ -1177,7 +1177,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // material can still change.
         this.WhenAnyValue(x => x.EditingType, x => x.EditingBaseUnit)
             .Where(_ => !IsBusyApplying)
-            .Subscribe(_ => RebuildUnitViews());
+            .Subscribe(_ =>
+            {
+                MoveBrandRowsOntoTheBaseUnit();
+                RebuildUnitViews();
+            });
 
         // Every selection-driven subscription skips while LoadCommand merges in fresh data, which
         // only re-points a selection at its refreshed copy; the form and details must stay as-is.
@@ -1903,6 +1907,26 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         ReplaceUnitRows([.. units], selectedUnit: null);
         RefreshBrandPriceRows();
         UpdateCanChangeBaseUnit();
+    }
+
+    /// <summary>
+    /// A packaging material's unit picked on a brand row before it was made the base unit: the rows priced in it are now
+    /// priced in the base unit, and the alternative unit the pick added goes with them (OnUnitPicked). Kept, Save would
+    /// refuse it as the base unit. One added in the Alternative Units grid is left for Save to refuse.
+    /// </summary>
+    private void MoveBrandRowsOntoTheBaseUnit()
+    {
+        if (EditingType != RawMaterialType.Packaging
+            || EditingBaseUnit is not { } baseUnit
+            || !_brandAddedUnits.Any(u => u.UnitOfMeasureId == baseUnit.Id))
+        {
+            return;
+        }
+
+        foreach (var row in BrandPriceRows.Where(r => r.UnitKey == baseUnit.Id).ToList())
+        {
+            row.UnitKey = PurchaseUnitChoice.BaseUnitKey;
+        }
     }
 
     /// <summary>Shows the base unit on the form's alternative units and in the purchase unit choices.</summary>

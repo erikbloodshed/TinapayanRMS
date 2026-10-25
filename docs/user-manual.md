@@ -404,7 +404,7 @@ Enter one row per brand you buy:
 | Column | What to enter |
 |---|---|
 | **Brand** | Optional. The brand or supplier. |
-| **Purchase Unit** | The unit you buy it in: the base unit or an alternative unit. Picking a unit the material doesn't have yet adds it as an alternative unit. |
+| **Purchase Unit** | The unit you buy it in: the base unit or an alternative unit. Picking a unit the material doesn't have yet adds it as an alternative unit. If you then make that unit a packaging material's base unit, the price moves to the base unit and the added alternative unit goes. |
 | **Qty per Purchase Unit** | How many base units one purchase unit holds. It's filled in for saved and standard units. |
 | **Purchase Price** | What one purchase unit costs. |
 | **Buffer %** | Read-only. How far the buffered cost is above this brand's price. |

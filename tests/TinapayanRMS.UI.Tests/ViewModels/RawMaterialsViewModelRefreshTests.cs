@@ -1673,6 +1673,36 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     /// (NewBrandPriceRow), picking the unit named <paramref name="unitName"/>, then adds it to the rows when it's
     /// committed. Only Save writes it.
     /// </summary>
+    [Fact]
+    public async Task A_purchase_unit_later_made_the_base_unit_is_priced_in_the_base_unit_and_saves()
+    {
+        var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
+        await AddPackagingCategoryAsync("Boxes");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Cake Box";
+        viewModel.EditingType = RawMaterialType.Packaging;
+        PickCategory(viewModel);
+
+        // Priced by the piece before the base unit is picked: the piece is added as an alternative unit.
+        var brand = AddBrandPrice(viewModel, null, "piece", 5m);
+        brand.Quantity = 1m;
+        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal("piece");
+
+        viewModel.EditingBaseUnit = viewModel.UnitsOfMeasure.Single(u => u.Id == pieceId);
+
+        (brand.UnitKey, brand.Quantity, brand.CanTypeQuantity).Should().Be((PurchaseUnitChoice.BaseUnitKey, 1m, false));
+        viewModel.UnitRows.Should().BeEmpty("the piece is the base unit now, which can't be an alternative unit too");
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterialUnits.CountAsync(Cancellation)).Should().Be(0);
+        (await dbContext.RawMaterialBrandPrices.SingleAsync(Cancellation)).Should().BeEquivalentTo(new { UnitId = (int?)null, Price = 5m });
+    }
+
     private static BrandPriceRow AddBrandPrice(RawMaterialsViewModel viewModel, string? brand, string unitName, decimal price)
     {
         var row = viewModel.NewBrandPriceRow();
