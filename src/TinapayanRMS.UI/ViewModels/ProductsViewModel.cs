@@ -90,8 +90,13 @@ public sealed class ProductUsageEdit : ReactiveObject
             usage.AuthoredValue,
             isOwn ? null : subAssembly.Name,
             [.. addIns.Select(a => new SubAssemblyLineEdit(IngredientOf(a.IngredientId, a.Ingredient), a.Grams))],
-            SubAssemblyRules.SectionLabel(subAssembly.Name, productName, role?.Name ?? string.Empty));
+            SubAssemblyRules.SectionLabel(subAssembly.Name, productName, role?.Name ?? string.Empty),
+            linkedOwner: isOwn ? null : LinkedOwnerOf(subAssembly));
     }
+
+    /// <summary>The product a linked sub-assembly is kept in, when it's that product's own (a variant's link); null for one on the Sub-Assemblies screen.</summary>
+    public static (int Id, string Name)? LinkedOwnerOf(SubAssembly subAssembly) =>
+        subAssembly.OwnerProductId is { } ownerId ? (ownerId, subAssembly.OwnerProduct?.Name ?? $"Product {ownerId}") : null;
 
     /// <param name="subAssemblyId">The sub-assembly's id, or 0 for a new section, not saved yet.</param>
     /// <param name="linkedName">The linked sub-assembly's name, e.g. "Cheese Roll Filling: Ube"; null for the product's own or a new section.</param>
@@ -109,6 +114,7 @@ public sealed class ProductUsageEdit : ReactiveObject
     /// A linked one's lines as the Sub-Assemblies screen has them, when <paramref name="lines"/> were changed here since; null
     /// when they're the same.
     /// </param>
+    /// <param name="linkedOwner">The product a linked one is kept in, its own, which only a variant links; null for one on the Sub-Assemblies screen.</param>
     public ProductUsageEdit(
         int subAssemblyId,
         SubAssemblyRole? role,
@@ -120,7 +126,8 @@ public sealed class ProductUsageEdit : ReactiveObject
         string? name = null,
         bool isOwn = false,
         bool isReleasing = false,
-        IReadOnlyList<SubAssemblyLineEdit>? savedLines = null)
+        IReadOnlyList<SubAssemblyLineEdit>? savedLines = null,
+        (int Id, string Name)? linkedOwner = null)
     {
         _isOwn = isOwn;
         _isReleasing = isReleasing;
@@ -132,6 +139,7 @@ public sealed class ProductUsageEdit : ReactiveObject
         AuthoredField = authoredField;
         AuthoredValue = authoredValue;
         LinkedName = linkedName;
+        LinkedOwner = linkedName is null ? null : linkedOwner;
         AddIns = addIns ?? [];
 
         // The sub-assembly's own batch, then this product's on top of it: add-ins go into the batch, so a
@@ -218,6 +226,12 @@ public sealed class ProductUsageEdit : ReactiveObject
     public string? LinkedName { get; }
 
     /// <summary>
+    /// The product a linked one is kept in, as its own: a variant links its source's. Null for one on the Sub-Assemblies
+    /// screen, or for a section that isn't linked.
+    /// </summary>
+    public (int Id, string Name)? LinkedOwner { get; }
+
+    /// <summary>
     /// The form edits its lines: the product's own (<see cref="IsOwned"/>), or a new section, which Save makes the
     /// product's own in a product-owned role, and otherwise keeps on the Sub-Assemblies screen and links.
     /// </summary>
@@ -259,8 +273,16 @@ public sealed class ProductUsageEdit : ReactiveObject
     /// </summary>
     public bool AreLinkedLinesEdited => IsLinked && !HaveSameRecipe(Lines, _savedLines);
 
-    /// <summary>The badge beside a linked section's heading, which opens it on the Sub-Assemblies screen: "Cheese Roll Dough, from Sub-Assemblies".</summary>
-    public string LinkedFromText => $"{LinkedName}, from {StandaloneSourceName}";
+    /// <summary>
+    /// The badge beside a linked section's heading, which opens where it's kept: "Cheese Roll Dough, from Sub-Assemblies",
+    /// or a variant's "Ensaymada Filling, from Ensaymada", the product whose own it is.
+    /// </summary>
+    public string LinkedFromText => $"{LinkedName}, from {LinkedOwner?.Name ?? StandaloneSourceName}";
+
+    /// <summary>The badge's tooltip: where it's kept, and that Save here writes changed lines there.</summary>
+    public string LinkedFromToolTip => LinkedOwner is { } owner
+        ? $"It's {owner.Name}'s own, and this product links it as {owner.Name}'s variant, so both use its lines. Change them here or there: Save here writes them there. Click to open {owner.Name}."
+        : "It's kept on the Sub-Assemblies screen, and every product linking it uses its lines. Change them here or there: Save here writes them there. Click to open it there.";
 
     /// <summary>What it's called where the recipe it's in isn't plain: a linked one by its name, a new one as its section is.</summary>
     public string DisplayName => LinkedName ?? SectionName;
@@ -304,11 +326,11 @@ public sealed class ProductUsageEdit : ReactiveObject
 
     /// <summary>A new section with its role refreshed (renamed in Settings) and its lines repriced with their ingredients.</summary>
     public ProductUsageEdit With(SubAssemblyRole? role, IReadOnlyList<SubAssemblyLineEdit> lines) =>
-        new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, _isReleasing);
+        new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, _isReleasing, linkedOwner: LinkedOwner);
 
     /// <summary>The same section of the product's own, for Save to move to the Sub-Assemblies screen and link.</summary>
     public ProductUsageEdit Released() =>
-        new(SubAssemblyId, Role, Lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, isReleasing: true);
+        new(SubAssemblyId, Role, Lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, isReleasing: true, linkedOwner: LinkedOwner);
 
     /// <summary>
     /// A linked section as the Sub-Assemblies screen now has it — its name, the label it gives (<paramref name="name"/>),
@@ -322,8 +344,9 @@ public sealed class ProductUsageEdit : ReactiveObject
         SubAssemblyRole? role,
         IReadOnlyList<SubAssemblyLineEdit> savedLines,
         IReadOnlyList<SubAssemblyLineEdit>? editedLines,
-        IReadOnlyList<SubAssemblyLineEdit> addIns) =>
-        new(SubAssemblyId, role, editedLines ?? savedLines, AuthoredField, AuthoredValue, linkedName, addIns, name, savedLines: savedLines);
+        IReadOnlyList<SubAssemblyLineEdit> addIns,
+        (int Id, string Name)? linkedOwner) =>
+        new(SubAssemblyId, role, editedLines ?? savedLines, AuthoredField, AuthoredValue, linkedName, addIns, name, savedLines: savedLines, linkedOwner: linkedOwner);
 
     /// <summary>The same linked section with the lines, piece size and add-ins the form now holds.</summary>
     public ProductUsageEdit WithLinkedForm(
@@ -331,7 +354,7 @@ public sealed class ProductUsageEdit : ReactiveObject
         UsageAuthoredField authoredField,
         decimal authoredValue,
         IReadOnlyList<SubAssemblyLineEdit> addIns) =>
-        new(SubAssemblyId, Role, lines, authoredField, authoredValue, LinkedName, addIns, Name, savedLines: _savedLines);
+        new(SubAssemblyId, Role, lines, authoredField, authoredValue, LinkedName, addIns, Name, savedLines: _savedLines, linkedOwner: LinkedOwner);
 
     /// <summary>Whether <paramref name="other"/> shows the same thing: the same role and names, piece size, and lines and add-ins at the same costs.</summary>
     public bool ShowsSameAs(ProductUsageEdit other) =>
@@ -340,6 +363,7 @@ public sealed class ProductUsageEdit : ReactiveObject
         && IsReleasing == other.IsReleasing
         && CollectionMerge.HasSameValues(Role, other.Role)
         && LinkedName == other.LinkedName
+        && LinkedOwner == other.LinkedOwner
         && Name == other.Name
         && AuthoredField == other.AuthoredField
         && AuthoredValue == other.AuthoredValue
@@ -1823,6 +1847,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     public ReactiveCommand<int, RxVoid> OpenSubAssemblyCommand { get; }
 
+    /// <summary>
+    /// A linked recipe section's badge clicked: opens where it's kept, the product whose own it is for a variant's link
+    /// (OpenProduct), and otherwise the Sub-Assemblies screen, as <see cref="OpenSubAssemblyCommand"/> does.
+    /// </summary>
+    public ReactiveCommand<ProductUsageEdit, RxVoid> OpenLinkedSourceCommand { get; }
+
     private readonly Subject<int> _subAssemblyOpenRequests = new();
 
     /// <summary>
@@ -2548,6 +2578,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         CollapseAllCommand = ReactiveCommand.Create<ProductFolderNode?>(ProductTree.CollapseAll);
 
         OpenSubAssemblyCommand = ReactiveCommand.Create<int>(_subAssemblyOpenRequests.OnNext);
+        OpenLinkedSourceCommand = ReactiveCommand.Create<ProductUsageEdit>(usage =>
+        {
+            if (usage.LinkedOwner is { } owner)
+            {
+                OpenProduct(owner.Id);
+            }
+            else
+            {
+                _subAssemblyOpenRequests.OnNext(usage.SubAssemblyId);
+            }
+        });
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
@@ -4570,7 +4611,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     section.AuthoredValue,
                     linked.Name,
                     [.. section.AddIns.Select(a => new SubAssemblyLineEdit(ingredientsById[a.IngredientId], a.Grams))],
-                    SectionLabelOf(linked.Name, linkedRole)));
+                    SectionLabelOf(linked.Name, linkedRole),
+                    linkedOwner: ProductUsageEdit.LinkedOwnerOf(linked)));
                 continue;
             }
 
@@ -5712,7 +5754,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     role,
                     [.. linkedLinesById[subAssembly.Id].Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
                     edit.AreLinkedLinesEdited ? Repriced(edit.Lines, ingredientsById) : null,
-                    Repriced(edit.AddIns, ingredientsById));
+                    Repriced(edit.AddIns, ingredientsById),
+                    ProductUsageEdit.LinkedOwnerOf(subAssembly));
             }
             else
             {

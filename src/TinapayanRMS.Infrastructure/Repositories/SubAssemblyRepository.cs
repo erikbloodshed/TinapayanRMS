@@ -36,24 +36,8 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     /// <summary>With each one's owner, if a product owns it: that one can only be copied.</summary>
     public Task<IReadOnlyList<SubAssembly>> GetLinkableAsync(CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<SubAssembly>>(
-            async dbContext => (await dbContext.Connection().QueryAsync<SubAssembly, SubAssemblyRole, Product?, SubAssembly>(
-                dbContext.Command(
-                    $"""
-                    SELECT {SubAssemblyReads.ColumnsWithRole}, o.id, o.name
-                    FROM sub_assemblies s
-                    {SubAssemblyReads.RoleJoin}
-                    LEFT JOIN products o ON o.id = s.owner_product_id
-                    WHERE s.total_weight > 0 AND NOT r.is_packaging
-                    ORDER BY s.name
-                    """,
-                    null,
-                    cancellationToken),
-                (subAssembly, role, owner) =>
-                {
-                    subAssembly.OwnerProduct = owner;
-                    return SubAssemblyReads.WithRole(subAssembly, role);
-                },
-                splitOn: "Id,Id")).AsList(),
+            dbContext => SubAssemblyReads.GetWithRoleAsync(
+                dbContext, "WHERE s.total_weight > 0 AND NOT r.is_packaging\nORDER BY s.name", null, cancellationToken),
             cancellationToken);
 
     public Task<IReadOnlyList<SubAssembly>> GetStandaloneAsync(CancellationToken cancellationToken) =>
