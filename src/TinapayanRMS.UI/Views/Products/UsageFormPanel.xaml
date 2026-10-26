@@ -142,13 +142,16 @@
                             Visibility="{Binding EditingUsage.IsReleasing, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
                         <TextBlock Text="Moves to Sub-Assemblies on Save" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
                     </Border>
-                    <!-- A linked one's badge is a link: it opens the sub-assembly on the Sub-Assemblies screen (MainWindow subscribes to SubAssemblyOpenRequests) -->
+                    <!--
+                        A linked one's badge is a link: it opens the sub-assembly on the Sub-Assemblies screen (MainWindow
+                        subscribes to SubAssemblyOpenRequests), or for a variant's link, the product whose own it is
+                    -->
                     <Button Style="{StaticResource LinkedBadgeLinkStyle}"
                             Margin="0,0,4,8"
                             Content="{Binding EditingUsage.LinkedFromText}"
-                            Command="{Binding OpenSubAssemblyCommand}"
-                            CommandParameter="{Binding EditingUsage.SubAssemblyId}"
-                            ToolTip="It's kept on the Sub-Assemblies screen, and every product linking it uses its lines. Change them here or there: Save here writes them there. Click to open it there."
+                            Command="{Binding OpenLinkedSourceCommand}"
+                            CommandParameter="{Binding EditingUsage}"
+                            ToolTip="{Binding EditingUsage.LinkedFromToolTip}"
                             Visibility="{Binding IsShowingLinkBadge, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <!--
                         Edit beside the badge: links another sub-assembly in its place, keeping this product's piece size and
@@ -161,7 +164,7 @@
                             VerticalAlignment="Center"
                             Style="{DynamicResource {skinManager:ThemeKey Key=WPFGlyphButtonStyle, Theme={x:Type sfTheme:Windows11LightSkinHelper}}}"
                             Command="{Binding StartChangingLinkCommand}"
-                            ToolTip="Link another sub-assembly in its place, keeping this product's piece size and add-ins. The one linked now stays on the Sub-Assemblies screen."
+                            ToolTip="Link another sub-assembly in its place, keeping this product's piece size and add-ins. The one linked now stays where it's kept."
                             AutomationProperties.Name="Change link"
                             Visibility="{Binding IsShowingLinkBadge, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <TextBlock Text="&#xE70F;" Style="{StaticResource IconGlyphStyle}" />

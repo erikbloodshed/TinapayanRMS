@@ -16,10 +16,10 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         CreateFromAsync(sourceProductId, newProductName, asVariant: true, cancellationToken);
 
     /// <summary>
-    /// A clone and a variant differ only in their packaging: a clone copies it, a variant links it. Both link the
-    /// sub-assemblies the source's recipe links, and have their own copy of each of the source's own; a composite's copy
-    /// holds the same products, at the same quantities. The product row — its quantity required and whether it's a
-    /// composite among the rest — and its costing are copied alike.
+    /// A clone links the sub-assemblies the source's recipe links, has its own copy of each of the source's own, and
+    /// copies its packaging. A variant links every sub-assembly the source uses, its own ones included, and has no
+    /// packaging. A composite's copy holds the same products, at the same quantities, either way. The
+    /// product row — its quantity required and whether it's a composite among the rest — and its costing are copied alike.
     /// </summary>
     private async Task<int> CreateFromAsync(int sourceProductId, string newProductName, bool asVariant, CancellationToken cancellationToken)
     {
@@ -87,23 +87,19 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
         }
 
         await ProductSubAssemblyUsageRepository.SetRecipeAsync(
-            dbContext, newProduct.Id, DerivedRecipe(source.Name, usages, ownLines, addInsByUsage), cancellationToken);
+            dbContext,
+            newProduct.Id,
+            asVariant ? VariantRecipe(usages, addInsByUsage) : DerivedRecipe(source.Name, usages, ownLines, addInsByUsage),
+            linksOthersOwn: asVariant,
+            cancellationToken);
 
-        if (asVariant)
-        {
-            // The variant's packaging is the source's, followed through a link — a chain, when the source links a set
-            // or another product's — whenever the source has any: its own lines or a link.
-            if (sourceLink is not null || packagingLines.Count > 0)
-            {
-                await PackagingLinkRepository.SetAsync(dbContext, newProduct.Id, new PackagingLinkDraft(sourceProductId, null), cancellationToken);
-            }
-        }
-        else if (sourceLink?.LinkedSubAssemblyId is { } setId)
+        // A variant has no packaging: it's given its own afterward.
+        if (!asVariant && sourceLink?.LinkedSubAssemblyId is { } setId)
         {
             dbContext.PackagingLinks.Add(new PackagingLink { ProductId = newProduct.Id, LinkedSubAssemblyId = setId });
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-        else if (packagingLines.Count > 0)
+        else if (!asVariant && packagingLines.Count > 0)
         {
             await PackagingLineRepository.SetLinesAsync(
                 dbContext,
@@ -177,4 +173,19 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
 
         return new RecipeDraft(own, linked);
     }
+
+    /// <summary>
+    /// A variant's recipe, at the source's piece sizes: a link to every sub-assembly the source uses, its own ones and
+    /// the ones it links from the Sub-Assemblies screen alike, with the source's add-ins on each as the variant's own.
+    /// </summary>
+    private static RecipeDraft VariantRecipe(List<ProductSubAssemblyUsage> usages, ILookup<int, UsageAddInLine> addInsByUsage) =>
+        new(
+            [],
+            [
+                .. usages
+                    .Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
+                    {
+                        AddIns = [.. addInsByUsage[u.Id].Select(l => (l.IngredientId, l.Grams))],
+                    }),
+            ]);
 }

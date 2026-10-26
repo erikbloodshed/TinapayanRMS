@@ -2008,9 +2008,9 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task Create_Variant_makes_a_product_that_links_the_recipe_and_packaging_and_shows_it()
+    public async Task Create_Variant_makes_a_product_that_links_the_sources_own_with_no_packaging_and_shows_it()
     {
-        var roleId = await AddRoleAsync("Dough");
+        var roleId = await AddRoleAsync("Dough", isProductOwned: true);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var (sourceId, doughId) = await AddProductWithSubAssemblyAsync("Ensaymada Big", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
         await GivePackagingAsync(sourceId);
@@ -2026,12 +2026,28 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SelectedProduct!.Name.Should().Be("Ensaymada Small");
+        var variantId = viewModel.SelectedProduct.Id;
         await WaitUntilSettledAsync(
-            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1 && viewModel.IsPackagingLinked,
-            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, packaging linked={viewModel.IsPackagingLinked}");
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}");
         var usage = viewModel.UsageEdits.Single();
         usage.IsLinked.Should().BeTrue();
         usage.SubAssemblyId.Should().Be(doughId);
+        usage.LinkedOwner.Should().Be((sourceId, "Ensaymada Big"));
+        usage.LinkedFromText.Should().Be("Ensaymada Big Dough, from Ensaymada Big");
+        viewModel.IsPackagingLinked.Should().BeFalse();
+        viewModel.LineEdits.Should().BeEmpty("a variant's packaging is neither linked nor copied");
+
+        // Its Save keeps the link to the source's own, which no other product could link.
+        viewModel.EditingCurrentPrice = 20m;
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        (await new ProductSubAssemblyUsageRepository(CreateDbContextFactory()).GetForProductAsync(variantId, Cancellation))
+            .Should().ContainSingle().Which.SubAssemblyId.Should().Be(doughId);
+
+        // The badge opens the source, where the dough is kept.
+        await viewModel.OpenLinkedSourceCommand.Execute(usage);
+        viewModel.SelectedProduct!.Id.Should().Be(sourceId);
     }
 
     [Fact]

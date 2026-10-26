@@ -88,7 +88,7 @@ Every sub-assembly has a **role** that says what it is in the recipe, such as Do
 A product uses a sub-assembly in one of two ways:
 
 - **Linked**: the product uses a sub-assembly that's kept on the Sub-Assemblies screen. Every product that links it follows every change made to it. Use this when several products share one dough, for example.
-- **Its own**: the sub-assembly belongs to that one product. Other products can copy it but can't link it. A role can be set to be **product-owned** in Settings. A section made in a product in that role is then always the product's own.
+- **Its own**: the sub-assembly belongs to that one product. Other products can copy it but can't link it, except its variants (see [Clone tab](#clone-tab)). A role can be set to be **product-owned** in Settings. A section made in a product in that role is then always the product's own.
 
 A sub-assembly in the **Packaging** role is a **packaging set**, such as a gift box with its ribbon and tag. It holds packaging materials instead of ingredients.
 
@@ -298,7 +298,7 @@ Each role has:
 
 - **Name**: what the section is called in a recipe, such as Dough or Filling.
 - **Order**: where the role's sections go in a recipe. Lower numbers come first. A new role goes last. To change a role's place, pick it in the list and press **Move Up** or **Move Down** above the list. The roles are numbered 1, 2, 3… again after a move or a delete, so there are no gaps.
-- **Product-owned**: a section made in a product in this role stays that product's own. It's edited in the product's recipe instead of on the Sub-Assemblies screen, and other products can copy it but not link it. Turning this on or off for a role that's already used asks first, and says how many sub-assemblies will move.
+- **Product-owned**: a section made in a product in this role stays that product's own. It's edited in the product's recipe instead of on the Sub-Assemblies screen, and other products can copy it but not link it, except its variants. Turning this on or off for a role that's already used asks first, and says how many sub-assemblies will move.
   - These are also the only roles a composite product can have sections in. So Product-owned can't be turned off while a composite has a section in the role; the message names the composites. Take the section out there first.
   - A section you make in a product in this role starts at a Yield of 1, so its Weight/piece is the whole batch (see [Piece size](#piece-size-weight-per-piece-and-yield)).
 
@@ -710,12 +710,16 @@ Press **Print** while this tab is showing to print the scaled recipe instead of 
 
 The Clone tab is shown for saved products only. Type a **New Product Name**, then choose:
 
-- **Clone**: the new product links the same sub-assemblies at the same piece sizes, and gets its **own copy of the packaging**.
-- **Create Variant**: the same, except the packaging is **linked**, so the new product follows every change made to this one's packaging. Use this for a smaller or bigger version of the same product. For a boxed version, re-point its packaging at a packaging set.
+- **Clone**: the new product links the same sub-assemblies from the Sub-Assemblies screen at the same piece sizes, gets its **own copy** of this product's own sub-assemblies, and gets its **own copy of the packaging**.
+- **Create Variant**: the new product **links every sub-assembly this product uses** at the same piece sizes: the ones it links from the Sub-Assemblies screen (a dough, sponge or batter) and this product's own (a filling, topping and so on). So it follows every change made to them. It gets **no packaging**, neither linked nor copied. Use this for a smaller or bigger version of the same product, then give it its own packaging.
 
-With both, the product's own sub-assemblies are copied to the new product. The category, Quantity Required, Current Price and costing percentages are copied too. The new product starts in Research and Development, and you can change its piece sizes. Its History tab starts with one version that says where it came from (see [History tab](#history-tab)).
+A section that's this product's own shows in the variant with a badge such as "Ensaymada Big Filling, from Ensaymada Big". Click it to open the product the section belongs to. You can change the section's lines in the variant too: Save writes them to that product's sub-assembly. **Make a Copy** gives the variant its own copy instead. Once a variant drops a linked section, it can't link it again.
 
-A composite product's clone or variant is a composite too, holding the same products at the same quantities. Its own sections are copied as any product's are.
+While a variant links one of this product's own sub-assemblies, this product can't remove that sub-assembly and can't be deleted. Make a copy of it in the variant, or remove it there, first.
+
+The category, Quantity Required, Current Price and costing percentages are copied with both. The new product starts in Research and Development, and you can change its piece sizes. Its History tab starts with one version that says where it came from (see [History tab](#history-tab)).
+
+A composite product's clone or variant is a composite too, holding the same products at the same quantities. A clone copies its own sections and a variant links them, as for any product.
 
 ### History tab
 
@@ -1112,7 +1116,7 @@ The app keeps costs at full precision and rounds them only for display. So a tot
 ### Start a new product from an existing one
 
 - For **a different product that shares some recipes**, use **Clone** (Clone tab, or right-click → **Clone…**). It gets its own packaging.
-- For **a size or pack variation** that should follow the original, use **Create Variant**. Then adjust its piece sizes, and its **Quantity Required** if it's sold as a pack.
+- For **a size or pack variation** that should follow the original's recipes, use **Create Variant**. Then adjust its piece sizes, give it its packaging, and set its **Quantity Required** if it's sold as a pack.
 - To **reuse just one dough or filling**, use **Add Sub-Assembly → Link an existing one** in the new product.
 
 ### See which products use an ingredient

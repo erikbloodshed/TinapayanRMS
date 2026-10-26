@@ -435,10 +435,9 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await RoleAsync(packagingRoleId)).IsProductOwned.Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task A_clone_or_variant_gets_its_own_copy_of_the_sources_own_and_links_what_it_links(bool asVariant)
+    // A variant links the source's own instead (ProductVariantPersistenceTests).
+    [Fact]
+    public async Task A_clone_gets_its_own_copy_of_the_sources_own_and_links_what_it_links()
     {
         var doughRoleId = await AddRoleAsync("Dough");
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2, isProductOwned: true);
@@ -453,11 +452,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
             []));
         var doughId = await SubAssemblyIdAsync(sourceId, doughRoleId);
         var sourceFillingId = await SubAssemblyIdAsync(sourceId, fillingRoleId);
-        var cloner = new ProductCloner(CreateDbContextFactory());
-
-        var newId = asVariant
-            ? await cloner.CreateVariantAsync(sourceId, "Cheese Roll Mini", Cancellation)
-            : await cloner.CloneAsync(sourceId, "Cheese Roll Mini", Cancellation);
+        var newId = await new ProductCloner(CreateDbContextFactory()).CloneAsync(sourceId, "Cheese Roll Mini", Cancellation);
 
         var usages = await CreateUsageRepository().GetForProductAsync(newId, Cancellation);
         usages.Single(u => u.SubAssembly!.RoleId == doughRoleId).SubAssemblyId.Should().Be(doughId, "the dough is on the Sub-Assemblies screen, so it's linked");

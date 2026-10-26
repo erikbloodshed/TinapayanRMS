@@ -107,10 +107,10 @@ public class ProductQuantityRequiredPersistenceTests(DatabaseFixture fixture) : 
     public async Task A_boxed_variant_costs_its_pieces_by_the_quantity_plus_one_whole_packaging_set()
     {
         // The worked example from the rework: Ensaymada at 10 g of a 1,000 g / P50 dough is P0.50 of recipe a
-        // piece. "Ensaymada Box of 8" is a variant of it — the recipe linked, so still 10 g a piece — with a
+        // piece. "Ensaymada Box of 8" is a variant of it — its own dough linked, so still 10 g a piece — with a
         // quantity of 8 and a packaging set of its own holding the 8 bags and the one box. So its materials
         // come to 8 x P0.50 + 8 x P0.25 + P12 = P18, and not eight boxes over.
-        var doughRoleId = await AddRoleAsync("Dough");
+        var doughRoleId = await AddRoleAsync("Dough", isProductOwned: true);
         var packagingRoleId = await AddRoleAsync("Packaging", sortOrder: 6, isPackaging: true);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var packagingCategoryId = await AddPackagingCategoryAsync();

@@ -87,8 +87,8 @@ public static class SubAssemblyRules
 
     /// <summary>
     /// A product's own sub-assembly is copied by other products, never linked: it's edited in its product, which can
-    /// change or remove it at any time. <paramref name="ownerName"/> is its product's, or null for one on the
-    /// Sub-Assemblies screen, which any product can link.
+    /// change or remove it at any time. Create Variant alone links it, and those links aren't checked here.
+    /// <paramref name="ownerName"/> is its product's, or null for one on the Sub-Assemblies screen, which any product can link.
     /// </summary>
     public static void EnsureLinkable(string subAssemblyName, string? ownerName)
     {
