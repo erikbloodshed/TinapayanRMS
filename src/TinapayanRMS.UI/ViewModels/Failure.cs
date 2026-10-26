@@ -39,6 +39,10 @@ public readonly record struct Failure(string Text, bool IsRejection)
     public static Failure Of(Exception exception) => exception switch
     {
         BusinessRuleException rule => new(rule.Message, IsRejection: true),
+
+        // Since Npgsql 11 a deadlock or serialization failure in SaveChanges comes as a concurrency exception, even
+        // inside our own transaction (only one raised by CommitAsync doesn't), with the server's error inside it.
+        DbUpdateConcurrencyException { InnerException: PostgresException postgres } => Of(postgres),
         DbUpdateConcurrencyException => new(
             "It was changed or deleted on another screen in the meantime. Open it again, then make the change.", IsRejection: true),
         DbUpdateException { InnerException: NpgsqlException npgsql } => Of(npgsql),
