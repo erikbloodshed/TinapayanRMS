@@ -116,7 +116,7 @@ You'll be productive sooner if you're comfortable with the following.
 | Tool | Version | Notes |
 |---|---|---|
 | Windows | 10 or 11 | WPF only runs on Windows. Icons use Segoe Fluent Icons (Windows 11), and fall back to Segoe MDL2 Assets on Windows 10. |
-| .NET SDK | 11.0.100-rc.2.26504.105 (a preview), or a later 11.0 feature band | Pinned in [global.json](../global.json) with `allowPrerelease` and `rollForward: latestFeature`. |
+| .NET SDK | 11.0.100-rc.3.26522.148 (a preview), or a later 11.0 feature band | Pinned in [global.json](../global.json) with `allowPrerelease` and `rollForward: latestFeature`. |
 | PostgreSQL | 18 (EDB's Windows installer, service `postgresql-x64-18`, `localhost:5432`) | Reached as the `tinapayanrms` role, which must be able to create databases (`CREATEDB`), because the tests create their own. Its password goes in the password file, `%APPDATA%\postgresql\pgpass.conf`, so no connection string carries one. The installer's `bin` folder holds `psql`, and the `pg_dump` and `pg_restore` the backups run. |
 | `dotnet-ef` | 11.0.0-rc.2.26504.105, matching EF Core | `dotnet tool update --global dotnet-ef --version 11.0.0-rc.2.26504.105` (it installs the tool if it isn't there) |
 | Syncfusion licence key | Essential Studio 35.x | Set as the `SYNCFUSION_LICENSE_KEY` user environment variable. The build compiles it into the app, so the app runs on a computer without the variable, but an app built without it won't start, and `dotnet publish` fails without it. The UI tests that build Syncfusion controls read the variable themselves and are skipped without it. After changing the key, rebuild. A key covers one major version, so moving `SyncfusionVersion` to a new major version needs a new key. A program started before the variable changed, such as the IDE and its terminals, keeps the old value until it's restarted. |
@@ -133,7 +133,7 @@ Docker isn't used anywhere in this project.
 
 Run every command from the repository root.
 
-1. **Check the SDK.** `dotnet --version` should print 11.0.100-rc.2.26504.105 or later.
+1. **Check the SDK.** `dotnet --version` should print 11.0.100-rc.3.26522.148 or later.
 2. **Set up PostgreSQL.** Install PostgreSQL 18, then, as the `postgres` superuser, create the app's role, and put its password in the password file (one line, `localhost:5432:*:tinapayanrms:<password>`):
    ```powershell
    $psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"

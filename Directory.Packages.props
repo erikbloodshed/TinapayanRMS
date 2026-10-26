@@ -3,9 +3,10 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <!-- Lets a PackageVersion below override a vulnerable transitive dependency. -->
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <!-- Npgsql.EntityFrameworkCore.PostgreSQL asks for exactly this EF Core: move both together. -->
     <EFCoreVersion>11.0.0-rc.2.26504.105</EFCoreVersion>
     <!-- Microsoft.Extensions.* ships with the .NET runtime: keep it on the same release. -->
-    <MicrosoftExtensionsVersion>11.0.0-rc.2.26504.105</MicrosoftExtensionsVersion>
+    <MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
     <!-- Every Syncfusion package must be on the same version: upgrade them together. -->
     <SyncfusionVersion>35.1.41</SyncfusionVersion>
   </PropertyGroup>

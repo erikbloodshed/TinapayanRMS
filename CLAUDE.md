@@ -8,7 +8,7 @@ TinapayanRMS is a WPF desktop app for a bakeshop. It tracks raw material prices 
 
 ## Commands
 
-Run everything from the repo root. The .NET 11 SDK (11.0.100-rc.2.26504.105, a preview) is pinned in `global.json`, which also sets `test.runner` to Microsoft.Testing.Platform. VSTest-style flags such as `--filter` and `--collect` don't work here.
+Run everything from the repo root. The .NET 11 SDK (11.0.100-rc.3.26522.148, a preview) is pinned in `global.json`, which also sets `test.runner` to Microsoft.Testing.Platform. VSTest-style flags such as `--filter` and `--collect` don't work here.
 
 ```sh
 dotnet build TinapayanRMS.slnx
