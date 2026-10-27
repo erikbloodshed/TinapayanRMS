@@ -318,6 +318,35 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         set => this.RaiseAndSetIfChanged(ref _editingSubAssembly, value);
     }
 
+    private bool _isChangingSubAssembly;
+    /// <summary>
+    /// The Recipe card's Edit was pressed: the Made from picker shows again in place of the badge, until another sub-assembly
+    /// is picked or Cancel is pressed (2026-10-27, at the user's request: the picker was too easy to change by accident).
+    /// </summary>
+    public bool IsChangingSubAssembly
+    {
+        get => _isChangingSubAssembly;
+        private set => this.RaiseAndSetIfChanged(ref _isChangingSubAssembly, value);
+    }
+
+    private readonly ObservableAsPropertyHelper<bool> _isPickingSubAssembly;
+    /// <summary>The Made from picker shows: no sub-assembly is picked yet, or Edit was pressed. Otherwise the badge and Edit show.</summary>
+    public bool IsPickingSubAssembly => _isPickingSubAssembly.Value;
+
+    private readonly ObservableAsPropertyHelper<bool> _isShowingSubAssemblyBadge;
+    /// <summary>The picked sub-assembly shows as a badge that opens it, with Edit beside it, so a stray click or scroll can't change it.</summary>
+    public bool IsShowingSubAssemblyBadge => _isShowingSubAssemblyBadge.Value;
+
+    private readonly ObservableAsPropertyHelper<string> _subAssemblyBadgeText;
+    /// <summary>"Butter Icing Base, from Sub-Assemblies", as a linked section's badge reads on the Products screen.</summary>
+    public string SubAssemblyBadgeText => _subAssemblyBadgeText.Value;
+
+    /// <summary>The badge's Edit: shows the Made from picker again (<see cref="IsChangingSubAssembly"/>).</summary>
+    public ReactiveCommand<RxVoid, RxVoid> StartChangingSubAssemblyCommand { get; }
+
+    /// <summary>The picker's Cancel: puts the badge back, keeping the sub-assembly as it is.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> CancelChangingSubAssemblyCommand { get; }
+
     /// <summary>
     /// The lines of <see cref="EditingSubAssembly"/>, as it's saved on the Sub-Assemblies screen, for show: read-only here,
     /// since that screen is the one place the recipe is written. Read again whenever the pick changes or the screen loads.
@@ -1225,6 +1254,27 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // Sub-Assemblies screen shows here. The tiles follow them.
         LoadLatest(this.WhenAnyValue(x => x.EditingSubAssembly), LoadRecipeLinesAsync);
 
+        // Once a sub-assembly is picked, it shows as a badge with Edit beside it, and the picker only comes back on Edit.
+        _isPickingSubAssembly = this.WhenAnyValue(x => x.EditingSubAssembly, x => x.IsChangingSubAssembly,
+                (subAssembly, isChanging) => subAssembly is null || isChanging)
+            .ToProperty(this, x => x.IsPickingSubAssembly, true);
+        _isShowingSubAssemblyBadge = this.WhenAnyValue(x => x.IsPickingSubAssembly)
+            .Select(isPicking => !isPicking)
+            .ToProperty(this, x => x.IsShowingSubAssemblyBadge);
+        _subAssemblyBadgeText = this.WhenAnyValue(x => x.EditingSubAssembly)
+            .Select(subAssembly => subAssembly is null ? string.Empty : $"{subAssembly.Name}, from Sub-Assemblies")
+            .ToProperty(this, x => x.SubAssemblyBadgeText, string.Empty);
+
+        // Another sub-assembly picked after Edit settles it, and the badge comes back. A refresh's re-pointing isn't a pick.
+        this.WhenAnyValue(x => x.EditingSubAssembly)
+            .Where(subAssembly => subAssembly is not null && IsChangingSubAssembly && !IsBusyApplying)
+            .Subscribe(_ => IsChangingSubAssembly = false);
+
+        StartChangingSubAssemblyCommand = ReactiveCommand.Create(
+            () => { IsChangingSubAssembly = true; },
+            this.WhenAnyValue(x => x.IsShowingSubAssemblyBadge));
+        CancelChangingSubAssemblyCommand = ReactiveCommand.Create(() => { IsChangingSubAssembly = false; });
+
         // The alternative units and the purchase unit choices name the base unit, which a new
         // material can still change.
         this.WhenAnyValue(x => x.EditingType, x => x.EditingBaseUnit)
@@ -1692,6 +1742,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             EditingSource = snapshot.Source;
             EditingBaseUnit = snapshot.BaseUnitId is { } baseUnitId ? UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId) : null;
             EditingWeightLossPercent = snapshot.WeightLossPercent;
+            IsChangingSubAssembly = false;
             EditingSubAssembly = snapshot.SubAssemblyId is { } subAssemblyId ? SubAssemblyOptions.FirstOrDefault(s => s.Id == subAssemblyId) : null;
             EditingLinkedTo = snapshot.LinkedToId is { } linkedToId ? Ingredients.FirstOrDefault(m => m.Id == linkedToId) : null;
             EditingWeightSharePercent = snapshot.WeightSharePercent;
@@ -1776,6 +1827,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         EditingSource = source;
         EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId && c.Type == RawMaterialRules.CategoryTypeFor(type, source));
 
+        IsChangingSubAssembly = false;
         EditingSubAssembly = null;
         EditingLinkedTo = null;
         EditingWeightSharePercent = null;
@@ -1813,6 +1865,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         EditingCategory = Categories.FirstOrDefault(c => c.Id == material.CategoryId);
         EditingSource = material.Source;
         EditingWeightLossPercent = material.WeightLossPercent;
+        IsChangingSubAssembly = false;
         EditingSubAssembly = SubAssemblyOptions.FirstOrDefault(s => s.Id == material.SubAssemblyId);
         EditingLinkedTo = Ingredients.FirstOrDefault(m => m.Id == material.LinkedToId);
         EditingWeightSharePercent = material.WeightSharePercent;

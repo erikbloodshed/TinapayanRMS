@@ -2,7 +2,9 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
-             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls">
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
+             xmlns:skinManager="clr-namespace:Syncfusion.SfSkinManager;assembly=Syncfusion.SfSkinManager.WPF"
+             xmlns:sfTheme="clr-namespace:Syncfusion.Themes.Windows11Light.WPF;assembly=Syncfusion.Themes.Windows11Light.WPF">
     <!-- No frame of its own: it sits straight in its tab, whose card has the border and rounded corners -->
     <Border Padding="12">
         <StackPanel>
@@ -10,7 +12,9 @@
 
             <!--
                 The sub-assembly it's made from: the Sub-Assemblies screen is the one place its lines are written, so they only
-                show here. The badge beside the picker opens it there (MainWindow subscribes to SubAssemblyOpenRequests).
+                show here. Once one is picked it shows as a badge that opens it there (MainWindow subscribes to
+                SubAssemblyOpenRequests), with Edit beside it, as a linked section does on the Products screen, so a stray
+                click or scroll can't change it. Edit brings the picker back, with Cancel beside it, until another is picked.
             -->
             <Grid Margin="0,0,0,8">
                 <Grid.ColumnDefinitions>
@@ -27,15 +31,41 @@
                                         controls:FieldUndoStep.Recorder="{Binding}"
                                         SelectedItem="{Binding EditingSubAssembly, Mode=TwoWay}"
                                         ToolTip="The sub-assembly whose recipe it's made from, as it's kept on the Sub-Assemblies screen. Its add-ins and weight loss go on top."
-                                        AutomationProperties.Name="Made from" />
+                                        AutomationProperties.Name="Made from"
+                                        Visibility="{Binding IsPickingSubAssembly, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Visibility="{Binding IsShowingSubAssemblyBadge, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Button Style="{StaticResource LinkedBadgeLinkStyle}"
+                            Margin="0,0,4,0"
+                            Content="{Binding SubAssemblyBadgeText}"
+                            Command="{Binding OpenSubAssemblyCommand}"
+                            ToolTip="Open it on the Sub-Assemblies screen, where its lines are changed. Every made ingredient and product using it follows."
+                            AutomationProperties.Name="{Binding SubAssemblyBadgeText}" />
+                    <!-- An icon only, in the theme's glyph-button style, as the Products screen's Edit beside a linked badge -->
+                    <Button Width="24"
+                            Height="24"
+                            VerticalAlignment="Center"
+                            Style="{DynamicResource {skinManager:ThemeKey Key=WPFGlyphButtonStyle, Theme={x:Type sfTheme:Windows11LightSkinHelper}}}"
+                            Command="{Binding StartChangingSubAssemblyCommand}"
+                            ToolTip="Make it from another sub-assembly"
+                            AutomationProperties.Name="Change sub-assembly">
+                        <TextBlock Text="&#xE70F;" Style="{StaticResource IconGlyphStyle}" />
+                    </Button>
+                </StackPanel>
                 <Button Grid.Column="2"
-                        Margin="8,0,0,0"
+                        Width="24"
+                        Height="24"
+                        Margin="4,0,0,0"
                         VerticalAlignment="Center"
-                        Style="{StaticResource LinkedBadgeLinkStyle}"
-                        Content="Open in Sub-Assemblies"
-                        Command="{Binding OpenSubAssemblyCommand}"
-                        ToolTip="Its lines are changed on the Sub-Assemblies screen, and every made ingredient and product using it follows."
-                        Visibility="{Binding EditingSubAssembly, Converter={StaticResource NotNullToVisibilityConverter}}" />
+                        Style="{DynamicResource {skinManager:ThemeKey Key=WPFGlyphButtonStyle, Theme={x:Type sfTheme:Windows11LightSkinHelper}}}"
+                        Command="{Binding CancelChangingSubAssemblyCommand}"
+                        ToolTip="Keep the sub-assembly as it is"
+                        AutomationProperties.Name="Cancel changing sub-assembly"
+                        Visibility="{Binding IsChangingSubAssembly, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="&#xE711;" Style="{StaticResource IconGlyphStyle}" />
+                </Button>
             </Grid>
 
             <!-- The recipe's lines, read-only: typed on the Sub-Assemblies screen -->

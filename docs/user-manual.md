@@ -441,7 +441,8 @@ Every Save that changes a purchased material's cost adds an entry to its **Price
 A made ingredient is made from a sub-assembly, the recipe kept on the Sub-Assemblies screen, with extras of its own on top.
 
 - **Made from**: pick the sub-assembly. Every recipe on the Sub-Assemblies screen is offered. A packaging set isn't, and nor is a product's own section: move it to the Sub-Assemblies screen first. You need to pick one before a new made ingredient can be saved.
-- **Open in Sub-Assemblies** opens that sub-assembly on the Sub-Assemblies screen. That's where its lines are changed. When you save it there, the made ingredient's cost follows, and so does every product that uses it.
+- Once it's picked, it shows as a badge, such as **Butter Icing Base, from Sub-Assemblies**, so it can't be changed by accident. Click the badge to open that sub-assembly on the Sub-Assemblies screen. That's where its lines are changed. When you save it there, the made ingredient's cost follows, and so does every product that uses it.
+- To make it from another sub-assembly, click the **Edit** button (the pencil) beside the badge. The picker comes back. Pick the other sub-assembly, or click the **✕** beside the picker to keep the one you had. Save as usual, or Undo to put the old one back.
 - The table under the picker shows the recipe's lines as they're saved: **Ingredient**, **Grams**, **Cost/g** (its buffered cost per gram) and **Cost**. You can't type into it here.
 - **Add-Ins** are this made ingredient's own extra ingredients on top of the recipe, such as a colouring or a flavouring. Type them like any recipe lines, in grams. An add-in can't be an ingredient the recipe already has, and can't be the made ingredient itself. Add-ins go into the made ingredient only: the sub-assembly itself stays as it is, and so do the products that link it. **Remove Add-In** removes the selected one.
 

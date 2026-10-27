@@ -670,6 +670,41 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task A_picked_sub_assembly_shows_as_a_badge_and_only_Edit_brings_the_picker_back()
+    {
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar");
+        await AddRecipeAsync("Syrup Base", [(sugarId, 1000m)]);
+        await AddRecipeAsync("Thin Syrup Base", [(sugarId, 500m)]);
+        var syrupId = await SeedMadeIngredientAsync("Simple Syrup", (sugarId, 800m));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingSource = RawMaterialSource.Made;
+        viewModel.IsPickingSubAssembly.Should().BeTrue("nothing is picked yet");
+        await PickRecipeAsync(viewModel, "Syrup Base");
+        (viewModel.IsPickingSubAssembly, viewModel.IsShowingSubAssemblyBadge).Should().Be((false, true), "a pick settles it");
+        viewModel.SubAssemblyBadgeText.Should().Be("Syrup Base, from Sub-Assemblies");
+
+        await viewModel.StartChangingSubAssemblyCommand.Execute();
+        (viewModel.IsPickingSubAssembly, viewModel.IsChangingSubAssembly).Should().Be((true, true));
+        await viewModel.CancelChangingSubAssemblyCommand.Execute();
+        viewModel.IsShowingSubAssemblyBadge.Should().BeTrue();
+        viewModel.EditingSubAssembly!.Name.Should().Be("Syrup Base", "Cancel keeps it as it was");
+
+        await viewModel.StartChangingSubAssemblyCommand.Execute();
+        viewModel.EditingSubAssembly = viewModel.SubAssemblyOptions.Single(s => s.Name == "Thin Syrup Base");
+        (viewModel.IsChangingSubAssembly, viewModel.IsShowingSubAssemblyBadge).Should().Be((false, true), "another pick settles it again");
+
+        // A saved one opens with its badge, even after Edit was left open on the form before.
+        await viewModel.StartChangingSubAssemblyCommand.Execute();
+        viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == syrupId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
+        (viewModel.IsChangingSubAssembly, viewModel.IsShowingSubAssemblyBadge).Should().Be((false, true));
+        viewModel.SubAssemblyBadgeText.Should().Be("Simple Syrup Base, from Sub-Assemblies");
+    }
+
+    [Fact]
     public async Task The_add_in_picker_leaves_out_the_made_ingredient_being_edited()
     {
         await MadeCategoryIdAsync();
@@ -1864,7 +1899,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     /// <summary>Picks the sub-assembly named <paramref name="name"/> on the Recipe card, and waits for its lines to show.</summary>
-    private async Task PickRecipeAsync(RawMaterialsViewModel viewModel, string name)
+    private static async Task PickRecipeAsync(RawMaterialsViewModel viewModel, string name)
     {
         viewModel.EditingSubAssembly = viewModel.SubAssemblyOptions.Single(s => s.Name == name);
         await WaitUntilSettledAsync(() => viewModel.RecipeLines.Count > 0, () => $"recipe lines={viewModel.RecipeLines.Count}");
