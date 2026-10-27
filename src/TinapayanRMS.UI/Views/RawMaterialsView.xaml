@@ -61,7 +61,7 @@
                                       ShowTabItemContextMenu="False"
                                       ShowTabListContextMenu="False"
                                       SelectedIndex="{Binding SelectedDetailsTab, Mode=TwoWay}">
-                <!-- A material is purchased (a price), made (a BOM) or linked (a share of another's cost), so one of the first three cards shows -->
+                <!-- A material is purchased (a price), made (a sub-assembly and add-ins) or linked (a share of another's cost), so one of the first three cards shows -->
                 <syncfusion:TabItemExt Header="Cost Setup" CanClose="False">
                     <!-- Full width, one card -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto">

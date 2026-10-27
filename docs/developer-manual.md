@@ -38,7 +38,7 @@ PLAN.md is long: about 1,150 lines of very long bullets. List its sections with 
 
 ### What it does
 
-- **Raw materials.** Ingredients and packaging materials. Each has a base unit, any number of alternative units (a bag of flour, a pack of boxes) and a cost. A purchased material is priced from its brand prices. An ingredient can also be *made* from other ingredients (a bill of materials), or *linked* to another ingredient as a share of its cost (egg white from egg).
+- **Raw materials.** Ingredients and packaging materials. Each has a base unit, any number of alternative units (a bag of flour, a pack of boxes) and a cost. A purchased material is priced from its brand prices. An ingredient can also be *made* from a sub-assembly, with add-ins of its own on top, or *linked* to another ingredient as a share of its cost (egg white from egg).
 - **Sub-assemblies.** In-house recipes such as a dough, a filling or a topping: ingredient lines in grams, with a stored batch weight and batch cost. A sub-assembly in the Packaging role is a *packaging set* instead, such as a gift box with its ribbon.
 - **Products.** A recipe of sub-assemblies, each cut into pieces of a set size, plus packaging and costing percentages. The app works out the cost and a cost-plus selling price per sellable unit. A *composite* product holds other products, such as a gift box of assorted breads.
 - **Reports, printing and scaling.** The Product Cost Summary and Raw Materials Price Summary reports, printed recipes and costings, and a recipe scaled to any number of units.
@@ -67,10 +67,11 @@ The [user manual](user-manual.md) describes every screen. Read its [Key ideas](u
 | Raw material | `RawMaterial` | Anything bought or made to produce a product. Its `Type` is `Ingredient` or `Packaging`, and it's fixed once saved. |
 | Base unit | `RawMaterial.BaseUnitId` | The unit a material's quantities and costs are kept in. It's always the gram for an ingredient (`BaseUnitId` is null) and is chosen per packaging material. |
 | Alternative unit | `RawMaterialUnit` | A multiple of the base unit, such as a bag of 25,000 g. Standard units, such as the kilogram and the inch, have fixed multipliers (`StandardUnitRules`). |
-| Source | `RawMaterialSource` | Where an ingredient's cost comes from: `Purchased` (brand prices), `Made` (a bill of materials) or `Linked` (a share of another ingredient's cost). Packaging is always purchased. Fixed once saved. |
+| Source | `RawMaterialSource` | Where an ingredient's cost comes from: `Purchased` (brand prices), `Made` (a sub-assembly and its add-ins) or `Linked` (a share of another ingredient's cost). Packaging is always purchased. Fixed once saved. |
+| Category type | `RawMaterialCategoryType` | What a `RawMaterialCategory` holds: `Ingredient` (purchased and linked ingredients), `Made` (made ingredients only) or `Packaging`. `RawMaterialRules.CategoryTypeFor` gives the one a material goes in, and `MaterialTypeOf` the material type a category holds, so a Made category's tree folder sits in Ingredients. |
 | Brand price | `RawMaterialBrandPrice` | What one brand of a purchased material costs now, in one of its units. The material is costed at its dearest brand per base unit. |
 | Price history | `RawMaterialPriceHistory` | A log of the prices a material was costed at. Deleting an entry reprices nothing. |
-| Bill of materials (BOM) | `IngredientBomLine` | A made ingredient's components, in grams. BOMs nest to any depth. `WeightLossPercent` shrinks the output. |
+| Bill of materials (BOM) | `IngredientBomLine` | A made ingredient's components, in grams: the lines of the sub-assembly it's made from (`RawMaterial.SubAssemblyId`), then its own add-ins (`IngredientAddInLine`). A read model, never stored (`Infrastructure/Queries/IngredientBoms`). BOMs nest to any depth. `WeightLossPercent` shrinks the output. |
 | Cost buffer, buffered cost | `CostBufferPercent`, `BufferedCostPerBaseUnit` | A cushion on top of the true cost (`CostPerBaseUnit`). Everything downstream is costed at the buffered cost. |
 | Sub-assembly | `SubAssembly` | A recipe of ingredient lines (`SubAssemblyLine`), or a packaging set of packaging lines (`SubAssemblyPackagingLine`). It stores its `TotalWeight` and `TotalCost`. |
 | Role | `SubAssemblyRole` | What a sub-assembly is in a recipe (Dough, Filling, …). Roles set the order of a product's recipe tabs. `IsPackaging` marks the role packaging sets go in. `IsProductOwned` makes a section made in a product that product's own. |
@@ -357,7 +358,7 @@ A ViewModel that owns a DynamicData `SourceCache` is `sealed` and `IDisposable`,
 Take a user who types a new price for cake flour on Raw Materials and presses **Save**:
 
 1. **The ViewModel.** `RawMaterialsViewModel.SaveCommand` runs inside `RunSafelyAsync`. It runs the FluentValidation validators for what it's about to save, and stops with an `ErrorMessage` if one fails.
-2. **The repository, in one transaction.** `IRawMaterialRepository.SaveAsync(material, units, brandPrices, bomLines)` opens one context and one transaction. It saves the material through `RawMaterialRules`' checks, replaces the units and brand prices, and reprices the material at its dearest brand, logging one price history entry if the cost moved. It replaces the BOM lines if they were sent.
+2. **The repository, in one transaction.** `IRawMaterialRepository.SaveAsync(material, units, brandPrices, addIns)` opens one context and one transaction. It saves the material through `RawMaterialRules`' checks, replaces the units and brand prices, and reprices the material at its dearest brand, logging one price history entry if the cost moved. It replaces a made ingredient's add-ins if they were sent, then checks the made ingredient as a whole (`EnsureMadeIngredientFitsAsync`: a sub-assembly it can be made from, add-ins its recipe lacks, no loop).
 3. **The cascade, in the same transaction.** `IngredientCostPropagator` recomputes every made or linked ingredient that depends on the flour, in dependency order. It then hands the changed ids to `SubAssemblyCostPropagator`, which recomputes the `TotalWeight` and `TotalCost` of every sub-assembly that uses any of them. Then the transaction commits. A rule that throws anywhere, or a cascade that fails part-way, rolls all of it back.
 4. **The DbContext** stamps `CostUpdatedAt` on every material whose stored cost changed.
 5. **Back in the ViewModel**, `LoadCommand` merges the fresh data into the screen, and a success toast says "Cake Flour was saved."
@@ -392,7 +393,8 @@ Each arrow reads "is used by". Costs flow the same way.
 
 ```
 INGREDIENTS
-  any ingredient ──► IngredientBomLine ──► made ingredient              (BOMs nest to any depth)
+  any ingredient ──► SubAssemblyLine ──► SubAssembly ──► made ingredient (SubAssemblyId; BOMs nest to any depth)
+  any ingredient ──► IngredientAddInLine ──► made ingredient           (its own extras)
   any ingredient ──► linked ingredient (LinkedToId)                     (egg white from egg)
   any ingredient ──► SubAssemblyLine ──► SubAssembly ──► ProductSubAssemblyUsage ──► Product
   any ingredient ──► UsageAddInLine ──► (extras on one product's usage)
@@ -416,7 +418,8 @@ PER PRODUCT
 | `RawMaterialUnit` | An alternative unit, defined in base units | Never the base unit itself: a line or price with no unit is in the base unit. Correcting a multiplier reprices the material. A unit in use can't be deleted. |
 | `RawMaterialBrandPrice` | A purchased material's price for one brand, in one unit | The Raw Materials Save replaces them as a set. |
 | `RawMaterialPriceHistory` | A price the material was costed at | A log. Nothing reads it to cost anything. |
-| `IngredientBomLine` | One component of a made ingredient, in grams | Components are ingredients only, and a BOM can't contain itself, directly or through others (`IngredientBomRules.EnsureNoCycle`). |
+| `IngredientAddInLine` | One of a made ingredient's own add-ins, in grams | Ingredients only, each once, none its sub-assembly already has (`IngredientBomRules.EnsureValidAddIns`). Cascades with the made ingredient. |
+| `IngredientBomLine` (read model) | One component of a made ingredient, in grams: its sub-assembly's lines, then its add-ins | A made ingredient can't be made from a packaging set or a product's own (`SubAssemblyRules.EnsureLinkableByMadeIngredient`), and its BOM can't contain it, directly or through others (`IngredientBomRules.EnsureNotInOwnRecipe`, `EnsureNoCycle`). |
 | `SubAssemblyRole` | Dough, Filling, Topping, Packaging, … | The starting roles are seeded by migrations, and are edited in Settings. The Packaging role (`IsPackaging`) can't be deleted, and nothing clears its flag. |
 | `SubAssembly` | A recipe, or a packaging set | Names are unique. A null `OwnerProductId` means standalone. It stores `TotalWeight` and `TotalCost`, and can't be deleted while a product links it. |
 | `SubAssemblyLine` | An ingredient in a recipe, in grams | Grams are always stored. `AuthoredBakersPercent` records a percentage the user typed instead. |
@@ -433,7 +436,8 @@ PER PRODUCT
 | `PriceScenario`, `PriceScenarioLine` | A set of Price Simulator price changes saved under a name, and one of its changes | Names are unique, ignoring case; saving under one replaces its lines (`IPriceScenarioRepository.SaveAsync`). A line stores exactly one of `ChangePercent` and `NewPrice`, whichever was typed (`PriceScenarioRules`, backed by check constraints). Deleting a raw material deletes its lines. Nothing reads a scenario to cost anything. See [The Price Simulator](#the-price-simulator). |
 | `SavedPlan`, `SavedPlanLine` | A Production Plan saved under a name, with its `HalfBatches`, and one of its products and units | Names are unique, ignoring case; saving under one replaces its lines (`ISavedPlanRepository.SaveAsync`). A line's `Units` is above 0 (`SavedPlanRules`, backed by `CK_SavedPlanLines_Units`). A product can be on two lines, as in the table. Deleting a product for good deletes its lines; a soft-deleted one is left out when the plan opens. See [The Production Plan](#the-production-plan). |
 | `CostingDefaults` | The stage and percentages a new product starts with, a new raw material's cost buffer, and the shop-wide `WastagePercent` | At most one row (Id 1). With no row, new products go in Production (`DefaultNewProductStage`), the costing reads as zero, the cost buffer as 10% (`DefaultCostBufferPercent`) and the wastage as 3% (`DefaultWastagePercent`). Unlike the rest, the wastage isn't a starting value: `SavedProductReader` stamps it on every `ProductDetail` it reads, and the Products screen keeps it from each load, so changing it reprices every product. |
-| `UnitOfMeasure`, `RawMaterialCategory` | Lookups edited in Settings | A unit's name is stored in lowercase. A category is for one type of material. |
+| `UnitOfMeasure`, `RawMaterialCategory` | Lookups edited in Settings | A unit's name is stored in lowercase. A category is for one type of material (`RawMaterialCategoryType`): a material goes only in one of its own, and a category's type changes only while everything in it fits the new one. |
+
 
 ### Deleted products
 
@@ -501,8 +505,9 @@ Before you change any cost path, read the user manual's [How costs are worked ou
 ### The cascade
 
 ```
-A saved brand price, a BOM or weight-loss edit, a link or share edit,
-a buffer edit, or a corrected unit multiplier
+A saved brand price, a made ingredient's sub-assembly, add-in or weight-loss edit,
+a line edit on a sub-assembly a made ingredient is made from,
+a link or share edit, a buffer edit, or a corrected unit multiplier
   │
   ▼
 the ingredient's stored cost
@@ -523,7 +528,7 @@ products, packaging, composites, Reports and Print
 A packaging material's saved price ──► its stored cost, which every packaging line and set reads (no propagation needed)
 ```
 
-The repositories call the propagators; the UI never does. The callers are `RawMaterialRepository` (add, update and Save), `RawMaterialBrandPriceRepository`, `RawMaterialUnitRepository` (a corrected multiplier) and `IngredientBomLineRepository`. Each call comes after the write has been saved and before its transaction commits. The propagators are static classes that run on the caller's context, so a save and the cascade it causes commit together or not at all. Each loads what it needs once, recomputes in memory, and saves once. A recomputed cost is stored at its column's scale (see [Precision and rounding](#precision-and-rounding)), so one worked out again from unchanged inputs equals what's stored, and isn't written or dated again.
+The repositories call the propagators; the UI never does. The callers are `RawMaterialRepository` (add, update and Save), `RawMaterialBrandPriceRepository`, `RawMaterialUnitRepository` (a corrected multiplier) and `SubAssemblyLineRepository.SetLinesAsync` (for each made ingredient made from the sub-assembly, after a loop check). Each call comes after the write has been saved and before its transaction commits. The propagators are static classes that run on the caller's context, so a save and the cascade it causes commit together or not at all. Each loads what it needs once, recomputes in memory, and saves once. A recomputed cost is stored at its column's scale (see [Precision and rounding](#precision-and-rounding)), so one worked out again from unchanged inputs equals what's stored, and isn't written or dated again.
 
 `IngredientCostGraph` is pure and lives in ApplicationCore. It finds the dependents with a reverse breadth-first search, then orders them with a depth-first topological sort. A linked ingredient's link is just one more edge in the same graph. `IngredientCostPropagator`, in Infrastructure, loads every ingredient and BOM line, asks the graph for the order, and recomputes each ingredient from its components' costs, which are already fresh by then. Sub-assemblies don't nest, so they need no ordering.
 
@@ -591,6 +596,7 @@ The read helpers are in `Infrastructure/Queries`:
 - **[DapperReads](../src/TinapayanRMS.Infrastructure/Queries/DapperReads.cs)** borrows a DbContext's connection, so reads use the same connection string as EF Core. `QueryAsync` and `QuerySingleOrDefaultAsync` run either on the factory, in a context of their own, or on a save's context. On a context that holds a transaction, a read joins that transaction (`DapperReads.Command`). `ReadAsync` gives a read that needs several queries, such as a multi-mapped join, a context of its own.
 - **[Columns](../src/TinapayanRMS.Infrastructure/Queries/Columns.cs)** lists every entity's columns by their snake_case names, `id` first, because a multi-mapped join splits on `Id` (Dapper matches it without regard to case). Dapper maps `cost_per_base_unit` back to `CostPerBaseUnit`, since `DapperReads` turns on `MatchNamesWithUnderscores`. `Columns.Of<T>(alias)` writes the SELECT list.
 - **`RawMaterialReads` and `SubAssemblyReads`** load the shared graphs: materials with their category, base unit and units; sub-assemblies with their role and owner.
+- **`IngredientBoms`** is the one definition of a made ingredient's bill of materials, an EF Core query over its sub-assembly's lines and its add-ins. The cascade, the cycle checks and `IngredientBomLineRepository` all read it.
 
 The rules for reads:
 
@@ -629,7 +635,7 @@ await using (var transaction = await dbContext.Database.BeginTransactionAsync(ca
         : await UpdateAsync(dbContext, fields, cancellationToken);
     id = fields.Id;
 
-    // … the units, brand prices and BOM lines, each through another repository's internal static method …
+    // … the units, brand prices and a made ingredient's add-ins, each through an internal static write method …
 
     if (costChanged)
     {
@@ -646,7 +652,7 @@ await using (var transaction = await dbContext.Database.BeginTransactionAsync(ca
 
 - **`IngredientCostPropagator` and `SubAssemblyCostPropagator`**: the cascade. They're internal static classes that run on a repository's context, inside its transaction, and aren't exposed through ApplicationCore interfaces.
 - **`CostRecalculator`** (`ICostRecalculator`): Settings' Recalculate Costs, the propagators' code run over every made and linked ingredient and every sub-assembly, in one transaction.
-- **`IngredientDependencies`**: loads the ingredient dependency graph, made of BOM edges and link edges, for the cycle checks.
+- **`IngredientDependencies`**: loads the ingredient dependency graph, made of BOM edges (`IngredientBoms`: sub-assembly lines and add-ins) and link edges, for the cycle checks, and `EnsureNoCycleAsync` checks one made ingredient against it.
 - **`ProductCloner`** (`IProductCloner`): Clone and Create Variant. A clone links the sub-assemblies the source links, copies the source's own ones and copies the packaging. A variant links every sub-assembly the source uses, the ones it links and its own alike, and has no packaging. It's the only way a product links another product's own sub-assembly. `SetRecipeAsync` takes `linksOthersOwn` for it, and otherwise refuses such a link (`SubAssemblyRules.EnsureLinkable`) unless the product already has it. While a variant links one, the source can't drop it from its recipe or be deleted. On the Products screen, `ProductUsageEdit.LinkedOwner` names the source, and the linked badge (`OpenLinkedSourceCommand`) opens it.
 - **`JsonViewStateStore`** (`IViewStateStore`): the view-state file. A missing or broken file reads as empty, and a failed write is dropped.
 - **`DatabaseBackups`** (`IDatabaseBackups`): Settings' Database tab and the daily automatic backup, taken by PostgreSQL's own tools through [PostgresTools](../src/TinapayanRMS.Infrastructure/Services/PostgresTools.cs). A backup is `pg_dump --format=custom` into a `.backup` file. Backups and restores take turns (a `SemaphoreSlim`), since the day's automatic backup can start while Settings is taking one. A restore reads the file first with `pg_restore --list` (`BackupRules.TryReadArchiveListing`): a file that isn't a backup, or is from a newer PostgreSQL, is refused before anything changes. It then takes a safety backup and restores into a scratch database, `<database>_restoring` (`--no-owner --no-privileges --exit-on-error --single-transaction`). There it brings an older backup up to date with `MigrateAsync`, and refuses one from a later version, or of another app (`BackupRules.UpdatesNeeded`). Only then does it swap the scratch database in: it closes the database to new connections, ends the app's own, renames the database to `<database>_replaced` and the scratch database to its name, and drops the one it replaced. So a backup that's refused or fails part-way never touches the data. Every statement runs on its own unpooled connection to the `postgres` maintenance database. A new backup or a file copied in never reuses a name in the folder: names go to the second, so `BackupRules.FreeFileNameFor` moves the time on a second while the name is taken. The app then restarts, since every singleton ViewModel holds data from before.
@@ -819,7 +825,9 @@ The rules for ViewModels:
 - **Switching to the latest inner observable** is written `Observable.Switch(source)`, never `source.Switch()`. ReactiveUI imports `ReactiveUI.Binding` into every file, and that namespace has a `Switch` of its own that clashes with Rx's (error CS0121). `ViewModelBase.LoadLatest` uses it to load a selection's details, so a newer pick cancels an older load that is still running.
 - **Lists** are a DynamicData `SourceCache<T, int>` bound with `Connect().SortAndBind(out collection, comparer).Subscribe()`, or an `ObservableCollection<T>` of editable rows.
 - **Several reads at once** start in parallel with `Task.Run`, are awaited together with `Task.WhenAll`, and are applied in one step on the UI thread. Code inside `Task.Run` calls repositories only and never touches ViewModel state. (`ProductsViewModel`'s `LoadCommand` starts about a dozen reads at once this way.)
-- **Dialogs and prompts** are `Interaction`s that the view handles: `ConfirmDelete` (a Yes/No `MessageBox`, through `RegisterNativeMessageBoxHandler`), `ExportToExcel` (a Save dialog and the export, through `RegisterExcelExport`), and `PromptForName` and `PromptForNewCategory` (`TextPromptWindow.Prompt`). Tests register handlers of their own.
+- **Dialogs and prompts** are `Interaction`s that the view handles: `ConfirmDelete` (a Yes/No `MessageBox`, through `RegisterNativeMessageBoxHandler`), `ExportToExcel` (a Save dialog and the export, through `RegisterExcelExport`), `PromptForName` and `PromptForNewCategory` (`TextPromptWindow.Prompt`), and the Products and Sub-Assemblies screens' `PromptForMadeIngredient` (`TextPromptWindow.PromptWithChoice`, a name box with a picker under it, taking a `ChoicePromptRequest` that `MadeIngredientPrompt` builds for both).
+ Tests register handlers of their own.
+
 - **One screen asks another for something** through an `IObservable<T>` backed by a `Subject<T>`: `ProductOpenRequests` (from Raw Materials, Sub-Assemblies and Reports), `RawMaterialOpenRequests` (from Reports), `NewProductRequests` (from Sub-Assemblies' New Product, handled by `ProductsViewModel.StartNewProductFrom`), `SubAssemblyOpenRequests` and `PrintRequests` (from Products). `MainWindow` subscribes to them, calls the target screen's `Open*` (or `StartNewProductFrom`) method and shows its tab, so the ViewModels never know about each other.
 
 ### Loading and refreshing

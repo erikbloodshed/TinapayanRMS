@@ -138,14 +138,13 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
     public async Task Correcting_the_multiplier_of_the_latest_prices_unit_reprices_the_ingredient_and_everything_built_from_it()
     {
         var sugarId = await SeedIngredientAsync("Sugar");
-        var syrupId = await SeedIngredientAsync("Simple Syrup", RawMaterialSource.Made);
         var sackUnitOfMeasureId = await SeedUnitOfMeasureAsync("sack", "sk");
         var repository = CreateRepository();
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = sugarId, UnitOfMeasureId = sackUnitOfMeasureId, BaseUnitsPerUnit = 1000m }, Cancellation);
         var sack = (await repository.GetForRawMaterialAsync(sugarId, Cancellation)).Single();
 
         await SetPriceAsync(sugarId, sack.Id, 90m);
-        await new IngredientBomLineRepository(CreateDbContextFactory()).SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation);
+        var syrupId = await AddMadeIngredientAsync("Simple Syrup", [(sugarId, 1000m)]);
         var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Custard Bun", await AddRoleAsync("Filling"), [(sugarId, 500m)]);
 
         (await GetCostPerGramAsync(sugarId)).Should().Be(0.09m);
@@ -168,14 +167,14 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
     public async Task Correcting_a_multiplier_leaves_recipe_lines_and_their_totals_alone_since_they_are_in_grams()
     {
         var eggId = await SeedIngredientAsync("Egg");
-        var custardId = await SeedIngredientAsync("Custard Base", RawMaterialSource.Made);
         var pieceUnitOfMeasureId = await SeedUnitOfMeasureAsync("piece", "pc");
         var repository = CreateRepository();
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = eggId, UnitOfMeasureId = pieceUnitOfMeasureId, BaseUnitsPerUnit = 50m }, Cancellation);
         var piece = (await repository.GetForRawMaterialAsync(eggId, Cancellation)).Single();
         await SetPriceAsync(eggId, null, 0.2m); // per gram
 
-        await new IngredientBomLineRepository(CreateDbContextFactory()).SetLinesAsync(custardId, [(eggId, 100m)], Cancellation);
+        var custardId = await AddMadeIngredientAsync("Custard Base", [(eggId, 100m)]);
+        var custardRecipeId = await RecipeIdOfAsync(custardId);
         var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Egg Bun", await AddRoleAsync("Topping"), [(eggId, 150m)]);
 
         // The eggs are bigger than recorded: 60 g each.
@@ -183,8 +182,8 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         await repository.UpdateAsync(piece, Cancellation);
 
         await using var check = CreateDbContext();
-        (await check.SubAssemblyLines.AsNoTracking().SingleAsync(Cancellation)).Grams.Should().Be(150m);
-        (await check.IngredientBomLines.AsNoTracking().SingleAsync(Cancellation)).Grams.Should().Be(100m);
+        (await check.SubAssemblyLines.AsNoTracking().SingleAsync(l => l.SubAssemblyId == subAssemblyId, Cancellation)).Grams.Should().Be(150m);
+        (await check.SubAssemblyLines.AsNoTracking().SingleAsync(l => l.SubAssemblyId == custardRecipeId, Cancellation)).Grams.Should().Be(100m);
         var subAssemblyAfter = await check.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == subAssemblyId, Cancellation);
         subAssemblyAfter.TotalWeight.Should().Be(150m);
         subAssemblyAfter.TotalCost.Should().Be(30m); // 150 g at 0.20/g
@@ -196,12 +195,11 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
     public async Task DeleteAsync_removes_an_ingredients_unit_even_while_recipes_use_the_ingredient()
     {
         var eggId = await SeedIngredientAsync("Egg");
-        var custardId = await SeedIngredientAsync("Custard Base", RawMaterialSource.Made);
         var pieceUnitOfMeasureId = await SeedUnitOfMeasureAsync("piece", "pc");
         var repository = CreateRepository();
         await repository.AddAsync(new RawMaterialUnit { RawMaterialId = eggId, UnitOfMeasureId = pieceUnitOfMeasureId, BaseUnitsPerUnit = 50m }, Cancellation);
         var piece = (await repository.GetForRawMaterialAsync(eggId, Cancellation)).Single();
-        await new IngredientBomLineRepository(CreateDbContextFactory()).SetLinesAsync(custardId, [(eggId, 100m)], Cancellation);
+        await AddMadeIngredientAsync("Custard Base", [(eggId, 100m)]);
 
         await repository.DeleteAsync(piece.Id, Cancellation);
 

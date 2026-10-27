@@ -35,9 +35,10 @@ public static class RawMaterialRules
 
     /// <summary>
     /// A Purchased material has no weight loss percent; its CostPerBaseUnit comes from its brand prices
-    /// (ApplyBrandPrices below). A Made ingredient needs a weight loss percent — its cost comes from
-    /// a BOM instead (IngredientBomRules). A Linked ingredient needs the ingredient it's linked to and
-    /// both shares — its cost is a share of that one's (LinkedCost). Only a linked one has link fields.
+    /// (ApplyBrandPrices below). A Made ingredient needs a weight loss percent and the sub-assembly it's made
+    /// from — its cost comes from that recipe and its own add-ins instead (IngredientBomRules). A Linked ingredient
+    /// needs the ingredient it's linked to and both shares — its cost is a share of that one's (LinkedCost). Only a
+    /// linked one has link fields, and only a made one a sub-assembly.
     /// Every kind can have alternative units (RawMaterialUnit); only a purchased one is ever priced in them.
     /// </summary>
     public static void EnsureFieldsMatchSource(RawMaterial material)
@@ -46,6 +47,11 @@ public static class RawMaterialRules
             && (material.LinkedToId is not null || material.WeightSharePercent is not null || material.CostSharePercent is not null))
         {
             throw new BusinessRuleException("Only a linked ingredient is linked to another.");
+        }
+
+        if (material.Source != RawMaterialSource.Made && material.SubAssemblyId is not null)
+        {
+            throw new BusinessRuleException("Only a made ingredient is made from a sub-assembly.");
         }
 
         switch (material.Source)
@@ -67,6 +73,11 @@ public static class RawMaterialRules
                 if (weightLossPercent is < 0 or >= 100)
                 {
                     throw new BusinessRuleException("Weight loss percent must be at least 0 and less than 100.");
+                }
+
+                if (material.SubAssemblyId is not > 0)
+                {
+                    throw new BusinessRuleException("Pick the sub-assembly it's made from.");
                 }
 
                 break;
@@ -365,29 +376,58 @@ public static class RawMaterialRules
     }
 
     /// <summary>
-    /// A material goes in a category of its own type: an ingredient in an ingredient category (Flour, Dairy), packaging
-    /// in a packaging one (Boxes, Labels).
+    /// The type of category a material goes in: a made ingredient in a Made one (In-House), any other ingredient in an
+    /// ingredient one (Flour, Dairy), and packaging in a packaging one (Boxes, Labels). A material's type and source are
+    /// both fixed, so this never changes for a saved one.
     /// </summary>
-    public static void EnsureCategoryMatchesType(RawMaterialType materialType, RawMaterialType categoryType, string categoryName)
+    public static RawMaterialCategoryType CategoryTypeFor(RawMaterialType type, RawMaterialSource source) => type switch
     {
-        if (materialType != categoryType)
+        RawMaterialType.Packaging => RawMaterialCategoryType.Packaging,
+        _ when source == RawMaterialSource.Made => RawMaterialCategoryType.Made,
+        _ => RawMaterialCategoryType.Ingredient,
+    };
+
+    /// <summary>The type of material a category of <paramref name="categoryType"/> holds: a Made one holds ingredients.</summary>
+    public static RawMaterialType MaterialTypeOf(RawMaterialCategoryType categoryType) =>
+        categoryType == RawMaterialCategoryType.Packaging ? RawMaterialType.Packaging : RawMaterialType.Ingredient;
+
+    /// <summary>A material goes in a category of its own type (<see cref="CategoryTypeFor"/>), and in no other.</summary>
+    public static void EnsureCategoryMatchesType(
+        RawMaterialType materialType, RawMaterialSource source, RawMaterialCategoryType categoryType, string categoryName)
+    {
+        var wanted = CategoryTypeFor(materialType, source);
+        if (wanted != categoryType)
         {
-            throw new BusinessRuleException(
-                $"{categoryName} is a{(categoryType == RawMaterialType.Ingredient ? "n ingredient" : " packaging")} category. "
-                + $"Put this {(materialType == RawMaterialType.Ingredient ? "ingredient" : "packaging material")} in a category for {TypePlural(materialType)}.");
+            var (noun, home) = wanted switch
+            {
+                RawMaterialCategoryType.Made => ("made ingredient", "a Made category"),
+                RawMaterialCategoryType.Packaging => ("packaging material", "a category for packaging"),
+                _ => ("ingredient", "a category for ingredients"),
+            };
+            var what = categoryType == RawMaterialCategoryType.Made ? $"{CategoryNoun(categoryType)}, for made ingredients only" : CategoryNoun(categoryType);
+            throw new BusinessRuleException($"{categoryName} is {what}. Put this {noun} in {home}.");
         }
     }
 
-    /// <summary>A category's type can change only while no material of its present type is in it, since each would be left in a category of the other type.</summary>
-    public static void EnsureCategoryTypeCanChange(string categoryName, int materialsInIt)
+    /// <summary>
+    /// A category's type can change only while every material in it can go in a category of the new type: an ingredient
+    /// category of made ingredients alone can become a Made one, but nothing in it can become packaging.
+    /// </summary>
+    public static void EnsureCategoryTypeCanChange(string categoryName, RawMaterialCategoryType newType, int materialsThatDontFit)
     {
-        if (materialsInIt > 0)
+        if (materialsThatDontFit > 0)
         {
+            var one = materialsThatDontFit == 1;
             throw new BusinessRuleException(
-                $"{categoryName} has {materialsInIt} material{(materialsInIt == 1 ? "" : "s")} in it, so its type can't change. "
-                + $"Move {(materialsInIt == 1 ? "it" : "them")} to another category first.");
+                $"{categoryName} has {materialsThatDontFit} material{(one ? "" : "s")} that can't go in {CategoryNoun(newType)}, so its type can't change. "
+                + $"Move {(one ? "it" : "them")} to another category first.");
         }
     }
 
-    private static string TypePlural(RawMaterialType type) => type == RawMaterialType.Ingredient ? "ingredients" : "packaging";
+    private static string CategoryNoun(RawMaterialCategoryType type) => type switch
+    {
+        RawMaterialCategoryType.Made => "a Made category",
+        RawMaterialCategoryType.Packaging => "a packaging category",
+        _ => "an ingredient category",
+    };
 }

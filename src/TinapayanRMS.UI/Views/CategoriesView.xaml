@@ -74,7 +74,7 @@
                     <syncfusion:ComboBoxAdv Grid.Column="1"
                                             ItemsSource="{Binding Types}"
                                             SelectedItem="{Binding EditingType, Mode=TwoWay}"
-                                            ToolTip="Ingredient categories are offered to ingredients, packaging ones to packaging materials. It can't change while a material is in it." />
+                                            ToolTip="Ingredient categories are offered to purchased and linked ingredients, Made ones to made ingredients, and packaging ones to packaging materials. It can't change while a material in it couldn't go in the new type." />
                 </Grid>
 
                 <StackPanel Orientation="Horizontal">

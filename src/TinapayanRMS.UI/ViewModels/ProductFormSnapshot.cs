@@ -200,6 +200,8 @@ public sealed record ProductFormSnapshot
             if (a.SubAssemblyId != b.SubAssemblyId
                 || a.IsOwned != b.IsOwned
                 || a.IsReleasing != b.IsReleasing
+                || a.ToMadeIngredient != b.ToMadeIngredient
+
                 || a.Role?.Id != b.Role?.Id
                 || a.Name != b.Name
                 || a.LinkedName != b.LinkedName

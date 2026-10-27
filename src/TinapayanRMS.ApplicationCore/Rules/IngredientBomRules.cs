@@ -1,23 +1,36 @@
 namespace TinapayanRMS.ApplicationCore.Rules;
 
+/// <summary>
+/// A made ingredient's bill of materials: the lines of the sub-assembly it's made from and its own add-ins (2026-10-27;
+/// until then a BOM of its own), less its weight loss.
+/// </summary>
 public static class IngredientBomRules
 {
-    /// <summary>A made ingredient needs at least one line, positive grams, and no component used twice.</summary>
-    public static void EnsureValidLines(IReadOnlyList<(int ComponentIngredientId, decimal Grams)> lines)
+    /// <summary>
+    /// A made ingredient's add-ins, its own extra ingredients on top of <paramref name="subAssemblyName"/>'s recipe, as a
+    /// product's linked usage has: none is fine, and each needs positive grams, comes once, and isn't already in the recipe.
+    /// <paramref name="baseIngredientIds"/> are the sub-assembly's lines' ingredients.
+    /// </summary>
+    public static void EnsureValidAddIns(
+        IReadOnlyList<(int IngredientId, decimal Grams, string IngredientName)> addIns,
+        string subAssemblyName,
+        IReadOnlyCollection<int> baseIngredientIds) =>
+        AddInRules.EnsureValid(
+            addIns,
+            baseIngredientIds,
+            alreadyThere => $"{alreadyThere} is already in {subAssemblyName}. Add-ins are only for what its recipe doesn't have — "
+                + $"change how much it uses on the Sub-Assemblies screen instead.");
+
+    /// <summary>
+    /// The plainest loop, named plainly: a made ingredient that's a line of the sub-assembly it's made from. Butter Icing
+    /// can't be made from a recipe with Butter Icing in it. A longer loop is EnsureNoCycle's.
+    /// </summary>
+    public static void EnsureNotInOwnRecipe(int madeIngredientId, string madeIngredientName, string subAssemblyName, IReadOnlyCollection<int> lineIngredientIds)
     {
-        if (lines.Count == 0)
+        if (lineIngredientIds.Contains(madeIngredientId))
         {
-            throw new BusinessRuleException("A made ingredient needs at least one BOM line.");
-        }
-
-        if (lines.Any(l => l.Grams <= 0))
-        {
-            throw new BusinessRuleException("A BOM line's grams must be positive.");
-        }
-
-        if (lines.Select(l => l.ComponentIngredientId).Distinct().Count() != lines.Count)
-        {
-            throw new BusinessRuleException("A made ingredient can't use the same component ingredient more than once — combine it into a single line instead.");
+            throw new BusinessRuleException(
+                $"{madeIngredientName} is made from {subAssemblyName}, so it can't be one of {subAssemblyName}'s ingredients.");
         }
     }
 

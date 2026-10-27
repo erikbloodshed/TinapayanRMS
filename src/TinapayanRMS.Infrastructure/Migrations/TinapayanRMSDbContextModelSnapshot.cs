@@ -137,7 +137,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.ToTable("costing_parameters", (string)null);
                 });
 
-            modelBuilder.Entity("TinapayanRMS.Domain.Entities.IngredientBomLine", b =>
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.IngredientAddInLine", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -146,9 +146,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("ComponentIngredientId")
+                    b.Property<int>("AddInIngredientId")
                         .HasColumnType("integer")
-                        .HasColumnName("component_ingredient_id");
+                        .HasColumnName("add_in_ingredient_id");
 
                     b.Property<decimal>("Grams")
                         .HasPrecision(18, 4)
@@ -164,16 +164,16 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasColumnName("sort_order");
 
                     b.HasKey("Id")
-                        .HasName("pk_ingredient_bom_lines");
+                        .HasName("pk_ingredient_add_in_lines");
 
-                    b.HasIndex("ComponentIngredientId")
-                        .HasDatabaseName("ix_ingredient_bom_lines_component_ingredient_id");
+                    b.HasIndex("AddInIngredientId")
+                        .HasDatabaseName("ix_ingredient_add_in_lines_add_in_ingredient_id");
 
-                    b.HasIndex("IngredientId", "ComponentIngredientId")
+                    b.HasIndex("IngredientId", "AddInIngredientId")
                         .IsUnique()
-                        .HasDatabaseName("ix_ingredient_bom_lines_ingredient_id_component_ingredient_id");
+                        .HasDatabaseName("ix_ingredient_add_in_lines_ingredient_id_add_in_ingredient_id");
 
-                    b.ToTable("ingredient_bom_lines", (string)null);
+                    b.ToTable("ingredient_add_in_lines", (string)null);
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.PackagingLine", b =>
@@ -648,6 +648,10 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("source");
 
+                    b.Property<int?>("SubAssemblyId")
+                        .HasColumnType("integer")
+                        .HasColumnName("sub_assembly_id");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -684,6 +688,9 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_raw_materials_name");
 
+                    b.HasIndex("SubAssemblyId")
+                        .HasDatabaseName("ix_raw_materials_sub_assembly_id");
+
                     b.ToTable("raw_materials", null, t =>
                         {
                             t.HasCheckConstraint("CK_RawMaterials_BaseUnitMatchesType", "(type = 'Ingredient' AND base_unit_id IS NULL) OR (type = 'Packaging' AND base_unit_id IS NOT NULL)");
@@ -693,6 +700,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_RawMaterials_LinkMatchesSource", "(source = 'Linked' AND linked_to_id IS NOT NULL AND weight_share_percent > 0 AND weight_share_percent <= 100 AND cost_share_percent > 0 AND cost_share_percent <= 100) OR (source <> 'Linked' AND linked_to_id IS NULL AND weight_share_percent IS NULL AND cost_share_percent IS NULL)");
 
                             t.HasCheckConstraint("CK_RawMaterials_OnlyIngredientsAreMade", "type = 'Ingredient' OR source = 'Purchased'");
+
+                            t.HasCheckConstraint("CK_RawMaterials_SubAssemblyMatchesSource", "(source = 'Made') = (sub_assembly_id IS NOT NULL)");
                         });
                 });
 
@@ -1256,23 +1265,23 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("TinapayanRMS.Domain.Entities.IngredientBomLine", b =>
+            modelBuilder.Entity("TinapayanRMS.Domain.Entities.IngredientAddInLine", b =>
                 {
-                    b.HasOne("TinapayanRMS.Domain.Entities.RawMaterial", "ComponentIngredient")
+                    b.HasOne("TinapayanRMS.Domain.Entities.RawMaterial", "AddInIngredient")
                         .WithMany()
-                        .HasForeignKey("ComponentIngredientId")
+                        .HasForeignKey("AddInIngredientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_ingredient_bom_lines_raw_materials_component_ingredient_id");
+                        .HasConstraintName("fk_ingredient_add_in_lines_raw_materials_add_in_ingredient_id");
 
                     b.HasOne("TinapayanRMS.Domain.Entities.RawMaterial", "Ingredient")
                         .WithMany()
                         .HasForeignKey("IngredientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_ingredient_bom_lines_raw_materials_ingredient_id");
+                        .HasConstraintName("fk_ingredient_add_in_lines_raw_materials_ingredient_id");
 
-                    b.Navigation("ComponentIngredient");
+                    b.Navigation("AddInIngredient");
 
                     b.Navigation("Ingredient");
                 });
@@ -1441,11 +1450,19 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_raw_materials_raw_materials_linked_to_id");
 
+                    b.HasOne("TinapayanRMS.Domain.Entities.SubAssembly", "SubAssembly")
+                        .WithMany()
+                        .HasForeignKey("SubAssemblyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_raw_materials_sub_assemblies_sub_assembly_id");
+
                     b.Navigation("BaseUnit");
 
                     b.Navigation("Category");
 
                     b.Navigation("LinkedTo");
+
+                    b.Navigation("SubAssembly");
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterialBrandPrice", b =>

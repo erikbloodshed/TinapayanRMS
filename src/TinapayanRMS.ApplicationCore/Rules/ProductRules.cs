@@ -55,28 +55,12 @@ public static class ProductRules
     public static void EnsureValidAddIns(
         IReadOnlyList<(int IngredientId, decimal Grams, string IngredientName)> addIns,
         string subAssemblyName,
-        IReadOnlyCollection<int> baseIngredientIds)
-    {
-        if (addIns.Any(a => a.Grams <= 0))
-        {
-            throw new BusinessRuleException("An add-in's grams must be positive.");
-        }
-
-        var duplicate = addIns.GroupBy(a => a.IngredientId).FirstOrDefault(g => g.Count() > 1);
-        if (duplicate is not null)
-        {
-            throw new BusinessRuleException(
-                $"{duplicate.First().IngredientName} is on two add-in lines. Put its total on one line and delete the other.");
-        }
-
-        var alreadyThere = addIns.Where(a => baseIngredientIds.Contains(a.IngredientId)).Select(a => a.IngredientName).FirstOrDefault();
-        if (alreadyThere is not null)
-        {
-            throw new BusinessRuleException(
-                $"{alreadyThere} is already in {subAssemblyName}. Add-ins are only for what its recipe doesn't have — "
+        IReadOnlyCollection<int> baseIngredientIds) =>
+        AddInRules.EnsureValid(
+            addIns,
+            baseIngredientIds,
+            alreadyThere => $"{alreadyThere} is already in {subAssemblyName}. Add-ins are only for what its recipe doesn't have — "
                 + $"change how much it uses where {subAssemblyName} is kept, or make this product a copy of it.");
-        }
-    }
 
     /// <summary>
     /// A usage's effective batch: the sub-assembly's own, plus this product's add-ins. Add-ins go into the

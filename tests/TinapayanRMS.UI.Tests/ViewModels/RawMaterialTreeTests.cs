@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.UI.ViewModels;
@@ -9,14 +10,14 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// <summary>The Raw Materials list's tree: a folder per type, holding a folder per category of that type, holding materials.</summary>
 public class RawMaterialTreeTests
 {
-    private static readonly RawMaterialCategory Flour = new() { Id = 1, Name = "Flour", Type = RawMaterialType.Ingredient };
-    private static readonly RawMaterialCategory Dairy = new() { Id = 2, Name = "Dairy", Type = RawMaterialType.Ingredient };
-    private static readonly RawMaterialCategory Boxes = new() { Id = 3, Name = "Boxes", Type = RawMaterialType.Packaging };
+    private static readonly RawMaterialCategory Flour = new() { Id = 1, Name = "Flour", Type = RawMaterialCategoryType.Ingredient };
+    private static readonly RawMaterialCategory Dairy = new() { Id = 2, Name = "Dairy", Type = RawMaterialCategoryType.Ingredient };
+    private static readonly RawMaterialCategory Boxes = new() { Id = 3, Name = "Boxes", Type = RawMaterialCategoryType.Packaging };
 
     private static readonly RawMaterialCategory[] Categories = [Flour, Dairy, Boxes];
 
     private static RawMaterial MaterialOf(int id, string name, RawMaterialCategory category) =>
-        new() { Id = id, Name = name, Type = category.Type, CategoryId = category.Id, Category = category };
+        new() { Id = id, Name = name, Type = RawMaterialRules.MaterialTypeOf(category.Type), CategoryId = category.Id, Category = category };
 
     private static RawMaterialFolderNode Folder(RawMaterialTree tree, RawMaterialType type, string title) =>
         tree.TypeFolder(type).Children.OfType<RawMaterialFolderNode>().Single(f => f.Title == title);
@@ -94,10 +95,10 @@ public class RawMaterialTreeTests
     public void A_category_whose_type_changed_moves_its_folder_to_the_other_type()
     {
         var tree = new RawMaterialTree();
-        var labels = new RawMaterialCategory { Id = 4, Name = "Labels", Type = RawMaterialType.Ingredient };
+        var labels = new RawMaterialCategory { Id = 4, Name = "Labels", Type = RawMaterialCategoryType.Ingredient };
         tree.Refresh([Flour, labels], [], isFiltered: false);
 
-        tree.Refresh([Flour, new RawMaterialCategory { Id = 4, Name = "Labels", Type = RawMaterialType.Packaging }], [], isFiltered: false);
+        tree.Refresh([Flour, new RawMaterialCategory { Id = 4, Name = "Labels", Type = RawMaterialCategoryType.Packaging }], [], isFiltered: false);
 
         TitlesIn(tree.TypeFolder(RawMaterialType.Ingredient)).Should().Equal("Flour");
         TitlesIn(tree.TypeFolder(RawMaterialType.Packaging)).Should().Equal("Labels");

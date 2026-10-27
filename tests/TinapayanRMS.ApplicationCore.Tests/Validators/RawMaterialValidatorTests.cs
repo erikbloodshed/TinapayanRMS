@@ -33,9 +33,25 @@ public class RawMaterialValidatorTests
             CategoryId = 1,
             Source = RawMaterialSource.Made,
             WeightLossPercent = 20m,
+            SubAssemblyId = 7,
         });
 
         result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Rejects_a_made_ingredient_without_a_sub_assembly()
+    {
+        var result = _validator.Validate(new RawMaterial
+        {
+            Type = RawMaterialType.Ingredient,
+            Name = "Simple Syrup",
+            CategoryId = 1,
+            Source = RawMaterialSource.Made,
+            WeightLossPercent = 20m,
+        });
+
+        result.Errors.Select(e => e.ErrorMessage).Should().Contain("Pick the sub-assembly it's made from.");
     }
 
     [Fact]

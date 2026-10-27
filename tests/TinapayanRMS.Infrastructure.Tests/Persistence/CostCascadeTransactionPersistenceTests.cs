@@ -39,18 +39,25 @@ public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : P
     }
 
     [Fact]
-    public async Task A_bom_edit_whose_cascade_fails_is_not_saved_either()
+    public async Task A_sub_assembly_line_edit_whose_made_ingredients_cascade_fails_is_not_saved_either()
     {
         var (flourId, syrupId) = await SeedFlourAndSyrupAsync();
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
+        var recipeId = await RecipeIdOfAsync(syrupId);
+        SubAssembly recipe;
+        await using (var read = CreateDbContext())
+        {
+            recipe = await read.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == recipeId, Cancellation);
+        }
+
         var failing = FactoryFailingWhen(entry => entry is { Entity: RawMaterial { Source: RawMaterialSource.Made }, State: EntityState.Modified });
 
-        var act = () => new IngredientBomLineRepository(failing).SetLinesAsync(syrupId, [(flourId, 1000m), (sugarId, 1000m)], Cancellation);
+        var act = () => new SubAssemblyRepository(failing).SaveStandaloneAsync(recipe, [new RecipeLine(flourId, 1000m), new RecipeLine(sugarId, 1000m)], Cancellation);
 
         await act.Should().ThrowAsync<SimulatedFailureException>();
         await using var dbContext = CreateDbContext();
-        (await dbContext.IngredientBomLines.Where(l => l.IngredientId == syrupId).Select(l => l.ComponentIngredientId).ToListAsync(Cancellation))
-            .Should().Equal([flourId], "the old lines' delete went with the cascade too");
+        (await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == recipeId).Select(l => l.IngredientId).ToListAsync(Cancellation))
+            .Should().Equal([flourId], "the old lines' delete went with the made ingredient's cascade too");
         (await dbContext.RawMaterials.SingleAsync(m => m.Id == syrupId, Cancellation)).CostPerBaseUnit.Should().Be(0.05m);
     }
 
@@ -65,7 +72,7 @@ public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : P
         var failing = FactoryFailingWhen(entry => entry is { Entity: RawMaterial { Source: RawMaterialSource.Made }, State: EntityState.Modified }
             && entry.Property(nameof(RawMaterial.CostPerBaseUnit)).IsModified);
 
-        var act = () => new RawMaterialRepository(failing).SaveAsync(syrup, [], brandPrices: null, bomLines: null, Cancellation);
+        var act = () => new RawMaterialRepository(failing).SaveAsync(syrup, [], brandPrices: null, addIns: null, Cancellation);
 
         await act.Should().ThrowAsync<SimulatedFailureException>();
         var stored = (await repository.GetByIdAsync(syrupId, Cancellation))!;
@@ -131,24 +138,13 @@ public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : P
             .Should().Be(syrup.CostUpdatedAt, "a cost recalculated to what it already was hasn't changed");
     }
 
-    /// <summary>Flour priced at ₱0.05 a gram, and Syrup made of 1,000 g of it with no weight loss: ₱0.05 a gram too.</summary>
+    /// <summary>Flour priced at ₱0.05 a gram, and Syrup made from a recipe of 1,000 g of it with no weight loss: ₱0.05 a gram too.</summary>
     private async Task<(int FlourId, int SyrupId)> SeedFlourAndSyrupAsync()
     {
         var flourId = await AddIngredientAsync("Flour");
         await SetPriceAsync(flourId, unitId: null, price: 0.05m);
 
-        int categoryId;
-        await using (var dbContext = CreateDbContext())
-        {
-            categoryId = await dbContext.RawMaterials.Where(m => m.Id == flourId).Select(m => m.CategoryId).SingleAsync(Cancellation);
-        }
-
-        var syrupId = await new RawMaterialRepository(CreateDbContextFactory()).SaveAsync(
-            new RawMaterial { Name = "Syrup", Type = RawMaterialType.Ingredient, CategoryId = categoryId, Source = RawMaterialSource.Made, WeightLossPercent = 0m },
-            [],
-            brandPrices: null,
-            [(flourId, 1000m)],
-            Cancellation);
+        var syrupId = await AddMadeIngredientAsync("Syrup", [(flourId, 1000m)]);
         return (flourId, syrupId);
     }
 
@@ -157,6 +153,7 @@ public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : P
     {
         var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
         var categoryId = await AddPackagingCategoryAsync();
+
         int boxId;
         await using (var dbContext = CreateDbContext())
         {

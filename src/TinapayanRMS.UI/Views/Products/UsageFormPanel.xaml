@@ -142,6 +142,13 @@
                             Visibility="{Binding EditingUsage.IsReleasing, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
                         <TextBlock Text="Moves to Sub-Assemblies on Save" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
                     </Border>
+                    <!-- Move to In-House was pressed: Save moves it to Sub-Assemblies, links it, and makes a made ingredient from it -->
+                    <Border Style="{StaticResource LinkedBadgeStyle}"
+                            Margin="0,0,16,8"
+                            ToolTip="Save puts it on the Sub-Assemblies screen, keeping its name and these lines, links this product to it there, and adds a made ingredient made from it, with no weight loss. Undo or Revert to keep it this product's own."
+                            Visibility="{Binding EditingUsage.IsMovingToInHouse, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
+                        <TextBlock Text="{Binding EditingUsage.MovingToInHouseText}" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
+                    </Border>
                     <!--
                         A linked one's badge is a link: it opens the sub-assembly on the Sub-Assemblies screen (MainWindow
                         subscribes to SubAssemblyOpenRequests), or for a variant's link, the product whose own it is
@@ -266,6 +273,14 @@
                                           Command="{Binding MoveToSubAssembliesCommand}"
                                           CommandParameter="{Binding EditingUsage}"
                                           Visibility="{Binding IsEditingOwnedUsage, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <syncfusion:ButtonAdv Label="Move to In-House"
+                                          ToolTip="Make a made ingredient from this section, on the Raw Materials screen in a Made category, so other recipes can use it as an ingredient. Save does it: the section moves to the Sub-Assemblies screen, where its lines are edited from then on, and this product links it there."
+                                          IconTemplate="{StaticResource ExportIconTemplate}"
+                                          Command="{Binding MoveToInHouseCommand}"
+                                          CommandParameter="{Binding EditingUsage}"
+                                          Visibility="{Binding CanMoveEditingUsageToInHouse, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                          Margin="8,0,0,0" />
+
                 </StackPanel>
             </Grid>
 

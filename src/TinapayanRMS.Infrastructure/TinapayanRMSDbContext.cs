@@ -40,7 +40,7 @@ public class TinapayanRMSDbContext : DbContext
 
     public DbSet<RawMaterialPriceHistory> RawMaterialPriceHistories => Set<RawMaterialPriceHistory>();
 
-    public DbSet<IngredientBomLine> IngredientBomLines => Set<IngredientBomLine>();
+    public DbSet<IngredientAddInLine> IngredientAddInLines => Set<IngredientAddInLine>();
 
     public DbSet<SubAssemblyRole> SubAssemblyRoles => Set<SubAssemblyRole>();
 

@@ -442,6 +442,38 @@
                                     <!-- One tile per product linking it (UsedByTilesStyle), which opens it on the Products screen -->
                                     <ItemsControl ItemsSource="{Binding UsedBy}" Style="{StaticResource UsedByTilesStyle}" />
 
+                                    <!--
+                                        Then one per made ingredient made from it, laid out as the product tiles are, which opens it on
+                                        the Raw Materials screen (MainWindow subscribes to RawMaterialOpenRequests). Its icon is the
+                                        In-House glyph of the list's Make In-House Ingredient.
+                                    -->
+                                    <ItemsControl ItemsSource="{Binding MadeIngredients}" Focusable="False">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel ItemWidth="124" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Style="{StaticResource UsedByTileStyle}"
+                                                        Command="{Binding DataContext.OpenRawMaterialCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                        CommandParameter="{Binding Id}"
+                                                        ToolTip="A made ingredient made from it. Open on the Raw Materials screen"
+                                                        AutomationProperties.Name="{Binding Name}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="&#xEDE1;"
+                                                                   Style="{StaticResource IconGlyphStyle}"
+                                                                   FontSize="32"
+                                                                   Foreground="{StaticResource AccentForegroundBrush}"
+                                                                   HorizontalAlignment="Center"
+                                                                   Margin="0,0,0,6" />
+                                                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
                                     <TextBlock Text="{Binding UsedByText}" Style="{StaticResource CaptionStyle}" Margin="0,2,0,0" />
                                 </StackPanel>
                             </Border>

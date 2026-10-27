@@ -162,9 +162,27 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
     protected async Task<int> AddPackagingCategoryAsync(string name = "Boxes")
     {
         await using var dbContext = CreateDbContext();
-        var category = new RawMaterialCategory { Name = name, Type = RawMaterialType.Packaging };
+        var category = new RawMaterialCategory { Name = name, Type = RawMaterialCategoryType.Packaging };
         dbContext.RawMaterialCategories.Add(category);
         await dbContext.SaveChangesAsync(Cancellation);
+        return category.Id;
+    }
+
+    /// <summary>
+    /// The id of a Made category, which is all a made ingredient can be filed under (RawMaterialRules.CategoryTypeFor): the
+    /// test's one by that name, added the first time it's asked for.
+    /// </summary>
+    protected async Task<int> MadeCategoryIdAsync(string name = "In-House")
+    {
+        await using var dbContext = CreateDbContext();
+        var category = await dbContext.RawMaterialCategories.FirstOrDefaultAsync(c => c.Name == name, Cancellation);
+        if (category is null)
+        {
+            category = new RawMaterialCategory { Name = name, Type = RawMaterialCategoryType.Made };
+            dbContext.RawMaterialCategories.Add(category);
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
         return category.Id;
     }
 
@@ -188,6 +206,98 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
         dbContext.RawMaterials.Add(ingredient);
         await dbContext.SaveChangesAsync(Cancellation);
         return ingredient.Id;
+    }
+
+    /// <summary>
+    /// A recipe on the Sub-Assemblies screen named <paramref name="name"/>, in a "Base" role added the first time, made of
+    /// <paramref name="lines"/> (grams), saved as that screen's Save does (SubAssemblyRepository.SaveStandaloneAsync), which
+    /// totals it. What a made ingredient is made from.
+    /// </summary>
+    protected async Task<int> AddRecipeAsync(string name, IReadOnlyList<(int IngredientId, decimal Grams)> lines)
+    {
+        int roleId;
+        await using (var dbContext = CreateDbContext())
+        {
+            roleId = await dbContext.SubAssemblyRoles.Where(r => r.Name == "Base").Select(r => r.Id).FirstOrDefaultAsync(Cancellation);
+        }
+
+        if (roleId == 0)
+        {
+            roleId = await AddRoleAsync("Base");
+        }
+
+        return await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Name = name, RoleId = roleId }, [.. lines.Select(l => new RecipeLine(l.IngredientId, l.Grams))], Cancellation);
+    }
+
+    /// <summary>
+    /// A recipe with no lines, inserted past the repository's checks, for a made ingredient whose recipe a test doesn't
+    /// look at: a made ingredient has to be made from one (CK_RawMaterials_SubAssemblyMatchesSource).
+    /// </summary>
+    protected async Task<int> AddEmptyRecipeAsync()
+    {
+        int roleId;
+        await using (var dbContext = CreateDbContext())
+        {
+            roleId = await dbContext.SubAssemblyRoles.Where(r => r.Name == "Base").Select(r => r.Id).FirstOrDefaultAsync(Cancellation);
+        }
+
+        if (roleId == 0)
+        {
+            roleId = await AddRoleAsync("Base");
+        }
+
+        await using var context = CreateDbContext();
+        var recipe = new SubAssembly { Name = $"Recipe {Guid.NewGuid():N}", RoleId = roleId };
+        context.SubAssemblies.Add(recipe);
+        await context.SaveChangesAsync(Cancellation);
+        return recipe.Id;
+    }
+
+    /// <summary>
+    /// A made ingredient named <paramref name="name"/>, in a Made category ("In-House" unless named), made from a new
+    /// recipe of <paramref name="lines"/> named "{name} Base" (AddRecipeAsync), with <paramref name="weightLossPercent"/>
+    /// and no add-ins, saved as the Raw Materials screen's Save does, so it's costed. Its sub-assembly is
+    /// <see cref="RecipeIdOfAsync"/>'s.
+    /// </summary>
+    protected async Task<int> AddMadeIngredientAsync(
+        string name, IReadOnlyList<(int IngredientId, decimal Grams)> lines, decimal weightLossPercent = 0m, string categoryName = "In-House")
+    {
+        var recipeId = await AddRecipeAsync($"{name} Base", lines);
+        var made = new RawMaterial
+        {
+            Name = name,
+            Type = RawMaterialType.Ingredient,
+            Source = RawMaterialSource.Made,
+            CategoryId = await MadeCategoryIdAsync(categoryName),
+            WeightLossPercent = weightLossPercent,
+            SubAssemblyId = recipeId,
+        };
+        return await new RawMaterialRepository(CreateDbContextFactory()).SaveAsync(made, [], brandPrices: null, addIns: null, Cancellation);
+    }
+
+    /// <summary>The id of the sub-assembly <paramref name="madeIngredientId"/> is made from.</summary>
+    protected async Task<int> RecipeIdOfAsync(int madeIngredientId)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.RawMaterials.Where(m => m.Id == madeIngredientId).Select(m => m.SubAssemblyId!.Value).SingleAsync(Cancellation);
+    }
+
+    /// <summary>
+    /// Replaces the lines of the sub-assembly <paramref name="madeIngredientId"/> is made from, keeping its name and role, as
+    /// the Sub-Assemblies screen's Save does: the made ingredient, and everything using it, is repriced.
+    /// </summary>
+    protected async Task SetRecipeLinesAsync(int madeIngredientId, IReadOnlyList<(int IngredientId, decimal Grams)> lines)
+    {
+        var recipeId = await RecipeIdOfAsync(madeIngredientId);
+        SubAssembly recipe;
+        await using (var dbContext = CreateDbContext())
+        {
+            recipe = await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == recipeId, Cancellation);
+        }
+
+        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            recipe, [.. lines.Select(l => new RecipeLine(l.IngredientId, l.Grams))], Cancellation);
     }
 
     /// <summary>Saves <paramref name="productId"/>'s recipe as the Products screen's Save does (ProductRepository.SaveAsync), keeping its name.</summary>

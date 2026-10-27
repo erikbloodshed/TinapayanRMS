@@ -28,6 +28,15 @@ public class RawMaterial
     public decimal? WeightLossPercent { get; set; }
 
     /// <summary>
+    /// Made only, and required for one: the sub-assembly whose recipe it's made from (2026-10-27). The Sub-Assemblies screen
+    /// is the one place the recipe is written; the made ingredient adds its own add-ins (IngredientAddInLine) and its
+    /// weight loss on top. Only one kept on the Sub-Assemblies screen, and not a packaging set (SubAssemblyRules.EnsureLinkableByMadeIngredient).
+    /// </summary>
+    public int? SubAssemblyId { get; set; }
+
+    public SubAssembly? SubAssembly { get; set; }
+
+    /// <summary>
     /// Linked only: the ingredient this one is a part of, whose cost it takes a share of — egg white
     /// is linked to the egg. Its cost per gram is the linked-to one's × CostSharePercent ÷ WeightSharePercent.
     /// </summary>

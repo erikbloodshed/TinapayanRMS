@@ -22,5 +22,13 @@ public partial class SubAssembliesView : UserControl
             var request = interaction.Input;
             interaction.SetOutput(TextPromptWindow.Prompt(request.Title, request.Label, request.InitialValue, Window.GetWindow(this), request.Message));
         });
+
+        // Move to In-House's name for the made ingredient, and the Made category it goes in.
+        viewModel.PromptForMadeIngredient.RegisterHandler(async interaction =>
+        {
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            interaction.SetOutput(TextPromptWindow.PromptWithChoice(interaction.Input, Window.GetWindow(this)));
+        });
+
     }
 }

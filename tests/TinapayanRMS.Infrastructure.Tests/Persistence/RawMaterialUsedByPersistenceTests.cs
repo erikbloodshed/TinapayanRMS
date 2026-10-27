@@ -25,24 +25,6 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
     private async Task<IReadOnlyList<string>> UsedByNamesAsync(int rawMaterialId) =>
         [.. (await CreateRepository().GetUsedByAsync(rawMaterialId, Cancellation)).Select(p => p.Name)];
 
-    /// <summary>A made ingredient whose BOM is <paramref name="bomLines"/>. Costs aren't cascaded: Used By doesn't read them.</summary>
-    private async Task<int> AddMadeIngredientAsync(string name, IReadOnlyList<(int ComponentIngredientId, decimal Grams)> bomLines)
-    {
-        await using var dbContext = CreateDbContext();
-        var category = await dbContext.RawMaterialCategories.FirstAsync(c => c.Name == "Ingredients", Cancellation);
-        var made = new RawMaterial { Name = name, Category = category, Source = RawMaterialSource.Made, WeightLossPercent = 0m };
-        dbContext.RawMaterials.Add(made);
-        await dbContext.SaveChangesAsync(Cancellation);
-        dbContext.IngredientBomLines.AddRange(bomLines.Select(l => new IngredientBomLine
-        {
-            IngredientId = made.Id,
-            ComponentIngredientId = l.ComponentIngredientId,
-            Grams = l.Grams,
-        }));
-        await dbContext.SaveChangesAsync(Cancellation);
-        return made.Id;
-    }
-
     /// <summary>A linked ingredient taking a share of <paramref name="linkedToId"/>'s weight and cost.</summary>
     private async Task<int> AddLinkedIngredientAsync(string name, int linkedToId)
     {
@@ -133,6 +115,20 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(eggId)).Should().Equal("Custard Cake", "Leche Flan");
         (await UsedByNamesAsync(milkId)).Should().Equal("Custard Cake");
         (await UsedByNamesAsync(custardId)).Should().Equal("Custard Cake");
+    }
+
+    [Fact]
+    public async Task An_ingredient_is_used_through_a_made_ingredients_add_ins()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling");
+        var milkId = await AddIngredientAsync("Milk");
+        var vanillaId = await AddIngredientAsync("Vanilla");
+        var custardId = await AddMadeIngredientAsync("Custard", [(milkId, 400m)]);
+        var rawMaterials = CreateRepository();
+        await rawMaterials.SaveAsync((await rawMaterials.GetByIdAsync(custardId, Cancellation))!, [], brandPrices: null, [(vanillaId, 5m)], Cancellation);
+        await AddProductWithSubAssemblyAsync("Custard Cake", fillingRoleId, [(custardId, 300m)]);
+
+        (await UsedByNamesAsync(vanillaId)).Should().Equal("Custard Cake");
     }
 
     [Fact]

@@ -3,6 +3,7 @@ using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
@@ -138,12 +139,12 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.BrandPriceRows.Select(r => (r.Brand, r.Price)).Should().Equal([(null, 0.09m)], "Flour's brands never join Sugar's");
         viewModel.PriceHistory.Should().ContainSingle().Which.Entry.RawMaterialId.Should().Be(sugarId);
 
-        // The same for a made ingredient's bill of materials.
+        // The same for the recipe a made ingredient is made from.
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Name == "Butter Icing");
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Name == "Syrup");
 
-        await WaitUntilSettledAsync(() => viewModel.BomLineEdits.Count > 0, () => $"lines={viewModel.BomLineEdits.Count}");
-        viewModel.BomLineEdits.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal([("Sugar", 100m)], "Butter Icing's lines never join Syrup's");
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
+        viewModel.RecipeLines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal([("Sugar", 100m)], "Butter Icing's lines never join Syrup's");
     }
 
     [Fact]
@@ -590,147 +591,213 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
-    public async Task A_made_ingredients_bom_is_saved_with_the_rest_and_left_alone_by_a_save_that_did_not_touch_it()
+    public async Task A_made_ingredients_sub_assembly_and_add_ins_are_saved_with_the_rest_and_add_ins_left_alone_by_a_save_that_did_not_touch_them()
     {
-        await SeedPurchasedIngredientAsync("Sugar");
+        await MadeCategoryIdAsync();
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar");
+        await SeedPurchasedIngredientAsync("Vanilla");
+        var recipeId = await AddRecipeAsync("Syrup Base", [(sugarId, 1000m)]);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Simple Syrup";
-        PickCategory(viewModel);
         viewModel.EditingSource = RawMaterialSource.Made;
+        PickCategory(viewModel);
         viewModel.EditingWeightLossPercent = 20m;
-        viewModel.ShowPurchaseSetup.Should().BeFalse("a made ingredient has a BOM instead of a price");
-        viewModel.BomLineEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single().Id, Grams = 1000m });
+        viewModel.ShowPurchaseSetup.Should().BeFalse("a made ingredient is made from a sub-assembly instead of priced");
+        await PickRecipeAsync(viewModel, "Syrup Base");
+        viewModel.AddInEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single(m => m.Name == "Vanilla").Id, Grams = 10m });
         await viewModel.SaveCommand.Execute();
 
-        await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial is not null && viewModel.BomLineEdits.Count == 1,
-            () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.BomLineEdits.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial is not null && viewModel.AddInEdits.Count == 1,
+            () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.AddInEdits.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SelectedRawMaterial!.SubAssemblyId.Should().Be(recipeId);
         viewModel.HeaderCostUnitText.Should().Be("g", "a made ingredient has no Purchase Cost Setup, so its header stays per gram");
         viewModel.CurrentCostText.Should().MatchRegex(@"^\d+\.\d{4}$");
-        var lineId = await BomLineIdAsync();
+        var addInId = await AddInIdAsync();
 
         viewModel.EditingName = "Syrup";
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        (await BomLineIdAsync()).Should().Be(lineId, "an untouched BOM isn't sent, so its line isn't replaced");
+        (await AddInIdAsync()).Should().Be(addInId, "untouched add-ins aren't sent, so the line isn't replaced");
     }
 
     [Fact]
-    public async Task The_BOM_component_picker_leaves_out_the_made_ingredient_being_edited()
+    public async Task A_made_ingredient_needs_a_sub_assembly_picked_before_it_saves()
     {
+        await MadeCategoryIdAsync();
         await SeedPurchasedIngredientAsync("Sugar");
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Simple Syrup";
-        PickCategory(viewModel);
         viewModel.EditingSource = RawMaterialSource.Made;
+        PickCategory(viewModel);
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().Be("Pick the sub-assembly it's made from.");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.AnyAsync(m => m.Name == "Simple Syrup", Cancellation)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task The_recipe_card_lists_only_recipes_and_opens_the_picked_one_on_Sub_Assemblies()
+    {
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar");
+        var recipeId = await AddRecipeAsync("Syrup Base", [(sugarId, 1000m)]);
+        var packagingRoleId = await AddRoleAsync("Packaging", sortOrder: 9, isPackaging: true);
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.SubAssemblies.Add(new SubAssembly { Name = "Gift Set", RoleId = packagingRoleId });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SubAssemblyOptions.Select(s => s.Name).Should().Equal(["Syrup Base"], "a packaging set isn't a recipe");
+
+        var opened = new List<int>();
+        using var subscription = viewModel.SubAssemblyOpenRequests.Subscribe(opened.Add);
+        viewModel.EditingSource = RawMaterialSource.Made;
+        await PickRecipeAsync(viewModel, "Syrup Base");
+        await viewModel.OpenSubAssemblyCommand.Execute();
+
+        opened.Should().Equal(recipeId);
+    }
+
+    [Fact]
+    public async Task The_add_in_picker_leaves_out_the_made_ingredient_being_edited()
+    {
+        await MadeCategoryIdAsync();
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar");
+        await AddRecipeAsync("Syrup Base", [(sugarId, 1000m)]);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Simple Syrup";
+        viewModel.EditingSource = RawMaterialSource.Made;
+        PickCategory(viewModel);
         viewModel.EditingWeightLossPercent = 20m;
-        viewModel.BomLineEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single().Id, Grams = 1000m });
+        await PickRecipeAsync(viewModel, "Syrup Base");
         await viewModel.SaveCommand.Execute();
 
         await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial?.Name == "Simple Syrup",
             () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
 
-        viewModel.BomComponentOptions.Should().NotContain(m => m.Name == "Simple Syrup", "a made ingredient can't be a component of itself");
-        viewModel.BomComponentOptions.Should().Contain(m => m.Name == "Sugar");
+        viewModel.AddInOptions.Should().NotContain(m => m.Name == "Simple Syrup", "a made ingredient can't be an add-in of itself");
+        viewModel.AddInOptions.Should().Contain(m => m.Name == "Sugar");
     }
 
     [Fact]
-    public async Task A_self_referencing_BOM_line_is_refused_even_when_the_rest_of_the_BOM_is_left_untouched()
+    public async Task A_self_referencing_add_in_is_refused_and_nothing_else_is_saved()
     {
-        await SeedPurchasedIngredientAsync("Sugar");
+        await MadeCategoryIdAsync();
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar");
+        await SeedPurchasedIngredientAsync("Vanilla");
+        await AddRecipeAsync("Syrup Base", [(sugarId, 1000m)]);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Simple Syrup";
-        PickCategory(viewModel);
         viewModel.EditingSource = RawMaterialSource.Made;
+        PickCategory(viewModel);
         viewModel.EditingWeightLossPercent = 20m;
-        viewModel.BomLineEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single().Id, Grams = 1000m });
+        await PickRecipeAsync(viewModel, "Syrup Base");
+        viewModel.AddInEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single(m => m.Name == "Vanilla").Id, Grams = 10m });
         await viewModel.SaveCommand.Execute();
         await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial?.Name == "Simple Syrup",
             () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
 
         // Only reachable by editing the database directly — the picker already leaves the material itself out of
-        // BomComponentOptions — but this pins the guard that catches it anyway, added straight to BomLineEdits.
-        viewModel.BomLineEdits.Add(new IngredientLineRow { IngredientId = viewModel.SelectedRawMaterial!.Id, Grams = 50m });
-        viewModel.EditingWeightLossPercent = 25m; // an unrelated edit, so the BOM change isn't what's exercised
+        // AddInOptions — but this pins the guard that catches it anyway, added straight to AddInEdits.
+        viewModel.AddInEdits.Add(new IngredientLineRow { IngredientId = viewModel.SelectedRawMaterial!.Id, Grams = 50m });
+        viewModel.EditingWeightLossPercent = 25m; // an unrelated edit, which goes with it
 
         await viewModel.SaveCommand.Execute();
 
-        viewModel.ErrorMessage.Should().Be("An ingredient can't be a component of itself.");
+        viewModel.ErrorMessage.Should().Be("An ingredient can't be an add-in of itself.");
         viewModel.SuccessMessage.Should().BeNull("nothing was saved");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.SingleAsync(m => m.Name == "Simple Syrup", Cancellation)).WeightLossPercent.Should().Be(20m, "the unrelated edit wasn't saved either");
-        (await dbContext.IngredientBomLines.CountAsync(Cancellation)).Should().Be(1, "the bad line was never persisted");
+        (await dbContext.IngredientAddInLines.CountAsync(Cancellation)).Should().Be(1, "the bad line was never persisted");
     }
 
     [Fact]
     public async Task A_made_ingredient_left_at_the_default_weight_loss_saves_with_3_percent()
     {
+        await MadeCategoryIdAsync();
         await SeedCategoryAsync("Syrups");
+        await AddRecipeAsync("Syrup Base", [(await SeedPurchasedIngredientAsync("Sugar"), 1000m)]);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Simple Syrup";
-        PickCategory(viewModel);
         viewModel.EditingWeightLossPercent.Should().BeNull("a purchased material has no weight loss");
         viewModel.EditingSource = RawMaterialSource.Made;
+        PickCategory(viewModel);
         viewModel.EditingWeightLossPercent.Should().Be(3m, "a made ingredient starts at 3%");
+        await PickRecipeAsync(viewModel, "Syrup Base");
 
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
-        (await dbContext.RawMaterials.SingleAsync(Cancellation)).WeightLossPercent.Should().Be(3m);
+        (await dbContext.RawMaterials.SingleAsync(m => m.Name == "Simple Syrup", Cancellation)).WeightLossPercent.Should().Be(3m);
     }
 
     [Fact]
     public async Task The_header_shows_a_made_ingredients_yield_and_bom_cost_and_its_buffered_cost_follows_them()
     {
+        await MadeCategoryIdAsync();
         var sugarId = await SeedCostedIngredientAsync("Sugar", costPerGram: 0.10m, bufferedCostPerGram: 0.11m);
+        var vanillaId = await SeedCostedIngredientAsync("Vanilla", costPerGram: 1m, bufferedCostPerGram: 1.1m);
+        await AddRecipeAsync("Syrup Base", [(sugarId, 1000m)]);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Simple Syrup";
-        PickCategory(viewModel);
         viewModel.EditingSource = RawMaterialSource.Made;
+        PickCategory(viewModel);
         viewModel.EditingWeightLossPercent.Should().Be(3m);
-        viewModel.BomTotalWeight.Should().Be(0m, "nothing in the BOM yet");
+        viewModel.BomTotalWeight.Should().Be(0m, "no sub-assembly picked yet");
         viewModel.BomTotalCost.Should().Be(0m);
 
-        viewModel.BomLineEdits.Add(new IngredientLineRow { IngredientId = sugarId, Grams = 1000m });
+        await PickRecipeAsync(viewModel, "Syrup Base");
 
         viewModel.BomTotalWeight.Should().Be(970m, "1,000 g less the 3% lost while making it");
         viewModel.BomTotalCost.Should().Be(110m, "1,000 g of sugar at its buffered ₱0.11");
-        viewModel.BufferedCostText.Should().Be("0.1134", "₱110 over the 970 g it yields, as the BOM stands");
+        viewModel.BufferedCostText.Should().Be("0.1134", "₱110 over the 970 g it yields, as the recipe stands");
+
+        // An add-in goes on top of the recipe.
+        viewModel.AddInEdits.Add(new IngredientLineRow(id => viewModel.Ingredients.FirstOrDefault(m => m.Id == id)) { IngredientId = vanillaId, Grams = 100m });
+        viewModel.BomTotalWeight.Should().Be(1067m, "1,100 g less 3%");
+        viewModel.BomTotalCost.Should().Be(220m, "and ₱110 of vanilla");
 
         // The weight loss moves the yield, not the cost.
         viewModel.EditingWeightLossPercent = 20m;
-        viewModel.BomTotalWeight.Should().Be(800m);
-        viewModel.BomTotalCost.Should().Be(110m);
-        viewModel.BufferedCostText.Should().Be("0.1375");
+        viewModel.BomTotalWeight.Should().Be(880m);
+        viewModel.BomTotalCost.Should().Be(220m);
+        viewModel.BufferedCostText.Should().Be("0.2500");
 
         await viewModel.SaveCommand.Execute();
 
-        await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial is not null && viewModel.BomLineEdits.Count == 1,
-            () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.BomLineEdits.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial is not null && viewModel.AddInEdits.Count == 1 && viewModel.RecipeLines.Count == 1,
+            () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.AddInEdits.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.BomTotalWeight.Should().Be(800m);
-        viewModel.BomTotalCost.Should().Be(110m);
+        viewModel.BomTotalWeight.Should().Be(880m);
+        viewModel.BomTotalCost.Should().Be(220m);
         (viewModel.BomTotalCost / viewModel.BomTotalWeight).Should().Be(viewModel.SelectedRawMaterial!.BufferedCostPerBaseUnit,
             "the tiles are the two sides of the buffered cost the cascade saved");
         viewModel.SelectedRawMaterial!.CostBufferPercent.Should().Be(0m, "a made ingredient carries no buffer of its own");
-        viewModel.BufferedCostText.Should().Be("0.1375");
+        viewModel.BufferedCostText.Should().Be("0.2500");
     }
 
     [Fact]
@@ -758,7 +825,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == syrupId);
-        await WaitUntilSettledAsync(() => viewModel.BomLineEdits.Count == 1, () => $"lines={viewModel.BomLineEdits.Count}");
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
         viewModel.BomTotalCost.Should().Be(110m);
 
         // Sugar goes up behind the screen's back, as another screen or the cascade would leave it.
@@ -813,21 +880,24 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     [Fact]
     public async Task A_cleared_weight_loss_box_saves_as_0_percent()
     {
+        await MadeCategoryIdAsync();
         await SeedCategoryAsync("Syrups");
+        await AddRecipeAsync("Syrup Base", [(await SeedPurchasedIngredientAsync("Sugar"), 1000m)]);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Simple Syrup";
-        PickCategory(viewModel);
         viewModel.EditingSource = RawMaterialSource.Made;
+        PickCategory(viewModel);
+        await PickRecipeAsync(viewModel, "Syrup Base");
         viewModel.EditingWeightLossPercent = null; // the box shows 0.00 when it's empty
 
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
-        (await dbContext.RawMaterials.SingleAsync(Cancellation)).WeightLossPercent.Should().Be(0m);
+        (await dbContext.RawMaterials.SingleAsync(m => m.Name == "Simple Syrup", Cancellation)).WeightLossPercent.Should().Be(0m);
     }
 
 
@@ -843,7 +913,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await AddUnitAsync(viewModel, bagId, 25000m);
         AddBrandPrice(viewModel, null, "bag", 90m);
         viewModel.EditingSource = RawMaterialSource.Made;
-        viewModel.BomLineEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single().Id, Grams = 100m });
+        viewModel.AddInEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single().Id, Grams = 100m });
 
         await viewModel.NewCommand.Execute();
 
@@ -851,7 +921,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.PurchaseUnitOptions.Select(o => o.Name).Should().Equal("gram", "bag");
         viewModel.BrandPriceRows.Should().BeEmpty();
         viewModel.PurchaseCostText.Should().Be("—");
-        viewModel.BomLineEdits.Should().BeEmpty();
+        viewModel.AddInEdits.Should().BeEmpty();
     }
 
     [Fact]
@@ -1247,6 +1317,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     [Fact]
     public async Task A_new_material_switched_to_packaging_drops_the_ingredient_only_fields_and_saves_its_own_base_unit()
     {
+        await MadeCategoryIdAsync();
         await SeedPurchasedIngredientAsync("Flour");
         var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
         var boxesId = await AddPackagingCategoryAsync("Boxes");
@@ -1258,8 +1329,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SavedBaseUnitText.Should().Be("gram (g)", "an ingredient's base unit is always the gram");
         viewModel.CategoryOptions.Where(c => c.Id > 0).Should().NotContain(c => c.Id == boxesId, "an ingredient is offered ingredient categories only");
         viewModel.EditingName = "Cake Box";
-        PickCategory(viewModel);
         viewModel.EditingSource = RawMaterialSource.Made;
+        PickCategory(viewModel);
         viewModel.EditingWeightLossPercent = 5m;
 
         viewModel.EditingType = RawMaterialType.Packaging;
@@ -1267,7 +1338,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingSource.Should().Be(RawMaterialSource.Purchased, "packaging is always purchased");
         viewModel.EditingWeightLossPercent.Should().BeNull();
         viewModel.IsEditingMade.Should().BeFalse();
-        viewModel.EditingCategory.Should().BeNull("the ingredient category it had can't hold packaging");
+        viewModel.EditingCategory.Should().BeNull("the Made category it had can't hold packaging");
+
         viewModel.CategoryOptions.Where(c => c.Id > 0).Select(c => c.Id).Should().Equal([boxesId], "packaging is offered packaging categories only");
         viewModel.EditingCategory = viewModel.CategoryOptions.Single(c => c.Id == boxesId);
 
@@ -1644,6 +1716,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             new RawMaterialPriceHistoryRepository(factory),
             new RawMaterialBrandPriceRepository(factory),
             new IngredientBomLineRepository(factory),
+            new SubAssemblyRepository(factory),
+            new SubAssemblyLineRepository(factory),
             new RawMaterialCategoryRepository(factory),
             new RawMaterialCategoryValidator(),
             new RawMaterialValidator(),
@@ -1728,7 +1802,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
     /// <summary>Picks the first category, which a new material starts without.</summary>
     private static void PickCategory(RawMaterialsViewModel viewModel) =>
-        viewModel.EditingCategory = viewModel.Categories.First(c => c.Type == viewModel.EditingType);
+        viewModel.EditingCategory = viewModel.Categories.First(c => c.Type == RawMaterialRules.CategoryTypeFor(viewModel.EditingType, viewModel.EditingSource));
 
     private async Task SeedCategoryAsync(string name)
     {
@@ -1767,9 +1841,13 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         return id;
     }
 
-    /// <summary>A made ingredient with a bill of materials: grams of each component.</summary>
+    /// <summary>
+    /// A made ingredient made from a recipe of <paramref name="lines"/> (grams of each), named "{name} Base", or from an
+    /// empty one for none. Inserted past the repository, so its cost isn't worked out: the screen works its tiles out itself.
+    /// </summary>
     private async Task<int> SeedMadeIngredientAsync(string name, params (int ComponentId, decimal Grams)[] lines)
     {
+        var recipeId = lines.Length == 0 ? await AddEmptyRecipeAsync() : await AddRecipeAsync($"{name} Base", [.. lines]);
         await using var dbContext = CreateDbContext();
         var ingredient = new RawMaterial
         {
@@ -1778,13 +1856,18 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             Category = new RawMaterialCategory { Name = $"{name} goods" },
             Source = RawMaterialSource.Made,
             WeightLossPercent = 0m,
+            SubAssemblyId = recipeId,
         };
         dbContext.RawMaterials.Add(ingredient);
         await dbContext.SaveChangesAsync(Cancellation);
-
-        dbContext.IngredientBomLines.AddRange(lines.Select(l => new IngredientBomLine { IngredientId = ingredient.Id, ComponentIngredientId = l.ComponentId, Grams = l.Grams }));
-        await dbContext.SaveChangesAsync(Cancellation);
         return ingredient.Id;
+    }
+
+    /// <summary>Picks the sub-assembly named <paramref name="name"/> on the Recipe card, and waits for its lines to show.</summary>
+    private async Task PickRecipeAsync(RawMaterialsViewModel viewModel, string name)
+    {
+        viewModel.EditingSubAssembly = viewModel.SubAssemblyOptions.Single(s => s.Name == name);
+        await WaitUntilSettledAsync(() => viewModel.RecipeLines.Count > 0, () => $"recipe lines={viewModel.RecipeLines.Count}");
     }
 
     /// <summary>Renames a unit of measure's abbreviation the way the Settings dialog would, behind the screen's back.</summary>
@@ -1796,10 +1879,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await dbContext.SaveChangesAsync(Cancellation);
     }
 
-    private async Task<int> BomLineIdAsync()
+    private async Task<int> AddInIdAsync()
     {
         await using var dbContext = CreateDbContext();
-        return await dbContext.IngredientBomLines.Select(l => l.Id).SingleAsync(Cancellation);
+        return await dbContext.IngredientAddInLines.Select(l => l.Id).SingleAsync(Cancellation);
     }
 
     /// <summary>

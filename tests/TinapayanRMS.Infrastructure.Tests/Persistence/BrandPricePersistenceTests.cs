@@ -234,6 +234,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
     [Fact]
     public async Task SetAsync_rejects_prices_for_a_made_ingredient()
     {
+        var recipeId = await AddEmptyRecipeAsync();
         await using var dbContext = CreateDbContext();
         var syrup = new RawMaterial
         {
@@ -241,6 +242,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
             Category = new RawMaterialCategory { Name = "Fillings" },
             Source = RawMaterialSource.Made,
             WeightLossPercent = 0m,
+            SubAssemblyId = recipeId,
         };
         dbContext.RawMaterials.Add(syrup);
         await dbContext.SaveChangesAsync(Cancellation);
