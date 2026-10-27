@@ -302,7 +302,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
     }
 
     [Fact]
-    public async Task Clone_and_Create_Variant_hold_the_same_products_the_variant_linking_the_packaging()
+    public async Task Clone_and_Create_Variant_hold_the_same_products_the_variant_linking_the_topping_with_no_packaging()
     {
         var ensaymadaId = await AddProductAsync("Ensaymada");
         var cheeseRollId = await AddProductAsync("Cheese Roll");
@@ -325,17 +325,20 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
             {
                 (await CreateRepository().GetByIdAsync(id, Cancellation))!.IsComposite.Should().BeTrue();
                 (await HeldAsync(id)).Should().Equal(("Cheese Roll", 4), ("Ensaymada", 6));
-
-                // Its topping is its own copy, as any product's own section is.
-                var topping = await dbContext.ProductSubAssemblyUsages.Where(u => u.ProductId == id).Select(u => u.SubAssembly!).SingleAsync(Cancellation);
-                topping.RoleId.Should().Be(toppingRoleId);
-                topping.OwnerProductId.Should().Be(id);
             }
+
+            // The clone's topping is its own copy, as any product's own section is; the variant links the source's.
+            var sourceToppingId = await dbContext.ProductSubAssemblyUsages.Where(u => u.ProductId == boxId).Select(u => u.SubAssemblyId).SingleAsync(Cancellation);
+            var cloneTopping = await dbContext.ProductSubAssemblyUsages.Where(u => u.ProductId == cloneId).Select(u => u.SubAssembly!).SingleAsync(Cancellation);
+            cloneTopping.RoleId.Should().Be(toppingRoleId);
+            cloneTopping.OwnerProductId.Should().Be(cloneId);
+            (await dbContext.ProductSubAssemblyUsages.Where(u => u.ProductId == variantId).Select(u => u.SubAssemblyId).SingleAsync(Cancellation))
+                .Should().Be(sourceToppingId);
         }
 
         var packagingLines = new PackagingLineRepository(CreateDbContextFactory());
         (await packagingLines.GetForProductAsync(cloneId, Cancellation)).Select(l => l.PackagingMaterialId).Should().Equal(giftBoxId);
-        var variantLink = await new PackagingLinkRepository(CreateDbContextFactory()).GetForProductAsync(variantId, Cancellation);
-        variantLink!.LinkedProductId.Should().Be(boxId);
+        (await packagingLines.GetEffectiveForProductAsync(variantId, Cancellation)).Should().BeEmpty("a variant has no packaging");
+        (await new PackagingLinkRepository(CreateDbContextFactory()).GetForProductAsync(variantId, Cancellation)).Should().BeNull();
     }
 }

@@ -16,7 +16,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
     private async Task<int> SeedCategoryAsync()
     {
         await using var dbContext = CreateDbContext();
-        var category = new RawMaterialCategory { Name = "Ribbons", Type = RawMaterialType.Packaging };
+        var category = new RawMaterialCategory { Name = "Ribbons", Type = RawMaterialCategoryType.Packaging };
         dbContext.RawMaterialCategories.Add(category);
         await dbContext.SaveChangesAsync(Cancellation);
         return category.Id;

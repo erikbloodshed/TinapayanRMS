@@ -62,7 +62,7 @@ You type every other multiplier yourself. This includes a bag, and a litre of an
 Every ingredient has a **source**, which is set when it's created and can't be changed afterwards:
 
 - **Purchased**: bought from a supplier. Its cost comes from the brand prices you enter. Packaging is always purchased.
-- **Made**: made in the shop from other ingredients, such as a syrup or an icing. Its cost comes from its **bill of materials** (the ingredients it's made from) and its **weight loss %**, the weight lost while making it.
+- **Made**: made in the shop from other ingredients, such as a syrup or an icing. Its recipe is a **sub-assembly** on the Sub-Assemblies screen, the one place that recipe is written. Its cost comes from that recipe's ingredients, any **add-ins** of its own on top, and its **weight loss %**, the weight lost while making it.
 - **Linked**: a part of another ingredient, such as egg white and egg yolk from a whole egg. Its cost is a share of that ingredient's cost.
 
 ### Cost buffer and buffered cost
@@ -88,9 +88,11 @@ Every sub-assembly has a **role** that says what it is in the recipe, such as Do
 A product uses a sub-assembly in one of two ways:
 
 - **Linked**: the product uses a sub-assembly that's kept on the Sub-Assemblies screen. Every product that links it follows every change made to it. Use this when several products share one dough, for example.
-- **Its own**: the sub-assembly belongs to that one product. Other products can copy it but can't link it. A role can be set to be **product-owned** in Settings. A section made in a product in that role is then always the product's own.
+- **Its own**: the sub-assembly belongs to that one product. Other products can copy it but can't link it, except its variants (see [Clone tab](#clone-tab)). A role can be set to be **product-owned** in Settings. A section made in a product in that role is then always the product's own.
 
 A sub-assembly in the **Packaging** role is a **packaging set**, such as a gift box with its ribbon and tag. It holds packaging materials instead of ingredients.
+
+A sub-assembly on the Sub-Assemblies screen can also be the recipe of a **made ingredient**, such as Butter Icing, so other recipes can use it as one ingredient. The made ingredient follows every change made to the sub-assembly, as linking products do.
 
 ### Products
 
@@ -177,7 +179,7 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 - On that bottom row, **Tab** from its last cell adds the line, as **Enter** does, and opens the first cell of the next empty row, so you can type one line after another without reaching for the mouse.
 - Pickers inside tables, such as the ingredient or material pickers, suggest names as you type.
 - To change a line's ingredient, material or product, type over it. The line keeps what it had until you pick another, so its cost and the totals don't change while you type. Text that names nothing in the list leaves the line as it was, whether you press Esc, Tab, Enter or click away. To empty the cell, delete all its text.
-- **Drag a row**, by its left edge or any cell you aren't typing in, to change the order of recipe lines, bill of materials lines and packaging lines. The order is saved.
+- **Drag a row**, by its left edge or any cell you aren't typing in, to change the order of recipe lines, add-ins and packaging lines. The order is saved.
 - **Insert Line** puts a blank line in above the selected one, so you don't have to add it at the bottom and drag it up. The new line's Ingredient cell opens, ready to type. With no line selected, or the empty row at the bottom selected, the new line goes in at the bottom. You can also press **Insert** while the table has the cursor and you aren't typing in a cell. It's on the ingredient tables: a sub-assembly's lines on the Sub-Assemblies screen, and a product section's lines and add-ins (the add-ins button is **Insert Add-In**). A line you leave blank does no harm, because Save leaves it out. **Undo** or **Remove Line** takes it away.
 - **Remove Line** removes the selected line.
 - Figures shown in grey are worked out by the app, so they can't be typed into.
@@ -260,13 +262,14 @@ A command can be shortened as long as it stays clear, as in **:del**, **:pro** a
 On a new database, set things up in this order. Each step uses what the one before it made.
 
 1. **Units of measure** (Settings → Units of Measure): the units you buy and use things in: g, kg, piece, pack, bag, cm, roll, and so on.
-2. **Material categories** (Settings → Material Categories): how raw materials are grouped, such as Flour, Dairy, Boxes and Ribbons. Each category is for either ingredients or packaging.
+2. **Material categories** (Settings → Material Categories): how raw materials are grouped, such as Flour, Dairy, In-House, Boxes and Ribbons. Each category is for ingredients, made ingredients or packaging.
 3. **Product categories** (Settings → Product Categories): how products are grouped, such as Breads, Cakes and Pastries.
 4. **Roles** (Settings → Roles): the parts of a recipe. Dough, Filling, Topping, Inclusion, Finishing and Packaging are there from the start.
 5. **Costing defaults** (Settings → Costing Defaults): the stage a new product goes in, the labour, overhead, administrative, markup and VAT percentages that it starts with, the cost buffer a new raw material starts with, and the shop's wastage.
-6. **Raw materials**: every purchased ingredient and packaging material with its prices, then the made and linked ingredients.
-7. **Sub-assemblies**: the doughs, fillings and packaging sets shared by more than one product.
-8. **Products**.
+6. **Raw materials**: every purchased ingredient and packaging material with its prices, then the linked ingredients.
+7. **Sub-assemblies**: the doughs, fillings and packaging sets shared by more than one product, and the recipes of the shop's made ingredients, such as a syrup or an icing.
+8. **Made ingredients**, on the Raw Materials screen, each made from one of those sub-assemblies.
+9. **Products**.
 
 You don't have to finish each list before moving on. You can add a category or unit later, and most pickers let you add a new category just by typing its name.
 
@@ -284,9 +287,17 @@ A unit that's in use can't be deleted. This means a price or a packaging line is
 
 ### Material Categories
 
-Each category has a **Name** and a **Type**: Ingredient or Packaging. An ingredient can only go in an ingredient category, and packaging only in a packaging category.
+Each category has a **Name** and a **Type**:
 
-A category's type can't change while a material is in it. A category with materials in it can't be deleted.
+- **Ingredient**: for purchased and linked ingredients, such as Flour and Dairy.
+- **Made**: for made ingredients, and only them, such as In-House.
+- **Packaging**: for packaging materials, such as Boxes and Labels.
+
+Every material goes in a category of its own type, and no other. A made ingredient can only go in a Made category, and a Made category takes nothing else.
+
+A category's type can only change when everything in it fits the new type. For example, an ingredient category that holds only made ingredients can become a Made one. If anything in it wouldn't fit, the message says how many materials to move out first. A category with materials in it can't be deleted.
+
+A made ingredient saved in an ingredient category before Made categories existed stays there, but it can't be saved again until it's in a Made category. Make a Made category, or change an ingredient category that holds only made ingredients to Made, then drag the made ingredient into it.
 
 ### Product Categories
 
@@ -298,7 +309,7 @@ Each role has:
 
 - **Name**: what the section is called in a recipe, such as Dough or Filling.
 - **Order**: where the role's sections go in a recipe. Lower numbers come first. A new role goes last. To change a role's place, pick it in the list and press **Move Up** or **Move Down** above the list. The roles are numbered 1, 2, 3… again after a move or a delete, so there are no gaps.
-- **Product-owned**: a section made in a product in this role stays that product's own. It's edited in the product's recipe instead of on the Sub-Assemblies screen, and other products can copy it but not link it. Turning this on or off for a role that's already used asks first, and says how many sub-assemblies will move.
+- **Product-owned**: a section made in a product in this role stays that product's own. It's edited in the product's recipe instead of on the Sub-Assemblies screen, and other products can copy it but not link it, except its variants. Turning this on or off for a role that's already used asks first, and says how many sub-assemblies will move.
   - These are also the only roles a composite product can have sections in. So Product-owned can't be turned off while a composite has a section in the role; the message names the composites. Take the section out there first.
   - A section you make in a product in this role starts at a Yield of 1, so its Weight/piece is the whole batch (see [Piece size](#piece-size-weight-per-piece-and-yield)).
 
@@ -361,18 +372,18 @@ The Raw Materials screen has the list of materials on the left, and the selected
 
 ### The list
 
-The list has two top-level folders, **Ingredients** and **Packaging**, with a folder for each category inside them. Every material is in a category.
+The list has two top-level folders, **Ingredients** and **Packaging**, with a folder for each category inside them. Made categories sit inside **Ingredients**, among the ingredient ones. Every material is in a category.
 
 Right-click menus:
 
-- **A material**: **Move to** (another category of the same type), **Rename…** (F2) and **Delete** (Del).
-- **A type's folder**: **New Ingredient Here** or **New Packaging Material Here**, **New Category…**, **Expand All** and **Collapse All**.
-- **A category's folder**: **New … Here**, **New Category…**, **Rename Category…** (F2) and **Delete Category** (Del). You can only delete a category when it's empty. Otherwise the menu shows how many materials it holds.
-- **The empty space**: **New Raw Material**, **New Ingredient Category…**, **New Packaging Category…**, **Expand All** and **Collapse All**.
+- **A material**: **Move to** (another category of the same type: a made ingredient's are the Made ones), **Rename…** (F2) and **Delete** (Del).
+- **A type's folder**: **New Ingredient Here** or **New Packaging Material Here**, **New Category…**, **New Made Category…** (Ingredients only), **Expand All** and **Collapse All**.
+- **A category's folder**: **New … Here**, **New Category…**, **Rename Category…** (F2) and **Delete Category** (Del). In a Made category's folder, **New Made Ingredient Here** starts a made ingredient in that category, and **New Category…** adds another Made category. You can only delete a category when it's empty. Otherwise the menu shows how many materials it holds.
+- **The empty space**: **New Raw Material**, **New Ingredient Category…**, **New Made Category…**, **New Packaging Category…**, **Expand All** and **Collapse All**.
 
-The same commands are buttons under the search box: **New Raw Material**, **New Category** (its arrow offers an ingredient or a packaging category), **Expand All** and **Collapse All**. Each button shows only its icon; point at it to see its name.
+The same commands are buttons under the search box: **New Raw Material**, **New Category** (its arrow offers an ingredient, a Made or a packaging category), **Expand All** and **Collapse All**. Each button shows only its icon; point at it to see its name.
 
-Dragging materials onto another category moves them straight away. A material can't be dragged into the other type.
+Dragging materials onto another category moves them straight away. A material can't be dragged into a category of another type, so a made ingredient only drops into a Made category, and nothing else does.
 
 ### The header
 
@@ -388,7 +399,8 @@ Below the figures are the fields you fill in:
 
 - **Name**: must be unique. The app tells you straight away if another material already has it.
 - **Type**: Ingredient or Packaging. Only chosen for a new material.
-- **Category**: pick one, or type a new name to add it. The app asks before adding.
+- **Category**: pick one, or type a new name to add it. The app asks before adding. It lists only the categories the material can go in: the Made ones for a made ingredient, and the ingredient or packaging ones for the rest. On a new material, changing the Type or Source to one the picked category doesn't take empties the Category.
+
 - **Source** (ingredients): Purchased, Made or Linked. Only chosen for a new material.
 - **Base Unit** (packaging): the unit the material is counted in. It can't be changed once the material has alternative units, prices, or packaging lines that use it.
 - **Weight Loss %** (made ingredients): how much of the batch's weight is lost while making it. A new made ingredient starts at 3%.
@@ -404,7 +416,7 @@ Enter one row per brand you buy:
 | Column | What to enter |
 |---|---|
 | **Brand** | Optional. The brand or supplier. |
-| **Purchase Unit** | The unit you buy it in: the base unit or an alternative unit. Picking a unit the material doesn't have yet adds it as an alternative unit. |
+| **Purchase Unit** | The unit you buy it in: the base unit or an alternative unit. Picking a unit the material doesn't have yet adds it as an alternative unit. If you then make that unit a packaging material's base unit, the price moves to the base unit and the added alternative unit goes. |
 | **Qty per Purchase Unit** | How many base units one purchase unit holds. It's filled in for saved and standard units. |
 | **Purchase Price** | What one purchase unit costs. |
 | **Buffer %** | Read-only. How far the buffered cost is above this brand's price. |
@@ -424,20 +436,24 @@ On a material's first price, Save works out the buffered cost from the percentag
 
 Every Save that changes a purchased material's cost adds an entry to its **Price History**.
 
-#### Made ingredients: Bill of Materials
+#### Made ingredients: Recipe
 
-List the ingredients the made ingredient is made from:
+A made ingredient is made from a sub-assembly, the recipe kept on the Sub-Assemblies screen, with extras of its own on top.
 
-| Column | Meaning |
-|---|---|
-| **Component** | An ingredient: purchased, made or linked. It can't be the ingredient itself. |
-| **Grams** | How much of it goes into one batch. |
-| **Cost/g** | The component's buffered cost per gram. |
-| **Cost** | Grams × Cost/g. |
+- **Made from**: pick the sub-assembly. Every recipe on the Sub-Assemblies screen is offered. A packaging set isn't, and nor is a product's own section: move it to the Sub-Assemblies screen first. You need to pick one before a new made ingredient can be saved.
+- Once it's picked, it shows as a badge, such as **Butter Icing Base, from Sub-Assemblies**, so it can't be changed by accident. Click the badge to open that sub-assembly on the Sub-Assemblies screen. That's where its lines are changed. When you save it there, the made ingredient's cost follows, and so does every product that uses it.
+- To make it from another sub-assembly, click the **Edit** button (the pencil) beside the badge. The picker comes back. Pick the other sub-assembly, or click the **✕** beside the picker to keep the one you had. Save as usual, or Undo to put the old one back.
+- The table under the picker shows the recipe's lines as they're saved: **Ingredient**, **Grams**, **Cost/g** (its buffered cost per gram) and **Cost**. You can't type into it here.
+- **Add-Ins** are this made ingredient's own extra ingredients on top of the recipe, such as a colouring or a flavouring. Type them like any recipe lines, in grams. An add-in can't be an ingredient the recipe already has, and can't be the made ingredient itself. Add-ins go into the made ingredient only: the sub-assembly itself stays as it is, and so do the products that link it. **Remove Add-In** removes the selected one.
 
-The header's **Total Weight** is the batch's grams less the **Weight Loss %**. The **Total Cost** is the sum of the Cost column. Its buffered cost per gram is Total Cost ÷ Total Weight.
+Several made ingredients can be made from the same sub-assembly, each with its own add-ins and weight loss.
 
-Made ingredients can be built from other made ingredients to any depth. For example, a caramel can be made from a syrup that's made from sugar. The app refuses a bill of materials that would contain the ingredient itself anywhere down the chain.
+The header's **Total Weight** is the recipe's grams and the add-ins', less the **Weight Loss %**. The **Total Cost** is the sum of both tables' Cost columns. Its buffered cost per gram is Total Cost ÷ Total Weight.
+
+A recipe can also become a made ingredient from the other screens: a product's own filling or topping with **Move to In-House** on the Products screen (see *The product's own sections*), and a sub-assembly with **Make In-House Ingredient…** on the Sub-Assemblies screen's list (see *Make In-House Ingredient* there).
+
+Made ingredients can be built from other made ingredients to any depth.
+ For example, a caramel can be made from a recipe with a syrup in it, and the syrup from a recipe with sugar in it. The app refuses a recipe or an add-in that would contain the made ingredient itself anywhere down the chain.
 
 A made ingredient has no buffer of its own, because its components are already buffered.
 
@@ -492,7 +508,7 @@ The list has a folder for each role, in the order set in Settings → Roles, wit
 
 Right-click menus:
 
-- **A sub-assembly**: **Move to** (another role), **Rename…** (F2) and **Delete** (Del). A packaging set has no **Move to**: it always stays in the Packaging role.
+- **A sub-assembly**: **Move to** (another role), **Rename…** (F2), **Make In-House Ingredient…** and **Delete** (Del). A packaging set has no **Move to** or **Make In-House Ingredient…**: it always stays in the Packaging role.
 - **A role's folder**: **New Sub-Assembly Here** (**New Packaging Set Here** on the Packaging role), **New Role…**, **Rename Role…** (F2), **Delete Role** (Del), **Expand All** and **Collapse All**. You can only delete a role when no sub-assembly here is in it. Otherwise the menu shows how many it holds. The Packaging role can't be deleted.
 - **The empty space**: **New Sub-Assembly**, **New Role…**, **Expand All** and **Collapse All**.
 
@@ -503,6 +519,17 @@ Dragging sub-assemblies onto another role's folder changes their role straight a
 **Rename…** saves the new name straight away, and so does a move. If the sub-assembly is open in the form, its name or role there changes too, and anything else you've changed stays to be saved.
 
 A new role from the list goes after the others and isn't product-owned. Change its place and **Product-owned** in Settings → Roles.
+
+#### Make In-House Ingredient
+
+**Make In-House Ingredient…** adds a made ingredient on the Raw Materials screen that's made from this recipe, so other recipes can use it as one ingredient. It asks for the ingredient's **Name**, which starts as the sub-assembly's name, and its **Category**, one of the Made categories, starting on **In-House** when there is one. If there's no Made category yet, add one on the Raw Materials screen first, with **New Made Category…**. The name can't be one another raw material already has. Press **OK** and it's saved straight away:
+
+- The new made ingredient is made from this sub-assembly, with no add-ins and a **Weight Loss %** of 0, so it costs per gram what the recipe does.
+- The sub-assembly stays here exactly as it is, and you still change its lines here. The products that link it don't change.
+- If the recipe really does lose weight while it's made, set its Weight Loss % on the Raw Materials screen afterwards. Every product that uses the made ingredient then follows.
+
+If the sub-assembly is open in the form with changes you haven't saved, save or undo them first: the made ingredient is made from it as it's saved. To remove the made ingredient again, delete it on the Raw Materials screen.
+
 
 ### The form
 
@@ -520,7 +547,9 @@ The card under it has two tabs along its bottom. Each scrolls while the header s
 
 **New Product** starts a new product from the sub-assembly picked in the list. The Products screen opens with a new, unsaved product named after the sub-assembly, and its recipe already **links** the sub-assembly. Type the piece size (and rename the product if you like), then press Save there. New Product isn't offered for a packaging set. If the sub-assembly has changes you haven't saved, save or undo them first, because the product links the sub-assembly as it's saved.
 
-Changing a sub-assembly here changes every product that links it. A sub-assembly that a product links **can't be deleted**. The message names the products.
+Changing a sub-assembly here changes every product that links it, and every made ingredient made from it. A sub-assembly that a product links, or that a made ingredient is made from, **can't be deleted**. The message names them.
+
+The **Used By** tab shows a tile for each product that links the sub-assembly, then one for each made ingredient made from it. Click a product's tile to open it on the Products screen, and a made ingredient's to open it on the Raw Materials screen. Saving lines here refuses a line that's a made ingredient made from this sub-assembly, directly or further down, because that ingredient would contain itself.
 
 ### Packaging sets
 
@@ -559,7 +588,7 @@ Right-click menus:
 
 **New Product Here** and **New Composite Product Here** file the new product in that folder when you save it. **New** from the header puts it in the stage set in Settings → Costing Defaults, Production unless you change it.
 
-Each product's name starts with a small full-colour picture of what it is: a round bread for **Breads**, a loaf for **Loaves**, a strawberry cake for **Cakes** and a cupcake for **Pastries**. A composite product always has a bag of breads, whatever its category. A product in any other category, or in none, has no picture.
+Each product's name starts with a small full-colour picture of what it is: a round bread for **Breads**, a loaf for **Loaves**, a strawberry cake for **Cakes**, a cupcake for **Pastries** and a roll cake for **Rolls**. A composite product always has a bag of breads, whatever its category. A product in any other category, or in none, has no picture.
 
 ### The header
 
@@ -631,6 +660,16 @@ A linked section has a badge saying where it's from. Click the badge to open the
 #### The product's own sections
 
 - **Move to Sub-Assemblies** is the reverse of Unlink. Save puts the section on the Sub-Assemblies screen, keeping its name and lines, and this product links it there. Other products can then link it too.
+- **Move to In-House** makes a made ingredient from the section, so other recipes can use it as one ingredient, the way a topping uses Butter Icing. It asks for the ingredient's **Name**, which starts as the name the section is saved under (such as *Cheese Roll Filling*), and its **Category**, one of the Made categories, starting on **In-House** when there is one. If there's no Made category yet, add one on the Raw Materials screen first, with **New Made Category…**. The name can't be one another raw material already has.
+
+  Until you save, a **Moves to Sub-Assemblies and In-House on Save, as …** badge shows and you can still change the lines. Undo or Revert keeps the section this product's own. When you save:
+
+  - The section moves to the Sub-Assemblies screen, as **Move to Sub-Assemblies** does, keeping its name, lines and baker's percentages. This product links it there at the same piece size, so it costs what it did. From then on its lines are changed on the Sub-Assemblies screen, or through this product's linked section.
+  - The new made ingredient goes in the category you picked, made from that sub-assembly, with no add-ins and a **Weight Loss %** of 0.
+  - If the filling or topping really does lose weight while it's made, set its Weight Loss % on the Raw Materials screen afterwards. Every product that uses the made ingredient then follows.
+
+  Move to In-House isn't offered for a section that's already just one made ingredient.
+
 
 #### Packaging
 
@@ -710,12 +749,16 @@ Press **Print** while this tab is showing to print the scaled recipe instead of 
 
 The Clone tab is shown for saved products only. Type a **New Product Name**, then choose:
 
-- **Clone**: the new product links the same sub-assemblies at the same piece sizes, and gets its **own copy of the packaging**.
-- **Create Variant**: the same, except the packaging is **linked**, so the new product follows every change made to this one's packaging. Use this for a smaller or bigger version of the same product. For a boxed version, re-point its packaging at a packaging set.
+- **Clone**: the new product links the same sub-assemblies from the Sub-Assemblies screen at the same piece sizes, gets its **own copy** of this product's own sub-assemblies, and gets its **own copy of the packaging**.
+- **Create Variant**: the new product **links every sub-assembly this product uses** at the same piece sizes: the ones it links from the Sub-Assemblies screen (a dough, sponge or batter) and this product's own (a filling, topping and so on). So it follows every change made to them. It gets **no packaging**, neither linked nor copied. Use this for a smaller or bigger version of the same product, then give it its own packaging.
 
-With both, the product's own sub-assemblies are copied to the new product. The category, Quantity Required, Current Price and costing percentages are copied too. The new product starts in Research and Development, and you can change its piece sizes. Its History tab starts with one version that says where it came from (see [History tab](#history-tab)).
+A section that's this product's own shows in the variant with a badge such as "Ensaymada Big Filling, from Ensaymada Big". Click it to open the product the section belongs to. You can change the section's lines in the variant too: Save writes them to that product's sub-assembly. **Make a Copy** gives the variant its own copy instead. Once a variant drops a linked section, it can't link it again.
 
-A composite product's clone or variant is a composite too, holding the same products at the same quantities. Its own sections are copied as any product's are.
+While a variant links one of this product's own sub-assemblies, this product can't remove that sub-assembly and can't be deleted. Make a copy of it in the variant, or remove it there, first.
+
+The category, Quantity Required, Current Price and costing percentages are copied with both. The new product starts in Research and Development, and you can change its piece sizes. Its History tab starts with one version that says where it came from (see [History tab](#history-tab)).
+
+A composite product's clone or variant is a composite too, holding the same products at the same quantities. A clone copies its own sections and a variant links them, as for any product.
 
 ### History tab
 
@@ -1001,6 +1044,9 @@ When a cost changes, the app carries the change upwards:
 A purchased ingredient's price changes
   → every made or linked ingredient that uses it (all the way up the chain)
     → every sub-assembly with those ingredients in its lines
+
+A sub-assembly's lines change
+  → every made ingredient made from it, and on up the same way
       → every product that uses those sub-assemblies
         → every composite product that holds those products
 
@@ -1014,7 +1060,7 @@ This happens as soon as you save. A product already open on another tab shows th
 ### Raw materials
 
 - **Purchased**: cost per base unit = the dearest brand's price ÷ the base units in its purchase unit. The buffered cost is a fixed amount. It's set from the Cost Buffer % on the first price, or whenever you type the percentage again.
-- **Made**: final weight = the bill of materials' grams × (1 − Weight Loss %). Cost per gram = the components' total cost ÷ final weight. The buffered cost uses the components' buffered costs.
+- **Made**: final weight = the grams of its sub-assembly's lines and its add-ins × (1 − Weight Loss %). Cost per gram = their total cost ÷ final weight. The buffered cost uses their buffered costs.
 - **Linked**: cost per gram = linked-to ingredient's cost per gram × Cost Share % ÷ Weight Share %.
 
 ### Sub-assemblies
@@ -1112,7 +1158,7 @@ The app keeps costs at full precision and rounds them only for display. So a tot
 ### Start a new product from an existing one
 
 - For **a different product that shares some recipes**, use **Clone** (Clone tab, or right-click → **Clone…**). It gets its own packaging.
-- For **a size or pack variation** that should follow the original, use **Create Variant**. Then adjust its piece sizes, and its **Quantity Required** if it's sold as a pack.
+- For **a size or pack variation** that should follow the original's recipes, use **Create Variant**. Then adjust its piece sizes, give it its packaging, and set its **Quantity Required** if it's sold as a pack.
 - To **reuse just one dough or filling**, use **Add Sub-Assembly → Link an existing one** in the new product.
 
 ### See which products use an ingredient
@@ -1208,8 +1254,8 @@ Or type the packaging straight into the pack product's Packaging tab, then press
 **"Something can't be deleted."**
 It's still in use. The message says where. For example:
 - A category, unit or role that something is in.
-- An ingredient used in another's bill of materials, or linked by a part.
-- A sub-assembly a product links.
+- An ingredient used in a recipe or as a made ingredient's add-in, or linked by a part.
+- A sub-assembly a product links, or that a made ingredient is made from.
 - A product whose packaging another product links.
 - A product that a composite product holds.
 

@@ -285,11 +285,6 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await EnsureNothingLeansOnAsync(dbContext, id, cancellationToken);
 
-        // Its own sub-assemblies go with it (Cascade). Nothing else can link one, but should another product's recipe
-        // somehow use it, say so rather than let the database refuse.
-        await SubAssemblyRepository.EnsureNoneLinkedElsewhereAsync(
-            dbContext, u => u.SubAssembly!.OwnerProductId == id && u.ProductId != id, cancellationToken);
-
         // The product's cascades take its own sub-assemblies, its packaging lines, its usages with their add-ins, a
         // composite's lines, and its costing parameters with it. The ones it links from the Sub-Assemblies screen stay
         // there, and so do the products a composite holds.
@@ -298,7 +293,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 
     /// <summary>
     /// Refuses deleting product <paramref name="id"/>, to the Deleted folder or for good, while another product links its
-    /// packaging or a composite holds it, deleted or not, naming them.
+    /// packaging or one of its own sub-assemblies (a variant), or a composite holds it, deleted or not, naming them.
     /// </summary>
     private static async Task EnsureNothingLeansOnAsync(TinapayanRMSDbContext dbContext, int id, CancellationToken cancellationToken)
     {
@@ -325,6 +320,10 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
                 $"{ListedNames(heldBy.Select(p => (p.Name, p.DeletedAt)))} "
                 + $"{(heldBy.Count == 1 ? "holds" : "hold")} this product. Take it out there first.");
         }
+
+        // Its own sub-assemblies go with it for good (Cascade), so none can be left linked by a variant.
+        await SubAssemblyRepository.EnsureNoneLinkedElsewhereAsync(
+            dbContext, u => u.SubAssembly!.OwnerProductId == id && u.ProductId != id, cancellationToken);
 
         static string ListedNames(IEnumerable<(string Name, DateTime? DeletedAt)> products) =>
             string.Join(", ", products

@@ -5,6 +5,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure.Queries;
 
+
 namespace TinapayanRMS.Infrastructure.Repositories;
 
 public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductSubAssemblyUsageRepository
@@ -19,7 +20,7 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
 
     private Task<IReadOnlyList<ProductSubAssemblyUsage>> GetUsagesAsync(string filter, object parameters, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<ProductSubAssemblyUsage>>(
-            async dbContext => (await dbContext.Connection().QueryAsync<ProductSubAssemblyUsage, SubAssembly, SubAssemblyRole, ProductSubAssemblyUsage>(
+            async dbContext => (await dbContext.Connection().QueryAsync<ProductSubAssemblyUsage, SubAssembly, SubAssemblyRole, Product?, ProductSubAssemblyUsage>(
                 dbContext.Command(
                     $"""
                     SELECT {Columns.Of<ProductSubAssemblyUsage>("u")}, {SubAssemblyReads.ColumnsWithRole}
@@ -31,12 +32,12 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                     """,
                     parameters,
                     cancellationToken),
-                (usage, subAssembly, role) =>
+                (usage, subAssembly, role, owner) =>
                 {
-                    usage.SubAssembly = SubAssemblyReads.WithRole(subAssembly, role);
+                    usage.SubAssembly = SubAssemblyReads.WithRole(subAssembly, role, owner);
                     return usage;
                 },
-                splitOn: "Id,Id")).AsList(),
+                splitOn: "Id,Id,Id")).AsList(),
             cancellationToken);
 
     // The Ingredient comes with it: every add-in is priced from its BufferedCostPerBaseUnit on read.
@@ -70,20 +71,31 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 splitOn: "Id")).AsList(),
             cancellationToken);
 
+    /// <summary>A product's recipe as its own screen saves it, linking nothing that's another product's own but what it already links.</summary>
+    internal static Task SetRecipeAsync(TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, CancellationToken cancellationToken) =>
+        SetRecipeAsync(dbContext, productId, recipe, linksOthersOwn: false, cancellationToken);
+
     /// <summary>
     /// Replaces the product's recipe on the caller's context, which should hold a transaction: its usages, one for each
     /// sub-assembly <paramref name="recipe"/> links and one for each section whose lines it edits (RecipeDraft.New).
     /// Such a section in a product-owned role (SubAssemblyRole.IsProductOwned), or marked NewSubAssemblyDraft.IsOwn (an
     /// unlinked one), is the product's own sub-assembly, added or rewritten in place; in any other role a new one is kept
     /// on the Sub-Assemblies screen and linked, and one of its own moved there out of a product-owned role is released to
-    /// it. One marked NewSubAssemblyDraft.Release goes to the Sub-Assemblies screen and is linked, whatever its role.
+    /// it. One marked NewSubAssemblyDraft.Release goes to the Sub-Assemblies screen and is linked, whatever its role, and
+    /// so does one marked ToMadeIngredient, which a new made ingredient is then made from (Move to In-House).
     /// Either is named after the product and its role (SubAssemblyRules.StandaloneNameFor, made unique). One of its own the recipe no longer lists is deleted; one on the
     /// Sub-Assemblies screen is kept. A linked one carrying new lines (LinkedUsageDraft.Lines) is relined where it's kept,
     /// for every product linking it. Every check runs before anything is written: the sections' lines, names and piece
-    /// sizes, that a saved one is the product's own, that no section is a packaging set, that nothing linked is another
-    /// product's own, sections in one role told apart by their names, and add-ins.
+    /// sizes, that a saved one is the product's own, that no section is a packaging set, that nothing newly linked is
+    /// another product's own (unless <paramref name="linksOthersOwn"/>), that none of its own the recipe drops is linked
+    /// by another product, sections in one role told apart by their names, and add-ins.
     /// </summary>
-    internal static async Task SetRecipeAsync(TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, CancellationToken cancellationToken)
+    /// <param name="linksOthersOwn">
+    /// Create Variant's recipe, which links its source's own sub-assemblies. Only a variant links another product's own;
+    /// the links it's made with stay through every later save of it, and a dropped one can't be linked again.
+    /// </param>
+    internal static async Task SetRecipeAsync(
+        TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, bool linksOthersOwn, CancellationToken cancellationToken)
     {
         foreach (var section in recipe.New)
         {
@@ -144,6 +156,10 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             .Where(s => linkedIds.Contains(s.Id))
             .ToDictionaryAsync(s => s.Id, cancellationToken);
 
+        // Another product's own already linked here came from Create Variant, and stays linked.
+        HashSet<int> alreadyLinkedIds = linksOthersOwn
+            ? []
+            : [.. await dbContext.ProductSubAssemblyUsages.Where(u => u.ProductId == productId).Select(u => u.SubAssemblyId).ToListAsync(cancellationToken)];
         foreach (var id in linkedIds)
         {
             if (!linkedSubAssemblies.TryGetValue(id, out var linked))
@@ -151,9 +167,13 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 throw new BusinessRuleException($"Sub-assembly {id} does not exist.");
             }
 
-            // A packaging set is linked by the product's packaging, never as a recipe section; a product's own is copied.
+            // A packaging set is linked by the product's packaging, never as a recipe section; a product's own is copied,
+            // except by its variants.
             SubAssemblyRules.EnsureRecipeRole(linked.Role!);
-            SubAssemblyRules.EnsureLinkable(linked.Name, linked.OwnerProduct?.Name);
+            if (!linksOthersOwn && !alreadyLinkedIds.Contains(id))
+            {
+                SubAssemblyRules.EnsureLinkable(linked.Name, linked.OwnerProduct?.Name);
+            }
         }
 
         SubAssemblyRules.EnsureSectionsDistinct(
@@ -191,14 +211,43 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             }
         }
 
+        // A section moving to In-House goes to the Sub-Assemblies screen, with a made ingredient made from it under a raw
+        // material name no other has, not even another moving in this save, in a Made category.
+        var toMade = recipe.New.Where(n => n.ToMadeIngredient is not null).ToList();
+        if (toMade.Count > 0)
+        {
+            List<string> newNames = [.. toMade.Select(n => n.ToMadeIngredient!.Name.Trim())];
+            HashSet<string> taken = new(
+                await dbContext.RawMaterials.Where(m => newNames.Contains(m.Name)).Select(m => m.Name).ToListAsync(cancellationToken),
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var section in toMade)
+            {
+                var name = section.ToMadeIngredient!.Name.Trim();
+                SubAssemblyRules.EnsureValidMadeIngredientName(name, !taken.Add(name));
+            }
+
+            List<int> categoryIds = [.. toMade.Select(n => n.ToMadeIngredient!.CategoryId).Distinct()];
+            if (await dbContext.RawMaterialCategories.CountAsync(c => categoryIds.Contains(c.Id), cancellationToken) < categoryIds.Count)
+            {
+                throw new BusinessRuleException("The category to put the made ingredient in no longer exists.");
+            }
+        }
+
+        // One of its own the recipe no longer lists is deleted, so a variant can't be linking it.
+        HashSet<int> keptIds = [.. recipe.New.Where(n => n.Id > 0).Select(n => n.Id)];
+        List<int> removedIds = [.. existingOwned.Keys.Where(id => !keptIds.Contains(id))];
+        if (removedIds.Count > 0)
+        {
+            await SubAssemblyRepository.EnsureNoneLinkedElsewhereAsync(
+                dbContext, u => removedIds.Contains(u.SubAssemblyId) && u.ProductId != productId, cancellationToken);
+        }
+
         // The usages go first: they reference the product's own sub-assemblies about to be deleted. One on the
         // Sub-Assemblies screen the recipe no longer lists stays there; one of its own goes, with its lines (Cascade).
         await dbContext.ProductSubAssemblyUsages
             .Where(u => u.ProductId == productId)
             .ExecuteDeleteAsync(cancellationToken);
 
-        HashSet<int> keptIds = [.. recipe.New.Where(n => n.Id > 0).Select(n => n.Id)];
-        List<int> removedIds = [.. existingOwned.Keys.Where(id => !keptIds.Contains(id))];
         if (removedIds.Count > 0)
         {
             foreach (var id in removedIds)
@@ -225,10 +274,10 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
             }
 
             // Read before RoleId changes: the tracked Role isn't moved over to the new one until SaveChanges. One moved to
-            // the Sub-Assemblies screen (Release) goes there whatever its role, keeping its name, and is linked below.
+            // the Sub-Assemblies screen (Release, or to In-House) goes there whatever its role, keeping its name, and is linked below.
             var wasRoleProductOwned = stored.Role.IsProductOwned;
             stored.RoleId = section.RoleId;
-            stored.OwnerProductId = !section.Release && (role.IsProductOwned || !wasRoleProductOwned) ? productId : null;
+            stored.OwnerProductId = !section.MovesToSubAssemblies && (role.IsProductOwned || !wasRoleProductOwned) ? productId : null;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -251,12 +300,18 @@ public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbC
                 var role = roles[section.RoleId];
                 var name = SubAssemblyRules.UniqueStandaloneName(SubAssemblyRules.StandaloneNameFor(productName, role.Name, section.SectionName), takenNames);
                 takenNames.Add(name);
-                subAssembly = new SubAssembly { Name = name, RoleId = section.RoleId, OwnerProductId = !section.Release && (section.IsOwn || role.IsProductOwned) ? productId : null };
+                subAssembly = new SubAssembly { Name = name, RoleId = section.RoleId, OwnerProductId = !section.MovesToSubAssemblies && (section.IsOwn || role.IsProductOwned) ? productId : null };
                 dbContext.SubAssemblies.Add(subAssembly);
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
 
             await SubAssemblyLineRepository.SetLinesAsync(dbContext, subAssembly, section.Lines, cancellationToken);
+
+            // Moved to In-House: a made ingredient made from it, now that it's on the Sub-Assemblies screen with its lines.
+            if (section.ToMadeIngredient is { } made)
+            {
+                await RawMaterialRepository.AddMadeAsync(dbContext, made, subAssembly.Id, cancellationToken);
+            }
 
             dbContext.ProductSubAssemblyUsages.Add(new ProductSubAssemblyUsage
             {

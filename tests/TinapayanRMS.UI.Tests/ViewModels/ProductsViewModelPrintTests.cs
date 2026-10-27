@@ -237,6 +237,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
+            new RawMaterialCategoryRepository(factory),
             new ProductCategoryRepository(factory),
             new ProductVersionRepository(factory),
             new ProductValidator(),

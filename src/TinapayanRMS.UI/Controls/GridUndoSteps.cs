@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
 using Syncfusion.UI.Xaml.Grid;
@@ -80,14 +81,63 @@ public static class GridUndoSteps
     /// The row already holds the typed value here: the grid writes it through the cell's binding inside EndEdit,
     /// and only then raises this. Everything the change sets off has run by now too, so the step closes on a form
     /// that has settled.
+    /// <para>
+    /// An add row with something typed into it is the exception: its item reaches the screen's lines only when the
+    /// row is committed, so the edit is still pending until then (<see cref="StayPendingUntilAdded"/>).
+    /// </para>
     /// </summary>
     private static void OnCellEndEdit(object? sender, CurrentCellEndEditEventArgs e)
     {
-        if (RecorderOf(sender!) is { } recorder)
+        if (RecorderOf(sender!) is not { } recorder)
+        {
+            return;
+        }
+
+        if (sender is SfDataGrid { View: { IsAddingNew: true } view } grid && !GridAddNewRow.IsUntouched(grid, view.CurrentAddItem))
+        {
+            StayPendingUntilAdded(grid, recorder, view.CurrentAddItem);
+        }
+        else
         {
             recorder.IsEditPending = false;
-            recorder.EndUndoStep();
         }
+
+        recorder.EndUndoStep();
+    }
+
+    private static readonly DependencyProperty PendingAddItemProperty = DependencyProperty.RegisterAttached(
+        "PendingAddItem", typeof(object), typeof(GridUndoSteps), new PropertyMetadata(null));
+
+    /// <summary>
+    /// Keeps Save offered while <paramref name="item"/>, typed into on the add row, is still waiting to be added, and
+    /// lets it go once the row is committed or dropped (the view's CurrentAddItem moves off it, as GridAddNewRow's
+    /// WatchForDrop reads it). A click on Save is what ends the cell's edit: the cell's renderer ends it as the cursor
+    /// leaves, mid-way through the move to Save. Save measured then saw nothing new, since the add row's line isn't in
+    /// the screen's lines yet, and went disabled under the cursor. Focus fell back into the grid, so GridEditCommit never
+    /// added the line either, and the click was lost (2026-10-26, reported by the user as an add-in that didn't save).
+    /// </summary>
+    private static void StayPendingUntilAdded(SfDataGrid grid, IUndoRecorder recorder, object item)
+    {
+        if (ReferenceEquals(grid.GetValue(PendingAddItemProperty), item) || grid.View is not INotifyPropertyChanged view)
+        {
+            return;
+        }
+
+        grid.SetValue(PendingAddItemProperty, item);
+
+        void Changed(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(IEditableCollectionView.CurrentAddItem) || ReferenceEquals(grid.View?.CurrentAddItem, item))
+            {
+                return;
+            }
+
+            view.PropertyChanged -= Changed;
+            grid.ClearValue(PendingAddItemProperty);
+            recorder.IsEditPending = false;
+        }
+
+        view.PropertyChanged += Changed;
     }
 
     /// <summary>

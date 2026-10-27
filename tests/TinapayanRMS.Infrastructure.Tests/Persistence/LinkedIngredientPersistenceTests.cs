@@ -56,12 +56,12 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
             Purchased("Egg", categoryId, costBufferPercent),
             [new RawMaterialUnit { UnitOfMeasureId = trayId, BaseUnitsPerUnit = 1500m }],
             [(null, trayId, price)],
-            bomLines: null,
+            addIns: null,
             Cancellation);
     }
 
-    private Task<int> SaveAsync(RawMaterial material, IReadOnlyList<(int ComponentIngredientId, decimal Grams)>? bomLines = null) =>
-        CreateRepository().SaveAsync(material, [], brandPrices: null, bomLines, Cancellation);
+    private Task<int> SaveAsync(RawMaterial material) =>
+        CreateRepository().SaveAsync(material, [], brandPrices: null, addIns: null, Cancellation);
 
     private async Task<RawMaterial> GetMaterialAsync(int id)
     {
@@ -121,7 +121,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
 
         // ₱180 a tray is ₱0.12 a gram.
         var trayUnitId = await TrayUnitOfMeasureIdAsync();
-        await CreateRepository().SaveAsync(Purchased("Egg", categoryId, id: eggId), await UnitsOfAsync(eggId), [(null, trayUnitId, 180m)], bomLines: null, Cancellation);
+        await CreateRepository().SaveAsync(Purchased("Egg", categoryId, id: eggId), await UnitsOfAsync(eggId), [(null, trayUnitId, 180m)], addIns: null, Cancellation);
 
         (await GetMaterialAsync(whiteId)).CostPerBaseUnit.Should().BeApproximately(0.0514286m, StoredPrecision, "₱0.12 × 30 / 70");
         (await GetMaterialAsync(yolkId)).CostPerBaseUnit.Should().Be(0.28m, "₱0.12 × 70 / 30");
@@ -150,7 +150,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         white.BufferedCostPerBaseUnit.Should().BeApproximately(0.0424286m, StoredPrecision, "₱0.0385714 with the egg's 10%");
 
         // A buffer change on the egg reaches its parts.
-        await CreateRepository().SaveAsync(Purchased("Egg", categoryId, costBufferPercent: 50m, id: eggId), await UnitsOfAsync(eggId), brandPrices: null, bomLines: null, Cancellation);
+        await CreateRepository().SaveAsync(Purchased("Egg", categoryId, costBufferPercent: 50m, id: eggId), await UnitsOfAsync(eggId), brandPrices: null, addIns: null, Cancellation);
         yolk = await GetMaterialAsync(yolkId);
         yolk.CostBufferPercent.Should().Be(50m);
         yolk.BufferedCostPerBaseUnit.Should().Be(0.315m, "₱0.21 with the egg's new 50%");
@@ -176,7 +176,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         // A buffered cost typed on the egg reaches the yolk as the same share of it.
         var egg = Purchased("Egg", categoryId, costBufferPercent: 10m, id: eggId);
         egg.BufferedCostPerBaseUnit = 0.15m;
-        await CreateRepository().SaveAsync(egg, await UnitsOfAsync(eggId), brandPrices: null, bomLines: null, Cancellation);
+        await CreateRepository().SaveAsync(egg, await UnitsOfAsync(eggId), brandPrices: null, addIns: null, Cancellation);
         (await GetMaterialAsync(yolkId)).BufferedCostPerBaseUnit.Should().Be(0.35m, "₱0.15 × 70 / 30");
     }
 
@@ -195,7 +195,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         half.CostBufferPercent.Should().Be(10m, "the yolk's, which is the egg's");
         half.BufferedCostPerBaseUnit.Should().Be(0.231m);
 
-        await CreateRepository().SaveAsync(Purchased("Egg", categoryId, costBufferPercent: 20m, id: eggId), await UnitsOfAsync(eggId), brandPrices: null, bomLines: null, Cancellation);
+        await CreateRepository().SaveAsync(Purchased("Egg", categoryId, costBufferPercent: 20m, id: eggId), await UnitsOfAsync(eggId), brandPrices: null, addIns: null, Cancellation);
         (await GetMaterialAsync(yolkHalf.Id)).CostBufferPercent.Should().Be(20m, "an egg buffer change reaches every link down the chain");
 
         // Relinked to a duck egg with no buffer, the yolk takes the duck egg's.
@@ -272,9 +272,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         var categoryId = await SeedCategoryAsync();
         var eggId = await SaveEggAsync(categoryId);
         var whiteId = await SaveAsync(Linked("Egg White", categoryId, eggId, weightShare: 70m, costShare: 30m));
-        var meringueId = await SaveAsync(
-            new RawMaterial { Name = "Meringue Base", Type = RawMaterialType.Ingredient, CategoryId = categoryId, Source = RawMaterialSource.Made, WeightLossPercent = 0m },
-            [(whiteId, 100m)]);
+        var meringueId = await AddMadeIngredientAsync("Meringue Base", [(whiteId, 100m)]);
 
         var act = () => SaveAsync(Linked("Egg White", categoryId, meringueId, weightShare: 70m, costShare: 30m, id: whiteId));
 
@@ -282,17 +280,14 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
     }
 
     [Fact]
-    public async Task A_bom_using_a_part_linked_to_the_made_ingredient_itself_is_refused_as_a_cycle()
+    public async Task A_sub_assembly_line_using_a_part_linked_to_the_made_ingredient_made_from_it_is_refused_as_a_cycle()
     {
         var categoryId = await SeedCategoryAsync();
         var eggId = await SaveEggAsync(categoryId);
-        var eggMixId = await SaveAsync(
-            new RawMaterial { Name = "Egg Mix", Type = RawMaterialType.Ingredient, CategoryId = categoryId, Source = RawMaterialSource.Made, WeightLossPercent = 0m },
-            [(eggId, 100m)]);
+        var eggMixId = await AddMadeIngredientAsync("Egg Mix", [(eggId, 100m)]);
         var mixWhiteId = await SaveAsync(Linked("Egg Mix White", categoryId, eggMixId, weightShare: 70m, costShare: 30m));
 
-        var act = () => new IngredientBomLineRepository(CreateDbContextFactory())
-            .SetLinesAsync(eggMixId, [(mixWhiteId, 100m)], Cancellation);
+        var act = () => SetRecipeLinesAsync(eggMixId, [(mixWhiteId, 100m)]);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*cycle*");
     }

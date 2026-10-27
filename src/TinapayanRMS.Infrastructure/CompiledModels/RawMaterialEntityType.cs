@@ -22,10 +22,10 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 "TinapayanRMS.Domain.Entities.RawMaterial",
                 typeof(RawMaterial),
                 baseEntityType,
-                propertyCount: 15,
-                navigationCount: 4,
-                foreignKeyCount: 3,
-                unnamedIndexCount: 4,
+                propertyCount: 16,
+                navigationCount: 5,
+                foreignKeyCount: 4,
+                unnamedIndexCount: 5,
                 keyCount: 1);
 
             var id = runtimeEntityType.AddProperty(
@@ -140,6 +140,15 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
             source.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
             source.AddAnnotation("Relational:ColumnName", "source");
 
+            var subAssemblyId = runtimeEntityType.AddProperty(
+                "SubAssemblyId",
+                typeof(int?),
+                propertyInfo: typeof(RawMaterial).GetProperty("SubAssemblyId", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                fieldInfo: typeof(RawMaterial).GetField("<SubAssemblyId>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                nullable: true);
+            subAssemblyId.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+            subAssemblyId.AddAnnotation("Relational:ColumnName", "sub_assembly_id");
+
             var type = runtimeEntityType.AddProperty(
                 "Type",
                 typeof(RawMaterialType),
@@ -205,6 +214,10 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 unique: true);
             index2.AddAnnotation("Relational:Name", "ix_raw_materials_name");
 
+            var index3 = runtimeEntityType.AddIndex(
+                new[] { subAssemblyId });
+            index3.AddAnnotation("Relational:Name", "ix_raw_materials_sub_assembly_id");
+
             return runtimeEntityType;
         }
 
@@ -260,6 +273,24 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 fieldInfo: typeof(RawMaterial).GetField("<LinkedTo>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly));
 
             runtimeForeignKey.AddAnnotation("Relational:Name", "fk_raw_materials_raw_materials_linked_to_id");
+            return runtimeForeignKey;
+        }
+
+        public static RuntimeForeignKey CreateForeignKey4(RuntimeEntityType declaringEntityType, RuntimeEntityType principalEntityType)
+        {
+            var runtimeForeignKey = declaringEntityType.AddForeignKey(new[] { declaringEntityType.FindProperty("SubAssemblyId") },
+                principalEntityType.FindKey(new[] { principalEntityType.FindProperty("Id") }),
+                principalEntityType,
+                deleteBehavior: DeleteBehavior.Restrict);
+
+            var subAssembly = declaringEntityType.AddNavigation("SubAssembly",
+                runtimeForeignKey,
+                onDependent: true,
+                typeof(SubAssembly),
+                propertyInfo: typeof(RawMaterial).GetProperty("SubAssembly", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                fieldInfo: typeof(RawMaterial).GetField("<SubAssembly>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly));
+
+            runtimeForeignKey.AddAnnotation("Relational:Name", "fk_raw_materials_sub_assemblies_sub_assembly_id");
             return runtimeForeignKey;
         }
 

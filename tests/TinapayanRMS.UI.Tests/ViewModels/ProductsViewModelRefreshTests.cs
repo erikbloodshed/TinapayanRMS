@@ -1047,6 +1047,96 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
+    public async Task Move_to_In_House_asks_for_a_name_and_Made_category_and_Save_moves_the_section_to_Sub_Assemblies_and_makes_the_ingredient_from_it()
+    {
+        var roleId = await AddRoleAsync("Filling", isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var milkId = await AddIngredientAsync("Milk", costPerGram: 0.1m);
+        var inHouseId = await MadeCategoryIdAsync();
+        await MadeCategoryIdAsync("Fillings");
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [new NewSubAssemblyDraft(roleId, [(cheeseId, 100m), (milkId, 50m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
+        var fillingId = await SubAssemblyIdAsync(productId, roleId);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.FormLines.Count == 2, () => $"form lines={viewModel.FormLines.Count}");
+        viewModel.CanMoveEditingUsageToInHouse.Should().BeTrue("Move to In-House shows on the product's own");
+        ChoicePromptRequest? asked = null;
+        viewModel.PromptForMadeIngredient.RegisterHandler(interaction =>
+        {
+            asked = interaction.Input;
+            interaction.SetOutput(new ChoicePromptResult("Cheese Filling", interaction.Input.InitialChoice));
+        });
+
+        // Typed into the form and not applied yet: the move takes it along.
+        viewModel.FormLines[0].Grams = 120m;
+        await viewModel.MoveToInHouseCommand.Execute(viewModel.EditingUsage!);
+
+        viewModel.ErrorMessage.Should().BeNull();
+        asked!.Title.Should().Be("Move to In-House");
+        asked.InitialValue.Should().Be("Cheese Roll Filling", "the name it's saved under");
+        asked.Choices.Should().Equal(["Fillings", "In-House"], "the Made categories, by name");
+        asked.InitialChoice.Should().Be(1, "In-House, when there's one");
+        var moving = viewModel.UsageEdits.Single();
+        moving.ToMadeIngredient.Should().Be(new MadeIngredientDraft("Cheese Filling", inHouseId));
+        moving.MovingToInHouseText.Should().Be("Moves to Sub-Assemblies and In-House on Save, as Cheese Filling");
+        moving.Lines[0].Grams.Should().Be(120m);
+        viewModel.EditingUsage.Should().BeSameAs(moving, "its tab is its form, so the form stays open on it");
+        viewModel.CanMoveEditingUsageToInHouse.Should().BeFalse("it's on its way already");
+        viewModel.IsEditingOwnedUsage.Should().BeFalse("so it can't move to Sub-Assemblies as well");
+        var costPerPiece = moving.CostPerPieceAt(CostBasis.Buffered);
+
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits is [{ IsOwned: false, Lines.Count: 2 }],
+            () => $"lines={viewModel.UsageEdits.FirstOrDefault()?.Lines.Count}, own={viewModel.UsageEdits.FirstOrDefault()?.IsOwned}");
+
+        var saved = viewModel.UsageEdits.Single();
+        saved.SubAssemblyId.Should().Be(fillingId, "the same section, linked from the Sub-Assemblies screen now");
+        saved.Lines.Select(l => (l.Ingredient.Name, l.Grams)).Should().Equal(("Cheese", 120m), ("Milk", 50m));
+        saved.CostPerPieceAt(CostBasis.Buffered).Should().BeApproximately(costPerPiece, 0.000001m, "it costs what it did");
+        viewModel.Ingredients.Should().Contain(m => m.Name == "Cheese Filling" && m.Source == RawMaterialSource.Made && m.SubAssemblyId == fillingId);
+    }
+
+    [Fact]
+    public async Task Move_to_In_House_needs_a_Made_category_and_a_name_no_ingredient_has()
+    {
+        var roleId = await AddRoleAsync("Filling", isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [new NewSubAssemblyDraft(roleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.FormLines.Count == 1, () => $"form lines={viewModel.FormLines.Count}");
+        var asked = 0;
+        viewModel.PromptForMadeIngredient.RegisterHandler(interaction =>
+        {
+            asked++;
+            interaction.SetOutput(new ChoicePromptResult("cheese", 0));
+        });
+
+        await viewModel.MoveToInHouseCommand.Execute(viewModel.EditingUsage!);
+
+        viewModel.ErrorMessage.Should().Be("There's no Made category to put it in. Add one on the Raw Materials screen first, with New Made Category.");
+        asked.Should().Be(0, "there's nothing to pick");
+
+        // One added since is offered at once: the categories are read when it's clicked.
+        await MadeCategoryIdAsync();
+        await viewModel.MoveToInHouseCommand.Execute(viewModel.EditingUsage!);
+
+        viewModel.ErrorMessage.Should().Be("There's already a raw material named 'cheese'. Give the made ingredient its own name.");
+        viewModel.UsageEdits.Single().IsMovingToInHouse.Should().BeFalse();
+        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeFalse("nothing changed");
+    }
+
+    [Fact]
     public async Task Removing_a_sub_assembly_another_product_links_leaves_it_there()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -2008,9 +2098,9 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task Create_Variant_makes_a_product_that_links_the_recipe_and_packaging_and_shows_it()
+    public async Task Create_Variant_makes_a_product_that_links_the_sources_own_with_no_packaging_and_shows_it()
     {
-        var roleId = await AddRoleAsync("Dough");
+        var roleId = await AddRoleAsync("Dough", isProductOwned: true);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var (sourceId, doughId) = await AddProductWithSubAssemblyAsync("Ensaymada Big", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
         await GivePackagingAsync(sourceId);
@@ -2026,12 +2116,28 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SelectedProduct!.Name.Should().Be("Ensaymada Small");
+        var variantId = viewModel.SelectedProduct.Id;
         await WaitUntilSettledAsync(
-            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1 && viewModel.IsPackagingLinked,
-            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, packaging linked={viewModel.IsPackagingLinked}");
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}");
         var usage = viewModel.UsageEdits.Single();
         usage.IsLinked.Should().BeTrue();
         usage.SubAssemblyId.Should().Be(doughId);
+        usage.LinkedOwner.Should().Be((sourceId, "Ensaymada Big"));
+        usage.LinkedFromText.Should().Be("Ensaymada Big Dough, from Ensaymada Big");
+        viewModel.IsPackagingLinked.Should().BeFalse();
+        viewModel.LineEdits.Should().BeEmpty("a variant's packaging is neither linked nor copied");
+
+        // Its Save keeps the link to the source's own, which no other product could link.
+        viewModel.EditingCurrentPrice = 20m;
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        (await new ProductSubAssemblyUsageRepository(CreateDbContextFactory()).GetForProductAsync(variantId, Cancellation))
+            .Should().ContainSingle().Which.SubAssemblyId.Should().Be(doughId);
+
+        // The badge opens the source, where the dough is kept.
+        await viewModel.OpenLinkedSourceCommand.Execute(usage);
+        viewModel.SelectedProduct!.Id.Should().Be(sourceId);
     }
 
     [Fact]
@@ -2158,6 +2264,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
+            new RawMaterialCategoryRepository(factory),
             new ProductCategoryRepository(factory),
             new ProductVersionRepository(factory),
             new ProductValidator(),

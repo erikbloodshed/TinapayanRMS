@@ -29,11 +29,11 @@ public class StoredCostPrecisionPersistenceTests(DatabaseFixture fixture) : Pers
             Name = "Cello Sheet", Type = RawMaterialType.Packaging, CategoryId = await AddPackagingCategoryAsync(), BaseUnitId = pieceId,
         };
 
-        var wrapperId = await repository.SaveAsync(wrapper, [new RawMaterialUnit { UnitOfMeasureId = packId, BaseUnitsPerUnit = 240m }], [(null, packId, 170m)], bomLines: null, Cancellation);
+        var wrapperId = await repository.SaveAsync(wrapper, [new RawMaterialUnit { UnitOfMeasureId = packId, BaseUnitsPerUnit = 240m }], [(null, packId, 170m)], addIns: null, Cancellation);
         var saved = (await repository.GetByIdAsync(wrapperId, Cancellation))!;
         var costDate = saved.CostUpdatedAt;
 
-        await repository.SaveAsync(saved, [.. saved.Units], [(null, packId, 170m)], bomLines: null, Cancellation);
+        await repository.SaveAsync(saved, [.. saved.Units], [(null, packId, 170m)], addIns: null, Cancellation);
 
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterialPriceHistories.CountAsync(h => h.RawMaterialId == wrapperId, Cancellation))
@@ -51,16 +51,18 @@ public class StoredCostPrecisionPersistenceTests(DatabaseFixture fixture) : Pers
         var repository = CreateRepository();
         var dough = new RawMaterial
         {
-            Name = "Dough", Type = RawMaterialType.Ingredient, CategoryId = await IngredientsCategoryIdAsync(), Source = RawMaterialSource.Made, WeightLossPercent = 10m,
+            Name = "Dough", Type = RawMaterialType.Ingredient, CategoryId = await MadeCategoryIdAsync(), Source = RawMaterialSource.Made, WeightLossPercent = 10m,
+            SubAssemblyId = await AddRecipeAsync("Dough Base", [(flourId, 1000m), (waterId, 500m)]),
+
         };
 
         // ₱50 of flour over the 1,350 g left of 1,500 g: ₱0.037037… a gram.
-        var doughId = await repository.SaveAsync(dough, [], brandPrices: null, [(flourId, 1000m), (waterId, 500m)], Cancellation);
+        var doughId = await repository.SaveAsync(dough, [], brandPrices: null, addIns: null, Cancellation);
         var saved = (await repository.GetByIdAsync(doughId, Cancellation))!;
         var costDate = saved.CostUpdatedAt;
         costDate.Should().NotBeNull();
 
-        await repository.SaveAsync(saved, [], brandPrices: null, [(flourId, 1000m), (waterId, 500m)], Cancellation);
+        await repository.SaveAsync(saved, [], brandPrices: null, addIns: [], Cancellation);
 
         var resaved = (await repository.GetByIdAsync(doughId, Cancellation))!;
         resaved.CostPerBaseUnit.Should().Be(0.03703703703703703704m);

@@ -29,8 +29,12 @@ public class RawMaterialCategoryRepository(IDbContextFactory<TinapayanRMSDbConte
 
         if (existing.Type != category.Type)
         {
+            var materials = await dbContext.RawMaterials
+                .Where(m => m.CategoryId == existing.Id)
+                .Select(m => new { m.Type, m.Source })
+                .ToListAsync(cancellationToken);
             RawMaterialRules.EnsureCategoryTypeCanChange(
-                existing.Name, await dbContext.RawMaterials.CountAsync(m => m.CategoryId == existing.Id, cancellationToken));
+                existing.Name, category.Type, materials.Count(m => RawMaterialRules.CategoryTypeFor(m.Type, m.Source) != category.Type));
         }
 
         existing.Name = category.Name;

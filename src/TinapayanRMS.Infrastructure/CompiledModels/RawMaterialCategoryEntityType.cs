@@ -47,7 +47,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
 
             var type = runtimeEntityType.AddProperty(
                 "Type",
-                typeof(RawMaterialType),
+                typeof(RawMaterialCategoryType),
                 propertyInfo: typeof(RawMaterialCategory).GetProperty("Type", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
                 fieldInfo: typeof(RawMaterialCategory).GetField("<Type>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
                 valueGenerated: ValueGenerated.OnAdd,
@@ -56,7 +56,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
             type.SetSentinelFromProviderValue("Ingredient");
             type.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
             type.AddAnnotation("Relational:ColumnName", "type");
-            type.AddAnnotation("Relational:DefaultValue", RawMaterialType.Ingredient);
+            type.AddAnnotation("Relational:DefaultValue", RawMaterialCategoryType.Ingredient);
 
             var key = runtimeEntityType.AddKey(
                 new[] { id });

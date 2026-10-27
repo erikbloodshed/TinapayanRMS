@@ -625,6 +625,33 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
     }
 
     [Fact]
+    public async Task Undoing_Move_to_In_House_keeps_its_lines_and_stops_offering_Save()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 1, isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        await MadeCategoryIdAsync();
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [new NewSubAssemblyDraft(fillingRoleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
+        var viewModel = await OpenAsync(productId, vm => vm.FormLines.Count == 1);
+        viewModel.PromptForMadeIngredient.RegisterHandler(interaction => interaction.SetOutput(new ChoicePromptResult("Cheese Filling", 0)));
+
+        await viewModel.MoveToInHouseCommand.Execute(viewModel.EditingUsage!);
+        viewModel.UsageEdits.Single().IsMovingToInHouse.Should().BeTrue();
+        (await CanSave(viewModel)).Should().BeTrue();
+
+        viewModel.TryUndo().Should().BeTrue();
+
+        viewModel.UsageEdits.Single().IsMovingToInHouse.Should().BeFalse();
+        viewModel.CanMoveEditingUsageToInHouse.Should().BeTrue();
+        (await CanSave(viewModel)).Should().BeFalse();
+
+        viewModel.TryRedo().Should().BeTrue();
+        viewModel.UsageEdits.Single().ToMadeIngredient!.Name.Should().Be("Cheese Filling");
+        (await CanSave(viewModel)).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Undoing_Make_a_Copy_stops_offering_Save()
     {
         var (viewModel, _) = await OpenLinkedDoughProductAsync();
@@ -794,6 +821,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
+            new RawMaterialCategoryRepository(factory),
             new ProductCategoryRepository(factory),
             new ProductVersionRepository(factory),
             new ProductValidator(),

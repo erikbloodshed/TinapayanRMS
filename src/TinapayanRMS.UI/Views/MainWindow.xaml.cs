@@ -145,12 +145,22 @@ public partial class MainWindow : AppWindow, IVimHost
             ShowTab(RawMaterialsTab);
         });
 
-        // And the other way: a linked badge on Products opens its standalone sub-assembly on Sub-Assemblies.
-        productsViewModel.SubAssemblyOpenRequests.Subscribe(subAssemblyId =>
+        // A made ingredient's Used By tile on Sub-Assemblies opens it on Raw Materials, the same way.
+        subAssembliesViewModel.RawMaterialOpenRequests.Subscribe(rawMaterialId =>
         {
-            subAssembliesViewModel.OpenSubAssembly(subAssemblyId);
-            ShowTab(SubAssembliesTab);
+            rawMaterialsViewModel.OpenRawMaterial(rawMaterialId);
+            ShowTab(RawMaterialsTab);
         });
+
+        // And the other way: a linked badge on Products, or a made ingredient's Recipe card on Raw Materials, opens its
+        // standalone sub-assembly on Sub-Assemblies.
+        productsViewModel.SubAssemblyOpenRequests
+            .Merge(rawMaterialsViewModel.SubAssemblyOpenRequests)
+            .Subscribe(subAssemblyId =>
+            {
+                subAssembliesViewModel.OpenSubAssembly(subAssemblyId);
+                ShowTab(SubAssembliesTab);
+            });
 
         // The tab that's selected at startup; every later switch goes through SelectionChanged.
         Loaded += (_, _) =>

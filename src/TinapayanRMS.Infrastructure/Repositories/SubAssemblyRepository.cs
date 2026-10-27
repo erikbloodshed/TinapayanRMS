@@ -36,24 +36,8 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     /// <summary>With each one's owner, if a product owns it: that one can only be copied.</summary>
     public Task<IReadOnlyList<SubAssembly>> GetLinkableAsync(CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<SubAssembly>>(
-            async dbContext => (await dbContext.Connection().QueryAsync<SubAssembly, SubAssemblyRole, Product?, SubAssembly>(
-                dbContext.Command(
-                    $"""
-                    SELECT {SubAssemblyReads.ColumnsWithRole}, o.id, o.name
-                    FROM sub_assemblies s
-                    {SubAssemblyReads.RoleJoin}
-                    LEFT JOIN products o ON o.id = s.owner_product_id
-                    WHERE s.total_weight > 0 AND NOT r.is_packaging
-                    ORDER BY s.name
-                    """,
-                    null,
-                    cancellationToken),
-                (subAssembly, role, owner) =>
-                {
-                    subAssembly.OwnerProduct = owner;
-                    return SubAssemblyReads.WithRole(subAssembly, role);
-                },
-                splitOn: "Id,Id")).AsList(),
+            dbContext => SubAssemblyReads.GetWithRoleAsync(
+                dbContext, "WHERE s.total_weight > 0 AND NOT r.is_packaging\nORDER BY s.name", null, cancellationToken),
             cancellationToken);
 
     public Task<IReadOnlyList<SubAssembly>> GetStandaloneAsync(CancellationToken cancellationToken) =>
@@ -296,6 +280,10 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
 
         var name = stored.Name;
 
+        // A made ingredient made from it keeps its recipe here (Restrict, refused first by name).
+        SubAssemblyRules.EnsureNoMadeIngredientMadeFrom(
+            name, await dbContext.RawMaterials.Where(m => m.SubAssemblyId == id).OrderBy(m => m.Name).Select(m => m.Name).ToListAsync(cancellationToken));
+
         // Every product using a sub-assembly links it: a recipe through a usage, a set through its
         // packaging link.
         await EnsureNoneLinkedElsewhereAsync(dbContext, u => u.SubAssemblyId == id, cancellationToken);
@@ -310,6 +298,51 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
 
         // Its lines go with it (Cascade).
         await dbContext.SubAssemblies.Where(s => s.Id == id).ExecuteDeleteAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<int, IReadOnlyList<MadeIngredientUse>>> GetMadeIngredientsBySubAssemblyAsync(CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var made = await dbContext.RawMaterials
+            .Where(m => m.SubAssemblyId != null)
+            .Select(m => new { SubAssemblyId = m.SubAssemblyId!.Value, m.Id, m.Name })
+            .ToListAsync(cancellationToken);
+        return made
+            .GroupBy(m => m.SubAssemblyId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<MadeIngredientUse>)[.. g.Select(m => new MadeIngredientUse(m.Id, m.Name)).OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase)]);
+    }
+
+    public async Task<int> AddMadeIngredientAsync(int id, MadeIngredientDraft made, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var subAssembly = await dbContext.SubAssemblies
+            .Where(s => s.Id == id)
+            .Select(s => new { s.Name, OwnerName = s.OwnerProduct!.Name, s.Role!.IsPackaging })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new BusinessRuleException($"Sub-assembly {id} does not exist.");
+        if (subAssembly.OwnerName is { } ownerName)
+        {
+            throw new BusinessRuleException($"{subAssembly.Name} is {ownerName}'s own. Move it to In-House from that product's recipe instead.");
+        }
+
+        SubAssemblyRules.EnsureLinkableByMadeIngredient(subAssembly.Name, ownerName: null, subAssembly.IsPackaging);
+
+        var name = made.Name.Trim();
+        SubAssemblyRules.EnsureValidMadeIngredientName(name, await dbContext.RawMaterials.AnyAsync(m => m.Name == name, cancellationToken));
+        if (!await dbContext.RawMaterialCategories.AnyAsync(c => c.Id == made.CategoryId, cancellationToken))
+        {
+            throw new BusinessRuleException("The category to put the made ingredient in no longer exists.");
+        }
+
+        // The recipe stays here as it is, the one place it's written, and every product linking it is left alone.
+        var ingredientId = await RawMaterialRepository.AddMadeAsync(dbContext, made with { Name = name }, id, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return ingredientId;
     }
 
     /// <summary>
@@ -458,13 +491,15 @@ public class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
 
     /// <summary>
     /// The sub-assemblies on the Sub-Assemblies screen in <paramref name="roleId"/> that making it product-owned would
-    /// give to a product: the ones exactly one product's recipe uses.
+    /// give to a product: the ones exactly one product's recipe uses, and no made ingredient is made from (it uses the
+    /// recipe too, and can only be made from one kept here).
     /// </summary>
     internal static IQueryable<SubAssembly> SingleUse(TinapayanRMSDbContext dbContext, int roleId) =>
         dbContext.SubAssemblies.Where(s =>
             s.OwnerProductId == null
             && s.RoleId == roleId
-            && dbContext.ProductSubAssemblyUsages.Count(u => u.SubAssemblyId == s.Id) == 1);
+            && dbContext.ProductSubAssemblyUsages.Count(u => u.SubAssemblyId == s.Id) == 1
+            && !dbContext.RawMaterials.Any(m => m.SubAssemblyId == s.Id));
 
     /// <summary>
     /// A role made product-owned: each of its sub-assemblies on the Sub-Assemblies screen that exactly one product uses

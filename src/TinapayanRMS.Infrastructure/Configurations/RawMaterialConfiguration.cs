@@ -39,6 +39,12 @@ public class RawMaterialConfiguration : IEntityTypeConfiguration<RawMaterial>
             .HasForeignKey(m => m.LinkedToId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // A sub-assembly a made ingredient is made from can't be deleted while it is.
+        builder.HasOne(m => m.SubAssembly)
+            .WithMany()
+            .HasForeignKey(m => m.SubAssemblyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // The costs per base unit keep 20 decimals rather than the usual 4, so a buffered cost typed per bag (₱1,297.37 for
         // 25 kg is ₱0.0518948 a gram) comes back as typed, and screens round only for show. 28 digits in all is as many as
         // a .NET decimal holds, so any stored value reads back without overflowing.
@@ -49,7 +55,7 @@ public class RawMaterialConfiguration : IEntityTypeConfiguration<RawMaterial>
         // EnsureValidCostBuffer, which the repository checks first with a friendlier message: an
         // ingredient's base unit is the gram (no row), a packaging material has one of its own, only an
         // ingredient can be made or linked, a linked one has a link and both shares and nothing else
-        // does, and a cost buffer is 0 to 100 percent.
+        // does, a made one has the sub-assembly it's made from and nothing else does, and a cost buffer is 0 to 100 percent.
         builder.ToTable(table =>
         {
             table.HasCheckConstraint(
@@ -64,6 +70,9 @@ public class RawMaterialConfiguration : IEntityTypeConfiguration<RawMaterial>
                 + " AND weight_share_percent > 0 AND weight_share_percent <= 100"
                 + " AND cost_share_percent > 0 AND cost_share_percent <= 100)"
                 + " OR (source <> 'Linked' AND linked_to_id IS NULL AND weight_share_percent IS NULL AND cost_share_percent IS NULL)");
+            table.HasCheckConstraint(
+                "CK_RawMaterials_SubAssemblyMatchesSource",
+                "(source = 'Made') = (sub_assembly_id IS NOT NULL)");
             table.HasCheckConstraint(
                 "CK_RawMaterials_CostBufferPercent",
                 "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");

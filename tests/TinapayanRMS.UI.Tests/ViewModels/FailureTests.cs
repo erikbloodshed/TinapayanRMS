@@ -172,7 +172,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
     private async Task AddCategoryAsync(string name)
     {
         await using var dbContext = CreateDbContext();
-        dbContext.RawMaterialCategories.Add(new RawMaterialCategory { Name = name, Type = RawMaterialType.Ingredient });
+        dbContext.RawMaterialCategories.Add(new RawMaterialCategory { Name = name, Type = RawMaterialCategoryType.Ingredient });
         await dbContext.SaveChangesAsync(Cancellation);
     }
 

@@ -23,7 +23,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class ProductsViewModelScalingTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task The_tab_scales_the_recipe_in_whole_batches_and_opens_a_made_ingredient_into_its_bom()
+    public Task The_tab_scales_the_recipe_in_whole_batches_and_opens_a_made_ingredient_into_its_bom() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
         var viewModel = await OpenAsync(productId);
@@ -40,10 +40,10 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         viewModel.ScalingTotalCost.Should().Be(108m, "1,800 g of flour at 0.05 and 200 g of syrup at 0.09");
         viewModel.ScalingPiecesText.Should().BeEmpty("a unit is one piece");
         viewModel.History.IsDirty.Should().BeFalse("the number to scale to isn't an edit");
-    }
+    });
 
     [Fact]
-    public async Task A_change_to_the_quantity_required_rescales_the_tab()
+    public Task A_change_to_the_quantity_required_rescales_the_tab() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
         var viewModel = await OpenAsync(productId);
@@ -55,10 +55,10 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ScalingRows.Single().Detail.Should().Be("2 batches · 200 pcs (40 extra)", "20 boxes of 8 are 160 pieces");
         viewModel.ScalingPiecesText.Should().Be("= 160 pieces");
-    }
+    });
 
     [Fact]
-    public async Task A_composites_products_open_into_their_saved_recipes()
+    public Task A_composites_products_open_into_their_saved_recipes() => StaThread.RunAsync(async () =>
     {
         var ensaymadaId = await AddEnsaymadaAsync();
         var flourId = await IngredientIdAsync("Flour");
@@ -82,10 +82,10 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         viewModel.ScalingRows.Select(r => (r.Name, r.Detail)).Should().Equal(("Ensaymada × 6", "30 pcs"), ("Cheese Roll × 4", "20 pcs"));
         viewModel.ScalingRows[0].Children.Single().Detail.Should().Be("1 batch · 100 pcs (70 extra)");
         viewModel.ScalingRows[1].Children.Single().Detail.Should().Be("2 batches · 20 pcs", "10 of 100 g from a 1,000 g batch");
-    }
+    });
 
     [Fact]
-    public async Task The_number_to_scale_to_stays_for_the_next_product_picked()
+    public Task The_number_to_scale_to_stays_for_the_next_product_picked() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
         var flourId = await IngredientIdAsync("Flour");
@@ -101,7 +101,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ScalingUnits.Should().Be(25);
         viewModel.ScalingRows.Single().Detail.Should().Be("3 batches · 30 pcs (5 extra)");
-    }
+    });
 
     /// <summary>
     /// Ensaymada: a Dough of 900 g of flour at 0.05 and 100 g of syrup, cut 10 g a piece, so 100 a batch. The syrup is
@@ -112,16 +112,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
-        var syrupId = await AddIngredientAsync("Syrup");
-        await using (var dbContext = CreateDbContext())
-        {
-            var syrup = await dbContext.RawMaterials.FindAsync([syrupId], Cancellation);
-            syrup!.Source = RawMaterialSource.Made;
-            syrup.WeightLossPercent = 0m;
-            await dbContext.SaveChangesAsync(Cancellation);
-        }
-
-        await new IngredientBomLineRepository(CreateDbContextFactory()).SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation);
+        var syrupId = await AddMadeIngredientAsync("Syrup", [(sugarId, 1000m)]);
         var (productId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 900m), (syrupId, 100m)], weightPerPiece: 10m);
         return productId;
     }
@@ -169,6 +160,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
+            new RawMaterialCategoryRepository(factory),
             new ProductCategoryRepository(factory),
             new ProductVersionRepository(factory),
             new ProductValidator(),

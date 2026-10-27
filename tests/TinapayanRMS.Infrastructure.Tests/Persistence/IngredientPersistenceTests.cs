@@ -48,13 +48,15 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     public async Task A_made_ingredient_can_be_added_with_a_weight_loss_percent()
     {
         var categoryId = await SeedCategoryAsync();
+        var madeCategoryId = await MadeCategoryIdAsync();
         var repository = CreateRepository();
 
         await repository.AddAsync(new RawMaterial
         {
             Name = "Simple Syrup",
-            CategoryId = categoryId,
+            CategoryId = madeCategoryId,
             Source = RawMaterialSource.Made,
+            SubAssemblyId = await AddEmptyRecipeAsync(),
             WeightLossPercent = 20m,
         }, Cancellation);
 
@@ -67,12 +69,14 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     public async Task AddAsync_rejects_a_made_ingredient_without_a_weight_loss_percent()
     {
         var categoryId = await SeedCategoryAsync();
+        var madeCategoryId = await MadeCategoryIdAsync();
 
-        var act = () => CreateRepository().AddAsync(new RawMaterial
+        var act = async () => await CreateRepository().AddAsync(new RawMaterial
         {
             Name = "Invalid",
-            CategoryId = categoryId,
+            CategoryId = madeCategoryId,
             Source = RawMaterialSource.Made,
+            SubAssemblyId = await AddEmptyRecipeAsync(),
         }, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -93,6 +97,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
         var ingredient = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
         ingredient.Source = RawMaterialSource.Made;
+        ingredient.SubAssemblyId = await AddEmptyRecipeAsync();
         ingredient.WeightLossPercent = 20m;
 
         var act = () => repository.UpdateAsync(ingredient, Cancellation);
@@ -173,13 +178,15 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     public async Task UpdateAsync_rejects_a_nonexistent_ingredient()
     {
         var categoryId = await SeedCategoryAsync();
+        var madeCategoryId = await MadeCategoryIdAsync();
 
-        var act = () => CreateRepository().UpdateAsync(new RawMaterial
+        var act = async () => await CreateRepository().UpdateAsync(new RawMaterial
         {
             Id = 999_999,
             Name = "Ghost",
-            CategoryId = categoryId,
+            CategoryId = madeCategoryId,
             Source = RawMaterialSource.Made,
+            SubAssemblyId = await AddEmptyRecipeAsync(),
             WeightLossPercent = 10m,
         }, Cancellation);
 
@@ -190,13 +197,15 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     public async Task DeleteAsync_removes_the_ingredient()
     {
         var categoryId = await SeedCategoryAsync();
+        var madeCategoryId = await MadeCategoryIdAsync();
         var repository = CreateRepository();
 
         await repository.AddAsync(new RawMaterial
         {
             Name = "Water",
-            CategoryId = categoryId,
+            CategoryId = madeCategoryId,
             Source = RawMaterialSource.Made,
+            SubAssemblyId = await AddEmptyRecipeAsync(),
             WeightLossPercent = 0m,
         }, Cancellation);
 
@@ -232,7 +241,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         var categoryId = await SeedCategoryAsync();
         var kilogramId = await SeedUnitOfMeasureAsync("kilogram", "kg");
 
-        var act = () => CreateRepository().AddAsync(new RawMaterial
+        var act = async () => await CreateRepository().AddAsync(new RawMaterial
         {
             Type = RawMaterialType.Ingredient,
             Name = "Sugar",
@@ -268,7 +277,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await repository.AddAsync(new RawMaterial { Name = "Butter", CategoryId = categoryId }, Cancellation);
         var packagingCategoryId = await AddPackagingCategoryAsync();
 
-        var act = () => repository.AddAsync(new RawMaterial
+        var act = async () => await repository.AddAsync(new RawMaterial
         {
             Type = RawMaterialType.Packaging,
             Name = "Butter",
@@ -298,21 +307,24 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
     public async Task Duplicate_ingredient_names_are_rejected()
     {
         var categoryId = await SeedCategoryAsync();
+        var madeCategoryId = await MadeCategoryIdAsync();
         var repository = CreateRepository();
 
         await repository.AddAsync(new RawMaterial
         {
             Name = "Butter",
-            CategoryId = categoryId,
+            CategoryId = madeCategoryId,
             Source = RawMaterialSource.Made,
+            SubAssemblyId = await AddEmptyRecipeAsync(),
             WeightLossPercent = 0m,
         }, Cancellation);
 
-        var act = () => repository.AddAsync(new RawMaterial
+        var act = async () => await repository.AddAsync(new RawMaterial
         {
             Name = "Butter",
-            CategoryId = categoryId,
+            CategoryId = madeCategoryId,
             Source = RawMaterialSource.Made,
+            SubAssemblyId = await AddEmptyRecipeAsync(),
             WeightLossPercent = 0m,
         }, Cancellation);
 

@@ -171,7 +171,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
     private async Task AddCategoryAsync(string name)
     {
         await using var dbContext = _database.CreateDbContext();
-        dbContext.RawMaterialCategories.Add(new RawMaterialCategory { Name = name, Type = RawMaterialType.Ingredient });
+        dbContext.RawMaterialCategories.Add(new RawMaterialCategory { Name = name, Type = RawMaterialCategoryType.Ingredient });
         await dbContext.SaveChangesAsync(Cancellation);
     }
 

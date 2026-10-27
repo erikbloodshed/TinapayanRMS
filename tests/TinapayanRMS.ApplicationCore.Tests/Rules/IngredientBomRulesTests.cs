@@ -6,43 +6,47 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 public class IngredientBomRulesTests
 {
     [Fact]
-    public void EnsureValidLines_rejects_an_empty_list()
+    public void EnsureValidAddIns_accepts_none()
     {
-        var act = () => IngredientBomRules.EnsureValidLines([]);
-
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void EnsureValidLines_rejects_non_positive_grams()
-    {
-        var act = () => IngredientBomRules.EnsureValidLines([(ComponentIngredientId: 1, Grams: 0m)]);
-
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void EnsureValidLines_rejects_the_same_component_twice()
-    {
-        var act = () => IngredientBomRules.EnsureValidLines(
-        [
-            (ComponentIngredientId: 1, Grams: 100m),
-            (ComponentIngredientId: 1, Grams: 50m),
-        ]);
-
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void EnsureValidLines_accepts_distinct_positive_lines()
-    {
-        var act = () => IngredientBomRules.EnsureValidLines(
-        [
-            (ComponentIngredientId: 1, Grams: 1000m),
-            (ComponentIngredientId: 2, Grams: 500m),
-        ]);
+        var act = () => IngredientBomRules.EnsureValidAddIns([], "Butter Icing Base", [1, 2]);
 
         act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureValidAddIns_rejects_non_positive_grams()
+    {
+        var act = () => IngredientBomRules.EnsureValidAddIns([(IngredientId: 3, Grams: 0m, IngredientName: "Ube Flavor")], "Butter Icing Base", [1, 2]);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage("An add-in's grams must be positive.");
+    }
+
+    [Fact]
+    public void EnsureValidAddIns_rejects_the_same_ingredient_twice()
+    {
+        var act = () => IngredientBomRules.EnsureValidAddIns(
+        [
+            (IngredientId: 3, Grams: 10m, IngredientName: "Ube Flavor"),
+            (IngredientId: 3, Grams: 5m, IngredientName: "Ube Flavor"),
+        ], "Butter Icing Base", [1, 2]);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage("Ube Flavor is on two add-in lines*");
+    }
+
+    [Fact]
+    public void EnsureValidAddIns_rejects_an_ingredient_the_recipe_already_has()
+    {
+        var act = () => IngredientBomRules.EnsureValidAddIns([(IngredientId: 2, Grams: 10m, IngredientName: "Sugar")], "Butter Icing Base", [1, 2]);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage("Sugar is already in Butter Icing Base*Sub-Assemblies screen*");
+    }
+
+    [Fact]
+    public void EnsureNotInOwnRecipe_rejects_the_made_ingredient_as_a_line_of_its_sub_assembly()
+    {
+        var act = () => IngredientBomRules.EnsureNotInOwnRecipe(5, "Butter Icing", "Butter Icing Base", [1, 5]);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage("Butter Icing is made from Butter Icing Base, so it can't be one of Butter Icing Base's ingredients.");
     }
 
     [Fact]

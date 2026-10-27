@@ -155,6 +155,7 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory),
+            new RawMaterialCategoryRepository(factory),
             new SubAssemblyValidator(),
             new SubAssemblyRoleValidator(),
             new InMemoryViewStateStore(),

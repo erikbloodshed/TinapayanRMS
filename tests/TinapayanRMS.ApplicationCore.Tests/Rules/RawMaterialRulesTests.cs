@@ -70,13 +70,42 @@ public class RawMaterialRulesTests
     }
 
     [Fact]
-    public void EnsureFieldsMatchSource_accepts_a_made_ingredient_with_a_weight_loss_percent()
+    public void EnsureFieldsMatchSource_accepts_a_made_ingredient_with_a_weight_loss_percent_and_a_sub_assembly()
+    {
+        var ingredient = new RawMaterial { Source = RawMaterialSource.Made, WeightLossPercent = 20m, SubAssemblyId = 7 };
+
+        var act = () => RawMaterialRules.EnsureFieldsMatchSource(ingredient);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureFieldsMatchSource_rejects_a_made_ingredient_without_a_sub_assembly()
     {
         var ingredient = new RawMaterial { Source = RawMaterialSource.Made, WeightLossPercent = 20m };
 
         var act = () => RawMaterialRules.EnsureFieldsMatchSource(ingredient);
 
-        act.Should().NotThrow();
+        act.Should().Throw<BusinessRuleException>().WithMessage("Pick the sub-assembly it's made from.");
+    }
+
+    [Theory]
+    [InlineData(RawMaterialSource.Purchased)]
+    [InlineData(RawMaterialSource.Linked)]
+    public void EnsureFieldsMatchSource_rejects_a_sub_assembly_on_an_ingredient_that_isnt_made(RawMaterialSource source)
+    {
+        var ingredient = new RawMaterial
+        {
+            Source = source,
+            SubAssemblyId = 7,
+            LinkedToId = source == RawMaterialSource.Linked ? 1 : null,
+            WeightSharePercent = source == RawMaterialSource.Linked ? 50m : null,
+            CostSharePercent = source == RawMaterialSource.Linked ? 50m : null,
+        };
+
+        var act = () => RawMaterialRules.EnsureFieldsMatchSource(ingredient);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage("Only a made ingredient is made from a sub-assembly.");
     }
 
     [Fact]
@@ -612,6 +641,76 @@ public class RawMaterialRulesTests
 
         material.CostPerBaseUnit.Should().Be(0.70833333333333333333m, "compared with the stored cost, it mustn't read as a change");
         material.BufferedCostPerBaseUnit.Should().Be(0.77916666666666666667m, "the cost with its 10% buffer on top, stored the same way");
+    }
+
+    [Theory]
+    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Purchased, RawMaterialCategoryType.Ingredient)]
+    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Linked, RawMaterialCategoryType.Ingredient)]
+    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Made, RawMaterialCategoryType.Made)]
+    [InlineData(RawMaterialType.Packaging, RawMaterialSource.Purchased, RawMaterialCategoryType.Packaging)]
+    public void CategoryTypeFor_puts_a_made_ingredient_in_a_Made_category_and_every_other_material_in_one_of_its_type(
+        RawMaterialType type, RawMaterialSource source, RawMaterialCategoryType expected)
+    {
+        RawMaterialRules.CategoryTypeFor(type, source).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(RawMaterialCategoryType.Ingredient, RawMaterialType.Ingredient)]
+    [InlineData(RawMaterialCategoryType.Made, RawMaterialType.Ingredient)]
+    [InlineData(RawMaterialCategoryType.Packaging, RawMaterialType.Packaging)]
+    public void MaterialTypeOf_counts_a_Made_category_among_the_ingredient_ones(RawMaterialCategoryType categoryType, RawMaterialType expected)
+    {
+        RawMaterialRules.MaterialTypeOf(categoryType).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Purchased, RawMaterialCategoryType.Made,
+        "In-House is a Made category, for made ingredients only. Put this ingredient in a category for ingredients.")]
+    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Linked, RawMaterialCategoryType.Made,
+        "In-House is a Made category, for made ingredients only. Put this ingredient in a category for ingredients.")]
+    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Made, RawMaterialCategoryType.Ingredient,
+        "In-House is an ingredient category. Put this made ingredient in a Made category.")]
+    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Made, RawMaterialCategoryType.Packaging,
+        "In-House is a packaging category. Put this made ingredient in a Made category.")]
+    [InlineData(RawMaterialType.Packaging, RawMaterialSource.Purchased, RawMaterialCategoryType.Made,
+        "In-House is a Made category, for made ingredients only. Put this packaging material in a category for packaging.")]
+    public void EnsureCategoryMatchesType_rejects_a_category_of_another_type_saying_where_the_material_goes(
+        RawMaterialType type, RawMaterialSource source, RawMaterialCategoryType categoryType, string message)
+    {
+        var act = () => RawMaterialRules.EnsureCategoryMatchesType(type, source, categoryType, "In-House");
+
+        act.Should().Throw<BusinessRuleException>().WithMessage(message);
+    }
+
+    [Theory]
+    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Purchased)]
+    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Linked)]
+    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Made)]
+    [InlineData(RawMaterialType.Packaging, RawMaterialSource.Purchased)]
+    public void EnsureCategoryMatchesType_accepts_a_category_of_the_materials_own_type(RawMaterialType type, RawMaterialSource source)
+    {
+        var act = () => RawMaterialRules.EnsureCategoryMatchesType(type, source, RawMaterialRules.CategoryTypeFor(type, source), "Flour");
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureCategoryTypeCanChange_accepts_a_change_everything_in_the_category_fits()
+    {
+        var act = () => RawMaterialRules.EnsureCategoryTypeCanChange("In-House", RawMaterialCategoryType.Made, materialsThatDontFit: 0);
+
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(1, RawMaterialCategoryType.Made, "Filling has 1 material that can't go in a Made category, so its type can't change. Move it to another category first.")]
+    [InlineData(7, RawMaterialCategoryType.Packaging, "Filling has 7 materials that can't go in a packaging category, so its type can't change. Move them to another category first.")]
+    public void EnsureCategoryTypeCanChange_rejects_a_change_that_leaves_materials_in_a_category_they_cant_go_in(
+        int materialsThatDontFit, RawMaterialCategoryType newType, string message)
+    {
+        var act = () => RawMaterialRules.EnsureCategoryTypeCanChange("Filling", newType, materialsThatDontFit);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage(message);
     }
 
     [Fact]

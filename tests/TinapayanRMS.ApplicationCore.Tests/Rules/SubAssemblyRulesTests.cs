@@ -167,6 +167,30 @@ public class SubAssemblyRulesTests
     }
 
     [Fact]
+    public void EnsureLinkableByMadeIngredient_takes_only_a_recipe_kept_on_the_Sub_Assemblies_screen()
+    {
+        var own = () => SubAssemblyRules.EnsureLinkableByMadeIngredient("Cheese Roll Filling: Cheese", "Cheese Roll", isPackaging: false);
+        var set = () => SubAssemblyRules.EnsureLinkableByMadeIngredient("Gift Box Set", null, isPackaging: true);
+        var standalone = () => SubAssemblyRules.EnsureLinkableByMadeIngredient("Butter Icing", null, isPackaging: false);
+
+        own.Should().Throw<BusinessRuleException>().WithMessage("Cheese Roll Filling: Cheese is Cheese Roll's own, so a made ingredient can't be made from it*");
+        set.Should().Throw<BusinessRuleException>().WithMessage("Gift Box Set is a packaging set*");
+        standalone.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureNoMadeIngredientMadeFrom_names_the_made_ingredients()
+    {
+        var one = () => SubAssemblyRules.EnsureNoMadeIngredientMadeFrom("Butter Icing Base", ["Butter Icing"]);
+        var two = () => SubAssemblyRules.EnsureNoMadeIngredientMadeFrom("Butter Icing Base", ["Butter Icing", "Ube Icing"]);
+        var none = () => SubAssemblyRules.EnsureNoMadeIngredientMadeFrom("Butter Icing Base", []);
+
+        one.Should().Throw<BusinessRuleException>().WithMessage("Butter Icing is made from Butter Icing Base, so it can't be deleted. On the Raw Materials screen, make it from another*");
+        two.Should().Throw<BusinessRuleException>().WithMessage("Butter Icing, Ube Icing are made from Butter Icing Base*make them from another*");
+        none.Should().NotThrow();
+    }
+
+    [Fact]
     public void EnsureProductOwnedAllowed_refuses_only_a_product_owned_packaging_role()
     {
         var packaging = () => SubAssemblyRules.EnsureProductOwnedAllowed(new SubAssemblyRole { Name = "Packaging", IsPackaging = true, IsProductOwned = true });

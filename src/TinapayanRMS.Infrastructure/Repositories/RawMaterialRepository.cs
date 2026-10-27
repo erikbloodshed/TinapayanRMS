@@ -31,7 +31,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
 
     /// <summary>
     /// GetUsedByAsync's products. feeds is the material and every ingredient whose cost it feeds: a made one with it in its
-    /// BOM, a linked one cut from it, and on up (both kinds are rejected when they'd close a loop). PostgreSQL lets a
+    /// BOM (a line of the sub-assembly it's made from, or one of its add-ins: IngredientBoms), a linked one cut from it, and on up (both kinds are rejected when they'd close a loop). PostgreSQL lets a
     /// recursive query name itself only once in its recursive part, so feeds follows both kinds of link through one union
     /// of them. A recipe takes an
     /// ingredient through a sub-assembly's lines or a usage's add-ins, and a composite through the products it holds, and
@@ -49,7 +49,9 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             SELECT e.id
             FROM feeds f
             JOIN (
-                SELECT b.component_ingredient_id AS source_id, b.ingredient_id AS id FROM ingredient_bom_lines b
+                SELECT l.ingredient_id AS source_id, m.id FROM raw_materials m JOIN sub_assembly_lines l ON l.sub_assembly_id = m.sub_assembly_id
+                UNION ALL
+                SELECT a.add_in_ingredient_id, a.ingredient_id FROM ingredient_add_in_lines a
                 UNION ALL
                 SELECT m.linked_to_id, m.id FROM raw_materials m WHERE m.linked_to_id IS NOT NULL
             ) e ON e.source_id = f.id
@@ -104,6 +106,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         if (await AddAsync(dbContext, material, cancellationToken))
         {
+            await EnsureMadeIngredientFitsAsync(dbContext, material.Id, cancellationToken);
             await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, material.Id, cancellationToken);
         }
 
@@ -117,6 +120,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         if (await UpdateAsync(dbContext, material, cancellationToken))
         {
+            await EnsureMadeIngredientFitsAsync(dbContext, material.Id, cancellationToken);
             await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, material.Id, cancellationToken);
         }
 
@@ -154,7 +158,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         {
             var material = materials[move.RawMaterialId];
             var category = categories[move.CategoryId];
-            RawMaterialRules.EnsureCategoryMatchesType(material.Type, category.Type, category.Name);
+            RawMaterialRules.EnsureCategoryMatchesType(material.Type, material.Source, category.Type, category.Name);
             material.CategoryId = move.CategoryId;
             material.UpdatedAt = now;
         }
@@ -177,7 +181,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         RawMaterial material,
         IReadOnlyList<RawMaterialUnit> units,
         IReadOnlyList<(string? Brand, int? UnitOfMeasureId, decimal Price)>? brandPrices,
-        IReadOnlyList<(int ComponentIngredientId, decimal Grams)>? bomLines,
+        IReadOnlyList<(int IngredientId, decimal Grams)>? addIns,
         CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -199,6 +203,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
                 CategoryId = material.CategoryId,
                 Source = material.Source,
                 WeightLossPercent = material.WeightLossPercent,
+                SubAssemblyId = material.SubAssemblyId,
                 LinkedToId = material.LinkedToId,
                 WeightSharePercent = material.WeightSharePercent,
                 CostSharePercent = material.CostSharePercent,
@@ -256,10 +261,15 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
 
-            if (bomLines is not null)
+            if (addIns is not null)
             {
-                await IngredientBomLineRepository.SetLinesAsync(dbContext, id, bomLines, cancellationToken);
+                await SetAddInsAsync(dbContext, id, addIns, cancellationToken);
                 costChanged = true;
+            }
+
+            if (fields.Source == RawMaterialSource.Made)
+            {
+                await EnsureMadeIngredientFitsAsync(dbContext, id, cancellationToken);
             }
 
             if (costChanged)
@@ -282,11 +292,11 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     /// <summary>
     /// Adds <paramref name="material"/> and saves it, rejecting fields that don't fit its type or source, or a
     /// link that doesn't fit. A linked ingredient takes the buffer of the one it's linked to, whatever it was
-    /// given, and a made one is always stored at 0 (RawMaterialRules.StoredCostBufferPercent) — which only this
-    /// method can do for a new made ingredient, since it has no BOM yet and so never cascades. A new material has
+    /// given, and a made one is always stored at 0 (RawMaterialRules.StoredCostBufferPercent). A new material has
     /// no cost yet, so its buffered cost only stands if one was typed for a purchased
     /// material; otherwise its first brand price or the cascade works it out. Returns whether the caller must
-    /// cascade its cost: a linked ingredient's is worked out from the one it's linked to.
+    /// cascade its cost: a linked ingredient's is worked out from the one it's linked to, and a made one's from the
+    /// sub-assembly it's made from, which the caller checks first (EnsureMadeIngredientFitsAsync).
     /// </summary>
     internal static async Task<bool> AddAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
     {
@@ -306,10 +316,128 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         dbContext.RawMaterials.Add(material);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return material.Source == RawMaterialSource.Linked;
+        return material.Source != RawMaterialSource.Purchased;
     }
 
-    /// <summary>A material goes in a category of its own type. A category that doesn't exist is left to the foreign key.</summary>
+    /// <summary>
+    /// Move to In-House, from a product's section or from the Sub-Assemblies screen: a new made ingredient
+    /// (<paramref name="made"/>) made from <paramref name="subAssemblyId"/>, with no add-ins and no weight loss, so it
+    /// costs per gram what the recipe does, costed (with nothing using it yet, the cascade stops there), on the caller's
+    /// context and in its transaction. Returns its id. The caller checks the name
+    /// (SubAssemblyRules.EnsureValidMadeIngredientName); a category that isn't Made, and a sub-assembly a made ingredient
+    /// can't be made from, are refused here.
+    /// </summary>
+    internal static async Task<int> AddMadeAsync(
+        TinapayanRMSDbContext dbContext, MadeIngredientDraft made, int subAssemblyId, CancellationToken cancellationToken)
+    {
+        var ingredient = new RawMaterial
+        {
+            Name = made.Name.Trim(),
+            Type = RawMaterialType.Ingredient,
+            Source = RawMaterialSource.Made,
+            WeightLossPercent = 0m,
+            SubAssemblyId = subAssemblyId,
+            CategoryId = made.CategoryId,
+        };
+        await AddAsync(dbContext, ingredient, cancellationToken);
+        await EnsureMadeIngredientFitsAsync(dbContext, ingredient.Id, cancellationToken);
+        await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, ingredient.Id, cancellationToken);
+        return ingredient.Id;
+    }
+
+    /// <summary>
+    /// Replaces a made ingredient's add-ins with <paramref name="addIns"/>, in their order, and saves, once every one
+    /// passes: an ingredient, positive grams, each once, and none its sub-assembly already has. Its cost is the caller's
+    /// to cascade, in its transaction.
+    /// </summary>
+    private static async Task SetAddInsAsync(
+        TinapayanRMSDbContext dbContext, int ingredientId, IReadOnlyList<(int IngredientId, decimal Grams)> addIns, CancellationToken cancellationToken)
+    {
+        var made = await MadeIngredientRecipeAsync(dbContext, ingredientId, cancellationToken);
+
+        var addInIds = addIns.Select(a => a.IngredientId).Distinct().ToList();
+        var addInMaterials = await dbContext.RawMaterials
+            .Where(m => addInIds.Contains(m.Id))
+            .Select(m => new { m.Id, m.Name, m.Type })
+            .ToDictionaryAsync(m => m.Id, cancellationToken);
+        foreach (var addIn in addIns)
+        {
+            var material = addInMaterials.GetValueOrDefault(addIn.IngredientId)
+                ?? throw new BusinessRuleException($"Ingredient {addIn.IngredientId} does not exist.");
+            RawMaterialRules.EnsureUsableInRecipes(material.Type, material.Name);
+        }
+
+        IngredientBomRules.EnsureValidAddIns(
+            [.. addIns.Select(a => (a.IngredientId, a.Grams, addInMaterials[a.IngredientId].Name))], made.SubAssemblyName, made.LineIngredientIds);
+
+        await dbContext.IngredientAddInLines.Where(l => l.IngredientId == ingredientId).ExecuteDeleteAsync(cancellationToken);
+        dbContext.IngredientAddInLines.AddRange(addIns.Select((a, index) => new IngredientAddInLine
+        {
+            IngredientId = ingredientId,
+            AddInIngredientId = a.IngredientId,
+            Grams = a.Grams,
+            SortOrder = index,
+        }));
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Refuses a made ingredient, as saved on <paramref name="dbContext"/>, that doesn't fit what it's made from: a
+    /// sub-assembly that's a packaging set or a product's own, an add-in its recipe now has, or a recipe with the made
+    /// ingredient in it, directly or through another one. Nothing to check for any other material. Call after every part
+    /// of a save is written, before its cascade: a save that changes the sub-assembly and the add-ins together is checked as
+    /// a whole.
+    /// </summary>
+    private static async Task EnsureMadeIngredientFitsAsync(TinapayanRMSDbContext dbContext, int id, CancellationToken cancellationToken)
+    {
+        if (!await dbContext.RawMaterials.AnyAsync(m => m.Id == id && m.Source == RawMaterialSource.Made, cancellationToken))
+        {
+            return;
+        }
+
+        var made = await MadeIngredientRecipeAsync(dbContext, id, cancellationToken);
+        SubAssemblyRules.EnsureLinkableByMadeIngredient(made.SubAssemblyName, made.OwnerName, made.IsPackaging);
+
+        var addIns = await dbContext.IngredientAddInLines
+            .Where(l => l.IngredientId == id)
+            .OrderBy(l => l.SortOrder)
+            .Select(l => new { l.AddInIngredientId, l.Grams, l.AddInIngredient!.Name })
+            .ToListAsync(cancellationToken);
+        IngredientBomRules.EnsureValidAddIns([.. addIns.Select(a => (a.AddInIngredientId, a.Grams, a.Name))], made.SubAssemblyName, made.LineIngredientIds);
+
+        IngredientBomRules.EnsureNotInOwnRecipe(id, made.Name, made.SubAssemblyName, made.LineIngredientIds);
+        await IngredientDependencies.EnsureNoCycleAsync(dbContext, id, cancellationToken);
+    }
+
+    /// <summary>A made ingredient's name, and the sub-assembly it's made from: its name, owner, kind and lines' ingredients.</summary>
+    private sealed record MadeIngredientRecipe(string Name, string SubAssemblyName, string? OwnerName, bool IsPackaging, IReadOnlyCollection<int> LineIngredientIds);
+
+    private static async Task<MadeIngredientRecipe> MadeIngredientRecipeAsync(TinapayanRMSDbContext dbContext, int id, CancellationToken cancellationToken)
+    {
+        var made = await dbContext.RawMaterials
+            .Where(m => m.Id == id)
+            .Select(m => new { m.Name, m.Source, m.SubAssemblyId })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new BusinessRuleException($"Ingredient {id} does not exist.");
+        if (made is not { Source: RawMaterialSource.Made, SubAssemblyId: { } subAssemblyId })
+        {
+            throw new BusinessRuleException("Only a made ingredient has add-ins.");
+        }
+
+        var subAssembly = await dbContext.SubAssemblies
+            .Where(s => s.Id == subAssemblyId)
+            .Select(s => new { s.Name, OwnerName = s.OwnerProduct!.Name, s.Role!.IsPackaging })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new BusinessRuleException("The sub-assembly it's made from no longer exists.");
+        var lineIngredientIds = await dbContext.SubAssemblyLines
+            .Where(l => l.SubAssemblyId == subAssemblyId)
+            .Select(l => l.IngredientId)
+            .ToListAsync(cancellationToken);
+
+        return new MadeIngredientRecipe(made.Name, subAssembly.Name, subAssembly.OwnerName, subAssembly.IsPackaging, lineIngredientIds);
+    }
+
+    /// <summary>A material goes in a category of its own type, a made ingredient in a Made one. A category that doesn't exist is left to the foreign key.</summary>
     private static async Task EnsureCategoryMatchesAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
     {
         var category = await dbContext.RawMaterialCategories
@@ -318,13 +446,13 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             .FirstOrDefaultAsync(cancellationToken);
         if (category is not null)
         {
-            RawMaterialRules.EnsureCategoryMatchesType(material.Type, category.Type, category.Name);
+            RawMaterialRules.EnsureCategoryMatchesType(material.Type, material.Source, category.Type, category.Name);
         }
     }
 
     /// <summary>
     /// Copies the form's fields onto the stored material and saves it. Returns whether the caller must
-    /// cascade its cost: a made ingredient's weight loss percent, a linked ingredient's link or shares,
+    /// cascade its cost: a made ingredient's weight loss percent or sub-assembly, a linked ingredient's link or shares,
     /// or an ingredient's buffer or fixed buffered cost may have just changed.
     /// </summary>
     internal static async Task<bool> UpdateAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
@@ -358,6 +486,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         existing.Name = material.Name;
         existing.CategoryId = material.CategoryId;
         existing.WeightLossPercent = material.WeightLossPercent;
+        existing.SubAssemblyId = material.SubAssemblyId;
         existing.LinkedToId = material.LinkedToId;
         existing.WeightSharePercent = material.WeightSharePercent;
         existing.CostSharePercent = material.CostSharePercent;
@@ -385,8 +514,8 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // WeightLossPercent, or the link and its shares, may have just changed; the cascade recomputes the
-        // cost from its current BOM or link. A new buffer on an ingredient reaches the made and linked
+        // WeightLossPercent or the sub-assembly, or the link and its shares, may have just changed; the cascade
+        // recomputes the cost from its current BOM or link. A new buffer on an ingredient reaches the made and linked
         // ingredients and sub-assemblies using it; a packaging material's needs nothing, since products
         // cost their packaging lines on read.
         return existing.Source is RawMaterialSource.Made or RawMaterialSource.Linked
