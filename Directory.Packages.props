@@ -8,7 +8,7 @@
     <!-- Microsoft.Extensions.* ships with the .NET runtime: keep it on the same release. -->
     <MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
     <!-- Every Syncfusion package must be on the same version: upgrade them together. -->
-    <SyncfusionVersion>35.1.41</SyncfusionVersion>
+    <SyncfusionVersion>35.1.42</SyncfusionVersion>
   </PropertyGroup>
   <ItemGroup Label="Application">
     <PackageVersion Include="Dapper" Version="2.1.89" />
