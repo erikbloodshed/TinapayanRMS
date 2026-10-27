@@ -30,6 +30,14 @@ public partial class ProductsView : UserControl
             interaction.SetOutput(TextPromptWindow.Prompt(request.Title, request.Label, request.InitialValue, Window.GetWindow(this), request.Message));
         });
 
+        // Move to In-House's name for the made ingredient, and the Made category it goes in.
+        viewModel.PromptForMadeIngredient.RegisterHandler(async interaction =>
+        {
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            interaction.SetOutput(TextPromptWindow.PromptWithChoice(interaction.Input, Window.GetWindow(this)));
+        });
+
+
         // New clears the form, as New Product Here does, and their composite ones; put the cursor in the name so typing can
         // start straight away.
         viewModel.NewCommand.Subscribe(_ => Details.FocusName());

@@ -100,6 +100,40 @@ public static class SubAssemblyRules
     }
 
     /// <summary>
+    /// What a made ingredient can be made from (2026-10-27): a recipe kept on the Sub-Assemblies screen, the one place it's
+    /// written. Not a packaging set, which has no ingredients, and not a product's own, which its product changes or removes
+    /// at any time. <paramref name="ownerName"/> is its product's, or null for one on the Sub-Assemblies screen.
+    /// </summary>
+    public static void EnsureLinkableByMadeIngredient(string subAssemblyName, string? ownerName, bool isPackaging)
+    {
+        if (isPackaging)
+        {
+            throw new BusinessRuleException($"{subAssemblyName} is a packaging set. A made ingredient is made from a recipe of ingredients.");
+        }
+
+        if (ownerName is not null)
+        {
+            throw new BusinessRuleException(
+                $"{subAssemblyName} is {ownerName}'s own, so a made ingredient can't be made from it. Move it to Sub-Assemblies from that product's recipe first.");
+        }
+    }
+
+    /// <summary>
+    /// A sub-assembly can't be deleted while a made ingredient is made from it: it's that ingredient's recipe.
+    /// <paramref name="madeIngredientNames"/> are theirs, by name.
+    /// </summary>
+    public static void EnsureNoMadeIngredientMadeFrom(string subAssemblyName, IReadOnlyList<string> madeIngredientNames)
+    {
+        if (madeIngredientNames.Count > 0)
+        {
+            var one = madeIngredientNames.Count == 1;
+            throw new BusinessRuleException(
+                $"{string.Join(", ", madeIngredientNames)} {(one ? "is" : "are")} made from {subAssemblyName}, so it can't be deleted. "
+                + $"On the Raw Materials screen, make {(one ? "it" : "them")} from another sub-assembly, or delete {(one ? "it" : "them")}, first.");
+        }
+    }
+
+    /// <summary>
     /// A product's own sub-assembly's name once its product or its role is renamed: one named after them
     /// (<see cref="StandaloneNameFor"/>) is named after the new ones, keeping its own part, so "Cheese Roll Filling: Cheese"
     /// becomes "Cheese Bun Filling: Cheese". One named otherwise, as a sub-assembly from the Sub-Assemblies screen a
@@ -279,6 +313,33 @@ public static class SubAssemblyRules
         if (otherStandaloneNames.Any(n => string.Equals(n.Trim(), trimmed, StringComparison.OrdinalIgnoreCase)))
         {
             throw new BusinessRuleException($"There's already a sub-assembly named '{trimmed}'. Give this one its own name.");
+        }
+    }
+
+    /// <summary>The most a raw material's name can be (RawMaterialConfiguration).</summary>
+    public const int MaxIngredientNameLength = 100;
+
+    /// <summary>
+    /// The made ingredient made from a sub-assembly by Move to In-House (on the Products screen) or Make In-House Ingredient
+    /// (on the Sub-Assemblies screen) needs a name of its
+    /// own: at most <see cref="MaxIngredientNameLength"/> characters, and no other raw material's (<paramref name="isNameTaken"/>).
+    /// </summary>
+    public static void EnsureValidMadeIngredientName(string ingredientName, bool isNameTaken)
+    {
+        var name = ingredientName.Trim();
+        if (name.Length == 0)
+        {
+            throw new BusinessRuleException("Give the made ingredient a name.");
+        }
+
+        if (name.Length > MaxIngredientNameLength)
+        {
+            throw new BusinessRuleException($"'{name[..20]}…' is too long for a raw material's name: keep it to {MaxIngredientNameLength} characters.");
+        }
+
+        if (isNameTaken)
+        {
+            throw new BusinessRuleException($"There's already a raw material named '{name}'. Give the made ingredient its own name.");
         }
     }
 

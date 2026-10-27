@@ -25,22 +25,11 @@ public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTes
 
         await using var dbContext = CreateDbContext();
         var category = await dbContext.RawMaterialCategories.FirstOrDefaultAsync(c => c.Name == "Boxes", Cancellation)
-            ?? new RawMaterialCategory { Name = "Boxes", Type = RawMaterialType.Packaging };
+            ?? new RawMaterialCategory { Name = "Boxes", Type = RawMaterialCategoryType.Packaging };
         var material = new RawMaterial { Type = RawMaterialType.Packaging, Name = name, Category = category, BaseUnitId = unitId };
         dbContext.RawMaterials.Add(material);
         await dbContext.SaveChangesAsync(Cancellation);
         return material.Id;
-    }
-
-    private async Task<int> AddMadeIngredientAsync(string name)
-    {
-        await using var dbContext = CreateDbContext();
-        var category = await dbContext.RawMaterialCategories.FirstOrDefaultAsync(c => c.Name == "Ingredients", Cancellation)
-            ?? new RawMaterialCategory { Name = "Ingredients" };
-        var ingredient = new RawMaterial { Name = name, Category = category, Source = RawMaterialSource.Made };
-        dbContext.RawMaterials.Add(ingredient);
-        await dbContext.SaveChangesAsync(Cancellation);
-        return ingredient.Id;
     }
 
     private async Task<(int SubAssemblyId, int RoleId, int FlourId, int SugarId, int SaltId)> SaveDoughAsync()
@@ -119,20 +108,22 @@ public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTes
     }
 
     [Fact]
-    public async Task A_made_ingredients_bom_comes_back_in_the_order_it_was_saved_in()
+    public async Task A_made_ingredients_bom_comes_back_in_its_sub_assemblys_order_then_its_add_ins()
     {
-        var madeId = await AddMadeIngredientAsync("Streusel");
         var flourId = await AddIngredientAsync("Flour");
         var butterId = await AddIngredientAsync("Butter");
         var sugarId = await AddIngredientAsync("Sugar");
-        var repository = new IngredientBomLineRepository(CreateDbContextFactory());
-        await repository.SetLinesAsync(madeId, [(flourId, 100m), (butterId, 50m), (sugarId, 50m)], Cancellation);
+        var vanillaId = await AddIngredientAsync("Vanilla");
+        var cinnamonId = await AddIngredientAsync("Cinnamon");
+        var madeId = await AddMadeIngredientAsync("Streusel", [(flourId, 100m), (butterId, 50m), (sugarId, 50m)]);
+        await SetRecipeLinesAsync(madeId, [(sugarId, 50m), (flourId, 100m), (butterId, 50m)]);
+        var rawMaterials = new RawMaterialRepository(CreateDbContextFactory());
+        await rawMaterials.SaveAsync((await rawMaterials.GetByIdAsync(madeId, Cancellation))!, [], brandPrices: null, [(vanillaId, 2m), (cinnamonId, 1m)], Cancellation);
 
-        await repository.SetLinesAsync(madeId, [(sugarId, 50m), (flourId, 100m), (butterId, 50m)], Cancellation);
+        var lines = await new IngredientBomLineRepository(CreateDbContextFactory()).GetForIngredientAsync(madeId, Cancellation);
 
-        var lines = await repository.GetForIngredientAsync(madeId, Cancellation);
-        lines.Select(l => l.ComponentIngredientId).Should().Equal(sugarId, flourId, butterId);
-        lines.Select(l => l.SortOrder).Should().Equal(0, 1, 2);
+        lines.Select(l => l.ComponentIngredientId).Should().Equal(sugarId, flourId, butterId, vanillaId, cinnamonId);
+        lines.Select(l => (l.IsAddIn, l.SortOrder)).Should().Equal((false, 0), (false, 1), (false, 2), (true, 0), (true, 1));
     }
 
     [Fact]

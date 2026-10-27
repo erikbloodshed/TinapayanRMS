@@ -36,6 +36,7 @@ public sealed record RawMaterialFormSnapshot
 
     public required int? BaseUnitId { get; init; }
     public required decimal? WeightLossPercent { get; init; }
+    public required int? SubAssemblyId { get; init; }
 
     public required int? LinkedToId { get; init; }
     public required decimal? WeightSharePercent { get; init; }
@@ -47,7 +48,8 @@ public sealed record RawMaterialFormSnapshot
 
     public required IReadOnlyList<UnitRowState> UnitRows { get; init; }
     public required IReadOnlyList<BrandPriceState> BrandPrices { get; init; }
-    public required IReadOnlyList<IngredientLineState> BomLines { get; init; }
+    /// <summary>A made ingredient's add-ins. Its sub-assembly's lines aren't the form's: they follow <see cref="SubAssemblyId"/>.</summary>
+    public required IReadOnlyList<IngredientLineState> AddIns { get; init; }
 
     /// <summary>
     /// True when two snapshots would look the same to the user. Written out rather than left to the record's own
@@ -62,6 +64,7 @@ public sealed record RawMaterialFormSnapshot
         && CanChangeTypeAndSource == other.CanChangeTypeAndSource
         && BaseUnitId == other.BaseUnitId
         && WeightLossPercent == other.WeightLossPercent
+        && SubAssemblyId == other.SubAssemblyId
         && LinkedToId == other.LinkedToId
         && WeightSharePercent == other.WeightSharePercent
         && CostSharePercent == other.CostSharePercent
@@ -70,5 +73,5 @@ public sealed record RawMaterialFormSnapshot
         && BufferedCostUnitKey == other.BufferedCostUnitKey
         && UnitRows.SequenceEqual(other.UnitRows)
         && BrandPrices.SequenceEqual(other.BrandPrices)
-        && BomLines.SequenceEqual(other.BomLines);
+        && AddIns.SequenceEqual(other.AddIns);
 }

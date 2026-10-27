@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reactive.Subjects;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
@@ -27,32 +28,40 @@ public closed class RawMaterialTreeNode : ReactiveObject
 }
 
 /// <summary>
-/// A folder of the Raw Materials list: a type's (Ingredients, Packaging), or a category's inside the type it's for. There's
-/// no Uncategorized, since every material has a category. The tree finds its rows in <see cref="Children"/> through a
-/// HierarchyPropertyDescriptor for this type alone (MaterialListCard), as the Products list does (ProductFolderNode).
+/// A folder of the Raw Materials list: a type's (Ingredients, Packaging), or a category's inside the type it's for, a Made
+/// category's among the ingredient ones. There's no Uncategorized, since every material has a category. The tree finds
+/// its rows in <see cref="Children"/> through a HierarchyPropertyDescriptor for this type alone (MaterialListCard), as the
+/// Products list does (ProductFolderNode).
+
 /// </summary>
 public sealed class RawMaterialFolderNode : RawMaterialTreeNode
 {
-    private RawMaterialFolderNode(RawMaterialType type, int? categoryId, string title)
+    private RawMaterialFolderNode(RawMaterialType type, int? categoryId, RawMaterialCategoryType? categoryType, string title)
     {
         Type = type;
         CategoryId = categoryId;
+        CategoryType = categoryType;
         _title = title;
         Children.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(Glyph));
     }
 
     /// <summary>A type's folder. Open to start with, so the list first opens on the category folders.</summary>
-    public static RawMaterialFolderNode ForType(RawMaterialType type) => new(type, null, TypeTitle(type)) { IsExpanded = true };
+    public static RawMaterialFolderNode ForType(RawMaterialType type) => new(type, null, null, TypeTitle(type)) { IsExpanded = true };
 
-    public static RawMaterialFolderNode ForCategory(RawMaterialCategory category) => new(category.Type, category.Id, category.Name);
+    public static RawMaterialFolderNode ForCategory(RawMaterialCategory category) =>
+        new(RawMaterialRules.MaterialTypeOf(category.Type), category.Id, category.Type, category.Name);
 
     /// <summary>What a type's folder reads: "Ingredients" or "Packaging".</summary>
     public static string TypeTitle(RawMaterialType type) => type == RawMaterialType.Ingredient ? "Ingredients" : "Packaging";
 
+    /// <summary>The type of material the folder holds: a Made category's is Ingredient, since it's in the Ingredients folder.</summary>
     public RawMaterialType Type { get; }
 
     /// <summary>The category a category folder holds, or null for a type's folder.</summary>
     public int? CategoryId { get; }
+
+    /// <summary>The type of the category a category folder holds, or null for a type's folder.</summary>
+    public RawMaterialCategoryType? CategoryType { get; }
 
     public override bool IsTypeFolder => CategoryId is null;
 
@@ -255,21 +264,26 @@ public sealed class RawMaterialTree : IDisposable
 
     /// <summary>
     /// Where dropping <paramref name="material"/> on <paramref name="target"/> files it: a category folder of its own type
-    /// puts it in that category, and another material of its type in the folder that one is in. Null when that's where it
-    /// is already, for a type's folder (which has no category to give), for anything of the other type (a material's type
-    /// is fixed), or with nothing to drop on.
+    /// (RawMaterialRules.CategoryTypeFor) puts it in that category, and a material in such a folder in the folder that one
+    /// is in. Null when that's where it is already, for a type's folder (which has no category to give), for a category of
+    /// another type (a material's type and source are fixed, so a made ingredient only ever goes in a Made one), or with
+    /// nothing to drop on.
     /// </summary>
     public static RawMaterialMove? MoveTo(RawMaterialTreeNode? target, RawMaterial material)
     {
-        (RawMaterialType Type, int CategoryId)? place = target switch
+        (RawMaterialCategoryType Type, int CategoryId)? place = target switch
         {
-            RawMaterialFolderNode { CategoryId: { } categoryId } folder => (folder.Type, categoryId),
-            RawMaterialLeafNode leaf => (leaf.RawMaterial.Type, leaf.RawMaterial.CategoryId),
+            RawMaterialFolderNode { CategoryId: { } categoryId, CategoryType: { } categoryType } => (categoryType, categoryId),
+            RawMaterialLeafNode leaf => (
+                leaf.RawMaterial.Category?.Type ?? RawMaterialRules.CategoryTypeFor(leaf.RawMaterial.Type, leaf.RawMaterial.Source),
+                leaf.RawMaterial.CategoryId),
             // A type's own folder holds categories, not materials; null is a drop on nothing.
             RawMaterialFolderNode or null => null,
         };
 
-        return place is { } to && to.Type == material.Type && to.CategoryId != material.CategoryId
+        return place is { } to
+            && to.Type == RawMaterialRules.CategoryTypeFor(material.Type, material.Source)
+            && to.CategoryId != material.CategoryId
             ? new RawMaterialMove(material.Id, to.CategoryId)
             : null;
     }
@@ -283,11 +297,11 @@ public sealed class RawMaterialTree : IDisposable
 
     /// <summary>
     /// Filing each of <paramref name="materials"/> under <paramref name="category"/>, leaving out any there already and
-    /// any of the other type: the list's Move To.
+    /// any that can't go in a category of its type: the list's Move To.
     /// </summary>
     public static IReadOnlyList<RawMaterialMove> MovesTo(RawMaterialCategory category, IEnumerable<RawMaterial> materials) =>
         [.. from material in materials
-            where material.Type == category.Type && material.CategoryId != category.Id
+            where RawMaterialRules.CategoryTypeFor(material.Type, material.Source) == category.Type && material.CategoryId != category.Id
             select new RawMaterialMove(material.Id, category.Id)];
 
     /// <summary>
@@ -324,13 +338,14 @@ public sealed class RawMaterialTree : IDisposable
 
         foreach (var category in allCategories)
         {
-            if (_categoryFolders.TryGetValue(category.Id, out var folder) && folder.Type == category.Type)
+            if (_categoryFolders.TryGetValue(category.Id, out var folder) && folder.CategoryType == category.Type)
             {
                 folder.Rename(category.Name);
             }
             else
             {
-                // New, or a category whose type was changed in Settings (only possible while it's empty): its folder moves type.
+                // New, or a category whose type was changed in Settings (only while everything in it fits the new one): its
+                // folder is made again, in the other type's folder when it's packaging now or no longer is.
                 _categoryFolders[category.Id] = NewFolder(RawMaterialFolderNode.ForCategory(category));
             }
         }
@@ -347,7 +362,7 @@ public sealed class RawMaterialTree : IDisposable
         // folders (it can't happen while the foreign key holds) isn't shown rather than put in the wrong one.
         var layout = Roots.ToDictionary(root => root, root =>
             allCategories
-                .Where(c => c.Type == root.Type)
+                .Where(c => RawMaterialRules.MaterialTypeOf(c.Type) == root.Type)
                 .Select(c => (Folder: _categoryFolders[c.Id], Rows: RowsOf(byCategory[c.Id].Where(m => m.Type == root.Type))))
                 .ToList());
 

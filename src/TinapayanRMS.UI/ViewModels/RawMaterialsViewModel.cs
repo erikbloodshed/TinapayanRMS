@@ -177,9 +177,10 @@ public sealed record UsageExampleResult(
 
 /// <summary>
 /// The Raw Materials screen: ingredients and packaging in one list. A material's type decides which
-/// parts of its details apply — an ingredient is measured in grams and can be made from a BOM, a
+/// parts of its details apply — an ingredient is measured in grams and can be made from a sub-assembly, a
 /// packaging material has a base unit of its own and is always purchased. Its details, alternative
-/// units, brand prices and BOM are all edited in memory, and Save writes them together.
+/// units, brand prices and a made ingredient's sub-assembly and add-ins are all edited in memory, and Save
+/// writes them together. The sub-assembly's own lines are only shown: they're written on the Sub-Assemblies screen.
 /// </summary>
 public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen, IRecordScreen
 {
@@ -187,6 +188,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
     private readonly IRawMaterialBrandPriceRepository _brandPriceRepository;
     private readonly IIngredientBomLineRepository _bomLineRepository;
+    private readonly ISubAssemblyRepository _subAssemblyRepository;
+    private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
     private readonly IRawMaterialCategoryRepository _categoryRepository;
     private readonly IValidator<RawMaterialCategory> _categoryValidator;
     private readonly IValidator<RawMaterial> _rawMaterialValidator;
@@ -197,7 +200,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private readonly ReadOnlyObservableCollection<RawMaterial> _visibleRawMaterials;
     private readonly ReadOnlyObservableCollection<RawMaterial> _ingredients;
     private readonly ReadOnlyObservableCollection<RawMaterial> _linkTargets;
-    private readonly ReadOnlyObservableCollection<RawMaterial> _bomComponentOptions;
+    private readonly ReadOnlyObservableCollection<RawMaterial> _addInOptions;
     private readonly SourceCache<RawMaterialCategory, int> _categoryCache = new(c => c.Id);
     private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categories;
     private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categoryOptions;
@@ -288,22 +291,47 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>
     /// The ingredients only: packaging never goes in a recipe. Resolves a BOM line's IngredientId and a saved
     /// LinkedToId back to their material; a picker that shouldn't offer the material being edited uses
-    /// BomComponentOptions or LinkTargets instead.
+    /// AddInOptions or LinkTargets instead.
     /// </summary>
     public ReadOnlyObservableCollection<RawMaterial> Ingredients => _ingredients;
 
     /// <summary>The ingredients a linked ingredient can be linked to: every one but the material being edited.</summary>
     public ReadOnlyObservableCollection<RawMaterial> LinkTargets => _linkTargets;
 
-    /// <summary>The Bill of Materials component picker's list: every ingredient but the made one being edited — a made ingredient can't be its own component.</summary>
-    public ReadOnlyObservableCollection<RawMaterial> BomComponentOptions => _bomComponentOptions;
+    /// <summary>The Add-Ins table's ingredient picker's list: every ingredient but the made one being edited — a made ingredient can't be its own add-in.</summary>
+    public ReadOnlyObservableCollection<RawMaterial> AddInOptions => _addInOptions;
 
     public ObservableCollection<RawMaterialPriceRow> PriceHistory { get; } = [];
 
-    public ObservableCollection<IngredientLineRow> BomLineEdits { get; } = [];
+    /// <summary>
+    /// The sub-assemblies a made ingredient can be made from, for the Recipe card's picker: every recipe on the
+    /// Sub-Assemblies screen, with its role, by name. Not a packaging set, and never a product's own, which that screen
+    /// doesn't list (SubAssemblyRules.EnsureLinkableByMadeIngredient).
+    /// </summary>
+    public ObservableCollection<SubAssembly> SubAssemblyOptions { get; } = [];
 
-    /// <summary>The line the BOM table's add row edits: it prices itself as its component is picked, before it's committed.</summary>
-    public Func<IngredientLineRow> NewBomLine => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id));
+    private SubAssembly? _editingSubAssembly;
+    /// <summary>Made only: the sub-assembly it's made from, the recipe its add-ins go on top of. Picked from <see cref="SubAssemblyOptions"/>.</summary>
+    public SubAssembly? EditingSubAssembly
+    {
+        get => _editingSubAssembly;
+        set => this.RaiseAndSetIfChanged(ref _editingSubAssembly, value);
+    }
+
+    /// <summary>
+    /// The lines of <see cref="EditingSubAssembly"/>, as it's saved on the Sub-Assemblies screen, for show: read-only here,
+    /// since that screen is the one place the recipe is written. Read again whenever the pick changes or the screen loads.
+    /// </summary>
+    public ObservableCollection<IngredientLineRow> RecipeLines { get; } = [];
+
+    /// <summary>
+    /// The made ingredient's own extra ingredients on top of its sub-assembly's recipe, typed straight into the Add-Ins
+    /// table (IngredientAddInLine).
+    /// </summary>
+    public ObservableCollection<IngredientLineRow> AddInEdits { get; } = [];
+
+    /// <summary>The line the Add-Ins table's add row edits: it prices itself as its ingredient is picked, before it's committed.</summary>
+    public Func<IngredientLineRow> NewAddIn => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id));
 
     public ReadOnlyObservableCollection<RawMaterialCategory> Categories => _categories;
 
@@ -602,7 +630,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public bool IsEditingPackaging => _isEditingPackaging.Value;
 
     private readonly ObservableAsPropertyHelper<bool> _isEditingMade;
-    /// <summary>A made ingredient: it has a weight loss percent and a BOM instead of a purchase price.</summary>
+    /// <summary>A made ingredient: it has a sub-assembly, add-ins and a weight loss percent instead of a purchase price.</summary>
     public bool IsEditingMade => _isEditingMade.Value;
 
     private readonly ObservableAsPropertyHelper<bool> _isEditingLinked;
@@ -693,8 +721,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
     private decimal _bomTotalWeight;
     /// <summary>
-    /// Made only: the batch's yield as the form has it, Σ BOM grams less the weight loss, so it follows the grid and
-    /// the Weight Loss % box as they're typed into. 0 while the BOM is empty.
+    /// Made only: the batch's yield as the form has it, the sub-assembly's grams and the add-ins' less the weight loss, so
+    /// it follows the pick, the Add-Ins table and the Weight Loss % box as they change. 0 with no sub-assembly picked.
     /// </summary>
     public decimal BomTotalWeight
     {
@@ -704,7 +732,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
     private decimal _bomTotalCost;
     /// <summary>
-    /// Made only: what the form's BOM costs at its components' buffered costs — the sum of the grid's Cost column.
+    /// Made only: what the form's BOM costs at its components' buffered costs — the sum of both tables' Cost columns, the
+    /// recipe's and the add-ins'.
     /// BomTotalCost ÷ BomTotalWeight is the buffered cost per gram Save stores, since a made ingredient adds no
     /// buffer of its own, which is why the header shows the two beside Buffered Cost per g.
     /// </summary>
@@ -823,16 +852,16 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         private set => this.RaiseAndSetIfChanged(ref _exampleResult, value);
     }
 
-    // Bill of Materials (made ingredients): components and grams, typed straight into its table.
-    private IngredientLineRow? _selectedBomLineEdit;
-    public IngredientLineRow? SelectedBomLineEdit
+    // Add-Ins (made ingredients): ingredients and grams on top of the sub-assembly, typed straight into their table.
+    private IngredientLineRow? _selectedAddInEdit;
+    public IngredientLineRow? SelectedAddInEdit
     {
-        get => _selectedBomLineEdit;
-        set => this.RaiseAndSetIfChanged(ref _selectedBomLineEdit, value);
+        get => _selectedAddInEdit;
+        set => this.RaiseAndSetIfChanged(ref _selectedAddInEdit, value);
     }
 
-    /// <summary>The BOM lines as last loaded, so Save only sends the BOM when its lines were changed.</summary>
-    private List<(int ComponentIngredientId, decimal Grams)> _savedBomLines = [];
+    /// <summary>The add-ins as last loaded, so Save only sends them when they were changed.</summary>
+    private List<(int IngredientId, decimal Grams)> _savedAddIns = [];
 
     private RawMaterialPriceRow? _selectedPriceRow;
     public RawMaterialPriceRow? SelectedPriceRow
@@ -849,7 +878,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public ReactiveCommand<RxVoid, RxVoid> CalculateExampleCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeletePriceCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveBrandPriceCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> RemoveBomLineCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> RemoveAddInCommand { get; }
 
     /// <summary>Files materials under another category, saved at once: a drag in the list, or its menu's Move To.</summary>
     public ReactiveCommand<IReadOnlyList<RawMaterialMove>, RxVoid> MoveMaterialsCommand { get; }
@@ -872,7 +901,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public ReactiveCommand<RawMaterialLeafNode, RxVoid> DeleteMaterialCommand { get; }
 
     /// <summary>The list's New Category, for materials of the type given.</summary>
-    public ReactiveCommand<RawMaterialType, RxVoid> NewCategoryCommand { get; }
+    public ReactiveCommand<RawMaterialCategoryType, RxVoid> NewCategoryCommand { get; }
 
     public ReactiveCommand<RawMaterialFolderNode, RxVoid> RenameCategoryCommand { get; }
 
@@ -926,6 +955,17 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// </summary>
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
 
+    /// <summary>The Recipe card's badge: asks for the sub-assembly the made ingredient is made from to be opened, through <see cref="SubAssemblyOpenRequests"/>.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> OpenSubAssemblyCommand { get; }
+
+    private readonly Subject<int> _subAssemblyOpenRequests = new();
+
+    /// <summary>
+    /// The sub-assemblies the Recipe card asks to open, by id. The main window subscribes and opens each on the
+    /// Sub-Assemblies screen, where its lines are edited, as it does for a linked badge on Products.
+    /// </summary>
+    public IObservable<int> SubAssemblyOpenRequests => _subAssemblyOpenRequests;
+
     /// <summary>
     /// The form's undo and redo stacks, the same shape as Products'. One step is one finished change. The price
     /// history is left out: its Delete writes to the database on the spot, so there is nothing unsaved to put back.
@@ -948,6 +988,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         IRawMaterialPriceHistoryRepository priceHistoryRepository,
         IRawMaterialBrandPriceRepository brandPriceRepository,
         IIngredientBomLineRepository bomLineRepository,
+        ISubAssemblyRepository subAssemblyRepository,
+        ISubAssemblyLineRepository subAssemblyLineRepository,
         IRawMaterialCategoryRepository categoryRepository,
         IValidator<RawMaterialCategory> categoryValidator,
         IValidator<RawMaterial> rawMaterialValidator,
@@ -963,6 +1005,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         _priceHistoryRepository = priceHistoryRepository;
         _brandPriceRepository = brandPriceRepository;
         _bomLineRepository = bomLineRepository;
+        _subAssemblyRepository = subAssemblyRepository;
+        _subAssemblyLineRepository = subAssemblyLineRepository;
         _categoryRepository = categoryRepository;
         _categoryValidator = categoryValidator;
         _rawMaterialValidator = rawMaterialValidator;
@@ -1018,7 +1062,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             .SortAndBind(out _ingredients, byName)
             .Subscribe();
 
-        // Shared by every picker that must leave out the ingredient being edited: Linked's target and the BOM's component.
+        // Shared by every picker that must leave out the ingredient being edited: Linked's target and an add-in.
         var notTheSelection = this.WhenAnyValue(x => x.SelectedRawMaterial)
             .Select(selected => selected?.Id ?? 0)
             .DistinctUntilChanged()
@@ -1031,18 +1075,21 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         _rawMaterialCache.Connect()
             .Filter(notTheSelection)
-            .SortAndBind(out _bomComponentOptions, byName)
+            .SortAndBind(out _addInOptions, byName)
             .Subscribe();
 
-        // The picker offers only the categories of the material's own type, which is all it can be saved in.
+        // The picker offers only the categories of the material's own type, which is all it can be saved in: a made
+        // ingredient's are the Made ones (RawMaterialRules.CategoryTypeFor).
+        var categoryType = this.WhenAnyValue(x => x.EditingType, x => x.EditingSource, RawMaterialRules.CategoryTypeFor);
         _categoryCache.Connect()
-            .Filter(this.WhenAnyValue(x => x.EditingType).Select(type => (Func<RawMaterialCategory, bool>)(c => c.Type == type)))
+            .Filter(categoryType.Select(type => (Func<RawMaterialCategory, bool>)(c => c.Type == type)))
             .SortAndBind(out _categoryOptions, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name))
             .Subscribe();
 
-        // A new material's type changed under a category of the other type: that category is no longer one it can go in.
-        this.WhenAnyValue(x => x.EditingType)
-            .Where(type => EditingCategory is { } category && category.Type != type)
+        // A new material's type or source changed under a category of another type: that category is no longer one it can
+        // go in. Only a new one's: a saved material's are fixed, and loading one sets its category before its source.
+        categoryType
+            .Where(type => CanChangeTypeAndSource && EditingCategory is { } category && category.Type != type)
             .Subscribe(_ => EditingCategory = null);
 
         _isEditingIngredient = this.WhenAnyValue(x => x.EditingType)
@@ -1117,7 +1164,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         this.Changed.Subscribe(_ => History.RefreshDirty());
         WatchForSave(UnitRows);
         WatchForSave(BrandPriceRows);
-        WatchForSave(BomLineEdits);
+        WatchForSave(AddInEdits);
 
         // The header's saved costs; a new Per unit, or a unit's multiplier, updates them through UpdatePurchaseCostTexts.
         this.WhenAnyValue(x => x.SelectedRawMaterial)
@@ -1173,6 +1220,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             .Where(_ => !IsBusyApplying)
             .Subscribe(_ => RecomputeBomTotals());
 
+        // The Recipe card shows the picked sub-assembly's lines as it's saved: read again on every pick, an undo's
+        // included, and on every load, which re-points the pick at the refreshed copy, so a change made on the
+        // Sub-Assemblies screen shows here. The tiles follow them.
+        LoadLatest(this.WhenAnyValue(x => x.EditingSubAssembly), LoadRecipeLinesAsync);
+
         // The alternative units and the purchase unit choices name the base unit, which a new
         // material can still change.
         this.WhenAnyValue(x => x.EditingType, x => x.EditingBaseUnit)
@@ -1206,15 +1258,15 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             .Where(_ => !_syncingUnitRows && !IsBusyApplying)
             .Subscribe(_ => OnUnitRowsEdited());
 
-        // A component picked in the BOM table is pointed at the screen's copy of it, for its name.
-        BomLineEdits.ToObservableChangeSet()
+        // An ingredient picked in the Add-Ins table is pointed at the screen's copy of it, for its name.
+        AddInEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
             .Where(_ => !IsRestoring)
-            .Subscribe(_ => IngredientLineRow.Resolve(BomLineEdits, Ingredients.ToDictionary(m => m.Id)));
+            .Subscribe(_ => IngredientLineRow.Resolve(AddInEdits, Ingredients.ToDictionary(m => m.Id)));
 
-        // The header's Total Weight and Total Cost follow the BOM as it's typed into: Cost covers both a component
-        // picked and grams typed, as the sub-assembly form's batch totals do.
-        BomLineEdits.ToObservableChangeSet()
+        // The header's Total Weight and Total Cost follow the add-ins as they're typed into: Cost covers both an
+        // ingredient picked and grams typed, as the sub-assembly form's batch totals do.
+        AddInEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.Cost)
             .Where(_ => !IsRestoring)
             .Subscribe(_ => RecomputeBomTotals());
@@ -1237,11 +1289,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             var units = await unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
             var rawMaterials = await _rawMaterialRepository.GetAllAsync(CancellationToken.None);
             var costingDefaults = await _costingDefaultsRepository.GetAsync(CancellationToken.None);
+            var subAssemblies = await _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None);
 
             // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
             var selectedId = SelectedRawMaterial?.Id;
             var categoryId = EditingCategory?.Id;
             var linkedToId = EditingLinkedTo?.Id;
+            var subAssemblyId = EditingSubAssembly?.Id;
             var baseUnitId = EditingBaseUnit?.Id;
             var exampleMaterialId = ExampleRawMaterial?.Id;
             var exampleUnit = ExampleUnit;
@@ -1254,10 +1308,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
                 EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId);
                 EditingLinkedTo = Ingredients.FirstOrDefault(m => m.Id == linkedToId);
+
+                // A packaging set is never a recipe to make an ingredient from.
+                SubAssemblyOptions.MergeFrom([.. subAssemblies.Where(s => s.Role is not { IsPackaging: true })], s => s.Id);
+                EditingSubAssembly = SubAssemblyOptions.FirstOrDefault(s => s.Id == subAssemblyId);
                 var previousBaseUnit = EditingBaseUnit;
                 EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId);
 
-                IngredientLineRow.Resolve(BomLineEdits, Ingredients.ToDictionary(m => m.Id));
+                IngredientLineRow.Resolve(AddInEdits, Ingredients.ToDictionary(m => m.Id));
 
                 // Resolve points each row at the refreshed component, so this is what carries a component repriced
                 // elsewhere into the header's totals: the change set above is suppressed while a refresh applies.
@@ -1292,6 +1350,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 }
             });
 
+            // The Sub-Assemblies screen may have changed the recipe's lines. Re-pointing the pick reads them only when the
+            // sub-assembly's own row changed, so they're read here every time.
+            if (EditingSubAssembly is { } recipe)
+            {
+                await LoadRecipeLinesAsync(recipe, CancellationToken.None);
+            }
+
             // Products may have started or stopped using the material on another tab. Kept only if the details
             // showing are still that material's once the read is back.
             if (_detailMaterialId is { } detailMaterialId)
@@ -1315,6 +1380,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
 
+        OpenSubAssemblyCommand = ReactiveCommand.Create(
+            () => _subAssemblyOpenRequests.OnNext(EditingSubAssembly!.Id),
+            this.WhenAnyValue(x => x.EditingSubAssembly).Select(subAssembly => subAssembly is not null));
+
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
             // The picked material's details haven't replaced the previous one's yet: saving now would write that material's
@@ -1335,6 +1404,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 Source = source,
                 // A cleared box shows 0.00, so it saves as 0%.
                 WeightLossPercent = source == RawMaterialSource.Made ? EditingWeightLossPercent ?? 0m : null,
+                SubAssemblyId = source == RawMaterialSource.Made ? EditingSubAssembly?.Id : null,
                 LinkedToId = source == RawMaterialSource.Linked ? EditingLinkedTo?.Id : null,
                 WeightSharePercent = source == RawMaterialSource.Linked ? EditingWeightSharePercent : null,
                 CostSharePercent = source == RawMaterialSource.Linked ? EditingCostSharePercent : null,
@@ -1359,20 +1429,17 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             EnsureValidUnitRows();
             var brandPrices = source == RawMaterialSource.Purchased ? CompleteBrandPrices() : null;
 
-            // The picker already leaves the material being edited out of BomComponentOptions, so this can't be
-            // picked through the UI. But a self-reference already in the database (only reachable by editing it
-            // directly, never through this app) would otherwise slip past: ChangedBomLines only re-validates a
-            // BOM that changed, so an untouched one skips IngredientBomRules.EnsureNoCycle entirely on a Save
-            // that touches something else. This runs unconditionally, whether or not the BOM itself changed.
-            if (source == RawMaterialSource.Made && BomLineEdits.Any(l => l.IngredientId == _editingId))
+            // The picker already leaves the material being edited out of AddInOptions, so this can't be picked through
+            // the UI; caught here with a plainer message than the repository's cycle check gives.
+            if (source == RawMaterialSource.Made && AddInEdits.Any(l => l.IngredientId == _editingId))
             {
-                ErrorMessage = "An ingredient can't be a component of itself.";
+                ErrorMessage = "An ingredient can't be an add-in of itself.";
                 return;
             }
 
-            var bomLines = source == RawMaterialSource.Made ? ChangedBomLines() : null;
+            var addIns = source == RawMaterialSource.Made ? ChangedAddIns() : null;
 
-            var id = await _rawMaterialRepository.SaveAsync(material, [.. UnitRows.Select(r => r.Unit)], brandPrices, bomLines, CancellationToken.None);
+            var id = await _rawMaterialRepository.SaveAsync(material, [.. UnitRows.Select(r => r.Unit)], brandPrices, addIns, CancellationToken.None);
 
             // The list picks up any cost that cascaded to other materials; then the form reloads what
             // was saved, so new units get their ids and the brand prices, price history and BOM show the new rows.
@@ -1442,9 +1509,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             }),
             this.WhenAnyValue(x => x.SelectedBrandPriceRow).Select(row => row is not null));
 
-        RemoveBomLineCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => BomLineEdits.Remove(SelectedBomLineEdit!)),
-            this.WhenAnyValue(x => x.SelectedBomLineEdit).Select(line => line is not null));
+        RemoveAddInCommand = ReactiveCommand.Create(
+            () => AsUndoStep(() => AddInEdits.Remove(SelectedAddInEdit!)),
+            this.WhenAnyValue(x => x.SelectedAddInEdit).Select(line => line is not null));
 
         MoveMaterialsCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<RawMaterialMove>>(
             moves => RunSafelyAsync(() => MoveMaterialsAsync(moves, isUndo: false)));
@@ -1452,10 +1519,12 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveMaterialsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
         DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
         NewMaterialInCommand = ReactiveCommand.Create<RawMaterialFolderNode?>(folder => ClearForm(
-            folder?.Type ?? RawMaterialType.Ingredient, folder?.CategoryId));
+            folder?.Type ?? RawMaterialType.Ingredient,
+            folder?.CategoryId,
+            folder?.CategoryType == RawMaterialCategoryType.Made ? RawMaterialSource.Made : RawMaterialSource.Purchased));
         RenameMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(RenameMaterialAsync);
         DeleteMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(leaf => DeleteRawMaterialAsync(leaf.RawMaterial));
-        NewCategoryCommand = ReactiveCommand.CreateFromTask<RawMaterialType>(NewCategoryAsync);
+        NewCategoryCommand = ReactiveCommand.CreateFromTask<RawMaterialCategoryType>(NewCategoryAsync);
         RenameCategoryCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode>(RenameCategoryAsync);
         DeleteCategoryCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode>(DeleteCategoryAsync);
         ExpandAllCommand = ReactiveCommand.Create<RawMaterialFolderNode?>(RawMaterialTree.ExpandAll);
@@ -1582,6 +1651,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         CanChangeTypeAndSource = CanChangeTypeAndSource,
         BaseUnitId = EditingBaseUnit?.Id,
         WeightLossPercent = EditingWeightLossPercent,
+        SubAssemblyId = EditingSubAssembly?.Id,
         LinkedToId = EditingLinkedTo?.Id,
         WeightSharePercent = EditingWeightSharePercent,
         CostSharePercent = EditingCostSharePercent,
@@ -1594,7 +1664,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 r.Unit.Id, r.Unit.RawMaterialId, r.UnitOfMeasureId, r.BaseUnitsPerUnit, r.BaseUnitAbbreviation)),
         ],
         BrandPrices = [.. BrandPriceRows.Select(r => new BrandPriceState(r.Brand, r.UnitKey, r.Price))],
-        BomLines = [.. BomLineEdits.Select(l => new IngredientLineState(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
+        AddIns = [.. AddInEdits.Select(l => new IngredientLineState(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
     };
 
     /// <summary>
@@ -1612,7 +1682,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         {
             SelectedUnitRow = null;
             SelectedBrandPriceRow = null;
-            SelectedBomLineEdit = null;
+            SelectedAddInEdit = null;
 
             _editingId = snapshot.EditingId;
             CanChangeTypeAndSource = snapshot.CanChangeTypeAndSource;
@@ -1622,6 +1692,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             EditingSource = snapshot.Source;
             EditingBaseUnit = snapshot.BaseUnitId is { } baseUnitId ? UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId) : null;
             EditingWeightLossPercent = snapshot.WeightLossPercent;
+            EditingSubAssembly = snapshot.SubAssemblyId is { } subAssemblyId ? SubAssemblyOptions.FirstOrDefault(s => s.Id == subAssemblyId) : null;
             EditingLinkedTo = snapshot.LinkedToId is { } linkedToId ? Ingredients.FirstOrDefault(m => m.Id == linkedToId) : null;
             EditingWeightSharePercent = snapshot.WeightSharePercent;
             EditingCostSharePercent = snapshot.CostSharePercent;
@@ -1655,10 +1726,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 BrandPriceRows.Add(new BrandPriceRow(this) { Brand = price.Brand, UnitKey = price.UnitKey, Price = price.Price });
             }
 
-            BomLineEdits.Clear();
-            foreach (var line in snapshot.BomLines)
+            AddInEdits.Clear();
+            foreach (var line in snapshot.AddIns)
             {
-                BomLineEdits.Add(IngredientLineRow.Restore(
+                AddInEdits.Add(IngredientLineRow.Restore(
                     id => Ingredients.FirstOrDefault(m => m.Id == id),
                     baseWeight: 0m,
                     line.IngredientId,
@@ -1675,7 +1746,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             ? BufferedCostUnitOptions.FirstOrDefault(o => o.Key == unitKey)
             : null;
 
-        IngredientLineRow.Resolve(BomLineEdits, Ingredients.ToDictionary(m => m.Id));
+        IngredientLineRow.Resolve(AddInEdits, Ingredients.ToDictionary(m => m.Id));
         RefreshBrandPriceRows();
         UpdatePurchaseCostTexts();
         // Once, from the restored form: the change set and the Weight Loss % subscription are both suppressed while
@@ -1688,9 +1759,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// the category, brand prices and the usage example's material start empty, so none is saved or
     /// costed by accident. The numbers keep a value: the cost buffer is Settings' default, and the usage example's
     /// quantity stays. The list's New … Here starts it as <paramref name="type"/> in <paramref name="categoryId"/>
-    /// instead, set before the form is settled, so it isn't taken for an edit to save.
+    /// instead, and as a made ingredient (<paramref name="source"/>) in a Made category, set before the form is settled, so
+    /// it isn't taken for an edit to save.
     /// </summary>
-    private void ClearForm(RawMaterialType type = RawMaterialType.Ingredient, int? categoryId = null)
+    private void ClearForm(
+        RawMaterialType type = RawMaterialType.Ingredient, int? categoryId = null, RawMaterialSource source = RawMaterialSource.Purchased)
     {
         History.Clear();
         _editingId = 0;
@@ -1698,9 +1771,12 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         CanChangeTypeAndSource = true;
         EditingName = string.Empty;
         EditingType = type;
-        EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId && c.Type == type);
-        EditingSource = RawMaterialSource.Purchased;
+        // Emptied before the source is set, which gives a made one its starting weight loss.
         EditingWeightLossPercent = null;
+        EditingSource = source;
+        EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId && c.Type == RawMaterialRules.CategoryTypeFor(type, source));
+
+        EditingSubAssembly = null;
         EditingLinkedTo = null;
         EditingWeightSharePercent = null;
         EditingCostSharePercent = null;
@@ -1737,6 +1813,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         EditingCategory = Categories.FirstOrDefault(c => c.Id == material.CategoryId);
         EditingSource = material.Source;
         EditingWeightLossPercent = material.WeightLossPercent;
+        EditingSubAssembly = SubAssemblyOptions.FirstOrDefault(s => s.Id == material.SubAssemblyId);
         EditingLinkedTo = Ingredients.FirstOrDefault(m => m.Id == material.LinkedToId);
         EditingWeightSharePercent = material.WeightSharePercent;
         EditingCostSharePercent = material.CostSharePercent;
@@ -1755,7 +1832,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         AreDetailsReady = material is null || material.Id == _detailMaterialId;
         SelectedPriceRow = null;
         SelectedBrandPriceRow = null;
-        SelectedBomLineEdit = null;
+        SelectedAddInEdit = null;
         LoadUnitRows(material);
         if (material is not null)
         {
@@ -1840,9 +1917,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         ReplacePriceHistory(material, detail.PriceHistory);
         ShowUpdatedAt(material);
 
-        BomLineEdits.Clear();
-        BomLineEdits.AddRange(detail.BomLines.Select(l => new IngredientLineRow(l.ComponentIngredient!, l.Grams)));
-        _savedBomLines = CurrentBomLines();
+        // The recipe's own lines show from the sub-assembly picked (LoadRecipeLinesAsync); only the add-ins are the form's.
+        AddInEdits.Clear();
+        AddInEdits.AddRange(detail.BomLines.Where(l => l.IsAddIn).Select(l => new IngredientLineRow(l.ComponentIngredient!, l.Grams)));
+        _savedAddIns = CurrentAddIns();
 
         BrandPriceRows.Clear();
         BrandPriceRows.AddRange(detail.BrandPrices.Select(p =>
@@ -2174,11 +2252,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     /// <summary>
-    /// The made-ingredient tiles, worked out from the FORM's BOM rows and Weight Loss % box: the yield comes from
-    /// IngredientBomRules.CalculateCost, the same formula IngredientCostPropagator saves with, so the tiles and the
-    /// stored cost can't drift apart, and the cost is the sum of the rows' own Cost — the grid's Cost column, at the
-    /// components' buffered costs. A row with no component picked counts for neither. Left alone until the details
-    /// are this material's (AreDetailsReady), since a pick loads the form before the grids.
+    /// The made-ingredient tiles, worked out from the FORM: the picked sub-assembly's lines, the Add-Ins rows and the
+    /// Weight Loss % box. The yield comes from IngredientBomRules.CalculateCost, the same formula IngredientCostPropagator
+    /// saves with, so the tiles and the stored cost can't drift apart, and the cost is the sum of the rows' own Cost — both
+    /// tables' Cost columns, at the ingredients' buffered costs. A row with no ingredient picked counts for neither. Left
+    /// alone until the details are this material's (AreDetailsReady), since a pick loads the form before the grids.
     /// </summary>
     private void RecomputeBomTotals()
     {
@@ -2187,15 +2265,32 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             return;
         }
 
+        List<IngredientLineRow> rows = [.. RecipeLines, .. AddInEdits];
         var (outputGrams, _) = IngredientBomRules.CalculateCost(
-            [.. BomLineEdits
+            [.. rows
                 .Where(l => l.Ingredient is not null)
                 .Select(l => (Grams: l.Grams ?? 0m, ComponentCostPerGram: l.Ingredient!.BufferedCostPerBaseUnit))],
             EditingWeightLossPercent ?? 0m);
 
         BomTotalWeight = outputGrams;
-        BomTotalCost = BomLineEdits.Sum(l => l.Cost);
+        BomTotalCost = rows.Sum(l => l.Cost);
         UpdateHeaderCostTexts();
+    }
+
+    /// <summary>
+    /// The Recipe card's lines: <paramref name="subAssembly"/>'s as it's saved, each priced at the screen's copy of its
+    /// ingredient, as the add-ins are. None for no pick.
+    /// </summary>
+    private async Task LoadRecipeLinesAsync(SubAssembly? subAssembly, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<SubAssemblyLine> lines = subAssembly is null
+            ? []
+            : await _subAssemblyLineRepository.GetForSubAssembliesAsync([subAssembly.Id], cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        RecipeLines.Clear();
+        RecipeLines.AddRange(lines.Select(l => new IngredientLineRow(Ingredients.FirstOrDefault(m => m.Id == l.IngredientId) ?? l.Ingredient!, l.Grams)));
+        RecomputeBomTotals();
     }
 
     /// <summary>
@@ -2350,16 +2445,16 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         return prices;
     }
 
-    /// <summary>The BOM editor's lines when they differ from those last loaded, or null to leave the saved BOM as it is.</summary>
-    private List<(int ComponentIngredientId, decimal Grams)>? ChangedBomLines()
+    /// <summary>The Add-Ins table's lines when they differ from those last loaded, or null to leave the saved add-ins as they are.</summary>
+    private List<(int IngredientId, decimal Grams)>? ChangedAddIns()
     {
-        var lines = CurrentBomLines();
-        return lines.SequenceEqual(_savedBomLines) ? null : lines;
+        var lines = CurrentAddIns();
+        return lines.SequenceEqual(_savedAddIns) ? null : lines;
     }
 
-    /// <summary>The BOM table's lines; a half-filled or repeated one is refused, naming the ingredient being made.</summary>
-    private List<(int ComponentIngredientId, decimal Grams)> CurrentBomLines() =>
-        [.. IngredientLineRow.CompleteLines(BomLineEdits, EditingName.Trim()).Select(l => (l.Ingredient.Id, l.Grams))];
+    /// <summary>The Add-Ins table's lines; a half-filled or repeated one is refused, naming the ingredient being made.</summary>
+    private List<(int IngredientId, decimal Grams)> CurrentAddIns() =>
+        [.. IngredientLineRow.CompleteLines(AddInEdits, EditingName.Trim()).Select(l => (l.Ingredient.Id, l.Grams))];
 
     /// <summary>
     /// Re-fetches the material just saved and pushes it into the grid's cache and the selection. A fresh
@@ -2474,15 +2569,16 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     /// <summary>
-    /// Saves a category of the material's own type, the only kind the picker offers it, and picks it. A refused name
-    /// puts back the category the picker had.
+    /// Saves a category of the material's own type, the only kind the picker offers it (a Made one for a made ingredient),
+    /// and picks it. A refused name puts back the category the picker had.
     /// </summary>
     private async Task AddCategoryAsync(string name)
     {
         var added = false;
         await RunSafelyAsync(async () =>
         {
-            var category = new RawMaterialCategory { Name = name, Type = EditingType };
+            var category = new RawMaterialCategory { Name = name, Type = RawMaterialRules.CategoryTypeFor(EditingType, EditingSource) };
+
 
             var validation = _categoryValidator.Validate(category);
             if (!validation.IsValid)
@@ -2663,7 +2759,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         var what = moves.Count == 1 && _rawMaterialCache.Lookup(moves[0].RawMaterialId) is { HasValue: true } one ? one.Value.Name : $"{moves.Count} materials";
         var categoryId = moves[0].CategoryId;
         return moves.All(m => m.CategoryId == categoryId) && Categories.FirstOrDefault(c => c.Id == categoryId) is { } category
-            ? $"Moved {what} to {RawMaterialFolderNode.TypeTitle(category.Type)} › {category.Name}"
+            ? $"Moved {what} to {RawMaterialFolderNode.TypeTitle(RawMaterialRules.MaterialTypeOf(category.Type))} › {category.Name}"
             : $"Moved {what}";
     }
 
@@ -2696,8 +2792,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             ? TreeMenuFor(node).FirstOrDefault(item => item.Gesture == gesture && item.IsEnabled)
             : null;
 
-    /// <summary>"Ingredient" or "Packaging Material": what a New … Here item makes.</summary>
-    private static string MaterialNoun(RawMaterialType type) => type == RawMaterialType.Ingredient ? "Ingredient" : "Packaging Material";
+    /// <summary>"Ingredient", "Made Ingredient" (in a Made category's folder) or "Packaging Material": what a New … Here item makes.</summary>
+    private static string MaterialNoun(RawMaterialFolderNode folder) => folder switch
+    {
+        { CategoryType: RawMaterialCategoryType.Made } => "Made Ingredient",
+        { Type: RawMaterialType.Ingredient } => "Ingredient",
+        _ => "Packaging Material",
+    };
 
     private List<TreeMenuItem> MaterialsMenu(IReadOnlyList<RawMaterialLeafNode> leaves)
     {
@@ -2705,8 +2806,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         var isOne = materials.Count == 1;
         List<TreeMenuItem> items = [];
 
-        // A material only goes in a category of its own type, so there's nowhere to move ingredients and packaging together.
-        if (materials.Select(m => m.Type).Distinct().ToList() is [var type])
+        // A material only goes in a category of its own type, so there's nowhere to move ingredients and packaging together,
+        // or made ingredients and the others.
+        if (materials.Select(m => RawMaterialRules.CategoryTypeFor(m.Type, m.Source)).Distinct().ToList() is [var type])
         {
             List<TreeMenuItem> folders =
             [
@@ -2739,14 +2841,31 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         return items;
     }
 
-    private List<TreeMenuItem> TypeFolderMenu(RawMaterialFolderNode typeFolder) =>
-    [
-        new($"New {MaterialNoun(typeFolder.Type)} Here", NewMaterialInCommand, typeFolder) { Glyph = AddGlyph },
-        new("New Category…", NewCategoryCommand, typeFolder.Type) { Glyph = NewFolderGlyph },
-        TreeMenuItem.Separator,
-        new("Expand All", ExpandAllCommand, typeFolder),
-        new("Collapse All", CollapseAllCommand, typeFolder),
-    ];
+    /// <summary>A type's folder's menu. Ingredients' adds a Made category too, whose folder goes in it.</summary>
+    private List<TreeMenuItem> TypeFolderMenu(RawMaterialFolderNode typeFolder)
+    {
+        var isIngredients = typeFolder.Type == RawMaterialType.Ingredient;
+        List<TreeMenuItem> items =
+        [
+            new($"New {MaterialNoun(typeFolder)} Here", NewMaterialInCommand, typeFolder) { Glyph = AddGlyph },
+            new("New Category…", NewCategoryCommand, isIngredients ? RawMaterialCategoryType.Ingredient : RawMaterialCategoryType.Packaging)
+            {
+                Glyph = NewFolderGlyph,
+            },
+        ];
+        if (isIngredients)
+        {
+            items.Add(new("New Made Category…", NewCategoryCommand, RawMaterialCategoryType.Made) { Glyph = NewFolderGlyph });
+        }
+
+        items.AddRange(
+        [
+            TreeMenuItem.Separator,
+            new("Expand All", ExpandAllCommand, typeFolder),
+            new("Collapse All", CollapseAllCommand, typeFolder),
+        ]);
+        return items;
+    }
 
     private List<TreeMenuItem> CategoryFolderMenu(RawMaterialFolderNode folder)
     {
@@ -2754,9 +2873,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         var holds = RawMaterials.Count(m => m.CategoryId == folder.CategoryId);
         return
         [
-            new($"New {MaterialNoun(folder.Type)} Here", NewMaterialInCommand, folder) { Glyph = AddGlyph },
+            new($"New {MaterialNoun(folder)} Here", NewMaterialInCommand, folder) { Glyph = AddGlyph },
             TreeMenuItem.Separator,
-            new("New Category…", NewCategoryCommand, folder.Type) { Glyph = NewFolderGlyph },
+            new("New Category…", NewCategoryCommand, folder.CategoryType!.Value) { Glyph = NewFolderGlyph },
             new("Rename Category…", RenameCategoryCommand, folder) { Gesture = "F2", Glyph = RenameGlyph },
             new(holds == 0 ? "Delete Category" : $"Delete Category (holds {holds})", DeleteCategoryCommand, folder)
             {
@@ -2770,8 +2889,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private List<TreeMenuItem> EmptySpaceMenu() =>
     [
         new("New Raw Material", NewMaterialInCommand) { Glyph = AddGlyph },
-        new("New Ingredient Category…", NewCategoryCommand, RawMaterialType.Ingredient) { Glyph = NewFolderGlyph },
-        new("New Packaging Category…", NewCategoryCommand, RawMaterialType.Packaging) { Glyph = NewFolderGlyph },
+        new("New Ingredient Category…", NewCategoryCommand, RawMaterialCategoryType.Ingredient) { Glyph = NewFolderGlyph },
+        new("New Made Category…", NewCategoryCommand, RawMaterialCategoryType.Made) { Glyph = NewFolderGlyph },
+        new("New Packaging Category…", NewCategoryCommand, RawMaterialCategoryType.Packaging) { Glyph = NewFolderGlyph },
         TreeMenuItem.Separator,
         new("Expand All", ExpandAllCommand),
         new("Collapse All", CollapseAllCommand),
@@ -2804,13 +2924,18 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     /// <summary>
-    /// The list's New Category: asks for a name and adds a category for <paramref name="type"/>, then picks its folder. A
+    /// The list's New Category: asks for a name and adds a category of <paramref name="type"/>, then picks its folder. A
     /// name that's one of that type's categories already picks that one's folder instead.
     /// </summary>
-    private async Task NewCategoryAsync(RawMaterialType type)
+    private async Task NewCategoryAsync(RawMaterialCategoryType type)
     {
+        var isMade = type == RawMaterialCategoryType.Made;
+        var typeTitle = RawMaterialFolderNode.TypeTitle(RawMaterialRules.MaterialTypeOf(type));
         var name = (await PromptForName.Handle(new TextPromptRequest(
-            "New Category", "Name", string.Empty, $"A folder in {RawMaterialFolderNode.TypeTitle(type)}.")))?.Trim();
+            isMade ? "New Made Category" : "New Category",
+            "Name",
+            string.Empty,
+            isMade ? $"A folder in {typeTitle}, for made ingredients only." : $"A folder in {typeTitle}.")))?.Trim();
         if (string.IsNullOrEmpty(name))
         {
             return;
@@ -2837,7 +2962,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
             if (category is not null
                 && RawMaterialTree.CategoryFolder(category.Id) is { } folder
-                && RawMaterialTree.TypeFolder(type).Children.Contains(folder))
+                && RawMaterialTree.TypeFolder(RawMaterialRules.MaterialTypeOf(type)).Children.Contains(folder))
             {
                 SelectedTreeNode = folder;
             }

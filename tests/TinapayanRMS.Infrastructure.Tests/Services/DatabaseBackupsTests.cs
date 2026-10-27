@@ -270,7 +270,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         await using var other = await ThrowawayDatabase.CreateAsync(fixture.ConnectionString, Cancellation);
         await using (var dbContext = other.CreateDbContext())
         {
-            dbContext.RawMaterialCategories.Add(new RawMaterialCategory { Name = "From the other computer", Type = RawMaterialType.Ingredient });
+            dbContext.RawMaterialCategories.Add(new RawMaterialCategory { Name = "From the other computer", Type = RawMaterialCategoryType.Ingredient });
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
@@ -295,7 +295,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
     private async Task AddCategoryAsync(string name)
     {
         await using var dbContext = _database.CreateDbContext();
-        dbContext.RawMaterialCategories.Add(new RawMaterialCategory { Name = name, Type = RawMaterialType.Ingredient });
+        dbContext.RawMaterialCategories.Add(new RawMaterialCategory { Name = name, Type = RawMaterialCategoryType.Ingredient });
         await dbContext.SaveChangesAsync(Cancellation);
     }
 

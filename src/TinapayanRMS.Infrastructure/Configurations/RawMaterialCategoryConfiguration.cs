@@ -18,6 +18,6 @@ public class RawMaterialCategoryConfiguration : IEntityTypeConfiguration<RawMate
             .HasConversion<string>()
             .HasMaxLength(20)
             .IsRequired()
-            .HasDefaultValue(RawMaterialType.Ingredient);
+            .HasDefaultValue(RawMaterialCategoryType.Ingredient);
     }
 }

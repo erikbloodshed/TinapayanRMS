@@ -59,6 +59,21 @@ public interface ISubAssemblyRepository
     /// <summary>Renames a sub-assembly and changes nothing else, checked as Save checks a new name.</summary>
     Task RenameAsync(int id, string name, CancellationToken cancellationToken);
 
-    /// <summary>Deletes a sub-assembly and its lines; refused while a product links it.</summary>
+    /// <summary>Deletes a sub-assembly and its lines; refused while a product links it or a made ingredient is made from it.</summary>
     Task DeleteStandaloneAsync(int id, CancellationToken cancellationToken);
+
+    /// <summary>For each sub-assembly a made ingredient is made from, those made ingredients, by name. One none is made from isn't listed.</summary>
+    Task<IReadOnlyDictionary<int, IReadOnlyList<MadeIngredientUse>>> GetMadeIngredientsBySubAssemblyAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Make In-House Ingredient on the Sub-Assemblies screen (2026-10-27; until then Move to In-House, which moved the
+    /// lines into a bill of materials of the made ingredient's own): a new made ingredient (<paramref name="made"/>) made
+    /// from this recipe, with no add-ins and no weight loss, in one transaction. The recipe stays here as it is, and the
+    /// products linking it are left alone. Refused for a packaging set, a product's own, and a name another raw material
+    /// has. Returns the made ingredient's id.
+    /// </summary>
+    Task<int> AddMadeIngredientAsync(int id, MadeIngredientDraft made, CancellationToken cancellationToken);
 }
+
+/// <summary>A made ingredient made from a sub-assembly, for its Used By: one tile each, which opens it on Raw Materials.</summary>
+public sealed record MadeIngredientUse(int Id, string Name);

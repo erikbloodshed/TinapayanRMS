@@ -175,14 +175,14 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
     }
 
     [Fact]
-    public async Task Undoing_a_bom_edit_puts_the_headers_totals_back()
+    public async Task Undoing_an_add_in_edit_puts_the_headers_totals_back()
     {
         var (viewModel, _) = await OpenMadeIngredientAsync();
         viewModel.BomTotalWeight.Should().Be(970m, "1,000 g less the 3% weight loss");
         viewModel.BomTotalCost.Should().Be(110m, "1,000 g of sugar at its buffered ₱0.11");
 
-        Edit(viewModel, () => viewModel.BomLineEdits.Single().Grams = 500m);
-        viewModel.BomTotalWeight.Should().Be(485m);
+        Edit(viewModel, () => viewModel.AddInEdits.Single().Grams = 0m);
+        viewModel.BomTotalWeight.Should().Be(485m, "the recipe's 500 g, less 3%");
         viewModel.BomTotalCost.Should().Be(55m);
 
         viewModel.TryUndo().Should().BeTrue();
@@ -192,6 +192,22 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.TryRedo().Should().BeTrue();
         viewModel.BomTotalWeight.Should().Be(485m);
         viewModel.BomTotalCost.Should().Be(55m);
+    }
+
+    [Fact]
+    public async Task Undoing_another_sub_assembly_picked_puts_the_recipe_and_its_totals_back()
+    {
+        var (viewModel, _) = await OpenMadeIngredientAsync();
+
+        Edit(viewModel, () => viewModel.EditingSubAssembly = viewModel.SubAssemblyOptions.Single(s => s.Name == "Thin Syrup Base"));
+        await WaitUntilSettledAsync(() => viewModel.RecipeLines.Count == 2, () => $"recipe lines={viewModel.RecipeLines.Count}");
+        viewModel.BomTotalWeight.Should().Be(1455m, "1,000 g of the thinner recipe and the 500 g add-in, less 3%");
+
+        viewModel.TryUndo().Should().BeTrue();
+        await WaitUntilSettledAsync(() => viewModel.RecipeLines.Count == 1, () => $"recipe lines={viewModel.RecipeLines.Count}");
+        viewModel.EditingSubAssembly!.Name.Should().Be("Syrup Base");
+        viewModel.BomTotalWeight.Should().Be(970m);
+        viewModel.History.IsDirty.Should().BeFalse("it's back as it was saved");
     }
 
     [Fact]
@@ -343,35 +359,44 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         return (viewModel, materialId);
     }
 
-    /// <summary>A saved made ingredient (3% weight loss) of 1,000 g of sugar at a buffered ₱0.11/g, open in the form.</summary>
+    /// <summary>
+    /// A saved made ingredient (3% weight loss) made from a recipe of 500 g of sugar ("Syrup Base"), with an add-in of 500 g
+    /// of brown sugar, each at a buffered ₱0.11/g, open in the form. "Thin Syrup Base" (500 g of sugar, 500 g of water) is
+    /// another recipe it could be made from.
+    /// </summary>
     private async Task<(RawMaterialsViewModel ViewModel, int MaterialId)> OpenMadeIngredientAsync()
     {
         int materialId;
+        RawMaterialCategory category;
+        RawMaterial sugar, brownSugar, water;
         await using (var dbContext = CreateDbContext())
         {
-            var category = new RawMaterialCategory { Name = "Syrup goods" };
+            category = new RawMaterialCategory { Name = "Syrup goods" };
             dbContext.RawMaterialCategories.Add(category);
-            var sugar = new RawMaterial
-            {
-                Name = "Sugar",
-                Type = RawMaterialType.Ingredient,
-                Category = category,
-                Source = RawMaterialSource.Purchased,
-                CostPerBaseUnit = 0.10m,
-                BufferedCostPerBaseUnit = 0.11m,
-            };
+            sugar = Purchased("Sugar", category);
+            brownSugar = Purchased("Brown Sugar", category);
+            water = Purchased("Water", category);
+            dbContext.RawMaterials.AddRange(sugar, brownSugar, water);
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var recipeId = await AddRecipeAsync("Syrup Base", [(sugar.Id, 500m)]);
+        await AddRecipeAsync("Thin Syrup Base", [(sugar.Id, 500m), (water.Id, 500m)]);
+        await using (var dbContext = CreateDbContext())
+        {
             var syrup = new RawMaterial
             {
                 Name = "Simple Syrup",
                 Type = RawMaterialType.Ingredient,
-                Category = category,
+                CategoryId = category.Id,
                 Source = RawMaterialSource.Made,
                 WeightLossPercent = 3m,
+                SubAssemblyId = recipeId,
             };
-            dbContext.RawMaterials.AddRange(sugar, syrup);
+            dbContext.RawMaterials.Add(syrup);
             await dbContext.SaveChangesAsync(Cancellation);
 
-            dbContext.IngredientBomLines.Add(new IngredientBomLine { IngredientId = syrup.Id, ComponentIngredientId = sugar.Id, Grams = 1000m });
+            dbContext.IngredientAddInLines.Add(new IngredientAddInLine { IngredientId = syrup.Id, AddInIngredientId = brownSugar.Id, Grams = 500m });
             await dbContext.SaveChangesAsync(Cancellation);
             materialId = syrup.Id;
         }
@@ -380,12 +405,23 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == materialId);
         await WaitUntilSettledAsync(
-            () => viewModel.AreDetailsReady && viewModel.BomLineEdits.Count == 1,
-            () => $"ready={viewModel.AreDetailsReady}, lines={viewModel.BomLineEdits.Count}");
+            () => viewModel.AreDetailsReady && viewModel.AddInEdits.Count == 1 && viewModel.RecipeLines.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, add-ins={viewModel.AddInEdits.Count}, recipe lines={viewModel.RecipeLines.Count}");
 
         viewModel.History.CanUndo.Should().BeFalse("the load itself isn't a change");
         return (viewModel, materialId);
     }
+
+    /// <summary>A purchased ingredient at ₱0.10 a gram, ₱0.11 buffered (water too: only the totals' arithmetic matters).</summary>
+    private static RawMaterial Purchased(string name, RawMaterialCategory category) => new()
+    {
+        Name = name,
+        Type = RawMaterialType.Ingredient,
+        Category = category,
+        Source = RawMaterialSource.Purchased,
+        CostPerBaseUnit = 0.10m,
+        BufferedCostPerBaseUnit = 0.11m,
+    };
 
     private RawMaterialsViewModel CreateViewModel()
     {
@@ -397,6 +433,8 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
             new RawMaterialPriceHistoryRepository(factory),
             new RawMaterialBrandPriceRepository(factory),
             new IngredientBomLineRepository(factory),
+            new SubAssemblyRepository(factory),
+            new SubAssemblyLineRepository(factory),
             new RawMaterialCategoryRepository(factory),
             new RawMaterialCategoryValidator(),
             new RawMaterialValidator(),

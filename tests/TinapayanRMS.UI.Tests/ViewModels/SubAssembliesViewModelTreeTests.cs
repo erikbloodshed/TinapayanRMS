@@ -39,7 +39,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
 
         var menu = viewModel.TreeMenuFor(leaf);
 
-        Headers(menu).Should().Equal("Move to", "Rename…", "Delete");
+        Headers(menu).Should().Equal("Move to", "Rename…", "Make In-House Ingredient…", "Delete");
         menu.Single(i => i.Header == "Rename…").Gesture.Should().Be("F2");
         menu.Single(i => i.Header == "Delete").Gesture.Should().Be("Del");
         var moveTo = menu.Single(i => i.Header == "Move to").Items;
@@ -370,6 +370,100 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
     }
 
     [Fact]
+    public async Task Make_In_House_Ingredient_makes_one_from_the_recipe_which_stays_on_the_list_and_lists_it_under_Used_By()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 1);
+        var custardId = await AddRecipeAsync("Custard", fillingRoleId);
+        var inHouseId = await MadeCategoryIdAsync();
+        var viewModel = await OpenedViewModelAsync(custardId);
+        ChoicePromptRequest? asked = null;
+        viewModel.PromptForMadeIngredient.RegisterHandler(interaction =>
+        {
+            asked = interaction.Input;
+            interaction.SetOutput(new ChoicePromptResult("Custard Filling", interaction.Input.InitialChoice));
+        });
+
+        await RunAsync(viewModel.TreeMenuFor(viewModel.SubAssemblyTree.Find(custardId)).Single(i => i.Header == "Make In-House Ingredient…"));
+
+        viewModel.ErrorMessage.Should().BeNull();
+        asked!.Title.Should().Be("Make In-House Ingredient");
+        asked.InitialValue.Should().Be("Custard", "the name starts as the sub-assembly's");
+        asked.Choices[asked.InitialChoice].Should().Be("In-House");
+        asked.Message.Should().Contain("Custard stays here as it is");
+        viewModel.Rows.Should().ContainSingle(r => r.Id == custardId, "the recipe stays where it's written");
+        viewModel.SuccessMessage.Should().Be("Custard Filling was added to In-House, made from Custard.");
+        var made = viewModel.Ingredients.Should().ContainSingle(m => m.Name == "Custard Filling").Subject;
+        made.Should().BeEquivalentTo(new { Source = RawMaterialSource.Made, CategoryId = inHouseId, WeightLossPercent = 0m, SubAssemblyId = (int?)custardId });
+        viewModel.MadeIngredients.Should().Equal(new MadeIngredientUse(made.Id, "Custard Filling"));
+
+        var opened = new List<int>();
+        using var subscription = viewModel.RawMaterialOpenRequests.Subscribe(opened.Add);
+        await viewModel.OpenRawMaterialCommand.Execute(made.Id);
+        opened.Should().Equal(made.Id);
+    }
+
+    [Fact]
+    public async Task Make_In_House_Ingredient_leaves_a_recipe_a_product_uses_and_the_product_as_they_are()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 1);
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.2m);
+        var milkId = await AddIngredientAsync("Milk", costPerGram: 0.1m);
+        var baseId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Name = "Ube Base", RoleId = fillingRoleId }, [(ubeId, 300m), (milkId, 100m)], Cancellation);
+        var productId = await AddProductAsync("Ube Bun");
+        await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(baseId, UsageAuthoredField.WeightPerPiece, 20m)]));
+        await MadeCategoryIdAsync();
+        var viewModel = await OpenedViewModelAsync(baseId);
+        string? message = null;
+        viewModel.PromptForMadeIngredient.RegisterHandler(interaction =>
+        {
+            message = interaction.Input.Message;
+            interaction.SetOutput(new ChoicePromptResult("Ube Filling", 0));
+        });
+
+        await RunAsync(viewModel.TreeMenuFor(viewModel.SubAssemblyTree.Find(baseId)).Single(i => i.Header == "Make In-House Ingredient…"));
+
+        viewModel.ErrorMessage.Should().BeNull();
+        message.Should().Contain("Ube Base stays here as it is");
+        viewModel.SuccessMessage.Should().Be("Ube Filling was added to In-House, made from Ube Base.");
+        viewModel.SelectedRow!.Id.Should().Be(baseId, "it stays on the list, and on the form");
+        viewModel.Lines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal(("Ube", 300m), ("Milk", 100m));
+        viewModel.SelectedRow.TotalCost.Should().Be(70m, "₱60 of ube and ₱10 of milk, as before");
+        viewModel.UsedBy.Select(p => p.Name).Should().Equal("Ube Bun");
+        viewModel.MadeIngredients.Select(m => m.Name).Should().Equal("Ube Filling");
+        viewModel.History.IsDirty.Should().BeFalse("the form shows it as it's saved");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.ProductVersions.AnyAsync(v => v.ProductId == productId, Cancellation)).Should().BeFalse("nothing about Ube Bun changed");
+    }
+
+    [Fact]
+    public async Task Make_In_House_Ingredient_waits_for_the_forms_changes_and_needs_a_Made_category()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 1);
+        var custardId = await AddRecipeAsync("Custard", fillingRoleId);
+        var flanId = await AddRecipeAsync("Leche Flan", fillingRoleId);
+        var viewModel = await OpenedViewModelAsync(custardId);
+        var asked = 0;
+        viewModel.PromptForMadeIngredient.RegisterHandler(interaction =>
+        {
+            asked++;
+            interaction.SetOutput(null);
+        });
+        Edit(viewModel, () => viewModel.EditingName = "Custard Base");
+
+        await RunAsync(viewModel.TreeMenuFor(viewModel.SubAssemblyTree.Find(custardId)).Single(i => i.Header == "Make In-House Ingredient…"));
+
+        viewModel.ErrorMessage.Should().Be("Save Custard first, or undo its changes: the made ingredient is made from it as it's saved.");
+
+        await RunAsync(viewModel.TreeMenuFor(viewModel.SubAssemblyTree.Find(flanId)).Single(i => i.Header == "Make In-House Ingredient…"));
+
+        viewModel.ErrorMessage.Should().Be(MadeIngredientPrompt.NoMadeCategoryMessage);
+        asked.Should().Be(0);
+        viewModel.Rows.Should().HaveCount(2);
+    }
+
+
+    [Fact]
     public async Task F2_and_Del_do_what_the_menu_shows_for_the_one_row_picked()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -502,7 +596,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
             {
                 Type = RawMaterialType.Packaging,
                 Name = $"{name} Box",
-                Category = new RawMaterialCategory { Name = $"{name} Boxes", Type = RawMaterialType.Packaging },
+                Category = new RawMaterialCategory { Name = $"{name} Boxes", Type = RawMaterialCategoryType.Packaging },
                 BaseUnitId = pieceId,
             };
             dbContext.RawMaterials.Add(box);
@@ -548,6 +642,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory),
+            new RawMaterialCategoryRepository(factory),
             new SubAssemblyValidator(),
             new SubAssemblyRoleValidator(),
             viewStateStore ?? new InMemoryViewStateStore(),

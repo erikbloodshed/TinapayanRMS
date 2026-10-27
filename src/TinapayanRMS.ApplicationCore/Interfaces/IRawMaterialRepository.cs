@@ -33,7 +33,7 @@ public interface IRawMaterialRepository
     Task AddAsync(RawMaterial material, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Changes the name, category, weight loss percent, a linked ingredient's link and shares (checked
+    /// Changes the name, category, a made ingredient's weight loss percent and sub-assembly, a linked ingredient's link and shares (checked
     /// as AddAsync checks them, and cascaded), and (packaging only, while nothing is measured in it yet)
     /// base unit. The type and source are fixed once created.
     /// </summary>
@@ -52,8 +52,10 @@ public interface IRawMaterialRepository
     /// <summary>
     /// Saves everything the Raw Materials screen edits in one transaction, so nothing is saved unless
     /// every part passes: the material itself (added when its Id is 0, otherwise updated as
-    /// UpdateAsync does), its alternative units, its brand prices and its BOM, each checked as their own
-    /// repositories check them. Returns the material's id.
+    /// UpdateAsync does), its alternative units, its brand prices and a made ingredient's add-ins, each checked as
+    /// their own repositories check them. A made ingredient is refused when its sub-assembly is a packaging set or a
+    /// product's own, an add-in is already in that recipe, or the recipe has the made ingredient in it, however deep.
+    /// Returns the material's id.
     /// </summary>
     /// <param name="units">
     /// The material's complete set of alternative units: saved ones missing from it are removed,
@@ -65,12 +67,16 @@ public interface IRawMaterialRepository
     /// no id yet; a null unit means a price per base unit. The material is costed at the dearest per base
     /// unit, and a new cost is logged in price history, dated today (RawMaterialBrandPriceRepository).
     /// </param>
-    /// <param name="bomLines">A made ingredient's new BOM, in grams, replacing the old one, or null to leave the BOM as it is.</param>
+    /// <param name="addIns">
+    /// A made ingredient's new add-ins, in grams, replacing the old ones, or null to leave them as they are. The recipe
+    /// they go on top of is the sub-assembly it's made from (RawMaterial.SubAssemblyId), which is edited on the
+    /// Sub-Assemblies screen, never here.
+    /// </param>
     Task<int> SaveAsync(
         RawMaterial material,
         IReadOnlyList<RawMaterialUnit> units,
         IReadOnlyList<(string? Brand, int? UnitOfMeasureId, decimal Price)>? brandPrices,
-        IReadOnlyList<(int ComponentIngredientId, decimal Grams)>? bomLines,
+        IReadOnlyList<(int IngredientId, decimal Grams)>? addIns,
         CancellationToken cancellationToken);
 
     Task DeleteAsync(int id, CancellationToken cancellationToken);

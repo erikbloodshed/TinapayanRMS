@@ -4,6 +4,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure.Queries;
+using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
@@ -38,10 +39,11 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
     }
 
     /// <summary>
-    /// Replaces the sub-assembly's whole line set on the caller's context (edited together, like an
-    /// ingredient's BOM), recomputes its TotalWeight/TotalCost, and saves. Lines are in grams, and every
-    /// one must be an ingredient (RawMaterialRules.EnsureUsableInRecipes). Nothing is deleted until every
-    /// line passes.
+    /// Replaces the sub-assembly's whole line set on the caller's context (edited together), recomputes its
+    /// TotalWeight/TotalCost, and saves. Lines are in grams, and every one must be an ingredient
+    /// (RawMaterialRules.EnsureUsableInRecipes). Nothing is deleted until every line passes. Every line write goes
+    /// through here, so here is where the made ingredients made from it are cascaded, in the caller's transaction,
+    /// after a check that no line closes a loop through one of them.
     /// </summary>
     /// <param name="subAssembly">The sub-assembly, tracked by <paramref name="dbContext"/> and saved already (it has its id).</param>
     internal static async Task SetLinesAsync(
@@ -86,5 +88,22 @@ public class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbContext> 
         (subAssembly.TotalWeight, subAssembly.TotalCost) = SubAssemblyRules.CalculateTotals(costInputs);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // A made ingredient made from it has these lines in its BOM (IngredientBoms), so each is checked for a loop through
+        // them, then repriced, which reaches every made ingredient and sub-assembly using it in turn (2026-10-27).
+        var madeFromIt = await dbContext.RawMaterials
+            .Where(m => m.SubAssemblyId == subAssembly.Id)
+            .Select(m => new { m.Id, m.Name })
+            .ToListAsync(cancellationToken);
+        foreach (var made in madeFromIt)
+        {
+            IngredientBomRules.EnsureNotInOwnRecipe(made.Id, made.Name, subAssembly.Name, ingredientIds);
+            await IngredientDependencies.EnsureNoCycleAsync(dbContext, made.Id, cancellationToken);
+        }
+
+        foreach (var made in madeFromIt)
+        {
+            await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, made.Id, cancellationToken);
+        }
     }
 }

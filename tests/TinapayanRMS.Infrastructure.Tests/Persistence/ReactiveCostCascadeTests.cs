@@ -24,7 +24,6 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
 {
     private RawMaterialRepository CreateIngredientRepository() => new(CreateDbContextFactory());
 
-    private IngredientBomLineRepository CreateBomRepository() => new(CreateDbContextFactory());
 
     private async Task<int> SeedCategoryAsync(string name)
     {
@@ -49,21 +48,6 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
 
         // Bought by the kilogram: tests price it per kilogram (₱90 is ₱0.09 a gram).
         await AddKilogramUnitAsync(ingredient.Id);
-        return ingredient.Id;
-    }
-
-    private async Task<int> SeedMadeIngredientAsync(string name, int categoryId, decimal weightLossPercent = 0m)
-    {
-        await using var dbContext = CreateDbContext();
-        var ingredient = new RawMaterial
-        {
-            Name = name,
-            CategoryId = categoryId,
-            Source = RawMaterialSource.Made,
-            WeightLossPercent = weightLossPercent,
-        };
-        dbContext.RawMaterials.Add(ingredient);
-        await dbContext.SaveChangesAsync(Cancellation);
         return ingredient.Id;
     }
 
@@ -104,11 +88,10 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         // sugar -> syrup (made) -> Custard sub-assembly, which uses syrup directly.
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
-        var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId);
         var roleId = await AddRoleAsync("Filling");
 
         await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 90m);
-        await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation); // syrup: 0.09/g
+        var syrupId = await AddMadeIngredientAsync("Simple Syrup", [(sugarId, 1000m)]); // syrup: 0.09/g
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, syrupId, 500m); // 500g syrup @ 0.09/g -> 45
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(45m);
@@ -123,12 +106,12 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
     public async Task A_weight_loss_percent_edit_ripples_into_every_sub_assembly_using_that_ingredient()
     {
         var categoryId = await SeedCategoryAsync("Fillings");
+        var madeCategoryId = await MadeCategoryIdAsync();
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
-        var syrupId = await SeedMadeIngredientAsync("Simple Syrup", categoryId, weightLossPercent: 0m);
         var roleId = await AddRoleAsync("Filling");
 
         await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 90m);
-        await CreateBomRepository().SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation); // syrup: 1000g -> 0.09/g
+        var syrupId = await AddMadeIngredientAsync("Simple Syrup", [(sugarId, 1000m)]); // syrup: 1000g -> 0.09/g
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, syrupId, 1000m); // 1000g syrup @ 0.09/g -> 90
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(90m);
@@ -140,9 +123,52 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
             syrup.WeightLossPercent = 10m;
             await dbContext.SaveChangesAsync(Cancellation);
         }
-        await CreateIngredientRepository().UpdateAsync(new RawMaterial { Id = syrupId, Name = "Simple Syrup", CategoryId = categoryId, Source = RawMaterialSource.Made, WeightLossPercent = 10m }, Cancellation);
+        await CreateIngredientRepository().UpdateAsync(
+            new RawMaterial { Id = syrupId, Name = "Simple Syrup", CategoryId = madeCategoryId, Source = RawMaterialSource.Made, WeightLossPercent = 10m, SubAssemblyId = await RecipeIdOfAsync(syrupId) },
+            Cancellation);
 
         (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(100m); // 1000g @ 0.10/g
+    }
+
+    [Fact]
+    public async Task A_line_edit_on_the_sub_assembly_a_made_ingredient_is_made_from_ripples_into_every_sub_assembly_using_it()
+    {
+        // sugar -> Syrup Base (sub-assembly) -> syrup (made) -> Custard sub-assembly. Syrup Base gains water.
+        var categoryId = await SeedCategoryAsync("Fillings");
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
+        var waterId = await SeedPurchasedIngredientAsync("Water", categoryId);
+        var roleId = await AddRoleAsync("Filling");
+        await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 90m);
+        var syrupId = await AddMadeIngredientAsync("Simple Syrup", [(sugarId, 1000m)]);
+        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, syrupId, 500m); // 500g syrup @ 0.09/g -> 45
+
+        await SetRecipeLinesAsync(syrupId, [(sugarId, 1000m), (waterId, 1000m)]); // syrup: ₱90 over 2,000 g -> 0.045/g
+
+        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(22.5m);
+    }
+
+    [Fact]
+    public async Task A_price_change_on_a_made_ingredients_add_in_ripples_into_every_sub_assembly_using_it_and_leaves_its_own_sub_assembly_alone()
+    {
+        var categoryId = await SeedCategoryAsync("Fillings");
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
+        var vanillaId = await SeedPurchasedIngredientAsync("Vanilla", categoryId);
+        var roleId = await AddRoleAsync("Filling");
+        await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 90m);
+        await SetPriceAsync(vanillaId, await KilogramUnitIdAsync(vanillaId), 1000m);
+        var syrupId = await AddMadeIngredientAsync("Vanilla Syrup", [(sugarId, 900m)]);
+        var rawMaterials = CreateIngredientRepository();
+        await rawMaterials.SaveAsync((await rawMaterials.GetByIdAsync(syrupId, Cancellation))!, [], brandPrices: null, [(vanillaId, 100m)], Cancellation);
+        var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, syrupId, 1000m); // ₱81 + ₱100 over 1,000 g -> 181
+        var baseId = await RecipeIdOfAsync(syrupId);
+        var baseCost = (await GetSubAssemblyAsync(baseId)).TotalCost;
+
+        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(181m);
+
+        await SetPriceAndRecalculateBufferAsync(vanillaId, await KilogramUnitIdAsync(vanillaId), 2000m);
+
+        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(281m);
+        (await GetSubAssemblyAsync(baseId)).TotalCost.Should().Be(baseCost, "an add-in is the made ingredient's, never its sub-assembly's");
     }
 
     [Fact]

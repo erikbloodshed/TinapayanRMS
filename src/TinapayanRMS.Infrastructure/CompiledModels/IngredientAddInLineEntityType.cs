@@ -13,13 +13,13 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.Infrastructure.CompiledModels;
 
 [EntityFrameworkInternal]
-public partial class IngredientBomLineEntityType
+public partial class IngredientAddInLineEntityType
 {
     public static RuntimeEntityType Create(RuntimeModel model, RuntimeEntityType baseEntityType = null)
     {
         var runtimeEntityType = model.AddEntityType(
-            "TinapayanRMS.Domain.Entities.IngredientBomLine",
-            typeof(IngredientBomLine),
+            "TinapayanRMS.Domain.Entities.IngredientAddInLine",
+            typeof(IngredientAddInLine),
             baseEntityType,
             propertyCount: 5,
             navigationCount: 2,
@@ -30,28 +30,28 @@ public partial class IngredientBomLineEntityType
         var id = runtimeEntityType.AddProperty(
             "Id",
             typeof(int),
-            propertyInfo: typeof(IngredientBomLine).GetProperty("Id", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            fieldInfo: typeof(IngredientBomLine).GetField("<Id>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            propertyInfo: typeof(IngredientAddInLine).GetProperty("Id", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(IngredientAddInLine).GetField("<Id>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
             valueGenerated: ValueGenerated.OnAdd,
             afterSaveBehavior: PropertySaveBehavior.Throw,
             sentinel: 0);
         id.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
         id.AddAnnotation("Relational:ColumnName", "id");
 
-        var componentIngredientId = runtimeEntityType.AddProperty(
-            "ComponentIngredientId",
+        var addInIngredientId = runtimeEntityType.AddProperty(
+            "AddInIngredientId",
             typeof(int),
-            propertyInfo: typeof(IngredientBomLine).GetProperty("ComponentIngredientId", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            fieldInfo: typeof(IngredientBomLine).GetField("<ComponentIngredientId>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            propertyInfo: typeof(IngredientAddInLine).GetProperty("AddInIngredientId", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(IngredientAddInLine).GetField("<AddInIngredientId>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
             sentinel: 0);
-        componentIngredientId.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
-        componentIngredientId.AddAnnotation("Relational:ColumnName", "component_ingredient_id");
+        addInIngredientId.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        addInIngredientId.AddAnnotation("Relational:ColumnName", "add_in_ingredient_id");
 
         var grams = runtimeEntityType.AddProperty(
             "Grams",
             typeof(decimal),
-            propertyInfo: typeof(IngredientBomLine).GetProperty("Grams", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            fieldInfo: typeof(IngredientBomLine).GetField("<Grams>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            propertyInfo: typeof(IngredientAddInLine).GetProperty("Grams", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(IngredientAddInLine).GetField("<Grams>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
             precision: 18,
             scale: 4,
             sentinel: 0m);
@@ -61,8 +61,8 @@ public partial class IngredientBomLineEntityType
         var ingredientId = runtimeEntityType.AddProperty(
             "IngredientId",
             typeof(int),
-            propertyInfo: typeof(IngredientBomLine).GetProperty("IngredientId", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            fieldInfo: typeof(IngredientBomLine).GetField("<IngredientId>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            propertyInfo: typeof(IngredientAddInLine).GetProperty("IngredientId", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(IngredientAddInLine).GetField("<IngredientId>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
             sentinel: 0);
         ingredientId.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         ingredientId.AddAnnotation("Relational:ColumnName", "ingredient_id");
@@ -70,8 +70,8 @@ public partial class IngredientBomLineEntityType
         var sortOrder = runtimeEntityType.AddProperty(
             "SortOrder",
             typeof(int),
-            propertyInfo: typeof(IngredientBomLine).GetProperty("SortOrder", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            fieldInfo: typeof(IngredientBomLine).GetField("<SortOrder>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            propertyInfo: typeof(IngredientAddInLine).GetProperty("SortOrder", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(IngredientAddInLine).GetField("<SortOrder>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
             sentinel: 0);
         sortOrder.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         sortOrder.AddAnnotation("Relational:ColumnName", "sort_order");
@@ -79,36 +79,36 @@ public partial class IngredientBomLineEntityType
         var key = runtimeEntityType.AddKey(
             new[] { id });
         runtimeEntityType.SetPrimaryKey(key);
-        key.AddAnnotation("Relational:Name", "pk_ingredient_bom_lines");
+        key.AddAnnotation("Relational:Name", "pk_ingredient_add_in_lines");
 
         var index = runtimeEntityType.AddIndex(
-            new[] { componentIngredientId });
-        index.AddAnnotation("Relational:Name", "ix_ingredient_bom_lines_component_ingredient_id");
+            new[] { addInIngredientId });
+        index.AddAnnotation("Relational:Name", "ix_ingredient_add_in_lines_add_in_ingredient_id");
 
         var index0 = runtimeEntityType.AddIndex(
-            new[] { ingredientId, componentIngredientId },
+            new[] { ingredientId, addInIngredientId },
             unique: true);
-        index0.AddAnnotation("Relational:Name", "ix_ingredient_bom_lines_ingredient_id_component_ingredient_id");
+        index0.AddAnnotation("Relational:Name", "ix_ingredient_add_in_lines_ingredient_id_add_in_ingredient_id");
 
         return runtimeEntityType;
     }
 
     public static RuntimeForeignKey CreateForeignKey1(RuntimeEntityType declaringEntityType, RuntimeEntityType principalEntityType)
     {
-        var runtimeForeignKey = declaringEntityType.AddForeignKey(new[] { declaringEntityType.FindProperty("ComponentIngredientId") },
+        var runtimeForeignKey = declaringEntityType.AddForeignKey(new[] { declaringEntityType.FindProperty("AddInIngredientId") },
             principalEntityType.FindKey(new[] { principalEntityType.FindProperty("Id") }),
             principalEntityType,
             deleteBehavior: DeleteBehavior.Restrict,
             required: true);
 
-        var componentIngredient = declaringEntityType.AddNavigation("ComponentIngredient",
+        var addInIngredient = declaringEntityType.AddNavigation("AddInIngredient",
             runtimeForeignKey,
             onDependent: true,
             typeof(RawMaterial),
-            propertyInfo: typeof(IngredientBomLine).GetProperty("ComponentIngredient", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            fieldInfo: typeof(IngredientBomLine).GetField("<ComponentIngredient>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly));
+            propertyInfo: typeof(IngredientAddInLine).GetProperty("AddInIngredient", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(IngredientAddInLine).GetField("<AddInIngredient>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly));
 
-        runtimeForeignKey.AddAnnotation("Relational:Name", "fk_ingredient_bom_lines_raw_materials_component_ingredient_id");
+        runtimeForeignKey.AddAnnotation("Relational:Name", "fk_ingredient_add_in_lines_raw_materials_add_in_ingredient_id");
         return runtimeForeignKey;
     }
 
@@ -124,10 +124,10 @@ public partial class IngredientBomLineEntityType
             runtimeForeignKey,
             onDependent: true,
             typeof(RawMaterial),
-            propertyInfo: typeof(IngredientBomLine).GetProperty("Ingredient", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            fieldInfo: typeof(IngredientBomLine).GetField("<Ingredient>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly));
+            propertyInfo: typeof(IngredientAddInLine).GetProperty("Ingredient", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(IngredientAddInLine).GetField("<Ingredient>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly));
 
-        runtimeForeignKey.AddAnnotation("Relational:Name", "fk_ingredient_bom_lines_raw_materials_ingredient_id");
+        runtimeForeignKey.AddAnnotation("Relational:Name", "fk_ingredient_add_in_lines_raw_materials_ingredient_id");
         return runtimeForeignKey;
     }
 
@@ -136,7 +136,7 @@ public partial class IngredientBomLineEntityType
         runtimeEntityType.AddAnnotation("Relational:FunctionName", null);
         runtimeEntityType.AddAnnotation("Relational:Schema", null);
         runtimeEntityType.AddAnnotation("Relational:SqlQuery", null);
-        runtimeEntityType.AddAnnotation("Relational:TableName", "ingredient_bom_lines");
+        runtimeEntityType.AddAnnotation("Relational:TableName", "ingredient_add_in_lines");
         runtimeEntityType.AddAnnotation("Relational:ViewName", null);
         runtimeEntityType.AddAnnotation("Relational:ViewSchema", null);
 

@@ -112,16 +112,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
-        var syrupId = await AddIngredientAsync("Syrup");
-        await using (var dbContext = CreateDbContext())
-        {
-            var syrup = await dbContext.RawMaterials.FindAsync([syrupId], Cancellation);
-            syrup!.Source = RawMaterialSource.Made;
-            syrup.WeightLossPercent = 0m;
-            await dbContext.SaveChangesAsync(Cancellation);
-        }
-
-        await new IngredientBomLineRepository(CreateDbContextFactory()).SetLinesAsync(syrupId, [(sugarId, 1000m)], Cancellation);
+        var syrupId = await AddMadeIngredientAsync("Syrup", [(sugarId, 1000m)]);
         var (productId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 900m), (syrupId, 100m)], weightPerPiece: 10m);
         return productId;
     }
@@ -169,6 +160,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory),
             new IngredientBomLineRepository(factory),
+            new RawMaterialCategoryRepository(factory),
             new ProductCategoryRepository(factory),
             new ProductVersionRepository(factory),
             new ProductValidator(),

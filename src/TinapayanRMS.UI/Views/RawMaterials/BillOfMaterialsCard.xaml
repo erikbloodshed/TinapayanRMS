@@ -6,14 +6,68 @@
     <!-- No frame of its own: it sits straight in its tab, whose card has the border and rounded corners -->
     <Border Padding="12">
         <StackPanel>
-            <TextBlock Text="Bill of Materials" Style="{StaticResource SectionHeaderStyle}" />
+            <TextBlock Text="Recipe" Style="{StaticResource SectionHeaderStyle}" />
+
+            <!--
+                The sub-assembly it's made from: the Sub-Assemblies screen is the one place its lines are written, so they only
+                show here. The badge beside the picker opens it there (MainWindow subscribes to SubAssemblyOpenRequests).
+            -->
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Made from" Style="{StaticResource FormLabelStyle}" />
+                <syncfusion:ComboBoxAdv Grid.Column="1"
+                                        ItemsSource="{Binding SubAssemblyOptions}"
+                                        DisplayMemberPath="Name"
+                                        IsTextSearchEnabled="True"
+                                        DefaultText="Pick a sub-assembly…"
+                                        controls:FieldUndoStep.Recorder="{Binding}"
+                                        SelectedItem="{Binding EditingSubAssembly, Mode=TwoWay}"
+                                        ToolTip="The sub-assembly whose recipe it's made from, as it's kept on the Sub-Assemblies screen. Its add-ins and weight loss go on top."
+                                        AutomationProperties.Name="Made from" />
+                <Button Grid.Column="2"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource LinkedBadgeLinkStyle}"
+                        Content="Open in Sub-Assemblies"
+                        Command="{Binding OpenSubAssemblyCommand}"
+                        ToolTip="Its lines are changed on the Sub-Assemblies screen, and every made ingredient and product using it follows."
+                        Visibility="{Binding EditingSubAssembly, Converter={StaticResource NotNullToVisibilityConverter}}" />
+            </Grid>
+
+            <!-- The recipe's lines, read-only: typed on the Sub-Assemblies screen -->
+            <syncfusion:SfDataGrid ItemsSource="{Binding RecipeLines}"
+                                   GridLinesVisibility="Both"
+                                   AutoGenerateColumns="False"
+                                   AllowEditing="False"
+                                   SelectionMode="None"
+                                   ColumnSizer="Star"
+                                   controls:GridFillerRows.IsEnabled="True"
+                                   AutomationProperties.Name="Recipe lines"
+                                   Height="180">
+                <syncfusion:SfDataGrid.Columns>
+                    <syncfusion:GridTextColumn MappingName="Ingredient.Name" HeaderText="Ingredient" />
+                    <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="120" NumberDecimalDigits="1" AllowEditing="False" />
+                    <controls:NumericColumn MappingName="CostPerGram" HeaderText="Cost/g" Width="120" NumberDecimalDigits="4" AllowEditing="False" />
+                    <controls:NumericColumn MappingName="Cost" HeaderText="Cost" Width="120" NumberDecimalDigits="2" AllowEditing="False" />
+                </syncfusion:SfDataGrid.Columns>
+            </syncfusion:SfDataGrid>
+
+            <TextBlock Text="Add-Ins" Style="{StaticResource SectionHeaderStyle}" Margin="0,16,0,4" />
+            <TextBlock Text="This ingredient's own extras on top of the recipe, such as a colouring or a flavouring. The recipe itself stays as it is."
+                       Style="{StaticResource CaptionStyle}"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,8" />
 
             <!-- Typed straight into, in grams (recipe lines have no unit of their own): the add row at the bottom starts a line, Delete removes the selected one -->
-            <syncfusion:SfDataGrid ItemsSource="{Binding BomLineEdits}"
+            <syncfusion:SfDataGrid ItemsSource="{Binding AddInEdits}"
                                    controls:GridUndoSteps.Recorder="{Binding}"
                                    controls:GridRowReordering.IsEnabled="True"
                                    controls:NumericEditing.IsEnabled="True"
-                                   SelectedItem="{Binding SelectedBomLineEdit, Mode=TwoWay}"
+                                   SelectedItem="{Binding SelectedAddInEdit, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                    CurrentCellBorderThickness="1"
@@ -28,14 +82,15 @@
                                    ColumnSizer="Star"
                                    controls:GridEditCommit.OnFocusLeave="True"
                                    controls:GridAddNewRow.DropWhenUntouched="True"
-                                   controls:GridAddNewRow.ItemFactory="{Binding NewBomLine}"
+                                   controls:GridAddNewRow.ItemFactory="{Binding NewAddIn}"
                                    controls:AutoCompleteDropDown.IsEnabled="True"
-                                   Height="200">
+                                   AutomationProperties.Name="Add-ins"
+                                   Height="160">
                 <syncfusion:SfDataGrid.Columns>
                     <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
                     <syncfusion:GridMultiColumnDropDownList MappingName="IngredientId"
-                                                            HeaderText="Component"
-                                                            ItemsSource="{Binding BomComponentOptions}"
+                                                            HeaderText="Ingredient"
+                                                            ItemsSource="{Binding AddInOptions}"
                                                             DisplayMember="Name"
                                                             ValueMember="Id"
                                                             AllowAutoComplete="True"
@@ -49,7 +104,7 @@
                                                             GridColumnSizer="Star">
                         <syncfusion:GridMultiColumnDropDownList.Columns>
                             <syncfusion:Columns>
-                                <syncfusion:GridTextColumn MappingName="Name" HeaderText="Component" />
+                                <syncfusion:GridTextColumn MappingName="Name" HeaderText="Ingredient" />
                                 <syncfusion:GridTextColumn MappingName="Category.Name" HeaderText="Category" Width="100" />
                                 <controls:NumericColumn MappingName="BufferedCostPerBaseUnit" HeaderText="Cost/g" Width="88" NumberDecimalDigits="4" />
                             </syncfusion:Columns>
@@ -61,7 +116,7 @@
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
 
-            <syncfusion:ButtonAdv HorizontalAlignment="Right" Margin="0,8,0,0" Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveBomLineCommand}" />
+            <syncfusion:ButtonAdv HorizontalAlignment="Right" Margin="0,8,0,0" Label="Remove Add-In" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveAddInCommand}" />
         </StackPanel>
     </Border>
 </UserControl>

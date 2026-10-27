@@ -16,12 +16,14 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// A standalone sub-assembly in the Sub-Assemblies list, with the products that use it. "Used by" is kept
-/// as text: CollectionMerge compares a row's scalar properties, so a changed list of products shows up
-/// as a changed row.
+/// A standalone sub-assembly in the Sub-Assemblies list, with the products that use it and the made ingredients made from
+/// it. "Used by" is kept as text: CollectionMerge compares a row's scalar properties, so a changed list of products or
+/// made ingredients shows up as a changed row.
 /// </summary>
-public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyList<LinkingProduct> usedBy)
+public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyList<LinkingProduct> usedBy, IReadOnlyList<MadeIngredientUse>? madeIngredients = null)
 {
+    private readonly IReadOnlyList<MadeIngredientUse> _madeIngredients = madeIngredients ?? [];
+
     public SubAssembly SubAssembly { get; } = subAssembly;
 
     public int Id => SubAssembly.Id;
@@ -39,6 +41,12 @@ public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyL
 
     /// <summary>The products linking it, by name. A method, not a property: CollectionMerge would compare the list by its scalar properties only.</summary>
     public IReadOnlyList<LinkingProduct> GetUsedBy() => usedBy;
+
+    /// <summary>The made ingredients made from it, e.g. "Butter Icing, Breads", or empty when none are.</summary>
+    public string MadeIngredientsText { get; } = string.Join(", ", (madeIngredients ?? []).Select(m => m.Name));
+
+    /// <summary>The made ingredients made from it, by name. A method for the same reason as <see cref="GetUsedBy"/>.</summary>
+    public IReadOnlyList<MadeIngredientUse> GetMadeIngredients() => _madeIngredients;
 }
 
 /// <summary>
@@ -51,6 +59,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _lineRepository;
     private readonly ISubAssemblyRoleRepository _roleRepository;
+    private readonly IRawMaterialCategoryRepository _rawMaterialCategoryRepository;
     private readonly IValidator<SubAssembly> _subAssemblyValidator;
     private readonly IValidator<SubAssemblyRole> _roleValidator;
     private readonly IViewStateStore _viewStateStore;
@@ -289,6 +298,17 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         private set => this.RaiseAndSetIfChanged(ref _usedBy, value);
     }
 
+    private IReadOnlyList<MadeIngredientUse> _madeIngredients = [];
+    /// <summary>
+    /// The made ingredients made from the sub-assembly the form shows, by name: one tile each under Used By, after the
+    /// products, which opens it on Raw Materials.
+    /// </summary>
+    public IReadOnlyList<MadeIngredientUse> MadeIngredients
+    {
+        get => _madeIngredients;
+        private set => this.RaiseAndSetIfChanged(ref _madeIngredients, value);
+    }
+
     private string _usedByText = NotUsedText;
     /// <summary>The caption under the Used By tiles: what linking means for editing it, or how to link it when nothing does.</summary>
     public string UsedByText
@@ -302,6 +322,16 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     private const string SetNotUsedText = "No product uses it yet. Link it from a product's Recipe Structure: Add Sub-Assembly, Link an existing one.";
 
     private const string UsedText = "These products follow every change saved here, and it can't be deleted while they use it.";
+
+    private const string MadeFromText = "These follow every change saved here, and it can't be deleted while they use it: the products link it, and the made ingredients are made from it.";
+
+    /// <summary>A made ingredient's Used By tile: asks for it to be opened on Raw Materials, through <see cref="RawMaterialOpenRequests"/>.</summary>
+    public ReactiveCommand<int, RxVoid> OpenRawMaterialCommand { get; }
+
+    private readonly Subject<int> _rawMaterialOpenRequests = new();
+
+    /// <summary>The made ingredients Used By tiles ask to open, by id. The main window subscribes and opens each on Raw Materials.</summary>
+    public IObservable<int> RawMaterialOpenRequests => _rawMaterialOpenRequests;
 
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
@@ -328,6 +358,18 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
     /// <summary>The list's Delete, as the header's: asks first.</summary>
     public ReactiveCommand<SubAssemblyLeafNode, RxVoid> DeleteSubAssemblyCommand { get; }
+
+    /// <summary>
+    /// Make In-House Ingredient on a recipe of the list: asks for the made ingredient's name and Made category, then adds
+    /// that ingredient, made from the recipe, at once. The recipe stays as it is.
+    /// </summary>
+    public ReactiveCommand<SubAssemblyLeafNode, RxVoid> MakeInHouseIngredientCommand { get; }
+
+    /// <summary>
+    /// Input: Make In-House Ingredient's prompt (MadeIngredientPrompt), its name box starting with the sub-assembly's name. Output:
+    /// the name typed and the Made category picked, or null if it was cancelled. The View shows a TextPromptWindow with a picker.
+    /// </summary>
+    public Interaction<ChoicePromptRequest, ChoicePromptResult?> PromptForMadeIngredient { get; } = new();
 
     /// <summary>The list's New Role: added after the others, as Settings → Roles adds one.</summary>
     public ReactiveCommand<RxVoid, RxVoid> NewRoleCommand { get; }
@@ -389,6 +431,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         ISubAssemblyLineRepository lineRepository,
         ISubAssemblyRoleRepository roleRepository,
         IRawMaterialRepository rawMaterialRepository,
+        IRawMaterialCategoryRepository rawMaterialCategoryRepository,
         IValidator<SubAssembly> subAssemblyValidator,
         IValidator<SubAssemblyRole> roleValidator,
         IViewStateStore viewStateStore,
@@ -400,6 +443,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         _versionRecorder = versionRecorder;
         _lineRepository = lineRepository;
         _roleRepository = roleRepository;
+        _rawMaterialCategoryRepository = rawMaterialCategoryRepository;
         _subAssemblyValidator = subAssemblyValidator;
         _roleValidator = roleValidator;
         _viewStateStore = viewStateStore;
@@ -537,6 +581,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             var rawMaterials = await rawMaterialRepository.GetAllAsync(CancellationToken.None);
             var subAssemblies = await _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None);
             var linkedBy = await _subAssemblyRepository.GetStandaloneLinkedByAsync(CancellationToken.None);
+            var madeFrom = await _subAssemblyRepository.GetMadeIngredientsBySubAssemblyAsync(CancellationToken.None);
 
             // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
             var selectedId = SelectedRow?.Id;
@@ -551,7 +596,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 Roles.MergeFrom(roles, r => r.Id);
                 Ingredients.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Ingredient).OrderBy(m => m.Name)], m => m.Id);
                 PackagingMaterials.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Packaging).OrderBy(m => m.Name)], m => m.Id);
-                _rowCache.MergeFrom(subAssemblies.Select(s => new StandaloneSubAssemblyRow(s, linkedBy.GetValueOrDefault(s.Id) ?? [])));
+                _rowCache.MergeFrom(subAssemblies.Select(s => new StandaloneSubAssemblyRow(s, linkedBy.GetValueOrDefault(s.Id) ?? [], madeFrom.GetValueOrDefault(s.Id))));
 
                 // A form opened before the roles were loaded (a new one, shown at start) takes the first role.
                 EditingRole = Roles.FirstOrDefault(r => r.Id == roleId) ?? (_editingId == 0 && roleId is null ? Roles.FirstOrDefault() : null);
@@ -564,7 +609,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 SelectedRow = Rows.FirstOrDefault(r => r.Id == selectedId);
                 if (_editingId > 0)
                 {
-                    ShowUsedBy(linkedBy.GetValueOrDefault(_editingId) ?? []);
+                    ShowUsedBy(linkedBy.GetValueOrDefault(_editingId) ?? [], madeFrom.GetValueOrDefault(_editingId) ?? []);
                 }
             });
 
@@ -588,6 +633,8 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         CopyCommand = ReactiveCommand.Create(CopyForm, this.WhenAnyValue(x => x.SelectedRow).Select(row => row is not null));
 
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
+
+        OpenRawMaterialCommand = ReactiveCommand.Create<int>(_rawMaterialOpenRequests.OnNext);
 
         NewProductCommand = ReactiveCommand.Create(
             () =>
@@ -698,6 +745,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             folder is null ? null : Roles.FirstOrDefault(r => r.Id == folder.RoleId)));
         RenameSubAssemblyCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(RenameSubAssemblyAsync);
         DeleteSubAssemblyCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(leaf => DeleteSubAssemblyAsync(leaf.Row));
+        MakeInHouseIngredientCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(leaf => RunSafelyAsync(() => MakeInHouseIngredientAsync(leaf.Row)));
         NewRoleCommand = ReactiveCommand.CreateFromTask(NewRoleAsync);
         RenameRoleCommand = ReactiveCommand.CreateFromTask<SubAssemblyFolderNode>(RenameRoleAsync);
         DeleteRoleCommand = ReactiveCommand.CreateFromTask<SubAssemblyFolderNode>(DeleteRoleAsync);
@@ -862,7 +910,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         Lines.Clear();
         SelectedPackagingLine = null;
         PackagingLines.Clear();
-        ShowUsedBy([]);
+        ShowUsedBy([], []);
 
         // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
         History.MarkClean();
@@ -883,7 +931,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         ClearForm();
         RestoreSnapshot(source with { EditingId = 0, Name = name });
         HeaderTitle = $"Copy of {sourceName}";
-        ShowUsedBy([]);
+        ShowUsedBy([], []);
         History.RefreshDirty();
     }
 
@@ -935,7 +983,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         SelectedPackagingLine = null;
         PackagingLines.Clear();
         PackagingLines.AddRange(savedSet.Select(l => new PackagingLineRow(packagingById.GetValueOrDefault(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId)));
-        ShowUsedBy(row.GetUsedBy());
+        ShowUsedBy(row.GetUsedBy(), row.GetMadeIngredients());
 
         // The form now holds what was saved, so this is what Save's dirty check measures against. Taken at the
         // end: the lines land after the name and role, and a form measured before them would read as changed
@@ -943,11 +991,12 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         History.MarkClean();
     }
 
-    private void ShowUsedBy(IReadOnlyList<LinkingProduct> products)
+    private void ShowUsedBy(IReadOnlyList<LinkingProduct> products, IReadOnlyList<MadeIngredientUse> madeIngredients)
     {
         UsedBy = products;
-        UsedByText = products.Count == 0
-            ? IsPackaging ? SetNotUsedText : NotUsedText
+        MadeIngredients = madeIngredients;
+        UsedByText = madeIngredients.Count > 0 ? MadeFromText
+            : products.Count == 0 ? IsPackaging ? SetNotUsedText : NotUsedText
             : UsedText;
     }
 
@@ -1171,6 +1220,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     }
 
     // Segoe Fluent Icons glyphs for the list's menu, as the Raw Materials and Products lists' menus have them.
+    private const string InHouseGlyph = "";
     private const string AddGlyph = "";
     private const string NewFolderGlyph = "";
     private const string MoveGlyph = "";
@@ -1232,12 +1282,15 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 items.Add(TreeMenuItem.Separator);
             }
 
-            items.AddRange(
-            [
-                new("Rename…", RenameSubAssemblyCommand, leaf) { Gesture = "F2", Glyph = RenameGlyph },
-                TreeMenuItem.Separator,
-                new("Delete", DeleteSubAssemblyCommand, leaf) { Gesture = "Del", Glyph = DeleteGlyph },
-            ]);
+            items.Add(new("Rename…", RenameSubAssemblyCommand, leaf) { Gesture = "F2", Glyph = RenameGlyph });
+
+            // A made ingredient can be made from a recipe; a packaging set's lines are packaging.
+            if (!SubAssemblyTree.IsPackagingSet(leaf.SubAssembly))
+            {
+                items.Add(new("Make In-House Ingredient…", MakeInHouseIngredientCommand, leaf) { Glyph = InHouseGlyph });
+            }
+
+            items.AddRange([TreeMenuItem.Separator, new("Delete", DeleteSubAssemblyCommand, leaf) { Gesture = "Del", Glyph = DeleteGlyph }]);
         }
 
         return items;
@@ -1280,7 +1333,55 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     ];
 
     /// <summary>
+    /// The list's Make In-House Ingredient, saved at once once the prompt is answered: a new made ingredient made from the
+    /// recipe, in the Made category picked, with no add-ins and no weight loss (2026-10-27; until then Move to In-House,
+    /// which moved the lines into the made ingredient). The recipe stays here as it is, and the products linking it are
+    /// left alone; it shows under Used By. The form's unsaved changes to it have to be saved or undone first: the made
+    /// ingredient is made from it as it's saved.
+    /// </summary>
+    private async Task MakeInHouseIngredientAsync(StandaloneSubAssemblyRow row)
+    {
+        ErrorMessage = null;
+        if (_editingId == row.Id && History.IsDirty)
+        {
+            ErrorMessage = $"Save {row.Name} first, or undo its changes: the made ingredient is made from it as it's saved.";
+            return;
+        }
+
+        var categories = await MadeIngredientPrompt.MadeCategoriesAsync(_rawMaterialCategoryRepository);
+        if (categories.Count == 0)
+        {
+            ErrorMessage = MadeIngredientPrompt.NoMadeCategoryMessage;
+            return;
+        }
+
+        var answer = await PromptForMadeIngredient.Handle(MadeIngredientPrompt.RequestFor(
+            "Make In-House Ingredient",
+            row.Name,
+            categories,
+            $"A made ingredient made from {row.Name}, with no weight loss, so it costs per gram what the recipe does. {row.Name} stays here as it is, and its lines are still changed here."));
+        if (answer is null)
+        {
+            return;
+        }
+
+        var name = answer.Text.Trim();
+        if (Ingredients.Concat(PackagingMaterials).Any(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            ErrorMessage = MadeIngredientPrompt.NameTakenMessage(name);
+            return;
+        }
+
+        var category = categories[answer.Choice];
+        await _subAssemblyRepository.AddMadeIngredientAsync(row.Id, new MadeIngredientDraft(name, category.Id), CancellationToken.None);
+
+        await LoadCommand.Execute();
+        SuccessMessage = $"{name} was added to {category.Name}, made from {row.Name}.";
+    }
+
+    /// <summary>
     /// The list's Rename: asks for the new name, and saves it at once. On the sub-assembly the form shows, the title and
+
     /// the name box take it, and the form's undo steps take it as given, as a move gives them its role: whatever else is
     /// typed there stays to be saved, and no undo brings the old name back for a Save to write.
     /// </summary>
@@ -1432,6 +1533,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
         _rowCache.Dispose();
         _productOpenRequests.Dispose();
+        _rawMaterialOpenRequests.Dispose();
         _newProductRequests.Dispose();
     }
 }

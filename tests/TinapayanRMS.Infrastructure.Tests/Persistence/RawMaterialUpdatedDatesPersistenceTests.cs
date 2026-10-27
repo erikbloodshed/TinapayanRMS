@@ -32,8 +32,8 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
     private static RawMaterial PurchasedIngredient(string name, int categoryId, int id = 0) =>
         new() { Id = id, Name = name, Type = RawMaterialType.Ingredient, CategoryId = categoryId, Source = RawMaterialSource.Purchased };
 
-    private static RawMaterial MadeIngredient(string name, int categoryId, int id = 0) =>
-        new() { Id = id, Name = name, Type = RawMaterialType.Ingredient, CategoryId = categoryId, Source = RawMaterialSource.Made, WeightLossPercent = 0m };
+    private static RawMaterial MadeIngredient(string name, int categoryId, int subAssemblyId, int id = 0) =>
+        new() { Id = id, Name = name, Type = RawMaterialType.Ingredient, CategoryId = categoryId, Source = RawMaterialSource.Made, WeightLossPercent = 0m, SubAssemblyId = subAssemblyId };
 
     private async Task<RawMaterial> GetMaterialAsync(int id)
     {
@@ -48,7 +48,7 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
         var repository = CreateRepository();
         var before = DateTime.Now;
 
-        var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [], brandPrices: null, bomLines: null, Cancellation);
+        var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [], brandPrices: null, addIns: null, Cancellation);
 
         var flour = await GetMaterialAsync(flourId);
         flour.UpdatedAt.Should().NotBeNull().And.BeOnOrAfter(before);
@@ -60,14 +60,14 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
     {
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
-        var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [], [(null, null, 0.05m)], bomLines: null, Cancellation);
+        var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [], [(null, null, 0.05m)], addIns: null, Cancellation);
 
         var priced = await GetMaterialAsync(flourId);
         priced.CostPerBaseUnit.Should().Be(0.05m);
         priced.CostUpdatedAt.Should().NotBeNull("the first price moved its cost");
 
         // A rename: the form saves, the cost doesn't move.
-        await repository.SaveAsync(PurchasedIngredient("Bread Flour", categoryId, id: flourId), [], brandPrices: null, bomLines: null, Cancellation);
+        await repository.SaveAsync(PurchasedIngredient("Bread Flour", categoryId, id: flourId), [], brandPrices: null, addIns: null, Cancellation);
 
         var renamed = await GetMaterialAsync(flourId);
         renamed.UpdatedAt.Should().BeAfter(priced.UpdatedAt!.Value, "the form saved it again");
@@ -79,7 +79,7 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
     {
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
-        var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [], [(null, null, 0.05m)], bomLines: null, Cancellation);
+        var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [], [(null, null, 0.05m)], addIns: null, Cancellation);
         var priced = await GetMaterialAsync(flourId);
 
         // The Purchase Cost Setup's own path, not a form save of the material.
@@ -95,13 +95,15 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
     public async Task A_components_price_change_stamps_the_made_ingredients_cost_date_through_the_cascade()
     {
         var categoryId = await SeedCategoryAsync();
+        var madeCategoryId = await MadeCategoryIdAsync();
         var repository = CreateRepository();
-        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], [(null, null, 0.10m)], bomLines: null, Cancellation);
-        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId), [], brandPrices: null, [(sugarId, 1000m)], Cancellation);
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], [(null, null, 0.10m)], addIns: null, Cancellation);
+        var syrupId = await repository.SaveAsync(
+            MadeIngredient("Simple Syrup", madeCategoryId, await AddRecipeAsync("Syrup Base", [(sugarId, 1000m)])), [], brandPrices: null, addIns: null, Cancellation);
 
         var syrupBefore = await GetMaterialAsync(syrupId);
         syrupBefore.CostPerBaseUnit.Should().Be(0.10m);
-        syrupBefore.CostUpdatedAt.Should().NotBeNull("its BOM gave it a cost");
+        syrupBefore.CostUpdatedAt.Should().NotBeNull("its recipe gave it a cost");
 
         await CreateBrandPriceRepository().SetAsync(sugarId, [new RawMaterialBrandPrice { Price = 0.20m }], Cancellation);
 
@@ -115,9 +117,11 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
     public async Task A_cascade_that_leaves_a_cost_where_it_was_leaves_its_cost_date_alone()
     {
         var categoryId = await SeedCategoryAsync();
+        var madeCategoryId = await MadeCategoryIdAsync();
         var repository = CreateRepository();
-        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], [(null, null, 0.10m)], bomLines: null, Cancellation);
-        var syrupId = await repository.SaveAsync(MadeIngredient("Simple Syrup", categoryId), [], brandPrices: null, [(sugarId, 1000m)], Cancellation);
+        var sugarId = await repository.SaveAsync(PurchasedIngredient("Sugar", categoryId), [], [(null, null, 0.10m)], addIns: null, Cancellation);
+        var syrupId = await repository.SaveAsync(
+            MadeIngredient("Simple Syrup", madeCategoryId, await AddRecipeAsync("Syrup Base", [(sugarId, 1000m)])), [], brandPrices: null, addIns: null, Cancellation);
         var before = await GetMaterialAsync(syrupId);
 
         // The same price again: the cascade runs and writes the same figures.

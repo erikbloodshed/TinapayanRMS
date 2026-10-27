@@ -39,7 +39,24 @@ public sealed record NewSubAssemblyDraft(
     /// and the role.
     /// </summary>
     public bool Release { get; init; }
+
+    /// <summary>
+    /// Save moves it to the Sub-Assemblies screen, as <see cref="Release"/> does, and adds a new made ingredient made from
+    /// it (Move to In-House, 2026-10-27; until then the lines became a bill of materials of the made ingredient's own). The
+    /// product links it at the same piece size, so it costs what it did. Null for any other section.
+    /// </summary>
+    public MadeIngredientDraft? ToMadeIngredient { get; init; }
+
+    /// <summary>Save keeps it on the Sub-Assemblies screen and links it: moved there (<see cref="Release"/>), or to In-House.</summary>
+    public bool MovesToSubAssemblies => Release || ToMadeIngredient is not null;
 }
+
+/// <summary>
+/// A made ingredient made from a sub-assembly by Move to In-House or Make In-House Ingredient: its name, unique among raw
+/// materials, and the Made category it goes in. It has no add-ins and loses no weight in the making (a weight loss of 0%),
+/// so it costs per gram what the recipe does; the real loss can be set on the Raw Materials screen afterwards.
+/// </summary>
+public sealed record MadeIngredientDraft(string Name, int CategoryId);
 
 /// <summary>A sub-assembly the product links, at the product's own piece size.</summary>
 public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField AuthoredField, decimal AuthoredValue)

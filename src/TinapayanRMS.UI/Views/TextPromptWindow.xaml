@@ -29,8 +29,9 @@
             <DropShadowEffect BlurRadius="20" ShadowDepth="4" Direction="270" Opacity="0.22" Color="Black" />
         </Border.Effect>
 
-        <Grid>
+        <Grid Grid.IsSharedSizeScope="True">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -54,18 +55,32 @@
                        Margin="16,8,16,0"
                        TextWrapping="Wrap" />
 
-            <!-- The label on the left of its box (FormLabelStyle), so keep it short: the heading says what it's for -->
-            <Grid Grid.Row="2" Margin="16,12,16,16">
+            <!--
+                The label on the left of its box (FormLabelStyle), so keep it short: the heading says what it's for. Its
+                bottom margin goes to the picker under it when there is one (PromptWithChoice).
+            -->
+            <Grid x:Name="ValueRow" Grid.Row="2" Margin="16,12,16,16">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="PromptLabel" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="PromptLabel" Style="{StaticResource FormLabelStyle}" />
                 <syncfusion:SfTextBoxExt x:Name="ValueTextBox" Grid.Column="1" />
             </Grid>
 
+            <!-- A picker under the box, lined up with it: only PromptWithChoice shows it -->
+            <Grid x:Name="ChoiceRow" Grid.Row="3" Margin="16,0,16,16" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="PromptLabel" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="ChoiceLabel" Style="{StaticResource FormLabelStyle}" />
+                <syncfusion:ComboBoxAdv x:Name="ChoiceComboBox" Grid.Column="1" />
+            </Grid>
+
             <!-- Inside the card's 1px border, so its corners are rounded 1 less to sit flush -->
-            <Border Grid.Row="3"
+            <Border Grid.Row="4"
+
                     Background="{StaticResource PageBackgroundBrush}"
                     BorderBrush="{StaticResource CardBorderBrush}"
                     BorderThickness="0,1,0,0"

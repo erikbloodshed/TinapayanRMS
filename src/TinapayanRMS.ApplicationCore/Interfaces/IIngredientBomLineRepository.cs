@@ -2,6 +2,11 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.ApplicationCore.Interfaces;
 
+/// <summary>
+/// Made ingredients' bills of materials: each one's sub-assembly's lines, then its own add-ins (IngredientBomLine.IsAddIn).
+/// Read only. The lines are written on the Sub-Assemblies screen, and the add-ins with the made ingredient
+/// (IRawMaterialRepository.SaveAsync).
+/// </summary>
 public interface IIngredientBomLineRepository
 {
     /// <summary>The lines with their component.</summary>
@@ -12,12 +17,4 @@ public interface IIngredientBomLineRepository
     /// its order, by made ingredient. What the Products screen's Scaling tab opens a made ingredient into.
     /// </summary>
     Task<IReadOnlyList<IngredientBomLine>> GetAllAsync(CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Replaces the made ingredient's whole BOM with these lines, in grams (a BOM is edited as a set, not
-    /// line by line), then recomputes its CostPerBaseUnit and ripples the change to any other made
-    /// ingredient that depends on it. Every component must be an ingredient
-    /// (RawMaterialRules.EnsureUsableInRecipes).
-    /// </summary>
-    Task SetLinesAsync(int ingredientId, IReadOnlyList<(int ComponentIngredientId, decimal Grams)> lines, CancellationToken cancellationToken);
 }

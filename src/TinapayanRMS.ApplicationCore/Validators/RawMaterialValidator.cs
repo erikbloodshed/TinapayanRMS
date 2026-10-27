@@ -66,6 +66,14 @@ public class RawMaterialValidator : AbstractValidator<RawMaterial>
             RuleFor(m => m.WeightLossPercent!.Value)
                 .GreaterThanOrEqualTo(0m).LessThan(100m).WithMessage("Weight loss percent must be at least 0 and less than 100.")
                 .When(m => m.WeightLossPercent is not null);
+            RuleFor(m => m.SubAssemblyId)
+                .NotNull().WithMessage("Pick the sub-assembly it's made from.")
+                .GreaterThan(0).WithMessage("Pick the sub-assembly it's made from.");
+        });
+
+        When(m => m.Source != RawMaterialSource.Made, () =>
+        {
+            RuleFor(m => m.SubAssemblyId).Null().WithMessage("Only a made ingredient is made from a sub-assembly.");
         });
     }
 }

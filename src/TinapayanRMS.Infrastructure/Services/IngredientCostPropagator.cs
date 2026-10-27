@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Services;
 
@@ -21,9 +22,10 @@ internal static class IngredientCostPropagator
 {
     /// <summary>
     /// Call after anything that can change changedIngredientId's own cost has been saved on <paramref name="dbContext"/>,
-    /// before its transaction commits: a brand price, a BOM line or weight loss percent edit, a link or share edit, a
-    /// buffer edit, or a corrected unit multiplier. If changedIngredientId is itself Made or Linked, its own cost is
-    /// recomputed first from its current BOM lines or link; then every made or linked ingredient that transitively depends
+    /// before its transaction commits: a brand price, a made ingredient's sub-assembly, add-in or weight loss percent edit,
+    /// its sub-assembly's lines changing (SubAssemblyLineRepository.SetLinesAsync), a link or share edit, a buffer edit, or
+    /// a corrected unit multiplier. If changedIngredientId is itself Made or Linked, its own cost is recomputed first from
+    /// its current BOM (IngredientBoms: its sub-assembly's lines and its add-ins) or link; then every made or linked ingredient that transitively depends
     /// on it is recomputed too, in dependency order; then every sub-assembly that uses any of those ingredients — or
     /// changedIngredientId itself, whose own cost the caller already updated — is recomputed. Only ingredients take part:
     /// packaging is never in a BOM, a link or a sub-assembly.
@@ -79,7 +81,11 @@ internal static class IngredientCostPropagator
         return corrected;
     }
 
-    /// <summary>Every ingredient, tracked, with every BOM line, and what each depends on: its BOM components, or the one it's linked to.</summary>
+    /// <summary>
+    /// Every ingredient, tracked, with every BOM line, and what each depends on: its BOM components, or the one it's linked
+    /// to. A made ingredient's BOM is its sub-assembly's lines and its add-ins, so a sub-assembly is never a node: its lines'
+    /// ingredients are the made ingredient's components, and ordering them needs nothing new.
+    /// </summary>
     private sealed class IngredientGraph(
         Dictionary<int, RawMaterial> ingredients,
         ILookup<int, IngredientBomLine> linesByIngredientId,
@@ -94,7 +100,7 @@ internal static class IngredientCostPropagator
             var ingredients = await dbContext.RawMaterials
                 .Where(m => m.Type == RawMaterialType.Ingredient)
                 .ToDictionaryAsync(m => m.Id, cancellationToken);
-            var bomLines = await dbContext.IngredientBomLines.ToListAsync(cancellationToken);
+            var bomLines = await IngredientBoms.ForAsync(dbContext, null, cancellationToken);
 
             // BOM components and links, from the ingredients and lines already loaded.
             var dependencyIdsByIngredientId = IngredientCostRules.Dependencies(ingredients.Values, bomLines);

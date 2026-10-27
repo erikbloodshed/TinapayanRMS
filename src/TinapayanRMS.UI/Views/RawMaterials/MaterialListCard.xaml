@@ -23,7 +23,7 @@
 
             <!--
                 The list-wide commands, as the tree's menu offers them for its empty space (RawMaterialsViewModel.EmptySpaceMenu),
-                as icons named in their tooltips, as on the Products list. The two New Category items share one drop-down,
+                as icons named in their tooltips, as on the Products list. The three New Category items share one drop-down,
                 since two folder icons side by side would look the same; each item closes it (NewCategoryItem_Click), as
                 Add Sub-Assembly's do on the Products screen. Not focusable, so Tab goes from the search box to the tree.
                 IconWidth, IconHeight and Padding centre each glyph, as the Products list explains. The drop-down ignores
@@ -43,7 +43,7 @@
                                       Margin="0,0,6,0" />
                 <syncfusion:DropDownButtonAdv x:Name="NewCategoryButton"
                                               Label="New Category"
-                                              ToolTip="New Category: an ingredient category or a packaging category"
+                                              ToolTip="New Category: an ingredient, Made or packaging category"
                                               SizeMode="Small"
                                               IconWidth="14"
                                               IconHeight="16"
@@ -62,7 +62,17 @@
                                               Background="Transparent"
                                               BorderThickness="0"
                                               Command="{Binding NewCategoryCommand}"
-                                              CommandParameter="{x:Static enums:RawMaterialType.Ingredient}"
+                                              CommandParameter="{x:Static enums:RawMaterialCategoryType.Ingredient}"
+                                              Click="NewCategoryItem_Click" />
+                        <syncfusion:ButtonAdv Label="New Made Category…"
+                                              IconTemplate="{StaticResource NewFolderIconTemplate}"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Left"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Margin="0,2,0,0"
+                                              Command="{Binding NewCategoryCommand}"
+                                              CommandParameter="{x:Static enums:RawMaterialCategoryType.Made}"
                                               Click="NewCategoryItem_Click" />
                         <syncfusion:ButtonAdv Label="New Packaging Category…"
                                               IconTemplate="{StaticResource NewFolderIconTemplate}"
@@ -72,7 +82,8 @@
                                               BorderThickness="0"
                                               Margin="0,2,0,0"
                                               Command="{Binding NewCategoryCommand}"
-                                              CommandParameter="{x:Static enums:RawMaterialType.Packaging}"
+                                              CommandParameter="{x:Static enums:RawMaterialCategoryType.Packaging}"
+
                                               Click="NewCategoryItem_Click" />
                     </StackPanel>
                 </syncfusion:DropDownButtonAdv>

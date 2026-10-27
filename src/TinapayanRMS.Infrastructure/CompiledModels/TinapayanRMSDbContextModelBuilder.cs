@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels;
 public partial class TinapayanRMSDbContextModel
 {
     private TinapayanRMSDbContextModel()
-        : base(skipDetectChanges: false, modelId: new Guid("33172f14-a31d-4aa0-9a30-19cbd60743f2"), entityTypeCount: 25)
+        : base(skipDetectChanges: false, modelId: new Guid("84029e46-6fdb-4865-8087-804ea0b082b6"), entityTypeCount: 25)
     {
     }
 
@@ -20,7 +20,7 @@ public partial class TinapayanRMSDbContextModel
     {
         var costingDefaults = CostingDefaultsEntityType.Create(this);
         var costingParameters = CostingParametersEntityType.Create(this);
-        var ingredientBomLine = IngredientBomLineEntityType.Create(this);
+        var ingredientAddInLine = IngredientAddInLineEntityType.Create(this);
         var packagingLine = PackagingLineEntityType.Create(this);
         var packagingLink = PackagingLinkEntityType.Create(this);
         var priceScenario = PriceScenarioEntityType.Create(this);
@@ -45,8 +45,8 @@ public partial class TinapayanRMSDbContextModel
         var usageAddInLine = UsageAddInLineEntityType.Create(this);
 
         CostingParametersEntityType.CreateForeignKey1(costingParameters, product);
-        IngredientBomLineEntityType.CreateForeignKey1(ingredientBomLine, rawMaterial);
-        IngredientBomLineEntityType.CreateForeignKey2(ingredientBomLine, rawMaterial);
+        IngredientAddInLineEntityType.CreateForeignKey1(ingredientAddInLine, rawMaterial);
+        IngredientAddInLineEntityType.CreateForeignKey2(ingredientAddInLine, rawMaterial);
         PackagingLineEntityType.CreateForeignKey1(packagingLine, rawMaterial);
         PackagingLineEntityType.CreateForeignKey2(packagingLine, product);
         PackagingLineEntityType.CreateForeignKey3(packagingLine, rawMaterialUnit);
@@ -64,6 +64,7 @@ public partial class TinapayanRMSDbContextModel
         RawMaterialEntityType.CreateForeignKey1(rawMaterial, unitOfMeasure);
         RawMaterialEntityType.CreateForeignKey2(rawMaterial, rawMaterialCategory);
         RawMaterialEntityType.CreateForeignKey3(rawMaterial, rawMaterial);
+        RawMaterialEntityType.CreateForeignKey4(rawMaterial, subAssembly);
         RawMaterialBrandPriceEntityType.CreateForeignKey1(rawMaterialBrandPrice, rawMaterial);
         RawMaterialBrandPriceEntityType.CreateForeignKey2(rawMaterialBrandPrice, rawMaterialUnit);
         RawMaterialPriceHistoryEntityType.CreateForeignKey1(rawMaterialPriceHistory, rawMaterial);
@@ -84,7 +85,7 @@ public partial class TinapayanRMSDbContextModel
 
         CostingDefaultsEntityType.CreateAnnotations(costingDefaults);
         CostingParametersEntityType.CreateAnnotations(costingParameters);
-        IngredientBomLineEntityType.CreateAnnotations(ingredientBomLine);
+        IngredientAddInLineEntityType.CreateAnnotations(ingredientAddInLine);
         PackagingLineEntityType.CreateAnnotations(packagingLine);
         PackagingLinkEntityType.CreateAnnotations(packagingLink);
         PriceScenarioEntityType.CreateAnnotations(priceScenario);
