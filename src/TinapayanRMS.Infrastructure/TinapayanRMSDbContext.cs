@@ -20,9 +20,10 @@ public class TinapayanRMSDbContext : DbContext
     /// <summary>
     /// Points <paramref name="options"/> at PostgreSQL with snake_case table and column names. The app, `dotnet ef` and
     /// the tests all come through here, so none of them can disagree with the names the Dapper reads are written against.
+    /// The server is PostgreSQL 18, and Npgsql 10 otherwise writes its SQL for 14.
     /// </summary>
     public static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, string connectionString) =>
-        options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention();
+        options.UseNpgsql(connectionString, npgsql => npgsql.SetPostgresVersion(18, 0)).UseSnakeCaseNamingConvention();
 
     /// <summary>The options <see cref="Configure"/> builds, for a context made by hand rather than by the factory.</summary>
     public static DbContextOptions<TinapayanRMSDbContext> CreateOptions(string connectionString) =>

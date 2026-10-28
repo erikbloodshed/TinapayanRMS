@@ -135,7 +135,7 @@ Docker isn't used anywhere in this project.
 Run every command from the repository root.
 
 1. **Check the SDK.** `dotnet --version` should print 10.0.402 or later.
-2. **Set up PostgreSQL.** Install PostgreSQL 18, then, as the `postgres` superuser, create the app's role, and put its password in the password file (one line, `localhost:5432:*:tinapayanrms:<password>`):
+2. **Set up PostgreSQL.** Install PostgreSQL 18, not an older one: `TinapayanRMSDbContext.Configure` tells Npgsql the server is 18 (`SetPostgresVersion(18, 0)`), so the SQL it writes may use what 18 has. Then, as the `postgres` superuser, create the app's role, and put its password in the password file (one line, `localhost:5432:*:tinapayanrms:<password>`):
    ```powershell
    $psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
    & $psql -h localhost -U postgres -c "CREATE ROLE tinapayanrms LOGIN CREATEDB PASSWORD '<password>'"
