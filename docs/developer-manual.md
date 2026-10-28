@@ -119,7 +119,7 @@ You'll be productive sooner if you're comfortable with the following.
 | Windows | 10 or 11 | WPF only runs on Windows. Icons use Segoe Fluent Icons (Windows 11), and fall back to Segoe MDL2 Assets on Windows 10. |
 | .NET SDK | 10.0.402, or a later 10.0 feature band | Pinned in [global.json](../global.json) with `rollForward: latestFeature`. |
 | PostgreSQL | 18 (EDB's Windows installer, service `postgresql-x64-18`, `localhost:5432`) | Reached as the `tinapayanrms` role, which must be able to create databases (`CREATEDB`), because the tests create their own. Its password goes in the password file, `%APPDATA%\postgresql\pgpass.conf`, so no connection string carries one. The installer's `bin` folder holds `psql`, and the `pg_dump` and `pg_restore` the backups run. |
-| `dotnet-ef` | 10.0.x, matching EF Core 10.0.12 | `dotnet tool install --global dotnet-ef --version 10.0.12` |
+| `dotnet-ef` | 10.0.x, matching EF Core (`EFCoreVersion` in [Directory.Packages.props](../Directory.Packages.props), now 10.0.14) | `dotnet tool install --global dotnet-ef --version 10.0.14` |
 | Syncfusion licence key | Essential Studio 35.x | Set as the `SYNCFUSION_LICENSE_KEY` user environment variable. The build compiles it into the app, so the app runs on a computer without the variable, but an app built without it won't start, and `dotnet publish` fails without it. The UI tests that build Syncfusion controls read the variable themselves and are skipped without it. After changing the key, rebuild. A key covers one major version, so moving `SyncfusionVersion` to a new major version needs a new key. A program started before the variable changed, such as the IDE and its terminals, keeps the old value until it's restarted. |
 | An IDE | Any with .NET 10 support | Visual Studio, VS Code with the C# Dev Kit, or Rider. Git ignores `.vs/`, `.vscode/` and `.idea/`. |
 | Optional tools | | `ilspycmd` (decompiles Syncfusion's assemblies), and `dotnet-stack`, `dotnet-dump` and `dotnet-trace` (diagnose the running app). Syncfusion's Essential Studio installer puts the demo source of every control in `C:\Users\Public\Documents\Syncfusion\WPF\<version>\SampleBrowser\`. |
@@ -147,7 +147,7 @@ Run every command from the repository root.
    ```powershell
    [Environment]::SetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", "<your key>", "User")
    ```
-4. **Install the EF Core tools:** `dotnet tool install --global dotnet-ef --version 10.0.12`.
+4. **Install the EF Core tools** at the `EFCoreVersion` in `Directory.Packages.props`: `dotnet tool install --global dotnet-ef --version 10.0.14`.
 5. **Build:** `dotnet build TinapayanRMS.slnx`.
 6. **Create the database.** This creates `tinapayanrms` and applies every migration, including the rows the migrations seed, such as the starting sub-assembly roles:
    ```powershell
@@ -246,7 +246,7 @@ Every folder in a project is a sub-namespace: `src/TinapayanRMS.UI/ViewModels/` 
 | Part of the Vim keys | `UI/Vim/` | `UI.Tests/Vim/` |
 | Icon image file (`.png` or `.ico`) | `UI/Assets/Icons/` | — |
 
-A ViewModel file can also hold the small row and edit types that only its screen uses. For example, `ProductsViewModel.cs` defines `ProductUsageEdit` and `ProductCostSummary`.
+A file can hold a few small, closely related types, such as a tree's rows in `ProductTree.cs`. The screen ViewModels hold only their screen: the row and edit types a screen uses have files of their own beside it, such as `ProductUsageEdit.cs` and `ProductCostSummary.cs` for Products.
 
 ### Build configuration
 
@@ -272,7 +272,7 @@ A ViewModel file can also hold the small row and edit types that only its screen
 7. [CollectionMerge](../src/TinapayanRMS.UI/ViewModels/CollectionMerge.cs) and [UndoHistory](../src/TinapayanRMS.UI/ViewModels/UndoHistory.cs).
 8. [ReactiveCostCascadeTests](../tests/TinapayanRMS.Infrastructure.Tests/Persistence/ReactiveCostCascadeTests.cs), which runs the whole cascade end to end.
 
-Then move on to the large screens. `ProductsViewModel.cs` is about 5,800 lines and `RawMaterialsViewModel.cs` about 2,900, so navigate them by command and member with your IDE's outline, rather than reading them top to bottom.
+Then move on to the large screens. `ProductsViewModel.cs` is about 6,000 lines and `RawMaterialsViewModel.cs` about 2,900, so navigate them by command and member with your IDE's outline, rather than reading them top to bottom.
 
 ---
 

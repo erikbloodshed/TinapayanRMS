@@ -1,8 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Globalization;
-using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using DynamicData;
@@ -17,656 +15,6 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI.ViewModels;
-
-/// <summary>One ingredient line of a sub-assembly, saved or not: grams of an ingredient, costed at its buffered (or true) cost per gram.</summary>
-public sealed class SubAssemblyLineEdit(RawMaterial ingredient, decimal grams, bool isFormulaBase = false, decimal? authoredBakersPercent = null)
-{
-    public RawMaterial Ingredient { get; } = ingredient;
-
-    public decimal Grams { get; } = grams;
-
-    /// <summary>Part of the formula's 100% base, which every line's baker's percentage is read against.</summary>
-    public bool IsFormulaBase { get; } = isFormulaBase;
-
-    /// <summary>The percentage typed for the line, or null when its grams were: whichever was typed is what stays put.</summary>
-    public decimal? AuthoredBakersPercent { get; } = authoredBakersPercent;
-
-    /// <summary>What a gram of the ingredient costs at <paramref name="basis"/>.</summary>
-    public decimal CostPerGramAt(CostBasis basis) => RawMaterialRules.CostPerBaseUnitAt(Ingredient, basis);
-
-    /// <summary>What this line adds to the batch's cost, at the ingredient's cost per gram at <paramref name="basis"/>.</summary>
-    public decimal CostAt(CostBasis basis) => Grams * CostPerGramAt(basis);
-}
-
-/// <summary>
-/// One sub-assembly in the product's recipe, saved or not: a section of the Recipe Structure, called by its
-/// role, and by its name too when the recipe has more than one in that role (<see cref="SectionName"/>), with its
-/// ingredient lines, and a box in the Unit Conversion Overview (a batch in pieces). Either new (the form edits its
-/// lines, and Save keeps it on the Sub-Assemblies screen), or one the product links (read-only lines, edited on the
-/// Sub-Assemblies screen, at the product's own piece size). Its batch totals come from its lines, so they follow its
-/// ingredients' costs.
-/// </summary>
-public sealed class ProductUsageEdit : ReactiveObject
-{
-    /// <summary>
-    /// Sections show in role order (SubAssemblyRole.SortOrder); several in one role, in the order they were saved,
-    /// then any not saved yet.
-    /// </summary>
-    public static IComparer<ProductUsageEdit> RecipeOrder { get; } = Comparer<ProductUsageEdit>.Create((a, b) =>
-    {
-        var byRole = (a.Role?.SortOrder ?? int.MaxValue).CompareTo(b.Role?.SortOrder ?? int.MaxValue);
-        if (byRole == 0)
-        {
-            byRole = StringComparer.CurrentCultureIgnoreCase.Compare(a.RoleName, b.RoleName);
-        }
-
-        return byRole != 0 ? byRole : SavedOrder(a).CompareTo(SavedOrder(b));
-    });
-
-    private static int SavedOrder(ProductUsageEdit usage) => usage.SubAssemblyId > 0 ? usage.SubAssemblyId : int.MaxValue;
-
-    /// <summary>
-    /// A saved usage of <paramref name="productName"/>'s as its section: the sub-assembly's lines, this product's add-ins,
-    /// and the piece size, with the name it goes by beside <paramref name="role"/>. The screen hands over its own copies
-    /// of the ingredients (<paramref name="ingredientsById"/>), which its pickers share; without them, each line keeps the
-    /// ingredient it was read with.
-    /// </summary>
-    public static ProductUsageEdit FromSaved(
-        ProductSubAssemblyUsage usage,
-        IEnumerable<SubAssemblyLine> lines,
-        IEnumerable<UsageAddInLine> addIns,
-        SubAssemblyRole? role,
-        string productName,
-        IReadOnlyDictionary<int, RawMaterial>? ingredientsById = null)
-    {
-        var subAssembly = usage.SubAssembly!;
-        var isOwn = subAssembly.OwnerProductId == usage.ProductId;
-        RawMaterial IngredientOf(int id, RawMaterial? read) => ingredientsById?.GetValueOrDefault(id) ?? read!;
-        return new ProductUsageEdit(
-            subAssembly.Id,
-            role,
-            [.. lines.Select(l => new SubAssemblyLineEdit(IngredientOf(l.IngredientId, l.Ingredient), l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
-            usage.AuthoredField,
-            usage.AuthoredValue,
-            isOwn ? null : subAssembly.Name,
-            [.. addIns.Select(a => new SubAssemblyLineEdit(IngredientOf(a.IngredientId, a.Ingredient), a.Grams))],
-            SubAssemblyRules.SectionLabel(subAssembly.Name, productName, role?.Name ?? string.Empty),
-            linkedOwner: isOwn ? null : LinkedOwnerOf(subAssembly));
-    }
-
-    /// <summary>The product a linked sub-assembly is kept in, when it's that product's own (a variant's link); null for one on the Sub-Assemblies screen.</summary>
-    public static (int Id, string Name)? LinkedOwnerOf(SubAssembly subAssembly) =>
-        subAssembly.OwnerProductId is { } ownerId ? (ownerId, subAssembly.OwnerProduct?.Name ?? $"Product {ownerId}") : null;
-
-    /// <param name="subAssemblyId">The sub-assembly's id, or 0 for a new section, not saved yet.</param>
-    /// <param name="linkedName">The linked sub-assembly's name, e.g. "Cheese Roll Filling: Ube"; null for the product's own or a new section.</param>
-    /// <param name="addIns">This product's own extra ingredients on top of a linked recipe; always empty for its own or a new section.</param>
-    /// <param name="name">
-    /// What it goes by beside its role: the optional name typed for a new section, or a linked one's name less this
-    /// product's own and its role (SubAssemblyRules.SectionLabel), "Ube".
-    /// </param>
-    /// <param name="isOwn">
-    /// A new section Save makes the product's own whatever its role: a linked one unlinked here. A saved one of the
-    /// product's own is its own without it.
-    /// </param>
-    /// <param name="isReleasing">One of the product's own that Save moves to the Sub-Assemblies screen and links (Move to Sub-Assemblies).</param>
-    /// <param name="toMadeIngredient">The made ingredient one of the product's own becomes on Save (Move to In-House); null for none.</param>
-    /// <param name="savedLines">
-    /// A linked one's lines as the Sub-Assemblies screen has them, when <paramref name="lines"/> were changed here since; null
-    /// when they're the same.
-    /// </param>
-    /// <param name="linkedOwner">The product a linked one is kept in, its own, which only a variant links; null for one on the Sub-Assemblies screen.</param>
-    public ProductUsageEdit(
-        int subAssemblyId,
-        SubAssemblyRole? role,
-        IReadOnlyList<SubAssemblyLineEdit> lines,
-        UsageAuthoredField authoredField,
-        decimal authoredValue,
-        string? linkedName,
-        IReadOnlyList<SubAssemblyLineEdit>? addIns = null,
-        string? name = null,
-        bool isOwn = false,
-        bool isReleasing = false,
-        IReadOnlyList<SubAssemblyLineEdit>? savedLines = null,
-        (int Id, string Name)? linkedOwner = null,
-        MadeIngredientDraft? toMadeIngredient = null)
-    {
-        _isOwn = isOwn;
-        _isReleasing = isReleasing;
-        _toMadeIngredient = toMadeIngredient;
-        _savedLines = savedLines ?? lines;
-        Name = SubAssemblyRules.NormalizeName(name);
-        SubAssemblyId = subAssemblyId;
-        Role = role;
-        Lines = lines;
-        AuthoredField = authoredField;
-        AuthoredValue = authoredValue;
-        LinkedName = linkedName;
-        LinkedOwner = linkedName is null ? null : linkedOwner;
-        AddIns = addIns ?? [];
-
-        // The sub-assembly's own batch, then this product's on top of it: add-ins go into the batch, so a
-        // piece takes its weight-per-piece share of the two together. Worked out at both costs, buffered and
-        // true, so the screen can switch between them without building its sections again.
-        (BaseTotalWeight, var baseCost) = SubAssemblyRules.CalculateTotals([.. lines.Select(l => (l.Grams, l.CostPerGramAt(CostBasis.Buffered)))]);
-        var baseUnbufferedCost = SubAssemblyRules.CalculateTotals([.. lines.Select(l => (l.Grams, l.CostPerGramAt(CostBasis.Unbuffered)))]).TotalCost;
-        (TotalWeight, _totalCost) = ProductRules.CalculateEffectiveBatch(
-            BaseTotalWeight, baseCost, [.. AddIns.Select(a => (a.Grams, a.CostPerGramAt(CostBasis.Buffered)))]);
-        _unbufferedTotalCost = ProductRules.CalculateEffectiveBatch(
-            BaseTotalWeight, baseUnbufferedCost, [.. AddIns.Select(a => (a.Grams, a.CostPerGramAt(CostBasis.Unbuffered)))]).TotalCost;
-
-        // The pieces share out the whole batch. What's lost making it is a cost on the product (its Wastage), not a
-        // smaller batch.
-        (WeightPerPiece, Yield) = ProductRules.ResolvePieceSize(authoredField, authoredValue, TotalWeight);
-
-        // A batch that weighs nothing has nothing to share out per piece.
-        if (TotalWeight > 0 && WeightPerPiece > 0)
-        {
-            _costPerPiece = ProductRules.CalculateUsageCostPerPiece(_totalCost, WeightPerPiece, TotalWeight);
-            _unbufferedCostPerPiece = ProductRules.CalculateUsageCostPerPiece(_unbufferedTotalCost, WeightPerPiece, TotalWeight);
-        }
-    }
-
-    public int SubAssemblyId { get; }
-
-    public SubAssemblyRole? Role { get; }
-
-    public int RoleId => Role?.Id ?? 0;
-
-    public string RoleName => Role?.Name ?? string.Empty;
-
-    /// <summary>
-    /// What it goes by beside its role, e.g. "Ube": the name typed for a new section, which it needn't have, or a linked
-    /// one's name less this product's own and its role, and nothing when that's all its name is (SubAssemblyRules.SectionLabel).
-    /// </summary>
-    public string? Name { get; }
-
-    /// <summary>
-    /// What it goes by beside its role when the recipe has more than one in the role: <see cref="Name"/>, which one in a
-    /// role can go without.
-    /// </summary>
-    public string? Label => Name;
-
-    private bool _isRoleRepeated;
-    /// <summary>
-    /// Whether the recipe has other sections in its role, so this one is called by its name as well. The screen sets it
-    /// as the recipe changes (ProductsViewModel.MarkRepeatedRoles).
-    /// </summary>
-    public bool IsRoleRepeated
-    {
-        get => _isRoleRepeated;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _isRoleRepeated, value);
-            this.RaisePropertyChanged(nameof(SectionName));
-            this.RaisePropertyChanged(nameof(DisplayName));
-        }
-    }
-
-    /// <summary>
-    /// What the section is called: its tab and its heading. Its role, e.g. "Filling",
-    /// and with its name when the recipe has more than one in the role: "Filling: Ube" beside "Filling: Cheese".
-    /// </summary>
-    public string SectionName => IsRoleRepeated && Label is { } label ? $"{RoleName}: {label}" : RoleName;
-
-    public IReadOnlyList<SubAssemblyLineEdit> Lines { get; }
-
-    /// <summary>
-    /// This product's own extra ingredients on top of a recipe it links — a colouring, a flavouring, an
-    /// inclusion. Empty for a new section, whose lines the form edits directly.
-    /// </summary>
-    public IReadOnlyList<SubAssemblyLineEdit> AddIns { get; }
-
-    /// <summary>Which figure the user typed; it stays put when the batch changes, and the other follows.</summary>
-    public UsageAuthoredField AuthoredField { get; }
-
-    public decimal AuthoredValue { get; }
-
-    /// <summary>Where every sub-assembly is kept, and edited: the Sub-Assemblies screen.</summary>
-    public const string StandaloneSourceName = "Sub-Assemblies";
-
-    /// <summary>The linked sub-assembly's name, e.g. "Cheese Roll Filling: Ube"; null for the product's own or a new section.</summary>
-    public string? LinkedName { get; }
-
-    /// <summary>
-    /// The product a linked one is kept in, as its own: a variant links its source's. Null for one on the Sub-Assemblies
-    /// screen, or for a section that isn't linked.
-    /// </summary>
-    public (int Id, string Name)? LinkedOwner { get; }
-
-    /// <summary>
-    /// The form edits its lines: the product's own (<see cref="IsOwned"/>), or a new section, which Save makes the
-    /// product's own in a product-owned role, and otherwise keeps on the Sub-Assemblies screen and links.
-    /// </summary>
-    public bool IsEditable => LinkedName is null;
-
-    /// <summary>Not saved yet.</summary>
-    public bool IsNew => SubAssemblyId == 0;
-
-    private readonly bool _isOwn;
-
-    /// <summary>
-    /// The product's own sub-assembly: a saved one, made in a product-owned role (SubAssemblyRole.IsProductOwned) or
-    /// unlinked, or a linked one unlinked here and not saved yet. Edited here, not on the Sub-Assemblies screen, and
-    /// deleted when it's taken out of the recipe.
-    /// </summary>
-    public bool IsOwned => LinkedName is null && (SubAssemblyId > 0 || _isOwn);
-
-    private readonly bool _isReleasing;
-
-    /// <summary>
-    /// One of the product's own that Save moves to the Sub-Assemblies screen, keeping its name and lines, and links
-    /// (Move to Sub-Assemblies). Its lines are still edited here until then.
-    /// </summary>
-    public bool IsReleasing => IsOwned && _isReleasing;
-
-    private readonly MadeIngredientDraft? _toMadeIngredient;
-
-    /// <summary>
-    /// The made ingredient Save makes from one of the product's own (Move to In-House): the section goes to the
-    /// Sub-Assemblies screen, as Move to Sub-Assemblies takes it, this product links it there, and the made ingredient is
-    /// made from it. Its lines are still edited here until then. Null for any other section.
-    /// </summary>
-    public MadeIngredientDraft? ToMadeIngredient => IsOwned ? _toMadeIngredient : null;
-
-    public bool IsMovingToInHouse => ToMadeIngredient is not null;
-
-    /// <summary>The badge a section moving to In-House shows: "Moves to Sub-Assemblies and In-House on Save, as Cheese Filling".</summary>
-    public string MovingToInHouseText => ToMadeIngredient is { } made ? $"Moves to Sub-Assemblies and In-House on Save, as {made.Name}" : string.Empty;
-
-    /// <summary>
-    /// Move to In-House is offered: one of the product's own, not already moving to the Sub-Assemblies screen or to
-    /// In-House, and not just one made ingredient already, which would only be wrapped in another.
-    /// </summary>
-    public bool CanMoveToInHouse =>
-        IsOwned && !IsReleasing && !IsMovingToInHouse && Lines is not [{ Ingredient.Source: RawMaterialSource.Made }];
-
-    public bool IsLinked => LinkedName is not null;
-
-    private readonly IReadOnlyList<SubAssemblyLineEdit> _savedLines;
-
-    /// <summary>
-    /// A linked one's lines as the Sub-Assemblies screen has them, which Save compares against: the same as
-    /// <see cref="Lines"/> until they're changed here.
-    /// </summary>
-    public IReadOnlyList<SubAssemblyLineEdit> SavedLines => _savedLines;
-
-    /// <summary>
-    /// A linked one's lines were changed in this product: Save writes them to the sub-assembly where it's kept, and every
-    /// product linking it follows. Only what Save would write counts, not what the lines cost.
-    /// </summary>
-    public bool AreLinkedLinesEdited => IsLinked && !HaveSameRecipe(Lines, _savedLines);
-
-    /// <summary>
-    /// The badge beside a linked section's heading, which opens where it's kept: "Cheese Roll Dough, from Sub-Assemblies",
-    /// or a variant's "Ensaymada Filling, from Ensaymada", the product whose own it is.
-    /// </summary>
-    public string LinkedFromText => $"{LinkedName}, from {LinkedOwner?.Name ?? StandaloneSourceName}";
-
-    /// <summary>The badge's tooltip: where it's kept, and that Save here writes changed lines there.</summary>
-    public string LinkedFromToolTip => LinkedOwner is { } owner
-        ? $"It's {owner.Name}'s own, and this product links it as {owner.Name}'s variant, so both use its lines. Change them here or there: Save here writes them there. Click to open {owner.Name}."
-        : "It's kept on the Sub-Assemblies screen, and every product linking it uses its lines. Change them here or there: Save here writes them there. Click to open it there.";
-
-    /// <summary>What it's called where the recipe it's in isn't plain: a linked one by its name, a new one as its section is.</summary>
-    public string DisplayName => LinkedName ?? SectionName;
-
-    /// <summary>The sub-assembly's own batch, before this product's add-ins: what the form's caption compares against.</summary>
-    public decimal BaseTotalWeight { get; }
-
-    /// <summary>The batch a piece is cut from: the sub-assembly's own plus this product's add-ins.</summary>
-    public decimal TotalWeight { get; }
-
-    private readonly decimal _totalCost;
-    private readonly decimal _unbufferedTotalCost;
-
-    /// <summary>What the whole batch costs, add-ins included, at <paramref name="basis"/>.</summary>
-    public decimal TotalCostAt(CostBasis basis) => basis == CostBasis.Unbuffered ? _unbufferedTotalCost : _totalCost;
-
-    /// <summary>Grams of the batch in one piece.</summary>
-    public decimal WeightPerPiece { get; }
-
-    /// <summary>Pieces one batch makes. Expected to differ across a product's sub-assemblies.</summary>
-    public decimal Yield { get; }
-
-    public bool IsYieldAuthored => AuthoredField == UsageAuthoredField.Yield;
-
-    public bool IsWeightAuthored => AuthoredField == UsageAuthoredField.WeightPerPiece;
-
-    private readonly decimal _costPerPiece;
-    private readonly decimal _unbufferedCostPerPiece;
-
-    /// <summary>What one piece costs at <paramref name="basis"/>; 0 while the batch weighs nothing or has no piece size.</summary>
-    public decimal CostPerPieceAt(CostBasis basis) => basis == CostBasis.Unbuffered ? _unbufferedCostPerPiece : _costPerPiece;
-
-    /// <summary>E.g. "1,700 g batch".</summary>
-    public string BatchText => $"{TotalWeight:#,0.##} g batch";
-
-    /// <summary>E.g. "28.33 pcs".</summary>
-    public string YieldText => $"{Yield:#,0.##} pcs";
-
-    /// <summary>E.g. "60 g per piece".</summary>
-    public string WeightText => $"{WeightPerPiece:#,0.##} g per piece";
-
-    /// <summary>A new section with its role refreshed (renamed in Settings) and its lines repriced with their ingredients.</summary>
-    public ProductUsageEdit With(SubAssemblyRole? role, IReadOnlyList<SubAssemblyLineEdit> lines) =>
-        new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, _isReleasing, linkedOwner: LinkedOwner, toMadeIngredient: _toMadeIngredient);
-
-    /// <summary>The same section of the product's own, for Save to move to the Sub-Assemblies screen and link.</summary>
-    public ProductUsageEdit Released() =>
-        new(SubAssemblyId, Role, Lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, isReleasing: true, linkedOwner: LinkedOwner);
-
-    /// <summary>The same section of the product's own, for Save to turn into <paramref name="made"/> (Move to In-House).</summary>
-    public ProductUsageEdit MovedToInHouse(MadeIngredientDraft made) =>
-        new(SubAssemblyId, Role, Lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, linkedOwner: LinkedOwner, toMadeIngredient: made);
-
-    /// <summary>
-    /// A linked section as the Sub-Assemblies screen now has it — its name, the label it gives (<paramref name="name"/>),
-    /// its role and <paramref name="savedLines"/> — with its add-ins repriced; its piece size stays the product's. Lines
-    /// changed here and not saved yet stay as they are, repriced (<paramref name="editedLines"/>), and Save writes them over
-    /// the ones kept there.
-    /// </summary>
-    public ProductUsageEdit WithLinked(
-        string linkedName,
-        string? name,
-        SubAssemblyRole? role,
-        IReadOnlyList<SubAssemblyLineEdit> savedLines,
-        IReadOnlyList<SubAssemblyLineEdit>? editedLines,
-        IReadOnlyList<SubAssemblyLineEdit> addIns,
-        (int Id, string Name)? linkedOwner) =>
-        new(SubAssemblyId, role, editedLines ?? savedLines, AuthoredField, AuthoredValue, linkedName, addIns, name, savedLines: savedLines, linkedOwner: linkedOwner);
-
-    /// <summary>The same linked section with the lines, piece size and add-ins the form now holds.</summary>
-    public ProductUsageEdit WithLinkedForm(
-        IReadOnlyList<SubAssemblyLineEdit> lines,
-        UsageAuthoredField authoredField,
-        decimal authoredValue,
-        IReadOnlyList<SubAssemblyLineEdit> addIns) =>
-        new(SubAssemblyId, Role, lines, authoredField, authoredValue, LinkedName, addIns, Name, savedLines: _savedLines, linkedOwner: LinkedOwner);
-
-    /// <summary>Whether <paramref name="other"/> shows the same thing: the same role and names, piece size, and lines and add-ins at the same costs.</summary>
-    public bool ShowsSameAs(ProductUsageEdit other) =>
-        SubAssemblyId == other.SubAssemblyId
-        && IsOwned == other.IsOwned
-        && IsReleasing == other.IsReleasing
-        && ToMadeIngredient == other.ToMadeIngredient
-        && CollectionMerge.HasSameValues(Role, other.Role)
-        && LinkedName == other.LinkedName
-        && LinkedOwner == other.LinkedOwner
-        && Name == other.Name
-        && AuthoredField == other.AuthoredField
-        && AuthoredValue == other.AuthoredValue
-        && AreLinkedLinesEdited == other.AreLinkedLinesEdited
-        && Lines.Count == other.Lines.Count
-        && Lines.Zip(other.Lines).All(pair =>
-            pair.First.Grams == pair.Second.Grams
-            && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
-            && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent
-            && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient))
-        && AddIns.Count == other.AddIns.Count
-        && AddIns.Zip(other.AddIns).All(pair => pair.First.Grams == pair.Second.Grams && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient));
-
-    /// <summary>Whether two sets of lines would save the same: the same ingredients, grams and base ticks, in the same order, whatever they cost.</summary>
-    private static bool HaveSameRecipe(IReadOnlyList<SubAssemblyLineEdit> a, IReadOnlyList<SubAssemblyLineEdit> b) =>
-        ReferenceEquals(a, b)
-        || (a.Count == b.Count
-            && a.Zip(b).All(pair =>
-                pair.First.Ingredient.Id == pair.Second.Ingredient.Id
-                && pair.First.Grams == pair.Second.Grams
-                && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
-                && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent));
-}
-
-/// <summary>
-/// Where the sub-assembly being added comes from, picked on Add Sub-Assembly's drop-down
-/// (RecipeStructureCard) and carried by AddUsageCommand. New is the default, which is what a
-/// parameterless Execute() passes.
-/// </summary>
-public enum UsageFormMode
-{
-    /// <summary>A new sub-assembly, kept on the Sub-Assemblies screen once saved, and linked.</summary>
-    New,
-
-    /// <summary>An existing sub-assembly, used as it is and following its changes.</summary>
-    Link,
-
-    /// <summary>A new sub-assembly starting from an existing one's role and lines; nothing connects the two afterward.</summary>
-    Copy,
-}
-
-/// <summary>
-/// A choice in the Link and Copy picker: a recipe sub-assembly, "Chocolate Glaze — Sub-Assemblies (Glaze)", or
-/// packaging: a packaging set, "Gift Box Set — Sub-Assemblies (Packaging)", or another product's, "Packaging — Cream Loaf".
-/// </summary>
-public sealed class LinkableSubAssemblyOption
-{
-    /// <summary>A sub-assembly: a recipe, or a packaging set (one in the Packaging role).</summary>
-    public LinkableSubAssemblyOption(SubAssembly subAssembly)
-    {
-        SubAssembly = subAssembly;
-        if (subAssembly.Role?.IsPackaging == true)
-        {
-            PackagingTarget = PackagingLinkTarget.ForSet(subAssembly.Id, subAssembly.Name);
-        }
-    }
-
-    /// <summary>Another product's packaging, whatever it is: its own lines, or what it links in turn.</summary>
-    public LinkableSubAssemblyOption(Product product)
-    {
-        PackagingTarget = PackagingLinkTarget.ForProduct(product.Id, product.Name);
-    }
-
-    /// <summary>The sub-assembly, or null for another product's packaging.</summary>
-    public SubAssembly? SubAssembly { get; }
-
-    /// <summary>What the product's packaging would link or copy, or null for a recipe.</summary>
-    public PackagingLinkTarget? PackagingTarget { get; }
-
-    public bool IsPackaging => PackagingTarget is not null;
-
-    /// <summary>A sub-assembly's id, or another product's id negated: one key for the picker's merge.</summary>
-    public int Key => SubAssembly?.Id ?? PackagingTarget!.Key;
-
-    public string DisplayName => SubAssembly is null
-        ? $"Packaging — {PackagingTarget!.Name}"
-        : $"{SubAssembly.Name} — {SubAssembly.OwnerProduct?.Name ?? ProductUsageEdit.StandaloneSourceName} ({SubAssembly.Role?.Name})";
-}
-
-/// <summary>
-/// One sub-assembly's part of the Costing Summary's Sub-assemblies row: what it costs in one sellable unit,
-/// and its share of the selling price.
-/// </summary>
-/// <param name="Name">What the recipe calls it: its tab's header (ProductUsageEdit.SectionName), e.g. "Filling: Ube".</param>
-public sealed record SubAssemblyCostLine(string Name, decimal Cost, decimal Share);
-
-/// <summary>
-/// A product's cost for one sellable unit, from its materials to its selling price (cost-plus,
-/// CostingRules), with each part's share of the selling price. The recipe is authored per piece, so the
-/// usages are multiplied by <c>quantityRequired</c>; the packaging lines already wrap one whole unit.
-/// Worked out from the form, so unsaved edits show at once. A composite's "usages" are the products it holds, each
-/// line what its quantity of that product brings in recipe cost (CompositeProductRules.CalculateComponentCost), then its
-/// own sections, at a quantity of 1: its Sub-assemblies figure is its recipe cost, and every formula after that is the same.
-/// </summary>
-public sealed class ProductCostSummary
-{
-    public static ProductCostSummary Empty { get; } = new([], 1, [], 0m, 0m, 0m, 0m, 0m, null);
-
-    /// <param name="wastagePercent">
-    /// The shop-wide Wastage % (CostingDefaults.WastagePercent): a share of <see cref="SubAssemblies"/> added on top, for
-    /// what's lost making it. A composite's products bring their recipe cost before theirs, so it's added once, here.
-    /// </param>
-
-    /// <param name="usages">
-    /// Each sub-assembly in the recipe, in recipe order: its name and its cost per piece. For a composite, each product it
-    /// holds: "Ensaymada × 6", and what the six bring in recipe cost, then its own sections.
-    /// </param>
-    /// <param name="packagingCosts">Its own packaging lines, each for one whole sellable unit.</param>
-    /// <param name="isComposite">The product is a composite, whose recipe is the products it holds.</param>
-    /// <param name="hasSections">A composite also has sections of its own (a topping, a filling), which its labels name too.</param>
-    /// <param name="componentPackaging">
-    /// What a composite's products bring in packaging, when it includes theirs (Product.IncludesComponentPackaging): it
-    /// joins the packaging, so labor, overhead and administrative don't go on it. Null when it doesn't include them.
-    /// </param>
-    public ProductCostSummary(
-        IReadOnlyList<(string Name, decimal CostPerPiece)> usages,
-        int quantityRequired,
-        IReadOnlyList<decimal> packagingCosts,
-        decimal laborPercent,
-        decimal overheadPercent,
-        decimal administrativePercent,
-        decimal marginPercent,
-        decimal vatPercent,
-        decimal? currentPrice,
-        bool isComposite = false,
-        bool hasSections = false,
-        decimal? componentPackaging = null,
-        decimal wastagePercent = 0m)
-    {
-        IReadOnlyList<decimal> usageCostsPerPiece = [.. usages.Select(u => u.CostPerPiece)];
-        IsComposite = isComposite;
-        HasSections = hasSections;
-        QuantityRequired = quantityRequired;
-        SubAssemblies = usageCostsPerPiece.Sum() * quantityRequired;
-        OwnPackaging = packagingCosts.Sum();
-        ComponentPackaging = componentPackaging;
-        Packaging = OwnPackaging + (componentPackaging ?? 0m);
-        Material = ProductRules.CalculateMaterialCost(usageCostsPerPiece, quantityRequired, [.. packagingCosts, componentPackaging ?? 0m]);
-        WastagePercent = wastagePercent;
-        Wastage = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, wastagePercent);
-        LaborPercent = laborPercent;
-        OverheadPercent = overheadPercent;
-        AdministrativePercent = administrativePercent;
-        Labor = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, laborPercent);
-        Overhead = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, overheadPercent);
-        Administrative = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, administrativePercent);
-        MarginPercent = marginPercent;
-        VatPercent = vatPercent;
-        (BaseCost, PreVatPrice, SellingPrice) = CostingRules.CalculateSellingPrice(
-            SubAssemblies, Packaging, laborPercent, overheadPercent, administrativePercent, marginPercent, vatPercent, wastagePercent);
-        CurrentPrice = currentPrice;
-        CurrentMarkupPercent = currentPrice is { } price
-            ? CostingRules.CalculateMarkupPercentFromPrice(BaseCost, price, vatPercent)
-            : null;
-        SubAssemblyLines = [.. usages.Select(u =>
-        {
-            var cost = u.CostPerPiece * quantityRequired;
-            return new SubAssemblyCostLine(u.Name, cost, CostingRules.PercentOf(cost, SellingPrice));
-        })];
-    }
-
-    /// <summary>How many finished pieces this unit holds: 1 for a product sold by the piece.</summary>
-    public int QuantityRequired { get; }
-
-    /// <summary>A composite's costs: its <see cref="SubAssemblies"/> are the recipe cost of the products it holds.</summary>
-    public bool IsComposite { get; }
-
-    /// <summary>A composite that also has sections of its own: a topping, a filling.</summary>
-    public bool HasSections { get; }
-
-    /// <summary>
-    /// What <see cref="SubAssemblies"/> is called in the breakdown: "Sub-assemblies (ingredients)", or a composite's
-    /// "Products (ingredients)", "Products and sub-assemblies (ingredients)" once it has sections of its own.
-    /// </summary>
-    public string PartsTitle => $"{char.ToUpperInvariant(PartsBase[0])}{PartsBase[1..]} (ingredients)";
-
-    /// <summary>What labor, overhead and administrative are a percentage of, in their labels: "sub-assemblies", or a composite's "products" (and "sub-assemblies").</summary>
-    public string PartsBase => (IsComposite, HasSections) switch
-    {
-        (true, true) => "products and sub-assemblies",
-        (true, false) => "products",
-        _ => "sub-assemblies",
-    };
-
-    /// <summary>The recipe cost: every sub-assembly's cost per piece times the pieces a unit holds, or the products a composite holds.</summary>
-    public decimal SubAssemblies { get; }
-
-    /// <summary>SubAssemblies broken down: each sub-assembly in the recipe, in recipe order, adding up to it.</summary>
-    public IReadOnlyList<SubAssemblyCostLine> SubAssemblyLines { get; }
-
-    /// <summary>All of the packaging for one sellable unit: its own, and a composite's products' when it includes theirs.</summary>
-    public decimal Packaging { get; }
-
-    /// <summary>Its own packaging lines alone, what its Packaging tab lists.</summary>
-    public decimal OwnPackaging { get; }
-
-    /// <summary>What a composite's products bring in packaging, when it includes theirs; null when it doesn't.</summary>
-    public decimal? ComponentPackaging { get; }
-
-    /// <summary>What <see cref="Packaging"/> is called in the breakdown: "Packaging", or "Packaging (own and products')" when a composite includes its products'.</summary>
-    public string PackagingTitle => ComponentPackaging is null ? "Packaging" : "Packaging (own and products')";
-
-    public decimal Material { get; }
-
-    /// <summary>The shop-wide Wastage % it's priced with.</summary>
-    public decimal WastagePercent { get; }
-
-    /// <summary>The wastage per sellable unit, in pesos: WastagePercent of the sub-assembly cost. It's in the base cost.</summary>
-    public decimal Wastage { get; }
-
-    public decimal LaborPercent { get; }
-
-    public decimal OverheadPercent { get; }
-
-    public decimal AdministrativePercent { get; }
-
-    /// <summary>The labor cost per sellable unit, in pesos: LaborPercent of the sub-assembly cost.</summary>
-    public decimal Labor { get; }
-
-    /// <summary>The overhead cost per sellable unit, in pesos: OverheadPercent of the sub-assembly cost.</summary>
-    public decimal Overhead { get; }
-
-    /// <summary>The administrative cost per sellable unit, in pesos: AdministrativePercent of the sub-assembly cost.</summary>
-    public decimal Administrative { get; }
-
-    /// <summary>The subtotal the markup goes on: materials, wastage, labor, overhead and administrative.</summary>
-    public decimal BaseCost { get; }
-
-    public decimal MarginPercent { get; }
-
-    public decimal PreVatPrice { get; }
-
-    public decimal VatPercent { get; }
-
-    public decimal SellingPrice { get; }
-
-    /// <summary>The markup: the profit on one sellable unit, since VAT is collected for the government.</summary>
-    public decimal Markup => PreVatPrice - BaseCost;
-
-    public decimal Vat => SellingPrice - PreVatPrice;
-
-    /// <summary>What the shop charges for one sellable unit now, with VAT, as entered on the form; null when not entered.</summary>
-    public decimal? CurrentPrice { get; }
-
-    /// <summary>
-    /// The markup CurrentPrice actually earns on the base cost, VAT taken out (as MarginPercent is on
-    /// SellingPrice); null when no current price is entered.
-    /// </summary>
-    public decimal? CurrentMarkupPercent { get; }
-
-    /// <summary>The current price doesn't cover the base cost: a negative markup, which the header shows in red.</summary>
-    public bool IsCurrentPriceBelowCost => CurrentMarkupPercent < 0;
-
-    public decimal SubAssembliesShare => CostingRules.PercentOf(SubAssemblies, SellingPrice);
-
-    public decimal PackagingShare => CostingRules.PercentOf(Packaging, SellingPrice);
-
-    public decimal WastageShare => CostingRules.PercentOf(Wastage, SellingPrice);
-
-    public decimal LaborShare => CostingRules.PercentOf(Labor, SellingPrice);
-
-    public decimal OverheadShare => CostingRules.PercentOf(Overhead, SellingPrice);
-
-    public decimal AdministrativeShare => CostingRules.PercentOf(Administrative, SellingPrice);
-
-    public decimal BaseCostShare => CostingRules.PercentOf(BaseCost, SellingPrice);
-
-    public decimal MarkupShare => CostingRules.PercentOf(Markup, SellingPrice);
-
-    public decimal VatShare => CostingRules.PercentOf(Vat, SellingPrice);
-
-    /// <summary>100% whenever there's a price, for the total row.</summary>
-    public decimal SellingPriceShare => CostingRules.PercentOf(SellingPrice, SellingPrice);
-}
 
 /// <summary>
 /// The Products screen: a product's recipe (the sub-assemblies it links and new ones not saved yet, each at its own
@@ -715,7 +63,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private readonly IValidator<CostingParameters> _costingParametersValidator;
     private readonly IProductCategoryRepository _categoryRepository;
     private readonly IValidator<ProductCategory> _categoryValidator;
-    private readonly IViewStateStore _viewStateStore;
     private readonly SourceCache<Product, int> _productCache = new(p => p.Id);
     private readonly ReadOnlyObservableCollection<Product> _products;
     private readonly ReadOnlyObservableCollection<Product> _visibleProducts;
@@ -740,20 +87,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The view state key the open folders of the Products list are kept under (IViewStateStore).</summary>
     public const string OpenFoldersKey = "Products.OpenFolders";
 
-    /// <summary>The open folders last written to the view state, so a write is only made for a change.</summary>
-    private IReadOnlyList<string> _writtenOpenFolders;
+    private readonly FolderStateWriter _openFoldersWriter;
 
-    private readonly IDisposable _openFoldersWriter;
-
-    /// <summary>Held while writing the open folders, which the throttled writer does off the UI thread and Dispose on it.</summary>
-    private readonly Lock _openFoldersLock = new();
+    private readonly TreeSelection _treeSelection = new();
 
     /// <summary>
     /// The rows picked in the Products list, bound to the tree's SelectedItems, which it shares: one row, or several with
     /// Ctrl or Shift held. Its first is <see cref="SelectedTreeNode"/>. The tree changes it as rows are clicked, and this
     /// screen as SelectedProduct changes (SyncTreeSelection).
     /// </summary>
-    public ObservableCollection<object> SelectedTreeNodes { get; } = [];
+    public ObservableCollection<object> SelectedTreeNodes => _treeSelection.Nodes;
 
     private object? _selectedTreeNode;
     /// <summary>
@@ -765,31 +108,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public object? SelectedTreeNode
     {
         get => _selectedTreeNode;
-        set
-        {
-            if (value is null)
-            {
-                if (SelectedTreeNodes.Count > 0)
-                {
-                    SelectedTreeNodes.Clear();
-                }
-            }
-            else if (SelectedTreeNodes.Count != 1 || !ReferenceEquals(SelectedTreeNodes[0], value))
-            {
-                SelectedTreeNodes.Clear();
-                SelectedTreeNodes.Add(value);
-            }
-        }
+        set => _treeSelection.Pick(value);
     }
 
     /// <summary>The products picked in the list, in the order they were picked, deleted ones left out.</summary>
     public IReadOnlyList<ProductLeafNode> SelectedTreeProducts => [.. SelectedTreeNodes.OfType<ProductLeafNode>().Where(l => !l.IsDeleted)];
-
-    /// <summary>
-    /// Set while the list's selection changes for a reason that's no pick of the user's: SyncTreeSelection moving it to
-    /// SelectedProduct, or the tree dropping a row from it as the row moves to another folder.
-    /// </summary>
-    private bool _isSyncingTreeSelection;
 
     private string? _moveNotice;
     /// <summary>
@@ -2075,7 +1398,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ILogger logger)
         : base(logger)
     {
-        _viewStateStore = viewStateStore;
         _versionRepository = versionRepository;
         _productRepository = productRepository;
         _usageRepository = usageRepository;
@@ -2097,18 +1419,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _categoryRepository = categoryRepository;
         _categoryValidator = categoryValidator;
 
-        // The list's folders open as they were left last time. Once they've settled after a change (a search or Expand
-        // All opens several in a row) the ones open are written for next time, off the UI thread; Dispose writes any
-        // change still waiting.
-        var openFolders = viewStateStore.ReadList(OpenFoldersKey);
-        ProductTree = new ProductTree(openFolders);
-
-        // As they start, so nothing is written until a folder is opened or closed, not even the first time.
-        _writtenOpenFolders = ProductTree.OpenFolderKeys();
-        _openFoldersWriter = ProductTree.ExpansionChanged
-            .Select(_ => ProductTree.OpenFolderKeys())
-            .Throttle(TimeSpan.FromMilliseconds(500))
-            .Subscribe(WriteOpenFolders);
+        // The list's folders open as they were left last time, and the ones open are written for next time
+        // (FolderStateWriter); Dispose writes any change still waiting.
+        ProductTree = new ProductTree(viewStateStore.ReadList(OpenFoldersKey));
+        _openFoldersWriter = new FolderStateWriter(viewStateStore, OpenFoldersKey, ProductTree.ExpansionChanged, ProductTree.OpenFolderKeys);
 
         SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();
 
@@ -3227,20 +2541,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         // The tree drops a row from its selection as the row leaves its folder, which is no pick of the user's: with
         // several picked, the first left would otherwise become SelectedTreeNode, and its product the one picked.
-        _isSyncingTreeSelection = true;
-        try
-        {
-            var search = SearchText.Trim();
-            ProductTree.Refresh(
-                Categories,
-                VisibleProducts,
-                isFiltered: search.Length > 0,
-                [.. DeletedProducts.Where(p => search.Length == 0 || p.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase))]);
-        }
-        finally
-        {
-            _isSyncingTreeSelection = false;
-        }
+        var search = SearchText.Trim();
+        _treeSelection.Quietly(() => ProductTree.Refresh(
+            Categories,
+            VisibleProducts,
+            isFiltered: search.Length > 0,
+            [.. DeletedProducts.Where(p => search.Length == 0 || p.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase))]));
 
         // A folder picked stays picked, and so does a deleted product, which the form never shows. Otherwise the row goes
         // back to the product picked: a product moved to another folder leaves the tree's selection as it goes, and one a
@@ -3255,32 +2561,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// Puts SelectedProduct's row first among the rows picked in the list, and so makes it SelectedTreeNode: alone, unless
     /// it's picked already, when the rows picked with it stay. Nothing picked, or a search hiding it, picks no row.
     /// </summary>
-    private void SyncTreeSelection()
-    {
-        var row = SelectedProduct is { } product ? ProductTree.Find(product.Id) : null;
-        var at = row is null ? -1 : SelectedTreeNodes.IndexOf(row);
-        if (at == 0)
-        {
-            return;
-        }
-
-        _isSyncingTreeSelection = true;
-        try
-        {
-            if (at > 0)
-            {
-                SelectedTreeNodes.Move(at, 0);
-            }
-            else
-            {
-                SelectedTreeNode = row;
-            }
-        }
-        finally
-        {
-            _isSyncingTreeSelection = false;
-        }
-    }
+    private void SyncTreeSelection() =>
+        _treeSelection.BringFirst(SelectedProduct is { } product ? ProductTree.Find(product.Id) : null);
 
     /// <summary>
     /// The list's selection changed: by a click (or several, with Ctrl or Shift), or by this screen. Its first row is
@@ -3301,7 +2583,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // The tree calls this in the middle of changing SelectedItems: picking the product leads to SyncTreeSelection,
         // which then finds its row first already and leaves the collection alone, as it must mid-change.
         // A deleted product's row is picked as a folder's is, leaving the form as it is: it's there to restore.
-        if (!_isSyncingTreeSelection && first is ProductLeafNode { IsDeleted: false } leaf && leaf.Product.Id != SelectedProduct?.Id)
+        if (!_treeSelection.IsSyncing && first is ProductLeafNode { IsDeleted: false } leaf && leaf.Product.Id != SelectedProduct?.Id)
         {
             SelectedProduct = leaf.Product;
         }
@@ -3349,30 +2631,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             History.RewriteAll(snapshot => snapshot with { CategoryId = onForm.CategoryId });
         }
 
-        RestoreTreeSelection(picked);
+        // Picks again the rows the tree dropped from its selection as they moved.
+        _treeSelection.Restore(picked, r => r is not ProductLeafNode leaf || ProductTree.Find(leaf.Product.Id) == leaf);
 
         _moveUndo = isUndo ? [] : undo;
         MoveNotice = isUndo ? null : MoveNoticeFor(moves);
-    }
-
-    /// <summary>Picks again the rows of <paramref name="picked"/> the tree dropped from its selection as they moved.</summary>
-    private void RestoreTreeSelection(IReadOnlyList<object> picked)
-    {
-        _isSyncingTreeSelection = true;
-        try
-        {
-            foreach (var row in picked.Where(r => r is not ProductLeafNode leaf || ProductTree.Find(leaf.Product.Id) == leaf))
-            {
-                if (!SelectedTreeNodes.Contains(row))
-                {
-                    SelectedTreeNodes.Add(row);
-                }
-            }
-        }
-        finally
-        {
-            _isSyncingTreeSelection = false;
-        }
     }
 
     /// <summary>
@@ -6519,19 +5782,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         });
     }
 
-    /// <summary>Writes the list's open folders for next time, when they differ from what was written last.</summary>
-    private void WriteOpenFolders(IReadOnlyList<string> openFolders)
-    {
-        lock (_openFoldersLock)
-        {
-            if (!openFolders.SequenceEqual(_writtenOpenFolders, StringComparer.Ordinal))
-            {
-                _viewStateStore.WriteList(OpenFoldersKey, openFolders);
-                _writtenOpenFolders = openFolders;
-            }
-        }
-    }
-
     public void BeginCategoryEdit()
     {
         if (!_isCommittingCategory)
@@ -6614,7 +5864,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         // A change still settling when the app closes is written now, rather than lost.
         _openFoldersWriter.Dispose();
-        WriteOpenFolders(ProductTree.OpenFolderKeys());
         ProductTree.Dispose();
 
         _productCache.Dispose();

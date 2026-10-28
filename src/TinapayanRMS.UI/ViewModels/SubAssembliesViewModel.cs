@@ -16,40 +16,6 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// A standalone sub-assembly in the Sub-Assemblies list, with the products that use it and the made ingredients made from
-/// it. "Used by" is kept as text: CollectionMerge compares a row's scalar properties, so a changed list of products or
-/// made ingredients shows up as a changed row.
-/// </summary>
-public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyList<LinkingProduct> usedBy, IReadOnlyList<MadeIngredientUse>? madeIngredients = null)
-{
-    private readonly IReadOnlyList<MadeIngredientUse> _madeIngredients = madeIngredients ?? [];
-
-    public SubAssembly SubAssembly { get; } = subAssembly;
-
-    public int Id => SubAssembly.Id;
-
-    public string Name => SubAssembly.Name ?? string.Empty;
-
-    public string RoleName => SubAssembly.Role?.Name ?? string.Empty;
-
-    public decimal TotalWeight => SubAssembly.TotalWeight;
-
-    public decimal TotalCost => SubAssembly.TotalCost;
-
-    /// <summary>The products linking it, e.g. "Cream Loaf, Cream Loaf Mini", or empty when none do.</summary>
-    public string UsedByText { get; } = string.Join(", ", usedBy.Select(p => p.Name));
-
-    /// <summary>The products linking it, by name. A method, not a property: CollectionMerge would compare the list by its scalar properties only.</summary>
-    public IReadOnlyList<LinkingProduct> GetUsedBy() => usedBy;
-
-    /// <summary>The made ingredients made from it, e.g. "Butter Icing, Breads", or empty when none are.</summary>
-    public string MadeIngredientsText { get; } = string.Join(", ", (madeIngredients ?? []).Select(m => m.Name));
-
-    /// <summary>The made ingredients made from it, by name. A method for the same reason as <see cref="GetUsedBy"/>.</summary>
-    public IReadOnlyList<MadeIngredientUse> GetMadeIngredients() => _madeIngredients;
-}
-
-/// <summary>
 /// The Sub-Assemblies screen: standalone sub-assemblies, which no product owns. Products link them (and
 /// follow every change saved here) or copy them, from their recipe on the Products screen. One Save writes
 /// the name, the role and the lines together.
@@ -62,7 +28,6 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     private readonly IRawMaterialCategoryRepository _rawMaterialCategoryRepository;
     private readonly IValidator<SubAssembly> _subAssemblyValidator;
     private readonly IValidator<SubAssemblyRole> _roleValidator;
-    private readonly IViewStateStore _viewStateStore;
     private readonly ProductVersionRecorder _versionRecorder;
     private readonly SourceCache<StandaloneSubAssemblyRow, int> _rowCache = new(r => r.Id);
     private readonly ReadOnlyObservableCollection<StandaloneSubAssemblyRow> _rows;
@@ -89,20 +54,16 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// <summary>The view state key the closed folders of the Sub-Assemblies list are kept under (IViewStateStore).</summary>
     public const string ClosedFoldersKey = "SubAssemblies.ClosedFolders";
 
-    /// <summary>The closed folders last written to the view state, or read from it, so a write is only made for a change.</summary>
-    private IReadOnlyList<string> _writtenClosedFolders;
+    private readonly FolderStateWriter _closedFoldersWriter;
 
-    private readonly IDisposable _closedFoldersWriter;
-
-    /// <summary>Held while writing the closed folders, which the throttled writer does off the UI thread and Dispose on it.</summary>
-    private readonly Lock _closedFoldersLock = new();
+    private readonly TreeSelection _treeSelection = new();
 
     /// <summary>
     /// The rows picked in the Sub-Assemblies list, bound to the tree's SelectedItems, which it shares: one row, or several
     /// with Ctrl or Shift held. Its first is <see cref="SelectedTreeNode"/>. The tree changes it as rows are clicked, and
     /// this screen as SelectedRow changes (SyncTreeSelection), as the Raw Materials screen does its own.
     /// </summary>
-    public ObservableCollection<object> SelectedTreeNodes { get; } = [];
+    public ObservableCollection<object> SelectedTreeNodes => _treeSelection.Nodes;
 
     private object? _selectedTreeNode;
     /// <summary>
@@ -114,31 +75,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     public object? SelectedTreeNode
     {
         get => _selectedTreeNode;
-        set
-        {
-            if (value is null)
-            {
-                if (SelectedTreeNodes.Count > 0)
-                {
-                    SelectedTreeNodes.Clear();
-                }
-            }
-            else if (SelectedTreeNodes.Count != 1 || !ReferenceEquals(SelectedTreeNodes[0], value))
-            {
-                SelectedTreeNodes.Clear();
-                SelectedTreeNodes.Add(value);
-            }
-        }
+        set => _treeSelection.Pick(value);
     }
 
     /// <summary>The sub-assemblies picked in the list, in the order they were picked.</summary>
     public IReadOnlyList<SubAssemblyLeafNode> SelectedTreeSubAssemblies => [.. SelectedTreeNodes.OfType<SubAssemblyLeafNode>()];
-
-    /// <summary>
-    /// Set while the list's selection changes for a reason that's no pick of the user's: SyncTreeSelection moving it to
-    /// SelectedRow, or the tree dropping a row from it as the row moves to another folder.
-    /// </summary>
-    private bool _isSyncingTreeSelection;
 
     private string? _moveNotice;
     /// <summary>
@@ -446,17 +387,12 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         _rawMaterialCategoryRepository = rawMaterialCategoryRepository;
         _subAssemblyValidator = subAssemblyValidator;
         _roleValidator = roleValidator;
-        _viewStateStore = viewStateStore;
 
-        // The list's folders open as they were left last time, and the ones closed are written for next time once they've
-        // settled after a change, off the UI thread, as on Raw Materials; Dispose writes any change still waiting. As read,
-        // so nothing is written until a folder is opened or closed: the folders aren't made until the roles are loaded.
+        // The list's folders open as they were left last time, and the ones closed are written for next time
+        // (FolderStateWriter), as on Raw Materials; Dispose writes any change still waiting. As read, so nothing is
+        // written until a folder is opened or closed: the folders aren't made until the roles are loaded.
         SubAssemblyTree = new SubAssemblyTree(viewStateStore.ReadList(ClosedFoldersKey));
-        _writtenClosedFolders = SubAssemblyTree.ClosedFolderKeys();
-        _closedFoldersWriter = SubAssemblyTree.ExpansionChanged
-            .Select(_ => SubAssemblyTree.ClosedFolderKeys())
-            .Throttle(TimeSpan.FromMilliseconds(500))
-            .Subscribe(WriteClosedFolders);
+        _closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, SubAssemblyTree.ExpansionChanged, SubAssemblyTree.ClosedFolderKeys);
 
         SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();
 
@@ -1077,15 +1013,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     {
         // The tree drops a row from its selection as the row leaves its folder, which is no pick of the user's: with
         // several picked, the first left would otherwise become SelectedTreeNode, and its sub-assembly the one picked.
-        _isSyncingTreeSelection = true;
-        try
-        {
-            SubAssemblyTree.Refresh(Roles, VisibleRows, isFiltered: SearchText.Trim().Length > 0);
-        }
-        finally
-        {
-            _isSyncingTreeSelection = false;
-        }
+        _treeSelection.Quietly(() => SubAssemblyTree.Refresh(Roles, VisibleRows, isFiltered: SearchText.Trim().Length > 0));
 
         // A folder picked stays picked. Otherwise the row goes back to the sub-assembly picked: one moved to another folder
         // leaves the tree's selection as it goes, and one a search hid gets its row back when the search ends.
@@ -1099,32 +1027,8 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// Puts SelectedRow's row first among the rows picked in the list, and so makes it SelectedTreeNode: alone, unless it's
     /// picked already, when the rows picked with it stay. Nothing picked, or a search hiding it, picks no row.
     /// </summary>
-    private void SyncTreeSelection()
-    {
-        var node = SelectedRow is { } row ? SubAssemblyTree.Find(row.Id) : null;
-        var at = node is null ? -1 : SelectedTreeNodes.IndexOf(node);
-        if (at == 0)
-        {
-            return;
-        }
-
-        _isSyncingTreeSelection = true;
-        try
-        {
-            if (at > 0)
-            {
-                SelectedTreeNodes.Move(at, 0);
-            }
-            else
-            {
-                SelectedTreeNode = node;
-            }
-        }
-        finally
-        {
-            _isSyncingTreeSelection = false;
-        }
-    }
+    private void SyncTreeSelection() =>
+        _treeSelection.BringFirst(SelectedRow is { } row ? SubAssemblyTree.Find(row.Id) : null);
 
     /// <summary>
     /// The list's selection changed: by a click (or several, with Ctrl or Shift), or by this screen. Its first row is
@@ -1144,7 +1048,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
         // The tree calls this in the middle of changing SelectedItems: picking the sub-assembly leads to SyncTreeSelection,
         // which then finds its row first already and leaves the collection alone, as it must mid-change.
-        if (!_isSyncingTreeSelection && first is SubAssemblyLeafNode leaf && leaf.Row.Id != SelectedRow?.Id)
+        if (!_treeSelection.IsSyncing && first is SubAssemblyLeafNode leaf && leaf.Row.Id != SelectedRow?.Id)
         {
             SelectedRow = leaf.Row;
         }
@@ -1180,30 +1084,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             History.RewriteAll(snapshot => snapshot with { RoleId = onForm.RoleId });
         }
 
-        RestoreTreeSelection(picked);
+        // Picks again the rows the tree dropped from its selection as they moved.
+        _treeSelection.Restore(picked, r => r is not SubAssemblyLeafNode leaf || SubAssemblyTree.Find(leaf.Row.Id) == leaf);
 
         _moveUndo = isUndo ? [] : undo;
         MoveNotice = isUndo ? null : MoveNoticeFor(moves);
-    }
-
-    /// <summary>Picks again the rows of <paramref name="picked"/> the tree dropped from its selection as they moved.</summary>
-    private void RestoreTreeSelection(IReadOnlyList<object> picked)
-    {
-        _isSyncingTreeSelection = true;
-        try
-        {
-            foreach (var row in picked.Where(r => r is not SubAssemblyLeafNode leaf || SubAssemblyTree.Find(leaf.Row.Id) == leaf))
-            {
-                if (!SelectedTreeNodes.Contains(row))
-                {
-                    SelectedTreeNodes.Add(row);
-                }
-            }
-        }
-        finally
-        {
-            _isSyncingTreeSelection = false;
-        }
     }
 
     /// <summary>
@@ -1511,24 +1396,10 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             });
     }
 
-    /// <summary>Writes the list's closed folders for next time, when they differ from what was written last.</summary>
-    private void WriteClosedFolders(IReadOnlyList<string> closedFolders)
-    {
-        lock (_closedFoldersLock)
-        {
-            if (!closedFolders.SequenceEqual(_writtenClosedFolders, StringComparer.Ordinal))
-            {
-                _viewStateStore.WriteList(ClosedFoldersKey, closedFolders);
-                _writtenClosedFolders = closedFolders;
-            }
-        }
-    }
-
     public void Dispose()
     {
         // A change still settling when the app closes is written now, rather than lost.
         _closedFoldersWriter.Dispose();
-        WriteClosedFolders(SubAssemblyTree.ClosedFolderKeys());
         SubAssemblyTree.Dispose();
 
         _rowCache.Dispose();
