@@ -149,16 +149,16 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         // Quantity Required multiplies every cost on the screen, so an undo has to put both back: the typed
         // figure and the summary worked out from it.
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
-        var costPerPiece = viewModel.Costs.Material;
+        var costPerPiece = viewModel.Costing.Costs.Material;
         costPerPiece.Should().BeGreaterThan(0m);
 
         Edit(viewModel, () => viewModel.EditingQuantityRequired = 8);
-        viewModel.Costs.Material.Should().Be(costPerPiece * 8m);
+        viewModel.Costing.Costs.Material.Should().Be(costPerPiece * 8m);
 
         viewModel.TryUndo().Should().BeTrue();
 
         viewModel.EditingQuantityRequired.Should().Be(1);
-        viewModel.Costs.Material.Should().Be(costPerPiece);
+        viewModel.Costing.Costs.Material.Should().Be(costPerPiece);
     }
 
     [Fact]
@@ -561,7 +561,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        viewModel.EditingLaborPercent.Should().Be(12m, "a new product takes the defaults once they've loaded");
+        viewModel.Costing.EditingLaborPercent.Should().Be(12m, "a new product takes the defaults once they've loaded");
         (await CanSave(viewModel)).Should().BeFalse();
     }
 

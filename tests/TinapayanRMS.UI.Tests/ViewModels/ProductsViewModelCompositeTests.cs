@@ -114,11 +114,11 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
 
         viewModel.ComponentEdits.Select(r => (r.Product!.Name, r.RecipeCost, r.Cost)).Should().Equal(
             ("Ensaymada", 2.50m, 15m), ("Cheese Roll", 5m, 20m));
-        viewModel.Costs.IsComposite.Should().BeTrue();
-        viewModel.Costs.PartsTitle.Should().Be("Products (ingredients)");
-        viewModel.Costs.SubAssemblies.Should().Be(35m);
-        viewModel.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m));
-        viewModel.Costs.Material.Should().Be(35m, "it has no packaging yet, and a product's own stays out");
+        viewModel.Costing.Costs.IsComposite.Should().BeTrue();
+        viewModel.Costing.Costs.PartsTitle.Should().Be("Products (ingredients)");
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(35m);
+        viewModel.Costing.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m));
+        viewModel.Costing.Costs.Material.Should().Be(35m, "it has no packaging yet, and a product's own stays out");
 
         await viewModel.SaveCommand.Execute();
 
@@ -138,7 +138,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.ComponentEdits.Select(r => (r.ComponentProductId, r.Quantity, r.RecipeCost)).Should().Equal(
             (ensaymadaId, 6, 2.50m), (cheeseRollId, 4, 5m));
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.ComponentsTab);
-        viewModel.Costs.SubAssemblies.Should().Be(35m);
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(35m);
         (await CanSave(viewModel)).Should().BeFalse();
     });
 
@@ -173,12 +173,12 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.RecipeTabs.Should().HaveCount(2);
         viewModel.RecipeTabs[0].Should().BeSameAs(viewModel.ComponentsTab);
         viewModel.RecipeTabs[1].Should().BeOfType<SubAssemblyRecipeTab>().Which.Header.Should().Be("Topping");
-        viewModel.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(
+        viewModel.Costing.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(
             ("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m), ("Topping", 10m));
-        viewModel.Costs.SubAssemblies.Should().Be(45m);
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(45m);
         viewModel.ComponentsCost.Should().Be(35m, "the Products tab shows what its products bring");
-        viewModel.Costs.PartsTitle.Should().Be("Products and sub-assemblies (ingredients)");
-        viewModel.Costs.PartsBase.Should().Be("products and sub-assemblies");
+        viewModel.Costing.Costs.PartsTitle.Should().Be("Products and sub-assemblies (ingredients)");
+        viewModel.Costing.Costs.PartsBase.Should().Be("products and sub-assemblies");
         (await CanSave(viewModel)).Should().BeFalse();
         await using (var dbContext = CreateDbContext())
         {
@@ -193,8 +193,8 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.UsageEdits.Should().BeEmpty();
         viewModel.RecipeTabs.Should().Equal(viewModel.ComponentsTab);
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.ComponentsTab);
-        viewModel.Costs.SubAssemblies.Should().Be(35m);
-        viewModel.Costs.PartsTitle.Should().Be("Products (ingredients)");
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(35m);
+        viewModel.Costing.Costs.PartsTitle.Should().Be("Products (ingredients)");
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
@@ -241,7 +241,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.ComponentProductOptions.Select(p => p.Name).Should().Equal("Cheese Roll", "Chocolate Cake", "Ensaymada", "Office Tray", "Pasalubong Box");
 
         // A composite's own figures follow what's in it, the box inside it included.
-        viewModel.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(("Pasalubong Box × 2", 70m), ("Chocolate Cake × 1", 0m));
+        viewModel.Costing.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(("Pasalubong Box × 2", 70m), ("Chocolate Cake × 1", 0m));
 
         // A product of sub-assemblies has no Products tab.
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == ensaymadaId);
@@ -268,19 +268,19 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.ComponentEdits[0].Quantity = 8;
         recorder.EndUndoStep();
 
-        viewModel.Costs.SubAssemblies.Should().Be(40m);
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(40m);
         (await CanSave(viewModel)).Should().BeTrue();
 
         await viewModel.UndoCommand.Execute();
 
         viewModel.ComponentEdits.Select(r => (r.ComponentProductId, r.Quantity)).Should().Equal((ensaymadaId, 6), (cheeseRollId, 4));
-        viewModel.Costs.SubAssemblies.Should().Be(35m);
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(35m);
         (await CanSave(viewModel)).Should().BeFalse();
 
         await viewModel.RedoCommand.Execute();
 
         viewModel.ComponentEdits[0].Quantity.Should().Be(8);
-        viewModel.Costs.SubAssemblies.Should().Be(40m);
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(40m);
 
         // Remove Line is a step of its own too.
         viewModel.SelectedComponentEdit = viewModel.ComponentEdits[1];
@@ -301,8 +301,8 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentEdits.Count}");
 
         viewModel.EditingIncludesComponentPackaging.Should().BeFalse();
-        viewModel.Costs.Packaging.Should().Be(0m, "a product's own packaging stays out until the box is ticked");
-        viewModel.Costs.PackagingTitle.Should().Be("Packaging");
+        viewModel.Costing.Costs.Packaging.Should().Be(0m, "a product's own packaging stays out until the box is ticked");
+        viewModel.Costing.Costs.PackagingTitle.Should().Be("Packaging");
         viewModel.ComponentsCaption.Should().Contain("Its own packaging stays out");
         viewModel.ComponentEdits.Select(r => (r.PackagingCost, r.Cost)).Should().Equal((1.50m, 15m), (0m, 20m));
         viewModel.ComponentsCost.Should().Be(35m);
@@ -317,28 +317,28 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
             new PrintedComponent("Ensaymada", 6, 2.50m, 24m, 1.50m), new PrintedComponent("Cheese Roll", 4, 5m, 20m, 0m));
 
         // The costing still keeps them apart: the products' lines are their recipe, and their packaging is packaging.
-        viewModel.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m));
+        viewModel.Costing.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m));
 
         viewModel.EditingIncludesComponentPackaging.Should().BeTrue();
-        viewModel.Costs.ComponentPackaging.Should().Be(9m, "6 bags of 1.50; Cheese Roll has none");
-        viewModel.Costs.Packaging.Should().Be(9m);
-        viewModel.Costs.OwnPackaging.Should().Be(0m, "the Packaging tab lists the composite's own lines only");
-        viewModel.Costs.PackagingTitle.Should().Be("Packaging (own and products')");
-        viewModel.Costs.SubAssemblies.Should().Be(35m, "the recipe cost is unchanged");
-        viewModel.Costs.Material.Should().Be(44m);
+        viewModel.Costing.Costs.ComponentPackaging.Should().Be(9m, "6 bags of 1.50; Cheese Roll has none");
+        viewModel.Costing.Costs.Packaging.Should().Be(9m);
+        viewModel.Costing.Costs.OwnPackaging.Should().Be(0m, "the Packaging tab lists the composite's own lines only");
+        viewModel.Costing.Costs.PackagingTitle.Should().Be("Packaging (own and products')");
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(35m, "the recipe cost is unchanged");
+        viewModel.Costing.Costs.Material.Should().Be(44m);
         viewModel.ComponentsCaption.Should().Contain("and its own packaging");
         (await CanSave(viewModel)).Should().BeTrue();
 
         await viewModel.UndoCommand.Execute();
 
         viewModel.EditingIncludesComponentPackaging.Should().BeFalse();
-        viewModel.Costs.Packaging.Should().Be(0m);
+        viewModel.Costing.Costs.Packaging.Should().Be(0m);
         viewModel.ComponentEdits.Select(r => r.Cost).Should().Equal(15m, 20m);
         viewModel.ComponentsCost.Should().Be(35m);
         (await CanSave(viewModel)).Should().BeFalse();
 
         await viewModel.RedoCommand.Execute();
-        viewModel.Costs.Packaging.Should().Be(9m);
+        viewModel.Costing.Costs.Packaging.Should().Be(9m);
 
         await viewModel.SaveCommand.Execute();
 
@@ -349,7 +349,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         }
 
         viewModel.EditingIncludesComponentPackaging.Should().BeTrue();
-        viewModel.Costs.Packaging.Should().Be(9m);
+        viewModel.Costing.Costs.Packaging.Should().Be(9m);
         // The rows reloaded after Save follow the box too.
         viewModel.ComponentEdits.Select(r => r.Cost).Should().Equal(24m, 20m);
         (await CanSave(viewModel)).Should().BeFalse();
@@ -397,7 +397,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         await viewModel.LoadCommand.Execute();
 
         viewModel.ComponentEdits[0].RecipeCost.Should().Be(5m);
-        viewModel.Costs.SubAssemblies.Should().Be(50m);
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(50m);
         (await CanSave(viewModel)).Should().BeFalse("a product repriced elsewhere isn't this product's change");
     });
 

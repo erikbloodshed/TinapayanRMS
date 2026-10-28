@@ -700,21 +700,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         private set => this.RaiseAndSetIfChanged(ref _hasPackaging, value);
     }
 
-    private ProductCostSummary _costs = ProductCostSummary.Empty;
-    public ProductCostSummary Costs
-    {
-        get => _costs;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _costs, value);
-
-            // The metrics' value boxes read the amounts from here: a percentage, the recipe or another metric changed.
-            this.RaisePropertyChanged(nameof(EditingLaborAmount));
-            this.RaisePropertyChanged(nameof(EditingOverheadAmount));
-            this.RaisePropertyChanged(nameof(EditingAdministrativeAmount));
-            this.RaisePropertyChanged(nameof(EditingMarkupAmount));
-        }
-    }
+    /// <summary>The Costing tab: the costing percentages, each metric's amount, and the cost summary (Costs).</summary>
+    public ProductCosting Costing { get; } = new();
 
     private int _scalingUnits = 1;
     /// <summary>
@@ -1068,77 +1055,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         set => this.RaiseAndSetIfChanged(ref _selectedLineEdit, value);
     }
 
-    private decimal _editingLaborPercent;
-    public decimal EditingLaborPercent
-    {
-        get => _editingLaborPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingLaborPercent, value);
-    }
-
-    private decimal _editingOverheadPercent;
-    public decimal EditingOverheadPercent
-    {
-        get => _editingOverheadPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingOverheadPercent, value);
-    }
-
-    private decimal _editingAdministrativePercent;
-    public decimal EditingAdministrativePercent
-    {
-        get => _editingAdministrativePercent;
-        set => this.RaiseAndSetIfChanged(ref _editingAdministrativePercent, value);
-    }
-
-    private decimal _editingMarginPercent;
-    public decimal EditingMarginPercent
-    {
-        get => _editingMarginPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingMarginPercent, value);
-    }
-
-    private decimal _editingVatPercent;
-    public decimal EditingVatPercent
-    {
-        get => _editingVatPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingVatPercent, value);
-    }
-
-    // Each metric's value box on the Costing tab: its percentage as pesos for one sellable unit. Typing an amount sets
-    // the percentage that comes to it, which is what's saved; the amount is only ever worked out from it.
-    private TypedAmount? _typedLaborAmount;
-    private TypedAmount? _typedOverheadAmount;
-    private TypedAmount? _typedAdministrativeAmount;
-    private TypedAmount? _typedMarkupAmount;
-
-    /// <summary>Labor Metric's value: EditingLaborPercent of the sub-assemblies cost.</summary>
-    public decimal EditingLaborAmount
-    {
-        get => TypedAmount.Shown(_typedLaborAmount, EditingLaborPercent, Costs.SubAssemblies, Costs.Labor);
-        set => EditingLaborPercent = TypedAmount.PercentFor(ref _typedLaborAmount, value, Costs.SubAssemblies, EditingLaborPercent);
-    }
-
-    /// <summary>Overhead Metric's value: EditingOverheadPercent of the sub-assemblies cost.</summary>
-    public decimal EditingOverheadAmount
-    {
-        get => TypedAmount.Shown(_typedOverheadAmount, EditingOverheadPercent, Costs.SubAssemblies, Costs.Overhead);
-        set => EditingOverheadPercent = TypedAmount.PercentFor(ref _typedOverheadAmount, value, Costs.SubAssemblies, EditingOverheadPercent);
-    }
-
-    /// <summary>Admin Metric's value: EditingAdministrativePercent of the sub-assemblies cost.</summary>
-    public decimal EditingAdministrativeAmount
-    {
-        get => TypedAmount.Shown(_typedAdministrativeAmount, EditingAdministrativePercent, Costs.SubAssemblies, Costs.Administrative);
-        set => EditingAdministrativePercent = TypedAmount.PercentFor(
-            ref _typedAdministrativeAmount, value, Costs.SubAssemblies, EditingAdministrativePercent);
-    }
-
-    /// <summary>Markup Metric's value: EditingMarginPercent of the base cost.</summary>
-    public decimal EditingMarkupAmount
-    {
-        get => TypedAmount.Shown(_typedMarkupAmount, EditingMarginPercent, Costs.BaseCost, Costs.Markup);
-        set => EditingMarginPercent = TypedAmount.PercentFor(ref _typedMarkupAmount, value, Costs.BaseCost, EditingMarginPercent);
-    }
-
     private string _editingCloneName = string.Empty;
     public string EditingCloneName
     {
@@ -1152,10 +1068,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     // What the product had when it was loaded, so Save only sends the parts that changed.
     private RecipeDraft _savedRecipe = new([], []);
     private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> _savedLines = [];
-    private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) _savedCosting;
-
-    // What a new product's costing starts with (Settings → Costing Defaults), as of the last LoadCommand.
-    private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) _costingDefaults;
 
     // The shop-wide Wastage % every product is priced with (Settings → Costing Defaults), as of the last LoadCommand.
     private decimal _wastagePercent = CostingDefaults.DefaultWastagePercent;
@@ -1490,7 +1402,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // The Scaling tab is worked out while it shows, and again as anything it scales changes: every change to the
         // recipe, the packaging, a composite's products, the quantity required or the cost basis gives new Costs.
-        this.WhenAnyValue(x => x.Costs, x => x.ScalingUnits, x => x.SelectedDetailsTab)
+        this.WhenAnyValue(x => x.Costing.Costs, x => x.ScalingUnits, x => x.SelectedDetailsTab)
             .Where(_ => SelectedDetailsTab == ScalingTab)
             .Subscribe(_ => RefreshScaling());
 
@@ -1701,14 +1613,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 RecomputeCosts();
             });
 
-        this.WhenAnyValue(
-                x => x.EditingLaborPercent,
-                x => x.EditingOverheadPercent,
-                x => x.EditingAdministrativePercent,
-                x => x.EditingMarginPercent,
-                x => x.EditingVatPercent,
-                x => x.EditingCurrentPrice,
-                x => x.EditingQuantityRequired)
+        Costing.WhenAnyValue(
+                c => c.EditingLaborPercent,
+                c => c.EditingOverheadPercent,
+                c => c.EditingAdministrativePercent,
+                c => c.EditingMarginPercent,
+                c => c.EditingVatPercent)
+            .Where(_ => !IsRestoring)
+            .Subscribe(_ => RecomputeCosts());
+
+        this.WhenAnyValue(x => x.EditingCurrentPrice, x => x.EditingQuantityRequired)
             .Where(_ => !IsRestoring)
             .Subscribe(_ => RecomputeCosts());
 
@@ -1733,6 +1647,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // change rather than only when an undo step settles: a step closes on the way out of a field, and a Save
         // button still disabled under the cursor would swallow the very click that enabled it.
         this.Changed.Subscribe(_ => History.RefreshDirty());
+        Costing.Changed.Subscribe(_ => History.RefreshDirty());
         WatchForSave(UsageEdits);
         WatchForSave(LineEdits);
         WatchForSave(ComponentEdits);
@@ -1998,15 +1913,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 return;
             }
 
-            var costing = new CostingParameters
-            {
-                LaborPercent = EditingLaborPercent,
-                OverheadPercent = EditingOverheadPercent,
-                AdministrativePercent = EditingAdministrativePercent,
-                MarginPercent = EditingMarginPercent,
-                VatPercent = EditingVatPercent,
-            };
-
+            var costing = Costing.ToParameters();
             var costingValidation = _costingParametersValidator.Validate(costing);
             if (!costingValidation.IsValid)
             {
@@ -2029,7 +1936,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             var packagingLines = ChangedLines();
             var changesSharing = UsageEdits.Any(u => u.AreLinkedLinesEdited) || packagingLines is not null || packagingLink is not null;
             var recipeToSave = IsSameRecipe(recipe, _savedRecipe) ? null : recipe;
-            var costingToSave = CurrentCosting() == _savedCosting ? null : costing;
+            var costingToSave = Costing.IsChanged ? costing : null;
             var saved = await Task.Run(() => _versionedSaves.SaveProductAsync(
                 product, recipeToSave, packagingLink, packagingLines, costingToSave, changesSharing, DateTime.Now, CancellationToken.None));
 
@@ -2668,7 +2575,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         SetComposite(isComposite);
         ClearDetails();
         RefreshComponentOptions();
-        ApplyCostingDefaults();
+        Costing.ApplyDefaults();
 
         // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
         History.MarkClean();
@@ -2716,7 +2623,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _scalingProducts.Clear();
         _savedRecipe = new RecipeDraft([], []);
         _savedLines = [];
-        SetCosting(null);
+        Costing.Load(null);
         RefreshLinkableOptions();
         RecomputeCosts();
 
@@ -2781,7 +2688,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ReplaceLines(detail.Lines);
         SetHasPackaging(detail.PackagingLink is not null || detail.Lines.Count > 0);
         ReplaceUsages(detail.Usages, detail.SubAssemblyLines, detail.AddIns);
-        SetCosting(detail.Costing);
+        Costing.Load(detail.Costing);
         RefreshLinkableOptions();
         RefreshComponentOptions();
         RecomputeCosts();
@@ -3118,7 +3025,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         IncludesComponentPackaging = EditingIncludesComponentPackaging,
         CategoryId = EditingCategory?.Id,
         CloneName = EditingCloneName,
-        Costing = (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent),
+        Costing = Costing.Percentages,
         Usages = [.. UsageEdits],
         SelectedTab = CaptureTabChoice(),
         HasAddSubAssemblyTab = RecipeTabs.Contains(AddSubAssemblyTab),
@@ -3194,8 +3101,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             this.RaisePropertyChanged(nameof(EditingCategory));
 
             // 3. Costing.
-            (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent) =
-                snapshot.Costing;
+            Costing.Percentages = snapshot.Costing;
 
             // 4. Packaging. _savedPackagingLinkKey is deliberately left alone: it's what Save compares against. Showing the
             //    link ends a Move to Sub-Assemblies, so the move goes back after it.
@@ -3409,26 +3315,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         LineEdits.AddRange(rows);
     }
 
-    private void SetCosting(CostingParameters? costing)
-    {
-        EditingLaborPercent = costing?.LaborPercent ?? 0m;
-        EditingOverheadPercent = costing?.OverheadPercent ?? 0m;
-        EditingAdministrativePercent = costing?.AdministrativePercent ?? 0m;
-        EditingMarginPercent = costing?.MarginPercent ?? 0m;
-        EditingVatPercent = costing?.VatPercent ?? 0m;
-        _savedCosting = CurrentCosting();
-    }
-
-    private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) CurrentCosting() =>
-        (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent);
-
-    /// <summary>
-    /// A new product's costing starts at the defaults, while what Save compares against stays at none (SetCosting(null)),
-    /// so its first Save writes them as its own. Defaults of all zero write nothing, as before there were defaults.
-    /// </summary>
-    private void ApplyCostingDefaults() =>
-        (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent) = _costingDefaults;
-
     /// <summary>
     /// Takes up the defaults as LoadCommand read them. A new product still showing the ones it started with (the screen's
     /// first load, or defaults changed in Settings since) takes the new ones; one whose costing was typed into keeps it.
@@ -3436,8 +3322,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private void RefreshCostingDefaults(CostingDefaults defaults)
     {
-        var untouchedNewProduct = _editingId == 0 && CurrentCosting() == _costingDefaults;
-        _costingDefaults = (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent);
+        var untouchedNewProduct = _editingId == 0 && Costing.ShowsDefaults;
+        Costing.SetDefaults(defaults);
         _defaultNewProductStage = defaults.NewProductStage;
         if (_wastagePercent != defaults.WastagePercent)
         {
@@ -3451,7 +3337,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }
         if (untouchedNewProduct)
         {
-            ApplyCostingDefaults();
+            Costing.ApplyDefaults();
 
             // The defaults landing on a form that was still showing the previous ones isn't the user's change -
             // on the screen's first load they land on a blank form costed at nothing - so what Save measures
@@ -5148,15 +5034,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         decimal? componentPackaging = IsEditingComposite && EditingIncludesComponentPackaging
             ? lines.Sum(r => r.PackagingCostTotal)
             : null;
-        Costs = new ProductCostSummary(
+        Costing.Recompute(
             [.. components, .. UsageEdits.Select(u => (u.SectionName, u.CostPerPieceAt(CostBasis)))],
             EditingQuantityRequired,
             [.. LineEdits.Select(l => l.CostPerUnit)],
-            EditingLaborPercent,
-            EditingOverheadPercent,
-            EditingAdministrativePercent,
-            EditingMarginPercent,
-            EditingVatPercent,
             EditingCurrentPrice,
             IsEditingComposite,
             IsEditingComposite && UsageEdits.Count > 0,
@@ -5303,7 +5184,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         DateTime.Now,
         [.. UsageEdits.Select(u => PrintedSection.From(u, CostBasis))],
         HasPackaging ? PrintedPackaging.From(LineEdits, IsPackagingLinked ? PackagingLinkedToText : null) : null,
-        Costs,
+        Costing.Costs,
         IsEditingComposite ? PrintedComponent.From(ComponentEdits) : null)
     {
         CostBasis = CostBasis,

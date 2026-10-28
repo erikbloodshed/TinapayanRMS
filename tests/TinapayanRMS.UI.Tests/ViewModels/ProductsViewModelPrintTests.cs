@@ -53,7 +53,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
 
         printout.Packaging.Should().NotBeNull();
         printout.Packaging!.Lines.Should().Equal(new PrintedPackagingLine("Gift Box", 1m, "pc", 30m, 30m));
-        printout.Costs.Should().BeSameAs(viewModel.Costs, "the costing is the Costing tab's");
+        printout.Costs.Should().BeSameAs(viewModel.Costing.Costs, "the costing is the Costing tab's");
         printout.Scaling.Should().BeNull("the Recipe tab was showing");
     }
 

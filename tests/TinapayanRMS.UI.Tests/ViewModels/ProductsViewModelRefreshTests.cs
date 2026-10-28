@@ -43,7 +43,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             () => $"usage rows={viewModel.UsageEdits.Count}, roles={viewModel.Roles.Count}");
         viewModel.UsageEdits.Single().CostPerPieceAt(CostBasis.Buffered).Should().Be(2.4m);
         var selected = viewModel.SelectedProduct;
-        viewModel.EditingLaborPercent = 5m;
+        viewModel.Costing.EditingLaborPercent = 5m;
 
         // As another tab would: ube's price goes up (the cascade reprices the sub-assembly too).
         await using (var dbContext = CreateDbContext())
@@ -59,11 +59,11 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.Products.Should().ContainSingle().Which.Should().BeSameAs(selected);
         viewModel.SelectedProduct.Should().BeSameAs(selected);
         viewModel.SelectedProduct!.Id.Should().Be(productId);
-        viewModel.EditingLaborPercent.Should().Be(5m, "an unsaved costing field must survive the refresh");
+        viewModel.Costing.EditingLaborPercent.Should().Be(5m, "an unsaved costing field must survive the refresh");
         viewModel.UsageEdits.Should().ContainSingle().Which.CostPerPieceAt(CostBasis.Buffered).Should().Be(3.6m);
-        viewModel.Costs.Material.Should().Be(3.6m);
+        viewModel.Costing.Costs.Material.Should().Be(3.6m);
         var (expectedBaseCost, _, _) = CostingRules.CalculateSellingPrice(3.6m, 0m, 5m, 0m, 0m, 0m, 0m);
-        viewModel.Costs.BaseCost.Should().Be(expectedBaseCost);
+        viewModel.Costing.Costs.BaseCost.Should().Be(expectedBaseCost);
     }
 
     [Fact]
@@ -128,8 +128,8 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageFormTotalWeightText.Should().Be("100 g");
         viewModel.EditingUsageWeightPerPiece = 10m;
         viewModel.EditingUsageYield.Should().Be(10m, "typing the weight per piece works out the yield");
-        viewModel.EditingLaborPercent = 50m;
-        viewModel.EditingAdministrativePercent = 12.5m;
+        viewModel.Costing.EditingLaborPercent = 50m;
+        viewModel.Costing.EditingAdministrativePercent = 12.5m;
 
         // The sub-assembly's form is left open: the one Save puts it in the recipe, shows its tab, and writes the lot.
         await viewModel.SaveCommand.Execute();
@@ -144,9 +144,9 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.LinkedFromText.Should().Be("Ube pandesal Filling, from Sub-Assemblies");
         viewModel.IsFormEditingLines.Should().BeFalse("its lines are edited on the Sub-Assemblies screen from now on");
         usage.CostPerPieceAt(CostBasis.Buffered).Should().Be(2.4m);
-        viewModel.Costs.Labor.Should().Be(1.2m, "labor is 50% of the ₱2.40 material cost");
-        viewModel.Costs.Administrative.Should().Be(0.3m, "administrative is 12.5% of the ₱2.40 material cost");
-        viewModel.Costs.BaseCost.Should().Be(3.9m, "₱2.40 of filling, ₱1.20 labor and ₱0.30 administrative");
+        viewModel.Costing.Costs.Labor.Should().Be(1.2m, "labor is 50% of the ₱2.40 material cost");
+        viewModel.Costing.Costs.Administrative.Should().Be(0.3m, "administrative is 12.5% of the ₱2.40 material cost");
+        viewModel.Costing.Costs.BaseCost.Should().Be(3.9m, "₱2.40 of filling, ₱1.20 labor and ₱0.30 administrative");
 
         int productId;
         await using (var dbContext = CreateDbContext())
@@ -220,7 +220,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         ribbonLine.QtyPerUnit = 30m;
         ribbonLine.BaseUnitAbbreviation.Should().Be("cm");
         viewModel.LineEdits.Add(ribbonLine);
-        viewModel.Costs.Packaging.Should().Be(6.6m, "₱6 of box and 30 cm of ribbon at ₱0.02 a cm");
+        viewModel.Costing.Costs.Packaging.Should().Be(6.6m, "₱6 of box and 30 cm of ribbon at ₱0.02 a cm");
 
         // A line with a material but no quantity is refused, and deleting it lets Save through.
         var halfLine = viewModel.NewLineEdit();
@@ -252,7 +252,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             () => viewModel.SelectedProduct is not null && viewModel.LineEdits.Count == 2 && !viewModel.LineEdits.Contains(boxLine),
             () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.LineEdits.Count}");
         viewModel.LineEdits.Single(l => l.PackagingMaterialId == ribbonId).QtyPerUnit.Should().Be(30m);
-        viewModel.Costs.Packaging.Should().Be(6.6m);
+        viewModel.Costing.Costs.Packaging.Should().Be(6.6m);
     }
 
     [Fact]
@@ -292,7 +292,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         line.UnitId.Should().Be(rollId, "the line stays in the unit it was saved in");
         line.BaseQty.Should().Be(20m, "0.02 of a 1,000 cm roll is 20 cm");
         line.BaseUnitAbbreviation.Should().Be("cm");
-        viewModel.Costs.Packaging.Should().Be(0.4m, "20 cm at ₱0.02, as before");
+        viewModel.Costing.Costs.Packaging.Should().Be(0.4m, "20 cm at ₱0.02, as before");
     }
 
 
@@ -593,10 +593,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageFormTotalWeightText.Should().Be("1,700 g");
 
         // A piece takes ₱3 of the ₱85 batch (60 g of ₱0.05 flour). The shop-wide 3% wastage goes on the costing, on top.
-        viewModel.Costs.SubAssemblies.Should().Be(3m);
-        viewModel.Costs.WastagePercent.Should().Be(3m, "nothing is saved in Settings yet");
-        viewModel.Costs.Wastage.Should().Be(0.09m);
-        viewModel.Costs.BaseCost.Should().Be(3.09m);
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(3m);
+        viewModel.Costing.Costs.WastagePercent.Should().Be(3m, "nothing is saved in Settings yet");
+        viewModel.Costing.Costs.Wastage.Should().Be(0.09m);
+        viewModel.Costing.Costs.BaseCost.Should().Be(3.09m);
     }
 
     /// <summary>
@@ -613,14 +613,14 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single();
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
-        viewModel.Costs.Wastage.Should().Be(0.09m);
+        viewModel.Costing.Costs.Wastage.Should().Be(0.09m);
 
         await SetWastageAsync(10m);
         await viewModel.LoadCommand.Execute();
-        await WaitUntilSettledAsync(() => viewModel.Costs.WastagePercent == 10m, () => $"wastage={viewModel.Costs.WastagePercent}");
+        await WaitUntilSettledAsync(() => viewModel.Costing.Costs.WastagePercent == 10m, () => $"wastage={viewModel.Costing.Costs.WastagePercent}");
 
-        viewModel.Costs.Wastage.Should().Be(0.3m, "10% of the ₱3 a piece takes");
-        viewModel.Costs.BaseCost.Should().Be(3.3m);
+        viewModel.Costing.Costs.Wastage.Should().Be(0.3m, "10% of the ₱3 a piece takes");
+        viewModel.Costing.Costs.BaseCost.Should().Be(3.3m);
         viewModel.History.IsDirty.Should().BeFalse("the shop's wastage isn't an edit of the product");
     }
 
@@ -1208,9 +1208,9 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         // Sold in twos: each sub-assembly's cost is per unit of two pieces, as the Sub-assemblies row is.
         viewModel.EditingQuantityRequired = 2;
-        viewModel.EditingLaborPercent = 20m;
+        viewModel.Costing.EditingLaborPercent = 20m;
 
-        var costs = viewModel.Costs;
+        var costs = viewModel.Costing.Costs;
         costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should()
             .Equal([("Dough", 5m), ("Filling", 4.8m)], "₱2.50 of dough and ₱2.40 of filling a piece, in recipe order");
         costs.SubAssemblyLines.Sum(l => l.Cost).Should().Be(costs.SubAssemblies);
@@ -1422,7 +1422,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var usage = viewModel.UsageEdits.Single();
         usage.TotalWeight.Should().Be(1000m, "the batch is its lines, sized or not");
         usage.CostPerPieceAt(CostBasis.Buffered).Should().Be(0m);
-        viewModel.Costs.Material.Should().Be(0m, "an unsized section costs the product nothing per piece");
+        viewModel.Costing.Costs.Material.Should().Be(0m, "an unsized section costs the product nothing per piece");
 
         await using (var dbContext = CreateDbContext())
         {
@@ -1841,17 +1841,17 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.SelectedProduct = viewModel.Products.Single();
         await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
-        viewModel.EditingLaborPercent = 100m;
-        viewModel.EditingVatPercent = 12m;
-        viewModel.Costs.BaseCost.Should().Be(5m, "₱2.50 of filling and as much again in labor");
-        viewModel.Costs.CurrentMarkupPercent.Should().BeNull("no current price is entered");
+        viewModel.Costing.EditingLaborPercent = 100m;
+        viewModel.Costing.EditingVatPercent = 12m;
+        viewModel.Costing.Costs.BaseCost.Should().Be(5m, "₱2.50 of filling and as much again in labor");
+        viewModel.Costing.Costs.CurrentMarkupPercent.Should().BeNull("no current price is entered");
 
         viewModel.EditingCurrentPrice = 7m;
-        viewModel.Costs.CurrentMarkupPercent.Should().Be(25m, "₱7 with 12% VAT is ₱6.25 before it: ₱1.25 on ₱5 of cost");
-        viewModel.Costs.IsCurrentPriceBelowCost.Should().BeFalse();
+        viewModel.Costing.Costs.CurrentMarkupPercent.Should().Be(25m, "₱7 with 12% VAT is ₱6.25 before it: ₱1.25 on ₱5 of cost");
+        viewModel.Costing.Costs.IsCurrentPriceBelowCost.Should().BeFalse();
 
         viewModel.EditingCurrentPrice = 5m;
-        viewModel.Costs.IsCurrentPriceBelowCost.Should().BeTrue("₱5 with VAT is under ₱5 before it");
+        viewModel.Costing.Costs.IsCurrentPriceBelowCost.Should().BeTrue("₱5 with VAT is under ₱5 before it");
 
         viewModel.EditingCurrentPrice = 7m;
         await viewModel.SaveCommand.Execute();
@@ -1864,7 +1864,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingCurrentPrice.Should().BeNull("a new product has no current price");
-        viewModel.Costs.CurrentMarkupPercent.Should().BeNull();
+        viewModel.Costing.Costs.CurrentMarkupPercent.Should().BeNull();
 
         viewModel.SelectedProduct = viewModel.Products.Single();
         viewModel.EditingCurrentPrice.Should().Be(7m);
@@ -1881,23 +1881,23 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single();
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
-        viewModel.Costs.SubAssemblies.Should().Be(2m, "10 g of ube at ₱0.20 a gram");
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(2m, "10 g of ube at ₱0.20 a gram");
         List<string> changed = [];
-        viewModel.PropertyChanged += (_, e) => changed.Add(e.PropertyName!);
+        viewModel.Costing.PropertyChanged += (_, e) => changed.Add(e.PropertyName!);
 
-        viewModel.EditingLaborPercent = 25m;
-        viewModel.EditingLaborAmount.Should().Be(0.5m, "25% of ₱2 of sub-assemblies");
-        changed.Should().Contain(nameof(ProductsViewModel.EditingLaborAmount), "the value box follows the percentage typed");
+        viewModel.Costing.EditingLaborPercent = 25m;
+        viewModel.Costing.EditingLaborAmount.Should().Be(0.5m, "25% of ₱2 of sub-assemblies");
+        changed.Should().Contain(nameof(ProductCosting.EditingLaborAmount), "the value box follows the percentage typed");
 
-        viewModel.EditingOverheadAmount = 0.3m;
-        viewModel.EditingOverheadPercent.Should().Be(15m, "₱0.30 is 15% of ₱2");
-        viewModel.EditingAdministrativeAmount = 0.2m;
-        viewModel.EditingAdministrativePercent.Should().Be(10m);
-        viewModel.Costs.BaseCost.Should().Be(3m, "₱2 of sub-assemblies, then ₱0.50 + ₱0.30 + ₱0.20");
+        viewModel.Costing.EditingOverheadAmount = 0.3m;
+        viewModel.Costing.EditingOverheadPercent.Should().Be(15m, "₱0.30 is 15% of ₱2");
+        viewModel.Costing.EditingAdministrativeAmount = 0.2m;
+        viewModel.Costing.EditingAdministrativePercent.Should().Be(10m);
+        viewModel.Costing.Costs.BaseCost.Should().Be(3m, "₱2 of sub-assemblies, then ₱0.50 + ₱0.30 + ₱0.20");
 
-        viewModel.EditingMarkupAmount = 0.75m;
-        viewModel.EditingMarginPercent.Should().Be(25m, "the markup is a percentage of the ₱3 base cost");
-        viewModel.Costs.Markup.Should().Be(0.75m);
+        viewModel.Costing.EditingMarkupAmount = 0.75m;
+        viewModel.Costing.EditingMarginPercent.Should().Be(25m, "the markup is a percentage of the ₱3 base cost");
+        viewModel.Costing.Costs.Markup.Should().Be(0.75m);
         viewModel.History.IsDirty.Should().BeTrue();
 
         await viewModel.SaveCommand.Execute();
@@ -2150,7 +2150,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await viewModel.LoadCommand.Execute();
 
-        (viewModel.EditingLaborPercent, viewModel.EditingOverheadPercent, viewModel.EditingAdministrativePercent, viewModel.EditingMarginPercent, viewModel.EditingVatPercent)
+        (viewModel.Costing.EditingLaborPercent, viewModel.Costing.EditingOverheadPercent, viewModel.Costing.EditingAdministrativePercent, viewModel.Costing.EditingMarginPercent, viewModel.Costing.EditingVatPercent)
             .Should().Be((25m, 10m, 5m, 40m, 12m), "the screen opens on a new product");
 
         viewModel.EditingName = "Pandesal";
@@ -2173,22 +2173,22 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         // As Settings would, while the screen shows a new product: it takes them up on the next load.
         await defaultsRepository.SetAsync(new CostingDefaults { LaborPercent = 20m, VatPercent = 12m }, Cancellation);
         await viewModel.LoadCommand.Execute();
-        viewModel.EditingLaborPercent.Should().Be(20m);
+        viewModel.Costing.EditingLaborPercent.Should().Be(20m);
 
         // Typed into, it keeps what was typed.
-        viewModel.EditingLaborPercent = 7m;
+        viewModel.Costing.EditingLaborPercent = 7m;
         await defaultsRepository.SetAsync(new CostingDefaults { LaborPercent = 30m, VatPercent = 12m }, Cancellation);
         await viewModel.LoadCommand.Execute();
-        viewModel.EditingLaborPercent.Should().Be(7m);
+        viewModel.Costing.EditingLaborPercent.Should().Be(7m);
 
         // A saved product without costing of its own shows none: the defaults are only where a new product starts.
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
-        viewModel.EditingLaborPercent.Should().Be(0m);
+        viewModel.Costing.EditingLaborPercent.Should().Be(0m);
 
         // New starts from the latest defaults.
         await viewModel.NewCommand.Execute();
-        (viewModel.EditingLaborPercent, viewModel.EditingVatPercent).Should().Be((30m, 12m));
+        (viewModel.Costing.EditingLaborPercent, viewModel.Costing.EditingVatPercent).Should().Be((30m, 12m));
     }
 
     private async Task<int> AddProductCategoryAsync(string name)

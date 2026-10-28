@@ -48,7 +48,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
         viewModel.HasPackaging.Should().BeTrue();
         viewModel.IsPackagingLinked.Should().BeFalse();
-        viewModel.Costs.Packaging.Should().Be(30m);
+        viewModel.Costing.Costs.Packaging.Should().Be(30m);
 
         // One packaging to a product: the role isn't offered again. Nothing is typed into this form, so Save drops it.
         await viewModel.AddUsageCommand.Execute();
@@ -121,7 +121,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.IsPackagingLinked.Should().BeTrue();
         viewModel.IsPackagingEditable.Should().BeFalse();
         viewModel.PackagingLinkedToText.Should().Be("Linked to Gift Box Set (Sub-Assemblies)");
-        viewModel.Costs.Packaging.Should().Be(31.5m, "one set per piece: a ₱30 box and 30 cm of ribbon at ₱0.05");
+        viewModel.Costing.Costs.Packaging.Should().Be(31.5m, "one set per piece: a ₱30 box and 30 cm of ribbon at ₱0.05");
 
         await using (var dbContext = CreateDbContext())
         {
@@ -221,7 +221,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.PackagingLinkedToText.Should().Be("Linked to Ensaymada Packaging (Sub-Assemblies)");
         viewModel.IsPackagingEditable.Should().BeFalse("a linked set's lines are kept on the Sub-Assemblies screen");
         viewModel.CanMovePackaging.Should().BeFalse();
-        viewModel.Costs.Packaging.Should().Be(60m, "one set per piece, as the lines were: two ₱30 boxes");
+        viewModel.Costing.Costs.Packaging.Should().Be(60m, "one set per piece, as the lines were: two ₱30 boxes");
 
         await using var dbContext = CreateDbContext();
         var set = await dbContext.SubAssemblies.SingleAsync(Cancellation);
@@ -296,7 +296,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
             viewModel.RecipeTabs.Should().BeEmpty();
             viewModel.SelectedRecipeTab.Should().BeNull();
             viewModel.HasPackaging.Should().BeFalse();
-            viewModel.Costs.Packaging.Should().Be(0m);
+            viewModel.Costing.Costs.Packaging.Should().Be(0m);
 
             await viewModel.SaveCommand.Execute();
             viewModel.ErrorMessage.Should().BeNull();
