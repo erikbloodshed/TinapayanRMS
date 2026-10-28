@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**`PLAN.md` is the project guide and the source of truth** for the tech stack, domain model, application architecture, build phases and conventions. This file only covers what you need before you open it, and it doesn't repeat PLAN.md. PLAN.md is about 1,150 lines of very long bullets (roughly 150k tokens), so it can't be read in one go. List its sections with `grep -n "^#" PLAN.md`, then read the ones the task touches. Keep PLAN.md up to date when a decision changes.
+**`PLAN.md` is the project guide and the source of truth** for the tech stack, domain model, application architecture and conventions. This file only covers what you need before you open it, and it doesn't repeat PLAN.md. PLAN.md opens with an overview ("At a glance"), then about 800 lines of very long bullets (roughly 95k tokens), so it can't be read in one go. List its sections with `grep -n "^#" PLAN.md`, then read the ones the task touches. Its largest parts live in `docs/plan/` and are still part of it: each main screen's design notes (`products-screen.md`, `raw-materials-screen.md`, `sub-assemblies-screen.md`), the Syncfusion notes (`syncfusion.md`), and the build plan with its dated change log and open items (`build-plan.md`). Keep PLAN.md and those files up to date when a decision changes.
 
 TinapayanRMS is a WPF desktop app for a bakeshop. It tracks raw material prices and cascades cost changes up through made ingredients and sub-assemblies to each finished product's cost and selling price.
 
@@ -58,4 +58,4 @@ dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-
 
 - **Prefer a Syncfusion control over its native WPF equivalent.** All Syncfusion packages share one version, the `SyncfusionVersion` property in `Directory.Packages.props`, so they upgrade together. The theme is the `Syncfusion.Themes.Windows11Light.WPF` package.
 - **To learn how a Syncfusion control is meant to be used**, start with the `syncfusion-wpf-*` skills in `.claude/skills/`. Next, check the local Sample Browser source at `C:\Users\Public\Documents\Syncfusion\WPF\34.2.2\SampleBrowser\` (a v34 install, older than the v35 packages), and grep file contents there, since demo filenames often don't name the control. Only then decompile the assembly with `ilspycmd`.
-- **Before launching the app to test it**, close any copy the user already has open. Run the app on the secondary monitor. PLAN.md's Application Architecture section has the UI-automation notes (DPI awareness, which Syncfusion controls need real clicks).
+- **Before launching the app to test it**, close any copy the user already has open. Run the app on the secondary monitor. PLAN.md's Application Architecture section and `docs/plan/syncfusion.md` have the UI-automation notes (DPI awareness, which Syncfusion controls need real clicks).
