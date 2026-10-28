@@ -1298,7 +1298,7 @@ When you compare the behaviour of two versions of the code, clean the UI project
 
 ### Driving the UI from a script
 
-Off-screen harnesses and UI-automation scripts have pitfalls that PLAN.md records in detail (Application Architecture and Development Environment, and [docs/plan/syncfusion.md](plan/syncfusion.md)). In short:
+To drive the running app (launch it on the secondary monitor, click, type, capture the window or a popup), use [.claude/skills/run-tinapayanrms/driver.ps1](../.claude/skills/run-tinapayanrms/driver.ps1); its SKILL.md lists the commands and what trips them up. Off-screen harnesses and UI-automation scripts have pitfalls that PLAN.md records in detail (Application Architecture and Development Environment, and [docs/plan/syncfusion.md](plan/syncfusion.md)). In short:
 
 - Make the script's thread per-monitor DPI-aware before it places, clicks or captures anything, because the app is per-monitor DPI-aware ([app.manifest](../src/TinapayanRMS.UI/app.manifest)).
 - Find the main window by its class and title. `Process.MainWindowHandle` can pick one of the app's hidden windows.
