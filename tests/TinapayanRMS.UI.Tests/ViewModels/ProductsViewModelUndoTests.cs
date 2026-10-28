@@ -34,23 +34,23 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
     public async Task Undoing_a_grams_edit_puts_the_line_and_the_costs_back()
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
-        var line = viewModel.FormLines.Single();
-        viewModel.UsageFormTotalWeightText.Should().Be("1,000 g");
+        var line = viewModel.UsageForm.FormLines.Single();
+        viewModel.UsageForm.UsageFormTotalWeightText.Should().Be("1,000 g");
 
         Edit(viewModel, () => line.Grams = 500m);
 
         viewModel.History.CanUndo.Should().BeTrue();
-        viewModel.UsageFormTotalWeightText.Should().Be("500 g");
+        viewModel.UsageForm.UsageFormTotalWeightText.Should().Be("500 g");
 
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.FormLines.Single().Grams.Should().Be(1000m);
-        viewModel.UsageFormTotalWeightText.Should().Be("1,000 g", "the restore works the form's figures out again, once");
+        viewModel.UsageForm.FormLines.Single().Grams.Should().Be(1000m);
+        viewModel.UsageForm.UsageFormTotalWeightText.Should().Be("1,000 g", "the restore works the form's figures out again, once");
         viewModel.History.CanUndo.Should().BeFalse();
         viewModel.History.CanRedo.Should().BeTrue();
 
         viewModel.TryRedo().Should().BeTrue();
-        viewModel.FormLines.Single().Grams.Should().Be(500m);
+        viewModel.UsageForm.FormLines.Single().Grams.Should().Be(500m);
     }
 
     [Fact]
@@ -59,8 +59,8 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         // The state a restore through the public setters loses silently: a percentage typed, then the base
         // unticked, so nothing can be typed into the percentage column and the figure is only being held.
         var (viewModel, ingredients) = await OpenTwoLineProductAsync();
-        var flour = viewModel.FormLines[0];
-        var sugar = viewModel.FormLines[1];
+        var flour = viewModel.UsageForm.FormLines[0];
+        var sugar = viewModel.UsageForm.FormLines[1];
 
         sugar.Percent = 65m;
         sugar.AuthoredBakersPercent.Should().Be(65m);
@@ -71,27 +71,27 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         Edit(viewModel, () => viewModel.EditingName = "Renamed");
         viewModel.TryUndo().Should().BeTrue();
 
-        var restored = viewModel.FormLines[1];
+        var restored = viewModel.UsageForm.FormLines[1];
         restored.AuthoredBakersPercent.Should().Be(65m, "the percentage was waiting for a base, not thrown away");
 
         // And it still works out the grams once a base comes back, which is the only way the loss would show.
-        viewModel.FormLines[0].IsFormulaBase = true;
-        viewModel.FormLines[0].Grams = 2000m;
-        viewModel.FormLines[1].Grams.Should().Be(1300m, "65% of the 2,000 g base");
+        viewModel.UsageForm.FormLines[0].IsFormulaBase = true;
+        viewModel.UsageForm.FormLines[0].Grams = 2000m;
+        viewModel.UsageForm.FormLines[1].Grams.Should().Be(1300m, "65% of the 2,000 g base");
     }
 
     [Fact]
     public async Task Undoing_a_grams_edit_leaves_another_lines_typed_percentage_alone()
     {
         var (viewModel, _) = await OpenTwoLineProductAsync();
-        viewModel.FormLines[1].Percent = 50m;
+        viewModel.UsageForm.FormLines[1].Percent = 50m;
 
-        Edit(viewModel, () => viewModel.FormLines[0].Grams = 1200m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines[0].Grams = 1200m);
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.FormLines[0].Grams.Should().Be(1000m);
-        viewModel.FormLines[1].AuthoredBakersPercent.Should().Be(50m);
-        viewModel.FormLines[1].IsPercentTyped.Should().BeTrue("the figure it keeps is still the typed percentage");
+        viewModel.UsageForm.FormLines[0].Grams.Should().Be(1000m);
+        viewModel.UsageForm.FormLines[1].AuthoredBakersPercent.Should().Be(50m);
+        viewModel.UsageForm.FormLines[1].IsPercentTyped.Should().BeTrue("the figure it keeps is still the typed percentage");
     }
 
     [Fact]
@@ -100,12 +100,12 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var (viewModel, seeded) = await OpenOneSubAssemblyProductAsync();
 
         // An ingredient picked with no grams yet: a legitimate row, and one no constructor can rebuild.
-        Edit(viewModel, () => viewModel.FormLines.Add(new IngredientLineRow { IngredientId = seeded.Ingredients.SugarId }));
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = seeded.Ingredients.SugarId }));
         Edit(viewModel, () => viewModel.EditingName = "Renamed");
 
         viewModel.TryUndo().Should().BeTrue();
 
-        var added = viewModel.FormLines.Should().HaveCount(2).And.Subject.Last();
+        var added = viewModel.UsageForm.FormLines.Should().HaveCount(2).And.Subject.Last();
         added.IngredientId.Should().Be(seeded.Ingredients.SugarId);
         added.Grams.Should().BeNull("it was half filled in, and that's how it comes back");
     }
@@ -114,13 +114,13 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
     public async Task Undoing_a_removed_line_puts_it_back()
     {
         var (viewModel, _) = await OpenTwoLineProductAsync();
-        viewModel.SelectedFormLine = viewModel.FormLines[1];
+        viewModel.UsageForm.SelectedFormLine = viewModel.UsageForm.FormLines[1];
 
         await viewModel.RemoveFormLineCommand.Execute();
-        viewModel.FormLines.Should().ContainSingle();
+        viewModel.UsageForm.FormLines.Should().ContainSingle();
 
         viewModel.TryUndo().Should().BeTrue();
-        viewModel.FormLines.Should().HaveCount(2);
+        viewModel.UsageForm.FormLines.Should().HaveCount(2);
     }
 
     [Fact]
@@ -131,7 +131,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var (viewModel, seeded) = await OpenOneSubAssemblyProductAsync();
         var subAssemblyId = await SubAssemblyIdAsync(seeded.ProductId, seeded.DoughRoleId);
 
-        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 500m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 500m);
         viewModel.TryUndo().Should().BeTrue();
 
         await viewModel.SaveCommand.Execute();
@@ -169,7 +169,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var filling = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
         viewModel.SelectedRecipeTab = dough;
-        viewModel.EditingUsageWeightPerPiece = 75m;
+        viewModel.UsageForm.EditingUsageWeightPerPiece = 75m;
 
         // Leaving the tab applies the form, which is one step.
         viewModel.SelectedRecipeTab = filling;
@@ -216,12 +216,12 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         // And a field still holding the cursor after the change records what's typed into it next.
         recorder.BeginUndoStep();
         viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
-        viewModel.EditingUsageWeightPerPiece = 12m;
+        viewModel.UsageForm.EditingUsageWeightPerPiece = 12m;
         recorder.EndUndoStep();
 
         viewModel.History.CanUndo.Should().BeTrue();
         viewModel.TryUndo().Should().BeTrue();
-        viewModel.EditingUsageWeightPerPiece.Should().Be(10m);
+        viewModel.UsageForm.EditingUsageWeightPerPiece.Should().Be(10m);
         viewModel.History.CanUndo.Should().BeFalse("the change of tab was never a step of its own");
     }
 
@@ -235,14 +235,14 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var filling = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
         viewModel.SelectedRecipeTab = dough;
-        viewModel.EditingUsageWeightPerPiece = 75m;
+        viewModel.UsageForm.EditingUsageWeightPerPiece = 75m;
         viewModel.SelectedRecipeTab = filling;
         viewModel.TryUndo().Should().BeTrue();
 
         // Back to Dough's tab by hand, then type and leave: the apply must still happen, which it wouldn't if
         // the restore had left behind a stale note of which tab's form was open.
         viewModel.SelectedRecipeTab = dough;
-        viewModel.EditingUsageWeightPerPiece = 80m;
+        viewModel.UsageForm.EditingUsageWeightPerPiece = 80m;
         viewModel.SelectedRecipeTab = filling;
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -254,7 +254,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
         var tabsBefore = viewModel.RecipeTabs.Count;
-        var linesBefore = viewModel.FormLines.Count;
+        var linesBefore = viewModel.UsageForm.FormLines.Count;
 
         await viewModel.AddUsageCommand.Execute();
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.AddSubAssemblyTab);
@@ -264,7 +264,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.RecipeTabs.Should().NotContain(viewModel.AddSubAssemblyTab);
         viewModel.RecipeTabs.Should().HaveCount(tabsBefore);
         viewModel.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>();
-        viewModel.FormLines.Should().HaveCount(linesBefore, "the form the add replaced is back with its lines");
+        viewModel.UsageForm.FormLines.Should().HaveCount(linesBefore, "the form the add replaced is back with its lines");
     }
 
     [Fact]
@@ -315,7 +315,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.History.CanUndo.Should().BeFalse();
 
         // Retyped to the value it already had.
-        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 1000m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 1000m);
         viewModel.History.CanUndo.Should().BeFalse();
     }
 
@@ -327,9 +327,9 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var (viewModel, seeded) = await OpenOneSubAssemblyProductAsync();
 
         await viewModel.AddUsageCommand.Execute();
-        viewModel.EditingUsageRole = viewModel.FormRoleOptions.First(r => r.Name == "Dough");
-        viewModel.FormLines.Add(new IngredientLineRow { IngredientId = seeded.Ingredients.SugarId, Grams = 500m });
-        viewModel.EditingUsageWeightPerPiece = 20m;
+        viewModel.UsageForm.EditingUsageRole = viewModel.UsageForm.FormRoleOptions.First(r => r.Name == "Dough");
+        viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = seeded.Ingredients.SugarId, Grams = 500m });
+        viewModel.UsageForm.EditingUsageWeightPerPiece = 20m;
 
         var stepsBefore = viewModel.History.CanUndo;
         viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First();
@@ -383,7 +383,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
 
         Edit(viewModel, () => viewModel.EditingName = "Renamed");
-        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 500m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 500m);
         viewModel.History.CanUndo.Should().BeTrue();
 
         await viewModel.RevertCommand.Execute();
@@ -449,7 +449,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeFalse();
 
         // Typed into the form and not applied: Save applies it on the way in, so it counts.
-        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 1500m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 1500m);
 
         (await CanSave(viewModel)).Should().BeTrue();
     }
@@ -473,7 +473,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeFalse("clicking through the sections writes nothing");
 
         // And the form is still live: typing in the one now showing does offer Save.
-        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 1500m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 1500m);
         (await CanSave(viewModel)).Should().BeTrue();
     }
 
@@ -493,17 +493,17 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
 
         await viewModel.AddUsageCommand.Execute(mode);
-        viewModel.EditingUsageMode.Should().Be(mode);
+        viewModel.UsageForm.EditingUsageMode.Should().Be(mode);
         (await CanSave(viewModel)).Should().BeFalse("nothing has been entered in the add form");
 
         // Another way picked on the drop-down over the untouched form only changes its way.
         var other = mode == UsageFormMode.Link ? UsageFormMode.Copy : UsageFormMode.Link;
         await viewModel.AddUsageCommand.Execute(other);
-        viewModel.EditingUsageMode.Should().Be(other);
+        viewModel.UsageForm.EditingUsageMode.Should().Be(other);
         (await CanSave(viewModel)).Should().BeFalse("the form is still empty");
 
         // Picking what to link or copy is an entry, though.
-        Edit(viewModel, () => viewModel.EditingUsageSource = viewModel.LinkableSubAssemblies.First());
+        Edit(viewModel, () => viewModel.UsageForm.EditingUsageSource = viewModel.UsageForm.LinkableSubAssemblies.First());
         (await CanSave(viewModel)).Should().BeTrue();
     }
 
@@ -528,8 +528,8 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
         await WaitUntilSettledAsync(
-            () => viewModel.AreDetailsReady && viewModel.FormLines.Count == 1,
-            () => $"details={viewModel.AreDetailsReady} lines={viewModel.FormLines.Count}");
+            () => viewModel.AreDetailsReady && viewModel.UsageForm.FormLines.Count == 1,
+            () => $"details={viewModel.AreDetailsReady} lines={viewModel.UsageForm.FormLines.Count}");
 
         (await CanSave(viewModel)).Should().BeFalse("what was written is the new starting point");
     }
@@ -606,17 +606,17 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var productId = await AddProductAsync("Cheese Roll");
         await SaveRecipeAsync(productId, new RecipeDraft(
             [new NewSubAssemblyDraft(fillingRoleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
-        var viewModel = await OpenAsync(productId, vm => vm.FormLines.Count == 1);
-        viewModel.IsEditingOwnedUsage.Should().BeTrue();
+        var viewModel = await OpenAsync(productId, vm => vm.UsageForm.FormLines.Count == 1);
+        viewModel.UsageForm.IsEditingOwnedUsage.Should().BeTrue();
 
-        await viewModel.MoveToSubAssembliesCommand.Execute(viewModel.EditingUsage!);
+        await viewModel.MoveToSubAssembliesCommand.Execute(viewModel.UsageForm.EditingUsage!);
         viewModel.UsageEdits.Single().IsReleasing.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeTrue();
 
         viewModel.TryUndo().Should().BeTrue();
 
         viewModel.UsageEdits.Single().IsReleasing.Should().BeFalse();
-        viewModel.IsEditingOwnedUsage.Should().BeTrue();
+        viewModel.UsageForm.IsEditingOwnedUsage.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeFalse();
 
         viewModel.TryRedo().Should().BeTrue();
@@ -633,17 +633,17 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var productId = await AddProductAsync("Cheese Roll");
         await SaveRecipeAsync(productId, new RecipeDraft(
             [new NewSubAssemblyDraft(fillingRoleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
-        var viewModel = await OpenAsync(productId, vm => vm.FormLines.Count == 1);
+        var viewModel = await OpenAsync(productId, vm => vm.UsageForm.FormLines.Count == 1);
         viewModel.PromptForMadeIngredient.RegisterHandler(interaction => interaction.SetOutput(new ChoicePromptResult("Cheese Filling", 0)));
 
-        await viewModel.MoveToInHouseCommand.Execute(viewModel.EditingUsage!);
+        await viewModel.MoveToInHouseCommand.Execute(viewModel.UsageForm.EditingUsage!);
         viewModel.UsageEdits.Single().IsMovingToInHouse.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeTrue();
 
         viewModel.TryUndo().Should().BeTrue();
 
         viewModel.UsageEdits.Single().IsMovingToInHouse.Should().BeFalse();
-        viewModel.CanMoveEditingUsageToInHouse.Should().BeTrue();
+        viewModel.UsageForm.CanMoveEditingUsageToInHouse.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeFalse();
 
         viewModel.TryRedo().Should().BeTrue();
@@ -671,13 +671,13 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         // The other half of taking the settled form back from when the step was taken: it's the form as the
         // section showed, not as it was typed into, so typing an undo puts back still counts as a change.
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
-        viewModel.EditingUsageWeightPerPiece = 70m;
+        viewModel.UsageForm.EditingUsageWeightPerPiece = 70m;
 
         Edit(viewModel, () => viewModel.EditingName = "Renamed");
         viewModel.TryUndo().Should().BeTrue();
 
         viewModel.EditingName.Should().Be("Ube Roll");
-        viewModel.EditingUsageWeightPerPiece.Should().Be(70m);
+        viewModel.UsageForm.EditingUsageWeightPerPiece.Should().Be(70m);
         (await CanSave(viewModel)).Should().BeTrue("the 70 g typed into the form isn't in the recipe yet, and Save would write it");
     }
 
@@ -710,7 +710,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         await SaveRecipeAsync(productId, new RecipeDraft(
             [new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m)], []));
 
-        var viewModel = await OpenAsync(productId, vm => vm.FormLines.Count == 1);
+        var viewModel = await OpenAsync(productId, vm => vm.UsageForm.FormLines.Count == 1);
         return (viewModel, new Seeded(productId, doughRoleId, new SeededIngredients(flourId, sugarId)));
     }
 
@@ -724,7 +724,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var productId = await AddProductAsync("Ube Roll");
         await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 50m)]));
 
-        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 1 && vm.FormLines.Count == 1);
+        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 1 && vm.UsageForm.FormLines.Count == 1);
         return (viewModel, doughId);
     }
 
@@ -741,8 +741,8 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
             ],
             []));
 
-        var viewModel = await OpenAsync(productId, vm => vm.FormLines.Count == 2);
-        viewModel.FormLines[0].IsFormulaBase = true;
+        var viewModel = await OpenAsync(productId, vm => vm.UsageForm.FormLines.Count == 2);
+        viewModel.UsageForm.FormLines[0].IsFormulaBase = true;
         return (viewModel, new SeededIngredients(flourId, sugarId));
     }
 
@@ -796,7 +796,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await WaitUntilSettledAsync(
             () => viewModel.AreDetailsReady && ready(viewModel),
-            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.FormLines.Count}");
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
 
         viewModel.History.CanUndo.Should().BeFalse("the load itself isn't a change");
         return viewModel;

@@ -82,13 +82,13 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         await viewModel.AddUsageCommand.Execute(UsageFormMode.New);
         viewModel.RecipeTabs.Should().Equal(viewModel.ComponentsTab, viewModel.AddSubAssemblyTab);
         viewModel.AddSubAssemblyTab.Header.Should().Be("New Sub-Assembly");
-        viewModel.FormRoleOptions.Select(r => r.Name).Should().Equal("Topping", "Packaging");
-        viewModel.EditingUsageRole!.Name.Should().Be("Topping");
-        viewModel.IsFormPackaging.Should().BeFalse();
+        viewModel.UsageForm.FormRoleOptions.Select(r => r.Name).Should().Equal("Topping", "Packaging");
+        viewModel.UsageForm.EditingUsageRole!.Name.Should().Be("Topping");
+        viewModel.UsageForm.IsFormPackaging.Should().BeFalse();
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
-        viewModel.LinkableSubAssemblies.Should().NotContain(o => !o.IsPackaging, "the products' sections are all Dough");
+        viewModel.UsageForm.LinkableSubAssemblies.Should().NotContain(o => !o.IsPackaging, "the products' sections are all Dough");
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
-        viewModel.LinkableSubAssemblies.Should().NotContain(o => !o.IsPackaging);
+        viewModel.UsageForm.LinkableSubAssemblies.Should().NotContain(o => !o.IsPackaging);
 
         // Back to a product of sub-assemblies: New takes the Products tab away.
         await viewModel.NewCommand.Execute();
@@ -160,9 +160,9 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
 
         // 500 g of icing at 0.10 a gram, 100 g of it on one box: 10.00.
         await viewModel.AddUsageCommand.Execute(UsageFormMode.New);
-        viewModel.EditingUsageRole!.Id.Should().Be(toppingRoleId);
-        viewModel.FormLines.Add(new IngredientLineRow { IngredientId = icingId, Grams = 500m });
-        viewModel.EditingUsageWeightPerPiece = 100m;
+        viewModel.UsageForm.EditingUsageRole!.Id.Should().Be(toppingRoleId);
+        viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = icingId, Grams = 500m });
+        viewModel.UsageForm.EditingUsageWeightPerPiece = 100m;
 
         await viewModel.SaveCommand.Execute();
         await WaitUntilSettledAsync(

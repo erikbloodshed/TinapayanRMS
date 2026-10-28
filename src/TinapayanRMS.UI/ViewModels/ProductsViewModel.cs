@@ -156,12 +156,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     public ObservableCollection<SubAssemblyRole> Roles { get; } = [];
 
-    /// <summary>
-    /// The roles the sub-assembly form offers: every recipe role, as a recipe can have several sub-assemblies in one,
-    /// told apart by their names; and the Packaging role while there's no packaging.
-    /// </summary>
-    public ObservableCollection<SubAssemblyRole> FormRoleOptions { get; } = [];
-
     /// <summary>The ingredients only, for a sub-assembly's lines: packaging never goes in a recipe.</summary>
     public ObservableCollection<RawMaterial> Ingredients { get; } = [];
 
@@ -309,68 +303,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The standalone packaging sets (sub-assemblies in the Packaging role), by name, as last loaded, for the form's picker.</summary>
     private IReadOnlyList<SubAssembly> _packagingSets = [];
 
-    /// <summary>
-    /// The add form's packaging lines, when it adds packaging (IsFormPackaging): how much of each material one piece
-    /// takes. Typed into for a new or copied packaging; read-only for a link, whose lines are kept where it's from.
-    /// </summary>
-    public ObservableCollection<PackagingLineRow> FormPackagingLines { get; } = [];
-
-    /// <summary>The line the form's packaging table's add row edits, priced as its material is picked.</summary>
-    public Func<PackagingLineRow> NewFormPackagingLine => () => new PackagingLineRow(FindPackagingMaterial) { CostBasis = CostBasis };
-
-    private PackagingLineRow? _selectedFormPackagingLine;
-    public PackagingLineRow? SelectedFormPackagingLine
-    {
-        get => _selectedFormPackagingLine;
-        set => this.RaiseAndSetIfChanged(ref _selectedFormPackagingLine, value);
-    }
-
-    /// <summary>
-    /// The add form adds the product's packaging rather than a recipe section: the Packaging role is picked for a new one,
-    /// or a packaging source for a link or a copy. It then shows the packaging table in place of the ingredients, add-ins
-    /// and piece size, and Apply fills the Packaging tab.
-    /// </summary>
-    public bool IsFormPackaging => IsAddingUsage && EditingUsageMode switch
-    {
-        UsageFormMode.Link => EditingUsageSource?.IsPackaging == true,
-        UsageFormMode.Copy => EditingUsageSource is { } source ? source.IsPackaging : EditingUsageRole?.IsPackaging == true,
-        _ => EditingUsageRole?.IsPackaging == true,
-    };
-
-    /// <summary>The form's packaging table can be typed into: a new or copied packaging, not a link.</summary>
-    public bool IsFormEditingPackaging => IsFormPackaging && EditingUsageMode != UsageFormMode.Link;
-
-    /// <summary>
-    /// The add form makes a new sub-assembly that Save keeps on the Sub-Assemblies screen, linked: its role isn't
-    /// product-owned (SubAssemblyRole.IsProductOwned), where it would stay the product's own, and it isn't packaging.
-    /// The form's "Moves to Sub-Assemblies on Save" badge shows then, in the place of a title.
-    /// </summary>
-    public bool IsFormNewMovingToSubAssemblies =>
-        IsAddingUsage && EditingUsageMode == UsageFormMode.New && EditingUsageRole is { IsPackaging: false, IsProductOwned: false };
-
-    /// <summary>
-    /// Other products' sub-assemblies the form can link or copy. Linking leaves out the ones the recipe
-    /// already uses; a product never links or copies its own.
-    /// </summary>
-    public ObservableCollection<LinkableSubAssemblyOption> LinkableSubAssemblies { get; } = [];
-
-    /// <summary>The sub-assembly form's lines, for a new section: typed straight into its table.</summary>
-    public ObservableCollection<IngredientLineRow> FormLines { get; } = [];
-
-    /// <summary>The line the form table's add row edits: it prices itself as its ingredient is picked, before it's committed.</summary>
-    public Func<IngredientLineRow> NewFormLine => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id), _formFormulaBase) { CostBasis = CostBasis };
-
-    /// <summary>
-    /// The form's add-ins, for a sub-assembly the product links: its own extras on top of the owner's
-    /// recipe, typed straight into their own table under it.
-    /// </summary>
-    public ObservableCollection<IngredientLineRow> FormAddIns { get; } = [];
-
-    /// <summary>The add-in the form table's add row edits, priced as its ingredient is picked.</summary>
-    public Func<IngredientLineRow> NewFormAddIn => () => new IngredientLineRow(id => Ingredients.FirstOrDefault(m => m.Id == id), _formFormulaBase) { CostBasis = CostBasis };
-
-    /// <summary>The form's formula base as last worked out, for a line started in either table's add row.</summary>
-    private decimal _formFormulaBase;
 
     private string _searchText = string.Empty;
     public string SearchText
@@ -574,6 +506,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>A composite's Products table: its lines, the add row, the product cell's options, and what each product brings.</summary>
     public ProductComponents ComponentsTable { get; }
 
+    /// <summary>The add/edit sub-assembly form: the section it edits or adds, its fields and tables, and what it shows.</summary>
+    public ProductUsageForm UsageForm { get; }
+
     private int _scalingUnits = 1;
     /// <summary>
     /// How many sellable units the Scaling tab scales the recipe to: boxes for a Box of 8, pieces for a product sold by
@@ -622,302 +557,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>Products whose recipe the Scaling tab is reading, so each is read once however often it's asked for.</summary>
     private readonly HashSet<int> _readingScalingProducts = [];
 
-    // The add/edit sub-assembly form: the section it edits (null when it adds one), and its fields.
-    private ProductUsageEdit? _editingUsage;
-
-    /// <summary>
-    /// The section the form edits, or null while it adds one. A sub-assembly's tab is its form, so this is the
-    /// tab's own section whenever one shows; the form's header reads its name, badges and where it's linked from.
-    /// </summary>
-    public ProductUsageEdit? EditingUsage
-    {
-        get => _editingUsage;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _editingUsage, value);
-            this.RaisePropertyChanged(nameof(IsEditingLinkedUsage));
-            this.RaisePropertyChanged(nameof(IsEditingOwnedUsage));
-            this.RaisePropertyChanged(nameof(CanMoveEditingUsageToInHouse));
-            this.RaisePropertyChanged(nameof(IsFormLinesEditable));
-
-            // A link being changed belongs to the section it was started on.
-            IsChangingLink = false;
-            this.RaisePropertyChanged(nameof(IsShowingLinkBadge));
-        }
-    }
-
     /// <summary>The products other than this one that use <paramref name="subAssemblyId"/>, by name.</summary>
     private List<string> OtherProductsUsing(int subAssemblyId, IReadOnlyDictionary<int, IReadOnlyList<LinkingProduct>> usedBy) =>
         [.. usedBy.GetValueOrDefault(subAssemblyId, [])
             .Where(p => p.Id != _detailProductId)
             .Select(p => p.Name)
             .Order(StringComparer.CurrentCultureIgnoreCase)];
-
-    /// <summary>
-    /// The form edits a section linked from elsewhere, so Unlink and Make a Copy have something to copy. A plain
-    /// <c>EditingUsage.IsLinked</c> binding can't say this: with no section it has no value at all, and the
-    /// button would fall back to showing.
-    /// </summary>
-    public bool IsEditingLinkedUsage => EditingUsage?.IsLinked == true;
-
-    private bool _isChangingLink;
-    /// <summary>
-    /// The badge's Edit was pressed: a picker of the sub-assemblies it could link instead (ChangeLinkOptions) stands in
-    /// for the badge until one is picked or the change is cancelled.
-    /// </summary>
-    public bool IsChangingLink
-    {
-        get => _isChangingLink;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _isChangingLink, value);
-            this.RaisePropertyChanged(nameof(IsShowingLinkBadge));
-        }
-    }
-
-    /// <summary>A linked section's badge and its Edit show: the form edits one, and its link isn't being changed.</summary>
-    public bool IsShowingLinkBadge => IsEditingLinkedUsage && !IsChangingLink;
-
-    /// <summary>
-    /// What a linked section can link instead: the Sub-Assemblies screen's recipes the recipe doesn't use yet, whatever
-    /// their role. Packaging goes through the Packaging tab, and a product's own sub-assembly is never linked.
-    /// </summary>
-    public ObservableCollection<LinkableSubAssemblyOption> ChangeLinkOptions { get; } = [];
-
-    private LinkableSubAssemblyOption? _changeLinkTarget;
-    /// <summary>The sub-assembly picked to link instead: picking it relinks the section (ChangeLinkAsync).</summary>
-    public LinkableSubAssemblyOption? ChangeLinkTarget
-    {
-        get => _changeLinkTarget;
-        set => this.RaiseAndSetIfChanged(ref _changeLinkTarget, value);
-    }
-
-    /// <summary>
-    /// The form edits one of the product's own that isn't already on its way to the Sub-Assemblies screen, so Move to
-    /// Sub-Assemblies has something to move. Its own property for the same reason as <see cref="IsEditingLinkedUsage"/>.
-    /// </summary>
-    public bool IsEditingOwnedUsage => EditingUsage is { IsOwned: true, IsReleasing: false, IsMovingToInHouse: false };
-
-    /// <summary>The form edits one of the product's own that Move to In-House can move (ProductUsageEdit.CanMoveToInHouse).</summary>
-    public bool CanMoveEditingUsageToInHouse => EditingUsage is { CanMoveToInHouse: true };
-
-    private bool _isUsageFormOpen;
-    public bool IsUsageFormOpen
-    {
-        get => _isUsageFormOpen;
-        private set => this.RaiseAndSetIfChanged(ref _isUsageFormOpen, value);
-    }
-
-    private string _usageFormTitle = string.Empty;
-    public string UsageFormTitle
-    {
-        get => _usageFormTitle;
-        private set => this.RaiseAndSetIfChanged(ref _usageFormTitle, value);
-    }
-
-    /// <summary>Adding, not editing: only then can the form's sub-assembly be an existing one, linked or copied.</summary>
-    private bool _isAddingUsage = true;
-    public bool IsAddingUsage
-    {
-        get => _isAddingUsage;
-        private set => this.RaiseAndSetIfChanged(ref _isAddingUsage, value);
-    }
-
-    private UsageFormMode _editingUsageMode;
-    /// <summary>Which way the add form takes its sub-assembly: what Add Sub-Assembly's drop-down picked.</summary>
-    public UsageFormMode EditingUsageMode
-    {
-        get => _editingUsageMode;
-        set => this.RaiseAndSetIfChanged(ref _editingUsageMode, value);
-    }
-
-    private bool _isFormEditingLines = true;
-    /// <summary>The form edits a new section: its name and role show, and its lines are typed into.</summary>
-    public bool IsFormEditingLines
-    {
-        get => _isFormEditingLines;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _isFormEditingLines, value);
-            this.RaisePropertyChanged(nameof(IsFormLinesEditable));
-            this.RaisePropertyChanged(nameof(IsFormShowingLines));
-            this.RaisePropertyChanged(nameof(IsFormShowingAddIns));
-            this.RaisePropertyChanged(nameof(HasFormAddIns));
-            this.RaisePropertyChanged(nameof(IsFormShowingNoAddIns));
-        }
-    }
-
-    /// <summary>
-    /// The form's lines table shows: the product's own lines, to type into, or a linked one's, read-only. A link
-    /// has none to show until the sub-assembly it comes from has been picked and its lines loaded.
-    /// </summary>
-    public bool IsFormShowingLines => IsFormEditingLines || FormLines.Count > 0;
-
-    /// <summary>
-    /// The form's lines can be typed into: a new or own section's, and a linked one's too, which Save writes to the
-    /// sub-assembly where it's kept, for every product linking it. Only a link being picked shows them read-only.
-    /// </summary>
-    public bool IsFormLinesEditable => IsFormEditingLines || IsEditingLinkedUsage;
-
-    /// <summary>
-    /// The form's add-ins table shows, always, empty or not: only for a sub-assembly the product links, and only
-    /// once the recipe it sits on top of is there to sit on. A sub-assembly of the product's own has no add-ins —
-    /// its extras just go in its lines. There was a Show/Hide Add-Ins toggle before (until 2026-09-28): a shut
-    /// table hid that the batch had extras in it, so the table stays open and the badge above the lines says
-    /// whether it has any (FormAddInsBadgeText).
-    /// </summary>
-    public bool IsFormShowingAddIns => !IsFormEditingLines && IsFormShowingLines;
-
-    /// <summary>The add-ins table's lines with an ingredient picked: the add row, or a line not yet picked, isn't one.</summary>
-    public int FormAddInCount => FormAddIns.Count(l => l.IngredientId is not null);
-
-    /// <summary>The add-ins badge beside a linked recipe's badge is a link: it has add-ins, and a click scrolls down to them.</summary>
-    public bool HasFormAddIns => IsFormShowingAddIns && FormAddInCount > 0;
-
-    /// <summary>The add-ins badge is a plain grey tag: a linked recipe with nothing added to it.</summary>
-    public bool IsFormShowingNoAddIns => IsFormShowingAddIns && FormAddInCount == 0;
-
-    /// <summary>The badge's text: "No add-ins", "1 add-in" or "3 add-ins".</summary>
-    public string FormAddInsBadgeText => FormAddInCount switch
-    {
-        0 => "No add-ins",
-        1 => "1 add-in",
-        var count => $"{count} add-ins",
-    };
-
-    private bool _isFormPickingSource;
-    /// <summary>The form links or copies an existing sub-assembly (another product's, or a standalone one): its picker shows.</summary>
-    public bool IsFormPickingSource
-    {
-        get => _isFormPickingSource;
-        private set => this.RaiseAndSetIfChanged(ref _isFormPickingSource, value);
-    }
-
-    private SubAssemblyRole? _editingUsageRole;
-    /// <summary>The role of the new section the form edits, which is what it's called. Picked from FormRoleOptions.</summary>
-    public SubAssemblyRole? EditingUsageRole
-    {
-        get => _editingUsageRole;
-        set => this.RaiseAndSetIfChanged(ref _editingUsageRole, value);
-    }
-
-    private string? _editingUsageName;
-    /// <summary>
-    /// The optional name of the new section the form edits: what tells it apart from others in its role,
-    /// its tab reading "Filling: Ube" beside "Filling: Cheese".
-    /// </summary>
-    public string? EditingUsageName
-    {
-        get => _editingUsageName;
-        set => this.RaiseAndSetIfChanged(ref _editingUsageName, value);
-    }
-
-    private LinkableSubAssemblyOption? _editingUsageSource;
-    /// <summary>The existing sub-assembly to link or copy.</summary>
-    public LinkableSubAssemblyOption? EditingUsageSource
-    {
-        get => _editingUsageSource;
-        set => this.RaiseAndSetIfChanged(ref _editingUsageSource, value);
-    }
-
-    private IngredientLineRow? _selectedFormLine;
-    public IngredientLineRow? SelectedFormLine
-    {
-        get => _selectedFormLine;
-        set => this.RaiseAndSetIfChanged(ref _selectedFormLine, value);
-    }
-
-    private IngredientLineRow? _selectedFormAddIn;
-    public IngredientLineRow? SelectedFormAddIn
-    {
-        get => _selectedFormAddIn;
-        set => this.RaiseAndSetIfChanged(ref _selectedFormAddIn, value);
-    }
-
-    // The piece size: the user types either figure, and the other follows from the batch weight. Only
-    // the one typed is kept (_usageAuthoredField); _syncingPieceSize stops each box setting the other back.
-    private UsageAuthoredField _usageAuthoredField = UsageAuthoredField.WeightPerPiece;
-    private bool _syncingPieceSize;
-
-    private decimal _editingUsageWeightPerPiece;
-    public decimal EditingUsageWeightPerPiece
-    {
-        get => _editingUsageWeightPerPiece;
-        set => this.RaiseAndSetIfChanged(ref _editingUsageWeightPerPiece, value);
-    }
-
-    private decimal _editingUsageYield;
-    public decimal EditingUsageYield
-    {
-        get => _editingUsageYield;
-        set => this.RaiseAndSetIfChanged(ref _editingUsageYield, value);
-    }
-
-
-
-    private string _usageFormTotalWeightText = "0 g";
-    /// <summary>The batch that goes in, e.g. "1,700 g".</summary>
-    public string UsageFormTotalWeightText
-    {
-        get => _usageFormTotalWeightText;
-        private set => this.RaiseAndSetIfChanged(ref _usageFormTotalWeightText, value);
-    }
-
-
-
-    private string _usageFormPieceSizeCaption = string.Empty;
-    /// <summary>Which figure stays put when the batch changes, e.g. "Weight per piece stays at 60 g if the batch changes".</summary>
-    public string UsageFormPieceSizeCaption
-    {
-        get => _usageFormPieceSizeCaption;
-        private set => this.RaiseAndSetIfChanged(ref _usageFormPieceSizeCaption, value);
-    }
-
-    private string _usageFormBaseCaption = string.Empty;
-    /// <summary>
-    /// The formula in baker's terms, e.g. "Base 1,000 g · whole formula 167.7%" — the figure a batch is scaled by — or,
-    /// with nothing ticked, what the absolute percentages are read against.
-    /// </summary>
-    public string UsageFormBaseCaption
-    {
-        get => _usageFormBaseCaption;
-        private set => this.RaiseAndSetIfChanged(ref _usageFormBaseCaption, value);
-    }
-
-    private string _usageFormPercentHeader = IngredientLineRow.PercentHeader(0m);
-    /// <summary>Both form tables' percentage header: "Baker's %" while the recipe has a base, "Absolute %" while it has none.</summary>
-    public string UsageFormPercentHeader
-    {
-        get => _usageFormPercentHeader;
-        private set => this.RaiseAndSetIfChanged(ref _usageFormPercentHeader, value);
-    }
-
-    private string _usageFormAddInsCaption = string.Empty;
-    /// <summary>The batch the two tables come to, e.g. "1,700 g from Sweet Dough + 20 g of add-ins = a 1,720 g batch."</summary>
-    public string UsageFormAddInsCaption
-    {
-        get => _usageFormAddInsCaption;
-        private set => this.RaiseAndSetIfChanged(ref _usageFormAddInsCaption, value);
-    }
-
-    private string _usageFormCostPerPieceText = "—";
-    /// <summary>
-    /// What a piece of the form's sub-assembly or packaging costs: the piece-size column's first tile, to two decimals
-    /// ("0.50"), and the packaging table's footer, to four ("0.5000").
-    /// </summary>
-    public string UsageFormCostPerPieceText
-    {
-        get => _usageFormCostPerPieceText;
-        private set => this.RaiseAndSetIfChanged(ref _usageFormCostPerPieceText, value);
-    }
-
-    private string _usageFormBatchCostText = "—";
-    /// <summary>What the form's whole batch costs, its lines and add-ins together, e.g. "73.98": the piece-size column's second tile.</summary>
-    public string UsageFormBatchCostText
-    {
-        get => _usageFormBatchCostText;
-        private set => this.RaiseAndSetIfChanged(ref _usageFormBatchCostText, value);
-    }
 
     private string _editingCloneName = string.Empty;
     public string EditingCloneName
@@ -1192,6 +837,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository,
             costingDefaultsRepository);
         Packaging = new ProductPackaging(FindPackagingMaterial, () => CostBasis);
+        UsageForm = new ProductUsageForm(id => Ingredients.FirstOrDefault(m => m.Id == id), FindPackagingMaterial, () => CostBasis);
         ComponentsTable = new ProductComponents(
             _savedProducts,
             id => Products.FirstOrDefault(p => p.Id == id),
@@ -1283,7 +929,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         _isUsageFormShowing = this.WhenAnyValue(
                 x => x.SelectedRecipeTab,
-                x => x.IsUsageFormOpen,
+                x => x.UsageForm.IsUsageFormOpen,
                 (tab, isFormOpen) => tab is SubAssemblyRecipeTab || (tab is AddSubAssemblyRecipeTab && isFormOpen))
             .ToProperty(this, x => x.IsUsageFormShowing);
 
@@ -1335,9 +981,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // The sub-assembly form: where its sub-assembly comes from, then the one it links or copies. The form starts
         // again empty in its new way, which is nothing to save yet, as StartAddingUsage's fresh form isn't.
-        this.WhenAnyValue(x => x.EditingUsageMode)
+        this.WhenAnyValue(x => x.UsageForm.EditingUsageMode)
             .Skip(1)
-            .Where(_ => !IsBusyApplying && IsUsageFormOpen && IsAddingUsage)
+            .Where(_ => !IsBusyApplying && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage)
             .Subscribe(_ =>
             {
                 StartUsageFormMode();
@@ -1346,13 +992,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // Every row put in a lines table, however it got there (a product read, an undo, a form opened), is priced at the
         // screen's costs, buffered or not; the add rows' factories see to a row still being typed.
-        FormLines.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
-        FormAddIns.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
-        FormPackagingLines.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
+        UsageForm.FormLines.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
+        UsageForm.FormAddIns.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
+        UsageForm.FormPackagingLines.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
         Packaging.LineEdits.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
 
         // A line picked, typed or deleted in the form's table: it's priced, and the batch and preview follow.
-        FormLines.ToObservableChangeSet()
+        UsageForm.FormLines.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
             .AutoRefresh(l => l.Grams)
             .AutoRefresh(l => l.IsFormulaBase)
@@ -1363,12 +1009,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     return;
                 }
 
-                IngredientLineRow.Resolve(FormLines, Ingredients.ToDictionary(m => m.Id));
+                IngredientLineRow.Resolve(UsageForm.FormLines, Ingredients.ToDictionary(m => m.Id));
                 FormLinesChanged();
             });
 
         // An add-in picked, typed or deleted: it's priced, and the batch it joins follows.
-        FormAddIns.ToObservableChangeSet()
+        UsageForm.FormAddIns.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
             .AutoRefresh(l => l.Grams)
             .Subscribe(_ =>
@@ -1378,12 +1024,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     return;
                 }
 
-                IngredientLineRow.Resolve(FormAddIns, Ingredients.ToDictionary(m => m.Id));
+                IngredientLineRow.Resolve(UsageForm.FormAddIns, Ingredients.ToDictionary(m => m.Id));
                 FormLinesChanged();
             });
 
         // A packaging line picked, typed or deleted in the add form: it's priced, and the preview follows.
-        FormPackagingLines.ToObservableChangeSet()
+        UsageForm.FormPackagingLines.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
             .AutoRefresh(l => l.CostPerUnit)
             .Subscribe(_ =>
@@ -1393,12 +1039,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     return;
                 }
 
-                PackagingLineRow.Resolve(FormPackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
+                PackagingLineRow.Resolve(UsageForm.FormPackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
                 RecomputeUsageForm();
             });
 
         // Whether the form adds packaging follows its mode, role and source.
-        this.WhenAnyValue(x => x.IsAddingUsage, x => x.EditingUsageMode, x => x.EditingUsageRole, x => x.EditingUsageSource)
+        this.WhenAnyValue(x => x.UsageForm.IsAddingUsage, x => x.UsageForm.EditingUsageMode, x => x.UsageForm.EditingUsageRole, x => x.UsageForm.EditingUsageSource)
             .Subscribe(_ =>
             {
                 if (IsRestoring)
@@ -1406,42 +1052,40 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     return;
                 }
 
-                this.RaisePropertyChanged(nameof(IsFormPackaging));
-                this.RaisePropertyChanged(nameof(IsFormEditingPackaging));
-                this.RaisePropertyChanged(nameof(IsFormNewMovingToSubAssemblies));
+                UsageForm.RaisePackagingChanged();
                 RecomputeUsageForm();
             });
 
         LoadLatest(
-            this.WhenAnyValue(x => x.EditingUsageSource)
+            this.WhenAnyValue(x => x.UsageForm.EditingUsageSource)
                 .Skip(1)
-                .Where(_ => !IsBusyApplying && IsUsageFormOpen && IsAddingUsage),
+                .Where(_ => !IsBusyApplying && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage),
             LoadUsageSourceAsync);
 
         // A sub-assembly picked to link instead relinks the section once its lines are in; a later pick overtakes it.
         LoadLatest(
-            this.WhenAnyValue(x => x.ChangeLinkTarget)
+            this.WhenAnyValue(x => x.UsageForm.ChangeLinkTarget)
                 .Skip(1)
-                .Where(target => target is not null && IsChangingLink && !IsBusyApplying)
+                .Where(target => target is not null && UsageForm.IsChangingLink && !IsBusyApplying)
                 .Select(target => target!),
             ChangeLinkAsync);
 
         // The add form's piece size starts as its role has it (StartingPieceSize), so it follows a role picked, or a
         // copy's taken, while it's still what the role before started it at: neither figure typed.
-        this.WhenAnyValue(x => x.EditingUsageRole)
+        this.WhenAnyValue(x => x.UsageForm.EditingUsageRole)
             .Buffer(2, 1)
-            .Where(roles => !IsBusyApplying && IsUsageFormOpen && IsAddingUsage && IsPieceSizeAsStarted(roles[0]))
+            .Where(roles => !IsBusyApplying && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage && IsPieceSizeAsStarted(roles[0]))
             .Subscribe(_ => StartPieceSize());
 
         // Typing one figure of the piece size works out the other, and makes it the one that's kept.
-        this.WhenAnyValue(x => x.EditingUsageWeightPerPiece)
+        this.WhenAnyValue(x => x.UsageForm.EditingUsageWeightPerPiece)
             .Skip(1)
-            .Where(_ => !_syncingPieceSize && !IsBusyApplying)
+            .Where(_ => !UsageForm.IsSyncingPieceSize && !IsBusyApplying)
             .Subscribe(_ => PieceSizeTyped(UsageAuthoredField.WeightPerPiece));
 
-        this.WhenAnyValue(x => x.EditingUsageYield)
+        this.WhenAnyValue(x => x.UsageForm.EditingUsageYield)
             .Skip(1)
-            .Where(_ => !_syncingPieceSize && !IsBusyApplying)
+            .Where(_ => !UsageForm.IsSyncingPieceSize && !IsBusyApplying)
             .Subscribe(_ => PieceSizeTyped(UsageAuthoredField.Yield));
 
         // A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.
@@ -1521,12 +1165,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         Costing.Changed.Subscribe(_ => History.RefreshDirty());
         Packaging.Changed.Subscribe(_ => History.RefreshDirty());
         ComponentsTable.Changed.Subscribe(_ => History.RefreshDirty());
+        UsageForm.Changed.Subscribe(_ => History.RefreshDirty());
         WatchForSave(UsageEdits);
         WatchForSave(Packaging.LineEdits);
         WatchForSave(ComponentsTable.ComponentEdits);
-        WatchForSave(FormLines);
-        WatchForSave(FormAddIns);
-        WatchForSave(FormPackagingLines);
+        WatchForSave(UsageForm.FormLines);
+        WatchForSave(UsageForm.FormAddIns);
+        WatchForSave(UsageForm.FormPackagingLines);
         ((INotifyPropertyChanged)RecipeTabs).PropertyChanged += (_, _) => RebaseSettledForm();
 
         // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
@@ -1604,8 +1249,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
             var selectedId = SelectedProduct?.Id;
             var categoryId = EditingCategory?.Id;
-            var usageRoleId = EditingUsageRole?.Id;
-            var usageSourceKey = EditingUsageSource?.Key;
+            var usageRoleId = UsageForm.EditingUsageRole?.Id;
+            var usageSourceKey = UsageForm.EditingUsageSource?.Key;
 
             ApplyRefresh(() =>
             {
@@ -1650,10 +1295,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 RefreshLinkableOptions();
 
                 // An add form opened before the roles were loaded takes the first role it can have, as it would have.
-                EditingUsageRole = FormRoleOptions.FirstOrDefault(r => r.Id == usageRoleId)
-                    ?? (usageRoleId is null && IsUsageFormOpen && IsAddingUsage ? FormRoleOptions.FirstOrDefault() : null);
-                EditingUsageSource = LinkableSubAssemblies.FirstOrDefault(o => o.Key == usageSourceKey);
-                PackagingLineRow.Resolve(FormPackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
+                UsageForm.EditingUsageRole = UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == usageRoleId)
+                    ?? (usageRoleId is null && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage ? UsageForm.FormRoleOptions.FirstOrDefault() : null);
+                UsageForm.EditingUsageSource = UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == usageSourceKey);
+                PackagingLineRow.Resolve(UsageForm.FormPackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
 
                 RecomputeUsageForm();
                 RecomputeCosts();
@@ -1751,7 +1396,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // A form left open is part of what's being saved, unless it's an add form nothing was entered in, which
             // has nothing to save. Its sub-assembly's tab shows, as Apply would show it, so an add made this way
             // stays the tab showing through the reload.
-            if (IsUsageFormOpen && !IsUsageFormUntouched())
+            if (UsageForm.IsUsageFormOpen && !IsUsageFormUntouched())
             {
                 SelectRecipeTab(ApplyForm());
             }
@@ -1917,7 +1562,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             {
                 if (SelectedRecipeTab is AddSubAssemblyRecipeTab && IsUsageFormUntouched())
                 {
-                    AsUndoStep(() => EditingUsageMode = mode);
+                    AsUndoStep(() => UsageForm.EditingUsageMode = mode);
                     return;
                 }
 
@@ -1930,7 +1575,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 {
                     InsertAddSubAssemblyTab();
                     SelectRecipeTab(AddSubAssemblyTab);
-                    EditingUsageMode = mode;
+                    UsageForm.EditingUsageMode = mode;
                 });
             });
 
@@ -1946,14 +1591,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // Sub-Assemblies screen, and the one it was linked to stays there as it is.
         UnlinkCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => AsUndoStep(() => ReplaceUsage(usage, CopyOfLinked(usage, isOwn: true))));
 
-        StartChangingLinkCommand = ReactiveCommand.Create(StartChangingLink, this.WhenAnyValue(x => x.IsEditingLinkedUsage));
-        CancelChangingLinkCommand = ReactiveCommand.Create(() => { IsChangingLink = false; });
+        StartChangingLinkCommand = ReactiveCommand.Create(StartChangingLink, this.WhenAnyValue(x => x.UsageForm.IsEditingLinkedUsage));
+        CancelChangingLinkCommand = ReactiveCommand.Create(() => { UsageForm.IsChangingLink = false; });
 
         // Anything typed into its form goes in first, so what moves is what shows; a form a rule refuses stays as it
         // is, with the message. It's still edited here until Save, which moves it and links it.
         MoveToSubAssembliesCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => AsUndoStep(() =>
         {
-            var wasEditing = ReferenceEquals(usage, EditingUsage);
+            var wasEditing = ReferenceEquals(usage, UsageForm.EditingUsage);
             var applied = usage;
             if (wasEditing)
             {
@@ -1997,7 +1642,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 AsUndoStep(() =>
                 {
                     // Whatever was typed into its form goes with it, rather than being applied on the way out.
-                    if (ReferenceEquals(usage, EditingUsage))
+                    if (ReferenceEquals(usage, UsageForm.EditingUsage))
                     {
                         CloseUsageForm();
                     }
@@ -2018,12 +1663,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             this.WhenAnyValue(x => x.SelectedRecipeTab).Select(tab => tab is SubAssemblyRecipeTab or PackagingRecipeTab));
 
         RemoveFormLineCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => FormLines.Remove(SelectedFormLine!)),
-            this.WhenAnyValue(x => x.SelectedFormLine).Select(line => line is not null));
+            () => AsUndoStep(() => UsageForm.FormLines.Remove(UsageForm.SelectedFormLine!)),
+            this.WhenAnyValue(x => x.UsageForm.SelectedFormLine).Select(line => line is not null));
 
         RemoveFormPackagingLineCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => FormPackagingLines.Remove(SelectedFormPackagingLine!)),
-            this.WhenAnyValue(x => x.SelectedFormPackagingLine).Select(line => line is not null));
+            () => AsUndoStep(() => UsageForm.FormPackagingLines.Remove(UsageForm.SelectedFormPackagingLine!)),
+            this.WhenAnyValue(x => x.UsageForm.SelectedFormPackagingLine).Select(line => line is not null));
 
         // The linked packaging's lines, as they show, become the product's own; Save drops the link and writes them.
         CopyPackagingCommand = ReactiveCommand.Create(
@@ -2064,8 +1709,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             Packaging.WhenAnyValue(p => p.CanMovePackaging));
 
         RemoveFormAddInCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => FormAddIns.Remove(SelectedFormAddIn!)),
-            this.WhenAnyValue(x => x.SelectedFormAddIn).Select(line => line is not null));
+            () => AsUndoStep(() => UsageForm.FormAddIns.Remove(UsageForm.SelectedFormAddIn!)),
+            this.WhenAnyValue(x => x.UsageForm.SelectedFormAddIn).Select(line => line is not null));
 
         RemoveLineCommand = ReactiveCommand.Create(
             () => AsUndoStep(() => Packaging.LineEdits.Remove(Packaging.SelectedLineEdit!)),
@@ -2247,8 +1892,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         EditingName = subAssembly.Name;
         InsertAddSubAssemblyTab();
         SelectRecipeTab(AddSubAssemblyTab);
-        EditingUsageMode = UsageFormMode.Link;
-        EditingUsageSource = LinkableSubAssemblies.FirstOrDefault(o => o.SubAssembly?.Id == subAssemblyId);
+        UsageForm.EditingUsageMode = UsageFormMode.Link;
+        UsageForm.EditingUsageSource = UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.SubAssembly?.Id == subAssemblyId);
         History.RefreshDirty();
     }
 
@@ -2769,23 +2414,23 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         IsPackagingMoving = Packaging.IsPackagingMoving,
         Lines = [.. Packaging.LineEdits.Select(CaptureLine)],
         Components = ComponentsTable.Capture(),
-        IsUsageFormOpen = IsUsageFormOpen,
-        IsAddingUsage = IsAddingUsage,
-        UsageFormTitle = UsageFormTitle,
-        UsageMode = EditingUsageMode,
-        IsFormEditingLines = IsFormEditingLines,
-        IsFormPickingSource = IsFormPickingSource,
-        EditingUsageIndex = EditingUsage is { } editing && UsageEdits.IndexOf(editing) is var i and >= 0 ? i : null,
-        UsageRoleId = EditingUsageRole?.Id,
-        UsageName = EditingUsageName,
-        UsageSourceKey = EditingUsageSource?.Key,
-        FormLines = [.. FormLines.Select(CaptureIngredientLine)],
-        FormAddIns = [.. FormAddIns.Select(CaptureIngredientLine)],
-        FormPackagingLines = [.. FormPackagingLines.Select(CaptureLine)],
-        FormFormulaBase = _formFormulaBase,
-        UsageAuthoredField = _usageAuthoredField,
-        UsageWeightPerPiece = EditingUsageWeightPerPiece,
-        UsageYield = EditingUsageYield,
+        IsUsageFormOpen = UsageForm.IsUsageFormOpen,
+        IsAddingUsage = UsageForm.IsAddingUsage,
+        UsageFormTitle = UsageForm.UsageFormTitle,
+        UsageMode = UsageForm.EditingUsageMode,
+        IsFormEditingLines = UsageForm.IsFormEditingLines,
+        IsFormPickingSource = UsageForm.IsFormPickingSource,
+        EditingUsageIndex = UsageForm.EditingUsage is { } editing && UsageEdits.IndexOf(editing) is var i and >= 0 ? i : null,
+        UsageRoleId = UsageForm.EditingUsageRole?.Id,
+        UsageName = UsageForm.EditingUsageName,
+        UsageSourceKey = UsageForm.EditingUsageSource?.Key,
+        FormLines = [.. UsageForm.FormLines.Select(CaptureIngredientLine)],
+        FormAddIns = [.. UsageForm.FormAddIns.Select(CaptureIngredientLine)],
+        FormPackagingLines = [.. UsageForm.FormPackagingLines.Select(CaptureLine)],
+        FormFormulaBase = UsageForm.FormFormulaBase,
+        UsageAuthoredField = UsageForm.AuthoredField,
+        UsageWeightPerPiece = UsageForm.EditingUsageWeightPerPiece,
+        UsageYield = UsageForm.EditingUsageYield,
     };
 
     private static IngredientLineState CaptureIngredientLine(IngredientLineRow row) =>
@@ -2818,9 +2463,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // 1. The form goes first. EditingUsage has to be null before the sections are replaced: the tab mirror
             //    refills FormLines from a section that replaces the one being edited, which would undo this restore.
             CloseUsageForm();
-            SelectedFormLine = null;
-            SelectedFormAddIn = null;
-            SelectedFormPackagingLine = null;
+            UsageForm.SelectedFormLine = null;
+            UsageForm.SelectedFormAddIn = null;
+            UsageForm.SelectedFormPackagingLine = null;
             Packaging.SelectedLineEdit = null;
             ComponentsTable.SelectedComponentEdit = null;
 
@@ -2897,53 +2542,43 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // 6. The form itself, last. The option lists are rebuilt before the pickers are put back, as a load does,
             //    and RefreshLinkableOptions runs inside the guard: outside it, the source it can null would start a
             //    load that clears the very lines being restored.
-            IsAddingUsage = snapshot.IsAddingUsage;
-            UsageFormTitle = snapshot.UsageFormTitle;
-            _editingUsageMode = snapshot.UsageMode;
-            this.RaisePropertyChanged(nameof(EditingUsageMode));
-            IsFormEditingLines = snapshot.IsFormEditingLines;
-            IsFormPickingSource = snapshot.IsFormPickingSource;
+            UsageForm.IsAddingUsage = snapshot.IsAddingUsage;
+            UsageForm.UsageFormTitle = snapshot.UsageFormTitle;
+            UsageForm.RestoreMode(snapshot.UsageMode);
+            UsageForm.IsFormEditingLines = snapshot.IsFormEditingLines;
+            UsageForm.IsFormPickingSource = snapshot.IsFormPickingSource;
 
             RefreshLinkableOptions();
             RefreshFormRoleOptions();
 
-            _editingUsageRole = snapshot.UsageRoleId is { } roleId ? FormRoleOptions.FirstOrDefault(r => r.Id == roleId) : null;
-            this.RaisePropertyChanged(nameof(EditingUsageRole));
-            _editingUsageSource = snapshot.UsageSourceKey is { } sourceKey
-                ? LinkableSubAssemblies.FirstOrDefault(o => o.Key == sourceKey)
-                : null;
-            this.RaisePropertyChanged(nameof(EditingUsageSource));
-            _editingUsageName = snapshot.UsageName;
-            this.RaisePropertyChanged(nameof(EditingUsageName));
+            UsageForm.RestorePicks(
+                snapshot.UsageRoleId is { } roleId ? UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == roleId) : null,
+                snapshot.UsageSourceKey is { } sourceKey ? UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == sourceKey) : null,
+                snapshot.UsageName);
 
-            _formFormulaBase = snapshot.FormFormulaBase;
-            RestoreIngredientLines(FormLines, snapshot.FormLines, snapshot.FormFormulaBase);
-            RestoreIngredientLines(FormAddIns, snapshot.FormAddIns, snapshot.FormFormulaBase);
-            FormPackagingLines.Clear();
+            UsageForm.FormFormulaBase = snapshot.FormFormulaBase;
+            RestoreIngredientLines(UsageForm.FormLines, snapshot.FormLines, snapshot.FormFormulaBase);
+            RestoreIngredientLines(UsageForm.FormAddIns, snapshot.FormAddIns, snapshot.FormFormulaBase);
+            UsageForm.FormPackagingLines.Clear();
             foreach (var line in snapshot.FormPackagingLines)
             {
-                FormPackagingLines.Add(RestoreLine(line));
+                UsageForm.FormPackagingLines.Add(RestoreLine(line));
             }
 
-            _usageAuthoredField = snapshot.UsageAuthoredField;
-            _editingUsageWeightPerPiece = snapshot.UsageWeightPerPiece;
-            this.RaisePropertyChanged(nameof(EditingUsageWeightPerPiece));
-            _editingUsageYield = snapshot.UsageYield;
-            this.RaisePropertyChanged(nameof(EditingUsageYield));
+            UsageForm.AuthoredField = snapshot.UsageAuthoredField;
+            UsageForm.RestorePieceSize(snapshot.UsageWeightPerPiece, snapshot.UsageYield);
 
-            EditingUsage = snapshot.EditingUsageIndex is { } usageIndex && usageIndex < UsageEdits.Count
+            UsageForm.EditingUsage = snapshot.EditingUsageIndex is { } usageIndex && usageIndex < UsageEdits.Count
                 ? UsageEdits[usageIndex]
                 : null;
-            IsUsageFormOpen = snapshot.IsUsageFormOpen;
+            UsageForm.IsUsageFormOpen = snapshot.IsUsageFormOpen;
         });
 
         // 8. One pass over the restored form, outside the guard. FormLinesChanged is the screen's own "the lines
         //    changed, bring everything into line" entry point: it raises what the form's tables show, works the
         //    derived piece-size figure out again, and runs the single ApplyFormulaBase pass that gives every row
         //    back its BaseWeight and BatchWeight.
-        this.RaisePropertyChanged(nameof(IsFormPackaging));
-        this.RaisePropertyChanged(nameof(IsFormEditingPackaging));
-        this.RaisePropertyChanged(nameof(IsFormNewMovingToSubAssemblies));
+        UsageForm.RaisePackagingChanged();
         FormLinesChanged();
         RecomputeCosts();
 
@@ -3497,33 +3132,33 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The add form, fresh for its mode: a new sub-assembly's name, role and lines, or the pick of another product's.</summary>
     private void StartUsageFormMode()
     {
-        var mode = EditingUsageMode;
-        IsFormEditingLines = mode != UsageFormMode.Link;
-        IsFormPickingSource = mode != UsageFormMode.New;
+        var mode = UsageForm.EditingUsageMode;
+        UsageForm.IsFormEditingLines = mode != UsageFormMode.Link;
+        UsageForm.IsFormPickingSource = mode != UsageFormMode.New;
 
         // The title is the one thing on the form that says which way in was picked, now that the picker that used to
         // say it is on Add Sub-Assembly's drop-down instead. Set here, not in StartAddingUsage, so it follows another
         // item picked while the form is open. A new one has none: its "Moves to Sub-Assemblies on Save" badge
         // (IsFormNewMovingToSubAssemblies) takes the title's place, and in a product-owned role nothing does.
-        UsageFormTitle = mode switch
+        UsageForm.UsageFormTitle = mode switch
         {
             UsageFormMode.Link => "Link an existing sub-assembly",
             UsageFormMode.Copy => "Copy an existing sub-assembly",
             _ => string.Empty,
         };
-        FormLines.Clear();
-        FormAddIns.Clear();
-        FormPackagingLines.Clear();
-        SelectedFormLine = null;
-        SelectedFormAddIn = null;
-        SelectedFormPackagingLine = null;
+        UsageForm.FormLines.Clear();
+        UsageForm.FormAddIns.Clear();
+        UsageForm.FormPackagingLines.Clear();
+        UsageForm.SelectedFormLine = null;
+        UsageForm.SelectedFormAddIn = null;
+        UsageForm.SelectedFormPackagingLine = null;
         RefreshLinkableOptions();
 
         // The first role the recipe doesn't have yet, so sections can be added in role order without picking.
         var takenRoleIds = UsageEdits.Select(u => u.RoleId).ToHashSet();
-        EditingUsageRole = FormRoleOptions.FirstOrDefault(r => !takenRoleIds.Contains(r.Id)) ?? FormRoleOptions.FirstOrDefault();
-        EditingUsageName = null;
-        EditingUsageSource = null;
+        UsageForm.EditingUsageRole = UsageForm.FormRoleOptions.FirstOrDefault(r => !takenRoleIds.Contains(r.Id)) ?? UsageForm.FormRoleOptions.FirstOrDefault();
+        UsageForm.EditingUsageName = null;
+        UsageForm.EditingUsageSource = null;
         StartPieceSize();
     }
 
@@ -3534,14 +3169,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// with no size. So does a link, whose batch is the Sub-Assemblies screen's and shared.
     /// </summary>
     private (UsageAuthoredField Field, decimal Value) StartingPieceSize(SubAssemblyRole? role) =>
-        EditingUsageMode != UsageFormMode.Link && role is { IsProductOwned: true }
+        UsageForm.EditingUsageMode != UsageFormMode.Link && role is { IsProductOwned: true }
             ? (UsageAuthoredField.Yield, 1m)
             : (UsageAuthoredField.WeightPerPiece, 0m);
 
     /// <summary>Shows the piece size the add form's role starts at.</summary>
     private void StartPieceSize()
     {
-        var (field, value) = StartingPieceSize(EditingUsageRole);
+        var (field, value) = StartingPieceSize(UsageForm.EditingUsageRole);
         SetPieceSize(field, value);
     }
 
@@ -3553,28 +3188,28 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private bool IsPieceSizeAsStarted(SubAssemblyRole? role)
     {
         var (field, value) = StartingPieceSize(role);
-        return CurrentAuthoredValue() == value && (value == 0 || _usageAuthoredField == field);
+        return CurrentAuthoredValue() == value && (value == 0 || UsageForm.AuthoredField == field);
     }
 
     /// <summary>The badge's Edit: the picker, holding what the section could link instead, in the badge's place.</summary>
     private void StartChangingLink()
     {
         var usedIds = UsageEdits.Select(u => u.SubAssemblyId).ToHashSet();
-        ChangeLinkOptions.MergeFrom(
+        UsageForm.ChangeLinkOptions.MergeFrom(
             [.. _linkable
                 .Where(s => s.OwnerProductId is null && s.Role?.IsPackaging != true && !usedIds.Contains(s.Id))
                 .Select(s => new LinkableSubAssemblyOption(s))],
             o => o.Key);
 
-        if (ChangeLinkOptions.Count == 0)
+        if (UsageForm.ChangeLinkOptions.Count == 0)
         {
             ErrorMessage = "There's no other sub-assembly to link: every one on the Sub-Assemblies screen is in this recipe already.";
             return;
         }
 
         ErrorMessage = null;
-        ChangeLinkTarget = null;
-        IsChangingLink = true;
+        UsageForm.ChangeLinkTarget = null;
+        UsageForm.IsChangingLink = true;
     }
 
     /// <summary>
@@ -3585,7 +3220,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private async Task ChangeLinkAsync(LinkableSubAssemblyOption target, CancellationToken cancellationToken)
     {
-        if (EditingUsage is not { IsLinked: true } linked || target.SubAssembly is not { } subAssembly)
+        if (UsageForm.EditingUsage is not { IsLinked: true } linked || target.SubAssembly is not { } subAssembly)
         {
             return;
         }
@@ -3594,7 +3229,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         cancellationToken.ThrowIfCancellationRequested();
 
         // The form moved on while the lines loaded: another section, or the change was cancelled.
-        if (!IsChangingLink || !ReferenceEquals(EditingUsage, linked) || !ReferenceEquals(ChangeLinkTarget, target))
+        if (!UsageForm.IsChangingLink || !ReferenceEquals(UsageForm.EditingUsage, linked) || !ReferenceEquals(UsageForm.ChangeLinkTarget, target))
         {
             return;
         }
@@ -3612,13 +3247,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             }
 
             var lineIngredientIds = lines.Select(l => l.Ingredient.Id).ToHashSet();
-            var addIns = IngredientLineRow.CompleteLines(FormAddIns, subAssembly.Name);
+            var addIns = IngredientLineRow.CompleteLines(UsageForm.FormAddIns, subAssembly.Name);
             var dropped = addIns.Where(a => lineIngredientIds.Contains(a.Ingredient.Id)).Select(a => a.Ingredient.Name).ToList();
             var replacement = new ProductUsageEdit(
                 subAssembly.Id,
                 role,
                 lines,
-                _usageAuthoredField,
+                UsageForm.AuthoredField,
                 CurrentAuthoredValue(),
                 subAssembly.Name,
                 [.. addIns.Where(a => !lineIngredientIds.Contains(a.Ingredient.Id)).Select(a => new SubAssemblyLineEdit(a.Ingredient, a.Grams))],
@@ -3663,24 +3298,24 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         cancellationToken.ThrowIfCancellationRequested();
 
         // The form moved on while the lines loaded (applied, cancelled, or another pick): they're stale.
-        if (!IsUsageFormOpen || !IsAddingUsage || !ReferenceEquals(EditingUsageSource, source))
+        if (!UsageForm.IsUsageFormOpen || !UsageForm.IsAddingUsage || !ReferenceEquals(UsageForm.EditingUsageSource, source))
         {
             return;
         }
 
         ShowFormLines(lines);
-        SelectedFormPackagingLine = null;
-        FormPackagingLines.Clear();
-        FormPackagingLines.AddRange(packagingRows);
+        UsageForm.SelectedFormPackagingLine = null;
+        UsageForm.FormPackagingLines.Clear();
+        UsageForm.FormPackagingLines.AddRange(packagingRows);
 
         // A copy takes its source's role; packaging, the Packaging role. Not its name, which is another product's and
         // role's ("Cheese Roll Filling: Cheese"): Save names the copy after this product.
-        if (EditingUsageMode == UsageFormMode.Copy && source is not null)
+        if (UsageForm.EditingUsageMode == UsageFormMode.Copy && source is not null)
         {
-            EditingUsageRole = source.IsPackaging
-                ? FormRoleOptions.FirstOrDefault(r => r.IsPackaging) ?? EditingUsageRole
-                : FormRoleOptions.FirstOrDefault(r => r.Id == source.SubAssembly!.RoleId) ?? EditingUsageRole;
-            EditingUsageName = null;
+            UsageForm.EditingUsageRole = source.IsPackaging
+                ? UsageForm.FormRoleOptions.FirstOrDefault(r => r.IsPackaging) ?? UsageForm.EditingUsageRole
+                : UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == source.SubAssembly!.RoleId) ?? UsageForm.EditingUsageRole;
+            UsageForm.EditingUsageName = null;
         }
 
         FormLinesChanged();
@@ -3690,7 +3325,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// Applies the form and returns the tab that shows what it applied: the sub-assembly's own, or the Packaging tab
     /// for packaging (IsFormPackaging).
     /// </summary>
-    private RecipeTab ApplyForm() => IsFormPackaging ? ApplyPackagingForm() : TabFor(ApplyUsageForm());
+    private RecipeTab ApplyForm() => UsageForm.IsFormPackaging ? ApplyPackagingForm() : TabFor(ApplyUsageForm());
 
     /// <summary>
     /// The add form's packaging, put in as the product's: a new or copied one's lines as its own (to type into on the
@@ -3699,14 +3334,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private PackagingRecipeTab ApplyPackagingForm()
     {
-        var linking = EditingUsageMode == UsageFormMode.Link;
-        var target = EditingUsageSource?.PackagingTarget;
+        var linking = UsageForm.EditingUsageMode == UsageFormMode.Link;
+        var target = UsageForm.EditingUsageSource?.PackagingTarget;
         if (linking && target is null)
         {
             throw new BusinessRuleException("Pick the packaging to link, or cancel the form.");
         }
 
-        var lines = PackagingLineRow.CompleteLines(FormPackagingLines);
+        var lines = PackagingLineRow.CompleteLines(UsageForm.FormPackagingLines);
         if (lines.Count == 0)
         {
             throw new BusinessRuleException(linking
@@ -3740,8 +3375,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             return;
         }
 
-        var wasEditing = ReferenceEquals(usage, EditingUsage);
-        var initialName = SubAssemblyRules.StandaloneNameFor(EditingName.Trim(), usage.RoleName, wasEditing ? EditingUsageName : usage.Name);
+        var wasEditing = ReferenceEquals(usage, UsageForm.EditingUsage);
+        var initialName = SubAssemblyRules.StandaloneNameFor(EditingName.Trim(), usage.RoleName, wasEditing ? UsageForm.EditingUsageName : usage.Name);
         var answer = await PromptForMadeIngredient.Handle(MadeIngredientPrompt.RequestFor(
             "Move to In-House",
             initialName,
@@ -3797,10 +3432,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var authoredValue = CurrentAuthoredValue();
         ProductUsageEdit usage;
 
-        if (EditingUsage is { IsLinked: true } linked)
+        if (UsageForm.EditingUsage is { IsLinked: true } linked)
         {
             // Its lines are typed into as a new section's are, and Save writes them where it's kept.
-            var lines = IngredientLineRow.CompleteLines(FormLines, linked.DisplayName);
+            var lines = IngredientLineRow.CompleteLines(UsageForm.FormLines, linked.DisplayName);
             if (lines.Count == 0)
             {
                 throw new BusinessRuleException($"Add the ingredients that go into {linked.DisplayName}, in grams.");
@@ -3808,14 +3443,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
             IReadOnlyList<SubAssemblyLineEdit> lineEdits = [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
             usage = linked.WithLinkedForm(
-                lineEdits, _usageAuthoredField, authoredValue, CompleteAddIns(linked.DisplayName, lineEdits));
+                lineEdits, UsageForm.AuthoredField, authoredValue, CompleteAddIns(linked.DisplayName, lineEdits));
         }
-        else if (IsFormEditingLines)
+        else if (UsageForm.IsFormEditingLines)
         {
-            var role = EditingUsageRole
+            var role = UsageForm.EditingUsageRole
                 ?? throw new BusinessRuleException("Pick the sub-assembly's role. It's what the sub-assembly is called.");
 
-            var lines = IngredientLineRow.CompleteLines(FormLines, role.Name);
+            var lines = IngredientLineRow.CompleteLines(UsageForm.FormLines, role.Name);
             if (lines.Count == 0)
             {
                 throw new BusinessRuleException($"Add the ingredients that go into the {role.Name}, in grams.");
@@ -3824,37 +3459,37 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // One of the product's own keeps its id, so Save rewrites it in place; a new one has none yet. One unlinked
             // and not saved yet stays the product's own, and one on its way to the Sub-Assemblies screen stays so.
             usage = new ProductUsageEdit(
-                EditingUsage is { IsOwned: true } own ? own.SubAssemblyId : 0, role, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], _usageAuthoredField, authoredValue, linkedName: null, name: EditingUsageName, isOwn: EditingUsage?.IsOwned == true, isReleasing: EditingUsage?.IsReleasing == true, toMadeIngredient: EditingUsage?.ToMadeIngredient);
+                UsageForm.EditingUsage is { IsOwned: true } own ? own.SubAssemblyId : 0, role, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], UsageForm.AuthoredField, authoredValue, linkedName: null, name: UsageForm.EditingUsageName, isOwn: UsageForm.EditingUsage?.IsOwned == true, isReleasing: UsageForm.EditingUsage?.IsReleasing == true, toMadeIngredient: UsageForm.EditingUsage?.ToMadeIngredient);
         }
         else
         {
-            var source = EditingUsageSource?.SubAssembly
+            var source = UsageForm.EditingUsageSource?.SubAssembly
                 ?? throw new BusinessRuleException("Pick the sub-assembly to link, or cancel the form.");
             var sourceName = source.Name;
 
             // The table's read-only lines are the ones LoadUsageSourceAsync loaded for this very pick; a pick
             // whose lines are still on their way has none yet, and linking it would make a batch of nothing.
-            if (FormLines.Count == 0)
+            if (UsageForm.FormLines.Count == 0)
             {
                 throw new BusinessRuleException($"{sourceName} is still loading its ingredients. Try again in a moment.");
             }
 
             IReadOnlyList<SubAssemblyLineEdit> sourceLines =
-                [.. FormLines.Where(l => l.Ingredient is not null).Select(l => new SubAssemblyLineEdit(l.Ingredient!, l.Grams ?? 0m, l.IsFormulaBase, l.AuthoredBakersPercent))];
+                [.. UsageForm.FormLines.Where(l => l.Ingredient is not null).Select(l => new SubAssemblyLineEdit(l.Ingredient!, l.Grams ?? 0m, l.IsFormulaBase, l.AuthoredBakersPercent))];
 
             var role = Roles.FirstOrDefault(r => r.Id == source.RoleId) ?? source.Role;
             usage = new ProductUsageEdit(
                 source.Id,
                 role,
                 sourceLines,
-                _usageAuthoredField,
+                UsageForm.AuthoredField,
                 authoredValue,
                 source.Name,
                 CompleteAddIns(sourceName, sourceLines),
                 SectionLabelOf(source.Name, role));
         }
 
-        if (EditingUsage is { } unchanged && usage.ShowsSameAs(unchanged))
+        if (UsageForm.EditingUsage is { } unchanged && usage.ShowsSameAs(unchanged))
         {
             CloseUsageForm();
             return unchanged;
@@ -3863,12 +3498,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // Sections in one role told apart by their names. A linked one being edited keeps its role and name, which are
         // the Sub-Assemblies screen's to change; and a section left as it was returned above, so it can still be looked
         // through, and Save says what's wrong when it's next changed.
-        if (EditingUsage is not { IsLinked: true })
+        if (UsageForm.EditingUsage is not { IsLinked: true })
         {
-            EnsureSectionsDistinct(usage, EditingUsage);
+            EnsureSectionsDistinct(usage, UsageForm.EditingUsage);
         }
 
-        if (EditingUsage is { } editing)
+        if (UsageForm.EditingUsage is { } editing)
         {
             ReplaceInRecipeOrder(editing, usage);
         }
@@ -3889,7 +3524,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private bool CommitUsageFormOnLeave()
     {
-        if (!IsUsageFormOpen)
+        if (!UsageForm.IsUsageFormOpen)
         {
             return true;
         }
@@ -3931,7 +3566,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private void ApplyOpenForm()
     {
-        if (!IsUsageFormOpen || IsUsageFormUntouched())
+        if (!UsageForm.IsUsageFormOpen || IsUsageFormUntouched())
         {
             return;
         }
@@ -3954,7 +3589,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private IReadOnlyList<SubAssemblyLineEdit> CompleteAddIns(string subAssemblyName, IReadOnlyList<SubAssemblyLineEdit> baseLines)
     {
-        var addIns = IngredientLineRow.CompleteLines(FormAddIns, subAssemblyName);
+        var addIns = IngredientLineRow.CompleteLines(UsageForm.FormAddIns, subAssemblyName);
         ProductRules.EnsureValidAddIns(
             [.. addIns.Select(a => (a.Ingredient.Id, a.Grams, a.Ingredient.Name))],
             subAssemblyName,
@@ -3996,8 +3631,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     private void CloseUsageForm()
     {
-        IsUsageFormOpen = false;
-        EditingUsage = null;
+        UsageForm.IsUsageFormOpen = false;
+        UsageForm.EditingUsage = null;
         RebaseSettledForm();
     }
 
@@ -4020,24 +3655,24 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The form on <paramref name="usage"/>, as it was last applied: the whole of its tab.</summary>
     private void OpenUsageForm(ProductUsageEdit usage)
     {
-        EditingUsage = usage;
-        IsAddingUsage = false;
-        UsageFormTitle = usage.IsEditable ? $"Edit {usage.SectionName}" : $"Edit {usage.SectionName} ({usage.LinkedFromText})";
-        IsFormEditingLines = usage.IsEditable;
-        IsFormPickingSource = false;
-        EditingUsageSource = null;
+        UsageForm.EditingUsage = usage;
+        UsageForm.IsAddingUsage = false;
+        UsageForm.UsageFormTitle = usage.IsEditable ? $"Edit {usage.SectionName}" : $"Edit {usage.SectionName} ({usage.LinkedFromText})";
+        UsageForm.IsFormEditingLines = usage.IsEditable;
+        UsageForm.IsFormPickingSource = false;
+        UsageForm.EditingUsageSource = null;
         RefreshFormRoleOptions();
-        EditingUsageRole = FormRoleOptions.FirstOrDefault(r => r.Id == usage.RoleId) ?? usage.Role;
-        EditingUsageName = usage.Name;
+        UsageForm.EditingUsageRole = UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == usage.RoleId) ?? usage.Role;
+        UsageForm.EditingUsageName = usage.Name;
 
         // A linked one's lines show too, read-only: they're the Sub-Assemblies screen's. What is this product's is its piece
         // size and its add-ins, which go in the table under them, open if there are any.
         ShowFormLines(usage.Lines);
         ShowFormAddIns(usage.AddIns);
-        SelectedFormLine = null;
-        SelectedFormAddIn = null;
+        UsageForm.SelectedFormLine = null;
+        UsageForm.SelectedFormAddIn = null;
         SetPieceSize(usage.AuthoredField, usage.AuthoredValue);
-        IsUsageFormOpen = true;
+        UsageForm.IsUsageFormOpen = true;
         RebaseSettledForm();
     }
 
@@ -4047,10 +3682,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private void StartAddingUsage()
     {
-        EditingUsage = null;
-        IsAddingUsage = true;
-        EditingUsageMode = UsageFormMode.New;
-        IsUsageFormOpen = true;
+        UsageForm.EditingUsage = null;
+        UsageForm.IsAddingUsage = true;
+        UsageForm.EditingUsageMode = UsageFormMode.New;
+        UsageForm.IsUsageFormOpen = true;
         StartUsageFormMode();
         RebaseSettledForm();
     }
@@ -4060,45 +3695,40 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// alone isn't an entry.
     /// </summary>
     private bool IsUsageFormUntouched() =>
-        IsAddingUsage
-        && EditingUsageSource is null
-        && string.IsNullOrWhiteSpace(EditingUsageName)
-        && FormLines.All(l => l.IngredientId is null && l.Grams == 0)
-        && FormAddIns.All(l => l.IngredientId is null && l.Grams == 0)
-        && FormPackagingLines.All(l => l.PackagingMaterialId is null && l.QtyPerUnit == 0)
-        && IsPieceSizeAsStarted(EditingUsageRole);
+        UsageForm.IsAddingUsage
+        && UsageForm.EditingUsageSource is null
+        && string.IsNullOrWhiteSpace(UsageForm.EditingUsageName)
+        && UsageForm.FormLines.All(l => l.IngredientId is null && l.Grams == 0)
+        && UsageForm.FormAddIns.All(l => l.IngredientId is null && l.Grams == 0)
+        && UsageForm.FormPackagingLines.All(l => l.PackagingMaterialId is null && l.QtyPerUnit == 0)
+        && IsPieceSizeAsStarted(UsageForm.EditingUsageRole);
 
     /// <summary>The form's lines changed, or its source's were loaded: the batch weight, the other piece-size figure and the preview follow.</summary>
     private void FormLinesChanged()
     {
-        this.RaisePropertyChanged(nameof(IsFormShowingLines));
-        this.RaisePropertyChanged(nameof(IsFormShowingAddIns));
-        this.RaisePropertyChanged(nameof(FormAddInCount));
-        this.RaisePropertyChanged(nameof(HasFormAddIns));
-        this.RaisePropertyChanged(nameof(IsFormShowingNoAddIns));
-        this.RaisePropertyChanged(nameof(FormAddInsBadgeText));
+        UsageForm.RaiseLinesChanged();
         ResyncPieceSize();
     }
 
     /// <summary>Shows a piece size in the form, with the other figure worked out, without any of it counting as typed.</summary>
     private void SetPieceSize(UsageAuthoredField authoredField, decimal authoredValue)
     {
-        _usageAuthoredField = authoredField;
-        _syncingPieceSize = true;
+        UsageForm.AuthoredField = authoredField;
+        UsageForm.IsSyncingPieceSize = true;
         try
         {
             if (authoredField == UsageAuthoredField.WeightPerPiece)
             {
-                EditingUsageWeightPerPiece = authoredValue;
+                UsageForm.EditingUsageWeightPerPiece = authoredValue;
             }
             else
             {
-                EditingUsageYield = authoredValue;
+                UsageForm.EditingUsageYield = authoredValue;
             }
         }
         finally
         {
-            _syncingPieceSize = false;
+            UsageForm.IsSyncingPieceSize = false;
         }
 
         ResyncPieceSize();
@@ -4106,7 +3736,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     private void PieceSizeTyped(UsageAuthoredField authoredField)
     {
-        _usageAuthoredField = authoredField;
+        UsageForm.AuthoredField = authoredField;
         ResyncPieceSize();
     }
 
@@ -4116,35 +3746,35 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private void ResyncPieceSize()
     {
-        _syncingPieceSize = true;
+        UsageForm.IsSyncingPieceSize = true;
         try
         {
             UpdateOtherPieceSizeFigure();
         }
         finally
         {
-            _syncingPieceSize = false;
+            UsageForm.IsSyncingPieceSize = false;
         }
 
         RecomputeUsageForm();
     }
 
-    /// <summary>Works out the figure the user didn't type from the one they did, rounded to the 2 decimals the box shows. Call with _syncingPieceSize set.</summary>
+    /// <summary>Works out the figure the user didn't type from the one they did, rounded to the 2 decimals the box shows. Call with UsageForm.IsSyncingPieceSize set.</summary>
     private void UpdateOtherPieceSizeFigure()
     {
-        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(_usageAuthoredField, CurrentAuthoredValue(), UsageFormBatch().Sum(l => l.Grams));
-        if (_usageAuthoredField == UsageAuthoredField.WeightPerPiece)
+        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(UsageForm.AuthoredField, CurrentAuthoredValue(), UsageFormBatch().Sum(l => l.Grams));
+        if (UsageForm.AuthoredField == UsageAuthoredField.WeightPerPiece)
         {
-            EditingUsageYield = Math.Round(yield, 2);
+            UsageForm.EditingUsageYield = Math.Round(yield, 2);
         }
         else
         {
-            EditingUsageWeightPerPiece = Math.Round(weightPerPiece, 2);
+            UsageForm.EditingUsageWeightPerPiece = Math.Round(weightPerPiece, 2);
         }
     }
 
     private decimal CurrentAuthoredValue() =>
-        _usageAuthoredField == UsageAuthoredField.WeightPerPiece ? EditingUsageWeightPerPiece : EditingUsageYield;
+        UsageForm.AuthoredField == UsageAuthoredField.WeightPerPiece ? UsageForm.EditingUsageWeightPerPiece : UsageForm.EditingUsageYield;
 
     /// <summary>
     /// The form's batch, as each line's grams and cost per gram (buffered, unless the screen isn't): both its tables, the recipe and
@@ -4153,34 +3783,34 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// the cost preview — reads it here, so add-ins reach all of them at once.
     /// </summary>
     private IReadOnlyList<(decimal Grams, decimal CostPerGram)> UsageFormBatch() =>
-        [.. FormLines.Concat(FormAddIns).Where(l => l.Ingredient is not null).Select(l => (l.Grams ?? 0m, l.CostPerGram))];
+        [.. UsageForm.FormLines.Concat(UsageForm.FormAddIns).Where(l => l.Ingredient is not null).Select(l => (l.Grams ?? 0m, l.CostPerGram))];
 
     /// <summary>The form's batch weight, which figure stays put, and what a piece costs.</summary>
     private void RecomputeUsageForm()
     {
         // Packaging is one set of lines per piece, with no batch to share out.
-        if (IsFormPackaging)
+        if (UsageForm.IsFormPackaging)
         {
-            var packagingCost = FormPackagingLines.Sum(l => l.CostPerUnit);
-            UsageFormCostPerPieceText = FormPackagingLines.Any(l => l.PackagingMaterial is not null) ? $"{packagingCost:N4}" : "—";
+            var packagingCost = UsageForm.FormPackagingLines.Sum(l => l.CostPerUnit);
+            UsageForm.UsageFormCostPerPieceText = UsageForm.FormPackagingLines.Any(l => l.PackagingMaterial is not null) ? $"{packagingCost:N4}" : "—";
             return;
         }
 
         var batch = UsageFormBatch();
         var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(batch);
-        UsageFormBatchCostText = batch.Count > 0 ? $"{totalCost:N2}" : "—";
+        UsageForm.UsageFormBatchCostText = batch.Count > 0 ? $"{totalCost:N2}" : "—";
         var authoredValue = CurrentAuthoredValue();
-        var (weightPerPiece, _) = ProductRules.ResolvePieceSize(_usageAuthoredField, authoredValue, totalWeight);
+        var (weightPerPiece, _) = ProductRules.ResolvePieceSize(UsageForm.AuthoredField, authoredValue, totalWeight);
 
-        UsageFormTotalWeightText = $"{totalWeight:#,0.##} g";
+        UsageForm.UsageFormTotalWeightText = $"{totalWeight:#,0.##} g";
         // Neither figure is needed to put the section in (ProductRules.EnsureValidUsages), so with none typed the
         // caption says what that costs: nothing per piece, until one is. A yield of 1 is what a section in a
         // product-owned role starts at (StartingPieceSize), so it says how to size a bigger batch.
-        UsageFormPieceSizeCaption = authoredValue <= 0
+        UsageForm.UsageFormPieceSizeCaption = authoredValue <= 0
             ? "Type the weight per piece or the yield; the other is worked out. Until then this section costs nothing per piece."
-            : _usageAuthoredField == UsageAuthoredField.Yield && authoredValue == 1
+            : UsageForm.AuthoredField == UsageAuthoredField.Yield && authoredValue == 1
                 ? "One piece takes the whole batch, and still does if the batch changes. For a batch that makes more, type the weight per piece or the yield."
-            : _usageAuthoredField == UsageAuthoredField.WeightPerPiece
+            : UsageForm.AuthoredField == UsageAuthoredField.WeightPerPiece
                 ? $"Weight per piece stays at {authoredValue:#,0.##} g if the batch changes."
                 : $"The yield stays at {authoredValue:#,0.##} pieces if the batch changes.";
 
@@ -4188,24 +3818,24 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight)
             : (decimal?)null;
         // Two decimals, as Batch cost beside it (2026-09-25, at the user's request); packaging's, above, keeps four.
-        UsageFormCostPerPieceText = costPerPiece is { } figure ? $"{figure:N2}" : "—";
+        UsageForm.UsageFormCostPerPieceText = costPerPiece is { } figure ? $"{figure:N2}" : "—";
 
         // The formula's base and the batch, given to both tables: an add-in is read against the recipe's base, never its own,
         // and with no base every line of both is read against the whole batch, add-ins included, so they come to 100%.
-        var formulaBase = IngredientLineRow.ApplyFormulaBase([.. FormLines], totalWeight);
-        _formFormulaBase = formulaBase;
-        IngredientLineRow.ApplyFormulaBase(FormAddIns, formulaBase, totalWeight);
-        UsageFormPercentHeader = IngredientLineRow.PercentHeader(formulaBase);
-        UsageFormBaseCaption = formulaBase > 0
+        var formulaBase = IngredientLineRow.ApplyFormulaBase([.. UsageForm.FormLines], totalWeight);
+        UsageForm.FormFormulaBase = formulaBase;
+        IngredientLineRow.ApplyFormulaBase(UsageForm.FormAddIns, formulaBase, totalWeight);
+        UsageForm.UsageFormPercentHeader = IngredientLineRow.PercentHeader(formulaBase);
+        UsageForm.UsageFormBaseCaption = formulaBase > 0
             ? $"Base {formulaBase:#,0.##} g · whole formula {totalWeight / formulaBase * 100m:#,0.#}%"
             : SubAssembliesViewModel.NoBaseCaption;
 
         // The arithmetic of the two tables, in words: the recipe's grams, this product's on top, the batch.
-        var recipeName = EditingUsage?.DisplayName
-            ?? EditingUsageSource?.SubAssembly?.Name ?? "the recipe";
-        var addInWeight = FormAddIns.Where(l => l.Ingredient is not null).Sum(l => l.Grams);
+        var recipeName = UsageForm.EditingUsage?.DisplayName
+            ?? UsageForm.EditingUsageSource?.SubAssembly?.Name ?? "the recipe";
+        var addInWeight = UsageForm.FormAddIns.Where(l => l.Ingredient is not null).Sum(l => l.Grams);
         var baseWeight = totalWeight - addInWeight;
-        UsageFormAddInsCaption = addInWeight > 0
+        UsageForm.UsageFormAddInsCaption = addInWeight > 0
             ? $"{baseWeight:#,0.##} g from {recipeName} + {addInWeight:#,0.##} g of add-ins = a {totalWeight:#,0.##} g batch."
             : $"Nothing extra yet — the batch is {recipeName}'s {baseWeight:#,0.##} g.";
     }
@@ -4223,7 +3853,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     private void ReplaceUsage(ProductUsageEdit old, ProductUsageEdit replacement)
     {
-        var wasEditing = ReferenceEquals(old, EditingUsage);
+        var wasEditing = ReferenceEquals(old, UsageForm.EditingUsage);
         if (wasEditing)
         {
             CloseUsageForm();
@@ -4293,7 +3923,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 var replacement = (ProductUsageEdit)e.NewItems![0]!;
                 var previous = (ProductUsageEdit)e.OldItems![0]!;
                 ((SubAssemblyRecipeTab)RecipeTabs[offset + e.NewStartingIndex]).Usage = replacement;
-                if (ReferenceEquals(previous, EditingUsage))
+                if (ReferenceEquals(previous, UsageForm.EditingUsage))
                 {
                     if (replacement.IsEditable != previous.IsEditable)
                     {
@@ -4303,7 +3933,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     }
                     else
                     {
-                        EditingUsage = replacement;
+                        UsageForm.EditingUsage = replacement;
 
                         // A linked one's lines as they now are, from the Sub-Assemblies screen or changed here and applied;
                         // lines typed into the form and not applied yet stay, repriced by RefreshFormLines.
@@ -4416,7 +4046,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             case SubAssemblyRecipeTab subAssembly:
                 _lastRecipeContentTab = tab;
-                if (!ReferenceEquals(EditingUsage, subAssembly.Usage))
+                if (!ReferenceEquals(UsageForm.EditingUsage, subAssembly.Usage))
                 {
                     OpenUsageForm(subAssembly.Usage);
                 }
@@ -4424,7 +4054,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 break;
 
             case AddSubAssemblyRecipeTab:
-                if (!IsUsageFormOpen || !IsAddingUsage)
+                if (!UsageForm.IsUsageFormOpen || !UsageForm.IsAddingUsage)
                 {
                     StartAddingUsage();
                 }
@@ -4506,12 +4136,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private void RefreshLinkableOptions()
     {
-        var linking = EditingUsageMode == UsageFormMode.Link;
+        var linking = UsageForm.EditingUsageMode == UsageFormMode.Link;
         var usedIds = UsageEdits.Select(u => u.SubAssemblyId).ToHashSet();
 
         // Packaging comes after the recipes, while the product has none: the packaging sets, then (to copy only) every
         // other product's packaging. A composite's own sections are only in product-owned roles, so it's offered those.
-        LinkableSubAssemblies.MergeFrom(
+        UsageForm.LinkableSubAssemblies.MergeFrom(
             [
                 .. _linkable
                     .Where(s => (!IsEditingComposite || s.Role?.IsProductOwned == true) && (linking
@@ -4523,9 +4153,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             ],
             o => o.Key);
 
-        if (EditingUsageSource is { } picked && !LinkableSubAssemblies.Contains(picked))
+        if (UsageForm.EditingUsageSource is { } picked && !UsageForm.LinkableSubAssemblies.Contains(picked))
         {
-            EditingUsageSource = null;
+            UsageForm.EditingUsageSource = null;
         }
 
         RefreshFormRoleOptions();
@@ -4538,14 +4168,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private void RefreshFormRoleOptions()
     {
-        var pickedRoleId = EditingUsageRole?.Id;
+        var pickedRoleId = UsageForm.EditingUsageRole?.Id;
         // The Packaging role adds the product's packaging, which isn't a recipe section: offered only to add, and only
         // while there's none. A section already in the recipe can't turn into packaging. A composite's sections are only
         // in product-owned roles (CompositeProductRules.EnsureSectionRoles).
-        FormRoleOptions.MergeFrom(
-            [.. Roles.Where(r => r.IsPackaging ? IsAddingUsage && !HasPackaging : !IsEditingComposite || r.IsProductOwned)],
+        UsageForm.FormRoleOptions.MergeFrom(
+            [.. Roles.Where(r => r.IsPackaging ? UsageForm.IsAddingUsage && !HasPackaging : !IsEditingComposite || r.IsProductOwned)],
             r => r.Id);
-        EditingUsageRole = FormRoleOptions.FirstOrDefault(r => r.Id == pickedRoleId);
+        UsageForm.EditingUsageRole = UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == pickedRoleId);
     }
 
     /// <summary>
@@ -4637,21 +4267,21 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private void RefreshFormLines()
     {
         var ingredientsById = Ingredients.ToDictionary(m => m.Id);
-        IngredientLineRow.Resolve(FormLines, ingredientsById);
-        IngredientLineRow.Resolve(FormAddIns, ingredientsById);
+        IngredientLineRow.Resolve(UsageForm.FormLines, ingredientsById);
+        IngredientLineRow.Resolve(UsageForm.FormAddIns, ingredientsById);
     }
 
     /// <summary>Puts <paramref name="lines"/> in the form's table, in place of whatever it held.</summary>
     private void ShowFormLines(IEnumerable<SubAssemblyLineEdit> lines)
     {
-        FormLines.Clear();
-        FormLines.AddRange(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)));
+        UsageForm.FormLines.Clear();
+        UsageForm.FormLines.AddRange(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)));
     }
 
     /// <summary>Whether the form's lines table still shows <paramref name="lines"/>, with nothing typed into it since.</summary>
     private bool IsFormShowing(IReadOnlyList<SubAssemblyLineEdit> lines) =>
-        FormLines.Count == lines.Count
-        && FormLines.Zip(lines).All(pair =>
+        UsageForm.FormLines.Count == lines.Count
+        && UsageForm.FormLines.Zip(lines).All(pair =>
             pair.First.IngredientId == pair.Second.Ingredient.Id
             && pair.First.Grams == pair.Second.Grams
             && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
@@ -4660,8 +4290,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The same for the add-ins table under it.</summary>
     private void ShowFormAddIns(IEnumerable<SubAssemblyLineEdit> addIns)
     {
-        FormAddIns.Clear();
-        FormAddIns.AddRange(addIns.Select(a => new IngredientLineRow(a.Ingredient, a.Grams)));
+        UsageForm.FormAddIns.Clear();
+        UsageForm.FormAddIns.AddRange(addIns.Select(a => new IngredientLineRow(a.Ingredient, a.Grams)));
     }
 
     /// <summary><paramref name="lines"/> with each ingredient swapped for its refreshed copy when that differs; unchanged lines are kept as they are.</summary>
@@ -4679,12 +4309,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         CostBasis = CostBasis == CostBasis.Buffered ? CostBasis.Unbuffered : CostBasis.Buffered;
         this.RaisePropertyChanged(nameof(MaterialCostTooltip));
-        foreach (var row in FormLines.Concat(FormAddIns))
+        foreach (var row in UsageForm.FormLines.Concat(UsageForm.FormAddIns))
         {
             row.CostBasis = CostBasis;
         }
 
-        foreach (var row in FormPackagingLines.Concat(Packaging.LineEdits))
+        foreach (var row in UsageForm.FormPackagingLines.Concat(Packaging.LineEdits))
         {
             row.CostBasis = CostBasis;
         }

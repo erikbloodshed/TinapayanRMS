@@ -29,7 +29,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
 
-        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 50m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 50m);
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -72,7 +72,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
     {
         await WithoutWastageAsync();
         var (viewModel, seeded) = await OpenToppedProductAsync();
-        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 50m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 50m);
         await viewModel.SaveCommand.Execute();
 
         // Sugar doubles after both were saved: the versions' costs then stay, today's follow.
@@ -105,7 +105,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
     {
         // Both versions are saved at the 3% wastage nothing in Settings gives.
         var (viewModel, _) = await OpenToppedProductAsync();
-        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 50m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 50m);
         await viewModel.SaveCommand.Execute();
 
         await SetWastageAsync(10m);
@@ -125,7 +125,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
     public async Task A_version_can_be_compared_with_any_other()
     {
         var (viewModel, _) = await OpenToppedProductAsync();
-        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 50m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 50m);
         await viewModel.SaveCommand.Execute();
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
         await viewModel.SaveCommand.Execute();
@@ -163,7 +163,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
         var toppingId = viewModel.UsageEdits.Single().SubAssemblyId;
-        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 50m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 50m);
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
         await viewModel.SaveCommand.Execute();
         await OpenHistoryAsync(viewModel, rows: 2);
@@ -176,8 +176,8 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         var topping = viewModel.UsageEdits.Single();
         topping.Lines.Single().Grams.Should().Be(100m);
         topping.SubAssemblyId.Should().Be(toppingId, "the product still owns it, so Save rewrites it in place");
-        viewModel.IsUsageFormOpen.Should().BeTrue("the section's tab shows its form, as it does when a product opens");
-        viewModel.FormLines.Single().Grams.Should().Be(100m, "the form shows the restored lines, not an empty batch");
+        viewModel.UsageForm.IsUsageFormOpen.Should().BeTrue("the section's tab shows its form, as it does when a product opens");
+        viewModel.UsageForm.FormLines.Single().Grams.Should().Be(100m, "the form shows the restored lines, not an empty batch");
         viewModel.EditingCurrentPrice.Should().BeNull();
         viewModel.History.IsDirty.Should().BeTrue("it's unsaved until Save");
 
@@ -203,7 +203,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
     {
         await WithoutWastageAsync();
         var (viewModel, seeded) = await OpenToppedProductAsync();
-        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 50m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 50m);
         await viewModel.SaveCommand.Execute();
         await SetCostAsync(seeded.SugarId, 0.2m);
         await viewModel.LoadCommand.Execute();
@@ -218,7 +218,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         printout.LastUpdatedText.Should().Be(viewModel.VersionHistory.Rows[1].SavedText);
         printout.Sections.Should().ContainSingle();
         printout.Costs.BaseCost.Should().Be(10m, "100 g of sugar at its cost then, 0.10 a gram");
-        viewModel.FormLines.Single().Grams.Should().Be(50m, "printing a version leaves the form as it is");
+        viewModel.UsageForm.FormLines.Single().Grams.Should().Be(50m, "printing a version leaves the form as it is");
     }
 
     [Fact]
@@ -244,7 +244,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 50m)]));
         var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 1);
 
-        Edit(viewModel, () => viewModel.EditingUsageWeightPerPiece = 40m);
+        Edit(viewModel, () => viewModel.UsageForm.EditingUsageWeightPerPiece = 40m);
         await viewModel.SaveCommand.Execute();
         await subAssemblies.SaveStandaloneAsync(
             new SubAssembly { Id = doughId, Name = "House Dough", RoleId = doughRoleId }, [(flourId, 800m)], Cancellation);
@@ -291,7 +291,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
 
         await viewModel.EditUsageCommand.Execute(viewModel.UsageEdits.Single());
-        Edit(viewModel, () => viewModel.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m }));
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m }));
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -353,7 +353,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
 
         // The clone's first Save adds only what it changed: its history began when it was made.
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == cloneId);
-        await WaitUntilAsync(() => viewModel.AreDetailsReady && viewModel.FormLines.Count == 1, () => $"lines={viewModel.FormLines.Count}");
+        await WaitUntilAsync(() => viewModel.AreDetailsReady && viewModel.UsageForm.FormLines.Count == 1, () => $"lines={viewModel.UsageForm.FormLines.Count}");
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 28m);
         await viewModel.SaveCommand.Execute();
         (await VersionsAsync(cloneId)).Select(v => v.Number).Should().Equal(2, 1);
@@ -390,7 +390,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
         await viewModel.SaveCommand.Execute();
         await OpenHistoryAsync(viewModel, rows: 2);
-        viewModel.IsUsageFormOpen.Should().BeTrue("the section's form shows, as it does whenever a product opens");
+        viewModel.UsageForm.IsUsageFormOpen.Should().BeTrue("the section's form shows, as it does whenever a product opens");
 
         viewModel.VersionHistory.SelectedRow = viewModel.VersionHistory.Rows[0];
         await viewModel.RestoreVersionCommand.Execute();
@@ -405,9 +405,9 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         var (viewModel, seeded) = await OpenToppedProductAsync();
         var butterId = await AddIngredientAsync("Butter", costPerGram: 0.3m);
         await viewModel.LoadCommand.Execute();
-        Edit(viewModel, () => viewModel.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 20m }));
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 20m }));
         await viewModel.SaveCommand.Execute();
-        Edit(viewModel, () => viewModel.FormLines.RemoveAt(1));
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.RemoveAt(1));
         await viewModel.SaveCommand.Execute();
         await using (var dbContext = CreateDbContext())
         {
@@ -513,7 +513,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await SaveRecipeAsync(productId, new RecipeDraft(
             [new NewSubAssemblyDraft(toppingRoleId, [(sugarId, 100m)], UsageAuthoredField.Yield, 1m)], []));
 
-        var viewModel = await OpenAsync(productId, vm => vm.FormLines.Count == 1);
+        var viewModel = await OpenAsync(productId, vm => vm.UsageForm.FormLines.Count == 1);
         return (viewModel, new Seeded(productId, sugarId));
     }
 
@@ -532,7 +532,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await WaitUntilAsync(
             () => viewModel.AreDetailsReady && ready(viewModel),
-            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.FormLines.Count}");
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
         return viewModel;
     }
 

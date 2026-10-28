@@ -59,7 +59,7 @@
             row generator, which left each Recipe Structure tab's grid showing the header of the tab shown before it.
         -->
         <DataTemplate x:Key="PercentHeaderTemplate">
-            <TextBlock Text="{Binding DataContext.UsageFormPercentHeader, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+            <TextBlock Text="{Binding DataContext.UsageForm.UsageFormPercentHeader, RelativeSource={RelativeSource AncestorType=UserControl}}" />
         </DataTemplate>
     </UserControl.Resources>
 
@@ -70,16 +70,16 @@
             title: in its place, the badge saying Save keeps it on the Sub-Assemblies screen, which it does unless its
             role is product-owned (Settings → Roles) or packaging — then neither shows, and the row takes no room.
         -->
-        <TextBlock Text="{Binding UsageFormTitle}"
+        <TextBlock Text="{Binding UsageForm.UsageFormTitle}"
                    FontWeight="SemiBold"
                    Foreground="{StaticResource HeadingForegroundBrush}"
                    Margin="0,0,0,8"
-                   Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                   Visibility="{Binding UsageForm.IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}" />
         <Border Style="{StaticResource LinkedBadgeStyle}"
                 HorizontalAlignment="Left"
                 Margin="0,0,0,8"
                 ToolTip="Save puts it on the Sub-Assemblies screen, named after this product and its role, and this product links it there. Pick a product-owned role to keep it this product's own."
-                Visibility="{Binding IsFormNewMovingToSubAssemblies, Converter={StaticResource BooleanToVisibilityConverter}}">
+                Visibility="{Binding UsageForm.IsFormNewMovingToSubAssemblies, Converter={StaticResource BooleanToVisibilityConverter}}">
             <TextBlock Text="Moves to Sub-Assemblies on Save" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
         </Border>
 
@@ -90,7 +90,7 @@
             sub-assembly has no row at all rather than an empty one — and the picker takes the rest of the width after its
             label (FormLabelStyle, on its left), which its longest entries ("Chocolate Glaze — Sub-Assemblies (Glaze)") need.
         -->
-        <Grid Margin="0,0,0,8" Visibility="{Binding IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <Grid Margin="0,0,0,8" Visibility="{Binding UsageForm.IsFormPickingSource, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -105,12 +105,12 @@
                 XAML they hold from the first template application. Same for Role below.
             -->
             <syncfusion:ComboBoxAdv Grid.Column="1"
-                                    ItemsSource="{Binding LinkableSubAssemblies}"
+                                    ItemsSource="{Binding UsageForm.LinkableSubAssemblies}"
                                     DisplayMemberPath="DisplayName"
                                     IsEditable="True"
                                     AutoCompleteMode="Suggest"
                                     controls:FieldUndoStep.Recorder="{Binding}"
-                                    SelectedItem="{Binding EditingUsageSource, Mode=TwoWay}"
+                                    SelectedItem="{Binding UsageForm.EditingUsageSource, Mode=TwoWay}"
                                     ToolTip="One from the Sub-Assemblies screen; or packaging: a packaging set, or another product's. A link follows every change made to it where it's kept; a copy is saved there as a new one, named after this product." />
         </Grid>
 
@@ -139,15 +139,15 @@
                     <Border Style="{StaticResource LinkedBadgeStyle}"
                             Margin="0,0,16,8"
                             ToolTip="Save puts it on the Sub-Assemblies screen, keeping its name and these lines, and this product links it there. Undo or Revert to keep it this product's own."
-                            Visibility="{Binding EditingUsage.IsReleasing, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
+                            Visibility="{Binding UsageForm.EditingUsage.IsReleasing, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
                         <TextBlock Text="Moves to Sub-Assemblies on Save" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
                     </Border>
                     <!-- Move to In-House was pressed: Save moves it to Sub-Assemblies, links it, and makes a made ingredient from it -->
                     <Border Style="{StaticResource LinkedBadgeStyle}"
                             Margin="0,0,16,8"
                             ToolTip="Save puts it on the Sub-Assemblies screen, keeping its name and these lines, links this product to it there, and adds a made ingredient made from it, with no weight loss. Undo or Revert to keep it this product's own."
-                            Visibility="{Binding EditingUsage.IsMovingToInHouse, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
-                        <TextBlock Text="{Binding EditingUsage.MovingToInHouseText}" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
+                            Visibility="{Binding UsageForm.EditingUsage.IsMovingToInHouse, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
+                        <TextBlock Text="{Binding UsageForm.EditingUsage.MovingToInHouseText}" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
                     </Border>
                     <!--
                         A linked one's badge is a link: it opens the sub-assembly on the Sub-Assemblies screen (MainWindow
@@ -155,11 +155,11 @@
                     -->
                     <Button Style="{StaticResource LinkedBadgeLinkStyle}"
                             Margin="0,0,4,8"
-                            Content="{Binding EditingUsage.LinkedFromText}"
+                            Content="{Binding UsageForm.EditingUsage.LinkedFromText}"
                             Command="{Binding OpenLinkedSourceCommand}"
-                            CommandParameter="{Binding EditingUsage}"
-                            ToolTip="{Binding EditingUsage.LinkedFromToolTip}"
-                            Visibility="{Binding IsShowingLinkBadge, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            CommandParameter="{Binding UsageForm.EditingUsage}"
+                            ToolTip="{Binding UsageForm.EditingUsage.LinkedFromToolTip}"
+                            Visibility="{Binding UsageForm.IsShowingLinkBadge, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <!--
                         Edit beside the badge: links another sub-assembly in its place, keeping this product's piece size and
                         add-ins. An icon only, in the theme's glyph-button style as the window's own icon buttons are
@@ -173,7 +173,7 @@
                             Command="{Binding StartChangingLinkCommand}"
                             ToolTip="Link another sub-assembly in its place, keeping this product's piece size and add-ins. The one linked now stays where it's kept."
                             AutomationProperties.Name="Change link"
-                            Visibility="{Binding IsShowingLinkBadge, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding UsageForm.IsShowingLinkBadge, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <TextBlock Text="&#xE70F;" Style="{StaticResource IconGlyphStyle}" />
                     </Button>
 
@@ -185,14 +185,14 @@
                     <syncfusion:ComboBoxAdv Width="360"
                                             Margin="0,0,4,8"
                                             VerticalAlignment="Center"
-                                            ItemsSource="{Binding ChangeLinkOptions}"
+                                            ItemsSource="{Binding UsageForm.ChangeLinkOptions}"
                                             DisplayMemberPath="DisplayName"
                                             IsEditable="True"
                                             AutoCompleteMode="Suggest"
                                             DefaultText="Link instead…"
-                                            SelectedItem="{Binding ChangeLinkTarget, Mode=TwoWay}"
+                                            SelectedItem="{Binding UsageForm.ChangeLinkTarget, Mode=TwoWay}"
                                             ToolTip="A sub-assembly from the Sub-Assemblies screen to link in this one's place"
-                                            Visibility="{Binding IsChangingLink, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            Visibility="{Binding UsageForm.IsChangingLink, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <Button Width="24"
                             Height="24"
                             Margin="0,0,16,8"
@@ -201,12 +201,12 @@
                             Command="{Binding CancelChangingLinkCommand}"
                             ToolTip="Keep the link as it is"
                             AutomationProperties.Name="Cancel changing link"
-                            Visibility="{Binding IsChangingLink, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding UsageForm.IsChangingLink, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <TextBlock Text="&#xE711;" Style="{StaticResource IconGlyphStyle}" />
                     </Button>
                 </StackPanel>
 
-                <Grid Grid.Column="1" Margin="0,0,0,8" VerticalAlignment="Center" Visibility="{Binding IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid Grid.Column="1" Margin="0,0,0,8" VerticalAlignment="Center" Visibility="{Binding UsageForm.IsFormEditingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <!--
                         Every column hugs what's in it, with the spacer as the gap: both fields are a fixed width, so a
                         share-of-the-width column left a gap between them that grew with the window.
@@ -227,58 +227,58 @@
                     <syncfusion:ComboBoxAdv Grid.Column="1"
                                             Width="180"
                                             HorizontalAlignment="Left"
-                                            ItemsSource="{Binding FormRoleOptions}"
+                                            ItemsSource="{Binding UsageForm.FormRoleOptions}"
                                             DisplayMemberPath="Name"
                                             IsEditable="True"
                                             AutoCompleteMode="Suggest"
                                             controls:FieldUndoStep.Recorder="{Binding}"
-                                            SelectedItem="{Binding EditingUsageRole, Mode=TwoWay}"
+                                            SelectedItem="{Binding UsageForm.EditingUsageRole, Mode=TwoWay}"
                                             ToolTip="What it's called in the recipe. Roles are added in Settings → Roles." />
 
                     <TextBlock Grid.Column="3"
                                Text="Name (optional)"
                                Style="{StaticResource FormLabelStyle}"
-                               Visibility="{Binding IsFormPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+                               Visibility="{Binding UsageForm.IsFormPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                     <syncfusion:SfTextBoxExt Grid.Column="4"
                                              Width="240"
                                              HorizontalAlignment="Left"
                                              controls:FieldUndoStep.Recorder="{Binding}"
-                                             Text="{Binding EditingUsageName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             Text="{Binding UsageForm.EditingUsageName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                              Watermark="e.g. Ube"
                                              ToolTip="Tells it apart from the recipe's other sub-assemblies in the same role: its tab reads Filling: Ube beside Filling: Cheese. One in a role can go without. Save keeps it on the Sub-Assemblies screen named after the product and role, with this after them: Cheese Roll Filling: Ube."
-                                             Visibility="{Binding IsFormPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+                                             Visibility="{Binding UsageForm.IsFormPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                 </Grid>
 
                 <StackPanel Grid.Column="2"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
                             Margin="12,0,0,8"
-                            Visibility="{Binding IsAddingUsage, Converter={StaticResource EmptyStateVisibilityConverter}}">
+                            Visibility="{Binding UsageForm.IsAddingUsage, Converter={StaticResource EmptyStateVisibilityConverter}}">
                     <syncfusion:ButtonAdv Label="Unlink"
                                           ToolTip="Make it this product's own copy, to change its lines for this product alone, whatever its role. The one on the Sub-Assemblies screen stays as it is. Save keeps the copy with this product, named after it: other products can copy it but not link it."
                                           IconTemplate="{StaticResource UnlinkIconTemplate}"
                                           Command="{Binding UnlinkCommand}"
-                                          CommandParameter="{Binding EditingUsage}"
-                                          Visibility="{Binding IsEditingLinkedUsage, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                          CommandParameter="{Binding UsageForm.EditingUsage}"
+                                          Visibility="{Binding UsageForm.IsEditingLinkedUsage, Converter={StaticResource BooleanToVisibilityConverter}}"
                                           Margin="0,0,8,0" />
                     <syncfusion:ButtonAdv Label="Copy"
                                           ToolTip="Make a copy of it, to change its lines for this product alone. Save keeps the copy named after this product, and uses it instead: as its own in a product-owned role, otherwise on the Sub-Assemblies screen, linked."
                                           IconTemplate="{StaticResource CopyIconTemplate}"
                                           Command="{Binding MakeCopyCommand}"
-                                          CommandParameter="{Binding EditingUsage}"
-                                          Visibility="{Binding IsEditingLinkedUsage, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                          CommandParameter="{Binding UsageForm.EditingUsage}"
+                                          Visibility="{Binding UsageForm.IsEditingLinkedUsage, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <syncfusion:ButtonAdv Label="Move to Sub-Assemblies"
                                           ToolTip="Save puts it on the Sub-Assemblies screen, keeping its name and lines, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen."
                                           IconTemplate="{StaticResource LinkIconTemplate}"
                                           Command="{Binding MoveToSubAssembliesCommand}"
-                                          CommandParameter="{Binding EditingUsage}"
-                                          Visibility="{Binding IsEditingOwnedUsage, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                          CommandParameter="{Binding UsageForm.EditingUsage}"
+                                          Visibility="{Binding UsageForm.IsEditingOwnedUsage, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <syncfusion:ButtonAdv Label="Move to In-House"
                                           ToolTip="Make a made ingredient from this section, on the Raw Materials screen in a Made category, so other recipes can use it as an ingredient. Save does it: the section moves to the Sub-Assemblies screen, where its lines are edited from then on, and this product links it there."
                                           IconTemplate="{StaticResource ExportIconTemplate}"
                                           Command="{Binding MoveToInHouseCommand}"
-                                          CommandParameter="{Binding EditingUsage}"
-                                          Visibility="{Binding CanMoveEditingUsageToInHouse, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                          CommandParameter="{Binding UsageForm.EditingUsage}"
+                                          Visibility="{Binding UsageForm.CanMoveEditingUsageToInHouse, Converter={StaticResource BooleanToVisibilityConverter}}"
                                           Margin="8,0,0,0" />
 
                 </StackPanel>
@@ -303,11 +303,11 @@
                 <Button HorizontalAlignment="Right"
                         Margin="0,0,0,8"
                         Style="{StaticResource LinkedBadgeLinkStyle}"
-                        Content="{Binding FormAddInsBadgeText}"
+                        Content="{Binding UsageForm.FormAddInsBadgeText}"
                         Click="AddInsBadge_Click"
                         ToolTip="This product adds its own extras to the linked recipe. Click to scroll down to them."
-                        AutomationProperties.Name="{Binding FormAddInsBadgeText, StringFormat='{}{0}: go to the add-ins table'}"
-                        Visibility="{Binding HasFormAddIns, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        AutomationProperties.Name="{Binding UsageForm.FormAddInsBadgeText, StringFormat='{}{0}: go to the add-ins table'}"
+                        Visibility="{Binding UsageForm.HasFormAddIns, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <Border HorizontalAlignment="Right"
                         VerticalAlignment="Center"
                         Margin="0,0,0,8"
@@ -315,8 +315,8 @@
                         CornerRadius="4"
                         Padding="6,1"
                         ToolTip="This product adds nothing to the linked recipe. Add a colouring, a flavouring or an inclusion in the Add-Ins table under its lines."
-                        Visibility="{Binding IsFormShowingNoAddIns, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <TextBlock Text="{Binding FormAddInsBadgeText}" FontSize="13" Foreground="{StaticResource MutedForegroundBrush}" />
+                        Visibility="{Binding UsageForm.IsFormShowingNoAddIns, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding UsageForm.FormAddInsBadgeText}" FontSize="13" Foreground="{StaticResource MutedForegroundBrush}" />
                 </Border>
             </Grid>
         </Grid>
@@ -326,29 +326,29 @@
             link or copy): how much of each material one piece takes, the Packaging tab's own columns. Typed into for a
             new or copied one; a link's lines are kept where it's from, so they only show.
         -->
-        <StackPanel Visibility="{Binding IsFormPackaging, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <syncfusion:SfDataGrid ItemsSource="{Binding FormPackagingLines}"
+        <StackPanel Visibility="{Binding UsageForm.IsFormPackaging, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <syncfusion:SfDataGrid ItemsSource="{Binding UsageForm.FormPackagingLines}"
                                    controls:GridUndoSteps.Recorder="{Binding}"
                                    controls:CostBasisColumns.Basis="{Binding CostBasis}"
                                    controls:GridRowReordering.IsEnabled="True"
                                    controls:NumericEditing.IsEnabled="True"
-                                   SelectedItem="{Binding SelectedFormPackagingLine, Mode=TwoWay}"
+                                   SelectedItem="{Binding UsageForm.SelectedFormPackagingLine, Mode=TwoWay}"
                                    GridLinesVisibility="Both"
                                    CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                    CurrentCellBorderThickness="1"
                                    controls:GridFillerRows.IsEnabled="True"
                                    ShowRowHeader="True"
                                    AutoGenerateColumns="False"
-                                   AllowEditing="{Binding IsFormEditingPackaging}"
-                                   AllowDeleting="{Binding IsFormEditingPackaging}"
+                                   AllowEditing="{Binding UsageForm.IsFormEditingPackaging}"
+                                   AllowDeleting="{Binding UsageForm.IsFormEditingPackaging}"
                                    EditTrigger="OnTap"
-                                   AddNewRowPosition="{Binding IsFormEditingPackaging, Converter={StaticResource AddNewRowPositionConverter}}"
+                                   AddNewRowPosition="{Binding UsageForm.IsFormEditingPackaging, Converter={StaticResource AddNewRowPositionConverter}}"
                                    SelectionMode="Single"
                                    ColumnSizer="Star"
                                    controls:GridEditCommit.OnFocusLeave="True"
                                    controls:GridAddNewRow.DropWhenUntouched="True"
                                    controls:AutoCompleteDropDown.IsEnabled="True"
-                                   controls:GridAddNewRow.ItemFactory="{Binding NewFormPackagingLine}"
+                                   controls:GridAddNewRow.ItemFactory="{Binding UsageForm.NewFormPackagingLine}"
                                    Height="200">
                 <syncfusion:SfDataGrid.Columns>
                     <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
@@ -406,25 +406,25 @@
                            Style="{StaticResource CaptionStyle}"
                            VerticalAlignment="Center"
                            Margin="0,0,12,0">
-                    <Run Text="Cost per piece · " /><Run Text="{Binding UsageFormCostPerPieceText, Mode=OneWay}" />
+                    <Run Text="Cost per piece · " /><Run Text="{Binding UsageForm.UsageFormCostPerPieceText, Mode=OneWay}" />
                 </TextBlock>
                 <TextBlock Text="How much of each material one piece takes, in its unit. It's the product's packaging: Apply puts it on the Packaging tab."
                            Style="{StaticResource CaptionStyle}"
                            VerticalAlignment="Center"
                            TextWrapping="Wrap"
                            Margin="0,0,12,0"
-                           Visibility="{Binding IsFormEditingPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                           Visibility="{Binding UsageForm.IsFormEditingPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <TextBlock Text="Linked: its lines are kept where it's from, and follow every change there, one set per piece."
                            Style="{StaticResource CaptionStyle}"
                            VerticalAlignment="Center"
                            TextWrapping="Wrap"
                            Margin="0,0,12,0"
-                           Visibility="{Binding IsFormEditingPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
+                           Visibility="{Binding UsageForm.IsFormEditingPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}" />
                 <syncfusion:ButtonAdv Grid.Column="2"
                                       Label="Remove Line"
                                       IconTemplate="{StaticResource RemoveIconTemplate}"
                                       Command="{Binding RemoveFormPackagingLineCommand}"
-                                      Visibility="{Binding IsFormEditingPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                      Visibility="{Binding UsageForm.IsFormEditingPackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </Grid>
         </StackPanel>
 
@@ -433,7 +433,7 @@
             add-ins to them are as wide as the form allows, and the three piece-size boxes sit beside
             them in a column of their own.
         -->
-        <Grid Visibility="{Binding IsFormPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}">
+        <Grid Visibility="{Binding UsageForm.IsFormPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="16" />
@@ -447,9 +447,9 @@
                     it's kept. Only a link being picked shows its lines read-only: AllowEditing is off and the add row goes
                     with it (AddNewRowPositionConverter).
                 -->
-                <StackPanel Visibility="{Binding IsFormShowingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel Visibility="{Binding UsageForm.IsFormShowingLines, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <syncfusion:SfDataGrid x:Name="LinesGrid"
-                                           ItemsSource="{Binding FormLines}"
+                                           ItemsSource="{Binding UsageForm.FormLines}"
                                            controls:GridUndoSteps.Recorder="{Binding}"
                                            controls:CostBasisColumns.Basis="{Binding CostBasis}"
                                            controls:GridRowReordering.IsEnabled="True"
@@ -457,23 +457,23 @@
                                            controls:NumericEditing.IsEnabled="True"
                                            controls:GridAddNewRow.HideCheckBoxes="True"
                                            controls:GridCellEditing.IsEnabled="True"
-                                           SelectedItem="{Binding SelectedFormLine, Mode=TwoWay}"
+                                           SelectedItem="{Binding UsageForm.SelectedFormLine, Mode=TwoWay}"
                                            GridLinesVisibility="Both"
                                            CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                            CurrentCellBorderThickness="1"
                                            controls:GridFillerRows.IsEnabled="True"
                                            ShowRowHeader="True"
                                            AutoGenerateColumns="False"
-                                           AllowEditing="{Binding IsFormLinesEditable}"
-                                           AllowDeleting="{Binding IsFormLinesEditable}"
+                                           AllowEditing="{Binding UsageForm.IsFormLinesEditable}"
+                                           AllowDeleting="{Binding UsageForm.IsFormLinesEditable}"
                                            EditTrigger="OnTap"
-                                           AddNewRowPosition="{Binding IsFormLinesEditable, Converter={StaticResource AddNewRowPositionConverter}}"
+                                           AddNewRowPosition="{Binding UsageForm.IsFormLinesEditable, Converter={StaticResource AddNewRowPositionConverter}}"
                                            SelectionMode="Single"
                                            ColumnSizer="Star"
                                            controls:GridEditCommit.OnFocusLeave="True"
                                            controls:GridAddNewRow.DropWhenUntouched="True"
                                            controls:AutoCompleteDropDown.IsEnabled="True"
-                                           controls:GridAddNewRow.ItemFactory="{Binding NewFormLine}"
+                                           controls:GridAddNewRow.ItemFactory="{Binding UsageForm.NewFormLine}"
                                            Height="314">
                         <syncfusion:SfDataGrid.Columns>
                             <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
@@ -516,7 +516,7 @@
                                                            HeaderText="Base"
                                                            Width="54"
                                                            HorizontalHeaderContentAlignment="Center"
-                                                           AllowEditing="{Binding IsFormLinesEditable}" />
+                                                           AllowEditing="{Binding UsageForm.IsFormLinesEditable}" />
                         </syncfusion:SfDataGrid.Columns>
                     </syncfusion:SfDataGrid>
 
@@ -527,14 +527,14 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <!-- What the percentages are read against, and the figure a batch is scaled by. -->
-                        <TextBlock Text="{Binding UsageFormBaseCaption}"
+                        <TextBlock Text="{Binding UsageForm.UsageFormBaseCaption}"
                                    Style="{StaticResource CaptionStyle}"
                                    VerticalAlignment="Center"
                                    TextWrapping="Wrap"
                                    Margin="0,0,12,0" />
                         <StackPanel Grid.Column="1"
                                     Orientation="Horizontal"
-                                    Visibility="{Binding IsFormLinesEditable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    Visibility="{Binding UsageForm.IsFormLinesEditable, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <syncfusion:ButtonAdv Label="Insert Line"
                                                   IconTemplate="{StaticResource AddIconTemplate}"
                                                   Command="{x:Static controls:GridRowInserting.InsertLine}"
@@ -556,7 +556,7 @@
                     empty or not: a Show/Hide Add-Ins toggle shut it before (until 2026-09-28), which hid that the batch
                     had extras in it. The badge above the lines says whether it has any, and scrolls here.
                 -->
-                <StackPanel x:Name="AddInsSection" Margin="0,6,0,0" Visibility="{Binding IsFormShowingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel x:Name="AddInsSection" Margin="0,6,0,0" Visibility="{Binding UsageForm.IsFormShowingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <!--
                         The table's heading, and on the right, over the table's top right corner as the add-ins badge is over
                         the lines', a Go to top badge (2026-09-28, at the user's request), the add-ins badge's way back: a
@@ -572,14 +572,14 @@
                                 AutomationProperties.Name="Go to top: the linked recipe's lines" />
                     </Grid>
                     <syncfusion:SfDataGrid x:Name="AddInsGrid"
-                                           ItemsSource="{Binding FormAddIns}"
+                                           ItemsSource="{Binding UsageForm.FormAddIns}"
                                            controls:GridUndoSteps.Recorder="{Binding}"
                                            controls:CostBasisColumns.Basis="{Binding CostBasis}"
                                            controls:GridRowReordering.IsEnabled="True"
                                            controls:GridRowInserting.IsEnabled="True"
                                            controls:NumericEditing.IsEnabled="True"
                                            controls:GridCellEditing.IsEnabled="True"
-                                           SelectedItem="{Binding SelectedFormAddIn, Mode=TwoWay}"
+                                           SelectedItem="{Binding UsageForm.SelectedFormAddIn, Mode=TwoWay}"
                                            GridLinesVisibility="Both"
                                            CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                            CurrentCellBorderThickness="1"
@@ -595,7 +595,7 @@
                                            controls:GridEditCommit.OnFocusLeave="True"
                                            controls:GridAddNewRow.DropWhenUntouched="True"
                                            controls:AutoCompleteDropDown.IsEnabled="True"
-                                           controls:GridAddNewRow.ItemFactory="{Binding NewFormAddIn}"
+                                           controls:GridAddNewRow.ItemFactory="{Binding UsageForm.NewFormAddIn}"
                                            Height="140">
                         <syncfusion:SfDataGrid.Columns>
                             <!-- The same columns as the recipe above, so the two tables read as one batch. -->
@@ -640,7 +640,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding UsageFormAddInsCaption}" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <TextBlock Text="{Binding UsageForm.UsageFormAddInsCaption}" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,0,12,0" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
                             <syncfusion:ButtonAdv Label="Insert Add-In"
                                                   IconTemplate="{StaticResource AddIconTemplate}"
@@ -670,7 +670,7 @@
                             ToolTip="What one piece of the product takes of this section: the batch's cost shared out by weight per piece.">
                         <StackPanel>
                             <TextBlock Text="Cost/piece" Style="{StaticResource StatCaptionStyle}" />
-                            <TextBlock Text="{Binding UsageFormCostPerPieceText}" Style="{StaticResource StatValueStyle}" />
+                            <TextBlock Text="{Binding UsageForm.UsageFormCostPerPieceText}" Style="{StaticResource StatValueStyle}" />
                         </StackPanel>
                     </Border>
                     <Border Grid.Column="2"
@@ -678,7 +678,7 @@
                             ToolTip="What the whole batch costs: its lines, and this product's add-ins to them.">
                         <StackPanel>
                             <TextBlock Text="Batch cost" Style="{StaticResource StatCaptionStyle}" />
-                            <TextBlock Text="{Binding UsageFormBatchCostText}" Style="{StaticResource StatValueStyle}" />
+                            <TextBlock Text="{Binding UsageForm.UsageFormBatchCostText}" Style="{StaticResource StatValueStyle}" />
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -694,7 +694,7 @@
                         <syncfusion:DoubleTextBox Grid.Column="1"
                                                   Width="80"
                                                   controls:FieldUndoStep.Recorder="{Binding}"
-                                                  Value="{Binding EditingUsageWeightPerPiece, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  Value="{Binding UsageForm.EditingUsageWeightPerPiece, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                   NumberDecimalDigits="2"
                                                   ToolTip="What one piece takes of the batch's total weight. Type it, and the yield is worked out." />
                     </Grid>
@@ -709,7 +709,7 @@
                         <syncfusion:DoubleTextBox Grid.Column="1"
                                                   Width="80"
                                                   controls:FieldUndoStep.Recorder="{Binding}"
-                                                  Value="{Binding EditingUsageYield, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  Value="{Binding UsageForm.EditingUsageYield, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                   NumberDecimalDigits="2"
                                                   ToolTip="Pieces one batch makes. Type it, and the weight per piece is worked out." />
                     </Grid>
@@ -729,12 +729,12 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Total weight" Style="{StaticResource ParamLabelStyle}" />
-                        <TextBlock Grid.Column="1" Text="{Binding UsageFormTotalWeightText}" Style="{StaticResource ComputedValueStyle}" />
+                        <TextBlock Grid.Column="1" Text="{Binding UsageForm.UsageFormTotalWeightText}" Style="{StaticResource ComputedValueStyle}" />
                     </Grid>
                 </Border>
 
 
-                <TextBlock Text="{Binding UsageFormPieceSizeCaption}" Style="{StaticResource CaptionStyle}" Margin="0,8,0,0" />
+                <TextBlock Text="{Binding UsageForm.UsageFormPieceSizeCaption}" Style="{StaticResource CaptionStyle}" Margin="0,8,0,0" />
             </StackPanel>
         </Grid>
     </StackPanel>
