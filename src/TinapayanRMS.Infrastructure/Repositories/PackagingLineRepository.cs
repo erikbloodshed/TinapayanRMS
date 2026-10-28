@@ -4,6 +4,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Queries;
+using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
@@ -128,7 +129,7 @@ public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> db
     {
         // The old lines' delete, which runs at once, and the new lines' insert commit together.
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         await SetLinesAsync(dbContext, productId, lines, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }

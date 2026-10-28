@@ -41,8 +41,11 @@ public static class CompositionRoot
                 // A factory, not AddDbContext: ViewModels are singletons that outlive any one
                 // screen, so there's no natural request scope to hand a single DbContext to.
                 // Each repository call creates and disposes its own short-lived context instead,
-                // which also makes concurrent calls from different screens safe.
-                services.AddDbContextFactory<TinapayanRMSDbContext>(options => TinapayanRMSDbContext.Configure(options, connectionString));
+                // which also makes concurrent calls from different screens safe. The factory is also the
+                // unit of work: inside one, every repository's context shares its one transaction.
+                services.AddSingleton(new SharedTransactionDbContextFactory(connectionString));
+                services.AddSingleton<IDbContextFactory<TinapayanRMSDbContext>>(provider => provider.GetRequiredService<SharedTransactionDbContextFactory>());
+                services.AddSingleton<IUnitOfWork>(provider => provider.GetRequiredService<SharedTransactionDbContextFactory>());
 
                 services.AddSingleton<IUnitOfMeasureRepository, UnitOfMeasureRepository>();
                 services.AddSingleton<IRawMaterialCategoryRepository, RawMaterialCategoryRepository>();
@@ -72,6 +75,7 @@ public static class CompositionRoot
                     provider.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>(), DatabaseBackups.DefaultFolder, backupToolsFolder));
                 services.AddSingleton<SavedProductReader>();
                 services.AddSingleton<ProductVersionRecorder>();
+                services.AddSingleton<VersionedSaves>();
                 services.AddSingleton<IViewStateStore>(new JsonViewStateStore(JsonViewStateStore.DefaultFilePath));
 
                 services.AddSingleton(Log.Logger);

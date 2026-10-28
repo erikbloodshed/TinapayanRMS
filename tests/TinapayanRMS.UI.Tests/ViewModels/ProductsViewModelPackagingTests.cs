@@ -33,12 +33,12 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.EditingName = "Ensaymada";
 
         await viewModel.AddUsageCommand.Execute();
-        viewModel.FormRoleOptions.Select(r => r.Name).Should().Equal("Dough", "Packaging");
-        viewModel.EditingUsageRole = viewModel.FormRoleOptions.Single(r => r.IsPackaging);
-        viewModel.IsFormPackaging.Should().BeTrue();
-        viewModel.IsFormEditingPackaging.Should().BeTrue();
-        viewModel.FormPackagingLines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
-        viewModel.UsageFormCostPerPieceText.Should().Be("30.0000");
+        viewModel.UsageForm.FormRoleOptions.Select(r => r.Name).Should().Equal("Dough", "Packaging");
+        viewModel.UsageForm.EditingUsageRole = viewModel.UsageForm.FormRoleOptions.Single(r => r.IsPackaging);
+        viewModel.UsageForm.IsFormPackaging.Should().BeTrue();
+        viewModel.UsageForm.IsFormEditingPackaging.Should().BeTrue();
+        viewModel.UsageForm.FormPackagingLines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
+        viewModel.UsageForm.UsageFormCostPerPieceText.Should().Be("30.0000");
 
         // The form has no Apply of its own: Save puts it in the recipe and shows its tab, as leaving the tab would.
         await viewModel.SaveCommand.Execute();
@@ -47,13 +47,13 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
         viewModel.HasPackaging.Should().BeTrue();
-        viewModel.IsPackagingLinked.Should().BeFalse();
-        viewModel.Costs.Packaging.Should().Be(30m);
+        viewModel.Packaging.IsPackagingLinked.Should().BeFalse();
+        viewModel.Costing.Costs.Packaging.Should().Be(30m);
 
         // One packaging to a product: the role isn't offered again. Nothing is typed into this form, so Save drops it.
         await viewModel.AddUsageCommand.Execute();
-        viewModel.FormRoleOptions.Select(r => r.Name).Should().Equal("Dough");
-        viewModel.LinkableSubAssemblies.Should().NotContain(o => o.IsPackaging);
+        viewModel.UsageForm.FormRoleOptions.Select(r => r.Name).Should().Equal("Dough");
+        viewModel.UsageForm.LinkableSubAssemblies.Should().NotContain(o => o.IsPackaging);
 
         await viewModel.SaveCommand.Execute();
 
@@ -83,8 +83,8 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.AddSubAssemblyTab);
         (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((true, false));
 
-        viewModel.EditingUsageRole = viewModel.FormRoleOptions.Single(r => r.IsPackaging);
-        viewModel.FormPackagingLines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
+        viewModel.UsageForm.EditingUsageRole = viewModel.UsageForm.FormRoleOptions.Single(r => r.IsPackaging);
+        viewModel.UsageForm.FormPackagingLines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
         await viewModel.SaveCommand.Execute();
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
         (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((false, true));
@@ -108,20 +108,20 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.RecipeTabs.Should().BeEmpty();
 
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
-        viewModel.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal("Gift Box Set — Sub-Assemblies (Packaging)");
-        viewModel.EditingUsageSource = viewModel.LinkableSubAssemblies.Single();
-        await WaitUntilSettledAsync(() => viewModel.FormPackagingLines.Count == 2, () => $"lines={viewModel.FormPackagingLines.Count}");
-        viewModel.IsFormPackaging.Should().BeTrue();
-        viewModel.IsFormEditingPackaging.Should().BeFalse("a link's lines are kept where it's from");
+        viewModel.UsageForm.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal("Gift Box Set — Sub-Assemblies (Packaging)");
+        viewModel.UsageForm.EditingUsageSource = viewModel.UsageForm.LinkableSubAssemblies.Single();
+        await WaitUntilSettledAsync(() => viewModel.UsageForm.FormPackagingLines.Count == 2, () => $"lines={viewModel.UsageForm.FormPackagingLines.Count}");
+        viewModel.UsageForm.IsFormPackaging.Should().BeTrue();
+        viewModel.UsageForm.IsFormEditingPackaging.Should().BeFalse("a link's lines are kept where it's from");
 
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
-        viewModel.IsPackagingLinked.Should().BeTrue();
-        viewModel.IsPackagingEditable.Should().BeFalse();
-        viewModel.PackagingLinkedToText.Should().Be("Linked to Gift Box Set (Sub-Assemblies)");
-        viewModel.Costs.Packaging.Should().Be(31.5m, "one set per piece: a ₱30 box and 30 cm of ribbon at ₱0.05");
+        viewModel.Packaging.IsPackagingLinked.Should().BeTrue();
+        viewModel.Packaging.IsPackagingEditable.Should().BeFalse();
+        viewModel.Packaging.PackagingLinkedToText.Should().Be("Linked to Gift Box Set (Sub-Assemblies)");
+        viewModel.Costing.Costs.Packaging.Should().Be(31.5m, "one set per piece: a ₱30 box and 30 cm of ribbon at ₱0.05");
 
         await using (var dbContext = CreateDbContext())
         {
@@ -130,8 +130,8 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
             (await dbContext.PackagingLines.CountAsync(Cancellation)).Should().Be(0, "a link has no lines of its own");
         }
 
-        await WaitUntilSettledAsync(() => viewModel.LineEdits.Count == 2, () => $"lines={viewModel.LineEdits.Count}");
-        viewModel.IsPackagingLinked.Should().BeTrue("the reload shows the saved link");
+        await WaitUntilSettledAsync(() => viewModel.Packaging.LineEdits.Count == 2, () => $"lines={viewModel.Packaging.LineEdits.Count}");
+        viewModel.Packaging.IsPackagingLinked.Should().BeTrue("the reload shows the saved link");
         viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
     }
 
@@ -147,11 +147,11 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.EditingName = "Cream Loaf Mini";
 
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
-        viewModel.EditingUsageSource = viewModel.LinkableSubAssemblies.Single(o => o.DisplayName == "Packaging — Cream Loaf");
-        await WaitUntilSettledAsync(() => viewModel.FormPackagingLines.Count == 1, () => $"lines={viewModel.FormPackagingLines.Count}");
-        viewModel.EditingUsageRole!.IsPackaging.Should().BeTrue("a copy of packaging takes the Packaging role");
-        viewModel.IsFormEditingPackaging.Should().BeTrue();
-        viewModel.FormPackagingLines.Single().QtyPerUnit = 3m;
+        viewModel.UsageForm.EditingUsageSource = viewModel.UsageForm.LinkableSubAssemblies.Single(o => o.DisplayName == "Packaging — Cream Loaf");
+        await WaitUntilSettledAsync(() => viewModel.UsageForm.FormPackagingLines.Count == 1, () => $"lines={viewModel.UsageForm.FormPackagingLines.Count}");
+        viewModel.UsageForm.EditingUsageRole!.IsPackaging.Should().BeTrue("a copy of packaging takes the Packaging role");
+        viewModel.UsageForm.IsFormEditingPackaging.Should().BeTrue();
+        viewModel.UsageForm.FormPackagingLines.Single().QtyPerUnit = 3m;
 
         await viewModel.SaveCommand.Execute();
 
@@ -174,15 +174,15 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await CreatePackagingLinkRepository().SetSubAssemblyLinkAsync(productId, setId, Cancellation);
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single();
-        await WaitUntilSettledAsync(() => viewModel.LineEdits.Count == 1, () => $"lines={viewModel.LineEdits.Count}");
+        await WaitUntilSettledAsync(() => viewModel.Packaging.LineEdits.Count == 1, () => $"lines={viewModel.Packaging.LineEdits.Count}");
         viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
-        viewModel.IsPackagingLinked.Should().BeTrue();
+        viewModel.Packaging.IsPackagingLinked.Should().BeTrue();
 
         await viewModel.CopyPackagingCommand.Execute();
 
-        viewModel.IsPackagingLinked.Should().BeFalse();
-        viewModel.IsPackagingEditable.Should().BeTrue();
-        viewModel.LineEdits.Should().ContainSingle().Which.QtyPerUnit.Should().Be(1m);
+        viewModel.Packaging.IsPackagingLinked.Should().BeFalse();
+        viewModel.Packaging.IsPackagingEditable.Should().BeTrue();
+        viewModel.Packaging.LineEdits.Should().ContainSingle().Which.QtyPerUnit.Should().Be(1m);
 
         await viewModel.SaveCommand.Execute();
 
@@ -200,28 +200,28 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
         var viewModel = await OpenWithOwnPackagingAsync(boxId);
-        viewModel.CanMovePackaging.Should().BeTrue("the lines are the product's own");
+        viewModel.Packaging.CanMovePackaging.Should().BeTrue("the lines are the product's own");
 
         await viewModel.MovePackagingToSubAssembliesCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.IsPackagingMoving.Should().BeTrue("the badge says Save moves it");
-        viewModel.CanMovePackaging.Should().BeFalse("it's on its way already");
-        viewModel.IsPackagingEditable.Should().BeTrue("its lines are still typed into here until Save");
+        viewModel.Packaging.IsPackagingMoving.Should().BeTrue("the badge says Save moves it");
+        viewModel.Packaging.CanMovePackaging.Should().BeFalse("it's on its way already");
+        viewModel.Packaging.IsPackagingEditable.Should().BeTrue("its lines are still typed into here until Save");
         (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeTrue();
 
         // Typed after the press: the set takes it along.
-        viewModel.LineEdits.Single().QtyPerUnit = 2m;
+        viewModel.Packaging.LineEdits.Single().QtyPerUnit = 2m;
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        await WaitUntilSettledAsync(() => viewModel.IsPackagingLinked && viewModel.LineEdits.Count == 1, () => $"linked={viewModel.IsPackagingLinked}");
-        viewModel.IsPackagingMoving.Should().BeFalse();
-        viewModel.IsPackagingLinkedToSet.Should().BeTrue();
-        viewModel.PackagingLinkedToText.Should().Be("Linked to Ensaymada Packaging (Sub-Assemblies)");
-        viewModel.IsPackagingEditable.Should().BeFalse("a linked set's lines are kept on the Sub-Assemblies screen");
-        viewModel.CanMovePackaging.Should().BeFalse();
-        viewModel.Costs.Packaging.Should().Be(60m, "one set per piece, as the lines were: two ₱30 boxes");
+        await WaitUntilSettledAsync(() => viewModel.Packaging.IsPackagingLinked && viewModel.Packaging.LineEdits.Count == 1, () => $"linked={viewModel.Packaging.IsPackagingLinked}");
+        viewModel.Packaging.IsPackagingMoving.Should().BeFalse();
+        viewModel.Packaging.IsPackagingLinkedToSet.Should().BeTrue();
+        viewModel.Packaging.PackagingLinkedToText.Should().Be("Linked to Ensaymada Packaging (Sub-Assemblies)");
+        viewModel.Packaging.IsPackagingEditable.Should().BeFalse("a linked set's lines are kept on the Sub-Assemblies screen");
+        viewModel.Packaging.CanMovePackaging.Should().BeFalse();
+        viewModel.Costing.Costs.Packaging.Should().Be(60m, "one set per piece, as the lines were: two ₱30 boxes");
 
         await using var dbContext = CreateDbContext();
         var set = await dbContext.SubAssemblies.SingleAsync(Cancellation);
@@ -242,17 +242,17 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeTrue();
 
         viewModel.TryUndo().Should().BeTrue();
-        viewModel.IsPackagingMoving.Should().BeFalse();
-        viewModel.CanMovePackaging.Should().BeTrue();
+        viewModel.Packaging.IsPackagingMoving.Should().BeFalse();
+        viewModel.Packaging.CanMovePackaging.Should().BeTrue();
         (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeFalse();
 
         viewModel.TryRedo().Should().BeTrue();
-        viewModel.IsPackagingMoving.Should().BeTrue();
+        viewModel.Packaging.IsPackagingMoving.Should().BeTrue();
         (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeTrue();
 
         // Taking the packaging out takes the move with it.
         await viewModel.RemoveUsageCommand.Execute();
-        viewModel.IsPackagingMoving.Should().BeFalse();
+        viewModel.Packaging.IsPackagingMoving.Should().BeFalse();
     }
 
     [Fact]
@@ -261,14 +261,14 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
         var viewModel = await OpenWithOwnPackagingAsync(boxId);
-        viewModel.SelectedLineEdit = viewModel.LineEdits.Single();
+        viewModel.Packaging.SelectedLineEdit = viewModel.Packaging.LineEdits.Single();
         await viewModel.RemoveLineCommand.Execute();
 
         await viewModel.MovePackagingToSubAssembliesCommand.Execute();
 
         viewModel.ErrorMessage.Should().Contain("at least one");
-        viewModel.IsPackagingMoving.Should().BeFalse();
-        viewModel.CanMovePackaging.Should().BeTrue();
+        viewModel.Packaging.IsPackagingMoving.Should().BeFalse();
+        viewModel.Packaging.CanMovePackaging.Should().BeTrue();
     }
 
     [Fact]
@@ -296,7 +296,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
             viewModel.RecipeTabs.Should().BeEmpty();
             viewModel.SelectedRecipeTab.Should().BeNull();
             viewModel.HasPackaging.Should().BeFalse();
-            viewModel.Costs.Packaging.Should().Be(0m);
+            viewModel.Costing.Costs.Packaging.Should().Be(0m);
 
             await viewModel.SaveCommand.Execute();
             viewModel.ErrorMessage.Should().BeNull();
@@ -323,11 +323,11 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Name == "Ensaymada");
         await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Name == "Ensaymada", () => $"selected={viewModel.SelectedProduct?.Name}");
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
-        viewModel.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal(
+        viewModel.UsageForm.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal(
             ["Gift Box Set — Sub-Assemblies (Packaging)"],
             "linking offers only the Sub-Assemblies screen's, never another product's packaging");
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
-        viewModel.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal(
+        viewModel.UsageForm.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal(
             ["Gift Box Set — Sub-Assemblies (Packaging)", "Packaging — Cream Loaf"],
             "another product's packaging can still be copied, and a product never offers its own");
 
@@ -335,8 +335,8 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == ownId);
         await WaitUntilSettledAsync(() => viewModel.HasPackaging, () => $"has packaging={viewModel.HasPackaging}");
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
-        viewModel.LinkableSubAssemblies.Should().NotContain(o => o.IsPackaging);
-        viewModel.FormRoleOptions.Should().NotContain(r => r.IsPackaging);
+        viewModel.UsageForm.LinkableSubAssemblies.Should().NotContain(o => o.IsPackaging);
+        viewModel.UsageForm.FormRoleOptions.Should().NotContain(r => r.IsPackaging);
     }
 
     /// <summary>Ensaymada, with one <paramref name="boxId"/> a piece as its own packaging, open on its Packaging tab.</summary>
@@ -348,7 +348,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await WaitUntilSettledAsync(
-            () => viewModel.SelectedRecipeTab is PackagingRecipeTab && viewModel.LineEdits.Count == 1, () => $"tab={viewModel.SelectedRecipeTab?.Header}");
+            () => viewModel.SelectedRecipeTab is PackagingRecipeTab && viewModel.Packaging.LineEdits.Count == 1, () => $"tab={viewModel.SelectedRecipeTab?.Header}");
         return viewModel;
     }
 
@@ -390,6 +390,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory),
             new ProductCloner(factory),
+            CreateUnitOfWork(),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),

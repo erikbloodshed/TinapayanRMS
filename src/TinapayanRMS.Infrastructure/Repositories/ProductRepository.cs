@@ -5,6 +5,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Queries;
+using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
@@ -101,7 +102,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     public async Task UpdateAsync(Product product, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         await UpdateAsync(dbContext, product, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
@@ -130,7 +131,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             throw new BusinessRuleException("The category to move it to no longer exists.");
         }
 
-        var now = DateTime.Now;
+        var now = dbContext.LocalNow();
         foreach (var move in moves)
         {
             var product = products[move.ProductId];
@@ -145,14 +146,14 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
     public async Task RenameAsync(int productId, string name, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         var existing = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == productId, cancellationToken)
             ?? throw new BusinessRuleException($"Product {productId} does not exist.");
         await EnsureNameNotHeldByDeletedAsync(dbContext, productId, name, cancellationToken);
 
         var oldName = existing.Name;
         existing.Name = name;
-        existing.UpdatedAt = DateTime.Now;
+        existing.UpdatedAt = dbContext.LocalNow();
         await dbContext.SaveChangesAsync(cancellationToken);
         await ResyncOwnedNamesAsync(dbContext, existing.Id, oldName, existing.Name, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -171,7 +172,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         // One transaction for every part, so a part that's rejected leaves nothing half-saved. Each
         // step saves as it goes, so the checks of the steps after it see what it wrote (a new product's
         // id, above all).
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
 
         // A copy of the form's fields: the caller's entity is never attached, and never given an id by
         // a save that then rolls back. The stage is only a new product's: a saved one's changes by moving it. So is
@@ -264,7 +265,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         // that leans on it can be left leaning on a deleted product.
         await EnsureNothingLeansOnAsync(dbContext, id, cancellationToken);
 
-        product.DeletedAt = DateTime.Now;
+        product.DeletedAt = dbContext.LocalNow();
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -348,7 +349,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         CompositeProductRules.EnsureOneUnit(product.IsComposite, product.QuantityRequired);
         CompositeProductRules.EnsureComponentPackagingOnComposite(product.IsComposite, product.IncludesComponentPackaging);
         await EnsureNameNotHeldByDeletedAsync(dbContext, 0, product.Name, cancellationToken);
-        product.UpdatedAt = DateTime.Now;
+        product.UpdatedAt = dbContext.LocalNow();
         dbContext.Products.Add(product);
         await dbContext.SaveChangesAsync(cancellationToken);
         return product;
@@ -376,7 +377,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         existing.QuantityRequired = product.QuantityRequired;
         existing.CurrentPrice = product.CurrentPrice;
         existing.IncludesComponentPackaging = product.IncludesComponentPackaging;
-        existing.UpdatedAt = DateTime.Now;
+        existing.UpdatedAt = dbContext.LocalNow();
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await ResyncOwnedNamesAsync(dbContext, existing.Id, oldName, existing.Name, cancellationToken);

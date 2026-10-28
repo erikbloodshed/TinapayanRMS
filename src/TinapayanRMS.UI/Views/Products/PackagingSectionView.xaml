@@ -28,31 +28,31 @@
             <Border HorizontalAlignment="Left"
                     Style="{StaticResource LinkedBadgeStyle}"
                     Margin="0,0,0,10"
-                    Visibility="{Binding IsPackagingLinkedToProduct, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock Text="{Binding PackagingLinkedToText}" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
+                    Visibility="{Binding Packaging.IsPackagingLinkedToProduct, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="{Binding Packaging.PackagingLinkedToText}" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
             </Border>
             <!-- A packaging set's badge is a link: it opens the set on the Sub-Assemblies screen -->
             <Button HorizontalAlignment="Left"
                     Style="{StaticResource LinkedBadgeLinkStyle}"
                     Margin="0,0,0,10"
-                    Content="{Binding PackagingLinkedToText}"
+                    Content="{Binding Packaging.PackagingLinkedToText}"
                     Command="{Binding OpenSubAssemblyCommand}"
-                    CommandParameter="{Binding PackagingLinkedSetId}"
+                    CommandParameter="{Binding Packaging.PackagingLinkedSetId}"
                     ToolTip="Open the packaging set on the Sub-Assemblies screen"
-                    Visibility="{Binding IsPackagingLinkedToSet, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    Visibility="{Binding Packaging.IsPackagingLinkedToSet, Converter={StaticResource BooleanToVisibilityConverter}}" />
             <!-- Move to Sub-Assemblies was pressed: Save makes the lines a packaging set there and links it -->
             <Border HorizontalAlignment="Left"
                     Style="{StaticResource LinkedBadgeStyle}"
                     Margin="0,0,0,10"
                     ToolTip="Save puts these lines on the Sub-Assemblies screen as a packaging set named after this product, and this product links it there. Undo or Revert to keep them this product's own."
-                    Visibility="{Binding IsPackagingMoving, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    Visibility="{Binding Packaging.IsPackagingMoving, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <TextBlock Text="Moves to Sub-Assemblies on Save" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
             </Border>
             <TextBlock Grid.Column="1"
                        Style="{StaticResource CaptionStyle}"
                        VerticalAlignment="Center"
                        Margin="12,0,0,10">
-                <Run Text="{Binding CostUnitCaption, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Costs.OwnPackaging, StringFormat='{}{0:N2}', Mode=OneWay}" />
+                <Run Text="{Binding CostUnitCaption, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Costing.Costs.OwnPackaging, StringFormat='{}{0:N2}', Mode=OneWay}" />
             </TextBlock>
             <syncfusion:ButtonAdv Grid.Column="2"
                                   VerticalAlignment="Center"
@@ -61,7 +61,7 @@
                                   ToolTip="Save puts these lines on the Sub-Assemblies screen as a packaging set, named after this product, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen."
                                   IconTemplate="{StaticResource LinkIconTemplate}"
                                   Command="{Binding MovePackagingToSubAssembliesCommand}"
-                                  Visibility="{Binding CanMovePackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                  Visibility="{Binding Packaging.CanMovePackaging, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
 
         <!--
@@ -69,28 +69,28 @@
             Quantity Required says otherwise — always in the material's base unit. Quantities are typed, so changing
             Quantity Required doesn't rescale them; the caption above says what a unit is.
         -->
-        <syncfusion:SfDataGrid ItemsSource="{Binding LineEdits}"
+        <syncfusion:SfDataGrid ItemsSource="{Binding Packaging.LineEdits}"
                                controls:GridUndoSteps.Recorder="{Binding}"
                                controls:CostBasisColumns.Basis="{Binding CostBasis}"
                                controls:GridRowReordering.IsEnabled="True"
                                controls:NumericEditing.IsEnabled="True"
-                               SelectedItem="{Binding SelectedLineEdit, Mode=TwoWay}"
+                               SelectedItem="{Binding Packaging.SelectedLineEdit, Mode=TwoWay}"
                                GridLinesVisibility="Both"
                                CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                CurrentCellBorderThickness="1"
                                controls:GridFillerRows.IsEnabled="True"
                                ShowRowHeader="True"
                                AutoGenerateColumns="False"
-                               AllowEditing="{Binding IsPackagingEditable}"
-                               AllowDeleting="{Binding IsPackagingEditable}"
+                               AllowEditing="{Binding Packaging.IsPackagingEditable}"
+                               AllowDeleting="{Binding Packaging.IsPackagingEditable}"
                                EditTrigger="OnTap"
-                               AddNewRowPosition="{Binding IsPackagingEditable, Converter={StaticResource AddNewRowPositionConverter}}"
+                               AddNewRowPosition="{Binding Packaging.IsPackagingEditable, Converter={StaticResource AddNewRowPositionConverter}}"
                                SelectionMode="Single"
                                ColumnSizer="Star"
                                controls:GridEditCommit.OnFocusLeave="True"
                                controls:GridAddNewRow.DropWhenUntouched="True"
                                controls:AutoCompleteDropDown.IsEnabled="True"
-                               controls:GridAddNewRow.ItemFactory="{Binding NewLineEdit}"
+                               controls:GridAddNewRow.ItemFactory="{Binding Packaging.NewLineEdit}"
                                Height="200">
             <syncfusion:SfDataGrid.Columns>
                 <!-- Typing opens the list of names containing the text and picks one: the first starting with it, else the first containing it -->
@@ -147,11 +147,11 @@
                                   Label="Remove Line"
                                   IconTemplate="{StaticResource RemoveIconTemplate}"
                                   Command="{Binding RemoveLineCommand}"
-                                  Visibility="{Binding IsPackagingEditable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                  Visibility="{Binding Packaging.IsPackagingEditable, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
 
         <!-- Linked packaging only shows here: Make a Copy makes its lines this product's own, and Save drops the link -->
-        <Grid Margin="0,8,0,0" Visibility="{Binding IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <Grid Margin="0,8,0,0" Visibility="{Binding Packaging.IsPackagingLinked, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />

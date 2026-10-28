@@ -46,7 +46,7 @@ public class RawMaterialBrandPriceRepository(IDbContextFactory<TinapayanRMSDbCon
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         // The prices, the cost they give and its cascade commit together.
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         var material = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == rawMaterialId, cancellationToken)
             ?? throw new BusinessRuleException($"Raw material {rawMaterialId} does not exist.");
         var costBefore = material.CostPerBaseUnit;

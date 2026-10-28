@@ -404,7 +404,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
             new SubAssemblyValidator(),
             new SubAssemblyRoleValidator(),
             new InMemoryViewStateStore(),
-            VersionRecorders.Create(factory),
+            VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
             new LoggerConfiguration().CreateLogger());
     }
 

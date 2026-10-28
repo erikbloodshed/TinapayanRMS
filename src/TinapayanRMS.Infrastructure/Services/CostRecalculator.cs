@@ -14,7 +14,7 @@ public class CostRecalculator(IDbContextFactory<TinapayanRMSDbContext> dbContext
     public async Task<CostRecalculation> RecalculateAllAsync(CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
 
         var ingredients = await IngredientCostPropagator.RecomputeAllAsync(dbContext, cancellationToken);
         var subAssemblies = await SubAssemblyCostPropagator.RecomputeAllAsync(dbContext, cancellationToken);

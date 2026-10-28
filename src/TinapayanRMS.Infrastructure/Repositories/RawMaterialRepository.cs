@@ -103,7 +103,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     {
         // The material and its cascade commit together.
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         if (await AddAsync(dbContext, material, cancellationToken))
         {
             await EnsureMadeIngredientFitsAsync(dbContext, material.Id, cancellationToken);
@@ -117,7 +117,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     {
         // The material and its cascade commit together.
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         if (await UpdateAsync(dbContext, material, cancellationToken))
         {
             await EnsureMadeIngredientFitsAsync(dbContext, material.Id, cancellationToken);
@@ -153,7 +153,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             throw new BusinessRuleException("The category to move it to no longer exists.");
         }
 
-        var now = DateTime.Now;
+        var now = dbContext.LocalNow();
         foreach (var move in moves)
         {
             var material = materials[move.RawMaterialId];
@@ -173,7 +173,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             ?? throw new BusinessRuleException($"Raw material {id} does not exist.");
 
         existing.Name = name;
-        existing.UpdatedAt = DateTime.Now;
+        existing.UpdatedAt = dbContext.LocalNow();
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -191,7 +191,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         // of the steps after it see what it wrote. The cascade runs once, after the last step.
         int id;
         var costChanged = false;
-        await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken))
         {
             // A copy of the form's fields: the caller's entity is never attached, and never given an
             // id by a save that then rolls back.
@@ -312,7 +312,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             ? RawMaterialRules.StoredCost(material.BufferedCostPerBaseUnit)
             : 0m;
 
-        material.UpdatedAt = DateTime.Now;
+        material.UpdatedAt = dbContext.LocalNow();
         dbContext.RawMaterials.Add(material);
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -492,7 +492,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         existing.CostSharePercent = material.CostSharePercent;
         existing.BaseUnitId = material.BaseUnitId;
         // The form saved it; its cost has its own date, stamped by the DbContext only when a cost really moves.
-        existing.UpdatedAt = DateTime.Now;
+        existing.UpdatedAt = dbContext.LocalNow();
 
         // A purchased material's buffered cost is the fixed amount the form sends, which the buffer percent
         // doesn't move (typing the percent on the screen works the amount out). A made one's is a BOM rollup of

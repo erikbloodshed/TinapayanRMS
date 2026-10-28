@@ -10,10 +10,10 @@ This manual is for developers who build, maintain or extend the app. It explains
 |---|---|---|
 | [docs/user-manual.md](user-manual.md) | The shop's staff | Every screen, and how costs are worked out, as a user sees them |
 | docs/developer-manual.md (this file) | Developers | How the code is built, and how to change it safely |
-| [PLAN.md](../PLAN.md) | Developers and AI agents | Every design decision with its reason and date: tech stack, domain model, architecture, costing cascade, build phases and conventions |
+| [PLAN.md](../PLAN.md) and [docs/plan/](plan/) | Developers and AI agents | Every design decision with its reason and date: tech stack, domain model, architecture, costing cascade and conventions in PLAN.md; each main screen's design notes, the Syncfusion notes and the build plan in `docs/plan/` |
 | [CLAUDE.md](../CLAUDE.md) | AI coding agents | The commands and rules an agent needs before it changes the code |
 
-PLAN.md is long: about 1,150 lines of very long bullets. List its sections with `grep -n "^#" PLAN.md` and read the ones your change touches.
+PLAN.md is long: an overview ("At a glance"), then about 800 lines of very long bullets. List its sections with `grep -n "^#" PLAN.md` and read the ones your change touches. Its largest parts moved to `docs/plan/` on 2026-10-28 and are still part of it.
 
 ## Contents
 
@@ -119,7 +119,7 @@ You'll be productive sooner if you're comfortable with the following.
 | Windows | 10 or 11 | WPF only runs on Windows. Icons use Segoe Fluent Icons (Windows 11), and fall back to Segoe MDL2 Assets on Windows 10. |
 | .NET SDK | 10.0.402, or a later 10.0 feature band | Pinned in [global.json](../global.json) with `rollForward: latestFeature`. |
 | PostgreSQL | 18 (EDB's Windows installer, service `postgresql-x64-18`, `localhost:5432`) | Reached as the `tinapayanrms` role, which must be able to create databases (`CREATEDB`), because the tests create their own. Its password goes in the password file, `%APPDATA%\postgresql\pgpass.conf`, so no connection string carries one. The installer's `bin` folder holds `psql`, and the `pg_dump` and `pg_restore` the backups run. |
-| `dotnet-ef` | 10.0.x, matching EF Core 10.0.12 | `dotnet tool install --global dotnet-ef --version 10.0.12` |
+| `dotnet-ef` | 10.0.x, matching EF Core (`EFCoreVersion` in [Directory.Packages.props](../Directory.Packages.props), now 10.0.14) | `dotnet tool install --global dotnet-ef --version 10.0.14` |
 | Syncfusion licence key | Essential Studio 35.x | Set as the `SYNCFUSION_LICENSE_KEY` user environment variable. The build compiles it into the app, so the app runs on a computer without the variable, but an app built without it won't start, and `dotnet publish` fails without it. The UI tests that build Syncfusion controls read the variable themselves and are skipped without it. After changing the key, rebuild. A key covers one major version, so moving `SyncfusionVersion` to a new major version needs a new key. A program started before the variable changed, such as the IDE and its terminals, keeps the old value until it's restarted. |
 | An IDE | Any with .NET 10 support | Visual Studio, VS Code with the C# Dev Kit, or Rider. Git ignores `.vs/`, `.vscode/` and `.idea/`. |
 | Optional tools | | `ilspycmd` (decompiles Syncfusion's assemblies), and `dotnet-stack`, `dotnet-dump` and `dotnet-trace` (diagnose the running app). Syncfusion's Essential Studio installer puts the demo source of every control in `C:\Users\Public\Documents\Syncfusion\WPF\<version>\SampleBrowser\`. |
@@ -147,7 +147,7 @@ Run every command from the repository root.
    ```powershell
    [Environment]::SetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", "<your key>", "User")
    ```
-4. **Install the EF Core tools:** `dotnet tool install --global dotnet-ef --version 10.0.12`.
+4. **Install the EF Core tools** at the `EFCoreVersion` in `Directory.Packages.props`: `dotnet tool install --global dotnet-ef --version 10.0.14`.
 5. **Build:** `dotnet build TinapayanRMS.slnx`.
 6. **Create the database.** This creates `tinapayanrms` and applies every migration, including the rows the migrations seed, such as the starting sub-assembly roles:
    ```powershell
@@ -246,7 +246,7 @@ Every folder in a project is a sub-namespace: `src/TinapayanRMS.UI/ViewModels/` 
 | Part of the Vim keys | `UI/Vim/` | `UI.Tests/Vim/` |
 | Icon image file (`.png` or `.ico`) | `UI/Assets/Icons/` | — |
 
-A ViewModel file can also hold the small row and edit types that only its screen uses. For example, `ProductsViewModel.cs` defines `ProductUsageEdit` and `ProductCostSummary`.
+A file can hold a few small, closely related types, such as a tree's rows in `ProductTree.cs`. The screen ViewModels hold only their screen: the row and edit types a screen uses have files of their own beside it, such as `ProductUsageEdit.cs` and `ProductCostSummary.cs` for Products.
 
 ### Build configuration
 
@@ -272,7 +272,7 @@ A ViewModel file can also hold the small row and edit types that only its screen
 7. [CollectionMerge](../src/TinapayanRMS.UI/ViewModels/CollectionMerge.cs) and [UndoHistory](../src/TinapayanRMS.UI/ViewModels/UndoHistory.cs).
 8. [ReactiveCostCascadeTests](../tests/TinapayanRMS.Infrastructure.Tests/Persistence/ReactiveCostCascadeTests.cs), which runs the whole cascade end to end.
 
-Then move on to the large screens. `ProductsViewModel.cs` is about 5,800 lines and `RawMaterialsViewModel.cs` about 2,900, so navigate them by command and member with your IDE's outline, rather than reading them top to bottom.
+Then move on to the large screens. `ProductsViewModel.cs` is about 4,950 lines and `RawMaterialsViewModel.cs` about 2,850, so navigate them by command and member with your IDE's outline, rather than reading them top to bottom. Parts of the Products screen have ViewModels of their own, which it holds and its views bind through: the Costing tab is [ProductCosting](../src/TinapayanRMS.UI/ViewModels/ProductCosting.cs) (`Costing`), the Recipe Structure's Packaging tab [ProductPackaging](../src/TinapayanRMS.UI/ViewModels/ProductPackaging.cs) (`Packaging`), a composite's Products table [ProductComponents](../src/TinapayanRMS.UI/ViewModels/ProductComponents.cs) (`ComponentsTable`), the add/edit sub-assembly form's state [ProductUsageForm](../src/TinapayanRMS.UI/ViewModels/ProductUsageForm.cs) (`UsageForm`), and the History tab `ProductVersionHistory` (`VersionHistory`). The screen keeps the undo history and the commands, which change them as undo steps.
 
 ---
 
@@ -326,9 +326,9 @@ ReactiveUI 26 must be initialised exactly once per process, before any `Reactive
 
 ### Dependency injection and lifetimes
 
-Everything in the container is a **singleton**: the repositories, the services (`ProductCloner`, `CostRecalculator`, `SavedProductReader`, `ProductVersionRecorder`), the validators, every ViewModel and `MainWindow`. A screen lives for the whole session, and so does its ViewModel.
+Everything in the container is a **singleton**: the repositories, the services (`ProductCloner`, `CostRecalculator`, `SavedProductReader`, `ProductVersionRecorder`, `VersionedSaves`), the validators, every ViewModel and `MainWindow`. A screen lives for the whole session, and so does its ViewModel.
 
-The DbContext is registered with **`AddDbContextFactory`**, never `AddDbContext`. A singleton can't hold a `DbContext`: two screens loading at once would share it, and EF Core throws when a second operation starts on a context that's still busy. That happened the first time the app ran. So every repository takes `IDbContextFactory<TinapayanRMSDbContext>` and creates a short-lived context for each call:
+The DbContext comes from a **factory**, never `AddDbContext`. A singleton can't hold a `DbContext`: two screens loading at once would share it, and EF Core throws when a second operation starts on a context that's still busy. That happened the first time the app ran. So every repository takes `IDbContextFactory<TinapayanRMSDbContext>` and creates a short-lived context for each call. The factory is [SharedTransactionDbContextFactory](../src/TinapayanRMS.Infrastructure/Services/SharedTransactionDbContextFactory.cs), registered as both `IDbContextFactory<TinapayanRMSDbContext>` and `IUnitOfWork` (see "Unit of work" below):
 
 ```csharp
 public class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductCategoryRepository
@@ -348,6 +348,11 @@ public class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbContext> 
 ```
 
 Never inject `TinapayanRMSDbContext` into a repository or a ViewModel.
+
+**Unit of work.** `IUnitOfWork.RunAsync(work)` runs several repositories' calls as one transaction: it commits when `work` returns and rolls everything back when it throws. While it runs, every context the factory makes on that async flow shares its one connection and its Serializable transaction, whichever repository asks. A repository begins its own transaction with `BeginOrJoinTransactionAsync` ([Transactions](../src/TinapayanRMS.Infrastructure/Services/Transactions.cs)), never `BeginTransactionAsync`, so inside a unit of work it joins that one instead of failing. Two rules follow:
+
+- **Reads inside a unit of work run one at a time.** They share one connection, and Npgsql refuses a second command while one is running. So `SavedProductReader` and `ProductVersionRecorder` read in sequence, never with `Task.WhenAll`.
+- **Only [VersionedSaves](../src/TinapayanRMS.UI/ViewModels/VersionedSaves.cs) uses it today**, for the saves that record product versions (see "Product versions"). Outside a unit of work, each context has a connection of its own, as before.
 
 Views aren't in the container. `MainWindow` and `SettingsWindow` create them with `new SomeView(viewModel)`. [CompositionRootTests](../tests/TinapayanRMS.UI.Tests/CompositionRootTests.cs) resolves every screen's ViewModel, so a missing registration fails a test rather than the app.
 
@@ -378,7 +383,7 @@ Take a user who types a new price for cake flour on Raw Materials and presses **
 | A failure is shown on its screen, and the app carries on | A crash loses unsaved work, and one failed read mustn't stop a screen working | Application Architecture, "A failure is shown on its screen" |
 | Screens merge fresh data instead of reloading it | A tab keeps its selection, scroll position and unsaved edits | Application Architecture, "A tab keeps its view state" |
 | Tests on a real database, with nothing mocked | They catch what mocks miss: SQL, constraints and EF Core's behaviour | [Development Environment](../PLAN.md#development-environment) |
-| Syncfusion controls over native ones | The whole UI picks up the theme consistently | [Syncfusion UI Framework](../PLAN.md#syncfusion-ui-framework) |
+| Syncfusion controls over native ones | The whole UI picks up the theme consistently | [Syncfusion notes](plan/syncfusion.md) |
 | AwesomeAssertions, not FluentAssertions | FluentAssertions 8 needs a paid licence for commercial use | [Tech Stack](../PLAN.md#tech-stack) |
 
 ---
@@ -454,9 +459,9 @@ A product is deleted in two steps, so a delete can be taken back. `IProductRepos
 Every save that changes a product's recipe or price records a `ProductVersion`, which the History tab shows and can restore: the product's own Save on the Products screen, and a save elsewhere that reaches it (a sub-assembly it uses, or another product it shares lines or packaging with). So does making it as a clone or a variant.
 
 - **A version is a snapshot, not a set of rows.** [ProductVersionContent](../src/TinapayanRMS.ApplicationCore/Interfaces/ProductVersionContent.cs) holds the sections with their lines and add-ins, the packaging lines as they showed (resolved through any link), a composite's products with what each brought, the costing percentages, the price, and every material used with its costs at that moment. It's stored as JSON (`ToJson`/`FromJson`, with a `Schema` number for a later change of shape), and its ids are only for Restore and for pairing sections, so deleting anything later leaves old versions readable.
-- **It's taken after Save, in the UI layer.** Products are priced only in the UI (`SavedProductReader.Build`), so the snapshot can't be written in `ProductRepository.SaveAsync`'s transaction. `ProductsViewModel`'s Save reloads the product's `ProductDetail` as it always did, [ProductVersionSnapshot](../src/TinapayanRMS.UI/ViewModels/ProductVersionSnapshot.cs)`.From` turns it into the content, and `IProductVersionRepository.AddAsync` writes it. A failed write shows its message and doesn't undo the Save; the next Save records the version, since its recipe still differs from the latest.
+- **A save and its versions are written together or not at all.** Products are priced only in the UI (`SavedProductReader.Build`), so the snapshot is taken in the UI project, by [VersionedSaves](../src/TinapayanRMS.UI/ViewModels/VersionedSaves.cs), but in one unit of work with the save (`IUnitOfWork`). `SaveProductAsync` calls `ProductRepository.SaveAsync`, reads the product's `ProductDetail` back inside the same transaction, turns it into the content with [ProductVersionSnapshot](../src/TinapayanRMS.UI/ViewModels/ProductVersionSnapshot.cs)`.From`, and writes it with `IProductVersionRepository.AddAsync`. A version that can't be written takes the Save back with it, and the screen shows the error. `SaveSubAssemblyAsync` (the Sub-Assemblies screen's Save) and `MakeProductFromAsync` (Clone and Create Variant) work the same way. The screen then shows the product and detail the Save read back (`ShowSavedProduct`), without reading them again.
 - **"Changed" has one definition.** `AddAsync` records nothing when `ProductVersionRules.IsSameRecipe` says the content matches the latest, and that is defined as `ProductVersionRules.Changes` finding nothing to list. So a version never appears with an empty list of changes, and a rename, a description, or a material's cost never makes one.
-- **The first Save of a product with no versions** first records the product as it stood (`RecordVersionBeforeHistoryAsync`, `ProductVersionRules.BaselineNote`), so there's something to go back to.
+- **The first Save of a product with no versions** first records the product as it stood (`VersionedSaves`, `ProductVersionRules.BaselineNote`), so there's something to go back to.
 - **A save also records the other products it changes.** [ProductVersionRecorder](../src/TinapayanRMS.UI/ViewModels/ProductVersionRecorder.cs) (a DI singleton; `ProductsViewModel` builds its own over its repositories, as it does its `SavedProductReader`) runs on both sides of a save:
   - `CaptureAsync` before it. `IProductRepository.GetProductsReadingAsync` finds every product that reads through the saved sub-assemblies or product: those using the sub-assembly, those whose packaging links it as a set, and, through packaging links however deep, those whose packaging links one of them. Each is snapshotted as it's saved.
   - `RecordChangesAsync` after it. Each is read again, and one whose recipe changed gets a version, noted with where the change came from. A product with no versions gets its baseline first. They're all written in one transaction by `IProductVersionRepository.AddRangeAsync`, which reads every product's latest version in one query. The number of commands doesn't grow with the products.
@@ -620,6 +625,7 @@ Never write through Dapper. A Dapper write would skip the cost propagators and t
 - **One Save, one transaction.** `RawMaterialRepository.SaveAsync` and `ProductRepository.SaveAsync` write everything a screen's form holds in one context and one transaction. Each step is an `internal static` method that takes the context, so steps from several repositories compose. Each step saves as it goes, so the checks of later steps see what earlier ones wrote. A part passed as `null` means "leave it as saved". The caller's entity is copied, never attached, so a rolled-back save never leaves an id on it. The cost cascade runs once, at the end, on the same context and in the same transaction, so it commits with the save or not at all.
 - **Save inputs are immutable records:** `RecipeDraft`, `NewSubAssemblyDraft`, `LinkedUsageDraft`, `PackagingLinkDraft`, `ProductMove`, `RawMaterialMove` and the `RecipeLine` record struct, all in `ApplicationCore/Interfaces`.
 - **`CostUpdatedAt` is stamped centrally**, in `TinapayanRMSDbContext.SaveChangesAsync`, by comparing the costs' original and current values. Don't set it by hand.
+- **Every saved time comes from the context's clock**: `dbContext.LocalNow()`, which reads `TinapayanRMSDbContext.Clock`. It's the system's unless the factory was given another (`SharedTransactionDbContextFactory(connectionString, clock)`). A repository never reads `DateTime.Now`, so a test that passes a `TestClock` to `CreateDbContextFactory(clock)` can assert the exact time a save stamped. `UpdatedAt` stays a repository's to set, because it means "saved from a form": a recipe-only Save sets it, and a soft delete doesn't, so no rule about changed rows could stamp it.
 
 The shape of an aggregate save, abridged from `RawMaterialRepository.SaveAsync`:
 
@@ -627,7 +633,7 @@ The shape of an aggregate save, abridged from `RawMaterialRepository.SaveAsync`:
 await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 int id;
 var costChanged = false;
-await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
+await using (var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken))
 {
     var fields = new RawMaterial { Id = material.Id, Name = material.Name /* … the form's fields … */ };
     costChanged = fields.Id == 0
@@ -667,7 +673,7 @@ await using (var transaction = await dbContext.Database.BeginTransactionAsync(ca
 - Check constraints back up the rules. They're named `CK_<Table>_<Rule>`.
 - Every line table has a `SortOrder`, because users drag lines into order.
 - Where the CLR default is a meaningful value, a column default is paired with `HasSentinel`, as on `Product.QuantityRequired` and `Product.Stage`.
-- Every `DateTime` column is `timestamp without time zone` (`ConfigureConventions`): the app stamps the shop's local time with `DateTime.Now`, and Npgsql's default, `timestamptz`, takes only UTC. PostgreSQL keeps a time to the microsecond.
+- Every `DateTime` column is `timestamp without time zone` (`ConfigureConventions`): the app stamps the shop's local time (`LocalNow()`), and Npgsql's default, `timestamptz`, takes only UTC. PostgreSQL keeps a time to the microsecond.
 - On a unique index over a nullable column, PostgreSQL lets null rows repeat. Add `.AreNullsDistinct(false)` if null rows must collide too.
 
 ### Migrations
@@ -1050,7 +1056,7 @@ The plan also follows the add row's line (`_newLine`, made by `NewLine`) while i
 
 - **[DatabaseFixtureBase](../tests/TinapayanRMS.Tests.Common/Fixtures/DatabaseFixtureBase.cs)** (in Tests.Common) reads the app's connection string, swaps in the project's database name, migrates the database, and resets it with Respawn.
 - **`DatabaseFixture`** and **`DatabaseCollection`** are defined in each project's own `Fixtures/` folder, because xUnit only finds a collection definition in the tests' own assembly. Each `DatabaseFixture` is one line that names its database.
-- **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`. With nothing saved in Settings, every product is priced with the 3% default wastage; a test whose figures are about something else calls `WithoutWastageAsync()` (or `SetWastageAsync`) before the screen or reader reads it.
+- **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()` (the app's own `SharedTransactionDbContextFactory`, optionally on a `TestClock`), `CreateUnitOfWork()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`. With nothing saved in Settings, every product is priced with the 3% default wastage; a test whose figures are about something else calls `WithoutWastageAsync()` (or `SetWastageAsync`) before the screen or reader reads it.
 - **[ThrowawayDatabase](../tests/TinapayanRMS.Tests.Common/Fixtures/ThrowawayDatabase.cs)** is a migrated database of one test's own on the same server (`tinapayanrms_test_backup_` and eight characters of a GUID), dropped when the test is done. The backup tests restore over it, which would put every other test out of the shared database.
 - **Every concrete test class must carry `[Collection(DatabaseCollection.Name)]`.** It's deliberately left off the base class: xUnit isn't guaranteed to honour it there, and without it tests could run in parallel against the one database.
 
@@ -1206,7 +1212,7 @@ Everything in the previous recipe, plus:
 
 1. A `DbSet` in `TinapayanRMSDbContext`, named as the table should be.
 2. An `IEntityTypeConfiguration<T>` in `Configurations/`, with the unique indexes, delete behaviours and check constraints the rules need.
-3. A repository interface in `ApplicationCore/Interfaces`, and its implementation in `Infrastructure/Repositories`, taking `IDbContextFactory<TinapayanRMSDbContext>` through its primary constructor. Reads use Dapper and `Columns`; writes use EF Core.
+3. A repository interface in `ApplicationCore/Interfaces`, and its implementation in `Infrastructure/Repositories`, taking `IDbContextFactory<TinapayanRMSDbContext>` through its primary constructor. Reads use Dapper and `Columns`; writes use EF Core, in a transaction begun with `BeginOrJoinTransactionAsync` when they need one.
 4. Registrations in `CompositionRoot`: the repository as a singleton, and `IValidator<T>` if the entity has a Save form.
 
 Respawn picks up the new table by itself.
@@ -1292,7 +1298,7 @@ When you compare the behaviour of two versions of the code, clean the UI project
 
 ### Driving the UI from a script
 
-Off-screen harnesses and UI-automation scripts have pitfalls that PLAN.md records in detail (Application Architecture and Development Environment). In short:
+To drive the running app (launch it on the secondary monitor, click, type, capture the window or a popup), use [.claude/skills/run-tinapayanrms/driver.ps1](../.claude/skills/run-tinapayanrms/driver.ps1); its SKILL.md lists the commands and what trips them up. Off-screen harnesses and UI-automation scripts have pitfalls that PLAN.md records in detail (Application Architecture and Development Environment, and [docs/plan/syncfusion.md](plan/syncfusion.md)). In short:
 
 - Make the script's thread per-monitor DPI-aware before it places, clicks or captures anything, because the app is per-monitor DPI-aware ([app.manifest](../src/TinapayanRMS.UI/app.manifest)).
 - Find the main window by its class and title. `Process.MainWindowHandle` can pick one of the app's hidden windows.
@@ -1312,11 +1318,12 @@ Off-screen harnesses and UI-automation scripts have pitfalls that PLAN.md record
 | [Tech Stack](../PLAN.md#tech-stack) | You touch a package, the ReactiveUI bootstrap, or the test runner |
 | [Solution Structure](../PLAN.md#solution-structure) | You add a project or a folder |
 | [Domain Model](../PLAN.md#domain-model) | You change an entity or a rule. Each entity's bullets give its rules and the reasons for them. |
-| [Syncfusion UI Framework](../PLAN.md#syncfusion-ui-framework) | You use a Syncfusion control, or change the theme, the DPI handling or printing |
+| [Syncfusion notes](plan/syncfusion.md) | You use a Syncfusion control, or change the theme, the DPI handling or printing |
 | [Application Architecture](../PLAN.md#application-architecture) | You change a screen, a repository pattern or a migration |
+| [Products](plan/products-screen.md), [Raw Materials](plan/raw-materials-screen.md), [Sub-Assemblies](plan/sub-assemblies-screen.md) | You change one of the three main screens: each one's design notes |
 | [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade) | You change any cost |
 | [Development Environment](../PLAN.md#development-environment) | You set up a machine, or change the tests' infrastructure |
-| [Build Plan](../PLAN.md#build-plan) | You want the history: every phase and dated change |
+| [Build plan](plan/build-plan.md) | You want the history: every phase and dated change, and the open items |
 | [Conventions](../PLAN.md#conventions) | Always |
 
 ### Library documentation

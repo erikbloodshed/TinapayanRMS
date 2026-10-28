@@ -3,6 +3,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure.Queries;
+using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
@@ -32,7 +33,7 @@ public class PriceScenarioRepository(IDbContextFactory<TinapayanRMSDbContext> db
         name = name.Trim();
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
 
         // The name's column ignores case, so "supplier a" finds "Supplier A", which keeps the name it has.
         var scenario = await dbContext.PriceScenarios.FirstOrDefaultAsync(s => s.Name == name, cancellationToken);

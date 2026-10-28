@@ -30,20 +30,20 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         var viewModel = await OpenAsync(productId);
         viewModel.CostBasis.Should().Be(CostBasis.Buffered, "the screen starts on the buffered costs");
         viewModel.CostBasisButtonLabel.Should().Be("Unbuffered");
-        (viewModel.Costs.SubAssemblies, viewModel.Costs.Packaging).Should().Be((2.50m, 30m));
-        viewModel.FormLines.Single().CostPerGram.Should().Be(0.05m);
-        viewModel.UsageFormBatchCostText.Should().Be($"{50m:N2}");
+        (viewModel.Costing.Costs.SubAssemblies, viewModel.Costing.Costs.Packaging).Should().Be((2.50m, 30m));
+        viewModel.UsageForm.FormLines.Single().CostPerGram.Should().Be(0.05m);
+        viewModel.UsageForm.UsageFormBatchCostText.Should().Be($"{50m:N2}");
 
         await viewModel.ToggleCostBasisCommand.Execute();
 
         viewModel.IsUnbuffered.Should().BeTrue();
         viewModel.CostBasisButtonLabel.Should().Be("Buffered", "the button names the costs a click switches to");
-        (viewModel.Costs.SubAssemblies, viewModel.Costs.Packaging).Should().Be((2.00m, 25m), "50 g of 1,000 g of flour at 0.04, and a box at 25");
-        viewModel.FormLines.Single().CostPerGram.Should().Be(0.04m);
-        viewModel.LineEdits.Single().UnitCost.Should().Be(25m);
-        viewModel.UsageFormBatchCostText.Should().Be($"{40m:N2}");
-        viewModel.NewFormLine().CostBasis.Should().Be(CostBasis.Unbuffered, "a row started in the add row is priced the same");
-        viewModel.NewLineEdit().CostBasis.Should().Be(CostBasis.Unbuffered);
+        (viewModel.Costing.Costs.SubAssemblies, viewModel.Costing.Costs.Packaging).Should().Be((2.00m, 25m), "50 g of 1,000 g of flour at 0.04, and a box at 25");
+        viewModel.UsageForm.FormLines.Single().CostPerGram.Should().Be(0.04m);
+        viewModel.Packaging.LineEdits.Single().UnitCost.Should().Be(25m);
+        viewModel.UsageForm.UsageFormBatchCostText.Should().Be($"{40m:N2}");
+        viewModel.UsageForm.NewFormLine().CostBasis.Should().Be(CostBasis.Unbuffered, "a row started in the add row is priced the same");
+        viewModel.Packaging.NewLineEdit().CostBasis.Should().Be(CostBasis.Unbuffered);
         viewModel.History.IsDirty.Should().BeFalse("the switch isn't an edit");
         viewModel.History.CanUndo.Should().BeFalse();
 
@@ -57,8 +57,8 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
 
         viewModel.IsUnbuffered.Should().BeFalse();
         viewModel.CostBasisButtonLabel.Should().Be("Unbuffered");
-        (viewModel.Costs.SubAssemblies, viewModel.Costs.Packaging).Should().Be((2.50m, 30m));
-        viewModel.FormLines.Single().CostPerGram.Should().Be(0.05m);
+        (viewModel.Costing.Costs.SubAssemblies, viewModel.Costing.Costs.Packaging).Should().Be((2.50m, 30m));
+        viewModel.UsageForm.FormLines.Single().CostPerGram.Should().Be(0.05m);
         viewModel.PreparePrintout().Printout!.CostBasis.Should().Be(CostBasis.Buffered);
     }
 
@@ -69,12 +69,12 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         var viewModel = await OpenAsync(productId);
         await viewModel.ToggleCostBasisCommand.Execute();
 
-        Edit(viewModel, () => viewModel.FormLines.Single().Grams = 500m);
+        Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 500m);
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.FormLines.Single().Should().Match<IngredientLineRow>(r => r.Grams == 1000m && r.CostBasis == CostBasis.Unbuffered);
-        viewModel.FormLines.Single().Cost.Should().Be(40m);
-        viewModel.Costs.SubAssemblies.Should().Be(2.00m);
+        viewModel.UsageForm.FormLines.Single().Should().Match<IngredientLineRow>(r => r.Grams == 1000m && r.CostBasis == CostBasis.Unbuffered);
+        viewModel.UsageForm.FormLines.Single().Cost.Should().Be(40m);
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(2.00m);
     }
 
     [Fact]
@@ -89,12 +89,12 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == cheeseRollId);
         await WaitUntilSettledAsync(
-            () => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == cheeseRollId && viewModel.FormLines.Count == 1,
-            () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.FormLines.Count}");
+            () => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == cheeseRollId && viewModel.UsageForm.FormLines.Count == 1,
+            () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.UsageForm.FormLines.Count}");
 
         viewModel.IsUnbuffered.Should().BeTrue();
-        viewModel.FormLines.Single().CostBasis.Should().Be(CostBasis.Unbuffered);
-        viewModel.Costs.SubAssemblies.Should().Be(4.00m, "100 g of 1,000 g of flour at 0.04");
+        viewModel.UsageForm.FormLines.Single().CostBasis.Should().Be(CostBasis.Unbuffered);
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(4.00m, "100 g of 1,000 g of flour at 0.04");
     }
 
     [Fact]
@@ -111,13 +111,13 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
             null,
             null,
             Cancellation);
-        var viewModel = await OpenAsync(boxId, vm => vm.ComponentEdits.Count == 2 && vm.ComponentEdits.All(r => r.RecipeCost is not null));
-        viewModel.Costs.SubAssemblies.Should().Be(35m, "6 × 2.50 + 4 × 5.00");
+        var viewModel = await OpenAsync(boxId, vm => vm.ComponentsTable.ComponentEdits.Count == 2 && vm.ComponentsTable.ComponentEdits.All(r => r.RecipeCost is not null));
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(35m, "6 × 2.50 + 4 × 5.00");
 
         await viewModel.ToggleCostBasisCommand.Execute();
 
-        viewModel.ComponentEdits.Select(r => r.RecipeCost).Should().Equal(2.00m, 4.00m);
-        viewModel.Costs.SubAssemblies.Should().Be(28m, "6 × 2.00 + 4 × 4.00");
+        viewModel.ComponentsTable.ComponentEdits.Select(r => r.RecipeCost).Should().Equal(2.00m, 4.00m);
+        viewModel.Costing.Costs.SubAssemblies.Should().Be(28m, "6 × 2.00 + 4 × 4.00");
         viewModel.PreparePrintout().Printout!.Components!.Select(c => c.Cost).Should().Equal(12m, 16m);
         viewModel.History.IsDirty.Should().BeFalse();
     }
@@ -176,8 +176,8 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await WaitUntilSettledAsync(
-            () => viewModel.AreDetailsReady && (ready?.Invoke(viewModel) ?? (viewModel.FormLines.Count == 1 && viewModel.HasPackaging)),
-            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.FormLines.Count}");
+            () => viewModel.AreDetailsReady && (ready?.Invoke(viewModel) ?? (viewModel.UsageForm.FormLines.Count == 1 && viewModel.HasPackaging)),
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
         return viewModel;
     }
 
@@ -195,6 +195,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory),
             new ProductCloner(factory),
+            CreateUnitOfWork(),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),

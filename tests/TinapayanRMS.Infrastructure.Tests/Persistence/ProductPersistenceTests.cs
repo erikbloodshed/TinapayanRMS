@@ -397,12 +397,14 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     [Fact]
     public async Task RenameAsync_changes_the_name_and_nothing_else()
     {
-        var repository = CreateProductRepository();
+        var clock = new TestClock(new DateTime(2026, 10, 1, 9, 0, 0));
+        var repository = new ProductRepository(CreateDbContextFactory(clock));
         var id = await repository.SaveAsync(
             new Product { Name = "Mamon", Description = "Soft chiffon cake", QuantityRequired = 6, CurrentPrice = 120m },
             recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
         var before = (await repository.GetByIdAsync(id, Cancellation))!;
 
+        clock.Advance(TimeSpan.FromHours(1));
         await repository.RenameAsync(id, "Mamon Tostado", Cancellation);
 
         var renamed = (await repository.GetByIdAsync(id, Cancellation))!;
@@ -411,7 +413,8 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         renamed.QuantityRequired.Should().Be(6);
         renamed.CurrentPrice.Should().Be(120m);
         renamed.Stage.Should().Be(before.Stage);
-        renamed.UpdatedAt.Should().BeOnOrAfter(before.UpdatedAt!.Value, "a rename is a change to the product");
+        before.UpdatedAt.Should().Be(clock.Now - TimeSpan.FromHours(1));
+        renamed.UpdatedAt.Should().Be(clock.Now, "a rename is a change to the product");
     }
 
     [Fact]
