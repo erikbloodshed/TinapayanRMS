@@ -131,7 +131,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
             throw new BusinessRuleException("The category to move it to no longer exists.");
         }
 
-        var now = DateTime.Now;
+        var now = dbContext.LocalNow();
         foreach (var move in moves)
         {
             var product = products[move.ProductId];
@@ -153,7 +153,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 
         var oldName = existing.Name;
         existing.Name = name;
-        existing.UpdatedAt = DateTime.Now;
+        existing.UpdatedAt = dbContext.LocalNow();
         await dbContext.SaveChangesAsync(cancellationToken);
         await ResyncOwnedNamesAsync(dbContext, existing.Id, oldName, existing.Name, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -265,7 +265,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         // that leans on it can be left leaning on a deleted product.
         await EnsureNothingLeansOnAsync(dbContext, id, cancellationToken);
 
-        product.DeletedAt = DateTime.Now;
+        product.DeletedAt = dbContext.LocalNow();
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -349,7 +349,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         CompositeProductRules.EnsureOneUnit(product.IsComposite, product.QuantityRequired);
         CompositeProductRules.EnsureComponentPackagingOnComposite(product.IsComposite, product.IncludesComponentPackaging);
         await EnsureNameNotHeldByDeletedAsync(dbContext, 0, product.Name, cancellationToken);
-        product.UpdatedAt = DateTime.Now;
+        product.UpdatedAt = dbContext.LocalNow();
         dbContext.Products.Add(product);
         await dbContext.SaveChangesAsync(cancellationToken);
         return product;
@@ -377,7 +377,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
         existing.QuantityRequired = product.QuantityRequired;
         existing.CurrentPrice = product.CurrentPrice;
         existing.IncludesComponentPackaging = product.IncludesComponentPackaging;
-        existing.UpdatedAt = DateTime.Now;
+        existing.UpdatedAt = dbContext.LocalNow();
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await ResyncOwnedNamesAsync(dbContext, existing.Id, oldName, existing.Name, cancellationToken);

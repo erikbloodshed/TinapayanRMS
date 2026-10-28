@@ -16,7 +16,10 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
+    /// <summary>The clock a move or rename stamps from, so the date it stamps is one the test can name.</summary>
+    private readonly TestClock _clock = new(new DateTime(2026, 10, 1, 9, 0, 0));
+
+    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(_clock));
 
     [Fact]
     public async Task MoveAsync_files_several_materials_in_one_save_changing_only_their_category()
@@ -25,15 +28,19 @@ public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : Persiste
         var dryGoodsId = await AddCategoryAsync("Dry Goods", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddMaterialAsync("Bread Flour", flourId, costPerGram: 0.05m);
         var cakeFlourId = await AddMaterialAsync("Cake Flour", flourId);
-        var before = DateTime.Now;
+        DateTime? costDateBefore;
+        await using (var before = CreateDbContext())
+        {
+            costDateBefore = (await before.RawMaterials.AsNoTracking().SingleAsync(m => m.Id == breadFlourId, Cancellation)).CostUpdatedAt;
+        }
 
         await CreateRepository().MoveAsync([new RawMaterialMove(breadFlourId, dryGoodsId), new RawMaterialMove(cakeFlourId, dryGoodsId)], Cancellation);
 
         await using var dbContext = CreateDbContext();
         var moved = await dbContext.RawMaterials.AsNoTracking().OrderBy(m => m.Name).ToListAsync(Cancellation);
-        moved.Should().OnlyContain(m => m.CategoryId == dryGoodsId && m.UpdatedAt >= before);
+        moved.Should().OnlyContain(m => m.CategoryId == dryGoodsId && m.UpdatedAt == _clock.Now);
         moved[0].CostPerBaseUnit.Should().Be(0.05m, "a category costs nothing");
-        moved[0].CostUpdatedAt.Should().BeOnOrBefore(before, "so its cost date stays as it was added");
+        moved[0].CostUpdatedAt.Should().Be(costDateBefore, "so its cost date stays as it was added");
     }
 
     [Fact]
@@ -88,7 +95,6 @@ public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : Persiste
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddMaterialAsync("Bread Flour", flourId, costPerGram: 0.05m);
         await AddMaterialAsync("Cake Flour", flourId);
-        var before = DateTime.Now;
 
         await CreateRepository().RenameAsync(breadFlourId, "Strong Flour", Cancellation);
 
@@ -96,7 +102,7 @@ public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : Persiste
         {
             var renamed = await dbContext.RawMaterials.AsNoTracking().SingleAsync(m => m.Id == breadFlourId, Cancellation);
             renamed.Name.Should().Be("Strong Flour");
-            renamed.UpdatedAt.Should().BeOnOrAfter(before);
+            renamed.UpdatedAt.Should().Be(_clock.Now);
             (renamed.CategoryId, renamed.CostPerBaseUnit).Should().Be((flourId, 0.05m));
         }
 

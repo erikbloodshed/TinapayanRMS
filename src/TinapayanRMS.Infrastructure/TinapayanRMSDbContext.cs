@@ -12,6 +12,15 @@ public class TinapayanRMSDbContext : DbContext
     }
 
     /// <summary>
+    /// The clock every save stamps its times from: UpdatedAt, DeletedAt and CostUpdatedAt. The system's, unless the factory
+    /// that made the context was given another (SharedTransactionDbContextFactory), as a test gives one it moves by hand.
+    /// </summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
+
+    /// <summary>The shop's local time now, by <see cref="Clock"/>: what every saved time is (see ConfigureConventions).</summary>
+    public DateTime LocalNow() => Clock.GetLocalNow().DateTime;
+
+    /// <summary>
     /// Every string column's collation: case-insensitive but accent-sensitive, as SQL Server's default was until the move
     /// to PostgreSQL (2026-10-21). The unique name indexes rely on it (a raw material "flour" is a duplicate of "Flour"),
     /// and so does the order names sort in. PostgreSQL's own collations are case-sensitive, hence this ICU one.
@@ -118,7 +127,7 @@ public class TinapayanRMSDbContext : DbContext
 
     private void StampCostUpdatedAt()
     {
-        var now = DateTime.Now;
+        var now = LocalNow();
         foreach (var entry in ChangeTracker.Entries<RawMaterial>())
         {
             var costChanged = entry.State switch
@@ -156,7 +165,7 @@ public class TinapayanRMSDbContext : DbContext
         configurationBuilder.Properties<decimal>().HavePrecision(18, DecimalScale);
         configurationBuilder.Properties<string>().UseCollation(CaseInsensitiveCollation);
 
-        // The shop's local time, stamped with DateTime.Now. Npgsql maps a DateTime to timestamptz by default, which only
+        // The shop's local time, stamped by LocalNow(). Npgsql maps a DateTime to timestamptz by default, which only
         // takes UTC values.
         configurationBuilder.Properties<DateTime>().HaveColumnType("timestamp without time zone");
     }

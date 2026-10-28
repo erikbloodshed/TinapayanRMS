@@ -153,7 +153,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             throw new BusinessRuleException("The category to move it to no longer exists.");
         }
 
-        var now = DateTime.Now;
+        var now = dbContext.LocalNow();
         foreach (var move in moves)
         {
             var material = materials[move.RawMaterialId];
@@ -173,7 +173,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             ?? throw new BusinessRuleException($"Raw material {id} does not exist.");
 
         existing.Name = name;
-        existing.UpdatedAt = DateTime.Now;
+        existing.UpdatedAt = dbContext.LocalNow();
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -312,7 +312,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
             ? RawMaterialRules.StoredCost(material.BufferedCostPerBaseUnit)
             : 0m;
 
-        material.UpdatedAt = DateTime.Now;
+        material.UpdatedAt = dbContext.LocalNow();
         dbContext.RawMaterials.Add(material);
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -492,7 +492,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         existing.CostSharePercent = material.CostSharePercent;
         existing.BaseUnitId = material.BaseUnitId;
         // The form saved it; its cost has its own date, stamped by the DbContext only when a cost really moves.
-        existing.UpdatedAt = DateTime.Now;
+        existing.UpdatedAt = dbContext.LocalNow();
 
         // A purchased material's buffered cost is the fixed amount the form sends, which the buffer percent
         // doesn't move (typing the percent on the screen works the amount out). A made one's is a BOM rollup of

@@ -18,7 +18,12 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 [Collection(DatabaseCollection.Name)]
 public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
+    /// <summary>The clock every save here stamps from, moved on between saves, so each date is one the test can name.</summary>
+    private readonly TestClock _clock = new(new DateTime(2026, 10, 1, 9, 0, 0));
+
+    private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(_clock));
+
+    private RawMaterialBrandPriceRepository CreateClockedBrandPriceRepository() => new(CreateDbContextFactory(_clock));
 
     private async Task<int> SeedCategoryAsync()
     {
@@ -46,12 +51,11 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
     {
         var categoryId = await SeedCategoryAsync();
         var repository = CreateRepository();
-        var before = DateTime.Now;
 
         var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [], brandPrices: null, addIns: null, Cancellation);
 
         var flour = await GetMaterialAsync(flourId);
-        flour.UpdatedAt.Should().NotBeNull().And.BeOnOrAfter(before);
+        flour.UpdatedAt.Should().Be(_clock.Now);
         flour.CostUpdatedAt.Should().BeNull("it has no price yet, so its cost has never moved");
     }
 
@@ -64,13 +68,14 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
 
         var priced = await GetMaterialAsync(flourId);
         priced.CostPerBaseUnit.Should().Be(0.05m);
-        priced.CostUpdatedAt.Should().NotBeNull("the first price moved its cost");
+        priced.CostUpdatedAt.Should().Be(_clock.Now, "the first price moved its cost");
 
-        // A rename: the form saves, the cost doesn't move.
+        // A rename an hour later: the form saves, the cost doesn't move.
+        _clock.Advance(TimeSpan.FromHours(1));
         await repository.SaveAsync(PurchasedIngredient("Bread Flour", categoryId, id: flourId), [], brandPrices: null, addIns: null, Cancellation);
 
         var renamed = await GetMaterialAsync(flourId);
-        renamed.UpdatedAt.Should().BeAfter(priced.UpdatedAt!.Value, "the form saved it again");
+        renamed.UpdatedAt.Should().Be(_clock.Now, "the form saved it again");
         renamed.CostUpdatedAt.Should().Be(priced.CostUpdatedAt, "nothing about its cost changed");
     }
 
@@ -82,12 +87,13 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
         var flourId = await repository.SaveAsync(PurchasedIngredient("Flour", categoryId), [], [(null, null, 0.05m)], addIns: null, Cancellation);
         var priced = await GetMaterialAsync(flourId);
 
-        // The Purchase Cost Setup's own path, not a form save of the material.
-        await CreateBrandPriceRepository().SetAsync(flourId, [new RawMaterialBrandPrice { Price = 0.08m }], Cancellation);
+        // The Purchase Cost Setup's own path, an hour later, not a form save of the material.
+        _clock.Advance(TimeSpan.FromHours(1));
+        await CreateClockedBrandPriceRepository().SetAsync(flourId, [new RawMaterialBrandPrice { Price = 0.08m }], Cancellation);
 
         var repriced = await GetMaterialAsync(flourId);
         repriced.CostPerBaseUnit.Should().Be(0.08m);
-        repriced.CostUpdatedAt.Should().BeAfter(priced.CostUpdatedAt!.Value);
+        repriced.CostUpdatedAt.Should().Be(_clock.Now);
         repriced.UpdatedAt.Should().Be(priced.UpdatedAt, "a price isn't a save of the material");
     }
 
@@ -105,11 +111,12 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
         syrupBefore.CostPerBaseUnit.Should().Be(0.10m);
         syrupBefore.CostUpdatedAt.Should().NotBeNull("its recipe gave it a cost");
 
-        await CreateBrandPriceRepository().SetAsync(sugarId, [new RawMaterialBrandPrice { Price = 0.20m }], Cancellation);
+        _clock.Advance(TimeSpan.FromHours(1));
+        await CreateClockedBrandPriceRepository().SetAsync(sugarId, [new RawMaterialBrandPrice { Price = 0.20m }], Cancellation);
 
         var syrupAfter = await GetMaterialAsync(syrupId);
         syrupAfter.CostPerBaseUnit.Should().Be(0.20m, "the cascade recomputed it");
-        syrupAfter.CostUpdatedAt.Should().BeAfter(syrupBefore.CostUpdatedAt!.Value, "the cascade moved its cost, so the cost date follows");
+        syrupAfter.CostUpdatedAt.Should().Be(_clock.Now, "the cascade moved its cost, so the cost date follows");
         syrupAfter.UpdatedAt.Should().Be(syrupBefore.UpdatedAt, "nobody saved the syrup");
     }
 
@@ -125,7 +132,8 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
         var before = await GetMaterialAsync(syrupId);
 
         // The same price again: the cascade runs and writes the same figures.
-        await CreateBrandPriceRepository().SetAsync(sugarId, [new RawMaterialBrandPrice { Price = 0.10m }], Cancellation);
+        _clock.Advance(TimeSpan.FromHours(1));
+        await CreateClockedBrandPriceRepository().SetAsync(sugarId, [new RawMaterialBrandPrice { Price = 0.10m }], Cancellation);
 
         var after = await GetMaterialAsync(syrupId);
         after.CostPerBaseUnit.Should().Be(0.10m);

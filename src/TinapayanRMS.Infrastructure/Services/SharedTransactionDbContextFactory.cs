@@ -12,8 +12,11 @@ namespace TinapayanRMS.Infrastructure.Services;
 /// repository, shares RunAsync's one connection and its transaction, and a repository's own transaction joins it
 /// (Transactions.BeginOrJoinTransactionAsync), so the whole run commits or rolls back as one.
 /// </summary>
-public sealed class SharedTransactionDbContextFactory(string connectionString) : IDbContextFactory<TinapayanRMSDbContext>, IUnitOfWork
+/// <param name="clock">The clock each context stamps saved times from (TinapayanRMSDbContext.Clock): the system's by default.</param>
+public sealed class SharedTransactionDbContextFactory(string connectionString, TimeProvider? clock = null) : IDbContextFactory<TinapayanRMSDbContext>, IUnitOfWork
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
     /// <summary>
     /// The transaction a run on this async flow holds. Static, so a factory made apart from the one running it (each test
     /// makes its own) joins it too; but only for the same database, which the backup tests' other databases aren't.
@@ -26,10 +29,10 @@ public sealed class SharedTransactionDbContextFactory(string connectionString) :
     {
         if (Shared() is not { } shared)
         {
-            return new TinapayanRMSDbContext(_options);
+            return new TinapayanRMSDbContext(_options) { Clock = _clock };
         }
 
-        var dbContext = new TinapayanRMSDbContext(shared.Options);
+        var dbContext = new TinapayanRMSDbContext(shared.Options) { Clock = _clock };
         dbContext.Database.UseTransaction(shared.Transaction);
         return dbContext;
     }

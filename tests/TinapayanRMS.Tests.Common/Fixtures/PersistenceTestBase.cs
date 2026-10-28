@@ -36,9 +36,12 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
     protected TinapayanRMSDbContext CreateDbContext() =>
         new(CreateDbContextOptions());
 
-    /// <summary>The app's own factory (CompositionRoot's), so a test's repositories join a unit of work as the app's do.</summary>
-    protected IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
-        new SharedTransactionDbContextFactory(fixture.ConnectionString);
+    /// <summary>
+    /// The app's own factory (CompositionRoot's), so a test's repositories join a unit of work as the app's do. With
+    /// <paramref name="clock"/> (a TestClock), its saves stamp their times from it.
+    /// </summary>
+    protected IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory(TimeProvider? clock = null) =>
+        new SharedTransactionDbContextFactory(fixture.ConnectionString, clock);
 
     /// <summary>
     /// A unit of work on the test database. Every factory from <see cref="CreateDbContextFactory"/> joins it, so the
