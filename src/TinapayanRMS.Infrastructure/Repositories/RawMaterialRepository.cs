@@ -103,7 +103,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     {
         // The material and its cascade commit together.
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         if (await AddAsync(dbContext, material, cancellationToken))
         {
             await EnsureMadeIngredientFitsAsync(dbContext, material.Id, cancellationToken);
@@ -117,7 +117,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     {
         // The material and its cascade commit together.
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         if (await UpdateAsync(dbContext, material, cancellationToken))
         {
             await EnsureMadeIngredientFitsAsync(dbContext, material.Id, cancellationToken);
@@ -191,7 +191,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         // of the steps after it see what it wrote. The cascade runs once, after the last step.
         int id;
         var costChanged = false;
-        await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken))
         {
             // A copy of the form's fields: the caller's entity is never attached, and never given an
             // id by a save that then rolls back.

@@ -155,6 +155,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory),
             new ProductCloner(factory),
+            CreateUnitOfWork(),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),

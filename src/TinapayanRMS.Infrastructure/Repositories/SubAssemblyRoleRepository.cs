@@ -3,6 +3,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure.Queries;
+using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
@@ -25,7 +26,7 @@ public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> 
     public async Task UpdateAsync(SubAssemblyRole role, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
 
         var existing = await dbContext.SubAssemblyRoles.FirstOrDefaultAsync(r => r.Id == role.Id, cancellationToken)
             ?? throw new BusinessRuleException($"Sub-assembly role {role.Id} does not exist.");
@@ -94,7 +95,7 @@ public class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbContext> 
             throw new BusinessRuleException("The Packaging role holds the packaging sets, so it can't be deleted. It can be renamed.");
         }
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         await dbContext.SubAssemblyRoles.Where(r => r.Id == id).ExecuteDeleteAsync(cancellationToken);
         Renumber(await InOrderAsync(dbContext, cancellationToken));
         await dbContext.SaveChangesAsync(cancellationToken);

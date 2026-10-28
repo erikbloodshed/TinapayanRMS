@@ -36,8 +36,15 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
     protected TinapayanRMSDbContext CreateDbContext() =>
         new(CreateDbContextOptions());
 
+    /// <summary>The app's own factory (CompositionRoot's), so a test's repositories join a unit of work as the app's do.</summary>
     protected IDbContextFactory<TinapayanRMSDbContext> CreateDbContextFactory() =>
-        new TestDbContextFactory(CreateDbContextOptions());
+        new SharedTransactionDbContextFactory(fixture.ConnectionString);
+
+    /// <summary>
+    /// A unit of work on the test database. Every factory from <see cref="CreateDbContextFactory"/> joins it, so the
+    /// repositories a test made before it take part.
+    /// </summary>
+    protected IUnitOfWork CreateUnitOfWork() => new SharedTransactionDbContextFactory(fixture.ConnectionString);
 
     protected RawMaterialBrandPriceRepository CreateBrandPriceRepository() => new(CreateDbContextFactory());
 
@@ -345,9 +352,4 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
 
     private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
         TinapayanRMSDbContext.CreateOptions(fixture.ConnectionString);
-
-    private sealed class TestDbContextFactory(DbContextOptions<TinapayanRMSDbContext> options) : IDbContextFactory<TinapayanRMSDbContext>
-    {
-        public TinapayanRMSDbContext CreateDbContext() => new(options);
-    }
 }

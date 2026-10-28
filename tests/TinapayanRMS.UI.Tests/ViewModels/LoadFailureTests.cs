@@ -173,7 +173,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         throw new TimeoutException($"The pick never settled: {describe?.Invoke()}");
     }
 
-    private static ProductsViewModel CreateProductsViewModel(FailingDbContextFactory factory)
+    private ProductsViewModel CreateProductsViewModel(FailingDbContextFactory factory)
     {
         ReactiveUIBootstrapper.EnsureInitialized();
         var packagingLineRepository = new PackagingLineRepository(factory);
@@ -185,6 +185,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory),
             new ProductCloner(factory),
+            CreateUnitOfWork(),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
@@ -221,7 +222,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new LoggerConfiguration().CreateLogger());
     }
 
-    private static SubAssembliesViewModel CreateSubAssembliesViewModel(FailingDbContextFactory factory)
+    private SubAssembliesViewModel CreateSubAssembliesViewModel(FailingDbContextFactory factory)
     {
         ReactiveUIBootstrapper.EnsureInitialized();
         return new SubAssembliesViewModel(
@@ -233,7 +234,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new SubAssemblyValidator(),
             new SubAssemblyRoleValidator(),
             new InMemoryViewStateStore(),
-            VersionRecorders.Create(factory),
+            VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
             new LoggerConfiguration().CreateLogger());
     }
 

@@ -58,7 +58,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     // Reads the product opened here, as Reports and Print read theirs, from the repositories above.
     private readonly SavedProductReader _savedProducts;
-    private readonly ProductVersionRecorder _versionRecorder;
+
+    // Save, Clone and Create Variant, each written with the versions it records.
+    private readonly VersionedSaves _versionedSaves;
     private readonly IValidator<Product> _productValidator;
     private readonly IValidator<CostingParameters> _costingParametersValidator;
     private readonly IProductCategoryRepository _categoryRepository;
@@ -482,8 +484,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private int? _detailProductId;
 
     /// <summary>
-    /// The detail Save's reload has read already, for the load its selection starts to show at once instead of reading
-    /// it again (ReloadSavedProductAsync).
+    /// The detail Save has read back already, for the load its selection starts to show at once instead of reading it
+    /// again (ShowSavedProduct).
     /// </summary>
     private (int ProductId, ProductDetail Detail)? _preloadedDetail;
 
@@ -1383,6 +1385,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ICostingDefaultsRepository costingDefaultsRepository,
         IPackagingLinkRepository packagingLinkRepository,
         IProductCloner productCloner,
+        IUnitOfWork unitOfWork,
         ISubAssemblyRepository subAssemblyRepository,
         ISubAssemblyLineRepository subAssemblyLineRepository,
         ISubAssemblyRoleRepository subAssemblyRoleRepository,
@@ -1413,7 +1416,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _savedProducts = new SavedProductReader(
             packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository,
             costingDefaultsRepository);
-        _versionRecorder = new ProductVersionRecorder(_savedProducts, productRepository, versionRepository);
+        _versionedSaves = new VersionedSaves(
+            unitOfWork, productRepository, versionRepository, _savedProducts, new ProductVersionRecorder(_savedProducts, productRepository, versionRepository));
         _productValidator = productValidator;
         _costingParametersValidator = costingParametersValidator;
         _categoryRepository = categoryRepository;
@@ -2016,52 +2020,43 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 return;
             }
 
-            // A saved product with no versions yet: how it stood until now is its first, so there's one to go back to.
-            // And the products sharing its sections' lines or linking its packaging, as they're saved now, so each one
-            // this Save changes gets a version too (ProductVersionRecorder); reading them can't stop the Save. Only linked
-            // lines edited here and the packaging reach them, so a Save of neither reads none (2026-10-17: a price-only Save
-            // spent half a second reading the 39 products sharing its dough, twice).
-            Exception? sharingFailure = null;
-            var sharingProducts = ProductVersionCapture.Empty;
-            if (_editingId != 0)
-            {
-                await RecordVersionBeforeHistoryAsync(_editingId);
-            }
-
-            if (_editingId != 0 && (UsageEdits.Any(u => u.AreLinkedLinesEdited) || ChangedLines() is not null || ChangedPackagingLink() is not null))
-            {
-                var editingId = _editingId;
-                try
-                {
-                    sharingProducts = await Task.Run(() => _versionRecorder.CaptureAsync([], [editingId], CancellationToken.None));
-                }
-                catch (Exception ex)
-                {
-                    sharingFailure = ex;
-                }
-            }
-
-            var id = await _productRepository.SaveAsync(
-                product,
-                IsSameRecipe(recipe, _savedRecipe) ? null : recipe,
-                ChangedPackagingLink(),
-                ChangedLines(),
-                CurrentCosting() == _savedCosting ? null : costing,
-                CancellationToken.None);
+            // Written with its versions, all or nothing (VersionedSaves): a saved product with none yet first gets how it
+            // stood until now, so there's one to go back to; then the product as saved; and the products sharing its
+            // sections' lines or linking its packaging each get one if this Save changes them. Only linked lines edited
+            // here and the packaging reach those, so a Save of neither reads none (2026-10-17: a price-only Save spent half
+            // a second reading the 39 products sharing its dough, twice).
+            var packagingLink = ChangedPackagingLink();
+            var packagingLines = ChangedLines();
+            var changesSharing = UsageEdits.Any(u => u.AreLinkedLinesEdited) || packagingLines is not null || packagingLink is not null;
+            var recipeToSave = IsSameRecipe(recipe, _savedRecipe) ? null : recipe;
+            var costingToSave = CurrentCosting() == _savedCosting ? null : costing;
+            var saved = await Task.Run(() => _versionedSaves.SaveProductAsync(
+                product, recipeToSave, packagingLink, packagingLines, costingToSave, changesSharing, DateTime.Now, CancellationToken.None));
 
             // What's saved is the new starting point: stepping back past it would show changes already written.
             // Save's own reload keeps the product selected, so ClearDetails doesn't run and wouldn't clear this.
             History.Clear();
 
-            // The list picks up the new name; then the form reloads what was saved, which is what the
-            // next Save compares against.
+            // The list picks up the new name; then the form shows what was saved, which is what the next Save compares
+            // against.
             await LoadCommand.Execute();
-            if (await ReloadSavedProductAsync(id) is { } saved)
+            ShowSavedProduct(saved.Product, saved.Detail);
+
+            // Read again now if the History tab shows; otherwise the versions it holds are out of date, and go, so showing it
+            // reads them (a Save made from the Recipe tab left the tab without the new version, found in the app 2026-10-17).
+            if (SelectedDetailsTab == HistoryTab)
             {
-                await RecordVersionAsync(saved.Product, saved.Detail);
+                RequestVersions(force: true);
+            }
+            else
+            {
+                VersionHistory.Clear();
             }
 
-            await RecordSharingVersionsAsync(sharingProducts, product.Name, sharingFailure);
+            if (ProductVersionRecorder.RecordedMessage(saved.SharingVersioned) is { } message)
+            {
+                SuccessMessage = message;
+            }
         }),
         History.WhenAnyValue(h => h.IsDirty));
 
@@ -2320,32 +2315,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         new(0, usage.Role, [.. usage.Lines, .. usage.AddIns], usage.AuthoredField, usage.AuthoredValue,
             linkedName: null, name: usage.IsRoleRepeated ? usage.Label : null, isOwn: isOwn);
 
-    /// <summary>Makes a new product named <paramref name="name"/> from another as saved (a clone or a variant), then shows it.</summary>
     /// <summary>
-    /// Makes a product from <paramref name="sourceProductId"/> (a clone or a variant), records its first version, noted
-    /// "<paramref name="madeAs"/>" the source (ProductVersionRecorder.RecordMadeFromAsync), and opens it. A version that
-    /// can't be recorded is shown and leaves the new product alone; its first Save records one as usual.
+    /// Makes a product named <paramref name="name"/> from <paramref name="sourceProductId"/> as saved (a clone or a
+    /// variant) with its first version, noted "<paramref name="madeAs"/>" the source, both or neither
+    /// (VersionedSaves.MakeProductFromAsync), and opens it.
     /// </summary>
     private Task MakeFromAsync(int sourceProductId, string name, Func<int, string, CancellationToken, Task<int>> make, string madeAs) =>
         RunSafelyAsync(async () =>
         {
-            var newId = await make(sourceProductId, name, CancellationToken.None);
-            Exception? versionFailure = null;
-            try
-            {
-                await Task.Run(() => _versionRecorder.RecordMadeFromAsync(newId, sourceProductId, madeAs, DateTime.Now, CancellationToken.None));
-            }
-            catch (Exception ex)
-            {
-                versionFailure = ex;
-            }
+            var newId = await Task.Run(() => _versionedSaves.MakeProductFromAsync(
+                sourceProductId, name, make, madeAs, DateTime.Now, CancellationToken.None));
 
             await LoadCommand.Execute();
             SelectedProduct = Products.FirstOrDefault(p => p.Id == newId);
-            if (versionFailure is not null)
-            {
-                ShowFailure(versionFailure, $"{name} was made, but its first version couldn't be recorded");
-            }
         });
 
     /// <summary>The list's Clone and Create Variant: asks for the new product's name first, starting from "… Copy".</summary>
@@ -3600,30 +3582,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         : PackagingLinkDraft.None;
 
     /// <summary>
-    /// Loads the saved product again and selects the fresh copy, so the form shows (and compares against) what was
-    /// saved. A new product, saved for the first time, is still the recipe showing, not another product's: it keeps
-    /// the tab it showed, as an existing one does.
+    /// Selects the product as Save left it, the fresh copy, so the form shows (and compares against) what was saved:
+    /// <paramref name="saved"/> and <paramref name="detail"/>, as the Save read them back. A new product, saved for the
+    /// first time, is still the recipe showing, not another product's: it keeps the tab it showed, as an existing one does.
     ///
-    /// The product and its detail are both read first, off the UI thread, and the selection then shows them in one
-    /// pass. Picked with the detail still to read, the same product closed its form (ResetDetails) and drew the
-    /// screen that way until the read came back and opened it again: a flicker on every Save.
+    /// The detail goes in with the selection, so it shows in one pass. Picked with the detail still to read, the same
+    /// product closed its form (ResetDetails) and drew the screen that way until the read came back and opened it again:
+    /// a flicker on every Save.
     /// </summary>
-    /// <returns>The product and its detail as read, which Save records as a version; null when it's gone.</returns>
-    private async Task<(Product Product, ProductDetail Detail)?> ReloadSavedProductAsync(int id)
+    private void ShowSavedProduct(Product saved, ProductDetail detail)
     {
-        var savedRead = Task.Run(() => _productRepository.GetByIdAsync(id, CancellationToken.None));
-        var detailRead = Task.Run(() => _savedProducts.ReadDetailAsync(id, CancellationToken.None));
-        await Task.WhenAll(savedRead, detailRead);
-        var saved = await savedRead;
-        var detail = await detailRead;
-        if (saved is null)
-        {
-            return null;
-        }
-
         _productCache.AddOrUpdate(saved);
-        _detailProductId = id;
-        _preloadedDetail = (id, detail);
+        _detailProductId = saved.Id;
+        _preloadedDetail = (saved.Id, detail);
         try
         {
             SelectedProduct = saved;
@@ -3632,94 +3603,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             _preloadedDetail = null;
         }
-
-        return (saved, detail);
-    }
-
-    /// <summary>
-    /// Records the product as Save has just left it as its next version, unless its recipe and price are the latest's
-    /// (IProductVersionRepository.AddAsync), and reads the History tab again if it shows. The Save itself has gone
-    /// through by now, so a version that can't be recorded says so without taking the Save back; the next Save
-    /// records it, since its recipe still differs from the latest.
-    /// </summary>
-    private async Task RecordVersionAsync(Product product, ProductDetail detail)
-    {
-        try
-        {
-            var content = ProductVersionSnapshot.From(product, detail);
-            await Task.Run(() => _versionRepository.AddAsync(product.Id, content, DateTime.Now, null, CancellationToken.None));
-        }
-        catch (Exception ex)
-        {
-            ShowFailure(ex, $"{product.Name} was saved, but its version couldn't be recorded");
-            return;
-        }
-
-        // Read again now if the History tab shows; otherwise the versions it holds are out of date, and go, so showing it
-        // reads them (a Save made from the Recipe tab left the tab without the new version, found in the app 2026-10-17).
-        if (SelectedDetailsTab == HistoryTab)
-        {
-            RequestVersions(force: true);
-        }
-        else
-        {
-            VersionHistory.Clear();
-        }
-    }
-
-    /// <summary>
-    /// After Save: a version of each product it changed besides itself, those sharing its sections' lines or linking its
-    /// packaging (<paramref name="sharing"/>, read before it), named in the message. A failure, here or reading them
-    /// before (<paramref name="captureFailure"/>), is shown and doesn't undo the Save.
-    /// </summary>
-    private async Task RecordSharingVersionsAsync(ProductVersionCapture sharing, string productName, Exception? captureFailure)
-    {
-        var failure = captureFailure;
-        IReadOnlyList<string> recorded = [];
-        try
-        {
-            recorded = await Task.Run(() => _versionRecorder.RecordChangesAsync(
-                sharing, $"Changed when {productName} was saved", DateTime.Now, CancellationToken.None));
-        }
-        catch (Exception ex)
-        {
-            failure ??= ex;
-        }
-
-        if (ProductVersionRecorder.RecordedMessage(recorded) is { } message)
-        {
-            SuccessMessage = message;
-        }
-
-        // Its own version's failure, already showing, is the one to read first.
-        if (failure is not null && ErrorMessage is null)
-        {
-            ShowFailure(failure, $"{productName} was saved, but versions of the products sharing its changes couldn't be recorded");
-        }
-    }
-
-    /// <summary>
-    /// Before the first Save since versions began to be kept: the product as it's saved now becomes its first version,
-    /// dated when it was last saved, priced at what its materials cost now. Nothing when it has versions already.
-    /// </summary>
-    private async Task RecordVersionBeforeHistoryAsync(int productId)
-    {
-        if (await Task.Run(() => _versionRepository.HasAnyAsync(productId, CancellationToken.None)))
-        {
-            return;
-        }
-
-        var productRead = Task.Run(() => _productRepository.GetByIdAsync(productId, CancellationToken.None));
-        var detailRead = Task.Run(() => _savedProducts.ReadDetailAsync(productId, CancellationToken.None));
-        await Task.WhenAll(productRead, detailRead);
-        if (await productRead is not { } product)
-        {
-            return;
-        }
-
-        var content = ProductVersionSnapshot.From(product, await detailRead);
-        await Task.Run(() => _versionRepository.AddAsync(
-            productId, content, product.UpdatedAt ?? DateTime.Now, ProductVersionRules.BaselineNote, CancellationToken.None));
     }
 
     /// <summary>

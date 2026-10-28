@@ -390,6 +390,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory),
             new ProductCloner(factory),
+            CreateUnitOfWork(),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),

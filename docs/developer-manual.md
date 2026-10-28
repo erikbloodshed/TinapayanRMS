@@ -326,9 +326,9 @@ ReactiveUI 26 must be initialised exactly once per process, before any `Reactive
 
 ### Dependency injection and lifetimes
 
-Everything in the container is a **singleton**: the repositories, the services (`ProductCloner`, `CostRecalculator`, `SavedProductReader`, `ProductVersionRecorder`), the validators, every ViewModel and `MainWindow`. A screen lives for the whole session, and so does its ViewModel.
+Everything in the container is a **singleton**: the repositories, the services (`ProductCloner`, `CostRecalculator`, `SavedProductReader`, `ProductVersionRecorder`, `VersionedSaves`), the validators, every ViewModel and `MainWindow`. A screen lives for the whole session, and so does its ViewModel.
 
-The DbContext is registered with **`AddDbContextFactory`**, never `AddDbContext`. A singleton can't hold a `DbContext`: two screens loading at once would share it, and EF Core throws when a second operation starts on a context that's still busy. That happened the first time the app ran. So every repository takes `IDbContextFactory<TinapayanRMSDbContext>` and creates a short-lived context for each call:
+The DbContext comes from a **factory**, never `AddDbContext`. A singleton can't hold a `DbContext`: two screens loading at once would share it, and EF Core throws when a second operation starts on a context that's still busy. That happened the first time the app ran. So every repository takes `IDbContextFactory<TinapayanRMSDbContext>` and creates a short-lived context for each call. The factory is [SharedTransactionDbContextFactory](../src/TinapayanRMS.Infrastructure/Services/SharedTransactionDbContextFactory.cs), registered as both `IDbContextFactory<TinapayanRMSDbContext>` and `IUnitOfWork` (see "Unit of work" below):
 
 ```csharp
 public class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductCategoryRepository
@@ -348,6 +348,11 @@ public class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbContext> 
 ```
 
 Never inject `TinapayanRMSDbContext` into a repository or a ViewModel.
+
+**Unit of work.** `IUnitOfWork.RunAsync(work)` runs several repositories' calls as one transaction: it commits when `work` returns and rolls everything back when it throws. While it runs, every context the factory makes on that async flow shares its one connection and its Serializable transaction, whichever repository asks. A repository begins its own transaction with `BeginOrJoinTransactionAsync` ([Transactions](../src/TinapayanRMS.Infrastructure/Services/Transactions.cs)), never `BeginTransactionAsync`, so inside a unit of work it joins that one instead of failing. Two rules follow:
+
+- **Reads inside a unit of work run one at a time.** They share one connection, and Npgsql refuses a second command while one is running. So `SavedProductReader` and `ProductVersionRecorder` read in sequence, never with `Task.WhenAll`.
+- **Only [VersionedSaves](../src/TinapayanRMS.UI/ViewModels/VersionedSaves.cs) uses it today**, for the saves that record product versions (see "Product versions"). Outside a unit of work, each context has a connection of its own, as before.
 
 Views aren't in the container. `MainWindow` and `SettingsWindow` create them with `new SomeView(viewModel)`. [CompositionRootTests](../tests/TinapayanRMS.UI.Tests/CompositionRootTests.cs) resolves every screen's ViewModel, so a missing registration fails a test rather than the app.
 
@@ -454,9 +459,9 @@ A product is deleted in two steps, so a delete can be taken back. `IProductRepos
 Every save that changes a product's recipe or price records a `ProductVersion`, which the History tab shows and can restore: the product's own Save on the Products screen, and a save elsewhere that reaches it (a sub-assembly it uses, or another product it shares lines or packaging with). So does making it as a clone or a variant.
 
 - **A version is a snapshot, not a set of rows.** [ProductVersionContent](../src/TinapayanRMS.ApplicationCore/Interfaces/ProductVersionContent.cs) holds the sections with their lines and add-ins, the packaging lines as they showed (resolved through any link), a composite's products with what each brought, the costing percentages, the price, and every material used with its costs at that moment. It's stored as JSON (`ToJson`/`FromJson`, with a `Schema` number for a later change of shape), and its ids are only for Restore and for pairing sections, so deleting anything later leaves old versions readable.
-- **It's taken after Save, in the UI layer.** Products are priced only in the UI (`SavedProductReader.Build`), so the snapshot can't be written in `ProductRepository.SaveAsync`'s transaction. `ProductsViewModel`'s Save reloads the product's `ProductDetail` as it always did, [ProductVersionSnapshot](../src/TinapayanRMS.UI/ViewModels/ProductVersionSnapshot.cs)`.From` turns it into the content, and `IProductVersionRepository.AddAsync` writes it. A failed write shows its message and doesn't undo the Save; the next Save records the version, since its recipe still differs from the latest.
+- **A save and its versions are written together or not at all.** Products are priced only in the UI (`SavedProductReader.Build`), so the snapshot is taken in the UI project, by [VersionedSaves](../src/TinapayanRMS.UI/ViewModels/VersionedSaves.cs), but in one unit of work with the save (`IUnitOfWork`). `SaveProductAsync` calls `ProductRepository.SaveAsync`, reads the product's `ProductDetail` back inside the same transaction, turns it into the content with [ProductVersionSnapshot](../src/TinapayanRMS.UI/ViewModels/ProductVersionSnapshot.cs)`.From`, and writes it with `IProductVersionRepository.AddAsync`. A version that can't be written takes the Save back with it, and the screen shows the error. `SaveSubAssemblyAsync` (the Sub-Assemblies screen's Save) and `MakeProductFromAsync` (Clone and Create Variant) work the same way. The screen then shows the product and detail the Save read back (`ShowSavedProduct`), without reading them again.
 - **"Changed" has one definition.** `AddAsync` records nothing when `ProductVersionRules.IsSameRecipe` says the content matches the latest, and that is defined as `ProductVersionRules.Changes` finding nothing to list. So a version never appears with an empty list of changes, and a rename, a description, or a material's cost never makes one.
-- **The first Save of a product with no versions** first records the product as it stood (`RecordVersionBeforeHistoryAsync`, `ProductVersionRules.BaselineNote`), so there's something to go back to.
+- **The first Save of a product with no versions** first records the product as it stood (`VersionedSaves`, `ProductVersionRules.BaselineNote`), so there's something to go back to.
 - **A save also records the other products it changes.** [ProductVersionRecorder](../src/TinapayanRMS.UI/ViewModels/ProductVersionRecorder.cs) (a DI singleton; `ProductsViewModel` builds its own over its repositories, as it does its `SavedProductReader`) runs on both sides of a save:
   - `CaptureAsync` before it. `IProductRepository.GetProductsReadingAsync` finds every product that reads through the saved sub-assemblies or product: those using the sub-assembly, those whose packaging links it as a set, and, through packaging links however deep, those whose packaging links one of them. Each is snapshotted as it's saved.
   - `RecordChangesAsync` after it. Each is read again, and one whose recipe changed gets a version, noted with where the change came from. A product with no versions gets its baseline first. They're all written in one transaction by `IProductVersionRepository.AddRangeAsync`, which reads every product's latest version in one query. The number of commands doesn't grow with the products.
@@ -627,7 +632,7 @@ The shape of an aggregate save, abridged from `RawMaterialRepository.SaveAsync`:
 await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 int id;
 var costChanged = false;
-await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
+await using (var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken))
 {
     var fields = new RawMaterial { Id = material.Id, Name = material.Name /* … the form's fields … */ };
     costChanged = fields.Id == 0
@@ -1050,7 +1055,7 @@ The plan also follows the add row's line (`_newLine`, made by `NewLine`) while i
 
 - **[DatabaseFixtureBase](../tests/TinapayanRMS.Tests.Common/Fixtures/DatabaseFixtureBase.cs)** (in Tests.Common) reads the app's connection string, swaps in the project's database name, migrates the database, and resets it with Respawn.
 - **`DatabaseFixture`** and **`DatabaseCollection`** are defined in each project's own `Fixtures/` folder, because xUnit only finds a collection definition in the tests' own assembly. Each `DatabaseFixture` is one line that names its database.
-- **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`. With nothing saved in Settings, every product is priced with the 3% default wastage; a test whose figures are about something else calls `WithoutWastageAsync()` (or `SetWastageAsync`) before the screen or reader reads it.
+- **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()` (the app's own `SharedTransactionDbContextFactory`), `CreateUnitOfWork()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`. With nothing saved in Settings, every product is priced with the 3% default wastage; a test whose figures are about something else calls `WithoutWastageAsync()` (or `SetWastageAsync`) before the screen or reader reads it.
 - **[ThrowawayDatabase](../tests/TinapayanRMS.Tests.Common/Fixtures/ThrowawayDatabase.cs)** is a migrated database of one test's own on the same server (`tinapayanrms_test_backup_` and eight characters of a GUID), dropped when the test is done. The backup tests restore over it, which would put every other test out of the shared database.
 - **Every concrete test class must carry `[Collection(DatabaseCollection.Name)]`.** It's deliberately left off the base class: xUnit isn't guaranteed to honour it there, and without it tests could run in parallel against the one database.
 
@@ -1206,7 +1211,7 @@ Everything in the previous recipe, plus:
 
 1. A `DbSet` in `TinapayanRMSDbContext`, named as the table should be.
 2. An `IEntityTypeConfiguration<T>` in `Configurations/`, with the unique indexes, delete behaviours and check constraints the rules need.
-3. A repository interface in `ApplicationCore/Interfaces`, and its implementation in `Infrastructure/Repositories`, taking `IDbContextFactory<TinapayanRMSDbContext>` through its primary constructor. Reads use Dapper and `Columns`; writes use EF Core.
+3. A repository interface in `ApplicationCore/Interfaces`, and its implementation in `Infrastructure/Repositories`, taking `IDbContextFactory<TinapayanRMSDbContext>` through its primary constructor. Reads use Dapper and `Columns`; writes use EF Core, in a transaction begun with `BeginOrJoinTransactionAsync` when they need one.
 4. Registrations in `CompositionRoot`: the repository as a singleton, and `IValidator<T>` if the entity has a Save form.
 
 Respawn picks up the new table by itself.

@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Data.Common;
+using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure;
@@ -25,9 +26,20 @@ public class TinapayanRMSDbContext : DbContext
     public static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, string connectionString) =>
         options.UseNpgsql(connectionString, npgsql => npgsql.SetPostgresVersion(18, 0)).UseSnakeCaseNamingConvention();
 
+    /// <summary>
+    /// The same, on <paramref name="connection"/>, which a context made with them uses but never closes: the connection a
+    /// unit of work's contexts share (SharedTransactionDbContextFactory).
+    /// </summary>
+    public static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, DbConnection connection) =>
+        options.UseNpgsql(connection, npgsql => npgsql.SetPostgresVersion(18, 0)).UseSnakeCaseNamingConvention();
+
     /// <summary>The options <see cref="Configure"/> builds, for a context made by hand rather than by the factory.</summary>
     public static DbContextOptions<TinapayanRMSDbContext> CreateOptions(string connectionString) =>
         (DbContextOptions<TinapayanRMSDbContext>)Configure(new DbContextOptionsBuilder<TinapayanRMSDbContext>(), connectionString).Options;
+
+    /// <summary>The options <see cref="Configure(DbContextOptionsBuilder, DbConnection)"/> builds.</summary>
+    public static DbContextOptions<TinapayanRMSDbContext> CreateOptions(DbConnection connection) =>
+        (DbContextOptions<TinapayanRMSDbContext>)Configure(new DbContextOptionsBuilder<TinapayanRMSDbContext>(), connection).Options;
 
     public DbSet<UnitOfMeasure> UnitsOfMeasure => Set<UnitOfMeasure>();
 

@@ -651,6 +651,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory),
             new ProductCloner(factory),
+            CreateUnitOfWork(),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),

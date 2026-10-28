@@ -232,6 +232,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory),
             new ProductCloner(factory),
+            CreateUnitOfWork(),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),

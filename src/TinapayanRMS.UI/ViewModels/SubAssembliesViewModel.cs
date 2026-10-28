@@ -28,7 +28,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     private readonly IRawMaterialCategoryRepository _rawMaterialCategoryRepository;
     private readonly IValidator<SubAssembly> _subAssemblyValidator;
     private readonly IValidator<SubAssemblyRole> _roleValidator;
-    private readonly ProductVersionRecorder _versionRecorder;
+    private readonly VersionedSaves _versionedSaves;
     private readonly SourceCache<StandaloneSubAssemblyRow, int> _rowCache = new(r => r.Id);
     private readonly ReadOnlyObservableCollection<StandaloneSubAssemblyRow> _rows;
     private readonly ReadOnlyObservableCollection<StandaloneSubAssemblyRow> _visibleRows;
@@ -376,12 +376,12 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         IValidator<SubAssembly> subAssemblyValidator,
         IValidator<SubAssemblyRole> roleValidator,
         IViewStateStore viewStateStore,
-        ProductVersionRecorder versionRecorder,
+        VersionedSaves versionedSaves,
         ILogger logger)
         : base(logger)
     {
         _subAssemblyRepository = subAssemblyRepository;
-        _versionRecorder = versionRecorder;
+        _versionedSaves = versionedSaves;
         _lineRepository = lineRepository;
         _roleRepository = roleRepository;
         _rawMaterialCategoryRepository = rawMaterialCategoryRepository;
@@ -596,23 +596,9 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 return;
             }
 
-            // The products using it as they're saved now, so each one this Save changes gets a version
-            // (ProductVersionRecorder). A failure to read or record them leaves the Save alone, and says so after it.
-            Exception? versionFailure = null;
-            var usingProducts = ProductVersionCapture.Empty;
-            if (_editingId != 0)
-            {
-                try
-                {
-                    usingProducts = await _versionRecorder.CaptureAsync([_editingId], [], CancellationToken.None);
-                }
-                catch (Exception ex)
-                {
-                    versionFailure = ex;
-                }
-            }
-
-            int id;
+            // The lines as they're typed, read here on the UI thread, for the save below.
+            var subAssembly = new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id };
+            Func<CancellationToken, Task<int>> save;
             if (IsPackaging)
             {
                 var setLines = PackagingLineRow.CompleteLines(PackagingLines, "set");
@@ -622,10 +608,9 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                     return;
                 }
 
-                id = await _subAssemblyRepository.SaveStandalonePackagingAsync(
-                    new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id },
-                    [.. setLines.Select(l => (l.PackagingMaterial.Id, l.UnitId, l.QtyPerUnit))],
-                    CancellationToken.None);
+                List<(int PackagingMaterialId, int? UnitId, decimal QtyPerUnit)> packagingLines =
+                    [.. setLines.Select(l => (l.PackagingMaterial.Id, l.UnitId, l.QtyPerUnit))];
+                save = cancellationToken => _subAssemblyRepository.SaveStandalonePackagingAsync(subAssembly, packagingLines, cancellationToken);
             }
             else
             {
@@ -636,35 +621,21 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                     return;
                 }
 
-                id = await _subAssemblyRepository.SaveStandaloneAsync(
-                    new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id },
-                    [.. lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
-                    CancellationToken.None);
+                List<RecipeLine> recipeLines = [.. lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
+                save = cancellationToken => _subAssemblyRepository.SaveStandaloneAsync(subAssembly, recipeLines, cancellationToken);
             }
 
-            IReadOnlyList<string> versioned = [];
-            try
-            {
-                versioned = await _versionRecorder.RecordChangesAsync(
-                    usingProducts, $"{name} changed on Sub-Assemblies", DateTime.Now, CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                versionFailure ??= ex;
-            }
+            // Written with a version of each product using it that this Save changes, both or neither (VersionedSaves).
+            var saved = await Task.Run(() => _versionedSaves.SaveSubAssemblyAsync(subAssembly.Id, name, save, DateTime.Now, CancellationToken.None));
 
             // The list picks up the new totals; then the form reloads what was saved.
             await LoadCommand.Execute();
-            var saved = Rows.FirstOrDefault(r => r.Id == id);
-            ApplyRefresh(() => SelectedRow = saved);
-            await LoadIntoFormAsync(saved);
-            SuccessMessage = ProductVersionRecorder.RecordedMessage(versioned) is { } recorded
+            var row = Rows.FirstOrDefault(r => r.Id == saved.Id);
+            ApplyRefresh(() => SelectedRow = row);
+            await LoadIntoFormAsync(row);
+            SuccessMessage = ProductVersionRecorder.RecordedMessage(saved.ProductsVersioned) is { } recorded
                 ? $"{name} was saved. {recorded}"
                 : $"{name} was saved.";
-            if (versionFailure is not null)
-            {
-                ShowFailure(versionFailure, $"{name} was saved, but versions of the products using it couldn't be recorded");
-            }
         }),
         History.WhenAnyValue(h => h.IsDirty));
 

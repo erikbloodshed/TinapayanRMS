@@ -281,6 +281,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory),
             new ProductCloner(factory),
+            CreateUnitOfWork(),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
