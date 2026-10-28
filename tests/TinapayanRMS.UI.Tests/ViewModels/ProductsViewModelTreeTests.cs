@@ -417,7 +417,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == viewModel.DeletePermanentlyCommand && i.Parameter == mamon);
         viewModel.TreeShortcut("F2").Should().BeNull();
         viewModel.TreeMenuFor(viewModel.ProductTree.DeletedFolder).Should().BeEmpty("the folder itself has nothing to offer");
-        viewModel.ComponentProductOptions.Select(p => p.Id).Should().NotContain(mamonId);
+        viewModel.ComponentsTable.ComponentProductOptions.Select(p => p.Id).Should().NotContain(mamonId);
 
         await RunAsync(menu.Single(i => i.Header == "Restore"));
 

@@ -52,7 +52,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
     /// <summary>A line as the table's add row makes one, filled in as typing it would.</summary>
     private static ProductComponentRow Line(ProductsViewModel viewModel, int productId, int? quantity)
     {
-        var row = viewModel.NewComponentRow();
+        var row = viewModel.ComponentsTable.NewComponentRow();
         row.ComponentProductId = productId;
         row.Quantity = quantity;
         return row;
@@ -74,7 +74,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.RecipeTabs.Should().Equal(viewModel.ComponentsTab);
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.ComponentsTab);
         viewModel.IsComponentsShowing.Should().BeTrue();
-        viewModel.ComponentProductOptions.Select(p => p.Name).Should().Equal("Cheese Roll", "Ensaymada");
+        viewModel.ComponentsTable.ComponentProductOptions.Select(p => p.Name).Should().Equal("Cheese Roll", "Ensaymada");
         (await CanSave(viewModel)).Should().BeFalse("nothing is typed into it yet");
 
         // Add Sub-Assembly opens the add form after the Products tab, offering the product-owned roles and packaging:
@@ -106,13 +106,13 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         await viewModel.NewCompositeCommand.Execute();
         viewModel.EditingName = "Pasalubong Box";
 
-        viewModel.ComponentEdits.Add(Line(viewModel, ensaymadaId, 6));
-        viewModel.ComponentEdits.Add(Line(viewModel, cheeseRollId, 4));
+        viewModel.ComponentsTable.ComponentEdits.Add(Line(viewModel, ensaymadaId, 6));
+        viewModel.ComponentsTable.ComponentEdits.Add(Line(viewModel, cheeseRollId, 4));
         await WaitUntilSettledAsync(
-            () => viewModel.ComponentEdits.All(r => r.RecipeCost is not null),
-            () => $"costs={string.Join(", ", viewModel.ComponentEdits.Select(r => r.RecipeCost))}");
+            () => viewModel.ComponentsTable.ComponentEdits.All(r => r.RecipeCost is not null),
+            () => $"costs={string.Join(", ", viewModel.ComponentsTable.ComponentEdits.Select(r => r.RecipeCost))}");
 
-        viewModel.ComponentEdits.Select(r => (r.Product!.Name, r.RecipeCost, r.Cost)).Should().Equal(
+        viewModel.ComponentsTable.ComponentEdits.Select(r => (r.Product!.Name, r.RecipeCost, r.Cost)).Should().Equal(
             ("Ensaymada", 2.50m, 15m), ("Cheese Roll", 5m, 20m));
         viewModel.Costing.Costs.IsComposite.Should().BeTrue();
         viewModel.Costing.Costs.PartsTitle.Should().Be("Products (ingredients)");
@@ -135,7 +135,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
 
         // Save reloads it as saved: the same lines, priced, on the tab it showed, with nothing left to save.
         viewModel.SelectedProduct!.IsComposite.Should().BeTrue();
-        viewModel.ComponentEdits.Select(r => (r.ComponentProductId, r.Quantity, r.RecipeCost)).Should().Equal(
+        viewModel.ComponentsTable.ComponentEdits.Select(r => (r.ComponentProductId, r.Quantity, r.RecipeCost)).Should().Equal(
             (ensaymadaId, 6, 2.50m), (cheeseRollId, 4, 5m));
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.ComponentsTab);
         viewModel.Costing.Costs.SubAssemblies.Should().Be(35m);
@@ -152,11 +152,11 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var viewModel = await CreateLoadedViewModelAsync();
         await viewModel.NewCompositeCommand.Execute();
         viewModel.EditingName = "Party Box";
-        viewModel.ComponentEdits.Add(Line(viewModel, ensaymadaId, 6));
-        viewModel.ComponentEdits.Add(Line(viewModel, cheeseRollId, 4));
+        viewModel.ComponentsTable.ComponentEdits.Add(Line(viewModel, ensaymadaId, 6));
+        viewModel.ComponentsTable.ComponentEdits.Add(Line(viewModel, cheeseRollId, 4));
         await WaitUntilSettledAsync(
-            () => viewModel.ComponentEdits.All(r => r.RecipeCost is not null),
-            () => $"costs={string.Join(", ", viewModel.ComponentEdits.Select(r => r.RecipeCost))}");
+            () => viewModel.ComponentsTable.ComponentEdits.All(r => r.RecipeCost is not null),
+            () => $"costs={string.Join(", ", viewModel.ComponentsTable.ComponentEdits.Select(r => r.RecipeCost))}");
 
         // 500 g of icing at 0.10 a gram, 100 g of it on one box: 10.00.
         await viewModel.AddUsageCommand.Execute(UsageFormMode.New);
@@ -166,8 +166,8 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
 
         await viewModel.SaveCommand.Execute();
         await WaitUntilSettledAsync(
-            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1 && viewModel.ComponentEdits.Count == 2,
-            () => $"sections={viewModel.UsageEdits.Count} lines={viewModel.ComponentEdits.Count}");
+            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1 && viewModel.ComponentsTable.ComponentEdits.Count == 2,
+            () => $"sections={viewModel.UsageEdits.Count} lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.RecipeTabs.Should().HaveCount(2);
@@ -176,7 +176,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.Costing.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(
             ("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m), ("Topping", 10m));
         viewModel.Costing.Costs.SubAssemblies.Should().Be(45m);
-        viewModel.ComponentsCost.Should().Be(35m, "the Products tab shows what its products bring");
+        viewModel.ComponentsTable.ComponentsCost.Should().Be(35m, "the Products tab shows what its products bring");
         viewModel.Costing.Costs.PartsTitle.Should().Be("Products and sub-assemblies (ingredients)");
         viewModel.Costing.Costs.PartsBase.Should().Be("products and sub-assemblies");
         (await CanSave(viewModel)).Should().BeFalse();
@@ -205,13 +205,13 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var viewModel = await CreateLoadedViewModelAsync();
         await viewModel.NewCompositeCommand.Execute();
         viewModel.EditingName = "Pasalubong Box";
-        viewModel.ComponentEdits.Add(Line(viewModel, ensaymadaId, 6));
+        viewModel.ComponentsTable.ComponentEdits.Add(Line(viewModel, ensaymadaId, 6));
 
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().Be("A composite product needs at least two different products.");
 
-        viewModel.ComponentEdits.Add(Line(viewModel, cheeseRollId, null));
+        viewModel.ComponentsTable.ComponentEdits.Add(Line(viewModel, cheeseRollId, null));
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().Be("Enter how many Cheese Roll go in, or delete its line.");
@@ -230,15 +230,15 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var viewModel = await CreateLoadedViewModelAsync();
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentEdits.Count}");
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
-        viewModel.ComponentProductOptions.Select(p => p.Name).Should().Equal(
+        viewModel.ComponentsTable.ComponentProductOptions.Select(p => p.Name).Should().Equal(
             ["Cheese Roll", "Chocolate Cake", "Ensaymada", "Office Tray"],
             "the Party Package holds the box, and the box can't hold itself; the Office Tray doesn't hold it");
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Name == "Party Package");
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentEdits.Count == 2 && viewModel.ComponentEdits[0].ComponentProductId == boxId, () => $"lines={viewModel.ComponentEdits.Count}");
-        viewModel.ComponentProductOptions.Select(p => p.Name).Should().Equal("Cheese Roll", "Chocolate Cake", "Ensaymada", "Office Tray", "Pasalubong Box");
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2 && viewModel.ComponentsTable.ComponentEdits[0].ComponentProductId == boxId, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
+        viewModel.ComponentsTable.ComponentProductOptions.Select(p => p.Name).Should().Equal("Cheese Roll", "Chocolate Cake", "Ensaymada", "Office Tray", "Pasalubong Box");
 
         // A composite's own figures follow what's in it, the box inside it included.
         viewModel.Costing.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(("Pasalubong Box × 2", 70m), ("Chocolate Cake × 1", 0m));
@@ -248,7 +248,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"sections={viewModel.UsageEdits.Count}");
         viewModel.IsEditingComposite.Should().BeFalse();
         viewModel.RecipeTabs.Should().NotContain(viewModel.ComponentsTab);
-        viewModel.ComponentEdits.Should().BeEmpty();
+        viewModel.ComponentsTable.ComponentEdits.Should().BeEmpty();
         viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single().Usage.RoleId.Should().Be(doughRoleId);
     });
 
@@ -259,13 +259,13 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentEdits.Count}");
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
         (await CanSave(viewModel)).Should().BeFalse();
 
         // What the grid's undo behaviour does around a cell edit.
         var recorder = (IUndoRecorder)viewModel;
         recorder.BeginUndoStep();
-        viewModel.ComponentEdits[0].Quantity = 8;
+        viewModel.ComponentsTable.ComponentEdits[0].Quantity = 8;
         recorder.EndUndoStep();
 
         viewModel.Costing.Costs.SubAssemblies.Should().Be(40m);
@@ -273,21 +273,21 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
 
         await viewModel.UndoCommand.Execute();
 
-        viewModel.ComponentEdits.Select(r => (r.ComponentProductId, r.Quantity)).Should().Equal((ensaymadaId, 6), (cheeseRollId, 4));
+        viewModel.ComponentsTable.ComponentEdits.Select(r => (r.ComponentProductId, r.Quantity)).Should().Equal((ensaymadaId, 6), (cheeseRollId, 4));
         viewModel.Costing.Costs.SubAssemblies.Should().Be(35m);
         (await CanSave(viewModel)).Should().BeFalse();
 
         await viewModel.RedoCommand.Execute();
 
-        viewModel.ComponentEdits[0].Quantity.Should().Be(8);
+        viewModel.ComponentsTable.ComponentEdits[0].Quantity.Should().Be(8);
         viewModel.Costing.Costs.SubAssemblies.Should().Be(40m);
 
         // Remove Line is a step of its own too.
-        viewModel.SelectedComponentEdit = viewModel.ComponentEdits[1];
+        viewModel.ComponentsTable.SelectedComponentEdit = viewModel.ComponentsTable.ComponentEdits[1];
         await viewModel.RemoveComponentCommand.Execute();
-        viewModel.ComponentEdits.Should().ContainSingle();
+        viewModel.ComponentsTable.ComponentEdits.Should().ContainSingle();
         await viewModel.UndoCommand.Execute();
-        viewModel.ComponentEdits.Should().HaveCount(2);
+        viewModel.ComponentsTable.ComponentEdits.Should().HaveCount(2);
     });
 
     [Fact]
@@ -298,22 +298,22 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentEdits.Count}");
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
         viewModel.EditingIncludesComponentPackaging.Should().BeFalse();
         viewModel.Costing.Costs.Packaging.Should().Be(0m, "a product's own packaging stays out until the box is ticked");
         viewModel.Costing.Costs.PackagingTitle.Should().Be("Packaging");
         viewModel.ComponentsCaption.Should().Contain("Its own packaging stays out");
-        viewModel.ComponentEdits.Select(r => (r.PackagingCost, r.Cost)).Should().Equal((1.50m, 15m), (0m, 20m));
-        viewModel.ComponentsCost.Should().Be(35m);
+        viewModel.ComponentsTable.ComponentEdits.Select(r => (r.PackagingCost, r.Cost)).Should().Equal((1.50m, 15m), (0m, 20m));
+        viewModel.ComponentsTable.ComponentsCost.Should().Be(35m);
 
         // What ticking the box does.
         viewModel.IsComponentPackagingTicked = true;
 
         // The Products table: each line's Cost is its recipe and its packaging, and the figure above adds them up.
-        viewModel.ComponentEdits.Select(r => (r.RecipeCost, r.PackagingCost, r.Cost)).Should().Equal((2.50m, 1.50m, 24m), (5m, 0m, 20m));
-        viewModel.ComponentsCost.Should().Be(44m);
-        PrintedComponent.From(viewModel.ComponentEdits).Should().Equal(
+        viewModel.ComponentsTable.ComponentEdits.Select(r => (r.RecipeCost, r.PackagingCost, r.Cost)).Should().Equal((2.50m, 1.50m, 24m), (5m, 0m, 20m));
+        viewModel.ComponentsTable.ComponentsCost.Should().Be(44m);
+        PrintedComponent.From(viewModel.ComponentsTable.ComponentEdits).Should().Equal(
             new PrintedComponent("Ensaymada", 6, 2.50m, 24m, 1.50m), new PrintedComponent("Cheese Roll", 4, 5m, 20m, 0m));
 
         // The costing still keeps them apart: the products' lines are their recipe, and their packaging is packaging.
@@ -333,8 +333,8 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
 
         viewModel.EditingIncludesComponentPackaging.Should().BeFalse();
         viewModel.Costing.Costs.Packaging.Should().Be(0m);
-        viewModel.ComponentEdits.Select(r => r.Cost).Should().Equal(15m, 20m);
-        viewModel.ComponentsCost.Should().Be(35m);
+        viewModel.ComponentsTable.ComponentEdits.Select(r => r.Cost).Should().Equal(15m, 20m);
+        viewModel.ComponentsTable.ComponentsCost.Should().Be(35m);
         (await CanSave(viewModel)).Should().BeFalse();
 
         await viewModel.RedoCommand.Execute();
@@ -351,7 +351,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.EditingIncludesComponentPackaging.Should().BeTrue();
         viewModel.Costing.Costs.Packaging.Should().Be(9m);
         // The rows reloaded after Save follow the box too.
-        viewModel.ComponentEdits.Select(r => r.Cost).Should().Equal(24m, 20m);
+        viewModel.ComponentsTable.ComponentEdits.Select(r => r.Cost).Should().Equal(24m, 20m);
         (await CanSave(viewModel)).Should().BeFalse();
 
         // A new composite starts with its products' packaging left out.
@@ -388,7 +388,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentEdits.Count}");
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
         // Ensaymada's pieces are made twice the size elsewhere: each now takes 5.00 of recipe.
         var doughId = await SubAssemblyIdAsync(ensaymadaId, doughRoleId);
@@ -396,7 +396,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
 
         await viewModel.LoadCommand.Execute();
 
-        viewModel.ComponentEdits[0].RecipeCost.Should().Be(5m);
+        viewModel.ComponentsTable.ComponentEdits[0].RecipeCost.Should().Be(5m);
         viewModel.Costing.Costs.SubAssemblies.Should().Be(50m);
         (await CanSave(viewModel)).Should().BeFalse("a product repriced elsewhere isn't this product's change");
     });
@@ -424,7 +424,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentEdits.Count}");
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
         var (printout, problem) = viewModel.PreparePrintout();
 

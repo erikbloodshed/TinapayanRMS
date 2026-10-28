@@ -40,10 +40,10 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         viewModel.CostBasisButtonLabel.Should().Be("Buffered", "the button names the costs a click switches to");
         (viewModel.Costing.Costs.SubAssemblies, viewModel.Costing.Costs.Packaging).Should().Be((2.00m, 25m), "50 g of 1,000 g of flour at 0.04, and a box at 25");
         viewModel.FormLines.Single().CostPerGram.Should().Be(0.04m);
-        viewModel.LineEdits.Single().UnitCost.Should().Be(25m);
+        viewModel.Packaging.LineEdits.Single().UnitCost.Should().Be(25m);
         viewModel.UsageFormBatchCostText.Should().Be($"{40m:N2}");
         viewModel.NewFormLine().CostBasis.Should().Be(CostBasis.Unbuffered, "a row started in the add row is priced the same");
-        viewModel.NewLineEdit().CostBasis.Should().Be(CostBasis.Unbuffered);
+        viewModel.Packaging.NewLineEdit().CostBasis.Should().Be(CostBasis.Unbuffered);
         viewModel.History.IsDirty.Should().BeFalse("the switch isn't an edit");
         viewModel.History.CanUndo.Should().BeFalse();
 
@@ -111,12 +111,12 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
             null,
             null,
             Cancellation);
-        var viewModel = await OpenAsync(boxId, vm => vm.ComponentEdits.Count == 2 && vm.ComponentEdits.All(r => r.RecipeCost is not null));
+        var viewModel = await OpenAsync(boxId, vm => vm.ComponentsTable.ComponentEdits.Count == 2 && vm.ComponentsTable.ComponentEdits.All(r => r.RecipeCost is not null));
         viewModel.Costing.Costs.SubAssemblies.Should().Be(35m, "6 × 2.50 + 4 × 5.00");
 
         await viewModel.ToggleCostBasisCommand.Execute();
 
-        viewModel.ComponentEdits.Select(r => r.RecipeCost).Should().Equal(2.00m, 4.00m);
+        viewModel.ComponentsTable.ComponentEdits.Select(r => r.RecipeCost).Should().Equal(2.00m, 4.00m);
         viewModel.Costing.Costs.SubAssemblies.Should().Be(28m, "6 × 2.00 + 4 × 4.00");
         viewModel.PreparePrintout().Printout!.Components!.Select(c => c.Cost).Should().Equal(12m, 16m);
         viewModel.History.IsDirty.Should().BeFalse();

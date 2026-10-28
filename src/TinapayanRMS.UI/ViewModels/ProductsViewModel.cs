@@ -21,7 +21,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// piece size, and its packaging), its costing, its packaging link, and cloning it or making a variant of it. The name, description,
 /// recipe, packaging and costing are edited in memory, and Save writes them together
 /// (IProductRepository.SaveAsync). A composite product's recipe is the products it holds instead, in its Products tab
-/// (<see cref="ComponentEdits"/>), each bringing its recipe cost.
+/// (<see cref="ProductComponents.ComponentEdits"/>), each bringing its recipe cost.
 /// </summary>
 public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen, IRecordScreen, IRevertScreen
 {
@@ -213,20 +213,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>A composite's Products table shows under the Recipe Structure's tabs: on its Products tab.</summary>
     public bool IsComponentsShowing => _isComponentsShowing.Value;
 
-    /// <summary>A composite's lines, typed straight into its Products table: each a product and how many of it go in.</summary>
-    public ObservableCollection<ProductComponentRow> ComponentEdits { get; } = [];
-
-    private decimal _componentsCost;
-    /// <summary>
-    /// What a composite's products bring together, for its Products tab: the sum of its Cost column, so its recipe cost less
-    /// its own sections, and its products' packaging too while it includes theirs.
-    /// </summary>
-    public decimal ComponentsCost
-    {
-        get => _componentsCost;
-        private set => this.RaiseAndSetIfChanged(ref _componentsCost, value);
-    }
-
     private bool _editingIncludesComponentPackaging;
     /// <summary>
     /// A composite's products each bring their own packaging too (Product.IncludesComponentPackaging), the checkbox beside
@@ -239,10 +225,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             // Each line's Cost, and the add row's, take the products' packaging in or leave it out: first, since the change
             // recomputes the costs from the rows as it's raised.
-            foreach (var row in _addingComponentRow is { } adding ? ComponentEdits.Append(adding) : ComponentEdits)
-            {
-                row.IncludesPackaging = value;
-            }
+            ComponentsTable.SetIncludesPackaging(value);
 
             this.RaiseAndSetIfChanged(ref _editingIncludesComponentPackaging, value);
             this.RaisePropertyChanged(nameof(IsComponentPackagingTicked));
@@ -272,60 +255,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public string ComponentsCaption => EditingIncludesComponentPackaging
         ? "Each product brings its recipe (ingredients) cost and its own packaging for how many of it go in: Cost is both. On the Costing tab the packaging joins this product's Packaging. A topping or filling over the whole goes on a tab of its own, with Add Sub-Assembly."
         : "Each product brings its recipe (ingredients) cost for how many of it go in. Its own packaging stays out: this product's Packaging covers the box and anything wrapping the pieces. A topping or filling over the whole goes on a tab of its own, with Add Sub-Assembly.";
-
-    /// <summary>
-    /// The line the Products table's add row edits: it finds its product, and its recipe cost once that's read, before
-    /// it's committed. Kept, so a cost read for it can price it while it's still being typed (FetchComponentCostsAsync).
-    /// </summary>
-    public Func<ProductComponentRow> NewComponentRow => () => _addingComponentRow = NewComponentRowFor(null, null);
-
-    private ProductComponentRow? _addingComponentRow;
-
-    private ProductComponentRow? _selectedComponentEdit;
-    public ProductComponentRow? SelectedComponentEdit
-    {
-        get => _selectedComponentEdit;
-        set => this.RaiseAndSetIfChanged(ref _selectedComponentEdit, value);
-    }
-
-    /// <summary>
-    /// What the Products table's product cell offers: every product but the one showing and the composites that hold it,
-    /// directly or through another, which would end up holding themselves (CompositeProductRules.Contains).
-    /// </summary>
-    public ObservableCollection<Product> ComponentProductOptions { get; } = [];
-
-    /// <summary>Every composite's lines as saved, without their products: which composites hold which products, for the picker.</summary>
-    private IReadOnlyList<ProductComponent> _componentLinks = [];
-
-    /// <summary>
-    /// What one of each product in the Products table brings, by product id: its recipe and packaging costs as saved, read
-    /// with the composite, when one is picked, and again with every LoadCommand. Kept for the product showing only.
-    /// </summary>
-    private readonly Dictionary<int, ComponentCosts> _componentCosts = [];
-
-    /// <summary>The products whose recipe cost is being read, so a second pick of one doesn't read it twice.</summary>
-    private readonly HashSet<int> _fetchingComponentCosts = [];
-
-    private Product? FindComponentProduct(int id) => Products.FirstOrDefault(p => p.Id == id);
-
-    /// <summary>
-    /// What one of a product brings, as the screen has read it; null while it hasn't, and the read starts, so the add row
-    /// prices itself once it arrives, before the line is committed.
-    /// </summary>
-    private ProductComponentRow.UnitCosts? FindComponentCosts(int id)
-    {
-        if (_componentCosts.TryGetValue(id, out var costs))
-        {
-            return AtBasis(costs);
-        }
-
-        if (_fetchingComponentCosts.Add(id))
-        {
-            _ = FetchComponentCostsAsync([id]);
-        }
-
-        return null;
-    }
 
     private RecipeTab? _selectedRecipeTab;
     /// <summary>The Recipe Structure tab showing. Showing New Sub-Assembly opens the form that adds one.</summary>
@@ -374,26 +303,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private bool _isRecipeClearedForAnother;
 
-    /// <summary>The packaging lines, typed straight into the Packaging tab's table.</summary>
-    public ObservableCollection<PackagingLineRow> LineEdits { get; } = [];
-
-    /// <summary>The line the packaging table's add row edits: it offers its material's units and prices itself before it's committed.</summary>
-    public Func<PackagingLineRow> NewLineEdit => () => new PackagingLineRow(FindPackagingMaterial) { CostBasis = CostBasis };
-
     /// <summary>A packaging material as the screen last loaded it, for a row that prices itself.</summary>
     private RawMaterial? FindPackagingMaterial(int id) => PackagingMaterials.FirstOrDefault(m => m.Id == id);
 
     /// <summary>The standalone packaging sets (sub-assemblies in the Packaging role), by name, as last loaded, for the form's picker.</summary>
     private IReadOnlyList<SubAssembly> _packagingSets = [];
-
-    /// <summary>
-    /// What the per-piece packaging links as the form stands, saved or not (the Add Sub-Assembly form's Link sets it,
-    /// the Packaging tab's Make a Copy and Delete Sub-Assembly clear it), or null while the product owns its lines.
-    /// </summary>
-    private PackagingLinkTarget? _packagingLinkTarget;
-
-    /// <summary>The key of the link last loaded or saved, or null for none: Save writes the link only when it differs.</summary>
-    private int? _savedPackagingLinkKey;
 
     /// <summary>
     /// The add form's packaging lines, when it adds packaging (IsFormPackaging): how much of each material one piece
@@ -640,55 +554,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>A saved product: links and clones need one, so the tab only shows then.</summary>
     public bool ShowLinks => _showLinks.Value;
 
-    private bool _isPackagingLinked;
-    public bool IsPackagingLinked
-    {
-        get => _isPackagingLinked;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _isPackagingLinked, value);
-            this.RaisePropertyChanged(nameof(IsPackagingEditable));
-            this.RaisePropertyChanged(nameof(CanMovePackaging));
-        }
-    }
-
-    /// <summary>The packaging is the product's own, so its table can be typed into; linked packaging is kept where it's from.</summary>
-    public bool IsPackagingEditable => !IsPackagingLinked;
-
-    private bool _isPackagingMoving;
-    /// <summary>
-    /// Move to Sub-Assemblies was pressed on the Packaging tab: Save puts the product's own lines on the Sub-Assemblies
-    /// screen as a packaging set, and links it. They're still typed into here until then, and the tab's "Moves to
-    /// Sub-Assemblies on Save" badge says so. Whatever changes what the packaging links ends it (ShowPackagingLink).
-    /// </summary>
-    public bool IsPackagingMoving
-    {
-        get => _isPackagingMoving;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _isPackagingMoving, value);
-            this.RaisePropertyChanged(nameof(CanMovePackaging));
-        }
-    }
-
-    /// <summary>The packaging is the product's own lines, not on their way already: the Packaging tab offers Move to Sub-Assemblies.</summary>
-    public bool CanMovePackaging => IsPackagingEditable && !IsPackagingMoving;
-
-    private string _packagingLinkedToText = string.Empty;
-    /// <summary>"Linked to Cream Loaf" or "Linked to Gift Box Set (Sub-Assemblies)", or empty while the product has its own packaging.</summary>
-    public string PackagingLinkedToText
-    {
-        get => _packagingLinkedToText;
-        private set => this.RaiseAndSetIfChanged(ref _packagingLinkedToText, value);
-    }
-
-    /// <summary>The packaging set linked packaging comes from, whose badge opens it on Sub-Assemblies; null for another product's, or none.</summary>
-    public int? PackagingLinkedSetId => _packagingLinkTarget?.SubAssemblyId;
-
-    public bool IsPackagingLinkedToSet => PackagingLinkedSetId is not null;
-
-    public bool IsPackagingLinkedToProduct => IsPackagingLinked && !IsPackagingLinkedToSet;
-
     private bool _hasPackaging;
     /// <summary>
     /// The product has packaging, its own lines or a link, so the Recipe Structure has its Packaging tab. A new product
@@ -702,6 +567,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>The Costing tab: the costing percentages, each metric's amount, and the cost summary (Costs).</summary>
     public ProductCosting Costing { get; } = new();
+
+    /// <summary>The Recipe Structure's Packaging tab: the packaging lines, or what they link, and a Move to Sub-Assemblies.</summary>
+    public ProductPackaging Packaging { get; }
+
+    /// <summary>A composite's Products table: its lines, the add row, the product cell's options, and what each product brings.</summary>
+    public ProductComponents ComponentsTable { get; }
 
     private int _scalingUnits = 1;
     /// <summary>
@@ -1048,13 +919,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         private set => this.RaiseAndSetIfChanged(ref _usageFormBatchCostText, value);
     }
 
-    private PackagingLineRow? _selectedLineEdit;
-    public PackagingLineRow? SelectedLineEdit
-    {
-        get => _selectedLineEdit;
-        set => this.RaiseAndSetIfChanged(ref _selectedLineEdit, value);
-    }
-
     private string _editingCloneName = string.Empty;
     public string EditingCloneName
     {
@@ -1067,7 +931,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     // What the product had when it was loaded, so Save only sends the parts that changed.
     private RecipeDraft _savedRecipe = new([], []);
-    private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> _savedLines = [];
 
     // The shop-wide Wastage % every product is priced with (Settings → Costing Defaults), as of the last LoadCommand.
     private decimal _wastagePercent = CostingDefaults.DefaultWastagePercent;
@@ -1328,6 +1191,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _savedProducts = new SavedProductReader(
             packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository,
             costingDefaultsRepository);
+        Packaging = new ProductPackaging(FindPackagingMaterial, () => CostBasis);
+        ComponentsTable = new ProductComponents(
+            _savedProducts,
+            id => Products.FirstOrDefault(p => p.Id == id),
+            () => Products.ToDictionary(p => p.Id),
+            () => CostBasis,
+            () => EditingIncludesComponentPackaging,
+            (ex, text) => ShowFailure(ex, text));
         _versionedSaves = new VersionedSaves(
             unitOfWork, productRepository, versionRepository, _savedProducts, new ProductVersionRecorder(_savedProducts, productRepository, versionRepository));
         _productValidator = productValidator;
@@ -1478,7 +1349,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         FormLines.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
         FormAddIns.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
         FormPackagingLines.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
-        LineEdits.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
+        Packaging.LineEdits.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
 
         // A line picked, typed or deleted in the form's table: it's priced, and the batch and preview follow.
         FormLines.ToObservableChangeSet()
@@ -1574,7 +1445,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .Subscribe(_ => PieceSizeTyped(UsageAuthoredField.Yield));
 
         // A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.
-        LineEdits.ToObservableChangeSet()
+        Packaging.LineEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
             .AutoRefresh(l => l.CostPerUnit)
             .Subscribe(_ =>
@@ -1584,7 +1455,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     return;
                 }
 
-                PackagingLineRow.Resolve(LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
+                PackagingLineRow.Resolve(Packaging.LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
                 RecomputeCosts();
             });
 
@@ -1595,7 +1466,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // subscriber sets the rows' costs (Resolve), so with a chain a cost set on one thread held one operator's lock
         // while waiting for the next, and a cost set on another thread the other way round. A cost read arriving off the
         // UI thread while a LoadCommand's applied (as in the tests, which have no UI thread) deadlocked there.
-        ComponentEdits.ToObservableChangeSet()
+        ComponentsTable.ComponentEdits.ToObservableChangeSet()
             .AutoRefreshOnObservable(r => r.WhenAnyPropertyChanged(
                 nameof(ProductComponentRow.ComponentProductId),
                 nameof(ProductComponentRow.Quantity),
@@ -1608,8 +1479,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     return;
                 }
 
-                ProductComponentRow.Resolve(ComponentEdits, Products.ToDictionary(p => p.Id), ComponentCostsAtBasis());
-                ReadMissingComponentCosts();
+                ComponentsTable.ResolveRows();
+                ComponentsTable.ReadMissingCosts();
                 RecomputeCosts();
             });
 
@@ -1648,9 +1519,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // button still disabled under the cursor would swallow the very click that enabled it.
         this.Changed.Subscribe(_ => History.RefreshDirty());
         Costing.Changed.Subscribe(_ => History.RefreshDirty());
+        Packaging.Changed.Subscribe(_ => History.RefreshDirty());
+        ComponentsTable.Changed.Subscribe(_ => History.RefreshDirty());
         WatchForSave(UsageEdits);
-        WatchForSave(LineEdits);
-        WatchForSave(ComponentEdits);
+        WatchForSave(Packaging.LineEdits);
+        WatchForSave(ComponentsTable.ComponentEdits);
         WatchForSave(FormLines);
         WatchForSave(FormAddIns);
         WatchForSave(FormPackagingLines);
@@ -1671,7 +1544,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
             // A composite's products can have changed elsewhere since they were read (a recipe, an ingredient's price, a
             // quantity required), so what each brings is read again; its lines may hold unsaved edits and stay as they are.
-            List<int> componentIds = [.. ComponentEdits.Select(r => r.ComponentProductId).OfType<int>().Distinct()];
+            List<int> componentIds = [.. ComponentsTable.ProductIds];
 
             // All at once, on the thread pool: each read is mostly a round trip's wait, so one after another they took
             // several times as long as the slowest of them, and the UI thread came back after each to start the next.
@@ -1715,7 +1588,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // have changed there, so it's fetched again — but only while the form still shows the link as saved. The
             // product's own lines aren't, since they may hold unsaved edits, and nor is a link picked but not saved.
             var savedLink = packagingLink is null ? null : PackagingLinkTarget.From(packagingLink);
-            var showsSavedLink = savedLink is not null && savedLink.Key == _savedPackagingLinkKey && _packagingLinkTarget?.Key == savedLink.Key;
+            var showsSavedLink = savedLink is not null && Packaging.ShowsSavedLink(savedLink);
             var linkedPackagingLines = showsSavedLink
                 ? await _packagingLineRepository.GetEffectiveForProductAsync(packagingLink!.ProductId, CancellationToken.None)
                 : null;
@@ -1751,13 +1624,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 RefreshCostingDefaults(costingDefaults);
 
                 // A composite's lines point at the fresh products (a rename shows) at their fresh recipe costs.
-                _componentLinks = componentLinks;
-                foreach (var (productId, cost) in componentCosts)
-                {
-                    _componentCosts[productId] = cost;
-                }
-
-                ProductComponentRow.Resolve(ComponentEdits, Products.ToDictionary(p => p.Id), ComponentCostsAtBasis());
+                ComponentsTable.TakeFresh(componentCosts, componentLinks);
                 RefreshComponentOptions();
 
                 // The Scaling tab opens made ingredients into their BOMs as they are now, and a composite's products
@@ -1774,8 +1641,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 if (detailProductId == _detailProductId && linkedPackagingLines is not null)
                 {
                     // A renamed product or set reads right in the banner too.
-                    ShowPackagingLink(savedLink);
-                    ReplaceLines(linkedPackagingLines);
+                    Packaging.ShowLink(savedLink);
+                    Packaging.LoadLines(linkedPackagingLines);
                 }
 
                 RefreshRecipeRows(linkedSubAssemblies, linkedLines);
@@ -1827,8 +1694,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         NewCompositeProductInCommand = ReactiveCommand.Create<ProductFolderNode?>(folder => StartNewProduct(
             folder?.Stage, folder?.CategoryId, isComposite: true));
         RemoveComponentCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => ComponentEdits.Remove(SelectedComponentEdit!)),
-            this.WhenAnyValue(x => x.SelectedComponentEdit).Select(row => row is not null));
+            () => AsUndoStep(() => ComponentsTable.ComponentEdits.Remove(ComponentsTable.SelectedComponentEdit!)),
+            ComponentsTable.WhenAnyValue(c => c.SelectedComponentEdit).Select(row => row is not null));
 
         // The list's commands, each run on the folder or product its menu was opened on (TreeMenuFor).
         MoveProductsCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<ProductMove>>(
@@ -1932,8 +1799,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // sections' lines or linking its packaging each get one if this Save changes them. Only linked lines edited
             // here and the packaging reach those, so a Save of neither reads none (2026-10-17: a price-only Save spent half
             // a second reading the 39 products sharing its dough, twice).
-            var packagingLink = ChangedPackagingLink();
-            var packagingLines = ChangedLines();
+            var packagingLink = Packaging.ChangedLink();
+            var packagingLines = Packaging.ChangedLines();
             var changesSharing = UsageEdits.Any(u => u.AreLinkedLinesEdited) || packagingLines is not null || packagingLink is not null;
             var recipeToSave = IsSameRecipe(recipe, _savedRecipe) ? null : recipe;
             var costingToSave = Costing.IsChanged ? costing : null;
@@ -1983,7 +1850,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
                 History.Clear();
                 CloseUsageForm();
-                SelectedLineEdit = null;
+                Packaging.SelectedLineEdit = null;
                 LoadIntoForm(product);
                 await LoadProductDetailAsync(product, CancellationToken.None);
                 SuccessMessage = $"{product.Name} was put back as it was last saved.";
@@ -2162,10 +2029,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         CopyPackagingCommand = ReactiveCommand.Create(
             () => AsUndoStep(() =>
             {
-                ShowPackagingLink(null);
+                Packaging.ShowLink(null);
                 RefreshLinkableOptions();
             }),
-            this.WhenAnyValue(x => x.IsPackagingLinked));
+            Packaging.WhenAnyValue(p => p.IsPackagingLinked));
 
         // The product's own packaging lines go to the Sub-Assemblies screen as a packaging set on Save, which it links.
         // They're typed straight into the tab rather than through a form, so they're checked now instead: a line half
@@ -2178,7 +2045,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 int lineCount;
                 try
                 {
-                    lineCount = CurrentLines().Count;
+                    lineCount = Packaging.CurrentLines().Count;
                 }
                 catch (BusinessRuleException ex)
                 {
@@ -2192,17 +2059,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     return;
                 }
 
-                IsPackagingMoving = true;
+                Packaging.IsPackagingMoving = true;
             }),
-            this.WhenAnyValue(x => x.CanMovePackaging));
+            Packaging.WhenAnyValue(p => p.CanMovePackaging));
 
         RemoveFormAddInCommand = ReactiveCommand.Create(
             () => AsUndoStep(() => FormAddIns.Remove(SelectedFormAddIn!)),
             this.WhenAnyValue(x => x.SelectedFormAddIn).Select(line => line is not null));
 
         RemoveLineCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => LineEdits.Remove(SelectedLineEdit!)),
-            this.WhenAnyValue(x => x.SelectedLineEdit, x => x.IsPackagingLinked, (line, linked) => line is not null && !linked));
+            () => AsUndoStep(() => Packaging.LineEdits.Remove(Packaging.SelectedLineEdit!)),
+            Packaging.WhenAnyValue(p => p.SelectedLineEdit, p => p.IsPackagingLinked, (line, linked) => line is not null && !linked));
 
         // A clone copies the product as saved, and a variant links it as saved: unsaved edits stay with this one.
         var canMakeFromSelected = this.WhenAnyValue(
@@ -2322,7 +2189,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         AreDetailsReady = true;
         CloseUsageForm();
-        SelectedLineEdit = null;
+        Packaging.SelectedLineEdit = null;
 
         if (product?.Id != _detailProductId)
         {
@@ -2337,7 +2204,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private void ClearDetailsForAnother(bool keepRecipeTabs)
     {
         CloseUsageForm();
-        SelectedLineEdit = null;
+        Packaging.SelectedLineEdit = null;
         VersionHistory.Clear();
         ClearDetails(keepRecipeTabs);
     }
@@ -2571,7 +2438,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // After an unsaved new product nothing was selected, so the selection subscriptions don't run. The kind goes
         // first, so the tab ClearDetails picks is the new kind's.
         CloseUsageForm();
-        SelectedLineEdit = null;
+        Packaging.SelectedLineEdit = null;
         SetComposite(isComposite);
         ClearDetails();
         RefreshComponentOptions();
@@ -2609,20 +2476,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             _arrangingRecipeTabs = false;
         }
 
-        LineEdits.Clear();
+        Packaging.Clear();
         if (!keepRecipeTabs)
         {
             SetHasPackaging(false);
         }
-        SetPackagingLink(null);
 
         // A composite's lines, and what its products were read to bring, are that composite's.
-        SelectedComponentEdit = null;
-        ComponentEdits.Clear();
-        _componentCosts.Clear();
+        ComponentsTable.Clear();
         _scalingProducts.Clear();
         _savedRecipe = new RecipeDraft([], []);
-        _savedLines = [];
         Costing.Load(null);
         RefreshLinkableOptions();
         RecomputeCosts();
@@ -2681,11 +2544,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // A composite's Products tab (or none) goes in before the tabs are rebuilt, and its lines before ReplaceUsages
         // settles what Save compares the recipe against, which they're part of.
         SetComposite(product.IsComposite);
-        ReplaceComponents(detail.Components);
+        ComponentsTable.Load(detail.Components);
 
         // The packaging first, so the recipe's tabs, rebuilt next, can reselect the Packaging tab if it showed.
-        SetPackagingLink(detail.PackagingLink);
-        ReplaceLines(detail.Lines);
+        Packaging.LoadLink(detail.PackagingLink);
+        Packaging.LoadLines(detail.Lines);
         SetHasPackaging(detail.PackagingLink is not null || detail.Lines.Count > 0);
         ReplaceUsages(detail.Usages, detail.SubAssemblyLines, detail.AddIns);
         Costing.Load(detail.Costing);
@@ -2740,136 +2603,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }
     }
 
-    /// <summary>
-    /// A saved composite's lines in its Products table, and what each product was read to bring. They're also part of what
-    /// Save compares the recipe against, which ReplaceUsages settles after this.
-    /// </summary>
-    private void ReplaceComponents(IReadOnlyList<SavedComponent> components)
-    {
-        foreach (var component in components)
-        {
-            _componentCosts[component.Component.ComponentProductId] = component.Costs;
-        }
-
-        SelectedComponentEdit = null;
-        ComponentEdits.Clear();
-        ComponentEdits.AddRange(components.Select(c => NewComponentRowFor(c.Component.ComponentProductId, c.Component.Quantity)));
-
-        // A product the list doesn't hold yet shows as it was read with the composite.
-        var productsById = Products.ToDictionary(p => p.Id);
-        foreach (var component in components)
-        {
-            productsById.TryAdd(component.Component.ComponentProductId, component.Component.ComponentProduct!);
-        }
-
-        ProductComponentRow.Resolve(ComponentEdits, productsById, ComponentCostsAtBasis());
-    }
-
-    /// <summary>
-    /// What the Products table's product cell offers: every product but the one showing and the composites holding it,
-    /// directly or through another, as saved. A new composite can hold any: nothing holds it yet.
-    /// </summary>
-    private void RefreshComponentOptions()
-    {
-        var productId = _detailProductId ?? 0;
-        var held = _componentLinks
-            .GroupBy(c => c.ProductId)
-            .ToDictionary(g => g.Key, g => (IReadOnlyList<int>)[.. g.Select(c => c.ComponentProductId)]);
-        ComponentProductOptions.MergeFrom(
-            [.. Products.Where(p => productId == 0 || (p.Id != productId && !CompositeProductRules.Contains(p.Id, productId, held)))],
-            p => p.Id);
-    }
-
-    /// <summary>What each product read so far brings at the screen's costs, buffered or not, for the Products table's rows.</summary>
-    private Dictionary<int, ProductComponentRow.UnitCosts> ComponentCostsAtBasis() => _componentCosts.ToDictionary(c => c.Key, c => AtBasis(c.Value));
-
-    private ProductComponentRow.UnitCosts AtBasis(ComponentCosts costs) => new(costs.RecipeAt(CostBasis), costs.PackagingAt(CostBasis));
-
-    /// <summary>A row for the Products table, finding its product and costs, its Cost following the checkbox as it stands.</summary>
-    private ProductComponentRow NewComponentRowFor(int? productId, int? quantity) =>
-        new(FindComponentProduct, FindComponentCosts)
-        {
-            IncludesPackaging = EditingIncludesComponentPackaging,
-            ComponentProductId = productId,
-            Quantity = quantity,
-        };
-
-    /// <summary>
-    /// Reads what each product picked in the Products table brings, when the screen hasn't read it yet: off the UI thread,
-    /// once per product however often it's picked. The line, and the add row still being typed into, are priced when it
-    /// arrives, and the composite's costs follow.
-    /// </summary>
-    private void ReadMissingComponentCosts()
-    {
-        List<int> missing =
-        [
-            .. ComponentEdits
-                .Select(r => r.ComponentProductId)
-                .OfType<int>()
-                .Distinct()
-                .Where(id => !_componentCosts.ContainsKey(id) && _fetchingComponentCosts.Add(id)),
-        ];
-        if (missing.Count > 0)
-        {
-            _ = FetchComponentCostsAsync(missing);
-        }
-    }
-
-    private async Task FetchComponentCostsAsync(IReadOnlyList<int> productIds)
-    {
-        try
-        {
-            var costs = await Task.Run(() => _savedProducts.ReadComponentCostsAsync(productIds, CancellationToken.None));
-            foreach (var (productId, cost) in costs)
-            {
-                _componentCosts[productId] = cost;
-            }
-        }
-        catch (Exception ex)
-        {
-            // Nothing awaits this read, so what went wrong is shown rather than lost. The line stays unpriced, and the
-            // next LoadCommand reads it again.
-            ShowFailure(ex, "Couldn't read what a product in the Products table costs");
-        }
-        finally
-        {
-            foreach (var productId in productIds)
-            {
-                _fetchingComponentCosts.Remove(productId);
-            }
-        }
-
-        var productsById = Products.ToDictionary(p => p.Id);
-        ProductComponentRow.Resolve(ComponentEdits, productsById, ComponentCostsAtBasis());
-        if (_addingComponentRow is { } adding)
-        {
-            ProductComponentRow.Resolve([adding], productsById, ComponentCostsAtBasis());
-        }
-    }
-
-    /// <summary>The saved packaging link, or none: what the Packaging tab shows, and what Save compares against.</summary>
-    private void SetPackagingLink(PackagingLink? link)
-    {
-        var target = link is null ? null : PackagingLinkTarget.From(link);
-        _savedPackagingLinkKey = target?.Key;
-        ShowPackagingLink(target);
-    }
-
-    /// <summary>
-    /// What the per-piece packaging links as the form stands, saved or not, and the Packaging tab's banner. A load, Delete
-    /// Sub-Assembly, Make a Copy and an add all come through here, so a Move to Sub-Assemblies waiting for Save ends here
-    /// too; an undo puts it back afterwards (RestoreSnapshot).
-    /// </summary>
-    private void ShowPackagingLink(PackagingLinkTarget? target)
-    {
-        _packagingLinkTarget = target;
-        IsPackagingMoving = false;
-        IsPackagingLinked = target is not null;
-        PackagingLinkedToText = target?.LinkedToText ?? string.Empty;
-        this.RaisePropertyChanged(nameof(PackagingLinkedSetId));
-        this.RaisePropertyChanged(nameof(IsPackagingLinkedToSet));
-        this.RaisePropertyChanged(nameof(IsPackagingLinkedToProduct));
-    }
+    /// <summary>What the Products table's product cell offers, for the product showing (a new one can hold any).</summary>
+    private void RefreshComponentOptions() => ComponentsTable.RefreshOptions(_detailProductId ?? 0, Products);
 
     /// <summary>The Packaging tab comes and goes with the packaging, always last, after the add form's tab.</summary>
     private void SetHasPackaging(bool hasPackaging)
@@ -2908,9 +2643,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private void RemovePackaging()
     {
         SelectRecipeTab(RecipeTabs.OfType<SubAssemblyRecipeTab>().LastOrDefault() ?? ComponentsTabIfShown);
-        SelectedLineEdit = null;
-        LineEdits.Clear();
-        ShowPackagingLink(null);
+        Packaging.SelectedLineEdit = null;
+        Packaging.LineEdits.Clear();
+        Packaging.ShowLink(null);
         SetHasPackaging(false);
         RefreshLinkableOptions();
         RecomputeCosts();
@@ -3030,10 +2765,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         SelectedTab = CaptureTabChoice(),
         HasAddSubAssemblyTab = RecipeTabs.Contains(AddSubAssemblyTab),
         HasPackaging = HasPackaging,
-        PackagingLink = _packagingLinkTarget,
-        IsPackagingMoving = IsPackagingMoving,
-        Lines = [.. LineEdits.Select(CaptureLine)],
-        Components = [.. ComponentEdits.Select(r => new ComponentLineState(r.ComponentProductId, r.Quantity))],
+        PackagingLink = Packaging.LinkTarget,
+        IsPackagingMoving = Packaging.IsPackagingMoving,
+        Lines = [.. Packaging.LineEdits.Select(CaptureLine)],
+        Components = ComponentsTable.Capture(),
         IsUsageFormOpen = IsUsageFormOpen,
         IsAddingUsage = IsAddingUsage,
         UsageFormTitle = UsageFormTitle,
@@ -3086,8 +2821,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             SelectedFormLine = null;
             SelectedFormAddIn = null;
             SelectedFormPackagingLine = null;
-            SelectedLineEdit = null;
-            SelectedComponentEdit = null;
+            Packaging.SelectedLineEdit = null;
+            ComponentsTable.SelectedComponentEdit = null;
 
             // 2. The product's own fields. The category goes back by id, as the reloaded list's own copy.
             _editingId = snapshot.EditingId;
@@ -3103,25 +2838,21 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // 3. Costing.
             Costing.Percentages = snapshot.Costing;
 
-            // 4. Packaging. _savedPackagingLinkKey is deliberately left alone: it's what Save compares against. Showing the
+            // 4. Packaging. The link as saved is deliberately left alone: it's what Save compares against. Showing the
             //    link ends a Move to Sub-Assemblies, so the move goes back after it.
-            ShowPackagingLink(snapshot.PackagingLink);
-            IsPackagingMoving = snapshot.IsPackagingMoving;
-            LineEdits.Clear();
+            Packaging.ShowLink(snapshot.PackagingLink);
+            Packaging.IsPackagingMoving = snapshot.IsPackagingMoving;
+            Packaging.LineEdits.Clear();
             foreach (var line in snapshot.Lines)
             {
-                LineEdits.Add(RestoreLine(line));
+                Packaging.LineEdits.Add(RestoreLine(line));
             }
 
             SetHasPackaging(snapshot.HasPackaging);
 
             // A composite's lines, each finding its product and the recipe cost read for it again (a cost not read yet is
             // read now, and prices the line when it arrives).
-            ComponentEdits.Clear();
-            foreach (var line in snapshot.Components)
-            {
-                ComponentEdits.Add(NewComponentRowFor(line.ProductId, line.Quantity));
-            }
+            ComponentsTable.Restore(snapshot.Components);
 
             // 5. The sections and their tabs, under _arrangingRecipeTabs so RecipeTabShown short-circuits: without
             //    it, moving the tab back would apply the form the tab is being moved off, which is the very change
@@ -3300,21 +3031,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private string? SectionLabelOf(string subAssemblyName, SubAssemblyRole? role) =>
         SubAssemblyRules.SectionLabel(subAssemblyName, EditingName, role?.Name ?? string.Empty);
 
-    /// <summary>The saved packaging lines in the Packaging tab's table; they're also what Save compares against.</summary>
-    private void ReplaceLines(IReadOnlyList<PackagingLine> lines)
-    {
-        ShowPackagingLines(lines.Select(PackagingLineRow.FromSaved));
-        _savedLines = CurrentLines();
-    }
-
-    /// <summary>Puts <paramref name="rows"/> in the Packaging tab's table, in place of whatever it held.</summary>
-    private void ShowPackagingLines(IEnumerable<PackagingLineRow> rows)
-    {
-        SelectedLineEdit = null;
-        LineEdits.Clear();
-        LineEdits.AddRange(rows);
-    }
-
     /// <summary>
     /// Takes up the defaults as LoadCommand read them. A new product still showing the ones it started with (the screen's
     /// first load, or defaults changed in Settings since) takes the new ones; one whose costing was typed into keeps it.
@@ -3345,10 +3061,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             History.Rebase((settled, now) => settled with { Costing = now.Costing });
         }
     }
-
-    /// <summary>The packaging lines as Save writes them, each in the unit it was typed in; a line half filled in is refused (PackagingLineRow.CompleteLines).</summary>
-    private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> CurrentLines() =>
-        [.. PackagingLineRow.CompleteLines(LineEdits).Select(l => (l.PackagingMaterial.Id, l.UnitId, PackagingLineAuthoredField.QtyPerUnit, l.QtyPerUnit))];
 
     /// <summary>
     /// Asks before Save changes the lines of a linked sub-assembly that other products use too, or a made ingredient is made
@@ -3408,7 +3120,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     : null,
             })])
         {
-            Components = IsEditingComposite ? [.. ProductComponentRow.CompleteLines(ComponentEdits).Select(c => (c.Product.Id, c.Quantity))] : [],
+            Components = IsEditingComposite ? [.. ProductComponentRow.CompleteLines(ComponentsTable.ComponentEdits).Select(c => (c.Product.Id, c.Quantity))] : [],
         };
 
     /// <summary>
@@ -3439,33 +3151,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             && pair.First.AuthoredField == pair.Second.AuthoredField
             && pair.First.AuthoredValue == pair.Second.AuthoredValue
             && pair.First.Lines.SequenceEqual(pair.Second.Lines));
-
-    /// <summary>
-    /// The packaging lines when they differ from those last loaded, else null. Linked packaging is never saved here. Lines
-    /// moving to the Sub-Assemblies screen always go, since they're what the new packaging set is made of.
-    /// </summary>
-    private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? ChangedLines()
-    {
-        if (IsPackagingLinked)
-        {
-            return null;
-        }
-
-        // Packaging that was linked when loaded, and is the product's own now (Make a Copy, or a new or copied one in its
-        // place), is written even when its lines match what the link showed: the product had none of its own.
-        var current = CurrentLines();
-        return current.SequenceEqual(_savedLines) && _savedPackagingLinkKey is null && !IsPackagingMoving ? null : current;
-    }
-
-    /// <summary>
-    /// What the packaging links when it differs from the link last loaded, else null; no link is PackagingLinkDraft.None, and
-    /// a set made of its own lines (Move to Sub-Assemblies) is PackagingLinkDraft.NewSet.
-    /// </summary>
-    private PackagingLinkDraft? ChangedPackagingLink() =>
-        IsPackagingMoving ? PackagingLinkDraft.NewSet
-        : _packagingLinkTarget?.Key == _savedPackagingLinkKey ? null
-        : _packagingLinkTarget is { } target ? new PackagingLinkDraft(target.ProductId, target.SubAssemblyId)
-        : PackagingLinkDraft.None;
 
     /// <summary>
     /// Selects the product as Save left it, the fresh copy, so the form shows (and compares against) what was saved:
@@ -3658,9 +3343,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             packagingLines = [.. content.PackagingLines.Select(l => OwnPackagingLineOf(l, content, packagingById))];
         }
-        else if (link.Key == _packagingLinkTarget?.Key)
+        else if (link.Key == Packaging.LinkTarget?.Key)
         {
-            packagingLines = [.. LineEdits.Select(CaptureLine)];
+            packagingLines = [.. Packaging.LineEdits.Select(CaptureLine)];
         }
         else if (link.SubAssemblyId is { } setId)
         {
@@ -4029,8 +3714,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 : "Add the packaging materials one piece takes.");
         }
 
-        ShowPackagingLines(lines.Select(l => new PackagingLineRow(l.PackagingMaterial, l.QtyPerUnit)));
-        ShowPackagingLink(linking ? target : null);
+        Packaging.ShowLines(lines.Select(l => new PackagingLineRow(l.PackagingMaterial, l.QtyPerUnit)));
+        Packaging.ShowLink(linking ? target : null);
         SetHasPackaging(true);
         CloseUsageForm();
         RefreshLinkableOptions();
@@ -4942,7 +4627,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }
 
         // The packaging lines at their materials' refreshed costs and units, in place, so a line being typed isn't lost.
-        PackagingLineRow.Resolve(LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
+        PackagingLineRow.Resolve(Packaging.LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
     }
 
     /// <summary>
@@ -4999,17 +4684,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             row.CostBasis = CostBasis;
         }
 
-        foreach (var row in FormPackagingLines.Concat(LineEdits))
+        foreach (var row in FormPackagingLines.Concat(Packaging.LineEdits))
         {
             row.CostBasis = CostBasis;
         }
 
-        var productsById = Products.ToDictionary(p => p.Id);
-        ProductComponentRow.Resolve(ComponentEdits, productsById, ComponentCostsAtBasis());
-        if (_addingComponentRow is { } adding)
-        {
-            ProductComponentRow.Resolve([adding], productsById, ComponentCostsAtBasis());
-        }
+        ComponentsTable.Reprice();
 
         RecomputeCosts();
         RecomputeUsageForm();
@@ -5022,12 +4702,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // A composite's recipe cost is what its products bring, each line its quantity at the product's recipe cost (a
         // line still being filled in brings nothing yet), then its own sections, each per whole composite.
         List<ProductComponentRow> lines = IsEditingComposite
-            ? [.. ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0)]
+            ? [.. ComponentsTable.ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0)]
             : [];
         List<(string Name, decimal Cost)> components = [.. lines.Select(r => (r.LineName, r.RecipeCostTotal))];
 
         // The Products table's figure adds up its Cost column: the products' packaging is in it while the box is ticked.
-        ComponentsCost = lines.Sum(r => r.Cost);
+        ComponentsTable.ComponentsCost = lines.Sum(r => r.Cost);
 
         // With the box ticked, each product's own packaging for one sellable unit, times its quantity, joins the
         // composite's packaging, not its recipe cost (a product whose costs haven't been read yet brings none until they are).
@@ -5037,7 +4717,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         Costing.Recompute(
             [.. components, .. UsageEdits.Select(u => (u.SectionName, u.CostPerPieceAt(CostBasis)))],
             EditingQuantityRequired,
-            [.. LineEdits.Select(l => l.CostPerUnit)],
+            [.. Packaging.LineEdits.Select(l => l.CostPerUnit)],
             EditingCurrentPrice,
             IsEditingComposite,
             IsEditingComposite && UsageEdits.Count > 0,
@@ -5053,13 +4733,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private void RefreshScaling()
     {
         List<ProductComponentRow> components = IsEditingComposite
-            ? [.. ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0)]
+            ? [.. ComponentsTable.ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0)]
             : [];
         ReadMissingScalingProducts(components.Select(r => r.Product!));
 
         var recipe = new ScalingRecipe(
             [.. UsageEdits],
-            [.. LineEdits],
+            [.. Packaging.LineEdits],
             [.. components.Select(r => (r.Product!, r.Quantity!.Value))],
             EditingQuantityRequired,
             IsEditingComposite && EditingIncludesComponentPackaging);
@@ -5183,9 +4863,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             : History.IsDirty ? ProductPrintout.UnsavedChangesNote : null,
         DateTime.Now,
         [.. UsageEdits.Select(u => PrintedSection.From(u, CostBasis))],
-        HasPackaging ? PrintedPackaging.From(LineEdits, IsPackagingLinked ? PackagingLinkedToText : null) : null,
+        HasPackaging ? PrintedPackaging.From(Packaging.LineEdits, Packaging.IsPackagingLinked ? Packaging.PackagingLinkedToText : null) : null,
         Costing.Costs,
-        IsEditingComposite ? PrintedComponent.From(ComponentEdits) : null)
+        IsEditingComposite ? PrintedComponent.From(ComponentsTable.ComponentEdits) : null)
     {
         CostBasis = CostBasis,
         Scaling = SelectedDetailsTab == ScalingTab

@@ -25,7 +25,7 @@
                        Style="{StaticResource CaptionStyle}"
                        VerticalAlignment="Center"
                        Margin="12,0,0,10">
-                <Run Text="{Binding CostUnitCaption, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding ComponentsCost, StringFormat='{}{0:N2}', Mode=OneWay}" />
+                <Run Text="{Binding CostUnitCaption, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding ComponentsTable.ComponentsCost, StringFormat='{}{0:N2}', Mode=OneWay}" />
             </TextBlock>
         </Grid>
 
@@ -33,10 +33,10 @@
             Qty counts the product's sellable units: pieces for one sold by the piece, boxes for a Box of 8. A whole number;
             Save refuses a line without one, and a composite of fewer than two different products.
         -->
-        <syncfusion:SfDataGrid ItemsSource="{Binding ComponentEdits}"
+        <syncfusion:SfDataGrid ItemsSource="{Binding ComponentsTable.ComponentEdits}"
                                controls:GridUndoSteps.Recorder="{Binding}"
                                controls:GridRowReordering.IsEnabled="True"
-                               SelectedItem="{Binding SelectedComponentEdit, Mode=TwoWay}"
+                               SelectedItem="{Binding ComponentsTable.SelectedComponentEdit, Mode=TwoWay}"
                                GridLinesVisibility="Both"
                                CurrentCellBorderBrush="{StaticResource AccentBrush}"
                                CurrentCellBorderThickness="1"
@@ -52,7 +52,7 @@
                                controls:GridEditCommit.OnFocusLeave="True"
                                controls:GridAddNewRow.DropWhenUntouched="True"
                                controls:AutoCompleteDropDown.IsEnabled="True"
-                               controls:GridAddNewRow.ItemFactory="{Binding NewComponentRow}"
+                               controls:GridAddNewRow.ItemFactory="{Binding ComponentsTable.NewComponentRow}"
                                controls:OptionalColumns.Show="{Binding EditingIncludesComponentPackaging}"
                                Height="200">
             <syncfusion:SfDataGrid.Columns>
@@ -62,7 +62,7 @@
                 -->
                 <syncfusion:GridMultiColumnDropDownList MappingName="ComponentProductId"
                                                         HeaderText="Product"
-                                                        ItemsSource="{Binding ComponentProductOptions}"
+                                                        ItemsSource="{Binding ComponentsTable.ComponentProductOptions}"
                                                         DisplayMember="Name"
                                                         ValueMember="Id"
                                                         AllowAutoComplete="True"

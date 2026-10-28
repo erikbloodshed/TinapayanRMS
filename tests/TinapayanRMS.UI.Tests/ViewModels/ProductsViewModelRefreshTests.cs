@@ -204,31 +204,31 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Gift loaf";
-        viewModel.IsPackagingEditable.Should().BeTrue();
+        viewModel.Packaging.IsPackagingEditable.Should().BeTrue();
 
         // The row the add row edits shows the material's base unit and prices itself as soon as the material is picked.
-        var boxLine = viewModel.NewLineEdit();
+        var boxLine = viewModel.Packaging.NewLineEdit();
         boxLine.PackagingMaterialId = boxId;
         boxLine.QtyPerUnit = 0.5m;
         boxLine.BaseUnitAbbreviation.Should().Be("pc");
         boxLine.UnitCost.Should().Be(12m);
         boxLine.CostPerUnit.Should().Be(6m, "half a ₱12 box a piece");
-        viewModel.LineEdits.Add(boxLine);
+        viewModel.Packaging.LineEdits.Add(boxLine);
 
-        var ribbonLine = viewModel.NewLineEdit();
+        var ribbonLine = viewModel.Packaging.NewLineEdit();
         ribbonLine.PackagingMaterialId = ribbonId;
         ribbonLine.QtyPerUnit = 30m;
         ribbonLine.BaseUnitAbbreviation.Should().Be("cm");
-        viewModel.LineEdits.Add(ribbonLine);
+        viewModel.Packaging.LineEdits.Add(ribbonLine);
         viewModel.Costing.Costs.Packaging.Should().Be(6.6m, "₱6 of box and 30 cm of ribbon at ₱0.02 a cm");
 
         // A line with a material but no quantity is refused, and deleting it lets Save through.
-        var halfLine = viewModel.NewLineEdit();
+        var halfLine = viewModel.Packaging.NewLineEdit();
         halfLine.PackagingMaterialId = boxId;
-        viewModel.LineEdits.Add(halfLine);
+        viewModel.Packaging.LineEdits.Add(halfLine);
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().Contain("Cake Box");
-        viewModel.SelectedLineEdit = halfLine;
+        viewModel.Packaging.SelectedLineEdit = halfLine;
         await viewModel.RemoveLineCommand.Execute();
 
         await viewModel.SaveCommand.Execute();
@@ -249,9 +249,9 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         }
 
         await WaitUntilSettledAsync(
-            () => viewModel.SelectedProduct is not null && viewModel.LineEdits.Count == 2 && !viewModel.LineEdits.Contains(boxLine),
-            () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.LineEdits.Count}");
-        viewModel.LineEdits.Single(l => l.PackagingMaterialId == ribbonId).QtyPerUnit.Should().Be(30m);
+            () => viewModel.SelectedProduct is not null && viewModel.Packaging.LineEdits.Count == 2 && !viewModel.Packaging.LineEdits.Contains(boxLine),
+            () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.Packaging.LineEdits.Count}");
+        viewModel.Packaging.LineEdits.Single(l => l.PackagingMaterialId == ribbonId).QtyPerUnit.Should().Be(30m);
         viewModel.Costing.Costs.Packaging.Should().Be(6.6m);
     }
 
@@ -285,9 +285,9 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single();
-        await WaitUntilSettledAsync(() => viewModel.LineEdits.Count == 1, () => $"lines={viewModel.LineEdits.Count}");
+        await WaitUntilSettledAsync(() => viewModel.Packaging.LineEdits.Count == 1, () => $"lines={viewModel.Packaging.LineEdits.Count}");
 
-        var line = viewModel.LineEdits.Single();
+        var line = viewModel.Packaging.LineEdits.Single();
         line.QtyPerUnit.Should().Be(0.02m, "a line saved as 50 pieces per roll is 0.02 of a roll a piece");
         line.UnitId.Should().Be(rollId, "the line stays in the unit it was saved in");
         line.BaseQty.Should().Be(20m, "0.02 of a 1,000 cm roll is 20 cm");
@@ -2125,8 +2125,8 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.SubAssemblyId.Should().Be(doughId);
         usage.LinkedOwner.Should().Be((sourceId, "Ensaymada Big"));
         usage.LinkedFromText.Should().Be("Ensaymada Big Dough, from Ensaymada Big");
-        viewModel.IsPackagingLinked.Should().BeFalse();
-        viewModel.LineEdits.Should().BeEmpty("a variant's packaging is neither linked nor copied");
+        viewModel.Packaging.IsPackagingLinked.Should().BeFalse();
+        viewModel.Packaging.LineEdits.Should().BeEmpty("a variant's packaging is neither linked nor copied");
 
         // Its Save keeps the link to the source's own, which no other product could link.
         viewModel.EditingCurrentPrice = 20m;

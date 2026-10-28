@@ -71,7 +71,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
             null,
             null,
             Cancellation);
-        var viewModel = await OpenAsync(boxId, vm => vm.ComponentEdits.Count == 2 && vm.ComponentEdits.All(r => r.RecipeCost is not null));
+        var viewModel = await OpenAsync(boxId, vm => vm.ComponentsTable.ComponentEdits.Count == 2 && vm.ComponentsTable.ComponentEdits.All(r => r.RecipeCost is not null));
 
         viewModel.ScalingUnits = 5;
         viewModel.SelectedDetailsTab = ProductsViewModel.ScalingTab;
