@@ -2,6 +2,19 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.UI.ViewModels;
 
+/// <summary>What the Sub-Assemblies screen's Scale makes weigh what's typed: the whole batch, or the lines ticked as its base.</summary>
+public enum BatchScaleBasis
+{
+    Batch,
+    Base,
+}
+
+/// <summary>A choice in Scale's picker: the basis and how it reads, "the whole batch".</summary>
+public sealed record BatchScaleOption(BatchScaleBasis Basis, string Label)
+{
+    public override string ToString() => Label;
+}
+
 /// <summary>A unit an amount of an ingredient is typed in on the Scaling tab: "g", or one of the ingredient's own, "kg" (1,000 g), "bag" (25,000 g).</summary>
 public sealed record IngredientAmountUnit(string Name, decimal Grams)
 {

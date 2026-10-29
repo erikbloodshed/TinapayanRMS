@@ -134,6 +134,44 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
     }
 
     [Fact]
+    public async Task Scale_makes_the_batch_weigh_what_is_typed_as_one_step_to_save_or_undo()
+    {
+        var (viewModel, _) = await OpenSavedSubAssemblyAsync();
+
+        // 1,000 g of flour and 200 g of sugar, 1,200 g, made 2,400 g: twice each.
+        viewModel.ScaleTo = 2400m;
+        await viewModel.ScaleCommand.Execute();
+
+        viewModel.Lines.Select(l => l.Grams).Should().Equal(2000m, 400m);
+        viewModel.BatchWeight.Should().Be(2400m);
+        viewModel.History.IsDirty.Should().BeTrue("Save keeps it");
+
+        viewModel.TryUndo().Should().BeTrue();
+        viewModel.Lines.Select(l => l.Grams).Should().Equal(1000m, 200m);
+        viewModel.History.IsDirty.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Scale_can_make_the_base_weigh_what_is_typed_and_says_when_nothing_is_ticked()
+    {
+        var (viewModel, _) = await OpenSavedSubAssemblyAsync();
+        viewModel.ScaleOption = viewModel.ScaleOptions.Single(o => o.Basis == BatchScaleBasis.Base);
+        viewModel.ScaleTo = 500m;
+
+        await viewModel.ScaleCommand.Execute();
+        viewModel.ErrorMessage.Should().Contain("Nothing is ticked as the base");
+        viewModel.Lines.Select(l => l.Grams).Should().Equal(1000m, 200m);
+
+        // The flour ticked as the base: 500 g of it, so the sugar is halved too, still 20% of the flour.
+        Edit(viewModel, () => viewModel.Lines[0].IsFormulaBase = true);
+        await viewModel.ScaleCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.Lines.Select(l => l.Grams).Should().Equal(500m, 100m);
+        viewModel.Lines[1].Percent.Should().Be(20m);
+    }
+
+    [Fact]
     public async Task Save_is_not_offered_until_the_form_is_changed()
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();

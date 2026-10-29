@@ -224,6 +224,34 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         private set => this.RaiseAndSetIfChanged(ref _batchCost, value);
     }
 
+    private decimal? _scaleTo;
+    /// <summary>What Scale makes the batch, or its base, weigh, in grams (2026-10-29). Not part of the sub-assembly.</summary>
+    public decimal? ScaleTo
+    {
+        get => _scaleTo;
+        set => this.RaiseAndSetIfChanged(ref _scaleTo, value);
+    }
+
+    /// <summary>What Scale can make weigh <see cref="ScaleTo"/>: the whole batch, or the lines ticked as its base.</summary>
+    public IReadOnlyList<BatchScaleOption> ScaleOptions { get; } =
+    [
+        new(BatchScaleBasis.Batch, "the whole batch"),
+        new(BatchScaleBasis.Base, "the base (ticked lines)"),
+    ];
+
+    private BatchScaleOption _scaleOption = null!;
+    public BatchScaleOption ScaleOption
+    {
+        get => _scaleOption;
+        set => this.RaiseAndSetIfChanged(ref _scaleOption, value);
+    }
+
+    /// <summary>
+    /// Every line's grams by the factor that makes the batch, or its base, weigh <see cref="ScaleTo"/>, as one undo step
+    /// (2026-10-29, at the user's request: "make it 5 kg"). A line typed as a baker's percentage keeps it and follows the base.
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> ScaleCommand { get; }
+
     private decimal _costPerGram;
     public decimal CostPerGram
     {
@@ -661,6 +689,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         ExpandAllCommand = ReactiveCommand.Create(SubAssemblyTree.ExpandAll);
         CollapseAllCommand = ReactiveCommand.Create(SubAssemblyTree.CollapseAll);
 
+        ScaleOption = ScaleOptions[0];
+        ScaleCommand = ReactiveCommand.Create(
+            ScaleBatch,
+            this.WhenAnyValue(x => x.ScaleTo, x => x.BatchWeight, x => x.IsPackaging, (to, weight, isPackaging) => to is > 0m && weight > 0m && !isPackaging));
+
         // The line selected in whichever table is showing.
         RemoveLineCommand = ReactiveCommand.Create(
             () => AsUndoStep(() =>
@@ -699,6 +732,29 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     {
         get => History.IsEditPending;
         set => History.IsEditPending = value;
+    }
+
+    private void ScaleBatch()
+    {
+        ErrorMessage = null;
+        var from = ScaleOption.Basis == BatchScaleBasis.Base ? _formulaBase : BatchWeight;
+        if (from <= 0m || ScaleTo is not { } to || to <= 0m)
+        {
+            ErrorMessage = "Nothing is ticked as the base, so there's no base to scale. Tick the base lines, or scale the whole batch.";
+            return;
+        }
+
+        AsUndoStep(() =>
+        {
+            // Lines typed in grams are scaled; a line typed as a percentage follows the base, which is among them.
+            foreach (var line in Lines.Where(l => l.Ingredient is not null && l.AuthoredBakersPercent is null && l.Grams is not null))
+            {
+                line.Grams = SubAssemblyRules.ScaledGrams(line.Grams!.Value, from, to);
+            }
+
+            RecomputeFormulaBase();
+            RecomputeTotals();
+        });
     }
 
     /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>

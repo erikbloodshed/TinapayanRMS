@@ -205,6 +205,15 @@ public static class SubAssemblyRules
     public static decimal GramsFromBakersPercent(decimal percent, decimal baseWeight) =>
         Math.Round(baseWeight * percent / 100m, 4);
 
+    /// <summary>
+    /// A line's grams in a batch scaled from weighing <paramref name="from"/> to <paramref name="to"/> (2026-10-29, the
+    /// Sub-Assemblies screen's Scale): the batch or its base, every line by the same factor, so each keeps its percentage.
+    /// Rounded to the 4 decimals grams are stored in, as <see cref="GramsFromBakersPercent"/> is. Nothing to scale from
+    /// leaves the grams as they are.
+    /// </summary>
+    public static decimal ScaledGrams(decimal grams, decimal from, decimal to) =>
+        from <= 0m ? grams : Math.Round(grams * to / from, 4);
+
     /// <summary>The longest name a sub-assembly can have (the Name column's length).</summary>
     public const int MaxNameLength = 100;
 

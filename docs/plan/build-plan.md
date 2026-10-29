@@ -159,6 +159,7 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 | 2026-10-29 | **Reports keep their filters, sort and columns between runs**, at the user's request: `GridLayoutStore` writes them to the view-state file and `Controls/GridLayoutKeeping` puts them back on the grid, refreshing it once its rows have loaded (see the Reports notes in syncfusion.md). No migration | Done |
 | 2026-10-29 | **Production Plan: Use the spare**, at the user's request: a button per product under the Mixing Sheet adds the most whole units its mixes' spare has room for with no more mixing of any of them (`ProductionPlanRules.UnitsFromSpare`, `ProductionPlanResult.SpareUses`, `UseSpareCommand`). No migration | Done |
 | 2026-10-29 | **Scaling tab: From What You Have**, at the user's request: the most sellable units an amount of one ingredient makes in whole batches (`RecipeScaler.UnitsFrom`, `GramsOf`, `IngredientsOf`), typed in grams or the ingredient's own units, with Scale to putting it in Sellable Units (see Products screen notes). No migration | Done |
+| 2026-10-29 | **Sub-Assemblies: Scale**, at the user's request: every line multiplied so the whole batch, or its base, weighs the grams typed, as one undo step (`ScaleCommand`, `SubAssemblyRules.ScaledGrams`; see Sub-Assemblies screen notes). No migration | Done |
 
 ## Open items (for later phases)
 

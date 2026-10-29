@@ -428,6 +428,28 @@
                                             <syncfusion:ButtonAdv Label="Remove Line" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveLineCommand}" />
                                         </StackPanel>
                                     </Grid>
+
+                                    <!-- Scale (2026-10-29): every line by the factor that makes the batch, or its base, weigh what's typed. One undo step; not for a packaging set. -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0"
+                                                Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}">
+                                        <TextBlock Text="Scale" Style="{StaticResource FormLabelStyle}" />
+                                        <syncfusion:ComboBoxAdv Width="200"
+                                                                ItemsSource="{Binding ScaleOptions}"
+                                                                SelectedItem="{Binding ScaleOption, Mode=TwoWay}"
+                                                                DisplayMemberPath="Label" />
+                                        <TextBlock Text="to" VerticalAlignment="Center" Margin="8,0" />
+                                        <syncfusion:DoubleTextBox Width="120"
+                                                                  MinValue="0"
+                                                                  NumberDecimalDigits="2"
+                                                                  UseNullOption="True"
+                                                                  WatermarkText="Grams"
+                                                                  Value="{Binding ScaleTo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
+                                        <TextBlock Text="g" VerticalAlignment="Center" Margin="6,0,10,0" />
+                                        <syncfusion:ButtonAdv Label="Scale"
+                                                              IconTemplate="{StaticResource ApplyIconTemplate}"
+                                                              Command="{Binding ScaleCommand}"
+                                                              ToolTip="Multiplies every line so the batch, or its base, weighs this much. Each line keeps its percentage. Undo takes it back." />
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                         </ScrollViewer>

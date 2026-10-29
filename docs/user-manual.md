@@ -548,6 +548,8 @@ The card under it has two tabs along its bottom. Each scrolls while the header s
 - **Recipe**: the **Lines**, with **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base** (tick it for baker's percentages).
 - **Used By**: a tile for each product that links this sub-assembly. Click one to open it.
 
+**Scale**, under the lines, resizes the recipe. Pick **the whole batch** or **the base (ticked lines)**, type the grams it should weigh, and press **Scale**: every line is multiplied by the same amount, so each keeps its percentage. For example, a 1,200 g batch scaled to 2,400 g doubles every line, and a dough whose ticked flour is 1,000 g, scaled on the base to 500 g, halves. It's one step for **Undo**, and **Save** keeps it. Scaling the base needs at least one line's **Base** ticked. It isn't offered for a packaging set.
+
 **Copy** starts a new, unsaved sub-assembly with the same role and lines, named "… Copy". Rename it if you like, then press Save. The original stays as it was.
 
 **New Product** starts a new product from the sub-assembly picked in the list. The Products screen opens with a new, unsaved product named after the sub-assembly, and its recipe already **links** the sub-assembly. Type the piece size (and rename the product if you like), then press Save there. New Product isn't offered for a packaging set. If the sub-assembly has changes you haven't saved, save or undo them first, because the product links the sub-assembly as it's saved.

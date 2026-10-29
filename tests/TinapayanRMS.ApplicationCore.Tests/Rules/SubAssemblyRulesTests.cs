@@ -7,6 +7,14 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 public class SubAssemblyRulesTests
 {
+    [Theory]
+    [InlineData(1000, 1200, 5000, 4166.6667)]
+    [InlineData(200, 1200, 5000, 833.3333)]
+    [InlineData(650, 1000, 2000, 1300)]
+    [InlineData(650, 0, 2000, 650)]
+    public void ScaledGrams_scales_a_line_by_the_batchs_factor_to_the_stored_decimals(double grams, double from, double to, double expected) =>
+        SubAssemblyRules.ScaledGrams((decimal)grams, (decimal)from, (decimal)to).Should().Be((decimal)expected);
+
     [Fact]
     public void EnsureValidLines_rejects_an_empty_list()
     {
