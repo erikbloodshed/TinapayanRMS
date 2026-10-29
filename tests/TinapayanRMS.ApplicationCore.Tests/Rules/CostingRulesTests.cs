@@ -5,6 +5,27 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 public class CostingRulesTests
 {
+    [Theory]
+    [InlineData(43.24, 0.25, 43.25)]
+    [InlineData(43.25, 0.25, 43.25)]
+    [InlineData(43.24, 1, 44)]
+    [InlineData(43.24, 5, 45)]
+    [InlineData(43.2401, 0, 43.2401)]
+    public void RoundPriceUp_goes_up_to_the_next_multiple_never_down(double price, double step, double expected) =>
+        CostingRules.RoundPriceUp((decimal)price, (decimal)step).Should().Be((decimal)expected);
+
+    [Fact]
+    public void EnsureValidPriceRoundingStep_takes_only_the_offered_steps()
+    {
+        foreach (var step in CostingRules.PriceRoundingSteps)
+        {
+            CostingRules.EnsureValidPriceRoundingStep(step);
+        }
+
+        var act = () => CostingRules.EnsureValidPriceRoundingStep(0.3m);
+        act.Should().Throw<BusinessRuleException>();
+    }
+
     [Fact]
     public void EnsureValidParameters_rejects_negative_labor_cost()
     {

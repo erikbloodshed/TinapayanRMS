@@ -20,6 +20,9 @@ public sealed record ProductDetail(
 
     /// <summary>The shop-wide Wastage % it's priced with (CostingDefaults.WastagePercent): today's, or a version's then.</summary>
     public decimal WastagePercent { get; init; }
+
+    /// <summary>What its rounded selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep): today's; 0 for a version's.</summary>
+    public decimal PriceRoundingStep { get; init; }
 }
 
 /// <summary>
@@ -150,7 +153,8 @@ public sealed class SavedProductReader(
         var addIns = await usageRepository.GetAddInsForProductsAsync(ids, cancellationToken);
         var usages = await usageRepository.GetForProductsAsync(ids, cancellationToken);
         var sectionLines = await subAssemblyLineRepository.GetForSubAssembliesAsync([.. usages.Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
-        var wastagePercent = (await costingDefaultsRepository.GetAsync(cancellationToken)).WastagePercent;
+        var costingDefaults = await costingDefaultsRepository.GetAsync(cancellationToken);
+        var wastagePercent = costingDefaults.WastagePercent;
 
         var usagesByProduct = usages.ToLookup(u => u.ProductId);
         var productIdByUsage = usages.ToDictionary(u => u.Id, u => u.ProductId);
@@ -186,6 +190,7 @@ public sealed class SavedProductReader(
                 [.. addInsByProduct[productId]])
             {
                 WastagePercent = wastagePercent,
+                PriceRoundingStep = costingDefaults.PriceRoundingStep,
                 Components =
                 [
                     .. componentsByHolder.GetValueOrDefault(productId, [])
@@ -366,7 +371,8 @@ public sealed class SavedProductReader(
             product.IsComposite,
             product.IsComposite && sections.Count > 0,
             product.IncludesComponentPackaging ? detail.Components.Sum(c => c.PackagingCostAt(basis)) : null,
-            detail.WastagePercent);
+            detail.WastagePercent,
+            detail.PriceRoundingStep);
 
         return new SavedProduct(
             product,

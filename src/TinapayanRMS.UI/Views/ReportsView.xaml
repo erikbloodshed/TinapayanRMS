@@ -129,6 +129,7 @@
                                     <controls:NumericColumn MappingName="AdministrativeCost" HeaderText="Admin Cost" NumberDecimalDigits="2" MinimumWidth="78" />
                                     <controls:NumericColumn MappingName="BaseCost" HeaderText="Base Cost" NumberDecimalDigits="2" MinimumWidth="66" />
                                     <controls:NumericColumn MappingName="SuggestedPrice" HeaderText="Suggested Price" NumberDecimalDigits="2" MinimumWidth="102" />
+                                    <controls:NumericColumn MappingName="RoundedPrice" HeaderText="Rounded Price" NumberDecimalDigits="2" MinimumWidth="96" />
                                     <controls:NumericColumn MappingName="CurrentPrice" HeaderText="Current Price" NumberDecimalDigits="2" AllowNullValue="True" MinimumWidth="84" />
                                     <controls:NumericColumn MappingName="MarkupPercent" HeaderText="Markup %" NumberDecimalDigits="2" AllowNullValue="True" MinimumWidth="84" />
                                     <controls:NumericColumn MappingName="TargetMarkupPercent" HeaderText="Target Markup %" NumberDecimalDigits="2" MinimumWidth="84" />

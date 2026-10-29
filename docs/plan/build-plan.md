@@ -162,6 +162,7 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 | 2026-10-29 | **Sub-Assemblies: Scale**, at the user's request: every line multiplied so the whole batch, or its base, weighs the grams typed, as one undo step (`ScaleCommand`, `SubAssemblyRules.ScaledGrams`; see Sub-Assemblies screen notes). No migration | Done |
 | 2026-10-29 | **Raw Materials' Used By: each product's cost share**, at the user's request: "38% of materials" under each tile, the product's material cost with the material at no cost against as it is (`MaterialCostShares`, the Price Simulator's repricing), worked out while the tab shows (see Raw Materials screen notes). No migration | Done |
 | 2026-10-29 | **Products short of their target markup are flagged**, at the user's request: the header's Markup % in amber, a ⚠ in the Products list (worked out after each load), and Reports' Target Markup % and Short By columns (`ProductCostSummary.IsBelowTargetMarkup`; see Products screen notes). No migration | Done |
+| 2026-10-29 | **Price rounding**, at the user's request: Settings → Costing Defaults → Price Rounding (none, or up to the next 0.25, 0.50, 1, 5 or 10), shown beside the exact figures on the Costing tab and in Reports' Rounded Price (`CostingDefaults.PriceRoundingStep`, `CostingRules.RoundPriceUp`, `ProductCostSummary.RoundedSellingPrice`; see Products screen notes). Migration `CostingDefaultsPriceRoundingStep` | Done |
 
 ## Open items (for later phases)
 

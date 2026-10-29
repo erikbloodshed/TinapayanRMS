@@ -37,7 +37,7 @@ internal static class Columns
             ["id", "product_id", "packaging_material_id", "unit_id", "qty_per_unit", "units_per_packaging_unit", "authored_field", "sort_order"],
         [typeof(CostingParameters)] =
             ["id", "product_id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent", "vat_percent"],
-        [typeof(CostingDefaults)] = ["id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent", "vat_percent", "wastage_percent", "new_product_stage", "cost_buffer_percent"],
+        [typeof(CostingDefaults)] = ["id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent", "vat_percent", "wastage_percent", "new_product_stage", "cost_buffer_percent", "price_rounding_step"],
         [typeof(PackagingLink)] = ["id", "product_id", "linked_product_id", "linked_sub_assembly_id"],
         [typeof(ProductVersion)] = ["id", "product_id", "number", "saved_at", "note", "content"],
         [typeof(PriceScenario)] = ["id", "name", "saved_at"],

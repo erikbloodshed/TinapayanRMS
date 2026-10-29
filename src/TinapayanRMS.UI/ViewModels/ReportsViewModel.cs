@@ -55,6 +55,12 @@ public sealed class ProductCostRow(Product product, ProductCostSummary costs)
     /// <summary>The selling price the costing works out, the Costing tab's Total Selling Price: a suggestion beside <see cref="CurrentPrice"/>.</summary>
     public decimal SuggestedPrice => costs.SellingPrice;
 
+    /// <summary>
+    /// <see cref="SuggestedPrice"/> rounded up to a price the shop would charge (Settings' price rounding, 2026-10-29); the
+    /// same figure without rounding.
+    /// </summary>
+    public decimal RoundedPrice => costs.RoundedSellingPrice;
+
     /// <summary>Null when no current price is entered.</summary>
     public decimal? CurrentPrice => costs.CurrentPrice;
 

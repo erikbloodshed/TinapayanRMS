@@ -24,6 +24,24 @@ public static class CostingRules
         }
     }
 
+    /// <summary>The steps a suggested price can be rounded up to (CostingDefaults.PriceRoundingStep): none, then from a quarter to ten.</summary>
+    public static readonly IReadOnlyList<decimal> PriceRoundingSteps = [0m, 0.25m, 0.50m, 1m, 5m, 10m];
+
+    public static void EnsureValidPriceRoundingStep(decimal step)
+    {
+        if (!PriceRoundingSteps.Contains(step))
+        {
+            throw new BusinessRuleException("Prices can be rounded up to 0.25, 0.50, 1, 5 or 10, or not at all.");
+        }
+    }
+
+    /// <summary>
+    /// <paramref name="price"/> rounded up to the next multiple of <paramref name="step"/> (2026-10-29): 43.24 to 43.25 on
+    /// 0.25, to 44 on 1. Up, never down, so a rounded price still earns at least its markup. No step leaves it as it is.
+    /// </summary>
+    public static decimal RoundPriceUp(decimal price, decimal step) =>
+        step <= 0m ? price : Math.Ceiling(price / step) * step;
+
     /// <summary>
     /// A cost entered as a percentage of the sub-assembly (ingredient) cost — wastage, labor, overhead,
     /// administrative — in pesos per piece: 25% labor on ₱20 of sub-assemblies is ₱5. Packaging is

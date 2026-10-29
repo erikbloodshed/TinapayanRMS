@@ -334,7 +334,9 @@ Under it are the five percentages a **new** product's costing starts with:
 
 Under them, **Wastage %** is the shop's [wastage](#wastage): a percentage of every product's sub-assemblies (ingredients) cost, added to its costing. It starts at 3%, and can be anything from 0 to 100. Unlike the other figures here, it isn't where a new product starts: **every** product is priced with it, saved ones included, so changing it changes every product's costs and suggested price.
 
-Last, **Cost Buffer %** is what a new raw material's [cost buffer](#cost-buffer) starts with on the Raw Materials screen. It starts at 10%, and can be anything from 0 to 100. It only matters for a purchased material: a linked ingredient takes the buffer of the one it's linked to, and a made ingredient has none of its own.
+**Price Rounding** rounds a suggested price up to a price you'd charge: up to the next 0.25, 0.50, 1, 5 or 10, or **None** (the default). It's always rounded up, so the rounded price still earns at least the markup. The exact figures don't change: the rounded price is shown beside them, under the **Total Selling Price** on a product's Costing tab (*Rounded up to the next 0.25: 43.25*), in the **Rounded Price** column of Reports' Product Cost Summary, and in the Price Simulator.
+
+**Cost Buffer %** is what a new raw material's [cost buffer](#cost-buffer) starts with on the Raw Materials screen. It starts at 10%, and can be anything from 0 to 100. It only matters for a purchased material: a linked ingredient takes the buffer of the one it's linked to, and a made ingredient has none of its own.
 
 Each product keeps its own stage and percentages, and each raw material its own cost buffer, from its first Save. Changing those defaults doesn't change anything saved. Changing the Wastage % does: it reprices every product. A new product you haven't saved yet moves to the new stage, since you didn't pick one for it. A new raw material you haven't saved moves to the new cost buffer, unless you've typed one.
 
@@ -866,7 +868,8 @@ One row for every product, as it's saved:
 - **Wastage Cost**: the Costing tab's **Wastage** row, the shop's Wastage % of the ingredients cost.
 - **Packaging Cost**: the **Packaging** row of the Costing tab. For a composite product that includes its products' packaging, theirs is counted too.
 - **Labor Cost**, **Overhead Cost** and **Admin Cost**: the Costing tab's Labor, Overhead and Admin metrics in pesos, each a percentage of the ingredients cost.
-- **Base Cost** and **Suggested Price**: as the product's Costing tab works them out. The base cost is the six costs before it added up, and the suggested price is the Costing tab's **Total Selling Price**.
+- **Base Cost** and **Suggested Price**: as the product's Costing tab works them out.
+- **Rounded Price**: the suggested price rounded up as Settings → Costing Defaults → **Price Rounding** says; the same as the suggested price with no rounding set. The base cost is the six costs before it added up, and the suggested price is the Costing tab's **Total Selling Price**.
 - **Current Price**: what the shop charges now, as entered on the product. Blank if none is entered.
 - **Markup %**: what the current price earns on the base cost, as the product's header shows it. Blank without a current price.
 - **Target Markup %**: the **Markup Metric** on the product's Costing tab, what you're aiming for.

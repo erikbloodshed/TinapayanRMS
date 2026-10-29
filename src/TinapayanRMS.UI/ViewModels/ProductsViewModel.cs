@@ -685,6 +685,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     // The shop-wide Wastage % every product is priced with (Settings → Costing Defaults), as of the last LoadCommand.
     private decimal _wastagePercent = CostingDefaults.DefaultWastagePercent;
 
+    /// <summary>What the Costing tab's rounded selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep).</summary>
+    private decimal _priceRoundingStep;
+
     // The stage New files a product in (Settings → Costing Defaults), as of the last LoadCommand.
     private ProductStage _defaultNewProductStage = CostingDefaults.DefaultNewProductStage;
 
@@ -2895,10 +2898,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var untouchedNewProduct = _editingId == 0 && Costing.ShowsDefaults;
         Costing.SetDefaults(defaults);
         _defaultNewProductStage = defaults.NewProductStage;
-        if (_wastagePercent != defaults.WastagePercent)
+        if (_wastagePercent != defaults.WastagePercent || _priceRoundingStep != defaults.PriceRoundingStep)
         {
             // Every product is priced with it, the one open included: its Costing tab follows at once.
             _wastagePercent = defaults.WastagePercent;
+            _priceRoundingStep = defaults.PriceRoundingStep;
             RecomputeCosts();
         }
         if (_editingId == 0 && _newProductInDefaultStage)
@@ -4571,7 +4575,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             IsEditingComposite,
             IsEditingComposite && UsageEdits.Count > 0,
             componentPackaging,
-            _wastagePercent);
+            _wastagePercent,
+            _priceRoundingStep);
     }
 
     /// <summary>

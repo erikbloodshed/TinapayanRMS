@@ -21,7 +21,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 "TinapayanRMS.Domain.Entities.CostingDefaults",
                 typeof(CostingDefaults),
                 baseEntityType,
-                propertyCount: 9,
+                propertyCount: 10,
                 keyCount: 1);
 
             var id = runtimeEntityType.AddProperty(
@@ -103,6 +103,17 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 sentinel: 0m);
             overheadPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
             overheadPercent.AddAnnotation("Relational:ColumnName", "overhead_percent");
+
+            var priceRoundingStep = runtimeEntityType.AddProperty(
+                "PriceRoundingStep",
+                typeof(decimal),
+                propertyInfo: typeof(CostingDefaults).GetProperty("PriceRoundingStep", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                fieldInfo: typeof(CostingDefaults).GetField("<PriceRoundingStep>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                precision: 18,
+                scale: 4,
+                sentinel: 0m);
+            priceRoundingStep.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+            priceRoundingStep.AddAnnotation("Relational:ColumnName", "price_rounding_step");
 
             var vatPercent = runtimeEntityType.AddProperty(
                 "VatPercent",

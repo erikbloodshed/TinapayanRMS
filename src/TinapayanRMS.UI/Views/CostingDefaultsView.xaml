@@ -46,6 +46,8 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="12" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="12" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -104,6 +106,13 @@
                                                       MaxValue="100"
                                                       NumberDecimalDigits="2"
                                                       Value="{Binding EditingCostBufferPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Grid.Row="16" Text="Price Rounding" Style="{StaticResource FormLabelStyle}" ToolTip="A suggested price rounded up to a price you'd charge, shown beside the exact one on the Costing tab, in Reports and in the Price Simulator. The exact figures don't change." />
+                            <syncfusion:ComboBoxAdv Grid.Row="16"
+                                                    Grid.Column="1"
+                                                    ItemsSource="{Binding PriceRoundingOptions}"
+                                                    DisplayMemberPath="Label"
+                                                    SelectedItem="{Binding EditingPriceRounding, Mode=TwoWay}" />
                         </Grid>
 
                         <syncfusion:ButtonAdv Label="Save"

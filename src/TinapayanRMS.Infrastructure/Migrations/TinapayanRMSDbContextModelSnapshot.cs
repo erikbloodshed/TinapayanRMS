@@ -18,7 +18,7 @@ namespace TinapayanRMS.Infrastructure.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("Npgsql:CollationDefinition:case_insensitive", "und-u-ks-level2,und-u-ks-level2,icu,False")
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -64,6 +64,11 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("overhead_percent");
 
+                    b.Property<decimal>("PriceRoundingStep")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("price_rounding_step");
+
                     b.Property<decimal>("VatPercent")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
@@ -82,6 +87,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
                     b.ToTable("costing_defaults", null, t =>
                         {
                             t.HasCheckConstraint("CK_CostingDefaults_CostBufferPercent", "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");
+
+                            t.HasCheckConstraint("CK_CostingDefaults_PriceRoundingStep", "price_rounding_step IN (0, 0.25, 0.5, 1, 5, 10)");
 
                             t.HasCheckConstraint("CK_CostingDefaults_SingleRow", "id = 1");
 

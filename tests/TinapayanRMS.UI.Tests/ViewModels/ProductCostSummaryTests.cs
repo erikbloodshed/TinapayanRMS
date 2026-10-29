@@ -20,6 +20,20 @@ public class ProductCostSummaryTests
     }
 
     [Fact]
+    public void The_selling_price_is_also_shown_rounded_up_when_rounding_is_set()
+    {
+        // 20.00 at a 30% markup, no VAT: 26.00 exactly, and 26.01 for 20.0077, which rounds up to 26.25 on quarters.
+        var rounded = new ProductCostSummary([("Dough", 20.0077m)], 1, [], 0m, 0m, 0m, 30m, 0m, null, priceRoundingStep: 0.25m);
+        rounded.RoundedSellingPrice.Should().Be(26.25m);
+        rounded.RoundedSellingPriceText.Should().Be("Rounded up to the next 0.25: 26.25");
+
+        var exact = new ProductCostSummary([("Dough", 20.0077m)], 1, [], 0m, 0m, 0m, 30m, 0m, null);
+        exact.HasPriceRounding.Should().BeFalse();
+        exact.RoundedSellingPrice.Should().Be(exact.SellingPrice);
+        exact.RoundedSellingPriceText.Should().BeEmpty();
+    }
+
+    [Fact]
     public void No_current_price_is_never_short_and_the_report_says_by_how_much_one_is()
     {
         new ProductCostSummary([("Dough", 20m)], 1, [], 0m, 0m, 0m, 30m, 0m, null).IsBelowTargetMarkup.Should().BeFalse();

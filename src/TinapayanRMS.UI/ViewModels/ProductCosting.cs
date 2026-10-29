@@ -163,7 +163,8 @@ public sealed class ProductCosting : ReactiveObject
         bool isComposite,
         bool hasOwnSections,
         decimal? componentPackaging,
-        decimal wastagePercent) =>
+        decimal wastagePercent,
+        decimal priceRoundingStep = 0m) =>
         Costs = new ProductCostSummary(
             parts,
             quantityRequired,
@@ -177,5 +178,6 @@ public sealed class ProductCosting : ReactiveObject
             isComposite,
             hasOwnSections,
             componentPackaging,
-            wastagePercent);
+            wastagePercent,
+            priceRoundingStep);
 }

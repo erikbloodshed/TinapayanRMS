@@ -44,8 +44,10 @@ public sealed class ProductCostSummary
         bool isComposite = false,
         bool hasSections = false,
         decimal? componentPackaging = null,
-        decimal wastagePercent = 0m)
+        decimal wastagePercent = 0m,
+        decimal priceRoundingStep = 0m)
     {
+        PriceRoundingStep = priceRoundingStep;
         IReadOnlyList<decimal> usageCostsPerPiece = [.. usages.Select(u => u.CostPerPiece)];
         IsComposite = isComposite;
         HasSections = hasSections;
@@ -166,6 +168,23 @@ public sealed class ProductCostSummary
     /// SellingPrice); null when no current price is entered.
     /// </summary>
     public decimal? CurrentMarkupPercent { get; }
+
+    /// <summary>What the selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep); 0 for none.</summary>
+    public decimal PriceRoundingStep { get; }
+
+    /// <summary>The prices are rounded: the rounded selling price shows beside the exact one.</summary>
+    public bool HasPriceRounding => PriceRoundingStep > 0m;
+
+    /// <summary>
+    /// The selling price rounded up to a price the shop would charge (CostingRules.RoundPriceUp, 2026-10-29): the exact one
+    /// when there's no rounding. Only shown and offered; every figure above it stays exact.
+    /// </summary>
+    public decimal RoundedSellingPrice => CostingRules.RoundPriceUp(SellingPrice, PriceRoundingStep);
+
+    /// <summary>"Rounded up to the next 0.25: 43.25"; empty without rounding.</summary>
+    public string RoundedSellingPriceText => HasPriceRounding
+        ? string.Create(System.Globalization.CultureInfo.CurrentCulture, $"Rounded up to the next {PriceRoundingStep:0.00}: {RoundedSellingPrice:N2}")
+        : string.Empty;
 
     /// <summary>The current price doesn't cover the base cost: a negative markup, which the header shows in red.</summary>
     public bool IsCurrentPriceBelowCost => CurrentMarkupPercent < 0;
