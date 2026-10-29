@@ -501,6 +501,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>The details tabs along the bottom: Cost Setup, Alternative Units, Usage Example, Used By, then Price History.</summary>
     public const int PriceHistoryTab = 4;
 
+    /// <summary>Used By: the products the material goes into, with what it makes up of each one's material cost.</summary>
+    public const int UsedByTab = 3;
+
     /// <summary>The details tab showing. Moves to Cost Setup when Price History is about to hide (ShowPriceHistory).</summary>
     private int _selectedDetailsTab;
     public int SelectedDetailsTab
@@ -843,9 +846,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         IUnitOfMeasureRepository unitOfMeasureRepository,
         IViewStateStore viewStateStore,
         ICostingDefaultsRepository costingDefaultsRepository,
-        ILogger logger)
+        ILogger logger,
+        MaterialCostShares? costShares = null)
         : base(logger)
     {
+        _costShares = costShares;
         _rawMaterialRepository = rawMaterialRepository;
         _priceHistoryRepository = priceHistoryRepository;
         _brandPriceRepository = brandPriceRepository;
@@ -1108,6 +1113,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // second pick never gets the first one's details added to its own. One that fails shows why, and the next pick
         // loads as usual.
         LoadLatest(this.WhenAnyValue(x => x.SelectedRawMaterial).Where(_ => !IsBusyApplying), LoadDetailsAsync);
+
+        // The Used By tiles' shares, when the tab shows or its tiles change: a newer ask cancels one still working.
+        LoadLatest(
+            _costSharesWanted.Merge(this.WhenAnyValue(x => x.SelectedDetailsTab).Select(_ => RxVoid.Default)),
+            (_, cancellationToken) => ShowCostSharesAsync(cancellationToken));
 
         // A unit's multiplier changed in the Alternative Units grid reprices the brands bought in it straight away,
         // and the add row goes once there are two units.
@@ -1809,6 +1819,36 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     {
         UsedBy = products;
         UsedByText = products.Count == 0 ? NotUsedText : UsedText;
+        _costSharesWanted.OnNext(RxVoid.Default);
+    }
+
+    /// <summary>What each Used By product's share is worked out by; null in a screen built without it (tests that don't need it).</summary>
+    private readonly MaterialCostShares? _costShares;
+
+    /// <summary>Asks for the Used By tiles' shares again: the tiles changed, or the tab showed.</summary>
+    private readonly Subject<RxVoid> _costSharesWanted = new();
+
+    /// <summary>
+    /// The Used By tiles' "38% of materials" (2026-10-29), worked out only while the tab shows, since it reads every product
+    /// the material goes into: the material at no cost against as it is (MaterialCostShares). Kept on the tiles until they change.
+    /// </summary>
+    private async Task ShowCostSharesAsync(CancellationToken cancellationToken)
+    {
+        if (_costShares is null
+            || SelectedDetailsTab != UsedByTab
+            || SelectedRawMaterial is not { } material
+            || UsedBy is not { Count: > 0 } tiles
+            || tiles.All(t => t.CostShareText is not null))
+        {
+            return;
+        }
+
+        var shares = await Task.Run(() => _costShares.ReadAsync(material.Id, [.. tiles.Select(t => t.Id)], cancellationToken), cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (ReferenceEquals(UsedBy, tiles))
+        {
+            UsedBy = [.. tiles.Select(t => t with { CostShareText = MaterialCostShares.Text(shares.GetValueOrDefault(t.Id)) })];
+        }
     }
 
     /// <summary>The Price History grid, newest first.</summary>
@@ -2920,5 +2960,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         _rawMaterialCache.Dispose();
         _categoryCache.Dispose();
         _productOpenRequests.Dispose();
+        _costSharesWanted.Dispose();
     }
 }

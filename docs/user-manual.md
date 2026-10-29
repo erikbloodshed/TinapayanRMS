@@ -491,6 +491,8 @@ This tab is a calculator. Type a **Use Quantity**, pick a unit and press **Calcu
 
 This tab lists every product the material ends up in as tiles, including products that use it indirectly, such as through a made ingredient, a linked part or a packaging set. An ingredient's list includes every composite product holding a product that uses it. A packaging material's list includes every composite product that holds such a product and has **Include each product's packaging** ticked. Click a tile to open that product.
 
+Under each product's name is what the material makes up of that product's **Material Cost** (its ingredients and packaging, at buffered costs), such as *38% of materials*. It counts the material however it gets into the product, through a made ingredient or a linked part too, so a price rise in a material with a large share moves the product's cost the most. The figures take a moment to appear the first time the tab shows.
+
 ### Price History tab
 
 This tab is shown for saved purchased materials only. It's a log of every price the material has been costed at: **Date**, **Brand**, **Unit**, **Price** and **Cost / Base Unit**.
