@@ -168,6 +168,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="Products" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
@@ -192,6 +193,14 @@
                                           ToolTip="{Binding CostBasisButtonTooltip}"
                                           VerticalAlignment="Center"
                                           Margin="0,0,8,0" />
+                    <!-- Writes: each product's Current Price to its Price to Charge, after a question that says how many -->
+                    <syncfusion:ButtonAdv Grid.Column="4"
+                                          Label="Set Current Prices"
+                                          IconTemplate="{StaticResource ApplyIconTemplate}"
+                                          Command="{Binding SetCurrentPricesCommand}"
+                                          ToolTip="Sets the Current Price of the products picked, or of every product shown, to its Price to Charge: only those a change reaches. Asks first. The raw material prices don't change."
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,8,0" />
                     <syncfusion:ButtonAdv Grid.Column="3"
                                           Label="Print Report"
                                           IconTemplate="{StaticResource PrintIconTemplate}"
@@ -199,7 +208,7 @@
                                           ToolTip="Previews and prints each product's recipe and costing with the price changes, beside today's: the products picked in the table, or every product it shows."
                                           VerticalAlignment="Center"
                                           Margin="0,0,8,0" />
-                    <syncfusion:ButtonAdv Grid.Column="4"
+                    <syncfusion:ButtonAdv Grid.Column="5"
                                           Label="Export to Excel"
                                           IconTemplate="{StaticResource ExportIconTemplate}"
                                           Command="{Binding ExportCommand}"
@@ -254,6 +263,7 @@
                         <controls:NumericColumn MappingName="MarkupPercent" HeaderText="Markup %" NumberDecimalDigits="2" AllowNullValue="True" />
                         <controls:NumericColumn MappingName="SimulatedMarkupPercent" HeaderText="Simulated Markup %" NumberDecimalDigits="2" AllowNullValue="True" />
                         <controls:NumericColumn MappingName="PriceToKeepMarkup" HeaderText="Price to Keep Markup" NumberDecimalDigits="2" AllowNullValue="True" />
+                        <controls:NumericColumn MappingName="PriceToCharge" HeaderText="Price to Charge" NumberDecimalDigits="2" AllowNullValue="True" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </DockPanel>

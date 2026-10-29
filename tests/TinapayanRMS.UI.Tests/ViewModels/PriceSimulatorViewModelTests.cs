@@ -464,6 +464,43 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
 
     private static PriceSimulatorProductRow? Row(PriceSimulatorViewModel viewModel, int productId) => viewModel.Products.FirstOrDefault(r => r.ProductId == productId);
 
+    [Fact]
+    public Task Set_Current_Prices_sets_each_affected_product_to_its_price_to_charge_with_a_version() => StaThread.RunAsync(async () =>
+    {
+        var bakery = await AddBakeryAsync();
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.Products.Single(p => p.Id == bakery.MeringueId).CurrentPrice = 5m;
+            dbContext.Products.Single(p => p.Id == bakery.PandesalId).CurrentPrice = 3m;
+            dbContext.CostingDefaults.Add(new CostingDefaults { PriceRoundingStep = 1m });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        List<string> asked = [];
+        var viewModel = await CreateLoadedViewModelAsync(confirm: question => { asked.Add(question); return true; });
+        AddChange(viewModel, bakery.EggId, percent: 10m);
+        await WaitUntilSettledAsync(() => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+
+        // 5.50 keeps the meringue's markup, and rounds up to 6.00 on whole pesos; the pandesal no change reaches keeps 3.00.
+        var meringue = Row(viewModel, bakery.MeringueId)!;
+        meringue.PriceToCharge.Should().Be(6m);
+        meringue.HasNewPriceToCharge.Should().BeTrue();
+        Row(viewModel, bakery.PandesalId)!.HasNewPriceToCharge.Should().BeFalse();
+
+        await viewModel.SetCurrentPricesCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        asked.Should().ContainSingle().Which.Should().StartWith("Set the Current Price of Meringue to its Price to Charge");
+        viewModel.SuccessMessage.Should().StartWith("Set the Current Price of Meringue.");
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.Products.Single(p => p.Id == bakery.MeringueId).CurrentPrice.Should().Be(6m);
+            dbContext.Products.Single(p => p.Id == bakery.PandesalId).CurrentPrice.Should().Be(3m);
+            dbContext.ProductVersions.Where(v => v.ProductId == bakery.MeringueId).Select(v => v.Note)
+                .Should().Contain("Current Price set from the Price Simulator");
+        }
+    });
+
     private PriceSimulatorViewModel CreateViewModel()
     {
         ReactiveUIBootstrapper.EnsureInitialized();
@@ -475,7 +512,8 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
             new RawMaterialBrandPriceRepository(factory),
             new PriceScenarioRepository(factory),
             SavedProducts(factory),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger(),
+            VersionRecorders.CreateSaves(factory, CreateUnitOfWork()));
     }
 
     /// <summary>A screen loaded, answering Save Scenario's name with <paramref name="name"/> and every question with <paramref name="confirm"/>.</summary>

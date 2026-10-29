@@ -57,6 +57,17 @@ public sealed class PriceSimulatorProductRow(Product product, ProductCostSummary
     /// </summary>
     public decimal? PriceToKeepMarkup => PriceChangeRules.PriceToKeepMarkup(now.CurrentPrice, BaseCost, SimulatedBaseCost);
 
+    /// <summary>
+    /// <see cref="PriceToKeepMarkup"/> rounded up to a price to charge (Settings' Price Rounding, 2026-10-29), for a product a
+    /// change reaches: what Set Current Prices sets. The current price as it is for one no change reaches; null without one.
+    /// </summary>
+    public decimal? PriceToCharge => PriceToKeepMarkup is { } price
+        ? IsAffected ? CostingRules.RoundPriceUp(price, simulated.PriceRoundingStep) : price
+        : null;
+
+    /// <summary>A change reaches it and <see cref="PriceToCharge"/> isn't its current price: what Set Current Prices would change.</summary>
+    public bool HasNewPriceToCharge => IsAffected && PriceToCharge is { } price && price != CurrentPrice;
+
     /// <summary>Whether any change reaches it. Exact: both figures come from the same arithmetic, so an untouched product's are equal.</summary>
     public bool IsAffected => SimulatedBaseCost != BaseCost;
 }
@@ -237,6 +248,16 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
 
     /// <summary>
+    /// Sets the Current Price of the products picked, or of every product the table shows, to its Price to Charge
+    /// (2026-10-29, at the user's request), once it's confirmed: only those a change reaches whose price would move. The
+    /// raw material prices don't change. Each product changed gets a version. Offered only with VersionedSaves to write it.
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> SetCurrentPricesCommand { get; }
+
+    /// <summary>What Set Current Prices writes with its versions; null in a screen built without it.</summary>
+    private readonly VersionedSaves? _versionedSaves;
+
+    /// <summary>
     /// Input: the report's sets, the one to show first first: the selected products, when any are, then all the products
     /// shown. The View shows them in a print pane.
     /// </summary>
@@ -255,9 +276,11 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         IRawMaterialBrandPriceRepository brandPriceRepository,
         IPriceScenarioRepository scenarioRepository,
         SavedProductReader savedProducts,
-        ILogger logger)
+        ILogger logger,
+        VersionedSaves? versionedSaves = null)
         : base(logger)
     {
+        _versionedSaves = versionedSaves;
         _productRepository = productRepository;
         _rawMaterialRepository = rawMaterialRepository;
         _bomLineRepository = bomLineRepository;
@@ -312,6 +335,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         });
         PrintCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () => await ShowPrint.Handle(PrintChoices(DateTime.Now))));
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
+        SetCurrentPricesCommand = ReactiveCommand.CreateFromTask(SetCurrentPricesAsync, Observable.Return(versionedSaves is not null));
 
         // A newer change cancels a recalculation still running, and one that's refused (a price of 0) says why and keeps
         // the figures it had, until the change is put right.
@@ -563,6 +587,37 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         }
 
         return PriceSimulatorReport.Set(printouts, [.. _tried.Select(t => t.Change)], printedAt);
+    }
+
+    private async Task SetCurrentPricesAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+        List<PriceSimulatorProductRow> picked = [.. SelectedProducts.OfType<PriceSimulatorProductRow>()];
+        List<PriceSimulatorProductRow> rows = [.. (picked.Count > 0 ? picked : ShownProducts()).Where(r => r.HasNewPriceToCharge)];
+        if (rows.Count == 0)
+        {
+            ErrorMessage = picked.Count > 0
+                ? "None of the products picked has a new price to charge: no change reaches it, it has no Current Price, or it's at its Price to Charge already."
+                : "No product shown has a new price to charge: try a price change that reaches one with a Current Price.";
+            return;
+        }
+
+        var what = rows.Count == 1 ? rows[0].ProductName : $"{rows.Count} products";
+        if (!await ConfirmDelete.Handle(
+                $"Set the Current Price of {what} to its Price to Charge, the price that keeps today's markup with these changes? "
+                + "The raw material prices don't change: record those on Raw Materials when they do. A version is recorded for each product."))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
+        {
+            var versioned = await Task.Run(() => _versionedSaves!.SetCurrentPricesAsync(
+                [.. rows.Select(r => (r.ProductId, r.PriceToCharge!.Value))], "Current Price set from the Price Simulator", DateTime.Now, CancellationToken.None));
+            await LoadCommand.Execute();
+            SuccessMessage = $"Set the Current Price of {what}." + (ProductVersionRecorder.RecordedMessage(versioned) is { } recorded ? $" {recorded}" : string.Empty);
+        });
     }
 
     /// <summary>A price change as the table shows it, for the report. Only a row with its new price worked out is tried.</summary>

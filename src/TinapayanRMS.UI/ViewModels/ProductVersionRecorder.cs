@@ -41,6 +41,10 @@ public sealed class ProductVersionRecorder(
         return new ProductVersionCapture(await SnapshotAsync([.. readers.Except(productIds)], cancellationToken));
     }
 
+    /// <summary><paramref name="productIds"/> themselves as they're saved now, for a change made to them from outside their form.</summary>
+    public async Task<ProductVersionCapture> CaptureProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
+        new(await SnapshotAsync(productIds, cancellationToken));
+
     /// <summary>
     /// Reads the captured products again and records a version, noted <paramref name="note"/> and dated
     /// <paramref name="savedAt"/>, of each one whose recipe or price differs from how it was captured, all in one write

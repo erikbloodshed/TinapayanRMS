@@ -171,6 +171,12 @@ public interface IProductRepository
     Task MoveAsync(IReadOnlyCollection<ProductMove> moves, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Sets each product's Current Price, all in one save, and stamps UpdatedAt (2026-10-29, the Price Simulator's Set Current
+    /// Prices). Refused, with nothing changed, if a product doesn't exist or a price is negative.
+    /// </summary>
+    Task SetCurrentPricesAsync(IReadOnlyCollection<(int ProductId, decimal CurrentPrice)> prices, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Renames the product and nothing else, stamping UpdatedAt; its own sub-assemblies, named after it, take the new
     /// name as a Save's rename gives it to them.
     /// </summary>

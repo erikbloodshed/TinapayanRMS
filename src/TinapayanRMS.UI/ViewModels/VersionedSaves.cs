@@ -101,6 +101,19 @@ public sealed class VersionedSaves(
         }, cancellationToken);
 
     /// <summary>
+    /// The Price Simulator's Set Current Prices (2026-10-29): each product's Current Price set (IProductRepository.SetCurrentPricesAsync),
+    /// with a version of each one it changes, noted <paramref name="note"/>. Returns the names of the products that got one.
+    /// </summary>
+    public Task<IReadOnlyList<string>> SetCurrentPricesAsync(
+        IReadOnlyCollection<(int ProductId, decimal CurrentPrice)> prices, string note, DateTime savedAt, CancellationToken cancellationToken) =>
+        unitOfWork.RunAsync(async () =>
+        {
+            var before = await versionRecorder.CaptureProductsAsync([.. prices.Select(p => p.ProductId).Distinct()], cancellationToken);
+            await productRepository.SetCurrentPricesAsync(prices, cancellationToken);
+            return await versionRecorder.RecordChangesAsync(before, note, savedAt, cancellationToken);
+        }, cancellationToken);
+
+    /// <summary>
     /// Before the first Save since versions began to be kept: the product as it's saved now becomes its first version,
     /// dated when it was last saved, priced at what its materials cost now. Nothing when it has versions already.
     /// </summary>
