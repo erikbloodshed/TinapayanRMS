@@ -109,7 +109,7 @@ public sealed class QuickFindViewModel : ViewModelBase
         ];
     }
 
-    private static IEnumerable<string> WordsOf(string name) =>
+    private static string[] WordsOf(string name) =>
         name.Split([.. name.Where(c => !char.IsLetterOrDigit(c)).Distinct()], StringSplitOptions.RemoveEmptyEntries);
 
     private async Task LoadAsync()
