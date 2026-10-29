@@ -405,9 +405,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         IValidator<SubAssemblyRole> roleValidator,
         IViewStateStore viewStateStore,
         VersionedSaves versionedSaves,
-        ILogger logger)
+        ILogger logger,
+        SharedRecipeImpact? recipeImpact = null)
         : base(logger)
     {
+        _recipeImpact = recipeImpact;
         _subAssemblyRepository = subAssemblyRepository;
         _versionedSaves = versionedSaves;
         _lineRepository = lineRepository;
@@ -653,6 +655,24 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
                 List<RecipeLine> recipeLines = [.. lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
                 save = cancellationToken => _subAssemblyRepository.SaveStandaloneAsync(subAssembly, recipeLines, cancellationToken);
+
+                // A saved one that products link: what it does to their costs is asked about first (2026-10-29).
+                if (_recipeImpact is not null && subAssembly.Id != 0)
+                {
+                    List<SubAssemblyLine> newLines =
+                    [
+                        .. lines.Select((l, i) => new SubAssemblyLine
+                        {
+                            SubAssemblyId = subAssembly.Id, IngredientId = l.Ingredient.Id, Ingredient = l.Ingredient, Grams = l.Grams,
+                            IsFormulaBase = l.IsFormulaBase, AuthoredBakersPercent = l.AuthoredBakersPercent, SortOrder = i,
+                        }),
+                    ];
+                    var impacts = await Task.Run(() => _recipeImpact.ReadAsync(subAssembly.Id, newLines, CancellationToken.None));
+                    if (impacts.Count > 0 && !await ConfirmDelete.Handle(SharedRecipeImpact.Question(name, impacts, MadeIngredients.Count)))
+                    {
+                        return;
+                    }
+                }
             }
 
             // Written with a version of each product using it that this Save changes, both or neither (VersionedSaves).
@@ -756,6 +776,9 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             RecomputeTotals();
         });
     }
+
+    /// <summary>What a Save of a recipe products link is asked about with; null in a screen built without it.</summary>
+    private readonly SharedRecipeImpact? _recipeImpact;
 
     /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>
     private void AsUndoStep(Action change)
