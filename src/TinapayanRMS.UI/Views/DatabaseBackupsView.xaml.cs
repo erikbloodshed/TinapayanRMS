@@ -40,6 +40,12 @@ public partial class DatabaseBackupsView : UserControl, IDisposable
             }),
 
             // Restore from File…: a backup from a USB stick or another computer.
+            viewModel.ChooseCopyFolder.RegisterHandler(interaction =>
+            {
+                var dialog = new OpenFolderDialog { Title = "Copy Automatic Backups To" };
+                interaction.SetOutput(dialog.ShowDialog(Window.GetWindow(this)) == true ? dialog.FolderName : null);
+            }),
+
             viewModel.ChooseBackupFile.RegisterHandler(interaction =>
             {
                 var dialog = new OpenFileDialog

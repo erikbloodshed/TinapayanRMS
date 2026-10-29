@@ -112,8 +112,12 @@ public static class CompositionRoot
                     provider.GetRequiredService<IViewStateStore>(), on => VimKeys.State.IsEnabled = on));
 
                 // A restore replaces everything every screen holds, so the app starts again after one (App.RestartAfterExit).
+                services.AddSingleton<AutomaticBackups>();
                 services.AddSingleton(provider => new DatabaseBackupsViewModel(
-                    provider.GetRequiredService<IDatabaseBackups>(), message => ((App)Application.Current).RestartAfterExit(message), provider.GetRequiredService<ILogger>()));
+                    provider.GetRequiredService<IDatabaseBackups>(),
+                    message => ((App)Application.Current).RestartAfterExit(message),
+                    provider.GetRequiredService<ILogger>(),
+                    provider.GetRequiredService<AutomaticBackups>()));
             });
     }
 }

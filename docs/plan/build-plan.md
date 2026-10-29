@@ -168,6 +168,7 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 | 2026-10-29 | **Target buffers and Reports' Cost Buffers**, at the user's request: the Cost Buffer % last typed is kept as the material's target (`RawMaterial.TargetCostBufferPercent`), Re-apply Target on Purchase Cost Setup types it again, and a Cost Buffers tab lists the materials whose buffer prices have worn below target with a bulk Re-apply Target Buffer (`IRawMaterialRepository.ReapplyTargetBuffersAsync`, with the cascade). Migration `RawMaterialTargetCostBuffer` | Done |
 | 2026-10-29 | **Sub-Assemblies: Save says what it does to the linking products' costs**, at the user's request: each product's base cost now and with the new lines, asked before saving (`SharedRecipeImpact`; see Sub-Assemblies screen notes). No migration | Done |
 | 2026-10-29 | **Reports: Cost Drivers and Margin Erosion**, at the user's request: the purchased materials that make up most of the Production products' material cost, with a cumulative share (`CostDriverAnalysis`), and each product's markup now against its version as of a day picked (`MarginErosionAnalysis`, `IProductVersionRepository.GetLatestAsOfAsync`). No migration | Done |
+| 2026-10-29 | **Safer backups**, at the user's request: the day's automatic backup is also checked every hour while the app runs, and each one can be copied to a second folder chosen on Settings → Database, which keeps the newest 14 too (`AutomaticBackups`). No migration | Done |
 
 ## Open items (for later phases)
 

@@ -355,10 +355,11 @@ Backups of all of the app's data: every raw material, price, sub-assembly, produ
 - **Folder** shows where the backups are kept, *C:\ProgramData\TinapayanRMS\Backups*. **Open Folder** shows it in File Explorer. Everyone who uses the app on this computer shares the folder.
 - The list shows every backup, newest first: when it was **Taken**, its **Kind** and its **Size (MB)**.
   - **Manual**: taken with **Back Up Now**.
-  - **Automatic**: the app takes one by itself the first time it's opened each day. The newest 14 are kept, and older automatic ones are deleted.
+  - **Automatic**: the app takes one by itself each day: when it's opened, and if it stays open past midnight, within the hour after. The newest 14 are kept, and older automatic ones are deleted.
   - **Before restore**: the safety backup a restore takes of the data it replaces.
   - **Copied in**: a backup brought in with **Restore from File…**.
   - Only automatic backups are ever deleted by the app. Delete others in File Explorer when you no longer need them.
+- **Also Copy To** is a second folder each automatic backup is copied to as well, such as a USB stick that stays plugged in or a OneDrive folder. Press **Choose…** to pick it: the newest automatic backup is copied there straight away. The newest 14 automatic backups are kept there too; nothing else in the folder is touched. **Stop Copying** stops it, and leaves what was copied. If the folder isn't there when a backup is taken (the USB stick was taken out), the backup is still taken here, and a note in amber says it wasn't copied. The folder is kept for you on this computer.
 - **Back Up Now** takes a backup straight away.
 - **Copy to…** copies the backup picked in the list somewhere else, such as a USB stick. Do this now and then: backups kept only on this computer are lost with it if it breaks.
 - **Restore** puts the backup picked in the list back, in place of all of the app's data. It asks first, saying when the backup was taken. Then it takes a safety backup of the data as it is, puts the backup back, and the app closes and opens again. Anything saved since the backup was taken is lost, and so is anything not yet saved on another screen.
@@ -1276,6 +1277,8 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 7. To make the price real, record it on **Raw Materials** as in [Record a price increase](#record-a-price-increase). The Price Simulator never changes a price itself.
 
 ### Back up to a USB stick
+
+To have it done every day, set the USB stick as **Also Copy To** on the **Database** tab and leave it plugged in. To copy one now:
 
 1. Put in the USB stick.
 2. Open **Settings**, then the **Database** tab.
