@@ -22,7 +22,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 "TinapayanRMS.Domain.Entities.SavedPlanLine",
                 typeof(SavedPlanLine),
                 baseEntityType,
-                propertyCount: 5,
+                propertyCount: 7,
                 navigationCount: 2,
                 foreignKeyCount: 2,
                 unnamedIndexCount: 2,
@@ -38,6 +38,28 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 sentinel: 0);
             id.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
             id.AddAnnotation("Relational:ColumnName", "id");
+
+            var leftoverUnits = runtimeEntityType.AddProperty(
+                "LeftoverUnits",
+                typeof(decimal?),
+                propertyInfo: typeof(SavedPlanLine).GetProperty("LeftoverUnits", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                fieldInfo: typeof(SavedPlanLine).GetField("<LeftoverUnits>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                nullable: true,
+                precision: 18,
+                scale: 4);
+            leftoverUnits.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+            leftoverUnits.AddAnnotation("Relational:ColumnName", "leftover_units");
+
+            var madeUnits = runtimeEntityType.AddProperty(
+                "MadeUnits",
+                typeof(decimal?),
+                propertyInfo: typeof(SavedPlanLine).GetProperty("MadeUnits", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                fieldInfo: typeof(SavedPlanLine).GetField("<MadeUnits>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                nullable: true,
+                precision: 18,
+                scale: 4);
+            madeUnits.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+            madeUnits.AddAnnotation("Relational:ColumnName", "made_units");
 
             var productId = runtimeEntityType.AddProperty(
                 "ProductId",

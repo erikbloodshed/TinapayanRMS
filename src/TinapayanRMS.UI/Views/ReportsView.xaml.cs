@@ -25,6 +25,7 @@ public partial class ReportsView : UserControl
         GridLayoutKeeping.Keep(CostBuffersGrid, viewModel.CostBuffersLayout);
         GridLayoutKeeping.Keep(CostDriversGrid, viewModel.CostDriversLayout);
         GridLayoutKeeping.Keep(MarginErosionGrid, viewModel.MarginErosionLayout);
+        GridLayoutKeeping.Keep(ProductionResultsGrid, viewModel.ProductionResultsLayout);
         CostBuffersGrid.SelectedItems = viewModel.SelectedCostBuffers;
 
         // Each tab's Export to Excel writes its own table, on a sheet named after it.
@@ -36,6 +37,7 @@ public partial class ReportsView : UserControl
                 ReportsViewModel.CostBuffersTitle => CostBuffersGrid,
                 ReportsViewModel.CostDriversTitle => CostDriversGrid,
                 ReportsViewModel.MarginErosionTitle => MarginErosionGrid,
+                ReportsViewModel.ProductionResultsTitle => ProductionResultsGrid,
                 _ => RawMaterialPricesGrid,
             }),
         ]);

@@ -31,6 +31,9 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
     /// <summary>Where the saved plan open in the table is kept, by id: none when no saved plan is open.</summary>
     public const string OpenPlanKey = "production-plan-open";
 
+    /// <summary>Where Make On is kept, as yyyy-MM-dd: none when the plan has no day.</summary>
+    public const string MakeOnKey = "production-plan-make-on";
+
     public const string ExportTitle = "Production Plan";
 
     private readonly IProductRepository _productRepository;
@@ -52,6 +55,9 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
 
     /// <summary>The saved plan open as it was kept, by id, found by the first load; null once it's been looked for.</summary>
     private int? _keptOpenPlanId;
+
+    /// <summary>Until the first load has looked for a saved plan for today, to open when the table's empty (2026-10-29).</summary>
+    private bool _lookForTodaysPlan = true;
 
     /// <summary>True while a load or an opened plan puts the lines in or right, which isn't an edit of each line.</summary>
     private bool _restoring;
@@ -96,6 +102,27 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
             {
                 Recalculate();
             }
+        }
+    }
+
+    private DateTime? _makeOn;
+    /// <summary>
+    /// The day the plan is to be made (2026-10-29, at the user's request: plans by date), or null for any day. Kept for this
+    /// Windows user, as the plan is, and saved with a saved plan, whose place in the Saved Plans list it sets.
+    /// </summary>
+    public DateTime? MakeOn
+    {
+        get => _makeOn;
+        set
+        {
+            value = value?.Date;
+            if (_makeOn == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _makeOn, value);
+            _viewState.WriteList(MakeOnKey, value is { } day ? [day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)] : []);
         }
     }
 
@@ -248,6 +275,9 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
     /// <summary>Empties the table, and closes the saved plan open, if any.</summary>
     public ReactiveCommand<RxVoid, RxVoid> ClearCommand { get; }
 
+    /// <summary>Takes the plan's day away: a plan for any day.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ClearMakeOnCommand { get; }
+
     /// <summary>A Use the spare button ("30 Ube Roll"): that many more units of the product in the plan, on its first line.</summary>
     public ReactiveCommand<SpareUse, RxVoid> UseSpareCommand { get; }
 
@@ -285,6 +315,9 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
         _viewState = viewState;
         _kept = viewState.ReadList(PlanKey);
         _halfBatches = viewState.ReadList(HalfBatchesKey) is ["true"];
+        _makeOn = viewState.ReadList(MakeOnKey) is [var kept] && DateTime.TryParseExact(kept, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
+            ? day
+            : null;
         _keptOpenPlanId = viewState.ReadList(OpenPlanKey) is [var openId] && int.TryParse(openId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)
             ? id
             : null;
@@ -357,6 +390,17 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
             }
 
             Recalculate();
+
+            // The first time the screen loads, with nothing in the table and no plan open: the plan saved for today, if any.
+            if (_lookForTodaysPlan)
+            {
+                _lookForTodaysPlan = false;
+                var today = DateOnly.FromDateTime(DateTime.Today);
+                if (_openPlan is null && Lines.Count == 0 && _data.Plans.FirstOrDefault(p => p.MakeOn == today) is { } todays)
+                {
+                    await OpenPlanAsync(todays);
+                }
+            }
         }));
 
         RemoveLineCommand = ReactiveCommand.Create(
@@ -367,8 +411,10 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
         ClearCommand = ReactiveCommand.Create(() =>
         {
             Lines.Clear();
+            MakeOn = null;
             ShowOpenPlan(null);
         });
+        ClearMakeOnCommand = ReactiveCommand.Create(() => { MakeOn = null; }, this.WhenAnyValue(x => x.MakeOn).Select(day => day is not null));
         UseSpareCommand = ReactiveCommand.Create<SpareUse>(use =>
         {
             if (Lines.FirstOrDefault(l => l.ProductId == use.ProductId) is { } line)
@@ -392,7 +438,7 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
     public ProductPrintSet PrintSet(DateTime printedAt) => ProductPrintSet.Of(
         new PrintedPlan([.. Lines.Where(l => l.Product is not null && l.Units is > 0m)], [.. Mixes], [.. Requisition], TotalCost, Notes)
         {
-            PlanName = _openPlan?.Name,
+            PlanName = _openPlan?.Name is { } name && MakeOn is { } day ? $"{name}, {day:ddd, MMM d}" : _openPlan?.Name,
             HalfBatches = HalfBatches,
             TotalBuyCost = TotalBuyCost,
             TotalSales = TotalSales,
@@ -483,13 +529,16 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
 
     private Product? Find(int id) => _data?.Products.GetValueOrDefault(id);
 
-    /// <summary>The kept lines whose products are still there: "12:40" is 40 of product 12.</summary>
+    /// <summary>
+    /// The kept lines whose products are still there: "12:40" is 40 of product 12, and "12:40:38:3" also 38 made and 3 left
+    /// over (2026-10-29); either can be blank.
+    /// </summary>
     private IEnumerable<PlanLineRow> Parse(IReadOnlyList<string> kept)
     {
         foreach (var entry in kept)
         {
             var parts = entry.Split(':');
-            if (parts.Length == 2
+            if (parts.Length is 2 or 4
                 && int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)
                 && decimal.TryParse(parts[1], NumberStyles.Number, CultureInfo.InvariantCulture, out var units)
                 && Find(id) is not null)
@@ -497,23 +546,38 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
                 var line = CreateLine();
                 line.ProductId = id;
                 line.Units = units;
+                if (parts.Length == 4)
+                {
+                    line.MadeUnits = decimal.TryParse(parts[2], NumberStyles.Number, CultureInfo.InvariantCulture, out var made) ? made : null;
+                    line.LeftoverUnits = decimal.TryParse(parts[3], NumberStyles.Number, CultureInfo.InvariantCulture, out var left) ? left : null;
+                }
+
                 yield return line;
             }
         }
     }
 
     /// <summary>
-    /// Keeps the plan for next time: every line with a product, as "id:units". Units are written without trailing zeros, as
-    /// typed: a saved plan's come back from the database with four places ("40.0000").
+    /// Keeps the plan for next time: every line with a product, as "id:units", or "id:units:made:left" once a result is
+    /// typed. Figures are written without trailing zeros, as typed: a saved plan's come back from the database with four
+    /// places ("40.0000").
     /// </summary>
     private void Keep() => _viewState.WriteList(
         PlanKey,
-        [.. Lines.Where(l => l.ProductId is not null).Select(l => string.Create(CultureInfo.InvariantCulture, $"{l.ProductId}:{l.Units ?? 0m:0.##########}"))]);
+        [
+            .. Lines.Where(l => l.ProductId is not null).Select(l => l.MadeUnits is null && l.LeftoverUnits is null
+                ? string.Create(CultureInfo.InvariantCulture, $"{l.ProductId}:{l.Units ?? 0m:0.##########}")
+                : string.Create(CultureInfo.InvariantCulture, $"{l.ProductId}:{l.Units ?? 0m:0.##########}:{l.MadeUnits:0.##########}:{l.LeftoverUnits:0.##########}")),
+        ]);
 
-    /// <summary>The table's plan as a saved plan holds it: the lines with a product and units to make, in order.</summary>
+    /// <summary>The table's plan as a saved plan holds it: the lines with a product and units to make, in order, with their results.</summary>
     private PlanContents Contents() => new(
-        [.. Lines.Where(l => l.ProductId is not null && l.Units is > 0m).Select(l => (l.ProductId!.Value, l.Units!.Value))],
-        HalfBatches);
+        [
+            .. Lines.Where(l => l.ProductId is not null && l.Units is > 0m)
+                .Select(l => new PlanContentsLine(l.ProductId!.Value, l.Units!.Value, l.MadeUnits, l.LeftoverUnits)),
+        ],
+        HalfBatches,
+        MakeOn is { } day ? DateOnly.FromDateTime(day) : null);
 
     /// <summary>
     /// Opens <paramref name="plan"/>: its products replace the table's, in its order, and its half batches are ticked or
@@ -550,10 +614,13 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
                     var line = CreateLine();
                     line.ProductId = saved.ProductId;
                     line.Units = saved.Units;
+                    line.MadeUnits = saved.MadeUnits;
+                    line.LeftoverUnits = saved.LeftoverUnits;
                     Lines.Add(line);
                 }
 
                 HalfBatches = plan.HalfBatches;
+                MakeOn = plan.MakeOn?.ToDateTime(TimeOnly.MinValue);
             }
             finally
             {
@@ -586,7 +653,7 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
             "Save Plan",
             "Name",
             _openPlan?.Name ?? string.Empty,
-            "Saves the products in the plan, and whether it's in half batches, under this name, to open here again.")))?.Trim();
+            "Saves the products in the plan, what was made and left over, whether it's in half batches, and the day it's made on, under this name, to open here again.")))?.Trim();
         if (name is null)
         {
             return;
@@ -601,8 +668,9 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
 
         var id = await _savedPlanRepository.SaveAsync(
             name,
-            [.. contents.Lines.Select(l => new SavedPlanLine { ProductId = l.ProductId, Units = l.Units })],
+            [.. contents.Lines.Select(l => new SavedPlanLine { ProductId = l.ProductId, Units = l.Units, MadeUnits = l.Made, LeftoverUnits = l.Left })],
             contents.HalfBatches,
+            contents.MakeOn,
             DateTime.Now,
             CancellationToken.None);
         ShowPlans(await _savedPlanRepository.GetAllAsync(CancellationToken.None));
@@ -706,6 +774,11 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
         {
             Edited();
         }
+        else if (e.PropertyName is nameof(PlanLineRow.MadeUnits) or nameof(PlanLineRow.LeftoverUnits) && !_restoring && _data is not null && _kept is null)
+        {
+            // A result typed changes nothing to make or buy: it's only kept.
+            Keep();
+        }
     }
 
     /// <summary>An edit to the plan: kept, once the products are known (before then the lines are only the kept ones going back in), and worked out again.</summary>
@@ -732,13 +805,17 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
 
     private sealed record Data(IReadOnlyDictionary<int, Product> Products, ProductionPlanSource Source, IReadOnlyList<SavedPlan> Plans);
 
-    /// <summary>A plan as a saved plan holds it: each product and its units, in order, and its half batches.</summary>
-    private sealed record PlanContents(IReadOnlyList<(int ProductId, decimal Units)> Lines, bool HalfBatches)
+    /// <summary>A plan as a saved plan holds it: each product, its units and results, in order, its half batches and its day.</summary>
+    private sealed record PlanContents(IReadOnlyList<PlanContentsLine> Lines, bool HalfBatches, DateOnly? MakeOn)
     {
-        public static PlanContents Empty { get; } = new([], false);
+        public static PlanContents Empty { get; } = new([], false, null);
 
-        public static PlanContents Of(SavedPlan plan) => new([.. plan.Lines.Select(l => (l.ProductId, l.Units))], plan.HalfBatches);
+        public static PlanContents Of(SavedPlan plan) =>
+            new([.. plan.Lines.Select(l => new PlanContentsLine(l.ProductId, l.Units, l.MadeUnits, l.LeftoverUnits))], plan.HalfBatches, plan.MakeOn);
 
-        public bool Matches(PlanContents other) => HalfBatches == other.HalfBatches && Lines.SequenceEqual(other.Lines);
+        public bool Matches(PlanContents other) => HalfBatches == other.HalfBatches && MakeOn == other.MakeOn && Lines.SequenceEqual(other.Lines);
     }
+
+    /// <summary>One line of <see cref="PlanContents"/>: a product, its units to make, and what was made and left over.</summary>
+    private sealed record PlanContentsLine(int ProductId, decimal Units, decimal? Made, decimal? Left);
 }

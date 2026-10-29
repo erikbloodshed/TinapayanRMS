@@ -28,7 +28,7 @@ public class SavedPlanPersistenceTests(DatabaseFixture fixture) : PersistenceTes
         var ensaymadaId = await AddProductAsync("Ensaymada");
         var repository = CreateRepository();
 
-        var id = await repository.SaveAsync("  Saturday  ", [Line(pandesalId, 1150m), Line(ensaymadaId, 40.5m), Line(pandesalId, 50m)], true, SavedAt, Cancellation);
+        var id = await repository.SaveAsync("  Saturday  ", [Line(pandesalId, 1150m), Line(ensaymadaId, 40.5m), Line(pandesalId, 50m)], true, null, SavedAt, Cancellation);
 
         var plan = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
         plan.Id.Should().Be(id);
@@ -45,13 +45,52 @@ public class SavedPlanPersistenceTests(DatabaseFixture fixture) : PersistenceTes
         var pandesalId = await AddProductAsync("Pandesal");
         var ensaymadaId = await AddProductAsync("Ensaymada");
         var repository = CreateRepository();
-        await repository.SaveAsync("Weekday", [Line(pandesalId, 800m), Line(ensaymadaId, 20m)], false, SavedAt.AddDays(1), Cancellation);
-        await repository.SaveAsync("Sunday", [Line(pandesalId, 600m)], false, SavedAt, Cancellation);
-        await repository.SaveAsync("Saturday", [Line(ensaymadaId, 60m)], false, SavedAt, Cancellation);
+        await repository.SaveAsync("Weekday", [Line(pandesalId, 800m), Line(ensaymadaId, 20m)], false, null, SavedAt.AddDays(1), Cancellation);
+        await repository.SaveAsync("Sunday", [Line(pandesalId, 600m)], false, null, SavedAt, Cancellation);
+        await repository.SaveAsync("Saturday", [Line(ensaymadaId, 60m)], false, null, SavedAt, Cancellation);
 
         var plans = await repository.GetAllAsync(Cancellation);
 
         plans.Select(p => (p.Name, p.Lines.Count)).Should().Equal(("Weekday", 2), ("Saturday", 1), ("Sunday", 1));
+    }
+
+    [Fact]
+    public async Task A_plan_keeps_its_day_and_what_was_made_and_left_over_and_reads_in_order_of_its_day()
+    {
+        var pandesalId = await AddProductAsync("Pandesal");
+        var repository = CreateRepository();
+        var made = Line(pandesalId, 1000m);
+        made.MadeUnits = 960m;
+        made.LeftoverUnits = 35m;
+        await repository.SaveAsync("Fiesta", [made], false, new DateOnly(2026, 11, 7), SavedAt, Cancellation);
+        await repository.SaveAsync("Weekday", [Line(pandesalId, 800m)], false, null, SavedAt.AddDays(3), Cancellation);
+        await repository.SaveAsync("Saturday", [Line(pandesalId, 900m)], false, new DateOnly(2026, 10, 31), SavedAt.AddDays(5), Cancellation);
+
+        var plans = await repository.GetAllAsync(Cancellation);
+
+        plans.Select(p => p.Name).Should().Equal(["Fiesta", "Saturday", "Weekday"], "by their days, a plan without one by the day it was saved, newest first");
+        plans[0].MakeOn.Should().Be(new DateOnly(2026, 11, 7));
+        plans[0].Lines.Single().Should().BeEquivalentTo(new { MadeUnits = 960m, LeftoverUnits = 35m });
+        plans[2].MakeOn.Should().BeNull();
+        plans[2].Lines.Single().MadeUnits.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(-1, null)]
+    [InlineData(10, 11)]
+    [InlineData(null, 2)]
+    [InlineData(10, -1)]
+    public async Task Results_that_cant_be_are_refused(int? madeUnits, int? leftoverUnits)
+    {
+        var pandesalId = await AddProductAsync("Pandesal");
+        var line = Line(pandesalId, 10m);
+        line.MadeUnits = madeUnits;
+        line.LeftoverUnits = leftoverUnits;
+
+        var act = () => CreateRepository().SaveAsync("Saturday", [line], false, null, SavedAt, Cancellation);
+
+        await act.Should().ThrowAsync<BusinessRuleException>();
+        (await CreateRepository().GetAllAsync(Cancellation)).Should().BeEmpty();
     }
 
     [Fact]
@@ -60,9 +99,9 @@ public class SavedPlanPersistenceTests(DatabaseFixture fixture) : PersistenceTes
         var pandesalId = await AddProductAsync("Pandesal");
         var ensaymadaId = await AddProductAsync("Ensaymada");
         var repository = CreateRepository();
-        var id = await repository.SaveAsync("Saturday", [Line(pandesalId, 1000m), Line(ensaymadaId, 40m)], false, SavedAt, Cancellation);
+        var id = await repository.SaveAsync("Saturday", [Line(pandesalId, 1000m), Line(ensaymadaId, 40m)], false, null, SavedAt, Cancellation);
 
-        var resavedId = await repository.SaveAsync("saturday", [Line(ensaymadaId, 60m)], true, SavedAt.AddDays(7), Cancellation);
+        var resavedId = await repository.SaveAsync("saturday", [Line(ensaymadaId, 60m)], true, null, SavedAt.AddDays(7), Cancellation);
 
         resavedId.Should().Be(id);
         var plan = (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
@@ -79,9 +118,9 @@ public class SavedPlanPersistenceTests(DatabaseFixture fixture) : PersistenceTes
     {
         var pandesalId = await AddProductAsync("Pandesal");
         var repository = CreateRepository();
-        await repository.SaveAsync("Saturday", [Line(pandesalId, 1000m)], false, SavedAt, Cancellation);
+        await repository.SaveAsync("Saturday", [Line(pandesalId, 1000m)], false, null, SavedAt, Cancellation);
 
-        var act = () => repository.SaveAsync("Saturday", [Line(pandesalId, 0m)], false, SavedAt, Cancellation);
+        var act = () => repository.SaveAsync("Saturday", [Line(pandesalId, 0m)], false, null, SavedAt, Cancellation);
 
         await act.Should().ThrowAsync<BusinessRuleException>().WithMessage(SavedPlanRules.UnitsText);
         (await repository.GetAllAsync(Cancellation)).Single().Lines.Single().Units.Should().Be(1000m);
@@ -92,8 +131,8 @@ public class SavedPlanPersistenceTests(DatabaseFixture fixture) : PersistenceTes
     {
         var pandesalId = await AddProductAsync("Pandesal");
         var repository = CreateRepository();
-        var goneId = await repository.SaveAsync("Gone", [Line(pandesalId, 10m)], false, SavedAt, Cancellation);
-        await repository.SaveAsync("Kept", [Line(pandesalId, 5m)], false, SavedAt, Cancellation);
+        var goneId = await repository.SaveAsync("Gone", [Line(pandesalId, 10m)], false, null, SavedAt, Cancellation);
+        await repository.SaveAsync("Kept", [Line(pandesalId, 5m)], false, null, SavedAt, Cancellation);
 
         await repository.DeleteAsync(goneId, Cancellation);
         await repository.DeleteAsync(goneId, Cancellation);
@@ -109,7 +148,7 @@ public class SavedPlanPersistenceTests(DatabaseFixture fixture) : PersistenceTes
         var pandesalId = await AddProductAsync("Pandesal");
         var ensaymadaId = await AddProductAsync("Ensaymada");
         var repository = CreateRepository();
-        await repository.SaveAsync("Saturday", [Line(pandesalId, 1000m), Line(ensaymadaId, 40m)], false, SavedAt, Cancellation);
+        await repository.SaveAsync("Saturday", [Line(pandesalId, 1000m), Line(ensaymadaId, 40m)], false, null, SavedAt, Cancellation);
         var products = new ProductRepository(CreateDbContextFactory());
 
         await products.DeleteAsync(ensaymadaId, Cancellation);

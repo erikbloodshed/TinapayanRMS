@@ -908,6 +908,10 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("half_batches");
 
+                    b.Property<DateOnly?>("MakeOn")
+                        .HasColumnType("date")
+                        .HasColumnName("make_on");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -938,6 +942,16 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<decimal?>("LeftoverUnits")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("leftover_units");
+
+                    b.Property<decimal?>("MadeUnits")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("made_units");
+
                     b.Property<int>("ProductId")
                         .HasColumnType("integer")
                         .HasColumnName("product_id");
@@ -966,6 +980,10 @@ namespace TinapayanRMS.Infrastructure.Migrations
 
                     b.ToTable("saved_plan_lines", null, t =>
                         {
+                            t.HasCheckConstraint("CK_SavedPlanLines_LeftoverUnits", "leftover_units IS NULL OR (made_units IS NOT NULL AND leftover_units >= 0 AND leftover_units <= made_units)");
+
+                            t.HasCheckConstraint("CK_SavedPlanLines_MadeUnits", "made_units IS NULL OR made_units >= 0");
+
                             t.HasCheckConstraint("CK_SavedPlanLines_Units", "units > 0");
                         });
                 });

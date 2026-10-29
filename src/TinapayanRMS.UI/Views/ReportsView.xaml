@@ -374,6 +374,56 @@
                         </DockPanel>
                     </Border>
                 </syncfusion:TabItemExt>
+
+                <!-- 2026-10-29: the saved plans' results, what was made against what was planned, by category -->
+                <syncfusion:TabItemExt Header="Production Results" CanClose="False">
+                    <Border Padding="12">
+                        <DockPanel>
+                            <Grid DockPanel.Dock="Top">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Production Results" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                                <syncfusion:ButtonAdv Grid.Column="1"
+                                                      Label="Export to Excel"
+                                                      IconTemplate="{StaticResource ExportIconTemplate}"
+                                                      Command="{Binding ExportProductionResultsCommand}"
+                                                      ToolTip="Saves this table to an Excel workbook as it's shown, in its order."
+                                                      VerticalAlignment="Center" />
+                            </Grid>
+                            <TextBlock DockPanel.Dock="Top"
+                                       Text="What the saved plans made against what they planned, for every product whose Made is typed on the Production Plan, added up by product category in pieces (a box of 8 is 8 pieces). Short % is how far the pieces made fell short of those planned; Left Over % is of those made. Set Short % against the Wastage % the category is priced with (Settings, Product Categories): a category that keeps falling short by more may need a higher Wastage %."
+                                       Style="{StaticResource CaptionStyle}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,12" />
+                            <syncfusion:SfDataGrid x:Name="ProductionResultsGrid"
+                                                   ItemsSource="{Binding ProductionResults}"
+                                                   GridLinesVisibility="Both"
+                                                   CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                                   CurrentCellBorderThickness="1"
+                                                   controls:GridFillerRows.IsEnabled="True"
+                                                   AutoGenerateColumns="False"
+                                                   AllowEditing="False"
+                                                   AllowSorting="True"
+                                                   SelectionMode="Single"
+                                                   NavigationMode="Row"
+                                                   ColumnSizer="Star">
+                                <syncfusion:SfDataGrid.Columns>
+                                    <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" Width="200" />
+                                    <controls:NumericColumn MappingName="Plans" HeaderText="Plans" NumberDecimalDigits="0" Width="80" />
+                                    <controls:NumericColumn MappingName="PlannedPieces" HeaderText="Planned (pcs)" NumberDecimalDigits="0" />
+                                    <controls:NumericColumn MappingName="MadePieces" HeaderText="Made (pcs)" NumberDecimalDigits="0" />
+                                    <controls:NumericColumn MappingName="ShortPercent" HeaderText="Short %" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="LeftoverPieces" HeaderText="Left Over (pcs)" NumberDecimalDigits="0" />
+                                    <controls:NumericColumn MappingName="LeftoverPercent" HeaderText="Left Over %" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="WastagePercent" HeaderText="Wastage %" NumberDecimalDigits="2" />
+                                    <syncfusion:GridTextColumn MappingName="Note" HeaderText="Note" Width="240" />
+                                </syncfusion:SfDataGrid.Columns>
+                            </syncfusion:SfDataGrid>
+                        </DockPanel>
+                    </Border>
+                </syncfusion:TabItemExt>
             </syncfusion:TabControlExt>
         </Border>
 

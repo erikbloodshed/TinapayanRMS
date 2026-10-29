@@ -940,6 +940,19 @@ How each product's markup at its **Current Price** has moved since a day you pic
 
 **Only dropped**, ticked to start with, shows only the products whose markup fell. A product isn't listed when it had no version by that day (its history began later) or no Current Price then or now. Double-click a product to open it.
 
+### Production Results
+
+How the saved Production Plans actually turned out, by product category: for every product whose **Made** is typed on a saved plan (see [Record what was made](#record-what-was-made)). Everything is in pieces, so a Box of 8 counts as 8 pieces and boxes and single pieces add up together.
+
+- **Plans**: how many saved plans have a result for the category.
+- **Planned (pcs)** and **Made (pcs)**: the pieces planned and made, on the lines with a result.
+- **Short %**: how far the pieces made fell short of those planned. Below 0 means more were made than planned.
+- **Left Over (pcs)** and **Left Over %**: the pieces left unsold, and their share of those made.
+- **Wastage %**: the [Wastage %](#wastage) the category's products are priced with: its own (Settings → Product Categories) or the shop's.
+- **Note**: says *Short by more than its Wastage %* when the shortfall is bigger than the wastage allows for. If a category keeps showing it, its Wastage % may be set too low.
+
+A product deleted since isn't counted.
+
 ### Exporting to Excel
 
 Each tab has **Export to Excel** at its top right. It saves the table to an Excel workbook (an .xlsx file) exactly as it's shown:
@@ -1044,13 +1057,15 @@ The first page lists the **Price Changes** tried, then every product with its **
 
 ### Saved plans
 
-At the top left, **Saved Plans** lists the plans saved under a name, such as *Saturday* or *Fiesta order*, newest first.
+At the top left, **Saved Plans** lists the plans saved under a name, such as *Saturday* or *Fiesta order*, with their **Make On** day. They're in order of that day, newest first; a plan with no day goes by the day it was saved.
 
-- **Save Plan** asks for a name and saves the products in the plan, and whether it's in half batches. With a saved plan open, the name starts as its own, so saving again updates it. Saving under another plan's name asks first, then replaces that plan.
+- **Save Plan** asks for a name and saves the products in the plan, what was **Made** and **Left Over**, whether it's in half batches, and its **Make On** day. With a saved plan open, the name starts as its own, so saving again updates it. Saving under another plan's name asks first, then replaces that plan.
 - Click a plan in the list to open it. Its products replace the ones in the table. If the table holds a plan that isn't saved, you're asked first. A product deleted since the plan was saved is left out, and a message says so.
 - **Delete Plan** deletes the open plan, after asking. Its products stay in the table.
 
 Saved plans are kept in the database, so everyone using the app on this computer sees them, and they're in every backup. A product deleted for good is taken out of every saved plan.
+
+**Make On**, above the Plan table, is the day the plan is to be made. Pick it from the calendar; **No Day** takes it away, for a plan made any day, such as a weekday's usual. It's saved with the plan. When you open the Production Plan with an empty table and nothing open, the plan saved for today opens by itself.
 
 ### The plan
 
@@ -1061,6 +1076,7 @@ Under it, the **Plan** table lists the products to make:
 - **Pieces**: what the units come to. A composite product shows none, since it's one unit of other products.
 - **Sales**: what the units sell for, at the product's **Current Price**, with VAT.
 - **Profit**: what they earn over the product's base cost (its ingredients, packaging, wastage, labor, overhead and administrative), once the VAT is taken out.
+- <a id="record-what-was-made"></a>**Made** and **Left Over**: once the plan's been baked and sold, how many units were actually made, and how many of those were left unsold, in the same units. Fill them in and **Save Plan**: Reports' [Production Results](#production-results) adds them up, to show whether the [Wastage %](#wastage) is right. Left Over can't be more than Made, and needs Made typed first. They change nothing to make or buy.
 
 Under the table are the plan's total **Sales**, **Profit** and **Profit Margin** (the profit as a share of the sales before VAT, as on the Products screen's Costing tab). A product with no Current Price is counted at the selling price its costing works out, and a note in orange names it.
 
@@ -1266,8 +1282,9 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 2. For a plan you make often, click it in **Saved Plans**. Otherwise, in the **Plan** table, pick each product and type how many to make.
 3. Check the **Mixing Sheet** for how many batches of each mix to make, and read any orange note under it. Open a mix's row to see its ingredients, and look at **Spare**: if a mix makes 30 pieces more than you need, you can add up to 30 to the plan for no extra mixing. **Use the spare** under the table adds them with one press. Tick **Half batches** if the kitchen can mix half a batch.
 4. Check **Sales** and **Profit** under the Plan table, and the **Buy Cost** of the Purchase Requisition: the money to take to the market.
-5. To keep the plan for another day, press **Save Plan** and name it.
+5. To keep the plan for another day, pick its **Make On** day, press **Save Plan** and name it. On that day it opens by itself, if the Plan table is empty.
 6. Press **Print**, clear **Costs** for the kitchen, and print. Or press **Export to Excel** to send the purchase requisition on.
+7. After the day's baking and selling, open the plan again, type each product's **Made** and **Left Over**, and press **Save Plan**.
 
 ### See what a price rise would do
 

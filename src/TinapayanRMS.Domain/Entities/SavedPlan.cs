@@ -14,6 +14,15 @@ public class SavedPlan
     /// <summary>When it was last saved, in the shop's local time.</summary>
     public DateTime SavedAt { get; set; }
 
+    /// <summary>
+    /// The day it's to be made (2026-10-29, at the user's request: plans by date), or null for a plan made any day, such as a
+    /// weekday's usual. The Saved Plans list is in its order, and the screen opens the plan for today by itself.
+    /// </summary>
+    public DateOnly? MakeOn { get; set; }
+
+    /// <summary>"Sat, Oct 31", as the Saved Plans list shows <see cref="MakeOn"/>; blank for a plan made any day.</summary>
+    public string MakeOnText => MakeOn is { } day ? day.ToString("ddd, MMM d", System.Globalization.CultureInfo.CurrentCulture) : string.Empty;
+
     /// <summary>Its mixes are rounded up to half batches rather than whole ones.</summary>
     public bool HalfBatches { get; set; }
 

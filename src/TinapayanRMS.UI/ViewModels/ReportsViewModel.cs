@@ -190,6 +190,20 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
 
     public const string MarginErosionTitle = "Margin Erosion";
 
+    public const string ProductionResultsTitle = "Production Results";
+
+    /// <summary>
+    /// The saved plans' results, what was made against what was planned, by product category in pieces, beside the Wastage %
+    /// each category is priced with (2026-10-29, ProductionResultsAnalysis).
+    /// </summary>
+    public ObservableCollection<ProductionResultRow> ProductionResults { get; } = [];
+
+    public ReactiveCommand<RxVoid, RxVoid> ExportProductionResultsCommand { get; }
+
+    public GridLayoutStore ProductionResultsLayout { get; }
+
+    private readonly ISavedPlanRepository? _savedPlanRepository;
+
     /// <summary>The purchased materials that make up most of what the products in Production cost, the most first (2026-10-29).</summary>
     public ObservableCollection<CostDriverRow> CostDrivers { get; } = [];
 
@@ -323,9 +337,13 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         IViewStateStore viewState,
         ILogger logger,
         IProductVersionRepository? versionRepository = null,
-        IIngredientBomLineRepository? bomLineRepository = null)
+        IIngredientBomLineRepository? bomLineRepository = null,
+        ISavedPlanRepository? savedPlanRepository = null)
         : base(logger)
     {
+        _savedPlanRepository = savedPlanRepository;
+        ProductionResultsLayout = new GridLayoutStore(viewState, "reports-production-results");
+        ExportProductionResultsCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(ProductionResultsTitle));
         _versionRepository = versionRepository;
         _bomLineRepository = bomLineRepository;
         CostDriversLayout = new GridLayoutStore(viewState, "reports-cost-drivers");
@@ -356,11 +374,14 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
             var productCostsRead = Task.Run(ReadProductCostsAsync);
             var costDriversRead = Task.Run(ReadCostDriversAsync);
             var rawMaterialPricesRead = Task.Run(ReadRawMaterialPricesAsync);
-            var productCosts = await productCostsRead;
+            var (productCosts, saved) = await productCostsRead;
+            var productionResults = await Task.Run(() => ReadProductionResultsAsync(saved));
             var (rawMaterialPrices, costBuffers) = await rawMaterialPricesRead;
 
             ProductCosts.Clear();
             ProductCosts.AddRange(productCosts);
+            ProductionResults.Clear();
+            ProductionResults.AddRange(productionResults);
             RawMaterialPrices.Clear();
             RawMaterialPrices.AddRange(rawMaterialPrices);
             _allCostBuffers = costBuffers;
@@ -377,11 +398,24 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     /// products there are (2026-10-03: they were read a product at a time, nine or so queries each, several products at
     /// once). The rows stay in the list's order, by name.
     /// </summary>
-    private async Task<List<ProductCostRow>> ReadProductCostsAsync()
+    private async Task<(List<ProductCostRow> Rows, IReadOnlyList<SavedProduct> Saved)> ReadProductCostsAsync()
     {
         var products = await _productRepository.GetAllAsync(CancellationToken.None);
         var saved = await _savedProducts.ReadAllAsync(products, CostBasis.Buffered, CancellationToken.None);
-        return [.. saved.Select(s => new ProductCostRow(s.Product, s.Costs))];
+        return ([.. saved.Select(s => new ProductCostRow(s.Product, s.Costs))], saved);
+    }
+
+    /// <summary>Production Results: the saved plans, against the products as <paramref name="saved"/> has them and the wastage they're priced with.</summary>
+    private async Task<IReadOnlyList<ProductionResultRow>> ReadProductionResultsAsync(IReadOnlyList<SavedProduct> saved)
+    {
+        if (_savedPlanRepository is null)
+        {
+            return [];
+        }
+
+        var plans = await _savedPlanRepository.GetAllAsync(CancellationToken.None);
+        return ProductionResultsAnalysis.Analyse(
+            plans, saved.ToDictionary(s => s.Product.Id, s => s.Product), saved.ToDictionary(s => s.Product.Id, s => s.Costs.WastagePercent));
     }
 
     /// <summary>

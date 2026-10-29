@@ -368,7 +368,7 @@ public class ProductionPlanViewModelTests(DatabaseFixture fixture) : Persistence
     {
         var bakery = await AddBakeryAsync();
         var plans = new SavedPlanRepository(CreateDbContextFactory());
-        await plans.SaveAsync("Weekday", [new SavedPlanLine { ProductId = bakery.CheeseRollId, Units = 10m }], false, DateTime.Now, Cancellation);
+        await plans.SaveAsync("Weekday", [new SavedPlanLine { ProductId = bakery.CheeseRollId, Units = 10m }], false, null, DateTime.Now, Cancellation);
         var viewModel = CreateViewModel(new InMemoryViewStateStore());
         string? asked = null;
         viewModel.ConfirmDelete.RegisterHandler(interaction =>
@@ -395,6 +395,7 @@ public class ProductionPlanViewModelTests(DatabaseFixture fixture) : Persistence
             "Saturday",
             [new SavedPlanLine { ProductId = bakery.UbeRollId, Units = 10m }, new SavedPlanLine { ProductId = bakery.BoxId, Units = 5m }],
             false,
+            null,
             DateTime.Now,
             Cancellation);
         await new ProductRepository(CreateDbContextFactory()).DeleteAsync(bakery.BoxId, Cancellation);
@@ -424,6 +425,76 @@ public class ProductionPlanViewModelTests(DatabaseFixture fixture) : Persistence
         viewModel.SelectedPlan.Should().BeNull();
         viewModel.Lines.Single().ProductId.Should().Be(bakery.UbeRollId);
         (await new SavedPlanRepository(CreateDbContextFactory()).GetAllAsync(Cancellation)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_plans_day_and_results_are_saved_with_it_kept_for_next_time_and_opened_again()
+    {
+        var bakery = await AddBakeryAsync();
+        var store = new InMemoryViewStateStore();
+        var viewModel = CreateViewModel(store);
+        viewModel.PromptForName.RegisterHandler(interaction => interaction.SetOutput("Fiesta"));
+        await viewModel.LoadCommand.Execute();
+        AddLine(viewModel, bakery.UbeRollId, 40m);
+        viewModel.MakeOn = new DateTime(2026, 11, 7, 15, 30, 0);
+        viewModel.Lines[0].MadeUnits = 38m;
+        viewModel.Lines[0].LeftoverUnits = 3m;
+
+        viewModel.MakeOn.Should().Be(new DateTime(2026, 11, 7), "a day, not a time");
+        store.ReadList(ProductionPlanViewModel.PlanKey).Should().Equal($"{bakery.UbeRollId}:40:38:3");
+        store.ReadList(ProductionPlanViewModel.MakeOnKey).Should().Equal("2026-11-07");
+        await viewModel.SavePlanCommand.Execute();
+
+        var saved = viewModel.Plans.Single();
+        saved.MakeOn.Should().Be(new DateOnly(2026, 11, 7));
+        saved.Lines.Single().Should().BeEquivalentTo(new { MadeUnits = 38m, LeftoverUnits = 3m });
+
+        // A result typed since is a change to the plan; opened again, it's back as saved.
+        viewModel.Lines[0].LeftoverUnits = 5m;
+        viewModel.HasUnsavedChanges.Should().BeTrue();
+        viewModel.ConfirmDelete.RegisterHandler(interaction => interaction.SetOutput(true));
+        await viewModel.ClearCommand.Execute();
+        viewModel.MakeOn.Should().BeNull();
+        await viewModel.OpenPlanCommand.Execute(saved);
+        viewModel.MakeOn.Should().Be(new DateTime(2026, 11, 7));
+        viewModel.Lines.Single().LeftoverUnits.Should().Be(3m);
+
+        // Next run, the kept table comes back with its results.
+        var next = CreateViewModel(store);
+        await next.LoadCommand.Execute();
+        next.Lines.Single().MadeUnits.Should().Be(38m);
+        next.MakeOn.Should().Be(new DateTime(2026, 11, 7));
+    }
+
+    [Fact]
+    public async Task The_plan_saved_for_today_opens_by_itself_when_the_table_is_empty_and_only_then()
+    {
+        var bakery = await AddBakeryAsync();
+        var plans = new SavedPlanRepository(CreateDbContextFactory());
+        await plans.SaveAsync(
+            "Today", [new SavedPlanLine { ProductId = bakery.UbeRollId, Units = 12m }], false, DateOnly.FromDateTime(DateTime.Today), DateTime.Now, Cancellation);
+
+        var empty = CreateViewModel(new InMemoryViewStateStore());
+        await empty.LoadCommand.Execute();
+        await WaitUntilAsync(() => empty.Lines.Count == 1);
+        empty.SelectedPlan!.Name.Should().Be("Today");
+
+        var store = new InMemoryViewStateStore();
+        store.WriteList(ProductionPlanViewModel.PlanKey, [$"{bakery.CheeseRollId}:5"]);
+        var busy = CreateViewModel(store);
+        await busy.LoadCommand.Execute();
+        busy.Lines.Single().ProductId.Should().Be(bakery.CheeseRollId, "a plan already in the table is left alone");
+        busy.SelectedPlan.Should().BeNull();
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        for (var i = 0; i < 100 && !condition(); i++)
+        {
+            await Task.Delay(20, TestContext.Current.CancellationToken);
+        }
+
+        condition().Should().BeTrue();
     }
 
     [Fact]

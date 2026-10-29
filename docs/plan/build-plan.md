@@ -172,6 +172,7 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 | 2026-10-29 | **Find (Ctrl+K)**, at the user's request ("search everything"): one box over every raw material, standalone sub-assembly and product name, opening the pick on its own screen (`QuickFindViewModel`, `QuickFindWindow`). No migration | Done |
 | 2026-10-29 | **Wastage per category**, at the user's request: a product category's own Wastage % (Settings → Product Categories) prices its products in place of the shop-wide one; blank keeps the shop-wide one. Also: the Price Simulator's "As now" boxes now show their placeholder (`WatermarkTextIsVisible`). Migration `ProductCategoryWastagePercent` | Done |
 | 2026-10-29 | **Cost by preferred brand**, at the user's request: Raw Materials' **Cost From** costs a purchased material at a brand picked instead of the dearest (`RawMaterial.PreferredBrand`, `RawMaterialRules.FindCostBrandPrice`); the average wasn't built. Also fixed: Undo left the Cost Buffer % box stale. Migration `RawMaterialPreferredBrand` | Done |
+| 2026-10-29 | **Plans by date** and **record actual results**, at the user's request: a saved plan's **Make On** day (the list in its order, today's opening by itself) and each line's **Made** and **Left Over**, which Reports' new **Production Results** adds up by category against its Wastage %. Migration `SavedPlanDayAndResults` | Done |
 
 ## Open items (for later phases)
 

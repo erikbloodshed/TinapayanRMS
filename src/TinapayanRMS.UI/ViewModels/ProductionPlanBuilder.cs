@@ -70,6 +70,22 @@ public sealed class PlanLineRow(Func<int, Product?> find, Func<int, ProductCostS
         }
     }
 
+    private decimal? _madeUnits;
+    /// <summary>The sellable units actually made, typed once the plan's been baked (2026-10-29); null until then.</summary>
+    public decimal? MadeUnits
+    {
+        get => _madeUnits;
+        set => this.RaiseAndSetIfChanged(ref _madeUnits, value);
+    }
+
+    private decimal? _leftoverUnits;
+    /// <summary>Of <see cref="MadeUnits"/>, the units left over unsold; null when not recorded.</summary>
+    public decimal? LeftoverUnits
+    {
+        get => _leftoverUnits;
+        set => this.RaiseAndSetIfChanged(ref _leftoverUnits, value);
+    }
+
     /// <summary>"160 pcs" for 20 boxes of 8; blank for a composite, which is one of itself, or with no units yet.</summary>
     public string PiecesText => Product is { IsComposite: false } product && Units is > 0m and var units
         ? $"{RecipeScalingRules.PiecesFor(units, product.QuantityRequired):#,0.##} pcs"
