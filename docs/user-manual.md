@@ -439,6 +439,8 @@ The material's **current cost** comes from the **dearest** brand: its price divi
 
 The buffered cost stays **fixed** when brand prices change. The percentage then follows, showing how far the fixed amount now sits above the dearest price. If the dearest brand goes above the buffered cost, a warning says so. **To put the buffer back on top of a new price, type the Cost Buffer % again**, then Save.
 
+The app remembers the Cost Buffer % you last typed as the material's **target**. While prices have moved the buffer away from it by a tenth of a point or more, **Target 10%** shows under the buffer with a **Re-apply Target** button, which types it again for you; then Save. To do this for many materials at once, see [Cost Buffers](#cost-buffers) in Reports. A material saved before targets were kept takes the buffer it was last saved with as its target.
+
 On a material's first price, Save works out the buffered cost from the percentage for you.
 
 Every Save that changes a purchased material's cost adds an entry to its **Price History**.
@@ -898,6 +900,20 @@ A material that has never been priced shows blank figures.
 
 Double-click a material to open it on the **Raw Materials** screen.
 
+### Cost Buffers
+
+Every purchased material with a price, and how its fixed **buffered cost** stands against its dearest brand now. Prices rising don't move the buffered cost, so they wear the buffer down: this tab finds the materials where that has happened.
+
+- **Raw Material**, **Type**, **Category** and **Per**: the base unit the costs are per, such as *g*.
+- **Dearest Brand** and **Buffered Cost**: the true cost and the buffered cost, per base unit.
+- **Buffer %**: how far the buffered cost now sits above the dearest brand. Below 0 means a price has gone above it.
+- **Target %**: the Cost Buffer % last typed for the material.
+- **Short By**: how many percentage points the buffer is under its target. Blank when it isn't.
+
+**Only below target**, ticked to start with, shows only the materials at least a tenth of a point under their target. Untick it to see them all.
+
+**Re-apply Target Buffer** puts each material's target buffer back on top of its dearest brand: its buffered cost becomes the dearest brand plus the target. It does this for the materials you've picked (click one, or several with **Ctrl** or **Shift**), or with none picked, for every one shown that's below target. It asks first. The new buffered costs reach every made and linked ingredient, recipe and product using them, as a Save on Raw Materials does. Double-click a material to open it on Raw Materials.
+
 ### Exporting to Excel
 
 Each tab has **Export to Excel** at its top right. It saves the table to an Excel workbook (an .xlsx file) exactly as it's shown:
@@ -1184,7 +1200,7 @@ The app keeps costs at full precision and rounds them only for display. So a tot
 
 1. Open **Raw Materials** and pick the material.
 2. On **Cost Setup**, change the brand's **Purchase Price**, or add a row for a new brand.
-3. The buffered cost stays where it was. To carry the new price into recipes with the buffer on top, **type the Cost Buffer % again**. Alternatively, type a new Buffered Cost.
+3. The buffered cost stays where it was. To carry the new price into recipes with the buffer on top, **type the Cost Buffer % again**, or press **Re-apply Target**. Alternatively, type a new Buffered Cost. After a round of price rises, **Reports → Cost Buffers** finds every material whose buffer they wore down, and re-applies them all at once.
 4. Press **Save**. The change is logged in **Price History** and carried up to every product that uses the material.
 5. Check the effect on the material's **Used By** tab, or open a product and look at its Costing tab.
 

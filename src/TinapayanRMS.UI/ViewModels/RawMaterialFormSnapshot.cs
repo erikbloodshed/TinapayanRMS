@@ -43,6 +43,7 @@ public sealed record RawMaterialFormSnapshot
     public required decimal? CostSharePercent { get; init; }
 
     public required decimal? CostBufferPercent { get; init; }
+    public required decimal? TargetCostBufferPercent { get; init; }
     public required decimal? BufferedCost { get; init; }
     public required int? BufferedCostUnitKey { get; init; }
 
@@ -69,6 +70,7 @@ public sealed record RawMaterialFormSnapshot
         && WeightSharePercent == other.WeightSharePercent
         && CostSharePercent == other.CostSharePercent
         && CostBufferPercent == other.CostBufferPercent
+        && TargetCostBufferPercent == other.TargetCostBufferPercent
         && BufferedCost == other.BufferedCost
         && BufferedCostUnitKey == other.BufferedCostUnitKey
         && UnitRows.SequenceEqual(other.UnitRows)

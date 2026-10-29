@@ -76,6 +76,11 @@ public class RawMaterialConfiguration : IEntityTypeConfiguration<RawMaterial>
             table.HasCheckConstraint(
                 "CK_RawMaterials_CostBufferPercent",
                 "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");
+
+            // The same range as the buffer itself, which it's typed as.
+            table.HasCheckConstraint(
+                "CK_RawMaterials_TargetCostBufferPercent",
+                "target_cost_buffer_percent IS NULL OR (target_cost_buffer_percent >= 0 AND target_cost_buffer_percent <= 100)");
         });
     }
 }

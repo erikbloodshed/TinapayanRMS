@@ -322,6 +322,35 @@ public static class RawMaterialRules
     public static decimal CostBufferPercentOf(decimal cost, decimal bufferedCost) =>
         (bufferedCost / cost - 1) * 100m;
 
+    /// <summary>
+    /// The buffer percent a purchased material is meant to have (2026-10-29): the one last typed for it, or for one saved
+    /// before that was kept, its buffer percent as last saved.
+    /// </summary>
+    public static decimal TargetBufferPercentOf(RawMaterial material) => material.TargetCostBufferPercent ?? material.CostBufferPercent;
+
+    /// <summary>
+    /// The buffer a purchased material's fixed buffered cost now makes over its dearest brand, in percent; null for one
+    /// that isn't purchased, or has no price yet.
+    /// </summary>
+    public static decimal? CurrentBufferPercentOf(RawMaterial material) =>
+        material.Source == RawMaterialSource.Purchased && material.CostPerBaseUnit > 0m && material.BufferedCostPerBaseUnit > 0m
+            ? CostBufferPercentOf(material.CostPerBaseUnit, material.BufferedCostPerBaseUnit)
+            : null;
+
+    /// <summary>
+    /// A purchased material whose buffer has worn below its target as its prices rose (2026-10-29, Reports' Cost Buffers):
+    /// by a tenth of a point or more, so a buffered cost typed to the centavo in a sack or a bag, which comes a hair under
+    /// its percent, isn't counted (found on the dev data: 9.98% against 10%).
+    /// </summary>
+    public static bool IsBufferBelowTarget(RawMaterial material) =>
+        CurrentBufferPercentOf(material) is { } now && Math.Round(now, 1) < Math.Round(TargetBufferPercentOf(material), 1);
+
+    /// <summary>
+    /// A buffer that has drifted from its target, either way, by a tenth of a point or more, as <see cref="IsBufferBelowTarget"/>
+    /// counts it: the Raw Materials form's Re-apply Target shows.
+    /// </summary>
+    public static bool IsOffTarget(decimal bufferPercent, decimal targetPercent) => Math.Round(bufferPercent, 1) != Math.Round(targetPercent, 1);
+
     /// <summary>A cost buffer is at least 0% (none) and at most 100% (double the cost).</summary>
     public static void EnsureValidCostBuffer(decimal bufferPercent)
     {

@@ -78,6 +78,14 @@ public class RawMaterial
     public decimal CostBufferPercent { get; set; }
 
     /// <summary>
+    /// Purchased only: the buffer percent last typed for it, 0 to 100 (2026-10-29), which <see cref="CostBufferPercent"/> drifts
+    /// from as prices change, since the buffered cost stays fixed. What Re-apply Target puts back on top of the dearest brand.
+    /// Null for one saved before it was kept, which takes <see cref="CostBufferPercent"/> as it was last saved instead
+    /// (RawMaterialRules.TargetBufferPercentOf), and for a made or linked ingredient.
+    /// </summary>
+    public decimal? TargetCostBufferPercent { get; set; }
+
+    /// <summary>
     /// The cost of one base unit with the buffer on top: what recipes, sub-assemblies, packaging lines
     /// and products are costed with, while <see cref="CostPerBaseUnit"/> stays the true cost. Stored
     /// alongside it: for Purchased it's CostPerBaseUnit plus the buffer, for Made the BOM rollup of the

@@ -329,6 +329,33 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
     }
 
     /// <summary>A saved purchased ingredient with one alternative unit (a 25 kg bag), open in the form.</summary>
+    [Fact]
+    public async Task Re_apply_Target_types_the_buffer_last_typed_again_once_a_price_has_worn_it_down()
+    {
+        var (viewModel, _) = await OpenPurchasedIngredientAsync();
+
+        // A 25 kg bag at 1,250, 0.05 a gram, the 10% buffer on top: 0.055. Then it rises to 1,300, 0.052, and the buffer wears to 5.77%.
+        var brand = viewModel.NewBrandPriceRow();
+        brand.UnitKey = viewModel.UnitRows[0].UnitOfMeasureId!.Value;
+        brand.Price = 1250m;
+        viewModel.BrandPriceRows.Add(brand);
+        viewModel.TypedCostBufferPercent = 10m;
+        viewModel.EditingBufferedCost.Should().Be(0.055m);
+        viewModel.IsBufferOffTarget.Should().BeFalse();
+
+        brand.Price = 1300m;
+        viewModel.IsBufferOffTarget.Should().BeTrue();
+        viewModel.TargetBufferText.Should().Be("Target 10%");
+
+        await viewModel.ReapplyTargetBufferCommand.Execute();
+
+        viewModel.EditingCostBufferPercent.Should().Be(10m);
+        viewModel.EditingBufferedCost.Should().Be(0.0572m);
+        viewModel.IsBufferOffTarget.Should().BeFalse();
+        viewModel.TryUndo().Should().BeTrue("it's one step to take back");
+        viewModel.EditingBufferedCost.Should().Be(0.055m);
+    }
+
     private async Task<(RawMaterialsViewModel ViewModel, int MaterialId)> OpenPurchasedIngredientAsync()
     {
         var bagId = await GetOrCreateUnitOfMeasureAsync("bag", "bag");

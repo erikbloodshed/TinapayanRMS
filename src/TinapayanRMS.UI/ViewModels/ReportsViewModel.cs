@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using DynamicData;
 using ReactiveUI;
@@ -136,6 +137,41 @@ public sealed class RawMaterialPriceSummaryRow
 }
 
 /// <summary>
+/// A row of Reports' Cost Buffers (2026-10-29): a purchased material with a price, its fixed buffered cost against its dearest
+/// brand now, and the buffer that leaves against the one last typed for it (RawMaterialRules.TargetBufferPercentOf). Rising
+/// prices wear a buffer down, since the buffered cost doesn't follow them.
+/// </summary>
+public sealed class CostBufferRow(RawMaterial material)
+{
+    public int RawMaterialId => material.Id;
+
+    public string Name => material.Name;
+
+    public string Type => material.Type.ToString();
+
+    public string Category => material.Category?.Name ?? string.Empty;
+
+    /// <summary>The base unit the two costs are per: "g" for an ingredient.</summary>
+    public string Per => BaseUnitText.AbbreviationOf(material);
+
+    /// <summary>The dearest brand's cost per base unit: the true cost.</summary>
+    public decimal DearestCost => material.CostPerBaseUnit;
+
+    public decimal BufferedCost => material.BufferedCostPerBaseUnit;
+
+    /// <summary>What the buffered cost now comes to over the dearest brand, in percent; below 0 once a price has passed it.</summary>
+    public decimal BufferPercent => RawMaterialRules.CurrentBufferPercentOf(material) ?? 0m;
+
+    public decimal TargetPercent => RawMaterialRules.TargetBufferPercentOf(material);
+
+    /// <summary>The buffer has worn below the target: Re-apply Target Buffer would put it back.</summary>
+    public bool IsBelowTarget => RawMaterialRules.IsBufferBelowTarget(material);
+
+    /// <summary>How many percentage points below the target; null when it isn't below.</summary>
+    public decimal? ShortBy => IsBelowTarget ? TargetPercent - BufferPercent : null;
+}
+
+/// <summary>
 /// The Reports screen: summaries across every product and every purchased raw material, each on a tab of its own. A load
 /// that fails says why in the screen's error notice (ViewModelBase.LoadSafelyAsync).
 /// </summary>
@@ -146,6 +182,41 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
 
     /// <summary>The Raw Materials Price Summary's name, which its export file takes and the View picks its grid by.</summary>
     public const string RawMaterialPriceSummaryTitle = "Raw Materials Price Summary";
+
+    /// <summary>The Cost Buffers tab's name, which its export file takes and the View picks its grid by.</summary>
+    public const string CostBuffersTitle = "Cost Buffers";
+
+    private IReadOnlyList<CostBufferRow> _allCostBuffers = [];
+
+    /// <summary>Every purchased material with a price and a buffered cost, or only those whose buffer is below target.</summary>
+    public ObservableCollection<CostBufferRow> CostBuffers { get; } = [];
+
+    /// <summary>The Cost Buffers rows picked (its SelectedItems): what Re-apply Target Buffer puts back, when any are.</summary>
+    public ObservableCollection<object> SelectedCostBuffers { get; } = [];
+
+    private bool _onlyBelowTarget = true;
+    /// <summary>Cost Buffers shows only the materials whose buffer is below target; on to start with.</summary>
+    public bool OnlyBelowTarget
+    {
+        get => _onlyBelowTarget;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _onlyBelowTarget, value);
+            ShowCostBuffers();
+        }
+    }
+
+    /// <summary>
+    /// Puts the target buffer back on top of the dearest brand for the materials picked, or for every one shown that's below
+    /// target, once it's confirmed (IRawMaterialRepository.ReapplyTargetBuffersAsync, with the cascade a Save runs).
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> ReapplyTargetBuffersCommand { get; }
+
+    /// <summary>The Cost Buffers table to an Excel workbook, as its grid shows it.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ExportCostBuffersCommand { get; }
+
+    /// <summary>The Cost Buffers table's sort and filters, kept between runs.</summary>
+    public GridLayoutStore CostBuffersLayout { get; }
 
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
     private readonly IRawMaterialRepository _rawMaterialRepository;
@@ -205,6 +276,9 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         _savedProducts = savedProducts;
         ProductCostsLayout = new GridLayoutStore(viewState, "reports-product-costs");
         RawMaterialPricesLayout = new GridLayoutStore(viewState, "reports-raw-material-prices");
+        CostBuffersLayout = new GridLayoutStore(viewState, "reports-cost-buffers");
+        ExportCostBuffersCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(CostBuffersTitle));
+        ReapplyTargetBuffersCommand = ReactiveCommand.CreateFromTask(ReapplyTargetBuffersAsync);
 
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
         OpenRawMaterialCommand = ReactiveCommand.Create<int>(_rawMaterialOpenRequests.OnNext);
@@ -217,12 +291,14 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
             var productCostsRead = Task.Run(ReadProductCostsAsync);
             var rawMaterialPricesRead = Task.Run(ReadRawMaterialPricesAsync);
             var productCosts = await productCostsRead;
-            var rawMaterialPrices = await rawMaterialPricesRead;
+            var (rawMaterialPrices, costBuffers) = await rawMaterialPricesRead;
 
             ProductCosts.Clear();
             ProductCosts.AddRange(productCosts);
             RawMaterialPrices.Clear();
             RawMaterialPrices.AddRange(rawMaterialPrices);
+            _allCostBuffers = costBuffers;
+            ShowCostBuffers();
         }));
     }
 
@@ -239,19 +315,53 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         return [.. saved.Select(s => new ProductCostRow(s.Product, s.Costs))];
     }
 
-    /// <summary>The purchased materials, ingredients and packaging alike, by name: a made or linked ingredient has no price history.</summary>
-    private async Task<List<RawMaterialPriceSummaryRow>> ReadRawMaterialPricesAsync()
+    /// <summary>
+    /// The purchased materials, ingredients and packaging alike, by name: a made or linked ingredient has no price history;
+    /// and those with a price and a buffered cost, for Cost Buffers.
+    /// </summary>
+    private async Task<(List<RawMaterialPriceSummaryRow> Prices, List<CostBufferRow> Buffers)> ReadRawMaterialPricesAsync()
     {
         var materials = await _rawMaterialRepository.GetAllAsync(CancellationToken.None);
         var history = (await _priceHistoryRepository.GetAllAsync(CancellationToken.None)).ToLookup(h => h.RawMaterialId);
+        List<RawMaterial> purchased = [.. materials.Where(m => m.Source == RawMaterialSource.Purchased).OrderBy(m => m.Name)];
 
-        return
-        [
-            .. materials
-                .Where(m => m.Source == RawMaterialSource.Purchased)
-                .OrderBy(m => m.Name)
-                .Select(m => new RawMaterialPriceSummaryRow(m, [.. history[m.Id]])),
-        ];
+        return (
+            [.. purchased.Select(m => new RawMaterialPriceSummaryRow(m, [.. history[m.Id]]))],
+            [.. purchased.Where(m => RawMaterialRules.CurrentBufferPercentOf(m) is not null).Select(m => new CostBufferRow(m))]);
+    }
+
+    private void ShowCostBuffers()
+    {
+        SelectedCostBuffers.Clear();
+        CostBuffers.Clear();
+        CostBuffers.AddRange(OnlyBelowTarget ? _allCostBuffers.Where(r => r.IsBelowTarget) : _allCostBuffers);
+    }
+
+    private async Task ReapplyTargetBuffersAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+        List<CostBufferRow> picked = [.. SelectedCostBuffers.OfType<CostBufferRow>()];
+        List<CostBufferRow> rows = [.. (picked.Count > 0 ? picked : CostBuffers.ToList()).Where(r => r.IsBelowTarget)];
+        if (rows.Count == 0)
+        {
+            ErrorMessage = "No material shown has a buffer below its target.";
+            return;
+        }
+
+        var what = rows.Count == 1 ? rows[0].Name : $"{rows.Count} materials";
+        if (!await ConfirmDelete.Handle(
+                $"Put the target buffer back on top of the dearest brand for {what}? Their buffered costs go up, and so do the costs of every recipe and product using them."))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
+        {
+            var changed = await Task.Run(() => _rawMaterialRepository.ReapplyTargetBuffersAsync([.. rows.Select(r => r.RawMaterialId)], CancellationToken.None));
+            await LoadCommand.Execute();
+            SuccessMessage = $"The target buffer is back on {(changed == 1 ? "1 material" : $"{changed} materials")}.";
+        });
     }
 
     public void Dispose()

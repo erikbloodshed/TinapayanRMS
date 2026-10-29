@@ -22,7 +22,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 "TinapayanRMS.Domain.Entities.RawMaterial",
                 typeof(RawMaterial),
                 baseEntityType,
-                propertyCount: 16,
+                propertyCount: 17,
                 navigationCount: 5,
                 foreignKeyCount: 4,
                 unnamedIndexCount: 5,
@@ -148,6 +148,17 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 nullable: true);
             subAssemblyId.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
             subAssemblyId.AddAnnotation("Relational:ColumnName", "sub_assembly_id");
+
+            var targetCostBufferPercent = runtimeEntityType.AddProperty(
+                "TargetCostBufferPercent",
+                typeof(decimal?),
+                propertyInfo: typeof(RawMaterial).GetProperty("TargetCostBufferPercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                fieldInfo: typeof(RawMaterial).GetField("<TargetCostBufferPercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                nullable: true,
+                precision: 18,
+                scale: 4);
+            targetCostBufferPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+            targetCostBufferPercent.AddAnnotation("Relational:ColumnName", "target_cost_buffer_percent");
 
             var type = runtimeEntityType.AddProperty(
                 "Type",

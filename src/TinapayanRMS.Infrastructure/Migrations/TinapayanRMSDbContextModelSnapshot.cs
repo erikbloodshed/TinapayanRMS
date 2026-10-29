@@ -659,6 +659,11 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("sub_assembly_id");
 
+                    b.Property<decimal?>("TargetCostBufferPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("target_cost_buffer_percent");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -709,6 +714,8 @@ namespace TinapayanRMS.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_RawMaterials_OnlyIngredientsAreMade", "type = 'Ingredient' OR source = 'Purchased'");
 
                             t.HasCheckConstraint("CK_RawMaterials_SubAssemblyMatchesSource", "(source = 'Made') = (sub_assembly_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_RawMaterials_TargetCostBufferPercent", "target_cost_buffer_percent IS NULL OR (target_cost_buffer_percent >= 0 AND target_cost_buffer_percent <= 100)");
                         });
                 });
 

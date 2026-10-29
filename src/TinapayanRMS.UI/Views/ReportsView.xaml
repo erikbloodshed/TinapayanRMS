@@ -188,6 +188,72 @@
                         </DockPanel>
                     </Border>
                 </syncfusion:TabItemExt>
+
+                <!-- 2026-10-29: the purchased materials whose fixed buffered cost rising prices have worn below its target buffer -->
+                <syncfusion:TabItemExt Header="Cost Buffers" CanClose="False">
+                    <Border Padding="12">
+                        <DockPanel>
+                            <Grid DockPanel.Dock="Top">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Cost Buffers" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                                <!-- Syncfusion has no check box of its own outside its grids and ribbon; the Price Simulator uses WPF's too -->
+                                <CheckBox Grid.Column="1"
+                                          Content="Only below target"
+                                          IsChecked="{Binding OnlyBelowTarget, Mode=TwoWay}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,12,0" />
+                                <syncfusion:ButtonAdv Grid.Column="2"
+                                                      Label="Re-apply Target Buffer"
+                                                      IconTemplate="{StaticResource ApplyIconTemplate}"
+                                                      Command="{Binding ReapplyTargetBuffersCommand}"
+                                                      ToolTip="Puts the target buffer back on top of the dearest brand for the materials picked, or for every one shown below target. Asks first."
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,8,0" />
+                                <syncfusion:ButtonAdv Grid.Column="3"
+                                                      Label="Export to Excel"
+                                                      IconTemplate="{StaticResource ExportIconTemplate}"
+                                                      Command="{Binding ExportCostBuffersCommand}"
+                                                      ToolTip="Saves this table to an Excel workbook as it's shown, in its order."
+                                                      VerticalAlignment="Center" />
+                            </Grid>
+                            <TextBlock DockPanel.Dock="Top"
+                                       Text="Every purchased material's buffered cost against its dearest brand now. Brand prices don't move the buffered cost, so a rise wears the buffer down; Target % is the buffer last typed for it. Pick materials (Ctrl or Shift for several), or none for all shown, and Re-apply Target Buffer puts it back on top. Double-click one to open it."
+                                       Style="{StaticResource CaptionStyle}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,12" />
+                            <syncfusion:SfDataGrid x:Name="CostBuffersGrid"
+                                                   ItemsSource="{Binding CostBuffers}"
+                                                   CellDoubleTapped="CostBuffers_CellDoubleTapped"
+                                                   GridLinesVisibility="Both"
+                                                   CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                                   CurrentCellBorderThickness="1"
+                                                   controls:GridFillerRows.IsEnabled="True"
+                                                   AutoGenerateColumns="False"
+                                                   AllowEditing="False"
+                                                   AllowSorting="True"
+                                                   SelectionMode="Extended"
+                                                   NavigationMode="Row"
+                                                   ColumnSizer="Star">
+                                <syncfusion:SfDataGrid.Columns>
+                                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Raw Material" Width="280" />
+                                    <syncfusion:GridTextColumn MappingName="Type" HeaderText="Type" />
+                                    <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" />
+                                    <syncfusion:GridTextColumn MappingName="Per" HeaderText="Per" Width="70" />
+                                    <controls:NumericColumn MappingName="DearestCost" HeaderText="Dearest Brand" NumberDecimalDigits="4" />
+                                    <controls:NumericColumn MappingName="BufferedCost" HeaderText="Buffered Cost" NumberDecimalDigits="4" />
+                                    <controls:NumericColumn MappingName="BufferPercent" HeaderText="Buffer %" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="TargetPercent" HeaderText="Target %" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="ShortBy" HeaderText="Short By" NumberDecimalDigits="2" AllowNullValue="True" />
+                                </syncfusion:SfDataGrid.Columns>
+                            </syncfusion:SfDataGrid>
+                        </DockPanel>
+                    </Border>
+                </syncfusion:TabItemExt>
             </syncfusion:TabControlExt>
         </Border>
 

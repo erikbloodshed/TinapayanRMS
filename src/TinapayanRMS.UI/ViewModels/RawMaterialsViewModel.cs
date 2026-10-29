@@ -344,6 +344,34 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         set => this.RaiseAndSetIfChanged(ref _editingCostBufferPercent, value);
     }
 
+    private decimal? _editingTargetCostBufferPercent = CostingDefaults.DefaultCostBufferPercent;
+    /// <summary>
+    /// Purchased only: the buffer last typed (2026-10-29), which the Cost Buffer % box drifts from as prices move while the
+    /// buffered cost stays fixed. Re-apply Target types it again.
+    /// </summary>
+    public decimal? EditingTargetCostBufferPercent
+    {
+        get => _editingTargetCostBufferPercent;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _editingTargetCostBufferPercent, value);
+            this.RaisePropertyChanged(nameof(TargetBufferText));
+            this.RaisePropertyChanged(nameof(IsBufferOffTarget));
+        }
+    }
+
+    /// <summary>"Target 10%", beside the Cost Buffer % box, while the buffer has drifted from it.</summary>
+    public string TargetBufferText => string.Create(CultureInfo.CurrentCulture, $"Target {EditingTargetCostBufferPercent ?? 0m:0.##}%");
+
+    /// <summary>The buffer has drifted from its target as prices moved: Re-apply Target shows.</summary>
+    public bool IsBufferOffTarget =>
+        DearestPurchaseCost is not null
+        && EditingBufferedCost is > 0m
+        && RawMaterialRules.IsOffTarget(EditingCostBufferPercent ?? 0m, EditingTargetCostBufferPercent ?? 0m);
+
+    /// <summary>Types the target buffer into the Cost Buffer % box again, which puts it back on top of the dearest brand; one undo step.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ReapplyTargetBufferCommand { get; }
+
     /// <summary>
     /// The Cost Buffer % box. Typing it works the buffered cost out afresh: the dearest brand, as the grid now is, with
     /// the percent on top (nothing to work out from while no brand is priced). The other way round, the % follows the
@@ -355,6 +383,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         set
         {
             EditingCostBufferPercent = value;
+            EditingTargetCostBufferPercent = value ?? 0m;
             if (DearestLiveCost() is { } dearest)
             {
                 EditingBufferedCost = RawMaterialRules.BufferedCost(dearest, value ?? 0m);
@@ -1248,6 +1277,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // A new material replaces the one showing, so its unsaved changes are asked about first.
         NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => ClearForm()));
 
+        // The target buffer beside the Cost Buffer % box shows while the buffer has drifted from it.
+        this.WhenAnyValue(x => x.EditingCostBufferPercent, x => x.EditingBufferedCost, x => x.DearestPurchaseCost)
+            .Subscribe(_ => this.RaisePropertyChanged(nameof(IsBufferOffTarget)));
+        ReapplyTargetBufferCommand = ReactiveCommand.Create(
+            () => AsUndoStep(() => TypedCostBufferPercent = EditingTargetCostBufferPercent),
+            this.WhenAnyValue(x => x.IsBufferOffTarget));
+
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
 
         OpenSubAssemblyCommand = ReactiveCommand.Create(
@@ -1284,6 +1320,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 CostBufferPercent = source == RawMaterialSource.Linked
                     ? EditingLinkedTo?.CostBufferPercent ?? 0m
                     : EditingCostBufferPercent ?? 0m,
+                TargetCostBufferPercent = source == RawMaterialSource.Purchased ? EditingTargetCostBufferPercent ?? 0m : null,
                 // Only a purchased material's is the form's; a made or linked one's is worked out by the cascade.
                 BufferedCostPerBaseUnit = source == RawMaterialSource.Purchased ? EditingBufferedCost ?? 0m : 0m,
             };
@@ -1526,6 +1563,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         WeightSharePercent = EditingWeightSharePercent,
         CostSharePercent = EditingCostSharePercent,
         CostBufferPercent = EditingCostBufferPercent,
+        TargetCostBufferPercent = EditingTargetCostBufferPercent,
         BufferedCost = EditingBufferedCost,
         BufferedCostUnitKey = BufferedCostUnit?.Key,
         UnitRows =
@@ -1568,6 +1606,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             EditingWeightSharePercent = snapshot.WeightSharePercent;
             EditingCostSharePercent = snapshot.CostSharePercent;
             EditingCostBufferPercent = snapshot.CostBufferPercent;
+            EditingTargetCostBufferPercent = snapshot.TargetCostBufferPercent;
             EditingBufferedCost = snapshot.BufferedCost;
 
             // The alternative units, as fresh entities carrying their ids.
@@ -1653,6 +1692,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         EditingWeightSharePercent = null;
         EditingCostSharePercent = null;
         EditingCostBufferPercent = _defaultCostBufferPercent;
+        EditingTargetCostBufferPercent = _defaultCostBufferPercent;
         EditingBufferedCost = null;
         EditingBaseUnit = null;
         ExampleRawMaterial = null;
@@ -1671,7 +1711,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         if (untouchedNewMaterial)
         {
             EditingCostBufferPercent = defaultCostBufferPercent;
-            History.Rebase((settled, now) => settled with { CostBufferPercent = now.CostBufferPercent });
+            EditingTargetCostBufferPercent = defaultCostBufferPercent;
+            History.Rebase((settled, now) => settled with { CostBufferPercent = now.CostBufferPercent, TargetCostBufferPercent = now.TargetCostBufferPercent });
         }
     }
 
@@ -1691,6 +1732,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         EditingWeightSharePercent = material.WeightSharePercent;
         EditingCostSharePercent = material.CostSharePercent;
         EditingCostBufferPercent = material.CostBufferPercent;
+        EditingTargetCostBufferPercent = RawMaterialRules.TargetBufferPercentOf(material);
         EditingBufferedCost = material.BufferedCostPerBaseUnit;
         EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId);
     }

@@ -90,6 +90,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -143,6 +144,18 @@
                            Text="{Binding BufferedCostWarningText}"
                            Foreground="{StaticResource WarningForegroundBrush}"
                            TextWrapping="Wrap" />
+                <!-- While prices have moved the buffer off the one last typed (2026-10-29): it, and a button that types it again -->
+                <StackPanel Grid.Row="4"
+                            Grid.ColumnSpan="5"
+                            Orientation="Horizontal"
+                            Margin="0,8,0,0"
+                            Visibility="{Binding IsBufferOffTarget, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding TargetBufferText}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <syncfusion:ButtonAdv Label="Re-apply Target"
+                                          IconTemplate="{StaticResource ApplyIconTemplate}"
+                                          Command="{Binding ReapplyTargetBufferCommand}"
+                                          ToolTip="Types the target buffer again: the Buffered Cost becomes the dearest brand with it on top. Save keeps it." />
+                </StackPanel>
             </Grid>
         </StackPanel>
     </Border>

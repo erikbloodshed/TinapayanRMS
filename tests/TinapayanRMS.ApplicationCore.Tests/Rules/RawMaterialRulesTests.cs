@@ -7,6 +7,33 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 public class RawMaterialRulesTests
 {
+    private static RawMaterial Purchased(decimal cost, decimal buffered, decimal bufferPercent, decimal? target) => new()
+    {
+        Source = RawMaterialSource.Purchased,
+        CostPerBaseUnit = cost,
+        BufferedCostPerBaseUnit = buffered,
+        CostBufferPercent = bufferPercent,
+        TargetCostBufferPercent = target,
+    };
+
+    [Fact]
+    public void A_buffer_worn_below_its_target_by_a_tenth_of_a_point_or_more_is_counted()
+    {
+        // 0.055 over 0.05 is 10%; the price up to 0.052 leaves 5.77%, under a 10% target.
+        Purchased(0.052m, 0.055m, 5.77m, 10m).Should().Match<RawMaterial>(m => RawMaterialRules.IsBufferBelowTarget(m));
+        Purchased(0.05m, 0.055m, 10m, 10m).Should().Match<RawMaterial>(m => !RawMaterialRules.IsBufferBelowTarget(m));
+        Purchased(0.1914m, 0.2105m, 9.98m, 10m).Should().Match<RawMaterial>(m => !RawMaterialRules.IsBufferBelowTarget(m), "9.98% rounds to the 10% target");
+        RawMaterialRules.CurrentBufferPercentOf(Purchased(0.052m, 0.055m, 5.77m, 10m))!.Value.Should().BeApproximately(5.7692m, 0.0001m);
+    }
+
+    [Fact]
+    public void A_material_saved_before_targets_were_kept_takes_its_last_saved_buffer_as_its_target()
+    {
+        RawMaterialRules.TargetBufferPercentOf(Purchased(0.05m, 0.055m, 10m, null)).Should().Be(10m);
+        RawMaterialRules.TargetBufferPercentOf(Purchased(0.05m, 0.055m, 10m, 12m)).Should().Be(12m);
+        RawMaterialRules.CurrentBufferPercentOf(Purchased(0m, 0m, 10m, 10m)).Should().BeNull("there's no price to have a buffer over");
+    }
+
     [Fact]
     public void EnsureFieldsMatchType_accepts_an_ingredient_with_no_base_unit()
     {
