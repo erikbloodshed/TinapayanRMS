@@ -186,6 +186,60 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     /// <summary>The Cost Buffers tab's name, which its export file takes and the View picks its grid by.</summary>
     public const string CostBuffersTitle = "Cost Buffers";
 
+    public const string CostDriversTitle = "Cost Drivers";
+
+    public const string MarginErosionTitle = "Margin Erosion";
+
+    /// <summary>The purchased materials that make up most of what the products in Production cost, the most first (2026-10-29).</summary>
+    public ObservableCollection<CostDriverRow> CostDrivers { get; } = [];
+
+    private IReadOnlyList<MarginErosionRow> _allMarginErosion = [];
+
+    /// <summary>Each product's markup as it stood on <see cref="MarginErosionSince"/> against now, the furthest dropped first (2026-10-29).</summary>
+    public ObservableCollection<MarginErosionRow> MarginErosion { get; } = [];
+
+    private DateTime _marginErosionSince = DateTime.Today.AddDays(-30);
+    /// <summary>The day Margin Erosion compares with: each product's latest version saved by its end. 30 days ago to start with.</summary>
+    public DateTime MarginErosionSince
+    {
+        get => _marginErosionSince;
+        set
+        {
+            if (value.Date == _marginErosionSince)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _marginErosionSince, value.Date);
+            _marginErosionWanted.OnNext(RxVoid.Default);
+        }
+    }
+
+    private bool _onlyDropped = true;
+    /// <summary>Margin Erosion shows only the products whose markup dropped; on to start with.</summary>
+    public bool OnlyDropped
+    {
+        get => _onlyDropped;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _onlyDropped, value);
+            ShowMarginErosion();
+        }
+    }
+
+    private readonly Subject<RxVoid> _marginErosionWanted = new();
+
+    public ReactiveCommand<RxVoid, RxVoid> ExportCostDriversCommand { get; }
+
+    public ReactiveCommand<RxVoid, RxVoid> ExportMarginErosionCommand { get; }
+
+    public GridLayoutStore CostDriversLayout { get; }
+
+    public GridLayoutStore MarginErosionLayout { get; }
+
+    private readonly IProductVersionRepository? _versionRepository;
+    private readonly IIngredientBomLineRepository? _bomLineRepository;
+
     private IReadOnlyList<CostBufferRow> _allCostBuffers = [];
 
     /// <summary>Every purchased material with a price and a buffered cost, or only those whose buffer is below target.</summary>
@@ -267,9 +321,20 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         IProductRepository productRepository,
         SavedProductReader savedProducts,
         IViewStateStore viewState,
-        ILogger logger)
+        ILogger logger,
+        IProductVersionRepository? versionRepository = null,
+        IIngredientBomLineRepository? bomLineRepository = null)
         : base(logger)
     {
+        _versionRepository = versionRepository;
+        _bomLineRepository = bomLineRepository;
+        CostDriversLayout = new GridLayoutStore(viewState, "reports-cost-drivers");
+        MarginErosionLayout = new GridLayoutStore(viewState, "reports-margin-erosion");
+        ExportCostDriversCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(CostDriversTitle));
+        ExportMarginErosionCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(MarginErosionTitle));
+
+        // A new day to compare with reads the versions again; a newer one cancels a read still running.
+        LoadLatest(_marginErosionWanted, (_, cancellationToken) => LoadMarginErosionAsync(cancellationToken));
         _priceHistoryRepository = priceHistoryRepository;
         _rawMaterialRepository = rawMaterialRepository;
         _productRepository = productRepository;
@@ -289,6 +354,7 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         {
             // Off the UI thread, as Products and Raw Materials read their details, and both summaries at once.
             var productCostsRead = Task.Run(ReadProductCostsAsync);
+            var costDriversRead = Task.Run(ReadCostDriversAsync);
             var rawMaterialPricesRead = Task.Run(ReadRawMaterialPricesAsync);
             var productCosts = await productCostsRead;
             var (rawMaterialPrices, costBuffers) = await rawMaterialPricesRead;
@@ -299,6 +365,9 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
             RawMaterialPrices.AddRange(rawMaterialPrices);
             _allCostBuffers = costBuffers;
             ShowCostBuffers();
+            CostDrivers.Clear();
+            CostDrivers.AddRange(await costDriversRead);
+            _marginErosionWanted.OnNext(RxVoid.Default);
         }));
     }
 
@@ -328,6 +397,50 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         return (
             [.. purchased.Select(m => new RawMaterialPriceSummaryRow(m, [.. history[m.Id]]))],
             [.. purchased.Where(m => RawMaterialRules.CurrentBufferPercentOf(m) is not null).Select(m => new CostBufferRow(m))]);
+    }
+
+    /// <summary>Cost Drivers, off the UI thread: every product and material as saved, priced as Reports prices them (CostDriverAnalysis).</summary>
+    private async Task<IReadOnlyList<CostDriverRow>> ReadCostDriversAsync()
+    {
+        if (_bomLineRepository is null)
+        {
+            return [];
+        }
+
+        var products = await _productRepository.GetAllAsync(CancellationToken.None);
+        var details = await _savedProducts.ReadDetailsAsync([.. products.Select(p => p.Id)], CancellationToken.None);
+        var materials = (await _rawMaterialRepository.GetAllAsync(CancellationToken.None)).ToDictionary(m => m.Id);
+        var bomLines = await _bomLineRepository.GetAllAsync(CancellationToken.None);
+        return CostDriverAnalysis.Analyse(products, details, materials, [.. bomLines]);
+    }
+
+    /// <summary>Margin Erosion: every product as saved today against its latest version by the end of <see cref="MarginErosionSince"/>.</summary>
+    private async Task LoadMarginErosionAsync(CancellationToken cancellationToken)
+    {
+        if (_versionRepository is null)
+        {
+            return;
+        }
+
+        var asOf = MarginErosionSince.AddDays(1).AddTicks(-1);
+        var rows = await Task.Run(
+            async () =>
+            {
+                var products = await _productRepository.GetAllAsync(cancellationToken);
+                var saved = await _savedProducts.ReadAllAsync(products, CostBasis.Buffered, cancellationToken);
+                var versions = (await _versionRepository.GetLatestAsOfAsync(asOf, cancellationToken)).ToDictionary(v => v.ProductId);
+                return MarginErosionAnalysis.Analyse(saved, versions);
+            },
+            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        _allMarginErosion = rows;
+        ShowMarginErosion();
+    }
+
+    private void ShowMarginErosion()
+    {
+        MarginErosion.Clear();
+        MarginErosion.AddRange(OnlyDropped ? _allMarginErosion.Where(r => r.HasDropped) : _allMarginErosion);
     }
 
     private void ShowCostBuffers()
@@ -368,5 +481,6 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     {
         _productOpenRequests.Dispose();
         _rawMaterialOpenRequests.Dispose();
+        _marginErosionWanted.Dispose();
     }
 }

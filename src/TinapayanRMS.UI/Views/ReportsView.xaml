@@ -254,6 +254,126 @@
                         </DockPanel>
                     </Border>
                 </syncfusion:TabItemExt>
+
+                <!-- 2026-10-29: the purchased materials that make up most of what the products in Production cost -->
+                <syncfusion:TabItemExt Header="Cost Drivers" CanClose="False">
+                    <Border Padding="12">
+                        <DockPanel>
+                            <Grid DockPanel.Dock="Top">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Cost Drivers" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                                <syncfusion:ButtonAdv Grid.Column="1"
+                                                      Label="Export to Excel"
+                                                      IconTemplate="{StaticResource ExportIconTemplate}"
+                                                      Command="{Binding ExportCostDriversCommand}"
+                                                      ToolTip="Saves this table to an Excel workbook as it's shown, in its order."
+                                                      VerticalAlignment="Center" />
+                            </Grid>
+                            <TextBlock DockPanel.Dock="Top"
+                                       Text="The purchased materials that make up most of the products in Production's material cost, one sellable unit of each, at buffered costs: a material is counted however it gets into a product, through a made or linked ingredient too. Cumulative % adds each row to those above it, so the top few that make up most of the cost show where a price rise would hurt. Double-click a material to open it."
+                                       Style="{StaticResource CaptionStyle}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,12" />
+                            <syncfusion:SfDataGrid x:Name="CostDriversGrid"
+                                                   ItemsSource="{Binding CostDrivers}"
+                                                   CellDoubleTapped="CostDrivers_CellDoubleTapped"
+                                                   GridLinesVisibility="Both"
+                                                   CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                                   CurrentCellBorderThickness="1"
+                                                   controls:GridFillerRows.IsEnabled="True"
+                                                   AutoGenerateColumns="False"
+                                                   AllowEditing="False"
+                                                   AllowSorting="True"
+                                                   SelectionMode="Single"
+                                                   NavigationMode="Row"
+                                                   ColumnSizer="Star">
+                                <syncfusion:SfDataGrid.Columns>
+                                    <syncfusion:GridTextColumn MappingName="Name" HeaderText="Raw Material" Width="260" />
+                                    <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" />
+                                    <controls:NumericColumn MappingName="Products" HeaderText="Products" NumberDecimalDigits="0" Width="90" />
+                                    <controls:NumericColumn MappingName="CostInProducts" HeaderText="Cost in Products" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="ShareOfAll" HeaderText="Share %" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="CumulativeShare" HeaderText="Cumulative %" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="LargestShare" HeaderText="Largest Share %" NumberDecimalDigits="2" />
+                                    <syncfusion:GridTextColumn MappingName="LargestIn" HeaderText="Largest In" Width="220" />
+                                </syncfusion:SfDataGrid.Columns>
+                            </syncfusion:SfDataGrid>
+                        </DockPanel>
+                    </Border>
+                </syncfusion:TabItemExt>
+
+                <!-- 2026-10-29: each product's markup at its current price as it stood on a day, against now -->
+                <syncfusion:TabItemExt Header="Margin Erosion" CanClose="False">
+                    <Border Padding="12">
+                        <DockPanel>
+                            <Grid DockPanel.Dock="Top">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Margin Erosion" Style="{StaticResource SectionHeaderStyle}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Since" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <syncfusion:SfDatePicker Grid.Column="2"
+                                                         Width="160"
+                                                         FormatString="MMM d, yyyy"
+                                                         Value="{Binding MarginErosionSince, Mode=TwoWay}"
+                                                         VerticalAlignment="Center"
+                                                         Margin="0,0,12,0" />
+                                <!-- Syncfusion has no check box of its own outside its grids and ribbon; the Price Simulator uses WPF's too -->
+                                <CheckBox Grid.Column="3"
+                                          Content="Only dropped"
+                                          IsChecked="{Binding OnlyDropped, Mode=TwoWay}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,12,0" />
+                                <syncfusion:ButtonAdv Grid.Column="4"
+                                                      Label="Export to Excel"
+                                                      IconTemplate="{StaticResource ExportIconTemplate}"
+                                                      Command="{Binding ExportMarginErosionCommand}"
+                                                      ToolTip="Saves this table to an Excel workbook as it's shown, in its order."
+                                                      VerticalAlignment="Center" />
+                            </Grid>
+                            <TextBlock DockPanel.Dock="Top"
+                                       Text="Each product's markup at its Current Price as it stood on the day picked, its latest version saved by then at its costs then, against now. A product with no version by then, or no Current Price then or now, isn't listed. Change is in percentage points: below 0 means it earns less now. Double-click a product to open it."
+                                       Style="{StaticResource CaptionStyle}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,12" />
+                            <syncfusion:SfDataGrid x:Name="MarginErosionGrid"
+                                                   ItemsSource="{Binding MarginErosion}"
+                                                   CellDoubleTapped="MarginErosion_CellDoubleTapped"
+                                                   GridLinesVisibility="Both"
+                                                   CurrentCellBorderBrush="{StaticResource AccentBrush}"
+                                                   CurrentCellBorderThickness="1"
+                                                   controls:GridFillerRows.IsEnabled="True"
+                                                   AutoGenerateColumns="False"
+                                                   AllowEditing="False"
+                                                   AllowSorting="True"
+                                                   SelectionMode="Single"
+                                                   NavigationMode="Row"
+                                                   ColumnSizer="Star">
+                                <syncfusion:SfDataGrid.Columns>
+                                    <syncfusion:GridTextColumn MappingName="ProductName" HeaderText="Product" Width="240" />
+                                    <syncfusion:GridTextColumn MappingName="Stage" HeaderText="Stage" />
+                                    <syncfusion:GridTextColumn MappingName="Category" HeaderText="Category" />
+                                    <controls:NumericColumn MappingName="VersionNumber" HeaderText="Version" NumberDecimalDigits="0" Width="80" />
+                                    <syncfusion:GridDateTimeColumn MappingName="VersionSavedAt" HeaderText="Saved" Pattern="CustomPattern" CustomPattern="MMM d, yyyy" />
+                                    <controls:NumericColumn MappingName="BaseCostThen" HeaderText="Base Cost Then" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="BaseCostNow" HeaderText="Base Cost Now" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="CurrentPriceThen" HeaderText="Price Then" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="CurrentPriceNow" HeaderText="Price Now" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="MarkupThen" HeaderText="Markup % Then" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="MarkupNow" HeaderText="Markup % Now" NumberDecimalDigits="2" />
+                                    <controls:NumericColumn MappingName="Change" HeaderText="Change" NumberDecimalDigits="2" />
+                                </syncfusion:SfDataGrid.Columns>
+                            </syncfusion:SfDataGrid>
+                        </DockPanel>
+                    </Border>
+                </syncfusion:TabItemExt>
             </syncfusion:TabControlExt>
         </Border>
 

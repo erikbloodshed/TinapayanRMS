@@ -23,6 +23,8 @@ public partial class ReportsView : UserControl
         GridLayoutKeeping.Keep(ProductCostsGrid, viewModel.ProductCostsLayout);
         GridLayoutKeeping.Keep(RawMaterialPricesGrid, viewModel.RawMaterialPricesLayout);
         GridLayoutKeeping.Keep(CostBuffersGrid, viewModel.CostBuffersLayout);
+        GridLayoutKeeping.Keep(CostDriversGrid, viewModel.CostDriversLayout);
+        GridLayoutKeeping.Keep(MarginErosionGrid, viewModel.MarginErosionLayout);
         CostBuffersGrid.SelectedItems = viewModel.SelectedCostBuffers;
 
         // Each tab's Export to Excel writes its own table, on a sheet named after it.
@@ -32,6 +34,8 @@ public partial class ReportsView : UserControl
             {
                 ReportsViewModel.ProductCostSummaryTitle => ProductCostsGrid,
                 ReportsViewModel.CostBuffersTitle => CostBuffersGrid,
+                ReportsViewModel.CostDriversTitle => CostDriversGrid,
+                ReportsViewModel.MarginErosionTitle => MarginErosionGrid,
                 _ => RawMaterialPricesGrid,
             }),
         ]);
@@ -46,6 +50,24 @@ public partial class ReportsView : UserControl
     private void ProductCosts_CellDoubleTapped(object? sender, GridCellDoubleTappedEventArgs e)
     {
         if (e.Record is ProductCostRow row && DataContext is ReportsViewModel viewModel)
+        {
+            Dispatcher.BeginInvoke(() => viewModel.OpenProductCommand.Execute(row.ProductId).Subscribe(), DispatcherPriority.Input);
+        }
+    }
+
+    /// <summary>Opens the double-clicked material of Cost Drivers on Raw Materials, once the press is over.</summary>
+    private void CostDrivers_CellDoubleTapped(object? sender, GridCellDoubleTappedEventArgs e)
+    {
+        if (e.Record is CostDriverRow row && DataContext is ReportsViewModel viewModel)
+        {
+            Dispatcher.BeginInvoke(() => viewModel.OpenRawMaterialCommand.Execute(row.RawMaterialId).Subscribe(), DispatcherPriority.Input);
+        }
+    }
+
+    /// <summary>Opens the double-clicked product of Margin Erosion on Products, once the press is over.</summary>
+    private void MarginErosion_CellDoubleTapped(object? sender, GridCellDoubleTappedEventArgs e)
+    {
+        if (e.Record is MarginErosionRow row && DataContext is ReportsViewModel viewModel)
         {
             Dispatcher.BeginInvoke(() => viewModel.OpenProductCommand.Execute(row.ProductId).Subscribe(), DispatcherPriority.Input);
         }

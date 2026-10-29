@@ -858,7 +858,7 @@ The Print tab always follows the Products screen. If you go back to Products, ch
 
 ## 9. Reports
 
-Reports has two tabs along the bottom. Each is a table you can read but not edit. Click a column's heading to sort by it, and click it again to reverse the order. The figures are worked out again each time you open Reports, so they always use today's prices.
+Reports has five tabs along the bottom: **Product Cost Summary**, **Raw Materials Price Summary**, **Cost Buffers**, **Cost Drivers** and **Margin Erosion**. Each is a table you can read but not edit (Cost Buffers has one button that changes buffered costs, after asking). Click a column's heading to sort by it, and click it again to reverse the order. The figures are worked out again each time you open Reports, so they always use today's prices.
 
 ### Product Cost Summary
 
@@ -913,6 +913,28 @@ Every purchased material with a price, and how its fixed **buffered cost** stand
 **Only below target**, ticked to start with, shows only the materials at least a tenth of a point under their target. Untick it to see them all.
 
 **Re-apply Target Buffer** puts each material's target buffer back on top of its dearest brand: its buffered cost becomes the dearest brand plus the target. It does this for the materials you've picked (click one, or several with **Ctrl** or **Shift**), or with none picked, for every one shown that's below target. It asks first. The new buffered costs reach every made and linked ingredient, recipe and product using them, as a Save on Raw Materials does. Double-click a material to open it on Raw Materials.
+
+### Cost Drivers
+
+The purchased materials that make up most of what the products in **Production** cost, one sellable unit of each, at buffered costs. A material counts however it gets into a product: in a recipe, as an add-in, inside a made ingredient, as the ingredient a linked part is cut from, or as packaging.
+
+- **Products**: how many products in Production use it.
+- **Cost in Products**: what one of each of those products spends on it, added up.
+- **Share %**: that, as a share of all their material costs, one of each.
+- **Cumulative %**: this row's share and every one above it. Where it passes 80%, the materials above are the few that matter most when prices rise.
+- **Largest Share %** and **Largest In**: the most it makes up of a single product's material cost, and which product.
+
+It's sorted by Cost in Products, the most first. It doesn't know how many of each product you sell, so treat it as a guide. Double-click a material to open it.
+
+### Margin Erosion
+
+How each product's markup at its **Current Price** has moved since a day you pick in **Since** (30 days ago to start with). It compares the product's latest version saved on or before that day, at its costs and price then, with the product now.
+
+- **Version** and **Saved**: the version it's compared with.
+- **Base Cost Then** and **Now**, **Price Then** and **Now**, **Markup % Then** and **Now**.
+- **Change**: the markup now less then, in percentage points. Below 0 means it earns less now.
+
+**Only dropped**, ticked to start with, shows only the products whose markup fell. A product isn't listed when it had no version by that day (its history began later) or no Current Price then or now. Double-click a product to open it.
 
 ### Exporting to Excel
 

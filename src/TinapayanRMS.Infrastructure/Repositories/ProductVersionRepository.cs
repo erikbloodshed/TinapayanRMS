@@ -15,6 +15,12 @@ public class ProductVersionRepository(IDbContextFactory<TinapayanRMSDbContext> d
             new { productId },
             cancellationToken);
 
+    public Task<IReadOnlyList<ProductVersion>> GetLatestAsOfAsync(DateTime asOf, CancellationToken cancellationToken) =>
+        dbContextFactory.QueryAsync<ProductVersion>(
+            $"SELECT DISTINCT ON (v.product_id) {Columns.Of<ProductVersion>("v")} FROM product_versions v WHERE v.saved_at <= @asOf ORDER BY v.product_id, v.number DESC",
+            new { asOf },
+            cancellationToken);
+
     public Task<bool> HasAnyAsync(int productId, CancellationToken cancellationToken) =>
         dbContextFactory.QuerySingleOrDefaultAsync<bool>(
             "SELECT EXISTS (SELECT 1 FROM product_versions v WHERE v.product_id = @productId)",
