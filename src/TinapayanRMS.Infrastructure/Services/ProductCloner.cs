@@ -160,7 +160,7 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
                     SubAssemblyRules.SectionLabel(subAssembly.Name, sourceName, subAssembly.Role!.Name))
                 {
                     // Its own whatever its role: the source's may have been unlinked in a role that isn't product-owned.
-                    IsOwn = true,
+                    Placement = new SectionPlacement.ProductsOwn(),
                 });
                 continue;
             }

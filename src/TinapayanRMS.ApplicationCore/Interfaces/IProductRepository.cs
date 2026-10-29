@@ -5,9 +5,9 @@ namespace TinapayanRMS.ApplicationCore.Interfaces;
 
 /// <summary>
 /// A recipe section whose lines the product's Recipe Structure edits: its role, its gram lines and the product's piece
-/// size. In a product-owned role (SubAssemblyRole.IsProductOwned), or marked <see cref="IsOwn"/>, it's the product's own
-/// sub-assembly, new or saved (<see cref="Id"/>); otherwise, or marked <see cref="Release"/>, one Save keeps on the
-/// Sub-Assemblies screen and links. Either is named after the product and its role (SubAssemblyRules.StandaloneNameFor).
+/// size. Its <see cref="Placement"/> says where Save puts it: the product's own sub-assembly, new or saved
+/// (<see cref="Id"/>), or one Save keeps on the Sub-Assemblies screen and links. Either is named after the product and its
+/// role (SubAssemblyRules.StandaloneNameFor).
 /// </summary>
 /// <param name="SectionName">
 /// Optional: what tells it apart from others in its role, e.g. "Ube" beside "Cheese" (SubAssemblyRules.EnsureSectionsDistinct),
@@ -26,29 +26,44 @@ public sealed record NewSubAssemblyDraft(
     /// </summary>
     public int Id { get; init; }
 
+    /// <summary>Where Save puts it: as its role says, unless the Products form asked for something else.</summary>
+    public SectionPlacement Placement { get; init; } = new SectionPlacement.ByRole();
+
+    /// <summary>Save keeps it on the Sub-Assemblies screen and links it: moved there, or to In-House.</summary>
+    public bool MovesToSubAssemblies => Placement is SectionPlacement.MoveToSubAssemblies or SectionPlacement.MoveToInHouse;
+}
+
+/// <summary>
+/// Where Save puts a recipe section's sub-assembly (<see cref="NewSubAssemblyDraft.Placement"/>): one case for each thing
+/// the Products form can ask of it.
+/// </summary>
+public closed record SectionPlacement
+{
     /// <summary>
-    /// Save makes a new one the product's own whatever its role: a linked section unlinked in the Products form, or a
-    /// clone's copy of its source's own. Otherwise its role decides (SubAssemblyRole.IsProductOwned). A saved one of the
-    /// product's own stays its own, unless it moves out of a product-owned role into one that isn't.
+    /// Its role decides (SubAssemblyRole.IsProductOwned): the product's own in a product-owned role, otherwise kept on the
+    /// Sub-Assemblies screen and linked. A saved one of the product's own stays its own, unless it moves out of a
+    /// product-owned role into one that isn't.
     /// </summary>
-    public bool IsOwn { get; init; }
+    public sealed record ByRole : SectionPlacement;
 
     /// <summary>
-    /// Save keeps it on the Sub-Assemblies screen and links it, whatever its role: a product's own moved there from the
-    /// Products form. A saved one keeps its id, name and lines (as written in this save). Overrides <see cref="IsOwn"/>
-    /// and the role.
+    /// A new one is the product's own whatever its role: a linked section unlinked in the Products form, or a clone's copy
+    /// of its source's own. A saved one's role decides, as for <see cref="ByRole"/>.
     /// </summary>
-    public bool Release { get; init; }
+    public sealed record ProductsOwn : SectionPlacement;
 
     /// <summary>
-    /// Save moves it to the Sub-Assemblies screen, as <see cref="Release"/> does, and adds a new made ingredient made from
-    /// it (Move to In-House, 2026-10-27; until then the lines became a bill of materials of the made ingredient's own). The
-    /// product links it at the same piece size, so it costs what it did. Null for any other section.
+    /// Move to Sub-Assemblies: kept on the Sub-Assemblies screen and linked, whatever its role. A saved one keeps its id,
+    /// name and lines (as written in this save).
     /// </summary>
-    public MadeIngredientDraft? ToMadeIngredient { get; init; }
+    public sealed record MoveToSubAssemblies : SectionPlacement;
 
-    /// <summary>Save keeps it on the Sub-Assemblies screen and links it: moved there (<see cref="Release"/>), or to In-House.</summary>
-    public bool MovesToSubAssemblies => Release || ToMadeIngredient is not null;
+    /// <summary>
+    /// Move to In-House (2026-10-27; until then the lines became a bill of materials of the made ingredient's own): moved to
+    /// the Sub-Assemblies screen as <see cref="MoveToSubAssemblies"/> is, and a new made ingredient is made from it. The
+    /// product links it at the same piece size, so it costs what it did.
+    /// </summary>
+    public sealed record MoveToInHouse(MadeIngredientDraft Ingredient) : SectionPlacement;
 }
 
 /// <summary>

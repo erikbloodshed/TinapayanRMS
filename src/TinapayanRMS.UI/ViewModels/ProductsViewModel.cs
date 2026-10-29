@@ -2964,9 +2964,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             {
                 // The product's own keeps its id, so Save rewrites it in place; a new section's is 0.
                 Id = u.SubAssemblyId,
-                IsOwn = u.IsOwned,
-                Release = u.IsReleasing,
-                ToMadeIngredient = u.ToMadeIngredient,
+                Placement = u.ToMadeIngredient is { } made ? new SectionPlacement.MoveToInHouse(made)
+                    : u.IsReleasing ? new SectionPlacement.MoveToSubAssemblies()
+                    : u.IsOwned ? new SectionPlacement.ProductsOwn()
+                    : new SectionPlacement.ByRole(),
             })],
             [.. UsageEdits.Where(u => u.IsLinked).Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
             {
@@ -3001,9 +3002,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         && a.New.Count == b.New.Count
         && a.New.Zip(b.New).All(pair =>
             pair.First.Id == pair.Second.Id
-            && pair.First.IsOwn == pair.Second.IsOwn
-            && pair.First.Release == pair.Second.Release
-            && pair.First.ToMadeIngredient == pair.Second.ToMadeIngredient
+            && pair.First.Placement == pair.Second.Placement
 
             && pair.First.RoleId == pair.Second.RoleId
             && pair.First.SectionName == pair.Second.SectionName

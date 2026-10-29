@@ -20,8 +20,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static NewSubAssemblyDraft Section(
-        int roleId, IReadOnlyList<RecipeLine> lines, int id = 0, string? sectionName = null, MadeIngredientDraft? made = null, bool release = false) =>
-        new(roleId, lines, UsageAuthoredField.WeightPerPiece, 30m, sectionName) { Id = id, Release = release, ToMadeIngredient = made };
+        int roleId, IReadOnlyList<RecipeLine> lines, int id = 0, string? sectionName = null, MadeIngredientDraft? made = null) =>
+        new(roleId, lines, UsageAuthoredField.WeightPerPiece, 30m, sectionName) { Id = id, Placement = made is null ? new SectionPlacement.ByRole() : new SectionPlacement.MoveToInHouse(made) };
 
     /// <summary>Butter at ₱0.50 a gram (₱0.55 buffered) and Sugar at ₱0.10 (₱0.11), in a Cheese Roll topping of the product's own.</summary>
     private async Task<(int ProductId, int ToppingRoleId, int ToppingId, IReadOnlyList<RecipeLine> Lines)> SeedToppingAsync()
@@ -142,7 +142,7 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task Moving_to_In_House_takes_a_section_to_Sub_Assemblies_whatever_its_role_and_whether_it_was_released_too()
+    public async Task Moving_to_In_House_takes_a_section_to_Sub_Assemblies_whatever_its_role()
     {
         var (productId, toppingRoleId, toppingId, lines) = await SeedToppingAsync();
         var inHouseId = await MadeCategoryIdAsync();
@@ -150,7 +150,7 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
 
         await SaveRecipeAsync(productId, new RecipeDraft(
             [
-                Section(toppingRoleId, lines, id: toppingId, made: new MadeIngredientDraft("Butter Icing", inHouseId), release: true),
+                Section(toppingRoleId, lines, id: toppingId, made: new MadeIngredientDraft("Butter Icing", inHouseId)),
                 Section(doughRoleId, [lines[0]], made: new MadeIngredientDraft("House Dough", inHouseId)),
             ],
             []));
