@@ -270,6 +270,57 @@ public class ProductionPlanRulesTests
         sales.Profit.Should().Be(100m);
     }
 
+    [Fact]
+    public void The_spare_of_a_mix_for_one_product_goes_to_it_whole()
+    {
+        // 70 pieces of 10 g from a 1,000 g dough: 1 batch of 100, so 30 more need no more mixing.
+        var recipes = new Dictionary<int, PlanRecipe> { [1] = Recipe(Section(Dough, [(Flour, 1000m)], weightPerPiece: 10m)) };
+
+        UnitsFromSpare([(1, 70m)], recipes, productId: 1).Should().Be(30);
+    }
+
+    [Fact]
+    public void The_spare_goes_no_further_than_every_one_of_its_mixes_has_room_for()
+    {
+        // The dough has room for 30 more, but the filling, 70 of 40 a batch, only for 10 before it needs a third batch.
+        var recipes = new Dictionary<int, PlanRecipe>
+        {
+            [1] = Recipe(Section(Dough, [(Flour, 1000m)], weightPerPiece: 10m), Section(Filling, [(Sugar, 600m)], yield: 40m)),
+        };
+
+        UnitsFromSpare([(1, 70m)], recipes, productId: 1).Should().Be(10);
+    }
+
+    [Fact]
+    public void The_spare_goes_in_whole_sellable_units()
+    {
+        // 8 boxes of 8 are 64 pieces of a 100-piece batch: the 36 spare make 4 more boxes, with 4 pieces over.
+        var recipes = new Dictionary<int, PlanRecipe>
+        {
+            [1] = Recipe(Section(Dough, [(Flour, 1000m)], weightPerPiece: 10m)) with { QuantityRequired = 8 },
+        };
+
+        UnitsFromSpare([(1, 8m)], recipes, productId: 1).Should().Be(4);
+    }
+
+    [Fact]
+    public void A_shared_mix_has_room_for_its_spare_in_either_product_and_none_for_a_product_not_planned()
+    {
+        var recipes = new Dictionary<int, PlanRecipe>
+        {
+            [1] = Recipe(Section(Dough, [(Flour, 1000m)], weightPerPiece: 10m)),
+            [2] = Recipe(Section(Dough, [(Flour, 1000m)], weightPerPiece: 10m)),
+            [3] = Recipe(Section(Dough, [(Flour, 1000m)], weightPerPiece: 10m)),
+        };
+
+        UnitsFromSpare([(1, 40m), (2, 40m)], recipes, productId: 1).Should().Be(20);
+        UnitsFromSpare([(1, 40m), (2, 40m)], recipes, productId: 2).Should().Be(20);
+        UnitsFromSpare([(1, 40m), (2, 40m)], recipes, productId: 3).Should().Be(0, "it isn't in the plan, so no mix is made for it");
+    }
+
+    private static int UnitsFromSpare(IReadOnlyList<(int, decimal)> orders, Dictionary<int, PlanRecipe> recipes, int productId) =>
+        ProductionPlanRules.UnitsFromSpare(orders, recipes, Ingredients, Boms, halfBatches: false, productId);
+
     private static ProductionPlan Plan(IReadOnlyList<(int, decimal)> orders, Dictionary<int, PlanRecipe> recipes) =>
         ProductionPlanRules.Plan(orders, recipes, Ingredients, Boms);
 

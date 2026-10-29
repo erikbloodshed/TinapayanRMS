@@ -205,6 +205,26 @@
                            Margin="0,0,0,12"
                            Text="Each mix in whole batches, or half ones with Half batches ticked, shared by every product it's for, and the made ingredients to prepare for them. Open a row for what goes into it. Spare is what the batches make beyond the plan." />
                 <!-- What the plan couldn't work out, such as a section with no piece size yet -->
+                <!-- The products the mixes' spare can go to with no more mixing: a click adds those units to the plan -->
+                <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                           Visibility="{Binding HasSpareUses, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock DockPanel.Dock="Left" Text="Use the spare:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ItemsControl ItemsSource="{Binding SpareUses}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <syncfusion:ButtonAdv Label="{Binding Text}" IconTemplate="{StaticResource AddIconTemplate}" Margin="0,0,6,0"
+                                                      ToolTip="Add these to the plan: the batches already being made have room for them, so nothing more is mixed."
+                                                      Command="{Binding DataContext.UseSpareCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                      CommandParameter="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </DockPanel>
                 <ItemsControl DockPanel.Dock="Bottom" ItemsSource="{Binding Notes}" Margin="0,8,0,0">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>

@@ -155,6 +155,20 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _notes, value);
     }
 
+    private IReadOnlyList<SpareUse> _spareUses = [];
+    /// <summary>The products the mixes' spare can go to with no more mixing (ProductionPlanResult.SpareUses): the Use the spare buttons.</summary>
+    public IReadOnlyList<SpareUse> SpareUses
+    {
+        get => _spareUses;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _spareUses, value);
+            this.RaisePropertyChanged(nameof(HasSpareUses));
+        }
+    }
+
+    public bool HasSpareUses => _spareUses.Count > 0;
+
     private PlanLineRow? _selectedLine;
     public PlanLineRow? SelectedLine
     {
@@ -233,6 +247,9 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
 
     /// <summary>Empties the table, and closes the saved plan open, if any.</summary>
     public ReactiveCommand<RxVoid, RxVoid> ClearCommand { get; }
+
+    /// <summary>A Use the spare button ("30 Ube Roll"): that many more units of the product in the plan, on its first line.</summary>
+    public ReactiveCommand<SpareUse, RxVoid> UseSpareCommand { get; }
 
     public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
 
@@ -352,6 +369,13 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
             Lines.Clear();
             ShowOpenPlan(null);
         });
+        UseSpareCommand = ReactiveCommand.Create<SpareUse>(use =>
+        {
+            if (Lines.FirstOrDefault(l => l.ProductId == use.ProductId) is { } line)
+            {
+                line.Units = (line.Units ?? 0m) + use.Units;
+            }
+        });
         PrintCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () => await ShowPrint.Handle(PrintSet(DateTime.Now))));
         ExportCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(ExportTitle));
         OpenPlanCommand = ReactiveCommand.CreateFromTask<SavedPlan>(OpenPlanAsync);
@@ -414,6 +438,11 @@ public sealed class ProductionPlanViewModel : ViewModelBase, IDisposable
         if (!Notes.SequenceEqual(result.Notes))
         {
             Notes = result.Notes;
+        }
+
+        if (!SpareUses.SequenceEqual(result.SpareUses))
+        {
+            SpareUses = result.SpareUses;
         }
     }
 

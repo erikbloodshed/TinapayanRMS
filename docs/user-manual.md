@@ -1010,6 +1010,8 @@ Each mix to make, in whole batches:
 - **Batches** and **Weight (g)**: the batches to make, and what they weigh before baking.
 - **Spare**: the batches are rounded up, so they make more than the plan needs. Spare is how many more pieces that is, such as **30 pcs**. For a mix shared by several products it says how many more of each, such as *Ube Roll 30 pcs or Cheese Roll 25 pcs*: it's the same dough either way.
 
+**Use the spare**, under the table, has a button for each product whose spare pieces can go into the plan with no more mixing, such as **30 Ube Roll**. Press it to add those units to the product's line in the plan. The figure is in sellable units (whole boxes for a Box of 8), and it's only as many as **every** mix of the product has room for: if its dough has 30 pieces spare but its filling only 10 before it needs another batch, the button says 10. A product whose mixes have no room, such as one with a topping made a batch per piece, gets no button. For a mix shared by several products, each gets a button, but the spare is used once: after you press one, the others work out again.
+
 Click the arrow at the start of a row to open it and see what goes into the mix: each ingredient, its grams **Per Batch**, and the **Total (g)** for all the batches. A row stays open while you change the plan.
 
 Tick **Half batches** at the top when the kitchen can mix half a batch. Each mix is then rounded up to the next half batch instead of a whole one: 1.2 batches are 1.5, not 2. The tick is kept with the plan, and saved with a saved plan.
@@ -1194,7 +1196,7 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 
 1. Open **Production Plan** from the menu.
 2. For a plan you make often, click it in **Saved Plans**. Otherwise, in the **Plan** table, pick each product and type how many to make.
-3. Check the **Mixing Sheet** for how many batches of each mix to make, and read any orange note under it. Open a mix's row to see its ingredients, and look at **Spare**: if a mix makes 30 pieces more than you need, you can add up to 30 to the plan for no extra mixing. Tick **Half batches** if the kitchen can mix half a batch.
+3. Check the **Mixing Sheet** for how many batches of each mix to make, and read any orange note under it. Open a mix's row to see its ingredients, and look at **Spare**: if a mix makes 30 pieces more than you need, you can add up to 30 to the plan for no extra mixing. **Use the spare** under the table adds them with one press. Tick **Half batches** if the kitchen can mix half a batch.
 4. Check **Sales** and **Profit** under the Plan table, and the **Buy Cost** of the Purchase Requisition: the money to take to the market.
 5. To keep the plan for another day, press **Save Plan** and name it.
 6. Press **Print**, clear **Costs** for the kitchen, and print. Or press **Export to Excel** to send the purchase requisition on.

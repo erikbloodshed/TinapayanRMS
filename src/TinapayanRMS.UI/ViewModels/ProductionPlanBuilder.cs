@@ -122,6 +122,9 @@ public sealed record MixRow(string Name, string For, decimal? Batches, decimal G
     public IReadOnlyList<MixIngredientRow> Ingredients { get; init; } = [];
 }
 
+/// <summary>Units of a product the plan can take from its mixes' spare with no more mixing, and the button's text, "30 Ube Roll".</summary>
+public sealed record SpareUse(int ProductId, int Units, string Text);
+
 /// <summary>An ingredient of a mix, or of a made ingredient to prepare.</summary>
 /// <param name="PerBatch">Its grams in one batch; null for a made ingredient's, which is prepared to the gram.</param>
 /// <param name="Grams">Its grams in all the batches, or in the made ingredient to prepare.</param>
@@ -155,6 +158,12 @@ public sealed record ProductionPlanResult(
     IReadOnlyList<string> Notes)
 {
     public static ProductionPlanResult Empty { get; } = new([], [], 0m, 0m, []);
+
+    /// <summary>
+    /// The products the mixes' spare can go to, each with the most whole units that need no more mixing of any of its mixes
+    /// (2026-10-29, ProductionPlanRules.UnitsFromSpare), in the plan's order: the Mixing Sheet's Use the spare buttons ("30 Ube Roll").
+    /// </summary>
+    public IReadOnlyList<SpareUse> SpareUses { get; init; } = [];
 }
 
 /// <summary>
@@ -235,8 +244,27 @@ public static class ProductionPlanBuilder
             requisition,
             requisition.Sum(row => row.Cost ?? 0m),
             requisition.Sum(row => row.BuyCost ?? 0m),
-            [.. plan.Issues.Select(issue => NoteOf(issue, products, NameOf)).Distinct()]);
+            [.. plan.Issues.Select(issue => NoteOf(issue, products, NameOf)).Distinct()])
+        {
+            SpareUses = SpareUsesOf(orders, plan, source, halfBatches),
+        };
     }
+
+    /// <summary>
+    /// Each product in the plan that a mix has spare pieces of, with the units it can take from them with no more mixing,
+    /// those that can take any. A product shares the spare of all its mixes, so it has one figure, however many it has.
+    /// </summary>
+    private static IReadOnlyList<SpareUse> SpareUsesOf(
+        IReadOnlyList<(int ProductId, decimal Units)> orders, ProductionPlan plan, ProductionPlanSource source, bool halfBatches) =>
+    [
+        .. plan.Mixes
+            .SelectMany(mix => mix.Uses.Select(u => u.ProductId).Distinct().Where(id => ProductionPlanRules.SparePieces(mix, id) > 0m))
+            .Distinct()
+            .Where(source.Products.ContainsKey)
+            .Select(id => (Id: id, Units: ProductionPlanRules.UnitsFromSpare(orders, source.Recipes, source.Ingredients, source.Boms, halfBatches, id)))
+            .Where(s => s.Units > 0)
+            .Select(s => new SpareUse(s.Id, s.Units, string.Create(CultureInfo.CurrentCulture, $"{s.Units:#,0} {source.Products[s.Id].Product.Name}"))),
+    ];
 
     /// <summary>What the plan needs of a product: its sections, its packaging in base units, and a composite's products.</summary>
     public static PlanRecipe RecipeOf(SavedProduct saved) => new(

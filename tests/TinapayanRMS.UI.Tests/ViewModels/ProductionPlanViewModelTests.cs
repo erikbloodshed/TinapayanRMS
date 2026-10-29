@@ -236,6 +236,27 @@ public class ProductionPlanViewModelTests(DatabaseFixture fixture) : Persistence
     }
 
     [Fact]
+    public async Task Using_the_spare_adds_the_units_its_batches_have_room_for()
+    {
+        var bakery = await AddBakeryAsync();
+        var viewModel = CreateViewModel(new InMemoryViewStateStore());
+        await viewModel.LoadCommand.Execute();
+
+        // 3 Ube Rolls take 0.3 of the batch: 7 more fit in it.
+        AddLine(viewModel, bakery.UbeRollId, 3m);
+        await WaitUntilSettledAsync(() => viewModel.Mixes.Count == 1 && viewModel.SpareUses.Count == 1, () => viewModel.ErrorMessage ?? "no spare");
+        var use = viewModel.SpareUses.Single();
+        use.Should().Be(new SpareUse(bakery.UbeRollId, 7, "7 Ube Roll"));
+
+        await viewModel.UseSpareCommand.Execute(use);
+
+        viewModel.Lines.Single().Units.Should().Be(10m);
+        await WaitUntilSettledAsync(() => viewModel.Mixes.Single().Spare.Length == 0, () => viewModel.Mixes.Single().Spare);
+        viewModel.Mixes.Single().Batches.Should().Be(1m, "the spare used no more mixing");
+        viewModel.SpareUses.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task The_plan_sells_at_each_products_current_price_or_its_worked_out_one_and_says_which()
     {
         var bakery = await AddBakeryAsync();

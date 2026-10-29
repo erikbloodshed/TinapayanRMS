@@ -224,6 +224,57 @@ public static class ProductionPlanRules
     }
 
     /// <summary>
+    /// The most whole sellable units of <paramref name="productId"/> that can go into the plan on top of
+    /// <paramref name="orders"/> with no more batches of any mix (2026-10-29, the Mixing Sheet's use-the-spare button): the
+    /// spare pieces of its mixes, as whole units, but only as many as every one of its mixes has room for, since a spare
+    /// dough is no use if its filling would need another batch. 0 when the product isn't in the plan, or there's no room.
+    /// Fewer units never need more batches, so the most is found by halving.
+    /// </summary>
+    public static int UnitsFromSpare(
+        IReadOnlyList<(int ProductId, decimal Units)> orders,
+        IReadOnlyDictionary<int, PlanRecipe> recipes,
+        IReadOnlyDictionary<int, PlanIngredient> ingredients,
+        ILookup<int, (int ComponentId, decimal Grams)> boms,
+        bool halfBatches,
+        int productId)
+    {
+        var plan = Plan(orders, recipes, ingredients, boms, halfBatches);
+        var mixesOf = plan.Mixes.Where(m => m.Uses.Any(u => u.ProductId == productId)).ToList();
+        if (mixesOf.Count == 0 || !recipes.TryGetValue(productId, out var recipe))
+        {
+            return 0;
+        }
+
+        var batches = BatchesByMix(plan);
+        bool Fits(int units)
+        {
+            var more = BatchesByMix(Plan([.. orders, (productId, units)], recipes, ingredients, boms, halfBatches));
+            return more.Count == batches.Count && more.All(m => batches.TryGetValue(m.Key, out var b) && m.Value == b);
+        }
+
+        var low = 0;
+        var high = (int)Math.Floor(mixesOf.Min(m => SparePieces(m, productId)) / Math.Max(1, recipe.QuantityRequired));
+        while (low < high)
+        {
+            var middle = (low + high + 1) / 2;
+            if (Fits(middle))
+            {
+                low = middle;
+            }
+            else
+            {
+                high = middle - 1;
+            }
+        }
+
+        return low;
+    }
+
+    /// <summary>Each mix's batches, by the same key a mix is gathered under (MixKey).</summary>
+    private static Dictionary<string, decimal> BatchesByMix(ProductionPlan plan) =>
+        plan.Mixes.ToDictionary(m => MixKey(m.SubAssemblyId, m.AddIns), m => m.Batches);
+
+    /// <summary>
     /// What <paramref name="units"/> sellable units sell for at <paramref name="price"/> (with VAT, at
     /// <paramref name="vatPercent"/>), and the profit on them over <paramref name="baseCost"/> a unit. The VAT is taken out
     /// first, since it's collected for the government, as CostingRules.CalculateMarkupPercentFromPrice takes it out.
@@ -329,8 +380,10 @@ public static class ProductionPlanRules
     }
 
     /// <summary>A sub-assembly and its add-ins, in a fixed order: the uses that can share batches.</summary>
-    private static string MixKey(PlanSection section) =>
-        $"{section.SubAssemblyId}|{string.Join(';', section.AddIns.OrderBy(a => a.IngredientId).ThenBy(a => a.Grams).Select(a => string.Create(CultureInfo.InvariantCulture, $"{a.IngredientId}:{a.Grams}")))}";
+    private static string MixKey(PlanSection section) => MixKey(section.SubAssemblyId, section.AddIns);
+
+    private static string MixKey(int subAssemblyId, IReadOnlyList<(int IngredientId, decimal Grams)> addIns) =>
+        $"{subAssemblyId}|{string.Join(';', addIns.OrderBy(a => a.IngredientId).ThenBy(a => a.Grams).Select(a => string.Create(CultureInfo.InvariantCulture, $"{a.IngredientId}:{a.Grams}")))}";
 
     private static void Add(Dictionary<int, decimal> totals, int id, decimal amount) => totals[id] = totals.GetValueOrDefault(id) + amount;
 
