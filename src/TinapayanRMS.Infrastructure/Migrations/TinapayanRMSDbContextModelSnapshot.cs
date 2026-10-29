@@ -657,6 +657,12 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasColumnName("name")
                         .UseCollation("case_insensitive");
 
+                    b.Property<string>("PreferredBrand")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("preferred_brand")
+                        .UseCollation("case_insensitive");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(20)

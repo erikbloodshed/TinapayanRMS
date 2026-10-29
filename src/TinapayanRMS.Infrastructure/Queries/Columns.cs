@@ -18,7 +18,7 @@ internal static class Columns
         [
             "id", "name", "type", "category_id", "source", "weight_loss_percent", "linked_to_id", "weight_share_percent",
             "cost_share_percent", "base_unit_id", "cost_per_base_unit", "cost_buffer_percent", "buffered_cost_per_base_unit",
-            "updated_at", "cost_updated_at", "sub_assembly_id", "target_cost_buffer_percent",
+            "updated_at", "cost_updated_at", "sub_assembly_id", "target_cost_buffer_percent", "preferred_brand",
         ],
         [typeof(RawMaterialUnit)] = ["id", "raw_material_id", "unit_of_measure_id", "base_units_per_unit", "description"],
         [typeof(RawMaterialBrandPrice)] = ["id", "raw_material_id", "brand", "unit_id", "price"],

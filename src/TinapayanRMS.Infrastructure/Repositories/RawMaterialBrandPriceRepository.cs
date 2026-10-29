@@ -114,7 +114,8 @@ public class RawMaterialBrandPriceRepository(IDbContextFactory<TinapayanRMSDbCon
     }
 
     /// <summary>
-    /// Reprices a purchased material from its saved brand prices (ApplyBrandPrices) without saving. When
+    /// Reprices a purchased material from its saved brand prices (ApplyBrandPrices: its preferred brand's, else the
+    /// dearest) without saving. When
     /// its cost is no longer <paramref name="costBefore"/>, the brand price it now comes from is logged in
     /// price history, dated today. Returns whether an ingredient's cost changed, which the caller cascades
     /// before its transaction commits; a packaging material's needs nothing, since products cost their
@@ -136,7 +137,7 @@ public class RawMaterialBrandPriceRepository(IDbContextFactory<TinapayanRMSDbCon
 
         // The buffered cost only moves here on a first pricing, or back to 0 with the last price gone.
         var bufferedBefore = material.BufferedCostPerBaseUnit;
-        var dearest = RawMaterialRules.ApplyBrandPrices(material, [.. brandPrices.Select(p => (p.Price, p.BaseUnitsPerUnit))]);
+        var dearest = RawMaterialRules.ApplyBrandPrices(material, [.. brandPrices.Select(p => (p.Brand, p.Price, p.BaseUnitsPerUnit))]);
         if (material.CostPerBaseUnit == costBefore)
         {
             return material.BufferedCostPerBaseUnit != bufferedBefore && material.Type == RawMaterialType.Ingredient;

@@ -154,7 +154,7 @@ public sealed class CostBufferRow(RawMaterial material)
     /// <summary>The base unit the two costs are per: "g" for an ingredient.</summary>
     public string Per => BaseUnitText.AbbreviationOf(material);
 
-    /// <summary>The dearest brand's cost per base unit: the true cost.</summary>
+    /// <summary>The cost per base unit of the brand it's costed at (its preferred brand, else the dearest): the true cost.</summary>
     public decimal DearestCost => material.CostPerBaseUnit;
 
     public decimal BufferedCost => material.BufferedCostPerBaseUnit;
@@ -464,7 +464,7 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
 
         var what = rows.Count == 1 ? rows[0].Name : $"{rows.Count} materials";
         if (!await ConfirmDelete.Handle(
-                $"Put the target buffer back on top of the dearest brand for {what}? Their buffered costs go up, and so do the costs of every recipe and product using them."))
+                $"Put the target buffer back on top of the brand each is costed at for {what}? Their buffered costs go up, and so do the costs of every recipe and product using them."))
         {
             return;
         }

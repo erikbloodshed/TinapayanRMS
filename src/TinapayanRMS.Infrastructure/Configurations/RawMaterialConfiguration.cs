@@ -10,6 +10,9 @@ public class RawMaterialConfiguration : IEntityTypeConfiguration<RawMaterial>
     {
         // Ingredients and packaging share one list, so a name is unique across both types.
         builder.Property(m => m.Name).HasMaxLength(100).IsRequired();
+
+        // A brand as its prices name it (RawMaterialBrandPrice.Brand), 2026-10-29.
+        builder.Property(m => m.PreferredBrand).HasMaxLength(100);
         builder.HasIndex(m => m.Name).IsUnique();
 
         builder.Property(m => m.Type)

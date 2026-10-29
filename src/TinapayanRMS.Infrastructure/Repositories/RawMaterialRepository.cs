@@ -174,6 +174,10 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
     }
 
     /// <summary>A purchased material's target buffer as it's stored, refused out of range; none for a made or linked one, which has no buffer of its own to type.</summary>
+    /// <summary>A purchased material's preferred brand as it's saved (trimmed, null for the dearest); none for any other.</summary>
+    private static string? StoredPreferredBrand(RawMaterialSource source, string? brand) =>
+        source == RawMaterialSource.Purchased ? RawMaterialRules.NormalizeBrand(brand) : null;
+
     private static decimal? StoredTarget(RawMaterialSource source, decimal? target)
     {
         if (source != RawMaterialSource.Purchased || target is not { } percent)
@@ -268,6 +272,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
                 BaseUnitId = material.BaseUnitId,
                 CostBufferPercent = material.CostBufferPercent,
                 TargetCostBufferPercent = material.TargetCostBufferPercent,
+                PreferredBrand = material.PreferredBrand,
                 BufferedCostPerBaseUnit = material.BufferedCostPerBaseUnit,
             };
 
@@ -367,6 +372,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         var inheritedBuffer = await EnsureValidLinkAsync(dbContext, material, cancellationToken);
         material.CostBufferPercent = RawMaterialRules.StoredCostBufferPercent(material.Source, inheritedBuffer, material.CostBufferPercent);
         material.TargetCostBufferPercent = StoredTarget(material.Source, material.TargetCostBufferPercent);
+        material.PreferredBrand = StoredPreferredBrand(material.Source, material.PreferredBrand);
 
         material.BufferedCostPerBaseUnit = material.Source == RawMaterialSource.Purchased
             ? RawMaterialRules.StoredCost(material.BufferedCostPerBaseUnit)
@@ -562,6 +568,7 @@ public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbCo
         var bufferChanged = existing.CostBufferPercent != costBufferPercent;
         existing.CostBufferPercent = costBufferPercent;
         existing.TargetCostBufferPercent = StoredTarget(existing.Source, material.TargetCostBufferPercent) ?? existing.TargetCostBufferPercent;
+        existing.PreferredBrand = StoredPreferredBrand(existing.Source, material.PreferredBrand);
         // None sent (0) is worked out afresh from the cost and the percent, as for a first price.
         // Stored to the column's places, so a buffered cost sent again unchanged compares equal and doesn't cascade.
         if (existing.Source == RawMaterialSource.Purchased)

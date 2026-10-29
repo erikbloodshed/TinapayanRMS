@@ -69,7 +69,7 @@ The [user manual](user-manual.md) describes every screen. Read its [Key ideas](u
 | Alternative unit | `RawMaterialUnit` | A multiple of the base unit, such as a bag of 25,000 g. Standard units, such as the kilogram and the inch, have fixed multipliers (`StandardUnitRules`). |
 | Source | `RawMaterialSource` | Where an ingredient's cost comes from: `Purchased` (brand prices), `Made` (a sub-assembly and its add-ins) or `Linked` (a share of another ingredient's cost). Packaging is always purchased. Fixed once saved. |
 | Category type | `RawMaterialCategoryType` | What a `RawMaterialCategory` holds: `Ingredient` (purchased and linked ingredients), `Made` (made ingredients only) or `Packaging`. `RawMaterialRules.CategoryTypeFor` gives the one a material goes in, and `MaterialTypeOf` the material type a category holds, so a Made category's tree folder sits in Ingredients. |
-| Brand price | `RawMaterialBrandPrice` | What one brand of a purchased material costs now, in one of its units. The material is costed at its dearest brand per base unit. |
+| Brand price | `RawMaterialBrandPrice` | What one brand of a purchased material costs now, in one of its units. The material is costed at its dearest brand per base unit, or at the brand in its `PreferredBrand` (Cost From) while that has a price. |
 | Price history | `RawMaterialPriceHistory` | A log of the prices a material was costed at. Deleting an entry reprices nothing. |
 | Bill of materials (BOM) | `IngredientBomLine` | A made ingredient's components, in grams: the lines of the sub-assembly it's made from (`RawMaterial.SubAssemblyId`), then its own add-ins (`IngredientAddInLine`). A read model, never stored (`Infrastructure/Queries/IngredientBoms`). BOMs nest to any depth. `WeightLossPercent` shrinks the output. |
 | Cost buffer, buffered cost | `CostBufferPercent`, `BufferedCostPerBaseUnit` | A cushion on top of the true cost (`CostPerBaseUnit`). Everything downstream is costed at the buffered cost. |
@@ -545,7 +545,7 @@ The cascade doesn't push changes live to other screens. A screen picks up new co
 
 | Figure | Formula | Code |
 |---|---|---|
-| Purchased cost per base unit | The dearest brand's price ÷ the base units in its unit | `RawMaterialRules.ApplyBrandPrices`, `UnitConversionRules.CostPerBaseUnit` |
+| Purchased cost per base unit | The price of the preferred brand (`RawMaterial.PreferredBrand`), else the dearest, ÷ the base units in its unit | `RawMaterialRules.ApplyBrandPrices` and `FindCostBrandPrice`, `UnitConversionRules.CostPerBaseUnit` |
 | Purchased buffered cost | A fixed amount, set to cost × (1 + buffer %) on the first price, or whenever the % is typed | `RawMaterialRules.BufferedCost` |
 | Made: output grams | Σ line grams × (1 − weight loss %) | `IngredientBomRules.CalculateOutputGrams` |
 | Made: cost per gram | Σ (line grams × component cost per gram) ÷ output grams. The buffered cost rolls up the components' buffered costs, and adds no buffer of its own. | `IngredientBomRules.CalculateCost` |

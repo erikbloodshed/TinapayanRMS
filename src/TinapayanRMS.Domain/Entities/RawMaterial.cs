@@ -86,6 +86,13 @@ public class RawMaterial
     public decimal? TargetCostBufferPercent { get; set; }
 
     /// <summary>
+    /// Purchased only: the brand its cost comes from (2026-10-29, at the user's request: cost by preferred brand), the
+    /// dearest of that brand's prices when it's priced in more than one unit. Null for the dearest brand, as before, which
+    /// is also what a brand that no longer has a price falls back to (RawMaterialRules.FindCostBrandPrice).
+    /// </summary>
+    public string? PreferredBrand { get; set; }
+
+    /// <summary>
     /// The cost of one base unit with the buffer on top: what recipes, sub-assemblies, packaging lines
     /// and products are costed with, while <see cref="CostPerBaseUnit"/> stays the true cost. Stored
     /// alongside it: for Purchased it's CostPerBaseUnit plus the buffer, for Made the BOM rollup of the

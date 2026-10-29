@@ -74,8 +74,22 @@
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
 
-            <!-- Remove acts on the row picked in the grid -->
-            <syncfusion:ButtonAdv HorizontalAlignment="Right" Margin="0,8,0,0" Label="Remove" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveBrandPriceCommand}" />
+            <!--
+                Remove acts on the row picked in the grid. Cost From (2026-10-29): the brand the material's cost comes from,
+                the dearest unless one is picked.
+            -->
+            <DockPanel Margin="0,8,0,0">
+                <syncfusion:ButtonAdv DockPanel.Dock="Right" Label="Remove" IconTemplate="{StaticResource RemoveIconTemplate}" Command="{Binding RemoveBrandPriceCommand}" />
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Cost From" Style="{StaticResource FormLabelStyle}" />
+                    <syncfusion:ComboBoxAdv Width="260"
+                                            ItemsSource="{Binding CostFromOptions}"
+                                            DisplayMemberPath="Label"
+                                            controls:FieldUndoStep.Recorder="{Binding}"
+                                            SelectedItem="{Binding CostFrom, Mode=TwoWay}"
+                                            ToolTip="The brand the material is costed at. Dearest brand costs it at the most it's bought for; pick a brand to cost it at that brand's price (its dearest unit, if it's priced in more than one). Save keeps it." />
+                </StackPanel>
+            </DockPanel>
 
             <!--
                 One fixed buffered cost for the whole material, which brand prices don't move: typed, or worked out from the
@@ -110,7 +124,7 @@
                                           Value="{Binding TypedCostBufferPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}"
                                           MinValue="0"
                                           MaxValue="100"
-                                          ToolTip="The cushion on top of the dearest brand, for price swings, waste and yield variation. Typing it works out the Buffered Cost; typing the Buffered Cost works it out." />
+                                          ToolTip="The cushion on top of the brand it's costed at (Cost From), for price swings, waste and yield variation. Typing it works out the Buffered Cost; typing the Buffered Cost works it out." />
                 <TextBlock Grid.Column="2" Text="Buffered Cost" Style="{StaticResource FieldLabelStyle}" />
                 <!-- Updated when focus leaves, since the value it shows back is rounded to the centavo -->
                 <syncfusion:DoubleTextBox Grid.Row="1"
@@ -154,7 +168,7 @@
                     <syncfusion:ButtonAdv Label="Re-apply Target"
                                           IconTemplate="{StaticResource ApplyIconTemplate}"
                                           Command="{Binding ReapplyTargetBufferCommand}"
-                                          ToolTip="Types the target buffer again: the Buffered Cost becomes the dearest brand with it on top. Save keeps it." />
+                                          ToolTip="Types the target buffer again: the Buffered Cost becomes the brand it's costed at (Cost From) with it on top. Save keeps it." />
                 </StackPanel>
             </Grid>
         </StackPanel>

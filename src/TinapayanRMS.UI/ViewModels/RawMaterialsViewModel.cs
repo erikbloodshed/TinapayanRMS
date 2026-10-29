@@ -360,6 +360,54 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         }
     }
 
+    private string? _editingPreferredBrand;
+
+    /// <summary>
+    /// The brand a purchased material's cost comes from (2026-10-29), as Save will keep it: null for the dearest brand. The
+    /// costs and texts below follow it at once, as they follow the grid (UpdatePurchaseCostTexts).
+    /// </summary>
+    public string? EditingPreferredBrand
+    {
+        get => _editingPreferredBrand;
+        set
+        {
+            if (_editingPreferredBrand == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _editingPreferredBrand, value);
+            this.RaisePropertyChanged(nameof(CostFrom));
+
+            // An undo puts the grid back after this, and works the texts out once at its end (RestoreSnapshot).
+            if (!IsRestoring)
+            {
+                UpdatePurchaseCostTexts();
+            }
+        }
+    }
+
+    /// <summary>The Cost From picker's choices: the dearest brand, then each brand in the grid (RebuildCostFromOptions).</summary>
+    public ObservableCollection<CostFromOption> CostFromOptions { get; } = [new(null)];
+
+    /// <summary>The Cost From picker's pick, <see cref="EditingPreferredBrand"/> as one of its choices.</summary>
+    public CostFromOption? CostFrom
+    {
+        get => CostFromOptions.FirstOrDefault(o => string.Equals(o.Brand, EditingPreferredBrand, StringComparison.OrdinalIgnoreCase)) ?? CostFromOptions[0];
+        set
+        {
+            // While the choices are replaced, the picker writes back an empty pick, as the Per picker does.
+            if (_rebuildingCostFromOptions || value is null)
+            {
+                return;
+            }
+
+            EditingPreferredBrand = value.Brand;
+        }
+    }
+
+    private bool _rebuildingCostFromOptions;
+
     /// <summary>"Target 10%", beside the Cost Buffer % box, while the buffer has drifted from it.</summary>
     public string TargetBufferText => string.Create(CultureInfo.CurrentCulture, $"Target {EditingTargetCostBufferPercent ?? 0m:0.##}%");
 
@@ -1321,6 +1369,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                     ? EditingLinkedTo?.CostBufferPercent ?? 0m
                     : EditingCostBufferPercent ?? 0m,
                 TargetCostBufferPercent = source == RawMaterialSource.Purchased ? EditingTargetCostBufferPercent ?? 0m : null,
+                PreferredBrand = source == RawMaterialSource.Purchased ? EditingPreferredBrand : null,
                 // Only a purchased material's is the form's; a made or linked one's is worked out by the cascade.
                 BufferedCostPerBaseUnit = source == RawMaterialSource.Purchased ? EditingBufferedCost ?? 0m : 0m,
             };
@@ -1564,6 +1613,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         CostSharePercent = EditingCostSharePercent,
         CostBufferPercent = EditingCostBufferPercent,
         TargetCostBufferPercent = EditingTargetCostBufferPercent,
+        PreferredBrand = EditingPreferredBrand,
         BufferedCost = EditingBufferedCost,
         BufferedCostUnitKey = BufferedCostUnit?.Key,
         UnitRows =
@@ -1607,6 +1657,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             EditingCostSharePercent = snapshot.CostSharePercent;
             EditingCostBufferPercent = snapshot.CostBufferPercent;
             EditingTargetCostBufferPercent = snapshot.TargetCostBufferPercent;
+            EditingPreferredBrand = snapshot.PreferredBrand;
             EditingBufferedCost = snapshot.BufferedCost;
 
             // The alternative units, as fresh entities carrying their ids.
@@ -1659,6 +1710,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         IngredientLineRow.Resolve(AddInEdits, Ingredients.ToDictionary(m => m.Id));
         RefreshBrandPriceRows();
         UpdatePurchaseCostTexts();
+
+        // The Cost Buffer % box shows TypedCostBufferPercent, which is only raised outside a restore: without this it kept
+        // the percent from before the undo (found 2026-10-29, undoing a Cost From pick).
+        this.RaisePropertyChanged(nameof(TypedCostBufferPercent));
         // Once, from the restored form: the change set and the Weight Loss % subscription are both suppressed while
         // a restore applies, so without this the tiles would keep the figures from before the undo.
         RecomputeBomTotals();
@@ -1693,6 +1748,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         EditingCostSharePercent = null;
         EditingCostBufferPercent = _defaultCostBufferPercent;
         EditingTargetCostBufferPercent = _defaultCostBufferPercent;
+        EditingPreferredBrand = null;
         EditingBufferedCost = null;
         EditingBaseUnit = null;
         ExampleRawMaterial = null;
@@ -1733,6 +1789,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         EditingCostSharePercent = material.CostSharePercent;
         EditingCostBufferPercent = material.CostBufferPercent;
         EditingTargetCostBufferPercent = RawMaterialRules.TargetBufferPercentOf(material);
+        EditingPreferredBrand = material.PreferredBrand;
         EditingBufferedCost = material.BufferedCostPerBaseUnit;
         EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId);
     }
@@ -2273,23 +2330,66 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         }
     }
 
-    /// <summary>The unit of the dearest brand as the grid now is, among the picker's choices; the base unit while unpriced.</summary>
+    /// <summary>The unit of the brand price the cost comes from as the grid now is, among the picker's choices; the base unit while unpriced.</summary>
     private PurchaseUnitChoice DearestBrandUnit()
     {
         var priced = BrandPriceRows.Where(r => r.CostPerBaseUnit is not null).ToList();
-        var key = RawMaterialRules.FindDearestBrandPrice([.. priced.Select(r => (r.Price!.Value, r.Quantity))]) is { } dearest
-            ? priced[dearest].UnitKey
-            : null;
+        var key = CostBrandIndex(priced) is { } source ? priced[source].UnitKey : null;
         return BufferedCostUnitOptions.FirstOrDefault(c => c.Key == key) ?? BufferedCostUnitOptions[0];
     }
 
-    /// <summary>The dearest brand per base unit as the grid now is, which is what Save costs the material at; null while unpriced.</summary>
+    /// <summary>
+    /// What Save costs the material at per base unit, as the grid now is: the preferred brand's price, else the dearest
+    /// (RawMaterialRules.FindCostBrandPrice); null while unpriced.
+    /// </summary>
     private decimal? DearestLiveCost()
     {
         var priced = BrandPriceRows.Where(r => r.CostPerBaseUnit is not null).ToList();
-        return RawMaterialRules.FindDearestBrandPrice([.. priced.Select(r => (r.Price!.Value, r.Quantity))]) is { } dearest
-            ? priced[dearest].CostPerBaseUnit
-            : null;
+        return CostBrandIndex(priced) is { } source ? priced[source].CostPerBaseUnit : null;
+    }
+
+    /// <summary>The row of <paramref name="priced"/> the cost comes from: the preferred brand's, else the dearest.</summary>
+    private int? CostBrandIndex(IReadOnlyList<BrandPriceRow> priced) =>
+        RawMaterialRules.FindCostBrandPrice([.. priced.Select(r => (r.Brand, r.Price!.Value, r.Quantity))], EditingPreferredBrand);
+
+    /// <summary>
+    /// The Cost From picker's choices as the grid now is: the dearest brand, each named brand once, and the preferred brand
+    /// still, saying so, when its prices have gone.
+    /// </summary>
+    private void RebuildCostFromOptions()
+    {
+        List<CostFromOption> choices = [new(null)];
+        foreach (var brand in BrandPriceRows.Select(r => RawMaterialRules.NormalizeBrand(r.Brand)).OfType<string>())
+        {
+            if (!choices.Any(c => string.Equals(c.Brand, brand, StringComparison.OrdinalIgnoreCase)))
+            {
+                choices.Add(new(brand));
+            }
+        }
+
+        if (RawMaterialRules.NormalizeBrand(EditingPreferredBrand) is { } preferred
+            && !choices.Any(c => string.Equals(c.Brand, preferred, StringComparison.OrdinalIgnoreCase)))
+        {
+            choices.Add(new(preferred, HasPrice: false));
+        }
+
+        if (choices.SequenceEqual(CostFromOptions))
+        {
+            return;
+        }
+
+        _rebuildingCostFromOptions = true;
+        try
+        {
+            CostFromOptions.Clear();
+            CostFromOptions.AddRange(choices);
+        }
+        finally
+        {
+            _rebuildingCostFromOptions = false;
+        }
+
+        this.RaisePropertyChanged(nameof(CostFrom));
     }
 
     /// <summary>
@@ -2304,11 +2404,12 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         }
 
         RebuildBufferedCostUnitOptions();
+        RebuildCostFromOptions();
         this.RaisePropertyChanged(nameof(EditingBufferedCostInUnit));
         UpdateHeaderCostTexts();
 
         var priced = BrandPriceRows.Where(r => r.CostPerBaseUnit is not null).ToList();
-        if (RawMaterialRules.FindDearestBrandPrice([.. priced.Select(r => (r.Price!.Value, r.Quantity))]) is not { } dearest)
+        if (CostBrandIndex(priced) is not { } dearest)
         {
             DearestPurchaseCost = null;
             PurchaseCostText = "—";
@@ -2320,6 +2421,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         var cost = priced[dearest].CostPerBaseUnit!.Value;
         var unit = BufferedCostUnit?.Abbreviation ?? BaseUnitAbbreviation;
+
+        // What the cost comes from, as the texts name it: the brand picked in Cost From while it has a price, else the dearest.
+        var isPreferred = RawMaterialRules.IsBrandPriced(priced.Select(r => r.Brand), EditingPreferredBrand);
+        var source = isPreferred ? RawMaterialRules.NormalizeBrand(priced[dearest].Brand)! : "the dearest brand";
         DearestPurchaseCost = cost;
         PurchaseCostText = $"{cost:N4}";
         if (EditingBufferedCost is > 0 and var buffered)
@@ -2330,22 +2435,24 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             // check constraint allow, so a buffer that's gone (or more than double) pins it; the line below and the
             // warning say where it really stands. Typing the % still works the other way, through TypedCostBufferPercent.
             EditingCostBufferPercent = Math.Clamp(Math.Round(over, 4), 0m, 100m);
-            PurchaseBufferedCostText = $"{FormatInBufferedCostUnit(buffered)}/{unit} is {over:0.##}% over the dearest brand's {FormatInBufferedCostUnit(cost)}/{unit}.";
+            PurchaseBufferedCostText = $"{FormatInBufferedCostUnit(buffered)}/{unit} is {over:0.##}% over {source}'s {FormatInBufferedCostUnit(cost)}/{unit}.";
             // Compared to the 4 places costs per base unit are shown to: a saved buffered cost comes back cut to its
             // column's 20 places, so a repeating one (170/240) would otherwise read as a hair under an unchanged dearest brand.
             BufferedCostWarningText = Math.Round(buffered, 4) < Math.Round(cost, 4)
-                ?"The dearest brand now costs more than the buffered cost. Type the Cost Buffer % again to put the buffer back on top."
+                ? $"{char.ToUpperInvariant(source[0])}{source[1..]} now costs more than the buffered cost. Type the Cost Buffer % again to put the buffer back on top."
                 : string.Empty;
         }
         else
         {
-            PurchaseBufferedCostText = $"Save works it out as {FormatInBufferedCostUnit(RawMaterialRules.BufferedCost(cost, EditingCostBufferPercent ?? 0m))}/{unit}, the dearest brand with the buffer on top.";
+            PurchaseBufferedCostText = $"Save works it out as {FormatInBufferedCostUnit(RawMaterialRules.BufferedCost(cost, EditingCostBufferPercent ?? 0m))}/{unit}, {source} with the buffer on top.";
             BufferedCostWarningText = string.Empty;
         }
 
-        PurchaseCostSourceText = priced.Count > 1
-            ? $"From {RawMaterialRules.NormalizeBrand(priced[dearest].Brand) ?? "the unnamed brand"}, the dearest of {priced.Count} brands."
-            : string.Empty;
+        PurchaseCostSourceText = isPreferred
+            ? $"From {source}, the brand picked in Cost From."
+            : priced.Count > 1
+                ? $"From {RawMaterialRules.NormalizeBrand(priced[dearest].Brand) ?? "the unnamed brand"}, the dearest of {priced.Count} brands."
+                : string.Empty;
     }
 
     /// <summary>

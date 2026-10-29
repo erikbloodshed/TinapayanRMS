@@ -399,7 +399,7 @@ Dragging materials onto another category moves them straight away. A material ca
 At the top are the material's name and **New**, **Save**, **Undo**, **Redo** and **Delete**, then these figures:
 
 - **Base Unit**: *gram (g)* for an ingredient.
-- **Current Cost per …**: the true cost. For a purchased material it's the dearest brand's price, per the unit it's shown in.
+- **Current Cost per …**: the true cost, as last saved. For a purchased material it's the price of the brand in **Cost From** (the dearest brand unless you pick one), per the unit it's shown in.
 - **Buffered Cost per …**: the cost with the buffer on top. This is the figure recipes use.
 - **Total Weight** and **Total Cost**, for a made ingredient only: what its batch yields after weight loss, and what that batch costs.
 - **Last Updated**: when the material was last saved, and when its cost last changed.
@@ -432,14 +432,16 @@ Enter one row per brand you buy:
 
 The material's **current cost** comes from the **dearest** brand: its price divided by the base units in its purchase unit. For example, a 25 kg bag at 1,250.00 costs 1,250 ÷ 25,000 = 0.05 per gram.
 
+<a id="cost-from"></a>**Cost From**, under the brand table beside **Remove**, picks another brand to cost the material at instead: say you nearly always buy the cheaper Queen flour, and only buy Sampaguita when Queen runs out. Pick **Queen** and the material is costed at Queen's price; leave it on **Dearest brand**, as it starts, to cost it at the most you pay. If the brand is priced in more than one unit, its dearest per base unit is used. If you remove every price of the brand you picked, the dearest brand is used until you price it again or pick another (the picker says *no price: the dearest is used*). The cost buffer, the texts under it, **Re-apply Target**, Price History, and every recipe and product that uses the material all follow the brand it's costed at once you Save.
+
 <a id="cost-buffer"></a>**Cost buffer.** Under the brand table are **Cost Buffer %**, **Buffered Cost** and **Per**:
 
 - A new material's **Cost Buffer %** starts at the default in Settings → Costing Defaults, 10% unless you change it there. Set it to 0 for no buffer.
-- Typing the **Cost Buffer %** works out the **Buffered Cost** as the dearest brand plus that percentage.
+- Typing the **Cost Buffer %** works out the **Buffered Cost** as the brand it's costed at (see Cost From) plus that percentage.
 - Typing the **Buffered Cost** works out the percentage.
 - **Per** chooses the unit the buffered cost is shown and typed in, such as per gram or per bag. It's always stored per base unit.
 
-The buffered cost stays **fixed** when brand prices change. The percentage then follows, showing how far the fixed amount now sits above the dearest price. If the dearest brand goes above the buffered cost, a warning says so. **To put the buffer back on top of a new price, type the Cost Buffer % again**, then Save.
+The buffered cost stays **fixed** when brand prices change. The percentage then follows, showing how far the fixed amount now sits above the price it's costed at. If that brand goes above the buffered cost, a warning says so. **To put the buffer back on top of a new price, type the Cost Buffer % again**, then Save.
 
 The app remembers the Cost Buffer % you last typed as the material's **target**. While prices have moved the buffer away from it by a tenth of a point or more, **Target 10%** shows under the buffer with a **Re-apply Target** button, which types it again for you; then Save. To do this for many materials at once, see [Cost Buffers](#cost-buffers) in Reports. A material saved before targets were kept takes the buffer it was last saved with as its target.
 
@@ -904,17 +906,17 @@ Double-click a material to open it on the **Raw Materials** screen.
 
 ### Cost Buffers
 
-Every purchased material with a price, and how its fixed **buffered cost** stands against its dearest brand now. Prices rising don't move the buffered cost, so they wear the buffer down: this tab finds the materials where that has happened.
+Every purchased material with a price, and how its fixed **buffered cost** stands against the brand it's costed at now (its [Cost From](#cost-from) brand, or the dearest). Prices rising don't move the buffered cost, so they wear the buffer down: this tab finds the materials where that has happened.
 
 - **Raw Material**, **Type**, **Category** and **Per**: the base unit the costs are per, such as *g*.
-- **Dearest Brand** and **Buffered Cost**: the true cost and the buffered cost, per base unit.
-- **Buffer %**: how far the buffered cost now sits above the dearest brand. Below 0 means a price has gone above it.
+- **Brand Cost** and **Buffered Cost**: the true cost (the price of the brand it's costed at) and the buffered cost, per base unit.
+- **Buffer %**: how far the buffered cost now sits above the brand it's costed at. Below 0 means a price has gone above it.
 - **Target %**: the Cost Buffer % last typed for the material.
 - **Short By**: how many percentage points the buffer is under its target. Blank when it isn't.
 
 **Only below target**, ticked to start with, shows only the materials at least a tenth of a point under their target. Untick it to see them all.
 
-**Re-apply Target Buffer** puts each material's target buffer back on top of its dearest brand: its buffered cost becomes the dearest brand plus the target. It does this for the materials you've picked (click one, or several with **Ctrl** or **Shift**), or with none picked, for every one shown that's below target. It asks first. The new buffered costs reach every made and linked ingredient, recipe and product using them, as a Save on Raw Materials does. Double-click a material to open it on Raw Materials.
+**Re-apply Target Buffer** puts each material's target buffer back on top of the brand it's costed at: its buffered cost becomes that brand's price plus the target. It does this for the materials you've picked (click one, or several with **Ctrl** or **Shift**), or with none picked, for every one shown that's below target. It asks first. The new buffered costs reach every made and linked ingredient, recipe and product using them, as a Save on Raw Materials does. Double-click a material to open it on Raw Materials.
 
 ### Cost Drivers
 
@@ -963,7 +965,7 @@ The **Price Simulator** shows what raw material price changes would do to every 
 The top table holds the changes to try, one row per raw material:
 
 - **Raw Material**: pick a purchased ingredient or packaging material. Type to search the list.
-- **Per** and **Current Price**: the unit it's bought in and what one costs now. These come from its dearest brand on **Cost Setup**, which is the price its cost comes from. A material with no price yet shows its base unit and no price.
+- **Per** and **Current Price**: the unit it's bought in and what one costs now. These come from the brand it's costed at on **Cost Setup** (its Cost From brand, or the dearest), which is the price its cost comes from. A material with no price yet shows its base unit and no price.
 - **New Price** or **Change %**: type either one, and the other is worked out. For example, a sack of flour at 1,250 up **10**% shows a new price of 1,375. A material with no price yet needs its new price typed.
 
 **Remove Line** takes the picked row away, and **Clear All** takes them all away, so every figure is today's again.
@@ -1094,7 +1096,7 @@ Everything to buy for the plan, ingredients first, then packaging:
 
 - **Needed**, in the material's base unit (grams for an ingredient).
 - **Cost**: what the amount needed costs, at buffered costs.
-- **Buy** and **Per**: whole units to buy, in the unit of its dearest brand price, such as **2** *sack*. It's rounded up. A material with no price yet shows no Buy.
+- **Buy** and **Per**: whole units to buy, in the unit of the brand price its cost comes from (its Cost From brand, or the dearest), such as **2** *sack*. It's rounded up. A material with no price yet shows no Buy.
 - **Buy Cost**: what the whole units to buy cost at that brand's price: the money to take to the market.
 
 **Total Cost** and **Buy Cost** for the whole plan are at the top.
@@ -1132,7 +1134,7 @@ This happens as soon as you save. A product already open on another tab shows th
 
 ### Raw materials
 
-- **Purchased**: cost per base unit = the dearest brand's price ÷ the base units in its purchase unit. The buffered cost is a fixed amount. It's set from the Cost Buffer % on the first price, or whenever you type the percentage again.
+- **Purchased**: cost per base unit = the price of the brand in Cost From (the dearest brand unless one is picked) ÷ the base units in its purchase unit. The buffered cost is a fixed amount. It's set from the Cost Buffer % on the first price, or whenever you type the percentage again.
 - **Made**: final weight = the grams of its sub-assembly's lines and its add-ins × (1 − Weight Loss %). Cost per gram = their total cost ÷ final weight. The buffered cost uses their buffered costs.
 - **Linked**: cost per gram = linked-to ingredient's cost per gram × Cost Share % ÷ Weight Share %.
 

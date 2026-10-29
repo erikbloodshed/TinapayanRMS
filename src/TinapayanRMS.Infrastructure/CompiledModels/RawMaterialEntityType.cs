@@ -22,7 +22,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 "TinapayanRMS.Domain.Entities.RawMaterial",
                 typeof(RawMaterial),
                 baseEntityType,
-                propertyCount: 17,
+                propertyCount: 18,
                 navigationCount: 5,
                 foreignKeyCount: 4,
                 unnamedIndexCount: 5,
@@ -128,6 +128,16 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 maxLength: 100);
             name.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
             name.AddAnnotation("Relational:ColumnName", "name");
+
+            var preferredBrand = runtimeEntityType.AddProperty(
+                "PreferredBrand",
+                typeof(string),
+                propertyInfo: typeof(RawMaterial).GetProperty("PreferredBrand", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                fieldInfo: typeof(RawMaterial).GetField("<PreferredBrand>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                nullable: true,
+                maxLength: 100);
+            preferredBrand.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+            preferredBrand.AddAnnotation("Relational:ColumnName", "preferred_brand");
 
             var source = runtimeEntityType.AddProperty(
                 "Source",
