@@ -10,6 +10,9 @@
     <!-- The SDK's built-in .NET analyzers at their Recommended rule set, tracking the SDK's latest
          rules. Per-folder exceptions live in .editorconfig. -->
     <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <!-- .NET 11's runtime async: async methods compile to the runtime's own support for them rather
+         than to state machines. Still an opt-in compiler feature in RC3. -->
+    <Features>$(Features);runtime-async=on</Features>
   </PropertyGroup>
 
 </Project>
