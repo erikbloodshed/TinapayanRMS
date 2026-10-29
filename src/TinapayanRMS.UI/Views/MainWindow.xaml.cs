@@ -49,6 +49,10 @@ public partial class MainWindow : AppWindow, IVimHost
     private readonly CostingDefaultsViewModel _costingDefaultsViewModel;
     private readonly KeyboardSettingsViewModel _keyboardSettingsViewModel;
     private readonly DatabaseBackupsViewModel _databaseBackupsViewModel;
+    private readonly QuickFindViewModel _quickFindViewModel;
+
+    // Opens each screen's record by its id, for Find: the screen's tab, and the open that asks about its own unsaved changes.
+    private readonly Dictionary<AppScreen, (TabItemExt Tab, Func<int, Task<bool>> Open)> _recordOpeners = [];
 
     public MainWindow(
         MainWindowViewModel viewModel,
@@ -65,10 +69,12 @@ public partial class MainWindow : AppWindow, IVimHost
         CostingDefaultsViewModel costingDefaultsViewModel,
         KeyboardSettingsViewModel keyboardSettingsViewModel,
         DatabaseBackupsViewModel databaseBackupsViewModel,
-        PrintTabViewModel printTabViewModel)
+        PrintTabViewModel printTabViewModel,
+        QuickFindViewModel quickFindViewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
+        _quickFindViewModel = quickFindViewModel;
         _unitsOfMeasureViewModel = unitsOfMeasureViewModel;
         _categoriesViewModel = categoriesViewModel;
         _productCategoriesViewModel = productCategoriesViewModel;
@@ -158,6 +164,10 @@ public partial class MainWindow : AppWindow, IVimHost
             .Merge(rawMaterialsViewModel.SubAssemblyOpenRequests)
             .Subscribe(subAssemblyId => _ = OpenOnAsync(SubAssembliesTab, () => subAssembliesViewModel.OpenSubAssemblyAsync(subAssemblyId)));
 
+        _recordOpeners[AppScreen.RawMaterials] = (RawMaterialsTab, rawMaterialsViewModel.OpenRawMaterialAsync);
+        _recordOpeners[AppScreen.SubAssemblies] = (SubAssembliesTab, subAssembliesViewModel.OpenSubAssemblyAsync);
+        _recordOpeners[AppScreen.Products] = (ProductsTab, productsViewModel.OpenProductAsync);
+
         // The tab that's selected at startup; every later switch goes through SelectionChanged.
         Loaded += (_, _) =>
         {
@@ -204,6 +214,21 @@ public partial class MainWindow : AppWindow, IVimHost
 
     private void BackButton_Click(object sender, RoutedEventArgs e) => NavigateHistory(back: true);
 
+    private void FindButton_Click(object sender, RoutedEventArgs e) => OpenFind();
+
+    /// <summary>
+    /// Find (Ctrl+K, or the title bar's magnifier): the record picked opens on its own screen, as a link from another screen
+    /// opens one, the screen showing asked about its unsaved changes first (OpenOnAsync).
+    /// </summary>
+    private void OpenFind()
+    {
+        CloseDrawer();
+        if (QuickFindWindow.Pick(_quickFindViewModel, this) is { } picked && _recordOpeners.TryGetValue(picked.Screen, out var opener))
+        {
+            _ = OpenOnAsync(opener.Tab, () => opener.Open(picked.Id));
+        }
+    }
+
     private void ForwardButton_Click(object sender, RoutedEventArgs e) => NavigateHistory(back: false);
 
     /// <summary>
@@ -213,6 +238,14 @@ public partial class MainWindow : AppWindow, IVimHost
     /// </summary>
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // Ctrl+K: Find, from anywhere in the window, a grid or a box included (2026-10-29).
+        if (e.Key == Key.K && e.KeyboardDevice.Modifiers == ModifierKeys.Control)
+        {
+            OpenFind();
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key != Key.System || e.KeyboardDevice.Modifiers != ModifierKeys.Alt)
         {
             return;
