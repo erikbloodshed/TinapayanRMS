@@ -210,10 +210,9 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await OpenHistoryAsync(viewModel, rows: 2);
         viewModel.VersionHistory.SelectedRow = viewModel.VersionHistory.Rows[1];
 
-        var (printout, problem) = viewModel.PreparePrintout();
+        var printout = viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Subject;
 
-        problem.Should().BeNull();
-        printout!.ProductName.Should().Be("Ube Roll (Version 1)");
+        printout.ProductName.Should().Be("Ube Roll (Version 1)");
         printout.SaveNote.Should().Be(ProductPrintout.VersionNote);
         printout.LastUpdatedText.Should().Be(viewModel.VersionHistory.Rows[1].SavedText);
         printout.Sections.Should().ContainSingle();

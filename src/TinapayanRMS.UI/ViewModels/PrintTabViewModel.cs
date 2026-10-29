@@ -205,13 +205,20 @@ public sealed class PrintTabViewModel : ViewModelBase
 
     private void PrepareThisProduct()
     {
-        var (printout, problem) = _products.PreparePrintout();
-        Note = problem is null
-            ? null
-            : $"These pages are the product as it was: the open sub-assembly form on Products can't be applied yet. {problem}";
-        if (printout is not null)
+        switch (_products.PreparePrintout())
         {
-            PrintSet = ProductPrintSet.Of(printout);
+            case ProductPrintout printout:
+                Note = null;
+                PrintSet = ProductPrintSet.Of(printout);
+                break;
+
+            case PrintProblem(var problem):
+                Note = $"These pages are the product as it was: the open sub-assembly form on Products can't be applied yet. {problem}";
+                break;
+
+            case null:
+                Note = null;
+                break;
         }
     }
 

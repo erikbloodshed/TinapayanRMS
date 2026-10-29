@@ -426,10 +426,9 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
-        var (printout, problem) = viewModel.PreparePrintout();
+        var printout = viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Subject;
 
-        problem.Should().BeNull();
-        printout!.IsComposite.Should().BeTrue();
+        printout.IsComposite.Should().BeTrue();
         printout.Sections.Should().BeEmpty();
         printout.CostUnitCaption.Should().Be("Per unit");
         printout.Components.Should().Equal(

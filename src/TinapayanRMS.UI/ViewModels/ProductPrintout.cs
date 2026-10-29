@@ -78,6 +78,16 @@ public sealed record ProductPrintout(
 }
 
 /// <summary>
+/// What Print gets from the Products screen (ProductsViewModel.PreparePrintout): the pages of the product it has open, or
+/// why the sub-assembly form left open there can't give them (<see cref="PrintProblem"/>). Empty (<c>default</c>) while
+/// there's nothing to print yet: the details are still arriving, or the History tab has no version picked.
+/// </summary>
+public union PreparedPrintout(ProductPrintout, PrintProblem);
+
+/// <summary>A rule refused the sub-assembly form left open, so Print keeps the pages it had: the rule's message.</summary>
+public sealed record PrintProblem(string Message);
+
+/// <summary>
 /// What one Print puts on paper: one product, as the Products screen shows it, or a set of products as they're saved,
 /// under a title ("All Products", "Breads · Production"), which gives the document a contents page and starts each
 /// product on a page of its own.

@@ -4713,23 +4713,23 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>
     /// The product the screen has open, as the Print tab shows it: asked for each time that tab is shown, so it follows
     /// the edits made here since, and the product opened here since (the user's choice, 2026-09-27). A sub-assembly form
-    /// left open is applied first, as Print applies it. Null for the printout while the details are still arriving, or
-    /// when a rule refuses the form, with its message as the problem (and on this screen, for when it's next shown):
-    /// the tab then keeps what it had.
+    /// left open is applied first, as Print applies it. Empty while the details are still arriving, and a
+    /// <see cref="PrintProblem"/> when a rule refuses the form, with its message (shown on this screen too, for when it's
+    /// next shown): the tab then keeps what it had.
     /// </summary>
-    public (ProductPrintout? Printout, string? Problem) PreparePrintout()
+    public PreparedPrintout PreparePrintout()
     {
         if (!AreDetailsReady)
         {
-            return (null, null);
+            return default;
         }
 
         // With the History tab showing, the pages are the version picked there, as the Scaling tab's are the recipe scaled.
         if (SelectedDetailsTab == HistoryTab)
         {
             return VersionHistory.SelectedRow is { } row && SelectedProduct is { } product
-                ? (VersionPrintout(row, product), null)
-                : (null, null);
+                ? VersionPrintout(row, product)
+                : default(PreparedPrintout);
         }
 
         try
@@ -4739,10 +4739,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         catch (BusinessRuleException ex)
         {
             ErrorMessage = ex.Message;
-            return (null, ex.Message);
+            return new PrintProblem(ex.Message);
         }
 
-        return (CurrentPrintout(), null);
+        return CurrentPrintout();
     }
 
     /// <summary>

@@ -131,7 +131,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         await SetCostingAsync(productId);
         var products = await OpenProductsAsync("Ube Roll", vm => vm.UsageEdits.Count == 2 && vm.HasPackaging);
 
-        var screen = products.PreparePrintout().Printout!;
+        var screen = products.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Subject;
         var saved = (await CreateReader().ReadAsync(products.SelectedProduct!, Cancellation)).ToPrintout(screen.PrintedAt);
 
         saved.Should().BeEquivalentTo(screen);
@@ -182,7 +182,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         await SetCostingAsync(boxId);
         var products = await OpenProductsAsync("Pasalubong Box", vm => vm.ComponentsTable.ComponentEdits.Count == 2 && vm.HasPackaging);
 
-        var screen = products.PreparePrintout().Printout!;
+        var screen = products.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Subject;
         var saved = (await CreateReader().ReadAsync(products.SelectedProduct!, Cancellation)).ToPrintout(screen.PrintedAt);
 
         saved.Should().BeEquivalentTo(screen);
