@@ -5,7 +5,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// the prices the material has been costed at: saving brand prices (RawMaterialBrandPrice) that move
 /// its cost adds the dearest brand's price, dated that day. Deleting an entry doesn't reprice anything.
 /// </summary>
-public class RawMaterialPriceHistory
+public sealed class RawMaterialPriceHistory
 {
     public int Id { get; set; }
 

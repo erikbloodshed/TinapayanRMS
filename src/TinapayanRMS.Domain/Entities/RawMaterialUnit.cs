@@ -5,7 +5,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// (1 bag = 25,000 g, 1 roll = 1,000 cm). The base unit never has a row of its own: a price entry or
 /// line with no unit is in the base unit, so nothing depends on a "gram" row in Units of Measure.
 /// </summary>
-public class RawMaterialUnit
+public sealed class RawMaterialUnit
 {
     public int Id { get; set; }
 

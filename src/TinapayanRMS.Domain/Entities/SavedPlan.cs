@@ -4,7 +4,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// A Production Plan saved under a name ("Saturday", "Fiesta order"), to open on the Production Plan screen again
 /// (2026-10-24): the products to make and how many, and whether its mixes are made in half batches.
 /// </summary>
-public class SavedPlan
+public sealed class SavedPlan
 {
     public int Id { get; set; }
 

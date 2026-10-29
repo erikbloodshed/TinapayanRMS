@@ -9,7 +9,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductRepository
+public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductRepository
 {
     private static readonly string ProductWithCategorySql = $"""
         SELECT {Columns.Of<Product>("p")}, {Columns.Of<ProductCategory>("c")}

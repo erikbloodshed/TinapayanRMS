@@ -7,7 +7,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class ProductVersionRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductVersionRepository
+public sealed class ProductVersionRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductVersionRepository
 {
     public Task<IReadOnlyList<ProductVersion>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
         dbContextFactory.QueryAsync<ProductVersion>(

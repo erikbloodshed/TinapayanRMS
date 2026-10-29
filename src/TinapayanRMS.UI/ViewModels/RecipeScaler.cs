@@ -135,12 +135,13 @@ public sealed class RecipeScaler(
         {
             var scaled = RecipeScalingRules.ScaleBom(grams, [.. bom.Select(l => l.Grams)], ingredient.WeightLossPercent ?? 0m);
             var inner = path.Add(ingredient.Id);
-            children =
-            [
-                .. bom.Zip(scaled)
-                    .Where(pair => ingredientsById.ContainsKey(pair.First.ComponentIngredientId))
-                    .Select(pair => ScaleIngredient(ingredientsById[pair.First.ComponentIngredientId], pair.Second, string.Empty, inner)),
-            ];
+            foreach (var (line, lineGrams) in bom.Zip(scaled))
+            {
+                if (ingredientsById.TryGetValue(line.ComponentIngredientId, out var component))
+                {
+                    children.Add(ScaleIngredient(component, lineGrams, string.Empty, inner));
+                }
+            }
         }
 
         var cost = grams * RawMaterialRules.CostPerBaseUnitAt(ingredient, basis);

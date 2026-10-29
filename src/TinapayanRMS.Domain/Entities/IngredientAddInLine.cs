@@ -6,7 +6,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// sub-assembly: two made ingredients made from the same base each keep their own, and neither changes the base itself.
 /// The made ingredient's bill of materials is the sub-assembly's lines and these (IngredientBomLine).
 /// </summary>
-public class IngredientAddInLine
+public sealed class IngredientAddInLine
 {
     public int Id { get; set; }
 

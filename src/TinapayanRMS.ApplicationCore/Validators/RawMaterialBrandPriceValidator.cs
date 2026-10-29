@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.ApplicationCore.Validators;
 
 /// <summary>Friendly pre-check for the Purchase Cost Setup grid, run when the Raw Materials screen saves; RawMaterialBrandPriceRepository enforces the same rules itself.</summary>
-public class RawMaterialBrandPriceValidator : AbstractValidator<RawMaterialBrandPrice>
+public sealed class RawMaterialBrandPriceValidator : AbstractValidator<RawMaterialBrandPrice>
 {
     public const int MaxBrandLength = 100;
 

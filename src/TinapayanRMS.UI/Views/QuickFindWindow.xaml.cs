@@ -12,7 +12,7 @@ namespace TinapayanRMS.UI.Views;
 /// product, and the match picked. The keyboard stays in the box: Up and Down move the pick, Enter opens it, Esc closes.
 /// MainWindow opens what's picked on its own screen. Chromeless, as TextPromptWindow is.
 /// </summary>
-public partial class QuickFindWindow : Window
+public sealed partial class QuickFindWindow : Window
 {
     private readonly QuickFindViewModel _viewModel;
 

@@ -6,7 +6,7 @@ namespace TinapayanRMS.UI.Views.Products;
 /// The Products screen's History tab: a saved product's versions, what changed in the one picked, and Restore. Inherits
 /// the Products screen's DataContext (ProductsViewModel).
 /// </summary>
-public partial class HistoryCard : UserControl
+public sealed partial class HistoryCard : UserControl
 {
     public HistoryCard()
     {

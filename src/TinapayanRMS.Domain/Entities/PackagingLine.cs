@@ -7,7 +7,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// unit of it — the wrapper, the box, the label, the ribbon. "Unit" in the two quantity fields below means
 /// that sellable unit, which is one finished piece unless the product's QuantityRequired says otherwise.
 /// </summary>
-public class PackagingLine
+public sealed class PackagingLine
 {
     public int Id { get; set; }
 

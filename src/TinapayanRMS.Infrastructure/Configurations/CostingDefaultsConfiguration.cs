@@ -5,7 +5,7 @@ using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class CostingDefaultsConfiguration : IEntityTypeConfiguration<CostingDefaults>
+public sealed class CostingDefaultsConfiguration : IEntityTypeConfiguration<CostingDefaults>
 {
     public void Configure(EntityTypeBuilder<CostingDefaults> builder)
     {

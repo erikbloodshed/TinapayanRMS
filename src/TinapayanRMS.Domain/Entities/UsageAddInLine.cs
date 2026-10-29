@@ -10,7 +10,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// whole thing. Only a linked usage has them — a product edits its own sub-assembly's lines directly.
 /// </para>
 /// </summary>
-public class UsageAddInLine
+public sealed class UsageAddInLine
 {
     public int Id { get; set; }
 

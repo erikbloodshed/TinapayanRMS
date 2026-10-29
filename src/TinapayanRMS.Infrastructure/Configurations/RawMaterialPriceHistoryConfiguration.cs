@@ -5,7 +5,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class RawMaterialPriceHistoryConfiguration : IEntityTypeConfiguration<RawMaterialPriceHistory>
+public sealed class RawMaterialPriceHistoryConfiguration : IEntityTypeConfiguration<RawMaterialPriceHistory>
 {
     public void Configure(EntityTypeBuilder<RawMaterialPriceHistory> builder)
     {

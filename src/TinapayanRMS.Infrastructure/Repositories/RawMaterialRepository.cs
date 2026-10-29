@@ -8,7 +8,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialRepository
+public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialRepository
 {
     public Task<IReadOnlyList<RawMaterial>> GetAllAsync(CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(

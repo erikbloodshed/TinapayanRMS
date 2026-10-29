@@ -3,7 +3,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.ApplicationCore.Validators;
 
-public class RawMaterialCategoryValidator : AbstractValidator<RawMaterialCategory>
+public sealed class RawMaterialCategoryValidator : AbstractValidator<RawMaterialCategory>
 {
     public RawMaterialCategoryValidator()
     {

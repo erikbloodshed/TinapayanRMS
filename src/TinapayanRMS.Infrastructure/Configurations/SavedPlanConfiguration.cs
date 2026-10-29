@@ -5,7 +5,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class SavedPlanConfiguration : IEntityTypeConfiguration<SavedPlan>
+public sealed class SavedPlanConfiguration : IEntityTypeConfiguration<SavedPlan>
 {
     public void Configure(EntityTypeBuilder<SavedPlan> builder)
     {

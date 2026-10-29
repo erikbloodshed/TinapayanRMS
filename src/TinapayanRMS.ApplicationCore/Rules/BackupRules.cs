@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using TinapayanRMS.ApplicationCore.Interfaces;
@@ -36,13 +37,13 @@ public static class BackupRules
 
     private const string DatabaseNameLabel = "dbname:";
 
-    private static readonly Dictionary<BackupKind, string> Suffixes = new()
+    private static readonly FrozenDictionary<BackupKind, string> Suffixes = new Dictionary<BackupKind, string>
     {
         [BackupKind.Manual] = "manual",
         [BackupKind.Automatic] = "auto",
         [BackupKind.BeforeRestore] = "before-restore",
         [BackupKind.CopiedIn] = "copied-in",
-    };
+    }.ToFrozenDictionary();
 
     /// <summary>"tinapayanrms_20261003_081512_manual.backup": the database, when, and what made it.</summary>
     public static string FileNameFor(string databaseName, BackupKind kind, DateTime takenAt) =>
@@ -133,7 +134,7 @@ public static class BackupRules
             if (line.StartsWith(ArchiveCreatedAt, StringComparison.Ordinal)
                 && line.Length >= ArchiveCreatedAt.Length + ArchiveTimeFormat.Length
                 && DateTime.TryParseExact(
-                    line.Substring(ArchiveCreatedAt.Length, ArchiveTimeFormat.Length),
+                    line.AsSpan(ArchiveCreatedAt.Length, ArchiveTimeFormat.Length),
                     ArchiveTimeFormat,
                     CultureInfo.InvariantCulture,
                     DateTimeStyles.None,

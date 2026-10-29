@@ -3,7 +3,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.ApplicationCore.Validators;
 
-public class UnitOfMeasureValidator : AbstractValidator<UnitOfMeasure>
+public sealed class UnitOfMeasureValidator : AbstractValidator<UnitOfMeasure>
 {
     public UnitOfMeasureValidator()
     {

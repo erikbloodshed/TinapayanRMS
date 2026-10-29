@@ -11,7 +11,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// own buffer: changing those defaults never touches a saved one. The wastage is different: it isn't a starting value
 /// but the one figure every product is priced with, so changing it reprices them all.
 /// </summary>
-public class CostingDefaults
+public sealed class CostingDefaults
 {
     /// <summary>The one row's id.</summary>
     public const int SingletonId = 1;

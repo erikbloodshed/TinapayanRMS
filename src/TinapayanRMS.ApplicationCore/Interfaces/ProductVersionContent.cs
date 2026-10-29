@@ -57,20 +57,14 @@ public sealed record ProductVersionContent
     /// <summary>Every material its lines, add-ins and packaging used, with its costs then.</summary>
     public IReadOnlyList<VersionMaterial> Materials { get; init; } = [];
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        Converters = { new JsonStringEnumConverter() },
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
-
-    public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
+    public string ToJson() => JsonSerializer.Serialize(this, ProductVersionJsonContext.Default.ProductVersionContent);
 
     /// <summary>The snapshot <paramref name="json"/> holds. Refused when it can't be read.</summary>
     public static ProductVersionContent FromJson(string json)
     {
         try
         {
-            return JsonSerializer.Deserialize<ProductVersionContent>(json, JsonOptions)
+            return JsonSerializer.Deserialize(json, ProductVersionJsonContext.Default.ProductVersionContent)
                 ?? throw new BusinessRuleException("This version's record is empty.");
         }
         catch (JsonException)
@@ -79,6 +73,15 @@ public sealed record ProductVersionContent
         }
     }
 }
+
+/// <summary>
+/// A version snapshot's JSON, written and read by code generated at compile time rather than by reflection (2026-10-29):
+/// enums by name and nulls left out, as the reflection-based options it replaced had them, so snapshots saved before read
+/// the same.
+/// </summary>
+[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, UseStringEnumConverter = true)]
+[JsonSerializable(typeof(ProductVersionContent))]
+internal sealed partial class ProductVersionJsonContext : JsonSerializerContext;
 
 /// <summary>The five costing percentages (CostingParameters).</summary>
 public sealed record VersionCosting(

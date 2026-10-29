@@ -15,7 +15,7 @@ namespace TinapayanRMS.UI.Controls;
 /// attributes after the constructor runs. Out of the box GridNumericColumn doesn't group at all
 /// (NumberGroupSizes is [0]) and centres its header.
 /// </summary>
-public class NumericColumn : GridNumericColumn
+public sealed class NumericColumn : GridNumericColumn
 {
     public NumericColumn()
     {

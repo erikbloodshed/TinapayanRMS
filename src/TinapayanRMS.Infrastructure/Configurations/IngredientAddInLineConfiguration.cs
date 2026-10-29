@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class IngredientAddInLineConfiguration : IEntityTypeConfiguration<IngredientAddInLine>
+public sealed class IngredientAddInLineConfiguration : IEntityTypeConfiguration<IngredientAddInLine>
 {
     public void Configure(EntityTypeBuilder<IngredientAddInLine> builder)
     {

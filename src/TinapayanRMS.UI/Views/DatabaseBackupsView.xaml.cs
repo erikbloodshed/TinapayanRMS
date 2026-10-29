@@ -13,7 +13,7 @@ namespace TinapayanRMS.UI.Views;
 /// The Settings dialog's Database tab: the backups, and Back Up Now, Copy to…, Restore and Restore from File…. Built
 /// afresh with each Settings, over the long-lived ViewModel, so its dialog handlers go with it (Dispose, from SettingsWindow).
 /// </summary>
-public partial class DatabaseBackupsView : UserControl, IDisposable
+public sealed partial class DatabaseBackupsView : UserControl, IDisposable
 {
     private readonly CompositeDisposable _registrations;
 

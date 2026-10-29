@@ -14,7 +14,7 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.UI.Views;
 
-public partial class MainWindow : AppWindow, IVimHost
+public sealed partial class MainWindow : AppWindow, IVimHost
 {
     // Each tab's screen, until the tab is first shown and the screen is made (see CreateScreen).
     private readonly Dictionary<TabItemExt, Func<FrameworkElement>> _screenFactories = [];

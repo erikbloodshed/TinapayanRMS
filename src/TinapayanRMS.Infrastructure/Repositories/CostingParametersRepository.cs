@@ -6,7 +6,7 @@ using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class CostingParametersRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ICostingParametersRepository
+public sealed class CostingParametersRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ICostingParametersRepository
 {
     // ProductId is unique, so there's at most one row.
     public Task<CostingParameters?> GetForProductAsync(int productId, CancellationToken cancellationToken) =>

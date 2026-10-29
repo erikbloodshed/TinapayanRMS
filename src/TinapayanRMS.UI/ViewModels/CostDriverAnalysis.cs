@@ -39,8 +39,17 @@ public static class CostDriverAnalysis
         IReadOnlyDictionary<int, RawMaterial> materials,
         IReadOnlyCollection<IngredientBomLine> bomLines)
     {
-        List<Product> counted = [.. products.Where(p => p.Stage == ProductStage.Production && !p.IsDeleted && details.ContainsKey(p.Id))];
-        var materialCostNow = counted.ToDictionary(p => p.Id, p => SavedProductReader.Build(p, details[p.Id]).Costs.Material);
+        List<Product> counted = [];
+        Dictionary<int, decimal> materialCostNow = [];
+        foreach (var product in products)
+        {
+            if (product.Stage == ProductStage.Production && !product.IsDeleted && details.TryGetValue(product.Id, out var detail))
+            {
+                counted.Add(product);
+                materialCostNow[product.Id] = SavedProductReader.Build(product, detail).Costs.Material;
+            }
+        }
+
         var allMaterialCost = materialCostNow.Values.Sum();
         if (allMaterialCost <= 0m)
         {

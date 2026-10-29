@@ -48,10 +48,15 @@ public sealed class MaterialCostShares(
         var pricedWithoutIt = SavedProductReader.PricedAt(details, withoutIt);
 
         var shares = new Dictionary<int, decimal>();
-        foreach (var id in productIds.Where(id => products.ContainsKey(id) && details.ContainsKey(id)))
+        foreach (var id in productIds)
         {
-            var now = SavedProductReader.Build(products[id], details[id], CostBasis.Buffered).Costs.Material;
-            var without = SavedProductReader.Build(products[id], pricedWithoutIt[id], CostBasis.Buffered, withoutIt).Costs.Material;
+            if (!products.TryGetValue(id, out var product) || !details.TryGetValue(id, out var detail))
+            {
+                continue;
+            }
+
+            var now = SavedProductReader.Build(product, detail, CostBasis.Buffered).Costs.Material;
+            var without = SavedProductReader.Build(product, pricedWithoutIt[id], CostBasis.Buffered, withoutIt).Costs.Material;
             if (now > 0m)
             {
                 shares[id] = Math.Clamp((now - without) / now, 0m, 1m);

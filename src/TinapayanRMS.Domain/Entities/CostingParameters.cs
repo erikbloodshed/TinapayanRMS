@@ -4,7 +4,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// Labor, overhead, administrative, margin and VAT for one product's selling price. Always independent
 /// per product, even for a derived/linked product (Phase 10) — never live-templated.
 /// </summary>
-public class CostingParameters
+public sealed class CostingParameters
 {
     public int Id { get; set; }
 

@@ -161,7 +161,10 @@ public sealed class PrintTabViewModel : ViewModelBase
         var preparing = new CancellationTokenSource();
         var previous = _preparing;
         _preparing = preparing;
-        previous?.Cancel();
+        if (previous is not null)
+        {
+            await previous.CancelAsync();
+        }
 
         try
         {

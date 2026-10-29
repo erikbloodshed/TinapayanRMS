@@ -27,7 +27,7 @@ using TinapayanRMS.UI.Views;
 
 namespace TinapayanRMS.UI;
 
-public partial class App : Application
+public sealed partial class App : Application
 {
     /// <summary>The height of every text box and button, in device-independent pixels.</summary>
     private const double ControlHeight = 24;

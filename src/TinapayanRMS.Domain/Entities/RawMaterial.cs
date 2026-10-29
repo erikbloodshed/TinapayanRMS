@@ -8,7 +8,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// list, alternative units and price history; the type decides where a material can be used and
 /// what its base unit is (TinapayanRMS.ApplicationCore.RawMaterialRules).
 /// </summary>
-public class RawMaterial
+public sealed class RawMaterial
 {
     public int Id { get; set; }
 

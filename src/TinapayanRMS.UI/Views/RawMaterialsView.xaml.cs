@@ -5,7 +5,7 @@ using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Views;
 
-public partial class RawMaterialsView : UserControl
+public sealed partial class RawMaterialsView : UserControl
 {
     public RawMaterialsView(RawMaterialsViewModel viewModel)
     {

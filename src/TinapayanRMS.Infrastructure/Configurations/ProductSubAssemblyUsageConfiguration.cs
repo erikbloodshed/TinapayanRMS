@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class ProductSubAssemblyUsageConfiguration : IEntityTypeConfiguration<ProductSubAssemblyUsage>
+public sealed class ProductSubAssemblyUsageConfiguration : IEntityTypeConfiguration<ProductSubAssemblyUsage>
 {
     public void Configure(EntityTypeBuilder<ProductSubAssemblyUsage> builder)
     {

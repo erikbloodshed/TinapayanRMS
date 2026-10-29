@@ -9,7 +9,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class RawMaterialBrandPriceRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialBrandPriceRepository
+public sealed class RawMaterialBrandPriceRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialBrandPriceRepository
 {
     /// <summary>In the order they were added, each with its unit (if any) and that unit's unit of measure.</summary>
     public Task<IReadOnlyList<RawMaterialBrandPrice>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken) =>

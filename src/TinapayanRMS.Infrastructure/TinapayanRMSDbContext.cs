@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure;
 
-public class TinapayanRMSDbContext : DbContext
+public sealed class TinapayanRMSDbContext : DbContext
 {
     public TinapayanRMSDbContext(DbContextOptions<TinapayanRMSDbContext> options)
         : base(options)

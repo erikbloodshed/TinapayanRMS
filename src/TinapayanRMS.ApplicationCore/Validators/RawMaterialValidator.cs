@@ -10,7 +10,7 @@ namespace TinapayanRMS.ApplicationCore.Validators;
 /// rules itself before every save, so a caller that skips this validator (or a bug in it) can never
 /// leave the database in a state the domain rules wouldn't have allowed anyway.
 /// </summary>
-public class RawMaterialValidator : AbstractValidator<RawMaterial>
+public sealed class RawMaterialValidator : AbstractValidator<RawMaterial>
 {
     public RawMaterialValidator()
     {

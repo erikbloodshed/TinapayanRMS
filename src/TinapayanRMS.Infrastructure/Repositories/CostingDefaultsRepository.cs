@@ -6,7 +6,7 @@ using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class CostingDefaultsRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ICostingDefaultsRepository
+public sealed class CostingDefaultsRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ICostingDefaultsRepository
 {
     public async Task<CostingDefaults> GetAsync(CancellationToken cancellationToken) =>
         await dbContextFactory.QuerySingleOrDefaultAsync<CostingDefaults>(

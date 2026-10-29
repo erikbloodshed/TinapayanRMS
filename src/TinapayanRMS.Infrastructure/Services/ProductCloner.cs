@@ -7,7 +7,7 @@ using TinapayanRMS.Infrastructure.Repositories;
 
 namespace TinapayanRMS.Infrastructure.Services;
 
-public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductCloner
+public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductCloner
 {
     public Task<int> CloneAsync(int sourceProductId, string newProductName, CancellationToken cancellationToken) =>
         CreateFromAsync(sourceProductId, newProductName, asVariant: false, cancellationToken);

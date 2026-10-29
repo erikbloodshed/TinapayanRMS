@@ -7,7 +7,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class SavedPlanRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ISavedPlanRepository
+public sealed class SavedPlanRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ISavedPlanRepository
 {
     public Task<IReadOnlyList<SavedPlan>> GetAllAsync(CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<SavedPlan>>(

@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class CostingParametersConfiguration : IEntityTypeConfiguration<CostingParameters>
+public sealed class CostingParametersConfiguration : IEntityTypeConfiguration<CostingParameters>
 {
     public void Configure(EntityTypeBuilder<CostingParameters> builder)
     {

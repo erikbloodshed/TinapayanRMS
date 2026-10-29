@@ -8,7 +8,7 @@ using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductSubAssemblyUsageRepository
+public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductSubAssemblyUsageRepository
 {
     public Task<IReadOnlyList<ProductSubAssemblyUsage>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
         GetUsagesAsync("u.product_id = @productId", new { productId }, cancellationToken);

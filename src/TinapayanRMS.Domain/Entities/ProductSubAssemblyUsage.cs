@@ -6,7 +6,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// One sub-assembly used in a product's recipe: one the product owns, or a link to another product's.
 /// Each product sizes its pieces itself, so two products can use the same batch differently.
 /// </summary>
-public class ProductSubAssemblyUsage
+public sealed class ProductSubAssemblyUsage
 {
     public int Id { get; set; }
 

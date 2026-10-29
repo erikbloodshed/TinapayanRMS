@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class PackagingLineConfiguration : IEntityTypeConfiguration<PackagingLine>
+public sealed class PackagingLineConfiguration : IEntityTypeConfiguration<PackagingLine>
 {
     public void Configure(EntityTypeBuilder<PackagingLine> builder)
     {

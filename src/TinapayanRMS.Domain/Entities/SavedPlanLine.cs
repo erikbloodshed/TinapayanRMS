@@ -4,7 +4,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// One line of a <see cref="SavedPlan"/>: a product and how many of its sellable units to make. A product can be on
 /// more than one line, as on the screen, where its units are added together.
 /// </summary>
-public class SavedPlanLine
+public sealed class SavedPlanLine
 {
     public int Id { get; set; }
 

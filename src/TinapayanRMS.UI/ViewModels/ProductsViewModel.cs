@@ -4672,7 +4672,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     productsRead.TryAdd(held.Id, held);
                 }
 
-                return productsRead.Values.Where(p => details.ContainsKey(p.Id)).Select(p => (p, details[p.Id])).ToList();
+                List<(Product Product, ProductDetail Detail)> found = [];
+                foreach (var product in productsRead.Values)
+                {
+                    if (details.TryGetValue(product.Id, out var detail))
+                    {
+                        found.Add((product, detail));
+                    }
+                }
+
+                return found;
             });
         }
         catch (Exception ex)

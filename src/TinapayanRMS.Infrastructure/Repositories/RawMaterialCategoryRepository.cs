@@ -6,7 +6,7 @@ using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class RawMaterialCategoryRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialCategoryRepository
+public sealed class RawMaterialCategoryRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialCategoryRepository
 {
     // Type is stored by name; Dapper parses it back into the enum.
     public Task<IReadOnlyList<RawMaterialCategory>> GetAllAsync(CancellationToken cancellationToken) =>

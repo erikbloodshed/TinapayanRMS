@@ -4,7 +4,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// A set of raw material price changes saved from the Price Simulator under a name ("Supplier A quote, Nov"), to open
 /// there again later. Saving it changes no real price.
 /// </summary>
-public class PriceScenario
+public sealed class PriceScenario
 {
     public int Id { get; set; }
 
