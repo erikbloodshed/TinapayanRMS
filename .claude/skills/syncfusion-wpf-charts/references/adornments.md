@@ -24,7 +24,7 @@ Customize what the label displays:
 
 ```xml
 <syncfusion:ChartAdornmentInfo ShowLabel="True"
-                               AdornmentsPosition="Outer"
+                               LabelPosition="Outer"
                                SegmentLabelContent="LabelContentPath"/>
 ```
 
@@ -249,7 +249,7 @@ Special adornment features for circular charts:
                                        SymbolHeight="10"
                                        SymbolWidth="10"
                                        SymbolInterior="White"
-                                       SymbolStroke="{Binding Interior, RelativeSource={RelativeSource Mode=Self}}"
+                                       SymbolStroke="Red"
                                        AdornmentsPosition="Top"
                                        Foreground="Black"/>
     </syncfusion:LineSeries.AdornmentsInfo>

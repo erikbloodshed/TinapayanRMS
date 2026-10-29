@@ -292,6 +292,6 @@ You can combine different series types on the same chart:
 
 ## Performance Considerations
 
-**Fast Series:** Use `FastLineSeries`, `FastColumnSeries`, `FastBarSeries` for datasets with 1000+ points.
+**Fast Series:** Use `FastLineSeries`, `FastColumnBitmapSeries`, `FastBarBitmapSeries` for datasets with 1000+ points.
 
 **Regular Series:** Use standard series for rich interactivity and visual features with smaller datasets (<1000 points).

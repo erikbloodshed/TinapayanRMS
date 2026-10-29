@@ -583,9 +583,9 @@ Respond to changes in the filtered suggestion list.
 ```
 
 ```csharp
-private void OnSuggestionsChanged(object sender, EventArgs e)
+private void OnSuggestionsChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
 {
-    var textBox = sender as SfTextBoxExt;
+    var textBox = d as SfTextBoxExt;
     
     // Access current text
     string searchText = textBox.Text;
@@ -600,9 +600,9 @@ private void OnSuggestionsChanged(object sender, EventArgs e)
 **1. Analytics Tracking:**
 
 ```csharp
-private void OnSuggestionsChanged(object sender, EventArgs e)
+private void OnSuggestionsChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
 {
-    var textBox = sender as SfTextBoxExt;
+    var textBox = d as SfTextBoxExt;
     AnalyticsService.TrackSearch(textBox.Text);
 }
 ```
@@ -610,9 +610,9 @@ private void OnSuggestionsChanged(object sender, EventArgs e)
 **2. Status Updates:**
 
 ```csharp
-private void OnSuggestionsChanged(object sender, EventArgs e)
+private void OnSuggestionsChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
 {
-    var textBox = sender as SfTextBoxExt;
+    var textBox = d as SfTextBoxExt;
     StatusLabel.Text = $"Searching for: {textBox.Text}...";
 }
 ```
@@ -620,9 +620,9 @@ private void OnSuggestionsChanged(object sender, EventArgs e)
 **3. Conditional Filtering:**
 
 ```csharp
-private void OnSuggestionsChanged(object sender, EventArgs e)
+private void OnSuggestionsChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
 {
-    var textBox = sender as SfTextBoxExt;
+    var textBox = d as SfTextBoxExt;
     
     // Show message if text is too short
     if (textBox.Text.Length < 3)

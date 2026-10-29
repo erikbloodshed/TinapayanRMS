@@ -1,6 +1,6 @@
 ---
 name: syncfusion-wpf-kanban-board
-description: Implement Syncfusion WPF Kanban (SfKanban) control for workflow visualization and task management. Use this when building agile project tracking interfaces, workflow boards, or task management systems. This skill covers card configuration, column management, swim lanes, WIP limits, drag-and-drop functionality, workflows, sorting, and event handling.
+description: Implement Syncfusion WPF Kanban (SfKanban) control for workflow visualization and task management. Use this when building agile project tracking interfaces, workflow boards, or task management systems. This skill covers card configuration, card selection with multi-card drag-and-drop, column management and reordering, swim lanes, WIP limits, drag-and-drop functionality, workflows, sorting, and event handling.
 metadata:
   author: "Syncfusion Inc"
   version: "34.1.29"
@@ -31,7 +31,9 @@ The Syncfusion WPF Kanban (SfKanban) provides an efficient way to visualize work
 - **Columns**: Organize work into workflow stages (e.g., Open, In Progress, Done)
 - **Swim Lanes**: Group cards by projects, teams, users, or custom categories
 - **Work-in-Progress (WIP) Limits**: Set minimum/maximum task limits per column to prevent overload
-- **Drag and Drop**: Intuitive card movement between columns and swim lanes
+- **Drag and Drop**: Intuitive card movement between columns and swim lanes, multi-card (bulk) drag-and-drop
+- **Card Selection**: Single and multiple card selection with customizable selected card appearance
+- **Column Reordering**: Drag-and-drop reordering of columns
 - **Workflows**: Define allowed card transitions between specific states
 - **Sorting**: Organize cards within columns by priority, date, or custom fields
 - **Events**: Rich event model for card interactions (tap, drag, drop)
@@ -63,6 +65,10 @@ Use when user needs:
 - Working with card indicators and tags
 - Implementing conditional card templates (CardTemplateSelector)
 - Enabling and customizing card tooltips
+- Selecting single or multiple cards (CardSelectionType)
+- Multi-card drag-and-drop for bulk task movement
+- Customizing selected card appearance (SelectedBorderBrush)
+- Retrieving selected cards programmatically (GetSelectedCards)
 - Troubleshooting card display issues
 
 ### Columns Management
@@ -76,6 +82,7 @@ Use when user needs:
 - Customizing column headers
 - Expanding/collapsing columns programmatically
 - Enabling/disabling drag-and-drop per column
+- Enabling column reordering with drag-and-drop (AllowColumnReorder)
 - Setting up multi-category columns
 - Configuring WIP (Work-in-Progress) limits with visual indicators
 - Customizing drag/drop placeholder appearance
@@ -127,6 +134,8 @@ Use when user needs:
 - Implementing MVVM commands (CardTappedCommand)
 - Accessing event arguments and card data
 - Preventing or customizing drag-and-drop behavior
+- Handling card selection events (CardSelected, CardDeselected)
+- Handling column reordering events (ColumnDragStarting, ColumnDragOver, ColumnDrop)
 - Implementing business logic on card interactions
 
 ## Quick Start Example
@@ -308,6 +317,51 @@ public class TaskDetails
 
 **Important:** Must define CardTemplate when using custom model
 
+### Pattern 7: Multi-Card Selection with Bulk Drag-Drop
+
+**When:** User needs to select multiple cards and move them together between stages
+
+```xml
+<kanban:SfKanban CardSelectionType="Multiple"
+                 ItemsSource="{Binding TaskDetails}">
+    <kanban:SfKanban.CardStyle>
+        <kanban:KanbanCardStyle SelectedBorderBrush="Blue"
+                                HoverBorderBrush="LightGray"/>
+    </kanban:SfKanban.CardStyle>
+</kanban:SfKanban>
+```
+
+**Result:**
+- <kbd>Ctrl</kbd> + <kbd>Click</kbd> adds/removes individual cards from selection
+- <kbd>Shift</kbd> + <kbd>Click</kbd> selects a range of cards within the same column
+- Dragging any selected card moves all selected cards as a single operation
+- Relative order of selected cards is preserved after the drop
+- Invalid workflow transitions cancel the entire drag operation
+
+**Retrieve selection in code:**
+```csharp
+var selectedCards = kanban.GetSelectedCards();
+```
+
+### Pattern 8: Column Reordering
+
+**When:** User needs to rearrange workflow stages at runtime
+
+```xml
+<kanban:SfKanban AllowColumnReorder="True"
+                 AutoGenerateColumns="False"
+                 ItemsSource="{Binding TaskDetails}">
+    <kanban:KanbanColumn Title="To Do" Categories="Open" />
+    <kanban:KanbanColumn Title="In Progress" Categories="In Progress" />
+    <kanban:KanbanColumn Title="Done" Categories="Done" />
+</kanban:SfKanban>
+```
+
+**Result:**
+- Dragging a column header moves the entire column (header and cards)
+- Column inserted at drop position, shifting other columns
+- Disable by leaving `AllowColumnReorder` unset (default: false)
+
 ## Key Properties
 
 ### SfKanban Properties
@@ -330,6 +384,8 @@ public class TaskDetails
 | `Workflows` | Collection | Allowed card transitions | Workflow validation |
 | `IndicatorColorPalette` | Collection | Color mapping for indicators | Priority/status colors |
 | `IsToolTipEnabled` | bool | Enable card tooltips | Additional card info on hover |
+| `CardSelectionType` | KanbanCardSelectionType | Card selection mode (Single, Multiple, None) | Single or multi-card selection |
+| `AllowColumnReorder` | bool | Enable column drag-and-drop reordering (default: false) | User-defined column order |
 
 ### KanbanColumn Properties
 

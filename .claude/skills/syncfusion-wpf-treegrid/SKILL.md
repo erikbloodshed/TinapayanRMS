@@ -152,6 +152,7 @@ Start here for initial setup and basic implementation:
 - AllowSorting property (grid and column level)
 - Single and multi-column sorting
 - Tri-state sorting (ascending, descending, unsorted)
+- Initial sort direction at grid and column level (InitialSortDirection)
 - Programmatic sorting with SortColumnDescriptions
 - Custom sorting logic with IComparer
 - SortColumnsChanging and SortColumnsChanged events

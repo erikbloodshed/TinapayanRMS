@@ -1,6 +1,6 @@
 ---
 name: syncfusion-wpf-toast-notification
-description: Guide for implementing Syncfusion WPF Toast Notification (SfToastNotification) control for displaying temporary notification messages. Use this skill when implementing toast notifications, pop-up alerts, status messages, or non-intrusive notifications in WPF applications. Covers showing success/error/warning messages, notification systems, and temporary UI feedback without blocking the main window.
+description: Guide for implementing Syncfusion WPF Toast Notification (SfToastNotification) control for displaying temporary notification messages. Use this skill when implementing toast notifications, pop-up alerts, status messages, or non-intrusive notifications in WPF applications. Covers showing success/error/warning messages, notification systems, temporary UI feedback, toast grouping, custom positioning, and custom spacing between toasts.
 metadata:
   author: "Syncfusion Inc"
   version: "34.1.29"
@@ -19,6 +19,9 @@ Use this skill whenever the user needs to:
 - Add **interactive action buttons** to notifications (Reply, Undo, OK)
 - Show **transient feedback** that doesn't block user workflow
 - Implement **global or window-scoped notifications**
+- **Group related notifications** using a unique Group ID for better organization
+- Display **toasts at custom screen positions** for flexible notification placement
+- **Customize spacing between toasts** for tailored notification layout
 
 ## Component Overview
 
@@ -47,6 +50,9 @@ Use this skill whenever the user needs to:
 - **[placement-and-animations.md](references/placement-and-animations.md):** 8 placements, animation types, animation reference
 - **[action-buttons.md](references/action-buttons.md):** Action buttons, callbacks, CloseOnClick, custom templates
 - **[template-customization.md](references/template-customization.md):** TitleTemplate, ContentTemplate, CloseButtonTemplate customization
+- **[toast-grouping.md](references/toast-grouping.md):** Grouping toasts by Group ID, EnableGroupView, GroupContainerHeader customization
+- **[custom-positioning.md](references/custom-positioning.md):** Custom screen positions, X/Y coordinates and HorizontalOffset/VerticalOffset properties
+- **[custom-spacing.md](references/custom-spacing.md):** Customize spacing between toasts, Spacing property
 
 ---
 
@@ -135,6 +141,14 @@ Initialize at startup via `WindowsToastBootstrapper.Initialize()`, then set `Mod
 - **CloseAnimationType:** Hide animation (FadeOut, etc.)
 - **Actions:** Interactive action buttons (List<ToastAction>)
 - **Id:** Unique identifier for management (string)
+- **GroupName:** Group ID for organizing related notifications (string)
+- **HorizontalOffset:** Horizontal adjustment from placement (double)
+- **VerticalOffset:** Vertical adjustment from placement (double)
+- **X:** Absolute horizontal position from left edge when using Custom placement (double)
+- **Y:** Absolute vertical position from top edge when using Custom placement (double)
+- **Spacing:** Custom spacing between toasts in the corner (double)
+- **EnableGroupView:** Enable grouped notification display (bool)
+- **GroupContainerHeader:** Custom header text for grouped notifications (string)
 
 ---
 

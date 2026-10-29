@@ -298,7 +298,6 @@ SfLineSparkline sparkline = new SfLineSparkline()
 <syncfusion:SfWinLossSparkline 
     ItemsSource="{Binding Match}" 
     YBindingPath="Result"
-    ShowAxis="True"
     Interior="Green">
 </syncfusion:SfWinLossSparkline>
 ```

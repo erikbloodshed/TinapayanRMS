@@ -1,4 +1,3 @@
-````markdown
 # Populating Items — Basics
 
 Core patterns for adding content to the Carousel: direct `CarouselItem` elements, collection binding with `ItemsSource`, and `ItemTemplate` usage for custom visuals.
@@ -28,5 +27,3 @@ Bind to an `ObservableCollection<T>` via `ItemsSource` and provide an `ItemTempl
 ```
 
 For a complete `ViewModel` example, see `getting-started.md`.
-
-````

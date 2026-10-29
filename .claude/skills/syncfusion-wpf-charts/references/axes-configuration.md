@@ -143,6 +143,14 @@ Control grid line visibility:
 </syncfusion:NumericalAxis>
 ```
 
+### Multi-level Label Rotation
+
+Rotate multi-level axis labels:
+
+```xml
+<syncfusion:CategoryAxis  MultiLevelLabelRotationAngle="45"/>
+```
+
 ## Multiple Axes
 
 Add additional axes for different data scales or units.
@@ -160,11 +168,11 @@ Add additional axes for different data scales or units.
     </syncfusion:SfChart.SecondaryAxis>
     
     <!-- Additional Y-Axis -->
-    <syncfusion:SfChart.SecondaryAxis>
+    <syncfusion:SfChart.Axes>
         <syncfusion:NumericalAxis x:Name="axis2" 
                                   Header="Humidity (%)"
                                   OpposedPosition="True"/>
-    </syncfusion:SfChart.SecondaryAxis>
+    </syncfusion:SfChart.Axes>
     
     <!-- First series uses axis1 -->
     <syncfusion:LineSeries ItemsSource="{Binding TempData}"

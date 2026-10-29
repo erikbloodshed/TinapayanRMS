@@ -1,4 +1,3 @@
-````markdown
 # Visual Effects Reference
 
 This file centralizes the shared visual-effect properties used by the Carousel control.
@@ -24,4 +23,3 @@ This file centralizes the shared visual-effect properties used by the Carousel c
 - For per-position control, use fraction collections to shape the appearance along the path.
 
 For examples and usage patterns, see `getting-started.md` and `advanced-features.md`.
-````

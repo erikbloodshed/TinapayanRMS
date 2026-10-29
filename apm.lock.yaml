@@ -48,7 +48,7 @@ dependencies:
 - repo_url: syncfusion/docx-editor-sdk-skills
   name: syncfusion-wpf-docx-editor
   host: github.com
-  resolved_commit: 7e4e62ce30cd04ac9054287b815c6d043eeca0fa
+  resolved_commit: 4e5b0bc79a29ed89f92ce59eafac33e5fea22416
   version: unknown
   virtual_path: skills/syncfusion-wpf-docx-editor
   is_virtual: true
@@ -198,7 +198,7 @@ dependencies:
 - repo_url: syncfusion/spreadsheet-editor-sdk-skills
   name: syncfusion-wpf-spreadsheet-editor
   host: github.com
-  resolved_commit: 1e6982a8cb0d1c25b7acc21b2855ea3b3cdfb010
+  resolved_commit: dc10d88dbd688f08bc2ee5f3a8be409a3126c31f
   version: unknown
   virtual_path: skills/syncfusion-wpf-spreadsheet-editor
   is_virtual: true
@@ -276,12 +276,12 @@ dependencies:
 - repo_url: syncfusion/wpf-ui-components-skills
   name: wpf-ui-components-skills
   host: github.com
-  resolved_commit: e2d52f5f6965ac85d84a959ecd0ceb2a1046967a
+  resolved_commit: 3dbf20ee6eb48426884c1616405491229de3f83c
   version: 1.0.0
   depth: 2
   resolved_by: syncfusion/wpf-ui-builder
   package_type: skill_bundle
-  content_hash: sha256:30555866e2fd0188ab1a58ea9fc3f66777f6bf3f52727fe4967616d650e7ff4a
+  content_hash: sha256:84c472adfc1a12c135f2abd1ad0c1007acc48d8cd05d630c25b12f9ecb300d11
   declared_license: Syncfusion Inc
 deployments:
 - kind: project-relative

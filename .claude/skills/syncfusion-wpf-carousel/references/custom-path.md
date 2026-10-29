@@ -165,18 +165,11 @@ carousel.VisualMode = VisualMode.CustomPath;
 
 ### Page Navigation
 
-Use Page Up/Down or commands to navigate between pages:
+Use Page Up and Page Down, or the carousel's built-in navigation actions, to move between pages when `ItemsPerPage` is enabled.
 
-```csharp
-// Navigate to next page
-
-The visual-effect controls (scaling, opacity, skew and per-position fraction collections) have been moved to `visual-effects.md` to avoid repeated content.
-
-For concrete fraction-collection examples (`ScaleFractions`, `OpacityFractions`, `SkewAngle*Fractions`) and best-practice values, see: [visual-effects.md](visual-effects.md).
+For scaling, opacity, and skew examples, see [visual-effects.md](visual-effects.md).
 
 ## Advanced Examples
-</syncfusion:Carousel.OpacityFractions>
-```
 
 **Gradual Fade In:**
 ```xml

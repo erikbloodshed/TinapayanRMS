@@ -145,13 +145,13 @@ Add internal padding inside groups:
 
 ## Headers
 
-### ShowHeader
+### ShowLabels
 
 Control header visibility:
 
 ```xaml
 <syncfusion:TreeMapFlatLevel GroupPath="Continent" 
-                             ShowHeader="True"
+                             ShowLabels="True"
                              HeaderHeight="30"/>
 ```
 
@@ -396,7 +396,7 @@ public class SalesData
 - Check that GroupGap isn't 0 (makes groups touch without visual separation)
 
 **Headers not showing:**
-- Set ShowHeader="True"
+- Set ShowLabels="True"
 - Ensure HeaderHeight is > 0
 - Check that HeaderTemplate renders visible content
 

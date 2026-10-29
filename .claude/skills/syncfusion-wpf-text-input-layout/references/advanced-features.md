@@ -151,7 +151,7 @@ public static class CultureHelper
 ### RTL Form Example
 
 ```xaml
-<Window xmlns:inputLayout="clr-namespace:Syncfusion.UI.Xaml.TextInputLayout;assembly=Syncfusion.SfInput.WPF"
+<Window xmlns:inputLayout="clr-namespace:Syncfusion.UI.Xaml.TextInputLayout;assembly=Syncfusion.SfTextInputLayout.WPF"
         FlowDirection="RightToLeft">
     <StackPanel Width="350" Margin="20">
         
@@ -259,8 +259,6 @@ This section provides a comprehensive reference of all public APIs available in 
 | Character Counter | 2 | Max Length, Counter Visibility |
 | Icon Properties | 4 | Leading/Trailing View and Position |
 | Layout Properties | 2 | Input Padding, Flow Direction |
-| Dropdown Properties | 1 | Dropdown Border |
-
 ---
 
 ## Properties Reference
@@ -269,7 +267,7 @@ This section provides a comprehensive reference of all public APIs available in 
 
 #### InputView
 - **Type**: `Object`
-- **Description**: The input control (TextBox, PasswordBox, ComboBox, ComboBoxAdv, or SfTextBoxExt) for the text input layout.
+- **Description**: The input control (TextBox, PasswordBox, ComboBox, ComboBoxAdv, SfTextBoxExt, DatePicker, SfDatePicker, SfTimePicker, UpDown, SfMaskedEdit, IntegerTextBox, DoubleTextBox, PercentTextBox, or CurrencyTextBox) for the text input layout.
 - **Usage**:
 ```csharp
 inputLayout.InputView = new TextBox();
@@ -527,23 +525,6 @@ inputLayout.FlowDirection = FlowDirection.RightToLeft;
 
 ---
 
-### Dropdown Properties
-
-#### DropDownBorder
-- **Type**: `Border`
-- **Description**: Custom border for dropdown popup (ComboBox/ComboBoxAdv only).
-- **Usage**:
-```csharp
-inputLayout.DropDownBorder = new Border
-{
-    BorderBrush = Brushes.Blue,
-    BorderThickness = new Thickness(2),
-    CornerRadius = new CornerRadius(5)
-};
-```
-
----
-
 ## Enumerations
 
 ### HintFloatMode
@@ -677,6 +658,15 @@ inputLayout.TrailingView = new Label { Content = "ℹ" };
 | **ComboBox** | Dropdown selection | Standard WPF control, simple lists |
 | **ComboBoxAdv** | Advanced dropdown | Syncfusion control, better performance |
 | **SfTextBoxExt** | Autocomplete input | Syncfusion control, search suggestions |
+| **DatePicker** | Standard date selection | Standard WPF control, calendar UI |
+| **SfDatePicker** | Advanced date selection | Syncfusion control, custom formats |
+| **SfTimePicker** | Time selection | Syncfusion control, time formatting |
+| **UpDown** | Numeric stepper input | Syncfusion control, increment/decrement |
+| **SfMaskedEdit** | Masked text input | Syncfusion control, formatted entry |
+| **IntegerTextBox** | Integer numeric input | Syncfusion control, range validation |
+| **DoubleTextBox** | Double numeric input | Syncfusion control, decimal values |
+| **PercentTextBox** | Percentage input | Syncfusion control, percent formatting |
+| **CurrencyTextBox** | Currency input | Syncfusion control, currency formatting |
 
 ### TextBox
 ```csharp
@@ -725,6 +715,80 @@ inputLayout.InputView = new SfTextBoxExt
 {
     AutoCompleteMode = AutoCompleteMode.Suggest,
     AutoCompleteSource = countries
+};
+```
+
+### DatePicker
+```csharp
+inputLayout.InputView = new DatePicker();
+```
+
+### SfDatePicker
+```csharp
+inputLayout.InputView = new SfDatePicker();
+```
+
+### SfTimePicker
+```csharp
+inputLayout.InputView = new SfTimePicker();
+```
+
+### UpDown
+```csharp
+inputLayout.InputView = new UpDown
+{
+    MinValue = 0,
+    MaxValue = 100,
+    Value = 1
+};
+```
+
+### SfMaskedEdit
+```csharp
+inputLayout.InputView = new SfMaskedEdit
+{
+    MaskType = MaskType.Simple,
+    Mask = "(###) ###-####"
+};
+```
+
+### IntegerTextBox
+```csharp
+inputLayout.InputView = new IntegerTextBox
+{
+    MinValue = 0,
+    MaxValue = 120,
+    Value = 25
+};
+```
+
+### DoubleTextBox
+```csharp
+inputLayout.InputView = new DoubleTextBox
+{
+    MinValue = 0,
+    MaxValue = 10000,
+    Value = 99.99
+};
+```
+
+### PercentTextBox
+```csharp
+inputLayout.InputView = new PercentTextBox
+{
+    MinValue = 0,
+    MaxValue = 100,
+    PercentValue = 10
+};
+```
+
+### CurrencyTextBox
+```csharp
+inputLayout.InputView = new CurrencyTextBox
+{
+    MinValue = 0,
+    MaxValue = 100000,
+    Value = 1000
 };
 ```
 
@@ -928,11 +992,11 @@ public class ThemeManager
 1. **Character Counter**: Applies `ErrorForeground` when count exceeds `CharMaxLength`
 2. **Error Validation**: Must be implemented at application level
 3. **FocusedBorderBrush**: Overrides `FocusedForeground` for border color
-4. **DropDownBorder**: Only applicable to ComboBox/ComboBoxAdv
-5. **OutlineCornerRadius**: Only applicable to Outlined container type
-6. **ContainerBackground**: Not applicable for None container type
-7. **ActiveForeground**: Read-only, does not include error state
-8. **RTL Support**: Automatically flips leading/trailing view positions
+4. **OutlineCornerRadius**: Only applicable to Outlined container type
+5. **ContainerBackground**: Not applicable for None container type
+6. **ActiveForeground**: Read-only, does not include error state
+7. **RTL Support**: Automatically flips leading/trailing view positions
+8. **DatePicker / SfDatePicker / SfTimePicker Limitations**: When using `DatePicker`, `SfDatePicker`, or `SfTimePicker` as the `InputView`, the hint is always displayed in the `AlwaysFloat` state and does not move to the inline position. When `CharCountVisibility` is enabled, the character count is always displayed as `0`.
 
 ## Summary
 
@@ -941,7 +1005,7 @@ The WPF TextInputLayout control provides:
 - **50+ properties** for complete customization
 - **3 hint float modes** for different UX patterns
 - **3 container types** for various design needs
-- **5 supported input views** for diverse scenarios
+- **14 supported input views** for diverse scenarios
 - **Advanced patterns** for validation, state management, and theming
 
 This makes it a powerful, flexible control for building modern, accessible, and internationalized WPF applications.

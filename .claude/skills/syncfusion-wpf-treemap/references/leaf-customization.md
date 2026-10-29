@@ -11,20 +11,20 @@ The `LeafItemSettings` property provides options to customize leaf node borders 
 <syncfusion:SfTreeMap ItemsSource="{Binding Data}" 
                       WeightValuePath="Value">
     <syncfusion:SfTreeMap.LeafItemSettings>
-        <syncfusion:LeafItemSettings LeafBorderBrush="White" 
-                                     LeafBorderThickness="2"
-                                     LeafLabelPath="Name"/>
+        <syncfusion:LeafItemSettings BorderBrush="White" 
+                                     BorderThickness="2"
+                                     LabelPath="Name"/>
     </syncfusion:SfTreeMap.LeafItemSettings>
 </syncfusion:SfTreeMap>
 ```
 
-## LeafBorderBrush
+## BorderBrush
 
 Sets the border color for all leaf nodes.
 
 **Usage:**
 ```xaml
-<syncfusion:LeafItemSettings LeafBorderBrush="White"/>
+<syncfusion:LeafItemSettings BorderBrush="White"/>
 ```
 
 **Example with Dark Background:**
@@ -33,14 +33,14 @@ Sets the border color for all leaf nodes.
     <syncfusion:SfTreeMap ItemsSource="{Binding PopulationDetails}"
                           WeightValuePath="Population">
         <syncfusion:SfTreeMap.LeafItemSettings>
-            <syncfusion:LeafItemSettings LeafBorderBrush="White" 
-                                         LeafBorderThickness="1"/>
+            <syncfusion:LeafItemSettings BorderBrush="White" 
+                                         BorderThickness="1"/>
         </syncfusion:SfTreeMap.LeafItemSettings>
     </syncfusion:SfTreeMap>
 </Grid>
 ```
 
-## LeafBorderThickness
+## BorderThickness
 
 Sets the border width for leaf nodes.
 
@@ -52,18 +52,18 @@ Sets the border width for leaf nodes.
 
 **Usage:**
 ```xaml
-<syncfusion:LeafItemSettings LeafBorderBrush="#CCCCCC" 
-                             LeafBorderThickness="2"/>
+<syncfusion:LeafItemSettings BorderBrush="#CCCCCC" 
+                             BorderThickness="2"/>
 ```
 
 **Asymmetric borders:**
 ```xaml
-<syncfusion:LeafItemSettings LeafBorderBrush="Gray" 
-                             LeafBorderThickness="1,2,1,2"/>
+<syncfusion:LeafItemSettings BorderBrush="Gray" 
+                             BorderThickness="1,2,1,2"/>
 <!-- Left, Top, Right, Bottom -->
 ```
 
-## LeafLabelPath
+## LabelPath
 
 Specifies which property to display as text on leaf nodes.
 
@@ -76,7 +76,7 @@ Specifies which property to display as text on leaf nodes.
 ```csharp
 public class CountryData
 {
-    public string CountryName { get; set; }   // ← Use for LeafLabelPath
+    public string CountryName { get; set; }   // ← Use for LabelPath
     public double Population { get; set; }
 }
 ```
@@ -85,25 +85,25 @@ public class CountryData
 <syncfusion:SfTreeMap ItemsSource="{Binding Countries}"
                       WeightValuePath="Population">
     <syncfusion:SfTreeMap.LeafItemSettings>
-        <syncfusion:LeafItemSettings LeafLabelPath="CountryName"
-                                     LeafBorderBrush="White"
-                                     LeafBorderThickness="1"/>
+        <syncfusion:LeafItemSettings LabelPath="CountryName"
+                                     BorderBrush="White"
+                                     BorderThickness="1"/>
     </syncfusion:SfTreeMap.LeafItemSettings>
 </syncfusion:SfTreeMap>
 ```
 
-## LeafTemplate
+## LabelTemplate
 
-For advanced customization, use `LeafTemplate` to define custom UI for each leaf node.
+For advanced customization, use `LabelTemplate` to define custom UI for each leaf node.
 
-### Basic LeafTemplate
+### Basic LabelTemplate
 
 ```xaml
 <syncfusion:SfTreeMap ItemsSource="{Binding Products}"
                       WeightValuePath="Sales">
     <syncfusion:SfTreeMap.LeafItemSettings>
         <syncfusion:LeafItemSettings>
-            <syncfusion:LeafItemSettings.LeafTemplate>
+            <syncfusion:LeafItemSettings.LabelTemplate>
                 <DataTemplate>
                     <Border BorderBrush="White" 
                             BorderThickness="1" 
@@ -114,17 +114,17 @@ For advanced customization, use `LeafTemplate` to define custom UI for each leaf
                                   VerticalAlignment="Center"/>
                     </Border>
                 </DataTemplate>
-            </syncfusion:LeafItemSettings.LeafTemplate>
+            </syncfusion:LeafItemSettings.LabelTemplate>
         </syncfusion:LeafItemSettings>
     </syncfusion:SfTreeMap.LeafItemSettings>
 </syncfusion:SfTreeMap>
 ```
 
-### Advanced LeafTemplate with Multiple Elements
+### Advanced LabelTemplate with Multiple Elements
 
 ```xaml
 <syncfusion:LeafItemSettings>
-    <syncfusion:LeafItemSettings.LeafTemplate>
+    <syncfusion:LeafItemSettings.LabelTemplate>
         <DataTemplate>
             <Grid>
                 <Grid.RowDefinitions>
@@ -160,15 +160,15 @@ For advanced customization, use `LeafTemplate` to define custom UI for each leaf
                           HorizontalAlignment="Center"/>
             </Grid>
         </DataTemplate>
-    </syncfusion:LeafItemSettings.LeafTemplate>
+    </syncfusion:LeafItemSettings.LabelTemplate>
 </syncfusion:LeafItemSettings>
 ```
 
-### Conditional Formatting in LeafTemplate
+### Conditional Formatting in LabelTemplate
 
 ```xaml
 <syncfusion:LeafItemSettings>
-    <syncfusion:LeafItemSettings.LeafTemplate>
+    <syncfusion:LeafItemSettings.LabelTemplate>
         <DataTemplate>
             <Border BorderBrush="White" BorderThickness="1">
                 <Grid>
@@ -190,7 +190,7 @@ For advanced customization, use `LeafTemplate` to define custom UI for each leaf
                 </Grid>
             </Border>
         </DataTemplate>
-    </syncfusion:LeafItemSettings.LeafTemplate>
+    </syncfusion:LeafItemSettings.LabelTemplate>
 </syncfusion:LeafItemSettings>
 ```
 
@@ -219,9 +219,9 @@ For advanced customization, use `LeafTemplate` to define custom UI for each leaf
     
     <!-- Leaf customization -->
     <syncfusion:SfTreeMap.LeafItemSettings>
-        <syncfusion:LeafItemSettings LeafBorderBrush="White" 
-                                     LeafBorderThickness="2">
-            <syncfusion:LeafItemSettings.LeafTemplate>
+        <syncfusion:LeafItemSettings BorderBrush="White" 
+                                     BorderThickness="2">
+            <syncfusion:LeafItemSettings.LabelTemplate>
                 <DataTemplate>
                     <Border Background="Transparent">
                         <StackPanel HorizontalAlignment="Center" 
@@ -241,7 +241,7 @@ For advanced customization, use `LeafTemplate` to define custom UI for each leaf
                         </StackPanel>
                     </Border>
                 </DataTemplate>
-            </syncfusion:LeafItemSettings.LeafTemplate>
+            </syncfusion:LeafItemSettings.LabelTemplate>
         </syncfusion:LeafItemSettings>
     </syncfusion:SfTreeMap.LeafItemSettings>
 </syncfusion:SfTreeMap>
@@ -251,29 +251,29 @@ For advanced customization, use `LeafTemplate` to define custom UI for each leaf
 
 ### Pattern 1: Simple Bordered Leaves
 ```xaml
-<syncfusion:LeafItemSettings LeafBorderBrush="White" 
-                             LeafBorderThickness="1"
-                             LeafLabelPath="Name"/>
+<syncfusion:LeafItemSettings BorderBrush="White" 
+                             BorderThickness="1"
+                             LabelPath="Name"/>
 ```
 
 ### Pattern 2: No Borders, Labels Only
 ```xaml
-<syncfusion:LeafItemSettings LeafBorderBrush="Transparent" 
-                             LeafBorderThickness="0"
-                             LeafLabelPath="Name"/>
+<syncfusion:LeafItemSettings BorderBrush="Transparent" 
+                             BorderThickness="0"
+                             LabelPath="Name"/>
 ```
 
 ### Pattern 3: Thick Borders for Emphasis
 ```xaml
-<syncfusion:LeafItemSettings LeafBorderBrush="Black" 
-                             LeafBorderThickness="3"
-                             LeafLabelPath="Name"/>
+<syncfusion:LeafItemSettings BorderBrush="Black" 
+                             BorderThickness="3"
+                             LabelPath="Name"/>
 ```
 
 ### Pattern 4: Custom Template with Icon
 ```xaml
 <syncfusion:LeafItemSettings>
-    <syncfusion:LeafItemSettings.LeafTemplate>
+    <syncfusion:LeafItemSettings.LabelTemplate>
         <DataTemplate>
             <StackPanel Orientation="Horizontal" 
                        HorizontalAlignment="Center" 
@@ -282,7 +282,7 @@ For advanced customization, use `LeafTemplate` to define custom UI for each leaf
                 <TextBlock Text="{Binding Name}" Foreground="White" VerticalAlignment="Center"/>
             </StackPanel>
         </DataTemplate>
-    </syncfusion:LeafItemSettings.LeafTemplate>
+    </syncfusion:LeafItemSettings.LabelTemplate>
 </syncfusion:LeafItemSettings>
 ```
 
@@ -309,28 +309,28 @@ For advanced customization, use `LeafTemplate` to define custom UI for each leaf
 // Set leaf settings in code
 var leafSettings = new LeafItemSettings
 {
-    LeafBorderBrush = new SolidColorBrush(Colors.White),
-    LeafBorderThickness = new Thickness(2),
-    LeafLabelPath = "Name"
+    BorderBrush = new SolidColorBrush(Colors.White),
+    BorderThickness = new Thickness(2),
+    LabelPath = "Name"
 };
 treeMap.LeafItemSettings = leafSettings;
 
 // With template
 var template = new DataTemplate();
 // ... configure template
-leafSettings.LeafTemplate = template;
+leafSettings.LabelTemplate = template;
 ```
 
 ## Troubleshooting
 
 **Labels not showing:**
-- Verify LeafLabelPath property name is correct (case-sensitive)
+- Verify LabelPath property name is correct (case-sensitive)
 - Ensure property contains non-empty string values
 - Check if rectangles are large enough to display text
 
 **Borders not visible:**
-- Verify LeafBorderThickness > 0
-- Check LeafBorderBrush is not transparent
+- Verify BorderThickness > 0
+- Check BorderBrush is not transparent
 - Ensure border color contrasts with leaf colors
 
 **Template not rendering:**

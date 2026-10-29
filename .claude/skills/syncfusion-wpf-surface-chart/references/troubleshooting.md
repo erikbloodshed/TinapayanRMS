@@ -140,7 +140,7 @@ if (chart.ColorBar == null)
 
 ```csharp
 // Color bar needs data to display
-if (chart.ItemsSource == null && chart.Data.Count == 0)
+if (chart.ItemsSource == null && chart.Data.XValues.Count == 0)
 {
     // Load data first, then color bar will appear
     LoadChartData();
@@ -393,7 +393,11 @@ public class ViewModel : INotifyPropertyChanged
 
 ```csharp
 // For Data.AddPoints approach
-chart.Data.Clear();
+
+chart.Data.XValues.Clear();
+chart.Data.YValues.Clear();
+chart.Data.ZValues.Clear();
+chart.Data.AddPoints(x, y, z);
 // Re-add all points
 for (int i = 0; i < newRowSize; i++)
 {

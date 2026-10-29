@@ -314,7 +314,7 @@ chart.XAxis = xAxis;
     </Style>
 </Grid.Resources>
 
-<chart:SfSurfaceAxis MajorTickLineStyle="{StaticResource majorTickStyle}" />
+<chart:SurfaceAxis MajorTickLineStyle="{StaticResource majorTickStyle}" />
 ```
 
 ### Minor Tick Line Style

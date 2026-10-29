@@ -484,9 +484,9 @@ namespace WpfAutoCompleteApp
             InitializeComponent();
         }
 
-        private void OnEmployeeSelected(object sender, SelectedItemChangedEventArgs e)
+        private void OnEmployeeSelected(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            var textBox = sender as SfTextBoxExt;
+            var textBox = d as SfTextBoxExt;
             var employee = textBox?.SelectedItem as Employee;
             
             if (employee != null)

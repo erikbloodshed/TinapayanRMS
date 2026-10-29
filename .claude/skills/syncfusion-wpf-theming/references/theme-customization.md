@@ -48,19 +48,16 @@ using Syncfusion.SfSkinManager;
 var themeSettings = new Windows11LightThemeSettings();
 
 // Create and customize palette
-var palette = new Windows11Palette
-{
-    PrimaryColor = Colors.Blue,
-    SecondaryColor = Colors.LightBlue,
-    BackgroundColor = Colors.White,
-    ForegroundColor = Colors.Black,
-    ErrorColor = Colors.Red,
-    WarningColor = Colors.Orange,
-    SuccessColor = Colors.Green
-};
-
-// Assign palette to theme settings
-themeSettings.Palette = palette;
+themeSettings.PrimaryBackground = new SolidColorBrush(Colors.Red);
+themeSettings.PrimaryForeground = new SolidColorBrush(Colors.AntiqueWhite);
+themeSettings.BodyFontSize = 15;
+themeSettings.HeaderFontSize = 18;
+themeSettings.SubHeaderFontSize = 17;
+themeSettings.TitleFontSize = 17;
+themeSettings.SubTitleFontSize = 16;
+themeSettings.BodyAltFontSize = 15;
+themeSettings.FontFamily = new FontFamily("Callibri");
+themeSettings.Palette = Windows11Palette.PinkRed;
 ```
 
 ### Step 3: Register Theme Settings
@@ -113,22 +110,21 @@ public partial class App : Application
 ```csharp
 private void CustomizeFluentDarkTheme()
 {
+    SfSkinManager.ApplyThemeAsDefaultStyle = true;
     // Create theme settings
     var fluentSettings = new FluentDarkThemeSettings();
 
-    // Define custom palette
-    var customPalette = new FluentPalette
-    {
-        PrimaryColor = Colors.Purple,        // Your brand color
-        SecondaryColor = Colors.LightPurple,
-        BackgroundColor = Color.FromArgb(255, 20, 20, 20),  // Very dark background
-        ForegroundColor = Colors.White,
-        BorderColor = Colors.Gray,
-        SurfaceColor = Color.FromArgb(255, 40, 40, 40),     // Elevated surface
-        DisabledColor = Colors.DarkGray
-    };
-
-    fluentSettings.Palette = customPalette;
+    FluentDarkThemeSettings fluentSettings = new FluentDarkThemeSettings();
+    fluentSettings.PrimaryBackground = new SolidColorBrush(Colors.Red);
+    fluentSettings.PrimaryForeground = new SolidColorBrush(Colors.AntiqueWhite);
+    fluentSettings.BodyFontSize = 15;
+    fluentSettings.HeaderFontSize = 18;
+    fluentSettings.SubHeaderFontSize = 17;
+    fluentSettings.TitleFontSize = 17;
+    fluentSettings.SubTitleFontSize = 16;
+    fluentSettings.BodyAltFontSize = 15;
+    fluentSettings.FontFamily = new FontFamily("Callibri");
+    fluentSettings.Palette = FluentPalette.PinkRed;
 
     // Register and apply
     SfSkinManager.RegisterThemeSettings("FluentDark", fluentSettings);

@@ -151,7 +151,7 @@ YBindingPath="Details.Performance.Value"
     <syncfusion:ColumnSeries.AdornmentsInfo>
         <syncfusion:ChartAdornmentInfo ShowLabel="False"
                                        ShowMarker="False"/>
-    </syncfusion:ChartAdornmentsInfo>
+    </syncfusion:ColumnSeries.AdornmentsInfo>
 </syncfusion:ColumnSeries>
 ```
 

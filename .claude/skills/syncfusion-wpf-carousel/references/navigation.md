@@ -103,7 +103,7 @@ When `ItemsPerPage="5"`, pressing `Page Down` navigates 5 items forward.
 
 ## Scroll Bar Navigation
 
-Enable scroll bars to navigate through carousel items using mouse dragging or clicking.
+Enable scroll bars to navigate carousel items using mouse dragging or scroll control clicks. For the core navigation behavior, see [navigation-basics.md](navigation-basics.md). For advanced navigation patterns and gestures, see [navigation-patterns.md](navigation-patterns.md).
 
 ### Enable Scroll Bars
 
@@ -124,12 +124,15 @@ By default, scroll bars are collapsed. Enable them using `ScrollViewer` attached
                     Width="100"
                     BorderBrush="Purple"
                     BorderThickness="3"
-                    # Navigation (split)
-
-                    This file was split to keep reference files small.
-
-                    - `navigation-basics.md`: core behaviors (keyboard, scroll, mouse wheel, commands).
-                    - `navigation-patterns.md`: patterns and advanced examples (arrow buttons, thumbnails, indicator dots, timers, gestures, looping).
-
-                    ```
+                    Background="LightBlue">
+                <TextBlock Text="{Binding Header}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Border>
+        </DataTemplate>
+    </syncfusion:Carousel.ItemTemplate>
+</syncfusion:Carousel>
 ```
+
+When scroll bars are visible, users can drag the thumb or use the scroll track to move through carousel items.
+
