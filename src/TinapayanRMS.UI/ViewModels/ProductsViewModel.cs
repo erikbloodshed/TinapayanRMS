@@ -3155,11 +3155,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             if (versionLink.SubAssemblyId is { } setId && subAssembliesNow.TryGetValue(setId, out var set))
             {
-                link = PackagingLinkTarget.ForSet(setId, set.Name);
+                link = new PackagingLinkTarget.Set(setId, set.Name);
             }
             else if (versionLink.ProductId is { } linkedProductId && Products.FirstOrDefault(p => p.Id == linkedProductId) is { } linkedProduct)
             {
-                link = PackagingLinkTarget.ForProduct(linkedProductId, linkedProduct.Name);
+                link = new PackagingLinkTarget.OtherProduct(linkedProductId, linkedProduct.Name);
             }
         }
 
@@ -3206,16 +3206,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             packagingLines = [.. Packaging.LineEdits.Select(CaptureLine)];
         }
-        else if (link.SubAssemblyId is { } setId)
-        {
-            packagingLines = [.. (await Task.Run(() => _subAssemblyRepository.GetPackagingLinesAsync(setId, CancellationToken.None)))
-                .Select(l => new PackagingLineState(l.PackagingMaterialId, l.UnitId, l.QtyPerSet))];
-        }
         else
         {
-            packagingLines = [.. (await Task.Run(() => _packagingLineRepository.GetEffectiveForProductAsync(link.ProductId!.Value, CancellationToken.None)))
-                .Select(l => PackagingLineRow.FromSaved(l))
-                .Select(r => new PackagingLineState(r.PackagingMaterialId, r.UnitId, r.QtyPerUnit))];
+            packagingLines = link switch
+            {
+                PackagingLinkTarget.Set(var setId, _) => [.. (await Task.Run(() => _subAssemblyRepository.GetPackagingLinesAsync(setId, CancellationToken.None)))
+                    .Select(l => new PackagingLineState(l.PackagingMaterialId, l.UnitId, l.QtyPerSet))],
+                PackagingLinkTarget.OtherProduct(var linkedProductId, _) => [.. (await Task.Run(() => _packagingLineRepository.GetEffectiveForProductAsync(linkedProductId, CancellationToken.None)))
+                    .Select(l => PackagingLineRow.FromSaved(l))
+                    .Select(r => new PackagingLineState(r.PackagingMaterialId, r.UnitId, r.QtyPerUnit))],
+            };
         }
 
         // Another product picked while that was read: the version isn't this one's.
@@ -3507,10 +3507,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         IReadOnlyList<PackagingLineRow> packagingRows = [];
         if (source?.PackagingTarget is { } packaging)
         {
-            packagingRows = packaging.SubAssemblyId is { } setId
-                ? [.. (await _subAssemblyRepository.GetPackagingLinesAsync(setId, cancellationToken))
-                    .Select(l => new PackagingLineRow(FindPackagingMaterial(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId))]
-                : [.. (await _packagingLineRepository.GetEffectiveForProductAsync(packaging.ProductId!.Value, cancellationToken)).Select(PackagingLineRow.FromSaved)];
+            packagingRows = packaging switch
+            {
+                PackagingLinkTarget.Set(var setId, _) => [.. (await _subAssemblyRepository.GetPackagingLinesAsync(setId, cancellationToken))
+                    .Select(l => new PackagingLineRow(FindPackagingMaterial(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId))],
+                PackagingLinkTarget.OtherProduct(var productId, _) =>
+                    [.. (await _packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken)).Select(PackagingLineRow.FromSaved)],
+            };
         }
         else if (source?.SubAssembly is { } subAssembly)
         {

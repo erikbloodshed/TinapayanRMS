@@ -235,7 +235,7 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
 
         // Move to Sub-Assemblies: the lines go to a new packaging set, which the packaging links in their place. After
         // the recipe, so the set's name is kept apart from the sub-assemblies this save has just made.
-        if (packagingLink is { IsNewSet: true })
+        if (packagingLink is PackagingLinkDraft.NewSet)
         {
             await PackagingLinkRepository.LinkNewSetAsync(dbContext, fields.Id, packagingLines ?? [], cancellationToken);
         }

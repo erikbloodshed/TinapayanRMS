@@ -14,14 +14,14 @@ public sealed class LinkableSubAssemblyOption
         SubAssembly = subAssembly;
         if (subAssembly.Role?.IsPackaging == true)
         {
-            PackagingTarget = PackagingLinkTarget.ForSet(subAssembly.Id, subAssembly.Name);
+            PackagingTarget = new PackagingLinkTarget.Set(subAssembly.Id, subAssembly.Name);
         }
     }
 
     /// <summary>Another product's packaging, whatever it is: its own lines, or what it links in turn.</summary>
     public LinkableSubAssemblyOption(Product product)
     {
-        PackagingTarget = PackagingLinkTarget.ForProduct(product.Id, product.Name);
+        PackagingTarget = new PackagingLinkTarget.OtherProduct(product.Id, product.Name);
     }
 
     /// <summary>The sub-assembly, or null for another product's packaging.</summary>

@@ -93,24 +93,27 @@ public sealed record RecipeDraft(IReadOnlyList<NewSubAssemblyDraft> New, IReadOn
 }
 
 /// <summary>
-/// What a product's packaging links, as Save writes it: another product's packaging, a standalone packaging
-/// set (one set per sellable unit), or neither (<see cref="None"/>), when the product owns its packaging lines; or a
-/// new set made of its lines (<see cref="NewSet"/>).
+/// What a product's packaging links, as Save writes it: another product's packaging (<see cref="OtherProduct"/>), a
+/// standalone packaging set (<see cref="Set"/>, one set per sellable unit), or neither (<see cref="None"/>), when the
+/// product owns its packaging lines; or a new set made of its lines (<see cref="NewSet"/>).
 /// </summary>
-public sealed record PackagingLinkDraft(int? LinkedProductId, int? LinkedSubAssemblyId)
+public closed record PackagingLinkDraft
 {
     /// <summary>No link: the product's packaging is its own lines.</summary>
-    public static PackagingLinkDraft None { get; } = new(null, null);
+    public sealed record None : PackagingLinkDraft;
 
     /// <summary>
     /// Move to Sub-Assemblies on the Products screen's Packaging tab: the packaging lines saved with it become a new
     /// packaging set on the Sub-Assemblies screen, named after the product and the Packaging role, and the product links
     /// it in their place.
     /// </summary>
-    public static PackagingLinkDraft NewSet { get; } = new(null, null) { IsNewSet = true };
+    public sealed record NewSet : PackagingLinkDraft;
 
-    /// <summary>This is <see cref="NewSet"/>: the link is to a set Save makes of the product's lines.</summary>
-    public bool IsNewSet { get; init; }
+    /// <summary>A standalone packaging set from the Sub-Assemblies screen.</summary>
+    public sealed record Set(int SubAssemblyId) : PackagingLinkDraft;
+
+    /// <summary>Another product's packaging, whatever it is: its own lines, or what it links in turn.</summary>
+    public sealed record OtherProduct(int ProductId) : PackagingLinkDraft;
 }
 
 /// <summary>

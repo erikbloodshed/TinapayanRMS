@@ -1193,7 +1193,7 @@ Coverage comes from Microsoft's MTP coverage extension (see the [command referen
 ### Code
 
 - **Use modern C# 15 and .NET 11 idioms**: primary constructors (every repository has one), collection expressions, `record` and `record struct` for immutable shapes (drafts, snapshots, printouts), `required` members, file-scoped namespaces and pattern matching.
-  - **A fixed set of cases is a `closed` class or record** (C# 15): the list trees' nodes, `RecipeTab`, `PlanIssue`, `PrintScope`, `RecipeTabChoice`. Each case is a sealed record nested in it, with only its own data, in place of a `Kind` enum and fields that only some kinds use. A switch over one names every case, and `null` when null can come, never `_`, so a new case is a CS8509 warning wherever it's missed.
+  - **A fixed set of cases is a `closed` class or record** (C# 15): the list trees' nodes, `RecipeTab`, `PlanIssue`, `PrintScope`, `RecipeTabChoice`, `PackagingLinkDraft`, `PackagingLinkTarget`. Each case is a sealed record nested in it, with only its own data, in place of a `Kind` enum or nullable fields that only some cases use. A switch over one names every case, and `null` when null can come, never `_`, so a new case is a CS8509 warning wherever it's missed.
   - **No `union` for anything XAML binds.** A union is a struct holding its case in `Value`, which bindings don't see through.
   - **A closed record that's shown seals its `ToString`** (`PrintScope`), or each case reads "Folder { Label = … }".
   - **`BeEquivalentTo` over a closed base type** needs `o => o.ComparingByValue<TBase>()`, since the base has no members to compare.

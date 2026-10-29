@@ -174,6 +174,7 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 | 2026-10-29 | **Cost by preferred brand**, at the user's request: Raw Materials' **Cost From** costs a purchased material at a brand picked instead of the dearest (`RawMaterial.PreferredBrand`, `RawMaterialRules.FindCostBrandPrice`); the average wasn't built. Also fixed: Undo left the Cost Buffer % box stale. Migration `RawMaterialPreferredBrand` | Done |
 | 2026-10-29 | **Plans by date** and **record actual results**, at the user's request: a saved plan's **Make On** day (the list in its order, today's opening by itself) and each line's **Made** and **Left Over**, which Reports' new **Production Results** adds up by category against its Wastage %. Migration `SavedPlanDayAndResults` | Done |
 | 2026-10-29 | **Dropped**, at the user's request ("it's confusing"): the Price Simulator's Price to Charge and Set Current Prices, and its Whole Category and Costing changes, both reverted whole | Done |
+| 2026-10-30 | **C# 15 on the packaging links**, from a review of what .NET 11 and C# 15 offer (dotnet11-rc2 is now the line moving forward): `PackagingLinkDraft` (two nullable ids, an `IsNewSet` flag and `None`/`NewSet` instances) and `PackagingLinkTarget` (two nullable ids) are closed records, one case per kind of link, so Save and the Packaging tab match the case instead of reading an id with `!` (Conventions, C# 15). No migration | Done |
 
 ## Open items (for later phases)
 
