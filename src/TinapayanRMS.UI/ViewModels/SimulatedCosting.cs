@@ -54,16 +54,17 @@ public sealed record SimulatedCosting(
     }
 
     /// <summary>
-    /// The changes as the report lists them beside the price changes, each reaching every product: "Wastage % (shop-wide)"
-    /// from <paramref name="wastagePercentNow"/> to the one tried, "VAT % (every product)" at the one tried, and the points
+    /// The changes as the report lists them beside the price changes, each reaching every product: "Wastage % (every product)"
+    /// from <paramref name="wastagePercentNow"/> to the one tried (no figure from when the products' categories price them
+    /// at different ones), "VAT % (every product)" at the one tried, and the points
     /// labor, overhead and administrative move by.
     /// </summary>
-    public IReadOnlyList<PrintedPriceChange> Printed(decimal wastagePercentNow)
+    public IReadOnlyList<PrintedPriceChange> Printed(decimal? wastagePercentNow)
     {
         List<PrintedPriceChange> printed = [];
         if (WastagePercent is { } wastage)
         {
-            printed.Add(new PrintedPriceChange("Wastage % (shop-wide)", "%", wastagePercentNow, null, wastage));
+            printed.Add(new PrintedPriceChange("Wastage % (every product)", "%", wastagePercentNow, null, wastage));
         }
 
         if (VatPercent is { } vat)

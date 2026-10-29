@@ -430,7 +430,7 @@ PER PRODUCT
 | `SubAssemblyLine` | An ingredient in a recipe, in grams | Grams are always stored. `AuthoredBakersPercent` records a percentage the user typed instead. |
 | `SubAssemblyPackagingLine` | A packaging material in a packaging set | Costed on read. |
 | `Product` | A sellable product | Names are unique, deleted products' included. `IsComposite` is fixed once saved. `QuantityRequired` is at least 1, and exactly 1 for a composite. Deleting one only stamps `DeletedAt` (a soft delete): see [Deleted products](#deleted-products). |
-| `ProductCategory` | Breads, Cakes, … | A list of its own, separate from raw material categories. |
+| `ProductCategory` | Breads, Cakes, … | A list of its own, separate from raw material categories. Its optional `WastagePercent` prices its products in place of `CostingDefaults.WastagePercent`. |
 | `ProductSubAssemblyUsage` | A sub-assembly in a product's recipe | Stores only the typed piece-size figure (`AuthoredField`, `AuthoredValue`). |
 | `UsageAddInLine` | A product's extra ingredient on a linked usage | Never changes the sub-assembly that the usage links. |
 | `PackagingLine` | A packaging material per sellable unit | Stores both reciprocal quantities and which one was typed (`AuthoredField`). |
@@ -556,7 +556,7 @@ The cascade doesn't push changes live to other screens. A screen picks up new co
 | Usage cost per piece | Batch cost × weight per piece ÷ batch weight | `ProductRules.CalculateUsageCostPerPiece` |
 | Packaging line cost | Cost per base unit × the quantity in base units | `ProductRules.CalculatePackagingLineCost` |
 | Material cost per sellable unit | Σ usage costs per piece × Quantity Required, + Σ packaging | `ProductRules.CalculateMaterialCost` |
-| Wastage, labor, overhead, administrative | Each is its % of the sub-assembly cost alone, never of the packaging. The Wastage % is the shop's (`CostingDefaults.WastagePercent`); a composite's products bring their cost before theirs, so it's added once | `CostingRules.CalculateCostFromSubAssemblyPercent` |
+| Wastage, labor, overhead, administrative | Each is its % of the sub-assembly cost alone, never of the packaging. The Wastage % is the product's category's (`ProductCategory.WastagePercent`, through `IProductRepository.GetCategoryWastageForProductsAsync` in `SavedProductReader`, and `EditingCategory` on the Products form) or else the shop's (`CostingDefaults.WastagePercent`); a composite's products bring their cost before theirs, so it's added once, at the composite's own | `CostingRules.CalculateCostFromSubAssemblyPercent` |
 | Selling price | Base cost = sub-assemblies + wastage + packaging + labor + overhead + administrative; pre-VAT price = base cost × (1 + markup %); selling price = pre-VAT price × (1 + VAT %) | `CostingRules.CalculateSellingPrice` |
 | Markup at the current price | (current price ÷ (1 + VAT %) − base cost) ÷ base cost | `CostingRules.CalculateMarkupPercentFromPrice` |
 | Price to keep the markup (Price Simulator) | current price × simulated base cost ÷ base cost (VAT cancels out) | `PriceChangeRules.PriceToKeepMarkup` |

@@ -6,4 +6,10 @@ public class ProductCategory
     public int Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The Wastage % its products are priced with in place of the shop-wide one (CostingDefaults.WastagePercent), 0 to 100;
+    /// null for the shop-wide one (2026-10-29, at the user's request: wastage per category).
+    /// </summary>
+    public decimal? WastagePercent { get; set; }
 }

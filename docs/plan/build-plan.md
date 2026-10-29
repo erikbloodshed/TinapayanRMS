@@ -170,6 +170,7 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 | 2026-10-29 | **Reports: Cost Drivers and Margin Erosion**, at the user's request: the purchased materials that make up most of the Production products' material cost, with a cumulative share (`CostDriverAnalysis`), and each product's markup now against its version as of a day picked (`MarginErosionAnalysis`, `IProductVersionRepository.GetLatestAsOfAsync`). No migration | Done |
 | 2026-10-29 | **Safer backups**, at the user's request: the day's automatic backup is also checked every hour while the app runs, and each one can be copied to a second folder chosen on Settings → Database, which keeps the newest 14 too (`AutomaticBackups`). No migration | Done |
 | 2026-10-29 | **Find (Ctrl+K)**, at the user's request ("search everything"): one box over every raw material, standalone sub-assembly and product name, opening the pick on its own screen (`QuickFindViewModel`, `QuickFindWindow`). No migration | Done |
+| 2026-10-29 | **Wastage per category**, at the user's request: a product category's own Wastage % (Settings → Product Categories) prices its products in place of the shop-wide one; blank keeps the shop-wide one. Also: the Price Simulator's "As now" boxes now show their placeholder (`WatermarkTextIsVisible`). Migration `ProductCategoryWastagePercent` | Done |
 
 ## Open items (for later phases)
 

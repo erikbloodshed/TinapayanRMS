@@ -28,7 +28,7 @@ internal static class Columns
         [typeof(SubAssembly)] = ["id", "name", "role_id", "owner_product_id", "total_weight", "total_cost"],
         [typeof(SubAssemblyLine)] = ["id", "sub_assembly_id", "ingredient_id", "grams", "is_formula_base", "authored_bakers_percent", "sort_order"],
         [typeof(SubAssemblyPackagingLine)] = ["id", "sub_assembly_id", "packaging_material_id", "unit_id", "qty_per_set", "sort_order"],
-        [typeof(ProductCategory)] = ["id", "name"],
+        [typeof(ProductCategory)] = ["id", "name", "wastage_percent"],
         [typeof(Product)] = ["id", "name", "description", "category_id", "quantity_required", "updated_at", "current_price", "stage", "is_composite", "includes_component_packaging", "deleted_at"],
         [typeof(ProductComponent)] = ["id", "product_id", "component_product_id", "quantity", "sort_order"],
         [typeof(ProductSubAssemblyUsage)] = ["id", "product_id", "sub_assembly_id", "authored_field", "authored_value"],

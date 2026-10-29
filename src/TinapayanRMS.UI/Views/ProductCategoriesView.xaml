@@ -41,6 +41,8 @@
                                        ColumnSizer="Star">
                     <syncfusion:SfDataGrid.Columns>
                         <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
+                        <!-- Blank: the shop-wide Wastage % (Costing Defaults) -->
+                        <controls:NumericColumn MappingName="WastagePercent" HeaderText="Wastage %" NumberDecimalDigits="2" Width="110" AllowNullValue="True" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </Grid>
@@ -57,10 +59,38 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <TextBlock Text="Name" Style="{StaticResource FormLabelStyle}" />
                     <syncfusion:SfTextBoxExt x:Name="NameTextBox"
                                              Grid.Column="1"
                                              Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <!-- 2026-10-29: the category's own Wastage %, in place of the shop-wide one; blank keeps the shop-wide one -->
+                    <TextBlock Grid.Row="1"
+                               Text="Wastage %"
+                               Style="{StaticResource FormLabelStyle}"
+                               Margin="0,8,6,0"
+                               ToolTip="What's lost making this category's products, as a cost on top of their sub-assemblies, in place of the shop-wide Wastage % (Costing Defaults). Blank uses the shop-wide one." />
+                    <syncfusion:DoubleTextBox Grid.Row="1"
+                                              Grid.Column="1"
+                                              Margin="0,8,0,0"
+                                              NumberDecimalDigits="2"
+                                              MinValue="0"
+                                              MaxValue="100"
+                                              UseNullOption="True"
+                                              WatermarkText="Shop-wide"
+                                              WatermarkTextIsVisible="True"
+                                              Value="{Binding EditingWastagePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
+                    <TextBlock Grid.Row="2"
+                               Grid.Column="1"
+                               Margin="0,4,0,0"
+                               Style="{StaticResource CaptionStyle}"
+                               TextWrapping="Wrap"
+                               Text="Blank uses the shop-wide Wastage % from Costing Defaults. A composite product uses its own category's, not its products'." />
                 </Grid>
 
                 <StackPanel Orientation="Horizontal">

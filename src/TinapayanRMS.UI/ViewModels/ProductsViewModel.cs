@@ -682,7 +682,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     // What the product had when it was loaded, so Save only sends the parts that changed.
     private RecipeDraft _savedRecipe = new([], []);
 
-    // The shop-wide Wastage % every product is priced with (Settings → Costing Defaults), as of the last LoadCommand.
+    // The shop-wide Wastage % (Settings → Costing Defaults), as of the last LoadCommand: what a product is priced with unless
+    // its category sets its own (EditingCategory.WastagePercent, 2026-10-29).
     private decimal _wastagePercent = CostingDefaults.DefaultWastagePercent;
 
     /// <summary>What the Costing tab's rounded selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep).</summary>
@@ -1254,7 +1255,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .Where(_ => !IsRestoring)
             .Subscribe(_ => RecomputeCosts());
 
-        this.WhenAnyValue(x => x.EditingCurrentPrice, x => x.EditingQuantityRequired)
+        // The category too: it can set the Wastage % the product is priced with.
+        this.WhenAnyValue(x => x.EditingCurrentPrice, x => x.EditingQuantityRequired, x => x.EditingCategory)
             .Where(_ => !IsRestoring)
             .Subscribe(_ => RecomputeCosts());
 
@@ -4575,7 +4577,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             IsEditingComposite,
             IsEditingComposite && UsageEdits.Count > 0,
             componentPackaging,
-            _wastagePercent,
+            EditingCategory?.WastagePercent ?? _wastagePercent,
             _priceRoundingStep);
     }
 

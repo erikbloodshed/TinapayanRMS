@@ -456,6 +456,11 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .HasColumnName("name")
                         .UseCollation("case_insensitive");
 
+                    b.Property<decimal?>("WastagePercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("wastage_percent");
+
                     b.HasKey("Id")
                         .HasName("pk_product_categories");
 
@@ -463,7 +468,10 @@ namespace TinapayanRMS.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_product_categories_name");
 
-                    b.ToTable("product_categories", (string)null);
+                    b.ToTable("product_categories", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductCategories_WastagePercent", "wastage_percent IS NULL OR (wastage_percent >= 0 AND wastage_percent <= 100)");
+                        });
                 });
 
             modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductComponent", b =>

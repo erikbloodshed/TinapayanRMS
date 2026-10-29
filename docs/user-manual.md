@@ -75,9 +75,9 @@ For a purchased material, the buffered cost is a **fixed amount**. A new brand p
 
 ### Wastage
 
-**Wastage %** is a cost allowance for what's lost making a product: dough left in the mixer, a filling that cooks down, a tray that burns. It's one figure for the whole shop, set in Settings → Costing Defaults (3% unless you change it there). Every product adds it to its costing as a percentage of its **sub-assemblies (ingredients) cost**: 3% of 100.00 of ingredients is 3.00 more. Packaging isn't wasted, so it's left out.
+**Wastage %** is a cost allowance for what's lost making a product: dough left in the mixer, a filling that cooks down, a tray that burns. It's one figure for the whole shop, set in Settings → Costing Defaults (3% unless you change it there), and a product category can set its own in its place (Settings → Product Categories): say 5% for Cakes, whose batters stick to the pans, while everything else stays at the shop's 3%. Every product adds its category's figure, or the shop's if its category doesn't set one, to its costing as a percentage of its **sub-assemblies (ingredients) cost**: 3% of 100.00 of ingredients is 3.00 more. Packaging isn't wasted, so it's left out.
 
-Wastage is a cost, not lost weight. A batch's pieces share out the whole batch, and the wastage goes on the product's Costing tab. A composite product adds it once, on everything it holds, so its products' ingredients are never charged wastage twice.
+Wastage is a cost, not lost weight. A batch's pieces share out the whole batch, and the wastage goes on the product's Costing tab. A composite product adds it once, on everything it holds, so its products' ingredients are never charged wastage twice. It uses its own category's figure (or the shop's), not those of the products in it.
 
 ### Sub-assemblies and roles
 
@@ -307,7 +307,7 @@ A made ingredient saved in an ingredient category before Made categories existed
 
 ### Product Categories
 
-Each category has a **Name**. Products don't need a category, and those without one are listed under **Uncategorized**. Deleting a category leaves its products uncategorized.
+Each category has a **Name**, and can have its own **Wastage %** (0 to 100), which its products are priced with in place of the shop's (see [Wastage](#wastage)). Leave it blank, as it starts, and its products use the shop's Wastage % from Costing Defaults. The list shows each category's Wastage %, blank for those using the shop's. Changing it reprices the category's products, saved ones included. Products don't need a category, and those without one are listed under **Uncategorized**. Deleting a category leaves its products uncategorized.
 
 ### Roles
 
@@ -333,7 +333,7 @@ Under it are the five percentages a **new** product's costing starts with:
 - **Markup %**: added on the base cost (materials, wastage, labour, overhead and administrative).
 - **VAT %**: added on top of the marked-up price.
 
-Under them, **Wastage %** is the shop's [wastage](#wastage): a percentage of every product's sub-assemblies (ingredients) cost, added to its costing. It starts at 3%, and can be anything from 0 to 100. Unlike the other figures here, it isn't where a new product starts: **every** product is priced with it, saved ones included, so changing it changes every product's costs and suggested price.
+Under them, **Wastage %** is the shop's [wastage](#wastage): a percentage of every product's sub-assemblies (ingredients) cost, added to its costing. It starts at 3%, and can be anything from 0 to 100. Unlike the other figures here, it isn't where a new product starts: **every** product is priced with it, saved ones included, unless its category sets its own (Settings → Product Categories), so changing it changes those products' costs and suggested prices.
 
 **Price Rounding** rounds a suggested price up to a price you'd charge: up to the next 0.25, 0.50, 1, 5 or 10, or **None** (the default). It's always rounded up, so the rounded price still earns at least the markup. The exact figures don't change: the rounded price is shown beside them, under the **Total Selling Price** on a product's Costing tab (*Rounded up to the next 0.25: 43.25*), in the **Rounded Price** column of Reports' Product Cost Summary, and in the Price Simulator.
 
@@ -737,7 +737,7 @@ Under each metric is its share of the price. VAT has a percentage box only, with
 On the right, the **Costing Summary** lists each component with its amount and its **% of Price**:
 
 - **Sub-assemblies (ingredients)**, with each sub-assembly listed under it. For a composite product this row is **Products (ingredients)**, with each product and its quantity listed under it, such as *Ensaymada × 6*. When the composite has sections of its own, the row is **Products and sub-assemblies (ingredients)** and lists them after the products. Its Labor, Overhead and Admin are a percentage of that row.
-- **Wastage**, labelled with the shop's [Wastage %](#wastage): a percentage of the row above. It's set in Settings → Costing Defaults, not here.
+- **Wastage**, labelled with the [Wastage %](#wastage) the product is priced with: its category's own, or the shop's if its category doesn't set one. It's set in Settings (Product Categories, or Costing Defaults), not here. Picking another **Category** on the product changes it at once.
 - **Packaging**. For a composite product that includes its products' packaging, this row is **Packaging (own and products')**.
 - **Labor**, **Overhead** and **Administrative**, each labelled with its percentage
 - **Subtotal (base cost)**
@@ -869,7 +869,7 @@ One row for every product, as it's saved:
 - **Product**, its **Stage** (Production or Research and Development) and its **Category**.
 - **Pieces**: how many pieces make one sellable unit (1 for a product sold by the piece). Every amount after it is for one sellable unit. Blank for a composite product, which is one unit made of other products.
 - **Ingredients Cost**: the recipe's cost, the **Sub-assemblies (ingredients)** row of the product's Costing tab. For a composite product, it's what its products bring (and its own sub-assemblies).
-- **Wastage Cost**: the Costing tab's **Wastage** row, the shop's Wastage % of the ingredients cost.
+- **Wastage Cost**: the Costing tab's **Wastage** row, the product's Wastage % (its category's, or the shop's) of the ingredients cost.
 - **Packaging Cost**: the **Packaging** row of the Costing tab. For a composite product that includes its products' packaging, theirs is counted too.
 - **Labor Cost**, **Overhead Cost** and **Admin Cost**: the Costing tab's Labor, Overhead and Admin metrics in pesos, each a percentage of the ingredients cost.
 - **Base Cost** and **Suggested Price**: as the product's Costing tab works them out.
@@ -972,7 +972,7 @@ The top table holds the changes to try, one row per raw material:
 
 **Costing**, under that, tries changes to the costing itself, on every product. Leave a box blank to keep its figure as it is now:
 
-- **Wastage %**: the shop-wide wastage to try in place of the one in Settings.
+- **Wastage %**: the wastage to try on every product, in place of the shop's in Settings and any category's own. The report lists it with today's figure beside it when every product has the same one today.
 - **VAT %**: the VAT to try on every product.
 - **Labor ± pts**, **Overhead ± pts** and **Admin ± pts**: how many percentage points each product's own percentage moves, up or down, such as **2** or **-1.5**. A percentage never goes below 0.
 
@@ -1150,7 +1150,7 @@ This happens as soon as you save. A product already open on another tab shows th
 All figures below are per sellable unit.
 
 1. **Sub-assemblies** = the sum of the sections' cost per piece × Quantity Required.
-2. **Wastage** = the shop's Wastage % (Settings → Costing Defaults) **of the sub-assemblies alone**.
+2. **Wastage** = the product's category's Wastage % (Settings → Product Categories), or the shop's (Settings → Costing Defaults) when its category doesn't set one, **of the sub-assemblies alone**.
 3. **Packaging** = the sum of the packaging lines. They're already per sellable unit.
 4. **Labor**, **Overhead** and **Administrative** = their percentage **of the sub-assemblies alone**. Packaging and wastage aren't included.
 5. **Base cost** = sub-assemblies + wastage + packaging + labour + overhead + administrative.

@@ -20,7 +20,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 "TinapayanRMS.Domain.Entities.ProductCategory",
                 typeof(ProductCategory),
                 baseEntityType,
-                propertyCount: 2,
+                propertyCount: 3,
                 unnamedIndexCount: 1,
                 keyCount: 1);
 
@@ -43,6 +43,17 @@ namespace TinapayanRMS.Infrastructure.CompiledModels
                 maxLength: 100);
             name.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
             name.AddAnnotation("Relational:ColumnName", "name");
+
+            var wastagePercent = runtimeEntityType.AddProperty(
+                "WastagePercent",
+                typeof(decimal?),
+                propertyInfo: typeof(ProductCategory).GetProperty("WastagePercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                fieldInfo: typeof(ProductCategory).GetField("<WastagePercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                nullable: true,
+                precision: 18,
+                scale: 4);
+            wastagePercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+            wastagePercent.AddAnnotation("Relational:ColumnName", "wastage_percent");
 
             var key = runtimeEntityType.AddKey(
                 new[] { id });

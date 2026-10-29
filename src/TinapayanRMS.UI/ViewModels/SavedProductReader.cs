@@ -18,7 +18,10 @@ public sealed record ProductDetail(
     /// <summary>A composite's products, in its Products table's order, each with its recipe and packaging costs as saved; none for a product made of sub-assemblies.</summary>
     public IReadOnlyList<SavedComponent> Components { get; init; } = [];
 
-    /// <summary>The shop-wide Wastage % it's priced with (CostingDefaults.WastagePercent): today's, or a version's then.</summary>
+    /// <summary>
+    /// The Wastage % it's priced with: its category's when that sets one (ProductCategory.WastagePercent), else the shop-wide
+    /// one (CostingDefaults.WastagePercent); today's, or a version's then.
+    /// </summary>
     public decimal WastagePercent { get; init; }
 
     /// <summary>What its rounded selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep): today's; 0 for a version's.</summary>
@@ -154,7 +157,7 @@ public sealed class SavedProductReader(
         var usages = await usageRepository.GetForProductsAsync(ids, cancellationToken);
         var sectionLines = await subAssemblyLineRepository.GetForSubAssembliesAsync([.. usages.Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
         var costingDefaults = await costingDefaultsRepository.GetAsync(cancellationToken);
-        var wastagePercent = costingDefaults.WastagePercent;
+        var categoryWastage = await productRepository.GetCategoryWastageForProductsAsync(ids, cancellationToken);
 
         var usagesByProduct = usages.ToLookup(u => u.ProductId);
         var productIdByUsage = usages.ToDictionary(u => u.Id, u => u.ProductId);
@@ -189,7 +192,8 @@ public sealed class SavedProductReader(
                 [.. productUsages.Select(u => u.SubAssemblyId).Distinct().SelectMany(id => sectionLinesBySubAssembly[id])],
                 [.. addInsByProduct[productId]])
             {
-                WastagePercent = wastagePercent,
+                // Its category's, when that sets one (2026-10-29); a composite's own, never its products'.
+                WastagePercent = categoryWastage.TryGetValue(productId, out var wastage) ? wastage : costingDefaults.WastagePercent,
                 PriceRoundingStep = costingDefaults.PriceRoundingStep,
                 Components =
                 [

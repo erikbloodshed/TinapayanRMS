@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -26,6 +27,31 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         var repository = CreateRepository();
         await repository.AddAsync(new ProductCategory { Name = name }, Cancellation);
         return (await repository.GetAllAsync(Cancellation)).Single(c => c.Name == name);
+    }
+
+    [Fact]
+    public async Task A_categorys_own_wastage_is_kept_read_for_its_products_and_held_to_0_to_100()
+    {
+        var repository = CreateRepository();
+        await repository.AddAsync(new ProductCategory { Name = "Breads", WastagePercent = 7.5m }, Cancellation);
+        var breads = (await repository.GetAllAsync(Cancellation)).Single();
+        var products = CreateProductRepository();
+        var inBreads = await AddProductAsync("Pandesal");
+        var uncategorized = await AddProductAsync("Cookie");
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.Products.Where(p => p.Id == inBreads).ExecuteUpdateAsync(s => s.SetProperty(p => p.CategoryId, breads.Id), Cancellation);
+        }
+
+        breads.WastagePercent.Should().Be(7.5m);
+        (await products.GetCategoryWastageForProductsAsync([inBreads, uncategorized], Cancellation))
+            .Should().BeEquivalentTo(new Dictionary<int, decimal> { [inBreads] = 7.5m }, "a product without its own category's figure isn't in it");
+
+        await repository.UpdateAsync(new ProductCategory { Id = breads.Id, Name = "Breads", WastagePercent = null }, Cancellation);
+        (await products.GetCategoryWastageForProductsAsync([inBreads], Cancellation)).Should().BeEmpty("blank is the shop-wide one");
+
+        var tooMuch = () => repository.UpdateAsync(new ProductCategory { Id = breads.Id, Name = "Breads", WastagePercent = 101m }, Cancellation);
+        await tooMuch.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Fact]

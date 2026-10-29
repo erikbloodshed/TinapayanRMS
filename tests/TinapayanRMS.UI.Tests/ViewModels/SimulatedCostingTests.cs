@@ -40,6 +40,6 @@ public class SimulatedCostingTests
         vat.Should().Throw<BusinessRuleException>();
 
         new SimulatedCosting(5m, null, 2m, null, null).Printed(3m).Select(p => (p.Material, p.CurrentPrice, p.NewPrice))
-            .Should().Equal(("Wastage % (shop-wide)", 3m, 5m), ("Labor % +2 points (every product)", null, 2m));
+            .Should().Equal(("Wastage % (every product)", 3m, 5m), ("Labor % +2 points (every product)", null, 2m));
     }
 }

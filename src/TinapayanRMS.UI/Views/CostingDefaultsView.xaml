@@ -26,7 +26,7 @@
                         <TextBlock Text="Costing Defaults" Style="{StaticResource SectionHeaderStyle}" />
                         <TextBlock Style="{StaticResource CaptionStyle}"
                                    Margin="0,0,0,12"
-                                   Text="Where a new product goes, what its costing starts with, and what a new raw material's cost buffer starts with: each keeps its own from its first Save, so changing these doesn't change anything saved. Wastage % is different: every product is priced with it, so changing it reprices them all." />
+                                   Text="Where a new product goes, what its costing starts with, and what a new raw material's cost buffer starts with: each keeps its own from its first Save, so changing these doesn't change anything saved. Wastage % is different: every product is priced with it, unless its category sets its own (Product Categories), so changing it reprices them all." />
 
                         <!-- One under another, each label on the left of its box (FormLabelStyle); the Auto column lines the boxes up -->
                         <Grid>
@@ -91,7 +91,7 @@
                                                       MinValue="0"
                                                       Value="{Binding EditingVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                            <TextBlock Grid.Row="12" Text="Wastage %" Style="{StaticResource FormLabelStyle}" ToolTip="Every product's, not just new ones: what's lost making a product, as a cost on top of its sub-assemblies (ingredients). 3% adds ₱3 to ₱100 of ingredients. Packaging isn't wasted, so it's left out." />
+                            <TextBlock Grid.Row="12" Text="Wastage %" Style="{StaticResource FormLabelStyle}" ToolTip="Every product's, not just new ones, unless its category sets its own (Product Categories): what's lost making a product, as a cost on top of its sub-assemblies (ingredients). 3% adds ₱3 to ₱100 of ingredients. Packaging isn't wasted, so it's left out." />
                             <syncfusion:DoubleTextBox Grid.Row="12"
                                                       Grid.Column="1"
                                                       MinValue="0"

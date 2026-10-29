@@ -188,13 +188,15 @@
                                                   NumberDecimalDigits="2"
                                                   UseNullOption="True"
                                                   WatermarkText="As now"
-                                                  ToolTip="The shop-wide Wastage % to try in place of Settings'. Blank keeps it."
+                                                  WatermarkTextIsVisible="True"
+                                                  ToolTip="The Wastage % to try on every product, in place of Settings' shop-wide one and any category's own. Blank keeps them."
                                                   Value="{Binding SimulatedWastagePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
                         <TextBlock Text="VAT %" VerticalAlignment="Center" Margin="12,0,6,0" />
                         <syncfusion:DoubleTextBox Width="80"
                                                   NumberDecimalDigits="2"
                                                   UseNullOption="True"
                                                   WatermarkText="As now"
+                                                  WatermarkTextIsVisible="True"
                                                   ToolTip="The VAT % to try on every product. Blank keeps each one's."
                                                   Value="{Binding SimulatedVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
                         <TextBlock Text="Labor ± pts" VerticalAlignment="Center" Margin="12,0,6,0" />
@@ -202,6 +204,7 @@
                                                   NumberDecimalDigits="2"
                                                   UseNullOption="True"
                                                   WatermarkText="As now"
+                                                  WatermarkTextIsVisible="True"
                                                   ToolTip="Percentage points every product's Labor % moves by, up or down, never below 0. Blank keeps each one's."
                                                   Value="{Binding LaborChangePoints, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
                         <TextBlock Text="Overhead ± pts" VerticalAlignment="Center" Margin="12,0,6,0" />
@@ -209,6 +212,7 @@
                                                   NumberDecimalDigits="2"
                                                   UseNullOption="True"
                                                   WatermarkText="As now"
+                                                  WatermarkTextIsVisible="True"
                                                   ToolTip="Percentage points every product's Overhead % moves by, up or down, never below 0. Blank keeps each one's."
                                                   Value="{Binding OverheadChangePoints, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
                         <TextBlock Text="Admin ± pts" VerticalAlignment="Center" Margin="12,0,6,0" />
@@ -216,6 +220,7 @@
                                                   NumberDecimalDigits="2"
                                                   UseNullOption="True"
                                                   WatermarkText="As now"
+                                                  WatermarkTextIsVisible="True"
                                                   ToolTip="Percentage points every product's Administrative % moves by, up or down, never below 0. Blank keeps each one's."
                                                   Value="{Binding AdministrativeChangePoints, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
                     </WrapPanel>

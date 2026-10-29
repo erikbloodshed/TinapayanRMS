@@ -487,7 +487,9 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         _now = now;
         _simulated = simulatedById;
         _tried = [.. printed.Zip(reaches)];
-        _costingTried = costing.Printed(data.Details.Values.FirstOrDefault()?.WastagePercent ?? 0m);
+        // The Wastage % now, when every product has the same one: a category can set its own (2026-10-29).
+        var wastagesNow = data.Details.Values.Select(d => d.WastagePercent).Distinct().ToList();
+        _costingTried = costing.Printed(wastagesNow is [var wastageNow] ? wastageNow : null);
         ShowRows();
     }
 
