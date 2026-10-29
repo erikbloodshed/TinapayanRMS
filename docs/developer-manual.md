@@ -1198,6 +1198,7 @@ Coverage comes from Microsoft's MTP coverage extension (see the [command referen
   - **A closed record that's shown seals its `ToString`** (`PrintScope`), or each case reads "Folder { Label = … }".
   - **`BeEquivalentTo` over a closed base type** needs `o => o.ComparingByValue<TBase>()`, since the base has no members to compare.
   - **`[with(comparer), ..]`** for a collection made with a comparer or capacity, and **labeled `break`/`continue`** in place of a flag or `goto` out of nested loops (IDE0410).
+  - **.NET 11's library additions in place of hand-written code**: `Enumerable.FullJoin` for a full outer join by a key that comes once on each side (`ProductVersionRules.Paired`).
 - **Nullable reference types are on everywhere.** Treat their warnings as real.
 - **Everything that touches the database is `async`** and takes a `CancellationToken`. ViewModels pass `CancellationToken.None`.
 - **A rule throws `BusinessRuleException` with a message written for the shop's staff**, because `RunSafelyAsync` shows it exactly as written. That goes for a repository's checks and a screen's own form checks too. A plain `InvalidOperationException` reads as a bug: EF Core and Npgsql throw those for failures.

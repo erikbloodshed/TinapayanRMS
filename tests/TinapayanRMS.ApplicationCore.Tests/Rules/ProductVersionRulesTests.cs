@@ -73,6 +73,23 @@ public class ProductVersionRulesTests
     }
 
     [Fact]
+    public void An_add_in_changed_added_and_removed_are_each_listed()
+    {
+        static ProductVersionContent WithAddIns(params VersionAddIn[] addIns) => Pandesal(
+            new VersionSection(100, "Pandesal Dough", false, Dough, UsageAuthoredField.WeightPerPiece, 60m, [new VersionLine(Flour, 500m, true, null)], addIns));
+
+        var before = WithAddIns(new VersionAddIn(Sugar, 20m));
+        var later = WithAddIns(new VersionAddIn(Salt, 5m), new VersionAddIn(Sugar, 25m));
+
+        ProductVersionRules.Changes(before, later).Should().Equal(
+            "Dough: add-in Salt added, 5 g",
+            "Dough: add-in Sugar 20 g → 25 g");
+        ProductVersionRules.Changes(later, before).Should().Equal(
+            "Dough: add-in Sugar 25 g → 20 g",
+            "Dough: add-in Salt removed");
+    }
+
+    [Fact]
     public void The_piece_size_is_listed()
     {
         var later = Base with
@@ -126,6 +143,15 @@ public class ProductVersionRulesTests
             "Current Price: 5.00 → 6.00",
             "Packaging: Paper Bag 1 pc → 0.02 pack",
             "Markup %: 30 → 35");
+    }
+
+    [Fact]
+    public void A_packaging_line_added_and_removed_are_each_listed()
+    {
+        var unpacked = Base with { PackagingLines = [] };
+
+        ProductVersionRules.Changes(Base, unpacked).Should().Equal("Packaging: Paper Bag removed");
+        ProductVersionRules.Changes(unpacked, Base).Should().Equal("Packaging: Paper Bag added, 1 pc");
     }
 
     [Fact]

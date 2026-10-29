@@ -176,29 +176,32 @@ public static class ProductVersionRules
     private static void AddLineChanges(
         List<string> changes, string title, IReadOnlyList<VersionLine> was, IReadOnlyList<VersionLine> now, MaterialNames names)
     {
-        foreach (var (old, line) in PairBy(was, now, l => l.IngredientId))
+        foreach (var pair in Paired(now, was, l => l.IngredientId))
         {
-            var name = names.Of((line ?? old)!.IngredientId);
-            if (old is null)
+            switch (pair)
             {
-                changes.Add($"{title}: {name} added, {Amount(line!.Grams)} g");
-            }
-            else if (line is null)
-            {
-                changes.Add($"{title}: {name} removed");
-            }
-            else
-            {
-                if (old.Grams != line.Grams)
+                case ({ } added, null):
+                    changes.Add($"{title}: {names.Of(added.IngredientId)} added, {Amount(added.Grams)} g");
+                    break;
+                case (null, { } removed):
+                    changes.Add($"{title}: {names.Of(removed.IngredientId)} removed");
+                    break;
+                case ({ } line, { } old):
                 {
-                    changes.Add($"{title}: {name} {Amount(old.Grams)} g → {Amount(line.Grams)} g");
-                }
+                    var name = names.Of(line.IngredientId);
+                    if (old.Grams != line.Grams)
+                    {
+                        changes.Add($"{title}: {name} {Amount(old.Grams)} g → {Amount(line.Grams)} g");
+                    }
 
-                if (old.IsFormulaBase != line.IsFormulaBase)
-                {
-                    changes.Add(line.IsFormulaBase
-                        ? $"{title}: {name} is now part of the formula's 100% base"
-                        : $"{title}: {name} is no longer part of the formula's 100% base");
+                    if (old.IsFormulaBase != line.IsFormulaBase)
+                    {
+                        changes.Add(line.IsFormulaBase
+                            ? $"{title}: {name} is now part of the formula's 100% base"
+                            : $"{title}: {name} is no longer part of the formula's 100% base");
+                    }
+
+                    break;
                 }
             }
         }
@@ -207,39 +210,38 @@ public static class ProductVersionRules
     private static void AddAddInChanges(
         List<string> changes, string title, IReadOnlyList<VersionAddIn> was, IReadOnlyList<VersionAddIn> now, MaterialNames names)
     {
-        foreach (var (old, addIn) in PairBy(was, now, a => a.IngredientId))
+        foreach (var pair in Paired(now, was, a => a.IngredientId))
         {
-            var name = names.Of((addIn ?? old)!.IngredientId);
-            if (old is null)
+            switch (pair)
             {
-                changes.Add($"{title}: add-in {name} added, {Amount(addIn!.Grams)} g");
-            }
-            else if (addIn is null)
-            {
-                changes.Add($"{title}: add-in {name} removed");
-            }
-            else if (old.Grams != addIn.Grams)
-            {
-                changes.Add($"{title}: add-in {name} {Amount(old.Grams)} g → {Amount(addIn.Grams)} g");
+                case ({ } added, null):
+                    changes.Add($"{title}: add-in {names.Of(added.IngredientId)} added, {Amount(added.Grams)} g");
+                    break;
+                case (null, { } removed):
+                    changes.Add($"{title}: add-in {names.Of(removed.IngredientId)} removed");
+                    break;
+                case ({ } addIn, { } old) when old.Grams != addIn.Grams:
+                    changes.Add($"{title}: add-in {names.Of(addIn.IngredientId)} {Amount(old.Grams)} g → {Amount(addIn.Grams)} g");
+                    break;
             }
         }
     }
 
     private static void AddComponentChanges(List<string> changes, IReadOnlyList<VersionComponent> was, IReadOnlyList<VersionComponent> now)
     {
-        foreach (var (old, component) in PairBy(was, now, c => c.ProductId))
+        foreach (var pair in Paired(now, was, c => c.ProductId))
         {
-            if (old is null)
+            switch (pair)
             {
-                changes.Add($"Products: {component!.ProductName} added, × {component.Quantity}");
-            }
-            else if (component is null)
-            {
-                changes.Add($"Products: {old.ProductName} removed");
-            }
-            else if (old.Quantity != component.Quantity)
-            {
-                changes.Add($"Products: {component.ProductName} × {old.Quantity} → × {component.Quantity}");
+                case ({ } added, null):
+                    changes.Add($"Products: {added.ProductName} added, × {added.Quantity}");
+                    break;
+                case (null, { } removed):
+                    changes.Add($"Products: {removed.ProductName} removed");
+                    break;
+                case ({ } component, { } old) when old.Quantity != component.Quantity:
+                    changes.Add($"Products: {component.ProductName} × {old.Quantity} → × {component.Quantity}");
+                    break;
             }
         }
     }
@@ -259,20 +261,19 @@ public static class ProductVersionRules
                 break;
         }
 
-        foreach (var (old, line) in PairBy(older.PackagingLines, newer.PackagingLines, l => l.MaterialId))
+        foreach (var pair in Paired(newer.PackagingLines, older.PackagingLines, l => l.MaterialId))
         {
-            var name = names.Of((line ?? old)!.MaterialId);
-            if (old is null)
+            switch (pair)
             {
-                changes.Add($"Packaging: {name} added, {names.Quantity(line!)}");
-            }
-            else if (line is null)
-            {
-                changes.Add($"Packaging: {name} removed");
-            }
-            else if (old.QtyPerUnit != line.QtyPerUnit || old.UnitId != line.UnitId)
-            {
-                changes.Add($"Packaging: {name} {names.Quantity(old)} → {names.Quantity(line)}");
+                case ({ } added, null):
+                    changes.Add($"Packaging: {names.Of(added.MaterialId)} added, {names.Quantity(added)}");
+                    break;
+                case (null, { } removed):
+                    changes.Add($"Packaging: {names.Of(removed.MaterialId)} removed");
+                    break;
+                case ({ } line, { } old) when old.QtyPerUnit != line.QtyPerUnit || old.UnitId != line.UnitId:
+                    changes.Add($"Packaging: {names.Of(line.MaterialId)} {names.Quantity(old)} → {names.Quantity(line)}");
+                    break;
             }
         }
     }
@@ -297,28 +298,14 @@ public static class ProductVersionRules
     }
 
     /// <summary>
-    /// <paramref name="was"/> and <paramref name="now"/> paired by key, in <paramref name="now"/>'s order with what went
-    /// after: a key on both sides is one pair, the nth of a repeated key with the nth, and the rest stand alone.
+    /// <paramref name="now"/> and <paramref name="was"/> paired by key (.NET 11's full outer join), in
+    /// <paramref name="now"/>'s order with what went after: a key on both sides is one pair, and the rest stand alone. A
+    /// key comes at most once on each side, since a section's lines and add-ins, a composite's products and a product's
+    /// packaging lines each have a unique index on it.
     /// </summary>
-    private static List<(T? Old, T? New)> PairBy<T>(IReadOnlyList<T> was, IReadOnlyList<T> now, Func<T, int> key)
-        where T : class
-    {
-        List<T> unpaired = [.. was];
-        List<(T? Old, T? New)> pairs = [];
-        foreach (var item in now)
-        {
-            var match = unpaired.FirstOrDefault(o => key(o) == key(item));
-            if (match is not null)
-            {
-                unpaired.Remove(match);
-            }
-
-            pairs.Add((match, item));
-        }
-
-        pairs.AddRange(unpaired.Select(o => ((T?)o, (T?)null)));
-        return pairs;
-    }
+    private static IEnumerable<(T? Now, T? Was)> Paired<T>(IReadOnlyList<T> now, IReadOnlyList<T> was, Func<T, int> key)
+        where T : class =>
+        now.FullJoin(was, key, key);
 
     private static string Amount(decimal value) => value.ToString("#,0.####", CultureInfo.CurrentCulture);
 
