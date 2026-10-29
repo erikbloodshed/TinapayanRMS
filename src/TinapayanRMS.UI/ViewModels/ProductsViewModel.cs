@@ -545,6 +545,89 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         private set => this.RaiseAndSetIfChanged(ref _scalingPiecesText, value);
     }
 
+    private IReadOnlyList<RawMaterial> _scalingIngredients = [];
+    /// <summary>
+    /// The ingredients the recipe takes, wherever they are in it (RecipeScaler.IngredientsOf): what the Scaling tab's "from
+    /// what you have" picker offers (2026-10-29).
+    /// </summary>
+    public IReadOnlyList<RawMaterial> ScalingIngredients
+    {
+        get => _scalingIngredients;
+        private set => this.RaiseAndSetIfChanged(ref _scalingIngredients, value);
+    }
+
+    private RawMaterial? _scalingHaveIngredient;
+    /// <summary>The ingredient there's a limited amount of, which the units it's enough for are worked out from. Not saved.</summary>
+    public RawMaterial? ScalingHaveIngredient
+    {
+        get => _scalingHaveIngredient;
+        set
+        {
+            if (ReferenceEquals(_scalingHaveIngredient, value))
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _scalingHaveIngredient, value);
+            var previous = ScalingHaveUnit;
+            ScalingHaveUnits = IngredientAmountUnit.For(value);
+            ScalingHaveUnit = ScalingHaveUnits.FirstOrDefault(u => u.Name == previous?.Name) ?? ScalingHaveUnits[0];
+        }
+    }
+
+    private IReadOnlyList<IngredientAmountUnit> _scalingHaveUnits = IngredientAmountUnit.For(null);
+    /// <summary>What the amount can be typed in: grams, and the ingredient's own units (a kilo, a bag, a tray).</summary>
+    public IReadOnlyList<IngredientAmountUnit> ScalingHaveUnits
+    {
+        get => _scalingHaveUnits;
+        private set => this.RaiseAndSetIfChanged(ref _scalingHaveUnits, value);
+    }
+
+    private IngredientAmountUnit? _scalingHaveUnit = IngredientAmountUnit.Gram;
+    public IngredientAmountUnit? ScalingHaveUnit
+    {
+        get => _scalingHaveUnit;
+        set => this.RaiseAndSetIfChanged(ref _scalingHaveUnit, value);
+    }
+
+    private decimal? _scalingHaveAmount;
+    /// <summary>How much of <see cref="ScalingHaveIngredient"/> there is, in <see cref="ScalingHaveUnit"/>.</summary>
+    public decimal? ScalingHaveAmount
+    {
+        get => _scalingHaveAmount;
+        set => this.RaiseAndSetIfChanged(ref _scalingHaveAmount, value);
+    }
+
+    private int _scalingHaveMakes;
+    /// <summary>The most sellable units the amount there is makes (RecipeScaler.UnitsFrom); 0 for none, or nothing asked.</summary>
+    public int ScalingHaveMakes
+    {
+        get => _scalingHaveMakes;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _scalingHaveMakes, value);
+            this.RaisePropertyChanged(nameof(ScaleToHaveLabel));
+            this.RaisePropertyChanged(nameof(HasScalingHaveMakes));
+        }
+    }
+
+    /// <summary>Whether the amount there is makes any: Scale to only shows when it does.</summary>
+    public bool HasScalingHaveMakes => _scalingHaveMakes > 0;
+
+    /// <summary>The button that scales the tab to <see cref="ScalingHaveMakes"/>: "Scale to 12".</summary>
+    public string ScaleToHaveLabel => $"Scale to {ScalingHaveMakes:#,0}";
+
+    private string _scalingHaveText = string.Empty;
+    /// <summary>What the amount there is makes, "Makes 12 (uses 2,400 g of the 2,500 g)", or why it makes none; empty with nothing asked.</summary>
+    public string ScalingHaveText
+    {
+        get => _scalingHaveText;
+        private set => this.RaiseAndSetIfChanged(ref _scalingHaveText, value);
+    }
+
+    /// <summary>Sets the Scaling tab's Sellable Units to what the amount there is makes.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ScaleToHaveCommand { get; }
+
     /// <summary>Every made ingredient's BOM lines, by made ingredient, read with every LoadCommand: what the Scaling tab opens a made ingredient into.</summary>
     private ILookup<int, IngredientBomLine> _bomLines = Array.Empty<IngredientBomLine>().ToLookup(l => l.IngredientId);
 
@@ -922,6 +1005,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         this.WhenAnyValue(x => x.Costing.Costs, x => x.ScalingUnits, x => x.SelectedDetailsTab)
             .Where(_ => SelectedDetailsTab == ScalingTab)
             .Subscribe(_ => RefreshScaling());
+        this.WhenAnyValue(x => x.ScalingHaveIngredient, x => x.ScalingHaveUnit, x => x.ScalingHaveAmount)
+            .Where(_ => SelectedDetailsTab == ScalingTab)
+            .Subscribe(_ => RefreshScaling());
+        ScaleToHaveCommand = ReactiveCommand.Create(
+            () => { ScalingUnits = ScalingHaveMakes; },
+            this.WhenAnyValue(x => x.ScalingHaveMakes).Select(units => units > 0));
 
         _showLinks =this.WhenAnyValue(x => x.SelectedProduct)
             .Select(product => product is not null)
@@ -4483,6 +4572,39 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ScalingPiecesText = EditingQuantityRequired > 1
             ? $"= {RecipeScalingRules.PiecesFor(ScalingUnits, EditingQuantityRequired):#,0} pieces"
             : string.Empty;
+        RefreshScalingFromHave(scaler, recipe);
+    }
+
+    /// <summary>
+    /// The Scaling tab's "from what you have" (2026-10-29): the ingredients the recipe takes, kept picked while it still
+    /// takes it, and how many sellable units the amount typed of it makes.
+    /// </summary>
+    private void RefreshScalingFromHave(RecipeScaler scaler, ScalingRecipe recipe)
+    {
+        var ingredients = scaler.IngredientsOf(recipe, _detailProductId);
+        if (!ingredients.Select(i => i.Id).SequenceEqual(ScalingIngredients.Select(i => i.Id)))
+        {
+            ScalingIngredients = ingredients;
+        }
+
+        if (ScalingHaveIngredient is { } picked && ingredients.FirstOrDefault(i => i.Id == picked.Id) is var kept && !ReferenceEquals(kept, picked))
+        {
+            ScalingHaveIngredient = kept;
+        }
+
+        if (ScalingHaveIngredient is not { } ingredient || ScalingHaveAmount is not > 0m || ScalingHaveUnit is not { } unit)
+        {
+            ScalingHaveMakes = 0;
+            ScalingHaveText = string.Empty;
+            return;
+        }
+
+        var grams = ScalingHaveAmount.Value * unit.Grams;
+        var makes = scaler.UnitsFrom(recipe, _detailProductId, ingredient.Id, grams);
+        ScalingHaveMakes = makes;
+        ScalingHaveText = makes > 0
+            ? $"Makes {RecipeScaler.UnitsText(makes, EditingQuantityRequired)}, using {RecipeScaler.GramsText(scaler.GramsOf(recipe, makes, _detailProductId, ingredient.Id))} of the {RecipeScaler.GramsText(grams)}."
+            : $"Not enough for one: one takes {RecipeScaler.GramsText(scaler.GramsOf(recipe, 1m, _detailProductId, ingredient.Id))}.";
     }
 
     /// <summary>A product a composite holds, as saved and priced at the screen's cost basis; null while it hasn't been read.</summary>

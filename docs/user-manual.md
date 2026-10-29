@@ -748,6 +748,8 @@ The table below it lists, with each row's **Amount** and **Cost**:
 
 **Total Cost**, at the top right, adds up the table. Because each section is made in whole batches, it includes the extra pieces, so it can be more than the Costing tab's figures times the number of units. Costs follow **Unbuffered**, and the table follows changes to the recipe, packaging and Quantity Required as you make them, before you save.
 
+**From What You Have** works the other way round: how many you can make from what there is of one ingredient. Pick the ingredient (any in the recipe, including what its made ingredients are made of), type how much there is, and pick its unit: grams, or one of the ingredient's own units, such as a kilogram or a bag. The tab says how many sellable units that makes and how much of it they use, such as *Makes 168 pcs, using 5,000 g of the 5,000 g*, or that there isn't enough for one. Because sections are made in whole batches, it's the most units whose batches the amount covers. Press **Scale to 168** to put that number in Sellable Units. Nothing here is saved.
+
 Press **Print** while this tab is showing to print the scaled recipe instead of the recipe and costing. See [Printing](#8-printing-recipes-and-costings).
 
 ### Clone tab

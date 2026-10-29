@@ -1,4 +1,25 @@
+using TinapayanRMS.Domain.Entities;
+
 namespace TinapayanRMS.UI.ViewModels;
+
+/// <summary>A unit an amount of an ingredient is typed in on the Scaling tab: "g", or one of the ingredient's own, "kg" (1,000 g), "bag" (25,000 g).</summary>
+public sealed record IngredientAmountUnit(string Name, decimal Grams)
+{
+    /// <summary>The gram, which every ingredient is measured in.</summary>
+    public static readonly IngredientAmountUnit Gram = new("g", 1m);
+
+    /// <summary>Grams, then <paramref name="ingredient"/>'s alternative units by size; only grams for none.</summary>
+    public static IReadOnlyList<IngredientAmountUnit> For(RawMaterial? ingredient) =>
+    [
+        Gram,
+        .. (ingredient?.Units ?? [])
+            .Where(u => u.UnitOfMeasure is not null && u.BaseUnitsPerUnit > 0m)
+            .OrderBy(u => u.BaseUnitsPerUnit)
+            .Select(u => new IngredientAmountUnit(u.UnitOfMeasure!.Abbreviation is { Length: > 0 } abbreviation ? abbreviation : u.UnitOfMeasure.Name, u.BaseUnitsPerUnit)),
+    ];
+
+    public override string ToString() => Name;
+}
 
 /// <summary>
 /// One row of the Products screen's Scaling tab (an SfTreeGrid): a section, a product a composite holds, or the packaging,

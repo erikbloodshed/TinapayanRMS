@@ -155,6 +155,121 @@ public sealed class RecipeScaler(
         return ScalingRow.Line(line.PackagingMaterial!.Name, string.Empty, $"{quantity:#,0.##} {unit}".TrimEnd(), line.CostPerUnit * units);
     }
 
+    /// <summary>
+    /// The ingredients <paramref name="recipe"/> takes, each once, in the order the tree lists them: its lines and add-ins,
+    /// what its made ingredients are made of, and those of the products a composite holds. What the Scaling tab's "from what
+    /// you have" picker offers.
+    /// </summary>
+    public IReadOnlyList<RawMaterial> IngredientsOf(ScalingRecipe recipe, int? productId) =>
+        [.. Amounts(recipe, 1m, productId is { } id ? [id] : []).Select(a => a.Ingredient).DistinctBy(i => i.Id)];
+
+    /// <summary>
+    /// The grams of <paramref name="ingredientId"/> that <paramref name="units"/> sellable units take, wherever it is in the
+    /// recipe, as the tree adds it up: each section in whole batches, a made ingredient's BOM opened exactly.
+    /// </summary>
+    public decimal GramsOf(ScalingRecipe recipe, decimal units, int? productId, int ingredientId) =>
+        Amounts(recipe, units, productId is { } id ? [id] : []).Where(a => a.Ingredient.Id == ingredientId).Sum(a => a.Grams);
+
+    /// <summary>
+    /// The most whole sellable units that <paramref name="grams"/> of <paramref name="ingredientId"/> are enough for (2026-10-29,
+    /// the Scaling tab's "from what you have"): 0 when not even one is, or the recipe doesn't take it. More units never take
+    /// less, since a section only ever needs more batches, so the most is found by doubling, then halving back.
+    /// </summary>
+    public int UnitsFrom(ScalingRecipe recipe, int? productId, int ingredientId, decimal grams)
+    {
+        bool Fits(int units)
+        {
+            var needed = GramsOf(recipe, units, productId, ingredientId);
+            return needed > 0m && needed <= grams;
+        }
+
+        if (!Fits(1))
+        {
+            return 0;
+        }
+
+        const int Most = 1_000_000;
+        var low = 1;
+        var high = 2;
+        while (high < Most && Fits(high))
+        {
+            low = high;
+            high *= 2;
+        }
+
+        high = Math.Min(high, Most);
+        while (high - low > 1)
+        {
+            var middle = low + ((high - low) / 2);
+            if (Fits(middle))
+            {
+                low = middle;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return Fits(high) ? high : low;
+    }
+
+    /// <summary>Every ingredient the recipe takes for <paramref name="units"/>, as Scale walks it, with its grams there.</summary>
+    private IEnumerable<(RawMaterial Ingredient, decimal Grams)> Amounts(ScalingRecipe recipe, decimal units, ImmutableHashSet<int> holders)
+    {
+        foreach (var (product, quantity) in recipe.Components)
+        {
+            if (!holders.Contains(product.Id) && findProduct(product.Id) is { } saved)
+            {
+                foreach (var amount in Amounts(ScalingRecipe.From(saved), units * quantity, holders.Add(product.Id)))
+                {
+                    yield return amount;
+                }
+            }
+        }
+
+        var pieces = RecipeScalingRules.PiecesFor(units, recipe.QuantityRequired);
+        foreach (var section in recipe.Sections)
+        {
+            var batches = RecipeScalingRules.BatchesFor(pieces, section.AuthoredField, section.AuthoredValue, section.TotalWeight);
+            if (batches == 0)
+            {
+                continue;
+            }
+
+            foreach (var (ingredient, grams) in section.Lines.Select(l => (l.Ingredient, l.Grams)).Concat(section.AddIns.Select(a => (a.Ingredient, a.Grams))))
+            {
+                foreach (var amount in IngredientAmounts(ingredient, grams * batches, []))
+                {
+                    yield return amount;
+                }
+            }
+        }
+    }
+
+    /// <summary><paramref name="grams"/> of an ingredient, then, for a made one, what its BOM takes to make them, as ScaleIngredient opens it.</summary>
+    private IEnumerable<(RawMaterial Ingredient, decimal Grams)> IngredientAmounts(RawMaterial ingredient, decimal grams, ImmutableHashSet<int> path)
+    {
+        yield return (ingredient, grams);
+        var bom = boms[ingredient.Id].ToList();
+        if (ingredient.Source != RawMaterialSource.Made || bom.Count == 0 || path.Contains(ingredient.Id))
+        {
+            yield break;
+        }
+
+        var scaled = RecipeScalingRules.ScaleBom(grams, [.. bom.Select(l => l.Grams)], ingredient.WeightLossPercent ?? 0m);
+        foreach (var (line, componentGrams) in bom.Zip(scaled))
+        {
+            if (ingredientsById.TryGetValue(line.ComponentIngredientId, out var component))
+            {
+                foreach (var amount in IngredientAmounts(component, componentGrams, path.Add(ingredient.Id)))
+                {
+                    yield return amount;
+                }
+            }
+        }
+    }
+
     /// <summary>A row with others under it, costing what they cost.</summary>
     private static ScalingRow Group(string name, string detail, string amountText, IReadOnlyList<ScalingRow> children) =>
         new(name, detail, amountText, children.Sum(c => c.Cost), true, children);
