@@ -10,8 +10,7 @@ This guide covers two essential aspects of the WPF TextInputLayout control: addi
 2. [Leading View](#leading-view)
 3. [Trailing View](#trailing-view)
 4. [Supported Input Views](#supported-input-views)
-5. [Dropdown Customization](#dropdown-customization)
-6. [Best Practices](#best-practices)
+5. [Best Practices](#best-practices)
 
 ---
 
@@ -405,7 +404,16 @@ SfTextInputLayout (Container)
         │                ├─ PasswordBox
         │                ├─ ComboBox
         │                ├─ ComboBoxAdv
-        │                └─ SfTextBoxExt (Autocomplete)
+        │                ├─ SfTextBoxExt (Autocomplete)
+        │                ├─ DatePicker
+        │                ├─ SfDatePicker
+        │                ├─ SfTimePicker
+        │                ├─ UpDown
+        │                ├─ SfMaskedEdit
+        │                ├─ IntegerTextBox
+        │                ├─ DoubleTextBox
+        │                ├─ PercentTextBox
+        │                └─ CurrencyTextBox
         ├─ Trailing View (optional)
         └─ Assistive Labels (HelperText/ErrorText)
 ```
@@ -652,91 +660,347 @@ this.Content = sfTextInputLayout;
 └────────────────────────────────┘
 ```
 
----
+### 6. DatePicker
 
-## Dropdown Customization
+**Purpose:** Standard WPF date selection control
 
-For ComboBox and ComboBoxAdv controls, you can customize the dropdown popup's border using the `DropDownBorder` property.
-
-### Basic Dropdown Border
+**When to use:**
+- Date of birth fields
+- Appointment scheduling
+- Any date entry requirement
 
 **XAML Example:**
 ```xaml
 <inputLayout:SfTextInputLayout 
-    Hint="Country" 
+    Hint="Date" 
+    HelperText="Select your date of birth" 
     VerticalAlignment="Center" 
     HorizontalAlignment="Center">
-    <inputLayout:SfTextInputLayout.DropDownBorder>
-        <Border BorderBrush="Blue" 
-                BorderThickness="2" 
-                CornerRadius="5"/>
-    </inputLayout:SfTextInputLayout.DropDownBorder>
-    <ComboBox x:Name="comboBox" 
-              Width="150" 
-              Height="10" 
-              ItemsSource="{Binding Countries}"/>
+    <DatePicker x:Name="datePicker" Width="150"/>
 </inputLayout:SfTextInputLayout>
 ```
 
 **C# Example:**
 ```csharp
-SfTextInputLayout sfTextInputLayout = new SfTextInputLayout() { Hint = "Country" };
+SfTextInputLayout sfTextInputLayout = new SfTextInputLayout() { Hint = "Date" };
+sfTextInputLayout.HelperText = "Select your date of birth";
 sfTextInputLayout.HorizontalAlignment = HorizontalAlignment.Center;
 sfTextInputLayout.VerticalAlignment = VerticalAlignment.Center;
 
-Border dropDownBorder = new Border();
-dropDownBorder.BorderBrush = Brushes.Blue;
-dropDownBorder.BorderThickness = new Thickness(2);
-dropDownBorder.CornerRadius = new CornerRadius(5);
-sfTextInputLayout.DropDownBorder = dropDownBorder;
+DatePicker datePicker = new DatePicker();
+datePicker.Width = 150;
 
-ComboBox comboBox = new ComboBox();
-comboBox.Width = 150;
-comboBox.Height = 10;
-comboBox.ItemsSource = viewModel.Countries;
-
-sfTextInputLayout.InputView = comboBox;
+sfTextInputLayout.InputView = datePicker;
 this.Content = sfTextInputLayout;
 ```
 
-> **Note:** The `DropDownBorder` property is applicable only when using ComboBox or ComboBoxAdv as the input view.
+### 7. SfDatePicker
 
-### Advanced Dropdown Styling
+**Purpose:** Syncfusion date selection control with enhanced features
 
-**Material Design Style:**
+**When to use:**
+- Need for Syncfusion's advanced date picker
+- Custom date formats
+- Enhanced styling and templates
+
+**XAML Example:**
 ```xaml
-<inputLayout:SfTextInputLayout.DropDownBorder>
-    <Border BorderBrush="#2196F3" 
-            BorderThickness="0,2,0,0" 
-            Background="White"
-            CornerRadius="0,0,4,4">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="8" 
-                            ShadowDepth="2" 
-                            Opacity="0.3"/>
-        </Border.Effect>
-    </Border>
-</inputLayout:SfTextInputLayout.DropDownBorder>
+<inputLayout:SfTextInputLayout 
+    Hint="Date" 
+    HelperText="Select your date of birth" 
+    VerticalAlignment="Center" 
+    HorizontalAlignment="Center">
+    <syncfusion:SfDatePicker Width="150"/>
+</inputLayout:SfTextInputLayout>
 ```
 
-**Elevated Card Style:**
+**C# Example:**
 ```csharp
-var dropDownBorder = new Border
-{
-    BorderBrush = Brushes.LightGray,
-    BorderThickness = new Thickness(1),
-    CornerRadius = new CornerRadius(8),
-    Background = Brushes.White,
-    Effect = new DropShadowEffect
-    {
-        BlurRadius = 16,
-        ShadowDepth = 4,
-        Opacity = 0.2,
-        Color = Colors.Black
-    }
-};
-sfTextInputLayout.DropDownBorder = dropDownBorder;
+SfTextInputLayout sfTextInputLayout = new SfTextInputLayout() { Hint = "Date" };
+sfTextInputLayout.HelperText = "Select your date of birth";
+sfTextInputLayout.HorizontalAlignment = HorizontalAlignment.Center;
+sfTextInputLayout.VerticalAlignment = VerticalAlignment.Center;
+
+SfDatePicker sfDatePicker = new SfDatePicker();
+sfDatePicker.Width = 150;
+
+sfTextInputLayout.InputView = sfDatePicker;
+this.Content = sfTextInputLayout;
 ```
+
+### 8. SfTimePicker
+
+**Purpose:** Syncfusion time selection control
+
+**When to use:**
+- Appointment time selection
+- Scheduling interfaces
+- Time-based forms
+
+**XAML Example:**
+```xaml
+<inputLayout:SfTextInputLayout 
+    Hint="Time" 
+    HelperText="Select appointment time" 
+    VerticalAlignment="Center" 
+    HorizontalAlignment="Center">
+    <syncfusion:SfTimePicker Width="150"/>
+</inputLayout:SfTextInputLayout>
+```
+
+**C# Example:**
+```csharp
+SfTextInputLayout sfTextInputLayout = new SfTextInputLayout() { Hint = "Time" };
+sfTextInputLayout.HelperText = "Select appointment time";
+sfTextInputLayout.HorizontalAlignment = HorizontalAlignment.Center;
+sfTextInputLayout.VerticalAlignment = VerticalAlignment.Center;
+
+SfTimePicker sfTimePicker = new SfTimePicker();
+sfTimePicker.Width = 150;
+
+sfTextInputLayout.InputView = sfTimePicker;
+this.Content = sfTextInputLayout;
+```
+
+### 9. UpDown
+
+**Purpose:** Numeric input with increment/decrement buttons
+
+**When to use:**
+- Quantity selection
+- Numeric value entry
+- Increment/decrement scenarios
+
+**XAML Example:**
+```xaml
+<inputLayout:SfTextInputLayout 
+    Hint="Quantity" 
+    HelperText="Enter quantity" 
+    VerticalAlignment="Center" 
+    HorizontalAlignment="Center">
+    <syncfusion:UpDown Width="150" Height="25" MinValue="0" MaxValue="100" Value="1"/>
+</inputLayout:SfTextInputLayout>
+```
+
+**C# Example:**
+```csharp
+SfTextInputLayout sfTextInputLayout = new SfTextInputLayout() { Hint = "Quantity" };
+sfTextInputLayout.HelperText = "Enter quantity";
+sfTextInputLayout.HorizontalAlignment = HorizontalAlignment.Center;
+sfTextInputLayout.VerticalAlignment = VerticalAlignment.Center;
+
+UpDown upDown = new UpDown();
+upDown.Width = 150;
+upDown.Height = 25;
+upDown.MinValue = 0;
+upDown.MaxValue = 100;
+upDown.Value = 1;
+
+sfTextInputLayout.InputView = upDown;
+this.Content = sfTextInputLayout;
+```
+
+### 10. SfMaskedEdit
+
+**Purpose:** Masked text input for formatted entries
+
+**When to use:**
+- Phone numbers
+- Social security numbers
+- Any formatted text input
+
+**XAML Example:**
+```xaml
+<inputLayout:SfTextInputLayout 
+    Hint="Phone Number" 
+    HelperText="Enter your phone number" 
+    VerticalAlignment="Center" 
+    HorizontalAlignment="Center">
+    <syncfusion:SfMaskedEdit x:Name="sfMaskedEdit" Width="150" Height="25" 
+                             MaskType="Simple" Mask="(###) ###-####"/>
+</inputLayout:SfTextInputLayout>
+```
+
+**C# Example:**
+```csharp
+SfTextInputLayout sfTextInputLayout = new SfTextInputLayout() { Hint = "Phone Number" };
+sfTextInputLayout.HelperText = "Enter your phone number";
+sfTextInputLayout.HorizontalAlignment = HorizontalAlignment.Center;
+sfTextInputLayout.VerticalAlignment = VerticalAlignment.Center;
+
+SfMaskedEdit sfMaskedEdit = new SfMaskedEdit();
+sfMaskedEdit.Width = 150;
+sfMaskedEdit.Height = 25;
+sfMaskedEdit.MaskType = MaskType.Simple;
+sfMaskedEdit.Mask = "(###) ###-####";
+
+sfTextInputLayout.InputView = sfMaskedEdit;
+this.Content = sfTextInputLayout;
+```
+
+### 11. IntegerTextBox
+
+**Purpose:** Numeric input restricted to integer values
+
+**When to use:**
+- Age fields
+- Count or quantity input
+- Whole number values
+
+**XAML Example:**
+```xaml
+<inputLayout:SfTextInputLayout 
+    Hint="Age" 
+    HelperText="Enter your age" 
+    VerticalAlignment="Center" 
+    HorizontalAlignment="Center">
+    <syncfusion:IntegerTextBox x:Name="integerTextBox" Width="150" Height="25" 
+                                MinValue="0" MaxValue="120" Value="25"/>
+</inputLayout:SfTextInputLayout>
+```
+
+**C# Example:**
+```csharp
+SfTextInputLayout sfTextInputLayout = new SfTextInputLayout() { Hint = "Age" };
+sfTextInputLayout.HelperText = "Enter your age";
+sfTextInputLayout.HorizontalAlignment = HorizontalAlignment.Center;
+sfTextInputLayout.VerticalAlignment = VerticalAlignment.Center;
+
+IntegerTextBox integerTextBox = new IntegerTextBox();
+integerTextBox.Width = 150;
+integerTextBox.Height = 25;
+integerTextBox.MinValue = 0;
+integerTextBox.MaxValue = 120;
+integerTextBox.Value = 25;
+
+sfTextInputLayout.InputView = integerTextBox;
+this.Content = sfTextInputLayout;
+```
+
+### 12. DoubleTextBox
+
+**Purpose:** Numeric input for double/decimal values
+
+**When to use:**
+- Price fields
+- Measurement values
+- Decimal numeric input
+
+**XAML Example:**
+```xaml
+<inputLayout:SfTextInputLayout 
+    Hint="Price" 
+    HelperText="Enter the price" 
+    VerticalAlignment="Center" 
+    HorizontalAlignment="Center">
+    <syncfusion:DoubleTextBox x:Name="doubleTextBox" Width="150" Height="25" 
+                              MinValue="0" MaxValue="10000" Value="99.99"/>
+</inputLayout:SfTextInputLayout>
+```
+
+**C# Example:**
+```csharp
+SfTextInputLayout sfTextInputLayout = new SfTextInputLayout() { Hint = "Price" };
+sfTextInputLayout.HelperText = "Enter the price";
+sfTextInputLayout.HorizontalAlignment = HorizontalAlignment.Center;
+sfTextInputLayout.VerticalAlignment = VerticalAlignment.Center;
+
+DoubleTextBox doubleTextBox = new DoubleTextBox();
+doubleTextBox.Width = 150;
+doubleTextBox.Height = 25;
+doubleTextBox.MinValue = 0;
+doubleTextBox.MaxValue = 10000;
+doubleTextBox.Value = 99.99;
+
+sfTextInputLayout.InputView = doubleTextBox;
+this.Content = sfTextInputLayout;
+```
+
+### 13. PercentTextBox
+
+**Purpose:** Numeric input formatted as percentage
+
+**When to use:**
+- Discount fields
+- Tax rates
+- Percentage values
+
+**XAML Example:**
+```xaml
+<inputLayout:SfTextInputLayout 
+    Hint="Discount" 
+    HelperText="Enter the discount percentage" 
+    VerticalAlignment="Center" 
+    HorizontalAlignment="Center">
+    <syncfusion:PercentTextBox x:Name="percentTextBox" Width="150" Height="25" 
+                                MinValue="0" MaxValue="100" PercentValue="10"/>
+</inputLayout:SfTextInputLayout>
+```
+
+**C# Example:**
+```csharp
+SfTextInputLayout sfTextInputLayout = new SfTextInputLayout() { Hint = "Discount" };
+sfTextInputLayout.HelperText = "Enter the discount percentage";
+sfTextInputLayout.HorizontalAlignment = HorizontalAlignment.Center;
+sfTextInputLayout.VerticalAlignment = VerticalAlignment.Center;
+
+PercentTextBox percentTextBox = new PercentTextBox();
+percentTextBox.Width = 150;
+percentTextBox.Height = 25;
+percentTextBox.MinValue = 0;
+percentTextBox.MaxValue = 100;
+percentTextBox.PercentValue = 10;
+
+sfTextInputLayout.InputView = percentTextBox;
+this.Content = sfTextInputLayout;
+```
+
+### 14. CurrencyTextBox
+
+**Purpose:** Numeric input formatted as currency
+
+**When to use:**
+- Price or amount fields
+- Financial forms
+- Money values
+
+**XAML Example:**
+```xaml
+<inputLayout:SfTextInputLayout 
+    Hint="Amount" 
+    HelperText="Enter the amount" 
+    VerticalAlignment="Center" 
+    HorizontalAlignment="Center">
+    <syncfusion:CurrencyTextBox x:Name="currencyTextBox" Width="150" Height="25" 
+                                MinValue="0" MaxValue="100000" Value="1000"/>
+</inputLayout:SfTextInputLayout>
+```
+
+**C# Example:**
+```csharp
+SfTextInputLayout sfTextInputLayout = new SfTextInputLayout() { Hint = "Amount" };
+sfTextInputLayout.HelperText = "Enter the amount";
+sfTextInputLayout.HorizontalAlignment = HorizontalAlignment.Center;
+sfTextInputLayout.VerticalAlignment = VerticalAlignment.Center;
+
+CurrencyTextBox currencyTextBox = new CurrencyTextBox();
+currencyTextBox.Width = 150;
+currencyTextBox.Height = 25;
+currencyTextBox.MinValue = 0;
+currencyTextBox.MaxValue = 100000;
+currencyTextBox.Value = 1000;
+
+sfTextInputLayout.InputView = currencyTextBox;
+this.Content = sfTextInputLayout;
+```
+
+### Limitations
+
+The following are the limitations when using [DatePicker](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/datepicker), [SfDatePicker](https://help.syncfusion.com/wpf/datepicker/overview) and [SfTimePicker](https://help.syncfusion.com/wpf/timepicker/overview) as the InputView of SfTextInputLayout.
+
+1. The hint is always displayed in the `AlwaysFloat` state and does not move to the inline position based on the control's focus state or the presence of a selected date/time value.
+
+2. When `CharCountVisibility` is enabled, the character count is always displayed as `0`, regardless of the selected date or time value.
 
 ---
 
@@ -784,6 +1048,15 @@ public static UIElement GetInputViewForScenario(InputScenario scenario)
         { 
             AutoCompleteMode = AutoCompleteMode.Suggest 
         },
+        InputScenario.StandardDate => new DatePicker(),
+        InputScenario.AdvancedDate => new SfDatePicker(),
+        InputScenario.Time => new SfTimePicker(),
+        InputScenario.NumericStepper => new UpDown(),
+        InputScenario.MaskedText => new SfMaskedEdit(),
+        InputScenario.Integer => new IntegerTextBox(),
+        InputScenario.Decimal => new DoubleTextBox(),
+        InputScenario.Percentage => new PercentTextBox(),
+        InputScenario.Currency => new CurrencyTextBox(),
         InputScenario.MultiLine => new TextBox 
         { 
             AcceptsReturn = true, 
@@ -991,14 +1264,13 @@ public void UpdateValidationIcon(SfTextInputLayout layout, ValidationState state
 3. **Wrong position choice**: Inside is better for functional icons, Outside for informational ones.
 4. **Accessibility neglect**: Always add `AutomationProperties.Name` for screen readers.
 5. **Performance with ComboBox**: Use ComboBoxAdv for lists with > 100 items.
-6. **DropDownBorder misuse**: Only applicable to ComboBox/ComboBoxAdv, not other input views.
+6. **Date/Time picker limitations**: When using DatePicker, SfDatePicker, or SfTimePicker, the hint is always displayed in the `AlwaysFloat` state, and character count (if enabled) will always show `0`.
 
 ## Summary
 
 The WPF TextInputLayout provides powerful customization through:
 - **Leading and Trailing Views** for contextual icons and actions
 - **Flexible positioning** (Inside/Outside) for optimal layout
-- **Multiple input view types** (TextBox, PasswordBox, ComboBox, ComboBoxAdv, SfTextBoxExt)
-- **Dropdown customization** for branded selection experiences
+- **Multiple input view types** (TextBox, PasswordBox, ComboBox, ComboBoxAdv, SfTextBoxExt, DatePicker, SfDatePicker, SfTimePicker, UpDown, SfMaskedEdit, IntegerTextBox, DoubleTextBox, PercentTextBox, CurrencyTextBox)
 
 By combining these features effectively, you can create intuitive, beautiful input forms that enhance user experience.

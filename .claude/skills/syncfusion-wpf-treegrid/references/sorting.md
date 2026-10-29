@@ -138,6 +138,88 @@ treeGrid.SortColumnsChanged += (s, e) =>
 treeGrid.AllowTriStateSorting = true;
 ```
 
+## Initial Sort Direction
+
+By default, when a column is sorted for the first time by clicking its header, the data is arranged in ascending order. Use `InitialSortDirection` to control the first sort direction at grid or column level.
+
+### Grid-Level Initial Sort Direction
+
+Set the same initial sort direction for all sortable columns:
+
+```xaml
+<syncfusion:SfTreeGrid Name="treeGrid"
+                       AllowSorting="True"
+                       InitialSortDirection="Descending"
+                       AutoExpandMode="RootNodesExpanded"
+                       ChildPropertyName="Children"
+                       ItemsSource="{Binding EmployeeDetails}">
+</syncfusion:SfTreeGrid>
+```
+
+```csharp
+treeGrid.InitialSortDirection = ListSortDirection.Descending;
+```
+
+When set to `Descending`, the first click on any column header sorts in descending order.
+
+### Column-Level Initial Sort Direction
+
+Define the initial sort direction for specific columns:
+
+```xaml
+<syncfusion:SfTreeGrid Name="treeGrid"
+                       AllowSorting="True"
+                       AutoGenerateColumns="False"
+                       AutoExpandMode="RootNodesExpanded"
+                       ChildPropertyName="Children"
+                       ItemsSource="{Binding EmployeeDetails}">
+    <syncfusion:SfTreeGrid.Columns>
+        <syncfusion:TreeGridTextColumn MappingName="ID" InitialSortDirection="Descending" />
+        <syncfusion:TreeGridTextColumn MappingName="FirstName" HeaderText="First Name" InitialSortDirection="Ascending" />
+        <syncfusion:TreeGridTextColumn MappingName="LastName" HeaderText="Last Name" />
+    </syncfusion:SfTreeGrid.Columns>
+</syncfusion:SfTreeGrid>
+```
+
+```csharp
+treeGrid.Columns["ID"].InitialSortDirection = ListSortDirection.Descending;
+treeGrid.Columns["FirstName"].InitialSortDirection = ListSortDirection.Ascending;
+treeGrid.Columns["LastName"].InitialSortDirection = ListSortDirection.Ascending; // Uses grid default
+```
+
+In this example:
+- `ID` column: sorts descending on first click
+- `FirstName` column: sorts ascending on first click
+- `LastName` column: uses the grid-level default
+
+**Priority:** Column-level `InitialSortDirection` takes higher priority than grid-level setting.
+
+### Initial Sorting Sequence with Tri-State Sorting
+
+When `AllowTriStateSorting` is enabled, the sorting sequence follows the `InitialSortDirection`:
+
+**If InitialSortDirection is `Descending`:**
+1. Descending (first click)
+2. Ascending (second click)
+3. Clear sorting (third click)
+
+**If InitialSortDirection is `Ascending` (default):**
+1. Ascending (first click)
+2. Descending (second click)
+3. Clear sorting (third click)
+
+Example with tri-state sorting:
+
+```csharp
+treeGrid.AllowSorting = true;
+treeGrid.AllowTriStateSorting = true;
+treeGrid.InitialSortDirection = ListSortDirection.Descending;
+
+// Now clicking a column header cycles: Descending -> Ascending -> Unsorted
+```
+
+**Important:** `InitialSortDirection` affects only the first sort action when clicking the header. It does not automatically sort the column when the control loads.
+
 ## Best Practices
 
 ### 1. Performance Optimization

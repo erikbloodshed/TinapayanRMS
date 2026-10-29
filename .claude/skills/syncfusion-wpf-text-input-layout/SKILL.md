@@ -33,7 +33,7 @@ The **SfTextInputLayout** control enhances standard WPF input controls by wrappi
 - **Container Types**: Outlined (default), Filled, and None styles
 - **Assistive Labels**: Helper text, error messages, and character counters
 - **Custom Icons**: Leading and trailing views with inside/outside positioning
-- **Multiple Input Views**: TextBox, PasswordBox, ComboBox, ComboBoxAdv, SfTextBoxExt
+- **Multiple Input Views**: TextBox, PasswordBox, ComboBox, ComboBoxAdv, SfTextBoxExt, DatePicker, SfDatePicker, SfTimePicker, UpDown, SfMaskedEdit, IntegerTextBox, DoubleTextBox, PercentTextBox, CurrencyTextBox
 - **State-Based Styling**: Different colors for focused, unfocused, and error states
 - **RTL Support**: Right-to-left text flow for internationalization
 - **Extensive Customization**: Border thickness, corner radius, padding, and more
@@ -94,7 +94,7 @@ The **SfTextInputLayout** control enhances standard WPF input controls by wrappi
 - LeadingView and LeadingViewPosition configuration
 - TrailingView and TrailingViewPosition configuration
 - Icon implementation with font icons
-- Supported input views: TextBox, PasswordBox, ComboBox
+- Supported input views: TextBox, PasswordBox, ComboBox, ComboBoxAdv, SfTextBoxExt, DatePicker, SfDatePicker, SfTimePicker, UpDown, SfMaskedEdit, IntegerTextBox, DoubleTextBox, PercentTextBox, CurrencyTextBox
 - ComboBoxAdv integration
 - SfTextBoxExt (Autocomplete) support
 - DropDownBorder customization
@@ -330,6 +330,11 @@ Create profile edit forms with validation, character counters for bio fields, an
 - **PasswordBox**: For password inputs
 - **ComboBox/ComboBoxAdv**: For dropdown selections
 - **SfTextBoxExt**: For autocomplete functionality
+- **DatePicker/SfDatePicker**: For date selection
+- **SfTimePicker**: For time selection
+- **UpDown**: For numeric stepper input
+- **SfMaskedEdit**: For masked text input
+- **IntegerTextBox/DoubleTextBox/PercentTextBox/CurrencyTextBox**: For numeric inputs
 
 ## Notes
 

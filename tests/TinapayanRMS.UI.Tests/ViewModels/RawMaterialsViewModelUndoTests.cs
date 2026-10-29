@@ -146,6 +146,8 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         Edit(viewModel, () => viewModel.EditingName = "Renamed again");
         viewModel.History.CanUndo.Should().BeTrue();
 
+        // New over unsaved changes asks about them first: not saving them is how they're left behind.
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         await viewModel.NewCommand.Execute();
         viewModel.History.CanUndo.Should().BeFalse("a new material has no history of its own");
     }
@@ -327,6 +329,71 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
     }
 
     /// <summary>A saved purchased ingredient with one alternative unit (a 25 kg bag), open in the form.</summary>
+    [Fact]
+    public async Task Re_apply_Target_types_the_buffer_last_typed_again_once_a_price_has_worn_it_down()
+    {
+        var (viewModel, _) = await OpenPurchasedIngredientAsync();
+
+        // A 25 kg bag at 1,250, 0.05 a gram, the 10% buffer on top: 0.055. Then it rises to 1,300, 0.052, and the buffer wears to 5.77%.
+        var brand = viewModel.NewBrandPriceRow();
+        brand.UnitKey = viewModel.UnitRows[0].UnitOfMeasureId!.Value;
+        brand.Price = 1250m;
+        viewModel.BrandPriceRows.Add(brand);
+        viewModel.TypedCostBufferPercent = 10m;
+        viewModel.EditingBufferedCost.Should().Be(0.055m);
+        viewModel.IsBufferOffTarget.Should().BeFalse();
+
+        brand.Price = 1300m;
+        viewModel.IsBufferOffTarget.Should().BeTrue();
+        viewModel.TargetBufferText.Should().Be("Target 10%");
+
+        await viewModel.ReapplyTargetBufferCommand.Execute();
+
+        viewModel.EditingCostBufferPercent.Should().Be(10m);
+        viewModel.EditingBufferedCost.Should().Be(0.0572m);
+        viewModel.IsBufferOffTarget.Should().BeFalse();
+        viewModel.TryUndo().Should().BeTrue("it's one step to take back");
+        viewModel.EditingBufferedCost.Should().Be(0.055m);
+    }
+
+    [Fact]
+    public async Task Cost_From_costs_the_material_at_the_brand_picked_and_undoing_it_puts_the_buffer_box_back()
+    {
+        var (viewModel, _) = await OpenPurchasedIngredientAsync();
+
+        // Kingbake at 1,300 a 25 kg bag (0.052/g) and Gold at 1,100 (0.044/g); 10% on the dearest is 0.0572.
+        Edit(viewModel, () =>
+        {
+            foreach (var (brand, price) in new[] { ("Kingbake", 1300m), ("Gold", 1100m) })
+            {
+                var row = viewModel.NewBrandPriceRow();
+                row.Brand = brand;
+                row.UnitKey = viewModel.UnitRows[0].UnitOfMeasureId!.Value;
+                row.Price = price;
+                viewModel.BrandPriceRows.Add(row);
+            }
+
+            viewModel.TypedCostBufferPercent = 10m;
+        });
+        viewModel.CostFromOptions.Select(o => o.Label).Should().Equal("Dearest brand", "Kingbake", "Gold");
+        viewModel.DearestPurchaseCost.Should().Be(0.052m);
+
+        Edit(viewModel, () => viewModel.CostFrom = viewModel.CostFromOptions.Single(o => o.Brand == "Gold"));
+
+        viewModel.EditingPreferredBrand.Should().Be("Gold");
+        viewModel.DearestPurchaseCost.Should().Be(0.044m, "Gold's price is what Save costs it at");
+        viewModel.EditingCostBufferPercent.Should().Be(30m, "the fixed 0.0572 is 30% over Gold's 0.044");
+        viewModel.PurchaseBufferedCostText.Should().Contain("over Gold's");
+
+        List<string?> raised = [];
+        viewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        viewModel.TryUndo().Should().BeTrue();
+
+        viewModel.EditingPreferredBrand.Should().BeNull();
+        viewModel.EditingCostBufferPercent.Should().Be(10m);
+        raised.Should().Contain(nameof(RawMaterialsViewModel.TypedCostBufferPercent), "the Cost Buffer % box shows it");
+    }
+
     private async Task<(RawMaterialsViewModel ViewModel, int MaterialId)> OpenPurchasedIngredientAsync()
     {
         var bagId = await GetOrCreateUnitOfMeasureAsync("bag", "bag");

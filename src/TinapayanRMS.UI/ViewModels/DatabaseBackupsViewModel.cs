@@ -73,17 +73,70 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
 
     public ReactiveCommand<RxVoid, RxVoid> RestoreFromFileCommand { get; }
 
+    /// <summary>What takes the day's backup and copies it to the second folder; null in a screen built without it.</summary>
+    private readonly AutomaticBackups? _automatic;
+
+    /// <summary>Where each automatic backup is copied as well (2026-10-29); "None" when nowhere.</summary>
+    public string CopyFolderText => _automatic?.CopyFolder ?? "None";
+
+    /// <summary>Why the last automatic copy didn't go through, in amber under the folder; null when it did.</summary>
+    public string? CopyProblemText => _automatic?.LastCopyProblem;
+
+    /// <summary>Output: the folder to copy automatic backups to, or null when cancelled. The View shows a folder dialog.</summary>
+    public Interaction<RxVoid, string?> ChooseCopyFolder { get; } = new();
+
+    /// <summary>Picks the second folder each automatic backup is copied to, then copies the newest automatic one there now.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ChooseCopyFolderCommand { get; }
+
+    /// <summary>Stops copying automatic backups anywhere else. What was copied stays.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ClearCopyFolderCommand { get; }
+
     /// <param name="restartApp">Closes the app and starts it again, after showing the message it's given.</param>
-    public DatabaseBackupsViewModel(IDatabaseBackups backups, Action<string> restartApp, ILogger logger)
+    public DatabaseBackupsViewModel(IDatabaseBackups backups, Action<string> restartApp, ILogger logger, AutomaticBackups? automatic = null)
         : base(logger)
     {
         _backups = backups;
         _restartApp = restartApp;
+        _automatic = automatic;
+
+        ChooseCopyFolderCommand = ReactiveCommand.CreateFromTask(
+            () => RunSafelyAsync(async () =>
+            {
+                var folder = await ChooseCopyFolder.Handle(RxVoid.Default);
+                if (folder is null || _automatic is null)
+                {
+                    return;
+                }
+
+                _automatic.CopyFolder = folder;
+                var newest = Backups.Select(r => r.Backup).Where(b => b.Kind == BackupKind.Automatic).MaxBy(b => b.TakenAt);
+                if (newest is not null)
+                {
+                    await WhileBusyAsync("Copying…", () => Task.Run(() => _automatic.CopyAsync(newest, CancellationToken.None)));
+                }
+
+                RaiseCopyFolderChanged();
+                SuccessMessage = CopyProblemText is null
+                    ? $"Each automatic backup is copied to {folder} too{(newest is null ? "." : ", starting with the newest.")}"
+                    : null;
+            }),
+            Observable.Return(automatic is not null));
+        ClearCopyFolderCommand = ReactiveCommand.Create(
+            () =>
+            {
+                _automatic!.CopyFolder = null;
+                RaiseCopyFolderChanged();
+            },
+            Observable.Return(automatic is not null));
 
         var idle = this.WhenAnyValue(x => x.BusyText).Select(text => text is null);
         var idleWithBackup = this.WhenAnyValue(x => x.BusyText, x => x.SelectedBackup, (text, backup) => text is null && backup is not null);
 
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(() => RefreshAsync(SelectedBackup?.Backup.Path)));
+        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
+        {
+            await RefreshAsync(SelectedBackup?.Backup.Path);
+            RaiseCopyFolderChanged();
+        }));
 
         BackUpNowCommand = ReactiveCommand.CreateFromTask(
             () => RunSafelyAsync(() => WhileBusyAsync("Backing up…", async () =>
@@ -216,5 +269,11 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
         {
             BusyText = null;
         }
+    }
+
+    private void RaiseCopyFolderChanged()
+    {
+        this.RaisePropertyChanged(nameof(CopyFolderText));
+        this.RaisePropertyChanged(nameof(CopyProblemText));
     }
 }

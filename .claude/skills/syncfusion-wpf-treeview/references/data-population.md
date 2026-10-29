@@ -482,14 +482,11 @@ viewModel.Folders[0].SubFiles = new ObservableCollection<FileManager>(newFiles);
 
 ### None (Default)
 
-No automatic updates. Requires manual refresh:
+Disables notification subscriptions configured through the
+`NotificationSubscriptionMode` property.
 
 ```csharp
 treeView.NotificationSubscriptionMode = NotificationSubscriptionMode.None;
-
-// Manual refresh required
-viewModel.Folders.Add(new FileManager { ItemName = "New Folder" });
-treeView.RefreshView();
 ```
 
 **Use When:**

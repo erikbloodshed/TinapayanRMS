@@ -3,7 +3,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.ApplicationCore.Validators;
 
-public class SubAssemblyValidator : AbstractValidator<SubAssembly>
+public sealed class SubAssemblyValidator : AbstractValidator<SubAssembly>
 {
     public SubAssemblyValidator()
     {

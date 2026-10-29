@@ -9,7 +9,7 @@ namespace TinapayanRMS.Infrastructure.Services;
 /// cascade commits with the save that causes it, so a stored cost can only go wrong through a change made outside the app.
 /// Purchased materials aren't touched: their cost comes straight from their own saved prices.
 /// </summary>
-public class CostRecalculator(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ICostRecalculator
+public sealed class CostRecalculator(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ICostRecalculator
 {
     public async Task<CostRecalculation> RecalculateAllAsync(CancellationToken cancellationToken)
     {

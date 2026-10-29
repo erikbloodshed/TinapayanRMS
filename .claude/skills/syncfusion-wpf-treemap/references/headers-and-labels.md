@@ -8,7 +8,7 @@ Headers appear at the top of each group level, displaying the group name and pro
 
 **Key Properties:**
 - `HeaderHeight` - Height of header in pixels
-- `ShowHeader` - Toggle header visibility
+- `ShowLabels` - Toggle header visibility
 - `HeaderTemplate` - Custom header UI
 
 ## HeaderHeight
@@ -25,16 +25,16 @@ Sets the height of the header for a specific level.
 - Top level: 30-40 pixels
 - Mid level: 20-30 pixels
 - Deep level: 15-20 pixels
-- Set to 0 to effectively hide header (alternative to ShowHeader="False")
+- Set to 0 to effectively hide header (alternative to ShowLabels="False")
 
-## ShowHeader
+## ShowLabels
 
 Controls whether headers are displayed for a level.
 
 **Usage:**
 ```xaml
 <syncfusion:TreeMapFlatLevel GroupPath="Continent" 
-                             ShowHeader="True"
+                             ShowLabels="True"
                              HeaderHeight="30"/>
 ```
 
@@ -330,7 +330,7 @@ The `ShowLabels` property controls whether leaf nodes display labels.
 ## Troubleshooting
 
 **Headers not showing:**
-- Verify ShowHeader="True" (or property not set, defaults to True)
+- Verify ShowLabels="True" (or property not set, defaults to True)
 - Check HeaderHeight > 0
 - Ensure HeaderTemplate renders visible content
 - Verify GroupPath groups data correctly

@@ -40,6 +40,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingWastagePercent = 4.5m;
         viewModel.EditingNewProductStage = ProductStage.ResearchAndDevelopment;
         viewModel.EditingCostBufferPercent = 8m;
+        viewModel.EditingPriceRounding = viewModel.PriceRoundingOptions.Single(o => o.Step == 0.25m);
 
         await viewModel.SaveCommand.Execute();
 
@@ -52,6 +53,8 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         reloaded.EditingWastagePercent.Should().Be(4.5m);
         reloaded.EditingNewProductStage.Should().Be(ProductStage.ResearchAndDevelopment);
         reloaded.EditingCostBufferPercent.Should().Be(8m);
+        reloaded.EditingPriceRounding.Should().Be(new PriceRoundingOption(0.25m, "Up to the next 0.25"));
+        reloaded.PriceRoundingOptions[0].Label.Should().Be("None", "rounding is off until it's chosen");
     }
 
     [Fact]

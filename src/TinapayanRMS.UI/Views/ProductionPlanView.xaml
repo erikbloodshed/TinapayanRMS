@@ -14,7 +14,7 @@
     -->
     <Grid Background="{StaticResource PageBackgroundBrush}" Margin="4">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="600" />
+            <ColumnDefinition Width="720" />
             <ColumnDefinition Width="4" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
@@ -50,7 +50,7 @@
                 <TextBlock DockPanel.Dock="Top"
                            Style="{StaticResource CaptionStyle}"
                            Margin="0,0,0,12"
-                           Text="Plans saved under a name, newest first. Click one to open it: its products replace the plan's." />
+                           Text="Plans saved under a name, by the day they're made on (or saved, for a plan without one), newest first. Click one to open it: its products replace the plan's. The plan for today opens by itself when the plan is empty." />
                 <!-- Clicking a saved plan opens it (ProductionPlanViewModel.SelectedPlan) -->
                 <syncfusion:SfDataGrid x:Name="PlansGrid"
                                        DockPanel.Dock="Top"
@@ -70,8 +70,10 @@
                                        Height="150"
                                        Margin="0,0,0,16">
                     <syncfusion:SfDataGrid.Columns>
-                        <syncfusion:GridDateTimeColumn MappingName="SavedAt" HeaderText="Saved" Pattern="CustomPattern" CustomPattern="MMM d, yyyy  h:mm tt" Width="170" />
+                        <!-- 2026-10-29: the day it's made on; blank for a plan made any day -->
+                        <syncfusion:GridTextColumn MappingName="MakeOnText" HeaderText="Make On" Width="130" />
                         <syncfusion:GridTextColumn MappingName="Name" HeaderText="Name" />
+                        <syncfusion:GridDateTimeColumn MappingName="SavedAt" HeaderText="Saved" Pattern="CustomPattern" CustomPattern="MMM d, yyyy  h:mm tt" Width="170" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
 
@@ -97,8 +99,25 @@
                 </Grid>
                 <TextBlock DockPanel.Dock="Top"
                            Style="{StaticResource CaptionStyle}"
-                           Margin="0,0,0,12"
-                           Text="Pick each product to make and type how many sellable units: pieces, or boxes for a product sold by the box. The plan is kept for you on this computer. Sales are at each product's Current Price, with VAT; profit is over its base cost, VAT out." />
+                           Margin="0,0,0,8"
+                           Text="Pick each product to make and type how many sellable units: pieces, or boxes for a product sold by the box. The plan is kept for you on this computer. Sales are at each product's Current Price, with VAT; profit is over its base cost, VAT out. Once it's baked, type how many were Made and Left Over unsold, and save the plan: Reports' Production Results adds them up." />
+
+                <!-- 2026-10-29: the day the plan is made on, saved with it -->
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
+                    <TextBlock Text="Make On" Style="{StaticResource FormLabelStyle}" />
+                    <syncfusion:SfDatePicker Width="160"
+                                             AllowNull="True"
+                                             FormatString="ddd, MMM d, yyyy"
+                                             Value="{Binding MakeOn, Mode=TwoWay}"
+                                             ToolTip="The day this plan is made, saved with it. The Saved Plans list is in this order, and the plan for today opens by itself."
+                                             VerticalAlignment="Center" />
+                    <syncfusion:ButtonAdv Label="No Day"
+                                          IconTemplate="{StaticResource CancelIconTemplate}"
+                                          Command="{Binding ClearMakeOnCommand}"
+                                          ToolTip="A plan for any day, such as a weekday's usual."
+                                          VerticalAlignment="Center"
+                                          Margin="8,0,0,0" />
+                </StackPanel>
 
                 <!-- What the plan sells for and earns, under its table -->
                 <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
@@ -164,6 +183,9 @@
                         <syncfusion:GridTextColumn MappingName="PiecesText" HeaderText="Pieces" Width="90" AllowEditing="False" AllowFocus="False" TextAlignment="Right" />
                         <controls:NumericColumn MappingName="Sales" HeaderText="Sales" NumberDecimalDigits="2" AllowNullValue="True" AllowEditing="False" AllowFocus="False" Width="96" />
                         <controls:NumericColumn MappingName="Profit" HeaderText="Profit" NumberDecimalDigits="2" AllowNullValue="True" AllowEditing="False" AllowFocus="False" Width="96" />
+                        <!-- 2026-10-29: the results, typed once the plan's been baked, in the same units -->
+                        <controls:NumericColumn MappingName="MadeUnits" HeaderText="Made" NumberDecimalDigits="0" TypedDecimalDigits="2" Width="64" AllowNullValue="True" />
+                        <controls:NumericColumn MappingName="LeftoverUnits" HeaderText="Left Over" NumberDecimalDigits="0" TypedDecimalDigits="2" Width="76" AllowNullValue="True" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </DockPanel>
@@ -205,6 +227,26 @@
                            Margin="0,0,0,12"
                            Text="Each mix in whole batches, or half ones with Half batches ticked, shared by every product it's for, and the made ingredients to prepare for them. Open a row for what goes into it. Spare is what the batches make beyond the plan." />
                 <!-- What the plan couldn't work out, such as a section with no piece size yet -->
+                <!-- The products the mixes' spare can go to with no more mixing: a click adds those units to the plan -->
+                <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                           Visibility="{Binding HasSpareUses, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock DockPanel.Dock="Left" Text="Use the spare:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ItemsControl ItemsSource="{Binding SpareUses}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <syncfusion:ButtonAdv Label="{Binding Text}" IconTemplate="{StaticResource AddIconTemplate}" Margin="0,0,6,0"
+                                                      ToolTip="Add these to the plan: the batches already being made have room for them, so nothing more is mixed."
+                                                      Command="{Binding DataContext.UseSpareCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                      CommandParameter="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </DockPanel>
                 <ItemsControl DockPanel.Dock="Bottom" ItemsSource="{Binding Notes}" Margin="0,8,0,0">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -276,7 +318,7 @@
                 <TextBlock DockPanel.Dock="Top"
                            Style="{StaticResource CaptionStyle}"
                            Margin="0,0,0,12"
-                           Text="Everything to buy: made ingredients as what they're made of, and egg white or yolk as the eggs they're cut from. Buy is in the unit of its dearest brand price, rounded up. Cost is what's needed, at buffered costs; Buy Cost is what the units to buy cost at that price." />
+                           Text="Everything to buy: made ingredients as what they're made of, and egg white or yolk as the eggs they're cut from. Buy is in the unit of the brand price its cost comes from (its Cost From brand, or the dearest), rounded up. Cost is what's needed, at buffered costs; Buy Cost is what the units to buy cost at that price." />
                 <syncfusion:SfDataGrid x:Name="RequisitionGrid"
                                        ItemsSource="{Binding Requisition}"
                                        GridLinesVisibility="Both"

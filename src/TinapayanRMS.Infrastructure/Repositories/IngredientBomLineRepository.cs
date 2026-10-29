@@ -9,7 +9,7 @@ namespace TinapayanRMS.Infrastructure.Repositories;
 /// Made ingredients' bills of materials, read from the sub-assembly each is made from and its own add-ins (IngredientBoms).
 /// Nothing is written here: the lines are the Sub-Assemblies screen's, and the add-ins RawMaterialRepository.SaveAsync's.
 /// </summary>
-public class IngredientBomLineRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IIngredientBomLineRepository
+public sealed class IngredientBomLineRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IIngredientBomLineRepository
 {
     public Task<IReadOnlyList<IngredientBomLine>> GetForIngredientAsync(int ingredientId, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<IngredientBomLine>>(

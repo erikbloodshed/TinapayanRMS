@@ -7,12 +7,18 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class ProductVersionRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductVersionRepository
+public sealed class ProductVersionRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductVersionRepository
 {
     public Task<IReadOnlyList<ProductVersion>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
         dbContextFactory.QueryAsync<ProductVersion>(
             $"SELECT {Columns.Of<ProductVersion>("v")} FROM product_versions v WHERE v.product_id = @productId ORDER BY v.number DESC",
             new { productId },
+            cancellationToken);
+
+    public Task<IReadOnlyList<ProductVersion>> GetLatestAsOfAsync(DateTime asOf, CancellationToken cancellationToken) =>
+        dbContextFactory.QueryAsync<ProductVersion>(
+            $"SELECT DISTINCT ON (v.product_id) {Columns.Of<ProductVersion>("v")} FROM product_versions v WHERE v.saved_at <= @asOf ORDER BY v.product_id, v.number DESC",
+            new { asOf },
             cancellationToken);
 
     public Task<bool> HasAnyAsync(int productId, CancellationToken cancellationToken) =>

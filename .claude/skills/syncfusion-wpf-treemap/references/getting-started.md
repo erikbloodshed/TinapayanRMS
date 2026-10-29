@@ -113,7 +113,7 @@ public class PopulationViewModel
     <syncfusion:SfTreeMap Name="TreeMap" 
                           ItemsSource="{Binding PopulationDetails}" 
                           ItemsLayoutMode="Squarified" 
-                          WeightValuePath="Population"/>
+                          WeightValuePath="Population">
         
         <syncfusion:SfTreeMap.Levels>
             <syncfusion:TreeMapFlatLevel GroupPath="Continent" 
@@ -131,7 +131,8 @@ public class PopulationViewModel
                 </syncfusion:TreeMapFlatLevel.HeaderTemplate>
             </syncfusion:TreeMapFlatLevel>
         </syncfusion:SfTreeMap.Levels>
-</syncfusion:SfTreeMap>
+    </syncfusion:SfTreeMap>
+</Grid>
 ```
 
 ### Step 4: Set DataContext in Code-Behind (Alternative)

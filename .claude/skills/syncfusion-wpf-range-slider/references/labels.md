@@ -494,19 +494,21 @@ public partial class MainWindow : Window
     private void RangeSlider_LabelLoaded(object sender, LabelLoadedEventArgs e)
     {
         // Customize label appearance based on value
-        if (e.Value >= 80)
-        {
-            e.Label.Foreground = new SolidColorBrush(Colors.Red);
-            e.Label.FontWeight = FontWeights.Bold;
-        }
-        else if (e.Value >= 50)
-        {
-            e.Label.Foreground = new SolidColorBrush(Colors.Orange);
-        }
-        else
-        {
-            e.Label.Foreground = new SolidColorBrush(Colors.Green);
-        }
+        if (double.TryParse(e.Content?.ToString(), out double value))
+            {
+                if (value >= 80)
+                {
+                    e.Content = $"{value} High";
+                }
+                else if (value >= 50)
+                {
+                    e.Content = $"{value} Medium";
+                }
+                else
+                {
+                    e.Content = $"{value} Low";
+                }
+            }
     }
 }
 ```
@@ -694,21 +696,18 @@ namespace RangeSliderDemo
 
         private void PrioritySlider_LabelLoaded(object sender, LabelLoadedEventArgs e)
         {
-            if (e.Value == 0)
+            if (e.Content is double value && value == 0)
             {
-                e.Label.Foreground = new SolidColorBrush(Colors.Green);
+                e.Content = "Low";
             }
-            else if (e.Value == 50)
+            else if (e.Content is double value && value == 50)
             {
-                e.Label.Foreground = new SolidColorBrush(Colors.Orange);
+                e.Content = "Medium";
             }
-            else if (e.Value == 100)
+            else if (e.Content is double value && value == 100)
             {
-                e.Label.Foreground = new SolidColorBrush(Colors.Red);
+                e.Content = "High";
             }
-            
-            e.Label.FontSize = 12;
-            e.Label.FontWeight = FontWeights.SemiBold;
         }
     }
 }

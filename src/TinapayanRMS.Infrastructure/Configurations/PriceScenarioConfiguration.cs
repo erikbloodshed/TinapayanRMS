@@ -5,7 +5,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class PriceScenarioConfiguration : IEntityTypeConfiguration<PriceScenario>
+public sealed class PriceScenarioConfiguration : IEntityTypeConfiguration<PriceScenario>
 {
     public void Configure(EntityTypeBuilder<PriceScenario> builder)
     {

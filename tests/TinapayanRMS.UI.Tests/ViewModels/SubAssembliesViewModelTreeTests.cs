@@ -546,6 +546,104 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.TreeMenuFor(viewModel.SubAssemblyTree.Find(subAssemblyId)).Single(i => i.Header == "Move to").Items.Single(i => i.Header == role);
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
+    [Fact]
+    public async Task Picking_another_sub_assembly_over_unsaved_changes_asks_and_Cancel_stays_on_them()
+    {
+        var doughId = await AddRoleAsync("Dough");
+        var sweetId = await AddRecipeAsync("Sweet Dough", doughId);
+        var plainId = await AddRecipeAsync("Plain Dough", doughId);
+        var viewModel = await OpenedViewModelAsync(sweetId);
+        var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.Cancel);
+        viewModel.EditingName = "Sweeter Dough";
+
+        Click(viewModel, viewModel.SubAssemblyTree.Find(plainId)!);
+        await WaitUntilSettledAsync(() => asked.Count == 1, () => $"asked={asked.Count}");
+
+        asked.Single().Should().StartWith("Save the changes to Sweeter Dough?");
+        viewModel.SelectedRow!.Id.Should().Be(sweetId);
+        viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.SubAssemblyTree.Find(sweetId), "the list goes back to the row showing");
+        viewModel.EditingName.Should().Be("Sweeter Dough");
+        viewModel.History.IsDirty.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(UnsavedChangesAnswer.Save, "Sweeter Dough")]
+    [InlineData(UnsavedChangesAnswer.DontSave, "Sweet Dough")]
+    public async Task Picking_another_sub_assembly_over_unsaved_changes_opens_it_once_they_are_saved_or_not(UnsavedChangesAnswer answer, string savedName)
+    {
+        var doughId = await AddRoleAsync("Dough");
+        var sweetId = await AddRecipeAsync("Sweet Dough", doughId);
+        var plainId = await AddRecipeAsync("Plain Dough", doughId);
+        var viewModel = await OpenedViewModelAsync(sweetId);
+        AnswerUnsavedChanges(viewModel, answer);
+        viewModel.EditingName = "Sweeter Dough";
+
+        Click(viewModel, viewModel.SubAssemblyTree.Find(plainId)!);
+        await WaitUntilSettledAsync(
+            () => viewModel.SelectedRow?.Id == plainId && viewModel.EditingName == "Plain Dough" && !viewModel.History.IsDirty,
+            () => $"selected={viewModel.SelectedRow?.Id} name={viewModel.EditingName}");
+
+        viewModel.ErrorMessage.Should().BeNull();
+        (await NameOfAsync(sweetId)).Should().Be(savedName);
+    }
+
+    [Fact]
+    public async Task New_over_unsaved_changes_asks_and_Cancel_keeps_them()
+    {
+        var doughId = await AddRoleAsync("Dough");
+        var sweetId = await AddRecipeAsync("Sweet Dough", doughId);
+        var viewModel = await OpenedViewModelAsync(sweetId);
+        var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.Cancel);
+        viewModel.EditingName = "Sweeter Dough";
+
+        await viewModel.NewCommand.Execute();
+
+        asked.Should().ContainSingle();
+        viewModel.SelectedRow!.Id.Should().Be(sweetId);
+        viewModel.EditingName.Should().Be("Sweeter Dough");
+    }
+
+    [Fact]
+    public async Task Leaving_the_screen_without_saving_puts_the_form_back_as_it_was_saved()
+    {
+        var doughId = await AddRoleAsync("Dough");
+        var sweetId = await AddRecipeAsync("Sweet Dough", doughId);
+        var viewModel = await OpenedViewModelAsync(sweetId);
+        AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
+        viewModel.EditingName = "Sweeter Dough";
+
+        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue();
+
+        await WaitUntilSettledAsync(() => viewModel.EditingName == "Sweet Dough" && !viewModel.History.IsDirty, () => $"name={viewModel.EditingName}");
+        viewModel.SelectedRow!.Id.Should().Be(sweetId);
+        (await NameOfAsync(sweetId)).Should().Be("Sweet Dough");
+    }
+
+    /// <summary>Answers the question about unsaved changes with <paramref name="answer"/>, collecting each question asked.</summary>
+    private static List<string> AnswerUnsavedChanges(SubAssembliesViewModel viewModel, UnsavedChangesAnswer answer)
+    {
+        List<string> asked = [];
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(context =>
+        {
+            asked.Add(context.Input);
+            context.SetOutput(answer);
+        });
+        return asked;
+    }
+
+    /// <summary>A click on <paramref name="row"/>, as the tree makes one: the rows picked replaced by it.</summary>
+    private static void Click(SubAssembliesViewModel viewModel, object row)
+    {
+        viewModel.SelectedTreeNodes.Clear();
+        viewModel.SelectedTreeNodes.Add(row);
+    }
+
+    private async Task<string> NameOfAsync(int subAssemblyId)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.SubAssemblies.Where(s => s.Id == subAssemblyId).Select(s => s.Name).SingleAsync(Cancellation);
+    }
+
     private static async Task RunAsync(TreeMenuItem item)
     {
         switch (item.Command)

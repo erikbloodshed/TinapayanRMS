@@ -89,6 +89,60 @@ public abstract class ViewModelBase : ReactiveObject
     public Interaction<string, bool> ConfirmDelete { get; } = new();
 
     /// <summary>
+    /// Input: the question about a form's unsaved changes, naming the record. Output: whether to save them, throw them away, or
+    /// stay. The View registers a handler that shows a native MessageBox with Yes, No and Cancel.
+    /// </summary>
+    public Interaction<string, UnsavedChangesAnswer> ConfirmUnsavedChanges { get; } = new();
+
+    /// <summary>Set while the question about unsaved changes is up, so a second one arriving meanwhile is turned away.</summary>
+    private bool _isAskingAboutUnsavedChanges;
+
+    /// <summary>
+    /// <see cref="IUnsavedChangesScreen.ResolveUnsavedChangesAsync"/> for a screen: when <paramref name="isDirty"/>, asks
+    /// about the changes to <paramref name="name"/> and runs <paramref name="save"/> (true when it went through) or
+    /// <paramref name="discard"/> (null when nothing needs putting back). True when the form may be left.
+    /// </summary>
+    protected async Task<bool> AskAboutUnsavedChangesAsync(bool isDirty, string name, Func<Task<bool>> save, Func<Task>? discard)
+    {
+        if (!isDirty)
+        {
+            return true;
+        }
+
+        if (_isAskingAboutUnsavedChanges)
+        {
+            return false;
+        }
+
+        UnsavedChangesAnswer answer;
+        _isAskingAboutUnsavedChanges = true;
+        try
+        {
+            answer = await ConfirmUnsavedChanges.Handle(
+                $"Save the changes to {name}?\n\nYes saves them. No throws them away. Cancel keeps them, and you stay on {name}.");
+        }
+        finally
+        {
+            _isAskingAboutUnsavedChanges = false;
+        }
+
+        switch (answer)
+        {
+            case UnsavedChangesAnswer.Save:
+                return await save();
+            case UnsavedChangesAnswer.DontSave:
+                if (discard is not null)
+                {
+                    await discard();
+                }
+
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
     /// Input: what's being exported, which names the file ("Product Cost Summary"). Output: where the workbook was saved, or
     /// null when the user cancelled. The View registers the handler (Exporting/ExcelExportHandlerRegistration), since the
     /// grids it writes, in their sort, filter and columns, are the View's.

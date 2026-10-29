@@ -221,6 +221,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <Border Grid.ColumnSpan="3" CornerRadius="4" Background="{StaticResource PageBackgroundBrush}" />
@@ -334,6 +335,14 @@
                            FontWeight="SemiBold"
                            Foreground="{StaticResource AccentForegroundBrush}"
                            Margin="8,16,8,8" />
+                <!-- The selling price rounded up to a price the shop would charge (Settings → Costing Defaults); only with rounding set -->
+                <TextBlock Grid.Row="12"
+                           Grid.ColumnSpan="3"
+                           HorizontalAlignment="Right"
+                           Margin="8,6,8,0"
+                           Text="{Binding Costing.Costs.RoundedSellingPriceText}"
+                           Style="{StaticResource CaptionStyle}"
+                           Visibility="{Binding Costing.Costs.HasPriceRounding, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </Grid>
         </Grid>
     </StackPanel>

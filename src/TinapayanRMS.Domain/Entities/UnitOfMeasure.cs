@@ -1,6 +1,6 @@
 namespace TinapayanRMS.Domain.Entities;
 
-public class UnitOfMeasure
+public sealed class UnitOfMeasure
 {
     public int Id { get; set; }
 

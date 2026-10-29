@@ -127,6 +127,9 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
 
         public Task<bool> HasAnyAsync(int productId, CancellationToken cancellationToken) => inner.HasAnyAsync(productId, cancellationToken);
 
+        public Task<IReadOnlyList<ProductVersion>> GetLatestAsOfAsync(DateTime asOf, CancellationToken cancellationToken) =>
+            inner.GetLatestAsOfAsync(asOf, cancellationToken);
+
         public Task<ProductVersion?> AddAsync(
             int productId, ProductVersionContent content, DateTime savedAt, string? note, CancellationToken cancellationToken) =>
             throw new TimeoutException(Refused);

@@ -7,6 +7,19 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 public class SubAssemblyRulesTests
 {
+    public static TheoryData<decimal, decimal, decimal, decimal> ScaledLines => new()
+    {
+        { 1000m, 1200m, 5000m, 4166.6667m },
+        { 200m, 1200m, 5000m, 833.3333m },
+        { 650m, 1000m, 2000m, 1300m },
+        { 650m, 0m, 2000m, 650m },
+    };
+
+    [Theory]
+    [MemberData(nameof(ScaledLines))]
+    public void ScaledGrams_scales_a_line_by_the_batchs_factor_to_the_stored_decimals(decimal grams, decimal from, decimal to, decimal expected) =>
+        SubAssemblyRules.ScaledGrams(grams, from, to).Should().Be(expected);
+
     [Fact]
     public void EnsureValidLines_rejects_an_empty_list()
     {

@@ -5,7 +5,7 @@ using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class CostingDefaultsConfiguration : IEntityTypeConfiguration<CostingDefaults>
+public sealed class CostingDefaultsConfiguration : IEntityTypeConfiguration<CostingDefaults>
 {
     public void Configure(EntityTypeBuilder<CostingDefaults> builder)
     {
@@ -40,6 +40,9 @@ public class CostingDefaultsConfiguration : IEntityTypeConfiguration<CostingDefa
 
             // A material's own range (CK_RawMaterials_CostBufferPercent): a new one starts at it.
             t.HasCheckConstraint("CK_CostingDefaults_CostBufferPercent", "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");
+
+            // None, or a step CostingRules.PriceRoundingSteps offers.
+            t.HasCheckConstraint("CK_CostingDefaults_PriceRoundingStep", "price_rounding_step IN (0, 0.25, 0.5, 1, 5, 10)");
         });
     }
 }

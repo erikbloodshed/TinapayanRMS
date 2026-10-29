@@ -3,7 +3,7 @@ using TinapayanRMS.Domain.Enums;
 namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>A user-managed grouping for raw materials (Flour, In-House, Boxes, …), each for one type of material.</summary>
-public class RawMaterialCategory
+public sealed class RawMaterialCategory
 {
     public int Id { get; set; }
 

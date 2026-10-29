@@ -109,7 +109,7 @@ private void OnKanbanCardDragEnd(object sender, KanbanDragEndEventArgs e)
                 <!-- Priority Indicator -->
                 <StackPanel Grid.Row="0" 
                            Orientation="Horizontal" 
-                           Spacing="4">
+                           >
                     <TextBlock Text="•" 
                               FontSize="14" 
                               FontWeight="Bold" 
@@ -202,7 +202,7 @@ private void ApplySortingWithoutPositionChange(KanbanDragEndEventArgs e)
 {
     var cardItems = e.TargetColumn.Items.Cast<KanbanCardItem>().ToList();
     if (this.kanban == null || this.selectedCard == null || this.selectedCard.Content == null || e.TargetColumn == null || e.TargetKey == null || cardItems == null || !cardItems.Any()
-        || e.SelectedColumn == null || (e.SelectedColumn == e.TargetColumn && e.SelectedColumnIndex == e.TargetCardIndex))
+        || e.SelectedColumn == null || (e.SelectedColumn == e.TargetColumn && e.SelectedCardIndex  == e.TargetCardIndex))
     {
         return;
     }
@@ -224,7 +224,6 @@ private void ApplySortingWithoutPositionChange(KanbanDragEndEventArgs e)
     // Sort items based on the sorting order
     if (targetColumnItems.Count > 0)
     {
-        Func<KanbanCardItem, object> keySelector = item => this.GetPropertyInfo(item.GetType(), sortMappingPath);
         targetColumnItems = sortingOrder == KanbanSortingOrder.Ascending
             ? targetColumnItems.OrderBy(item => keySelector(item) ?? 0).ToList()
             : targetColumnItems.OrderByDescending(item => keySelector(item) ?? 0).ToList();

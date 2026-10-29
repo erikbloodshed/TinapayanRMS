@@ -103,6 +103,56 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         viewModel.ScalingRows.Single().Detail.Should().Be("3 batches · 30 pcs (5 extra)");
     });
 
+    [Fact]
+    public Task An_amount_of_one_ingredient_makes_the_most_units_whose_whole_batches_it_covers() => StaThread.RunAsync(async () =>
+    {
+        var productId = await AddEnsaymadaAsync();
+        var viewModel = await OpenAsync(productId);
+        viewModel.SelectedDetailsTab = ProductsViewModel.ScalingTab;
+
+        viewModel.ScalingIngredients.Select(i => i.Name).Should().Equal("Flour", "Syrup", "Sugar");
+
+        // 900 g of flour a batch of 100: 2,000 g covers 2 batches, so 200, not 222.
+        viewModel.ScalingHaveIngredient = viewModel.ScalingIngredients[0];
+        viewModel.ScalingHaveAmount = 2000m;
+        viewModel.ScalingHaveMakes.Should().Be(200);
+        viewModel.ScalingHaveText.Should().Be("Makes 200 pcs, using 1,800 g of the 2,000 g.");
+
+        // Sugar is in the syrup: 100 g a batch.
+        viewModel.ScalingHaveIngredient = viewModel.ScalingIngredients[2];
+        viewModel.ScalingHaveAmount = 150m;
+        viewModel.ScalingHaveMakes.Should().Be(100);
+
+        viewModel.ScalingHaveIngredient = viewModel.ScalingIngredients[0];
+        viewModel.ScalingHaveAmount = 500m;
+        viewModel.ScalingHaveMakes.Should().Be(0);
+        viewModel.ScalingHaveText.Should().Be("Not enough for one: one takes 900 g.");
+        (await viewModel.ScaleToHaveCommand.CanExecute.FirstAsync()).Should().BeFalse();
+
+        viewModel.ScalingHaveAmount = 2000m;
+        await viewModel.ScaleToHaveCommand.Execute();
+        viewModel.ScalingUnits.Should().Be(200);
+        viewModel.ScalingRows.Single().Detail.Should().Be("2 batches · 200 pcs");
+        viewModel.History.IsDirty.Should().BeFalse("none of it is an edit");
+    });
+
+    [Fact]
+    public void An_amount_is_typed_in_grams_or_one_of_the_ingredients_own_units()
+    {
+        var flour = new RawMaterial
+        {
+            Name = "Flour",
+            Units =
+            [
+                new RawMaterialUnit { BaseUnitsPerUnit = 25000m, UnitOfMeasure = new UnitOfMeasure { Name = "bag", Abbreviation = "bag" } },
+                new RawMaterialUnit { BaseUnitsPerUnit = 1000m, UnitOfMeasure = new UnitOfMeasure { Name = "kilogram", Abbreviation = "kg" } },
+            ],
+        };
+
+        IngredientAmountUnit.For(flour).Should().Equal(new IngredientAmountUnit("g", 1m), new IngredientAmountUnit("kg", 1000m), new IngredientAmountUnit("bag", 25000m));
+        IngredientAmountUnit.For(null).Should().Equal(new IngredientAmountUnit("g", 1m));
+    }
+
     /// <summary>
     /// Ensaymada: a Dough of 900 g of flour at 0.05 and 100 g of syrup, cut 10 g a piece, so 100 a batch. The syrup is
     /// made from sugar at 0.09, with no weight loss.

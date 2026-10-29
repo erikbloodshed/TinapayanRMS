@@ -3,7 +3,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.ApplicationCore.Validators;
 
-public class ProductValidator : AbstractValidator<Product>
+public sealed class ProductValidator : AbstractValidator<Product>
 {
     /// <summary>The longest description the Products table holds (ProductConfiguration).</summary>
     public const int MaxDescriptionLength = 500;

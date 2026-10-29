@@ -422,12 +422,11 @@ var focusedItem = treeView.CurrentItem;
 // Set keyboard focus
 treeView.CurrentItem = specificFolder;
 
-// Listen to focus changes
-treeView.PropertyChanged += (s, e) =>
+// React to changes using supported tree view events
+treeView.SelectionChanged += (s, e) =>
 {
-    if (e.PropertyName == nameof(SfTreeView.CurrentItem))
+    if (treeView.CurrentItem is FolderModel current)
     {
-        var current = treeView.CurrentItem as FolderModel;
         // Update preview pane, etc.
     }
 };

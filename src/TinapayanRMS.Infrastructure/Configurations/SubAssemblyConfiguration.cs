@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class SubAssemblyConfiguration : IEntityTypeConfiguration<SubAssembly>
+public sealed class SubAssemblyConfiguration : IEntityTypeConfiguration<SubAssembly>
 {
     public void Configure(EntityTypeBuilder<SubAssembly> builder)
     {

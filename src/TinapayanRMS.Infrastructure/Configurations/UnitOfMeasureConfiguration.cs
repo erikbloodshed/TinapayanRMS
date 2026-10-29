@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class UnitOfMeasureConfiguration : IEntityTypeConfiguration<UnitOfMeasure>
+public sealed class UnitOfMeasureConfiguration : IEntityTypeConfiguration<UnitOfMeasure>
 {
     public void Configure(EntityTypeBuilder<UnitOfMeasure> builder)
     {

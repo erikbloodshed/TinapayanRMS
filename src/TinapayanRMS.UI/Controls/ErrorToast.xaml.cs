@@ -13,7 +13,7 @@ namespace TinapayanRMS.UI.Controls;
 /// next action does; a new error replaces it. RunSafelyAsync clears the error before every action,
 /// so the same error twice still shows twice.
 /// </summary>
-public partial class ErrorToast : UserControl
+public sealed partial class ErrorToast : UserControl
 {
     public static readonly DependencyProperty MessageProperty = DependencyProperty.Register(
         nameof(Message), typeof(string), typeof(ErrorToast), new PropertyMetadata(null, OnMessageChanged));

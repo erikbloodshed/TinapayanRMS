@@ -67,6 +67,27 @@ using (MemoryStream stream = new MemoryStream())
 }
 ```
 
+## Export to XPS
+
+Save chart as an XPS file format.
+
+### Export XPS to a File
+
+```csharp
+sfChart.SaveAsXps("Chart_Export.xps");
+```
+
+### Export XPS to a Stream
+
+```csharp
+using System.IO;
+
+using (FileStream fileStream = new FileStream("Chart_Export_Stream.xps", FileMode.Create, FileAccess.Write))
+{
+    sfChart.SaveAsXps(fileStream);
+}
+```
+
 ## Serialization
 
 Save and load chart configuration.

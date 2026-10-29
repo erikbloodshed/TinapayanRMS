@@ -6,6 +6,7 @@ Comprehensive reference for sorting operations, configuration, and custom sortin
 - [Overview](#overview)
 - [Basic Sorting Configuration](#basic-sorting-configuration)
 - [Sorting Modes](#sorting-modes)
+- [Initial Sort Direction](#initial-sort-direction)
 - [Multi-Column Sorting](#multi-column-sorting)
 - [Programmatic Sorting](#programmatic-sorting)
 - [Custom Sorting](#custom-sorting)
@@ -127,6 +128,39 @@ dataGrid.AllowTriStateSorting = true;
 - First click: Ascending order
 - Second click: Descending order
 - Third click: Clear sorting (original order)
+
+## Initial Sort Direction
+
+Control the sort direction applied the first time a user sorts a column.
+
+**Grid-level (applies to all columns):**
+```xml
+<syncfusion:SfDataGrid AllowSorting="True"
+                       InitialSortDirection="Descending"
+                       ItemsSource="{Binding Orders}" />
+```
+
+```csharp
+dataGrid.InitialSortDirection = ListSortDirection.Descending;
+```
+
+**Column-level (overrides grid-level):**
+```xml
+<syncfusion:SfDataGrid AllowSorting="True" AutoGenerateColumns="False"
+                       ItemsSource="{Binding Orders}">
+    <syncfusion:SfDataGrid.Columns>
+        <syncfusion:GridTextColumn MappingName="OrderID"
+                                   InitialSortDirection="Descending" />
+        <syncfusion:GridTextColumn MappingName="CustomerName"
+                                   InitialSortDirection="Ascending" />
+    </syncfusion:SfDataGrid.Columns>
+</syncfusion:SfDataGrid>
+```
+
+> `GridColumn.InitialSortDirection` takes higher priority than `SfDataGrid.InitialSortDirection`. This property affects only the first-time sort direction; it does not auto-sort on load.
+
+**Tri-state cycle with `InitialSortDirection = Descending`:**
+Descending → Ascending → Clear
 
 ## Multi-Column Sorting
 

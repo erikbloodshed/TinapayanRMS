@@ -1,4 +1,3 @@
-````markdown
 # Navigation — Basics
 
 Core navigation behaviors for the Carousel: keyboard, scroll bars, and mouse wheel. See `navigation-patterns.md` for patterns and gestures.
@@ -20,5 +19,3 @@ Mouse wheel maps to next/previous item by default. Combine with focus management
 Use built-in commands (`SelectFirstItemCommand`, `SelectNextItemCommand`, etc.) or call methods (`SelectFirstItem()`, `SelectNextItem()`) from code-behind.
 
 For XAML and code examples, see `navigation-patterns.md`.
-
-````

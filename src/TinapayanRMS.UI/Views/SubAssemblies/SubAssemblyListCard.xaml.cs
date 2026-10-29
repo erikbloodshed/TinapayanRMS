@@ -19,7 +19,7 @@ namespace TinapayanRMS.UI.Views.SubAssemblies;
 /// opens a menu of what can be done with the row, or with the list; F2, Del and Enter work on the row picked. Inherits the
 /// Sub-Assemblies screen's DataContext (SubAssembliesViewModel).
 /// </summary>
-public partial class SubAssemblyListCard : UserControl
+public sealed partial class SubAssemblyListCard : UserControl
 {
     /// <summary>How long the notice of a move shows before hiding itself; checked again later while the mouse is over it.</summary>
     private readonly DispatcherTimer _moveNoticeTimer = new() { Interval = TimeSpan.FromSeconds(8) };

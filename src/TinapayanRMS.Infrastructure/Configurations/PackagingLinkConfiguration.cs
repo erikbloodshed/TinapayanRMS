@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class PackagingLinkConfiguration : IEntityTypeConfiguration<PackagingLink>
+public sealed class PackagingLinkConfiguration : IEntityTypeConfiguration<PackagingLink>
 {
     public void Configure(EntityTypeBuilder<PackagingLink> builder)
     {

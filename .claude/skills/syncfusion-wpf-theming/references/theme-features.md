@@ -286,13 +286,13 @@ Keyboard focus visuals provide **visual indicators** showing which control curre
 
 ### High Visibility Keyboard Focus
 
-The `HighVisibilityKeyboardFocusTheme` property controls the prominence of keyboard focus indicators:
+The `HighVisibility` property controls the prominence of keyboard focus indicators:
 
 ```csharp
 var theme = new FluentTheme 
 { 
     ThemeName = "FluentDark",
-    HighVisibilityKeyboardFocusTheme = true  // Enable high visibility
+    FocusVisualKind = FocusVisualKind.Default  // Enable high visibility
 };
 ```
 
@@ -421,12 +421,13 @@ public MainWindow()
     
     SfSkinManager.ApplyThemeAsDefaultStyle = true;
     
-    var fluentTheme = new FluentDarkTheme 
+    var fluentTheme = new FluentTheme 
     { 
+        ThemeName = "FluentDark",
         HoverEffectMode = HoverEffect.BackgroundAndBorder,
         PressedEffectMode = PressedEffect.Reveal,
         ShowAcrylicBackground = true,
-        HighVisibilityKeyboardFocusTheme = false  // Modern, subtle focus
+        FocusVisualKind = FocusVisualKind.Default  // Modern, subtle focus
     };
     
     SfSkinManager.SetTheme(this, fluentTheme);
@@ -447,12 +448,13 @@ public MainWindow()
     // Use high-contrast theme with accessible features
     var officeTheme = new Office2019HighContrastTheme();
     
-    var fluentTheme = new FluentLightTheme 
+    var fluentTheme = new FluentTheme 
     { 
+        ThemeName = "FluentDark",
         HoverEffectMode = HoverEffect.BackgroundAndBorder,
         PressedEffectMode = PressedEffect.Reveal,
         ShowAcrylicBackground = false,  // No acrylic for clarity
-        HighVisibilityKeyboardFocusTheme = true  // Bold focus indicators
+        FocusVisualKind = FocusVisualKind.Default  // Bold focus indicators
     };
     
     SfSkinManager.SetTheme(this, fluentTheme);
@@ -522,7 +524,7 @@ public partial class MainWindow : Window
 |-------|----------|
 | Acrylic background not visible | Ensure Fluent theme is used; older Windows versions may not support acrylic |
 | Hover animations not working | Check that `ApplyThemeAsDefaultStyle = true` is set |
-| Focus rectangle not visible | Set `HighVisibilityKeyboardFocusTheme = true` for high-contrast focus |
+| Focus rectangle not visible | Set `FocusVisualKind = FocusVisualKind.HighVisibility` for high-contrast focus |
 | Poor touch responsiveness | Increase control sizes to ≥44x44 pixels; add spacing between controls |
 | ScrollBar appears wrong | Verify theme supports ScrollBarMode property; not all themes have this option |
 | Performance issues with animations | Disable reveal effects by setting `HoverEffectMode = HoverEffect.None` |

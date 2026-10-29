@@ -9,7 +9,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IPackagingLinkRepository
+public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IPackagingLinkRepository
 {
     // ProductId is unique, so there's at most one link.
     public async Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken) =>

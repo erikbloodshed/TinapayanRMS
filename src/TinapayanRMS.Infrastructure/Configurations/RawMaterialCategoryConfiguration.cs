@@ -5,7 +5,7 @@ using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class RawMaterialCategoryConfiguration : IEntityTypeConfiguration<RawMaterialCategory>
+public sealed class RawMaterialCategoryConfiguration : IEntityTypeConfiguration<RawMaterialCategory>
 {
     public void Configure(EntityTypeBuilder<RawMaterialCategory> builder)
     {

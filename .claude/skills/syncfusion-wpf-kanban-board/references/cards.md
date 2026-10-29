@@ -7,6 +7,7 @@
 - [Custom Card Template](#custom-card-template)
 - [Conditional Card Templates](#conditional-card-templates)
 - [Card Tooltips](#card-tooltips)
+- [Card Selection](#card-selection)
 - [Troubleshooting](#troubleshooting)
 
 ## Card Overview
@@ -26,7 +27,7 @@ When using `KanbanModel`, these properties control the default card appearance:
 | Property | Type | Description | Display Location |
 |----------|------|-------------|------------------|
 | `Title` | string | Card heading | Top, bold text |
-| `ID` | object | Unique identifier | Not displayed in default UI |
+| `ID` | string | Unique identifier | Not displayed in default UI |
 | `Description` | string | Detailed text | Below title |
 | `Category` | object | Column assignment | Determines column placement |
 | `Assignee` | string | Assigned person | Used for swim lane grouping |
@@ -105,7 +106,7 @@ var task = new KanbanModel()
 
 ## Indicator Colors
 
-Map `IndicatorColorKey` values to actual colors using `IndicatorColorPalette`.
+Map `ColorKey` values to actual colors using `IndicatorColorPalette`.
 
 ### Defining Color Palette
 
@@ -219,7 +220,7 @@ Replace default card UI with your own design using `CardTemplate`.
                               FontSize="14" 
                               FontWeight="Bold" 
                               Foreground="Orange"/>
-                    <TextBlock Text="{Binding IndicatorColorKey}" 
+                    <TextBlock Text="{Binding ColorKey}" 
                               FontSize="12" 
                               FontWeight="Bold" 
                               Foreground="Orange"/>
@@ -272,12 +273,17 @@ Replace default card UI with your own design using `CardTemplate`.
                               FontWeight="Bold" 
                               VerticalAlignment="Center"/>
                     
-                    <Border Grid.Column="1" 
-                           Width="30" 
-                           Height="30" 
-                           CornerRadius="15">
-                        <ContentControl Content="{Binding Image}"/>
-                    </Border>
+                    <Border Grid.Row="1"
+                        Grid.Column="1"
+                        Height="50"
+                        CornerRadius="50"
+                        Width="50"
+                        BorderBrush="Silver"
+                        BorderThickness=".75">
+                    <Border.Background>
+                        <ImageBrush ImageSource="{Binding ImageURL}" />
+                    </Border.Background>
+                </Border>
                 </Grid>
                 
                 <!-- Description -->
@@ -502,7 +508,7 @@ kanban.IsToolTipEnabled = true;
                               Foreground="White"
                               Margin="0,0,8,4"/>
                     <TextBlock Grid.Row="2" Grid.Column="1"
-                              Text="{Binding IndicatorColorKey}" 
+                              Text="{Binding ColorKey}" 
                               FontSize="11" 
                               Foreground="White"
                               Margin="0,0,0,4"/>
@@ -530,6 +536,108 @@ kanban.IsToolTipEnabled = true;
 
 **Note:** `ToolTipTemplate` only applies when `IsToolTipEnabled="True"`
 
+## Card Selection
+
+The SfKanban control supports selecting a single card or multiple cards at a time and performing drag-and-drop operations on the selection. The selection mode is configured through the `CardSelectionType` property of `SfKanban`, which accepts the values `Single`, `Multiple`, and `None`.
+
+### Single Card Selection
+
+Set `CardSelectionType` to `Single` when only one card should be selected at any given time. Selecting a different card automatically clears the previous selection, keeping the focus on a single task.
+
+**XAML:**
+```xml
+<kanban:SfKanban x:Name="kanban"
+                 CardSelectionType="Single"
+                 ItemsSource="{Binding TaskDetails}">
+    <kanban:SfKanban.DataContext>
+        <local:ViewModel/>
+    </kanban:SfKanban.DataContext>
+</kanban:SfKanban>
+```
+
+**C#:**
+```csharp
+this.kanban.CardSelectionType = KanbanCardSelectionType.Single;
+this.kanban.ItemsSource = new ViewModel().TaskDetails;
+```
+
+### Multiple Card Selection
+
+Set `CardSelectionType` to `Multiple` to enable selecting more than one card at a time. The control supports the following keyboard and mouse interactions for building a selection:
+
+- Use <kbd>Ctrl</kbd> + <kbd>Click</kbd> to add or remove an individual card from the current selection.
+- Use <kbd>Shift</kbd> + <kbd>Click</kbd> to select a range of cards within the same column.
+
+**XAML:**
+```xml
+<kanban:SfKanban x:Name="kanban"
+                 CardSelectionType="Multiple"
+                 ItemsSource="{Binding TaskDetails}">
+    <kanban:SfKanban.DataContext>
+        <local:ViewModel/>
+    </kanban:SfKanban.DataContext>
+</kanban:SfKanban>
+```
+
+**C#:**
+```csharp
+this.kanban.CardSelectionType = KanbanCardSelectionType.Multiple;
+this.kanban.ItemsSource = new ViewModel().TaskDetails;
+```
+
+### Multi-Card Drag and Drop
+
+When `CardSelectionType` is set to `Multiple`, the entire selection can be dragged and dropped as a single operation. This enables bulk-moving related work items between stages without losing their relative order.
+
+The following behaviors are supported for multi-card drag and drop:
+
+- Moves every selected card in a single drag operation.
+- Preserves the relative order of the selected cards after the drop.
+- Supports moving cards between columns and across swimlanes.
+- Validates workflow restrictions for all selected cards before completing the drop operation.
+
+**Important:** Multi-card drag and drop is enabled only when `CardSelectionType` is set to `Multiple`. All selected cards are moved together in a single drag operation, and the relative order of the selected cards is preserved after the drop. If the drop target violates a `Workflows` restriction for any card in the selection, the entire drag-and-drop operation is canceled.
+
+### Customize Selected Card Appearance
+
+Customize the appearance of selected cards using the `SelectedBorderBrush` property of `KanbanCardStyle`. This visually highlights the selected cards by changing their border color. Additionally, customize the border color when the mouse pointer hovers over a card using the `HoverBorderBrush` property.
+
+**XAML:**
+```xml
+<kanban:SfKanban.CardStyle>
+    <kanban:KanbanCardStyle SelectedBorderBrush="Blue"
+                            HoverBorderBrush="LightGray">
+    </kanban:KanbanCardStyle>
+</kanban:SfKanban.CardStyle>
+```
+
+**C#:**
+```csharp
+kanban.CardStyle = new KanbanCardStyle()
+{
+    SelectedBorderBrush = new SolidColorBrush(Colors.Blue),
+    HoverBorderBrush = new SolidColorBrush(Colors.LightGray)
+};
+```
+
+### Retrieve Selected Cards
+
+The `GetSelectedCards` method returns the collection of cards that are currently selected in the Kanban board.
+
+```csharp
+var selectedCards = kanban.GetSelectedCards();
+if (selectedCards != null)
+{
+    foreach (var card in selectedCards)
+    {
+        var model = card.Content as KanbanModel;
+        System.Diagnostics.Debug.WriteLine($"Selected: {model.Title}");
+    }
+}
+```
+
+**Use Case:** Enable a "bulk move" or "assign" toolbar action that operates on all currently selected cards.
+
 ## Troubleshooting
 
 ### Cards Not Displaying
@@ -548,9 +656,9 @@ kanban.IsToolTipEnabled = true;
 
 **Solutions:**
 1. Verify IndicatorColorPalette is defined
-2. Check IndicatorColorKey values match palette Key values (case-sensitive)
-3. Ensure KanbanColorMapping entries are added to palette
-4. Verify cards have IndicatorColorKey property set
+2. Check ColorKey values match palette Key values (case-sensitive)
+3. Ensure ColorMapping entries are added to palette
+4. Verify cards have ColorKey property set
 
 ### Images Not Displaying
 
@@ -559,7 +667,7 @@ kanban.IsToolTipEnabled = true;
 **Solutions:**
 1. Check image URI is correct
 2. Verify image files are added to project with "Content" build action
-3. Ensure Image property is set correctly on KanbanModel
+3. Ensure ImageURL property is set correctly on KanbanModel
 4. Check image path case (WPF is case-sensitive)
 
 ### Custom Template Not Applied

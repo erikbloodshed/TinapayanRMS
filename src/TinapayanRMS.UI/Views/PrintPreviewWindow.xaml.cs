@@ -15,7 +15,7 @@ namespace TinapayanRMS.UI.Views;
 /// the pane goes into it: a PrintPreview already in a window when SfSkinManager themes the window throws
 /// (PrintPreviewThemeOrderTests), so whoever opens this mustn't theme it again.
 /// </summary>
-public partial class PrintPreviewWindow : AppWindow
+public sealed partial class PrintPreviewWindow : AppWindow
 {
     /// <summary>One printout: the Production Plan's.</summary>
     public PrintPreviewWindow(ProductPrintSet set, Theme theme)

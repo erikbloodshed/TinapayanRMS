@@ -17,7 +17,7 @@ namespace TinapayanRMS.UI.Views;
 /// The Production Plan screen: the saved plans, the products to make, and the mixing sheet and purchase requisition they
 /// come to.
 /// </summary>
-public partial class ProductionPlanView : UserControl
+public sealed partial class ProductionPlanView : UserControl
 {
     /// <summary>The mixes open to show their ingredients, by name: what's opened again once the plan replaces their rows.</summary>
     private readonly HashSet<string> _openMixes = [];

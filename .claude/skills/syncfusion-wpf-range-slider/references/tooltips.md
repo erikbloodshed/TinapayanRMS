@@ -517,7 +517,11 @@ border.SetValue(Border.PaddingProperty, new Thickness(12, 8, 12, 8));
 
 FrameworkElementFactory contentPresenter = new FrameworkElementFactory(typeof(ContentPresenter));
 contentPresenter.SetBinding(ContentPresenter.ContentProperty, 
-    new TemplateBinding(ToolTip.ContentProperty));
+    new Binding
+    {
+        RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        Path = new PropertyPath(ContentControl.ContentProperty)
+    });
 
 border.AppendChild(contentPresenter);
 template.VisualTree = border;
@@ -546,7 +550,7 @@ this.Content = parentGrid;
 The `ThumbInterval` property sets the minimum distance between two thumbs in a range slider. The thumbs cannot be moved within this range, ensuring a minimum gap between values.
 
 **Property:** `ThumbInterval`  
-**Type:** `double`  
+**Type:** `int`  
 **Default Value:** `0`
 
 **XAML Example:**

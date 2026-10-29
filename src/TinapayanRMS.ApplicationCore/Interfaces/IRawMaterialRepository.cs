@@ -40,6 +40,14 @@ public interface IRawMaterialRepository
     Task UpdateAsync(RawMaterial material, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Puts each purchased material's target buffer back on top of its dearest brand (2026-10-29, Reports' Cost Buffers): its
+    /// buffered cost becomes that, and its buffer percent the target again, with the cascade a Save runs, all in one
+    /// transaction. A material with no price, or not purchased, is passed over, and so is one already at its target.
+    /// Returns how many were changed.
+    /// </summary>
+    Task<int> ReapplyTargetBuffersAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Files each material under another category, all in one save: sets its category, nothing else, and stamps
     /// UpdatedAt. Refused, with nothing moved, if a material or a category doesn't exist, or a category is of the
     /// other type. A category costs nothing, so nothing cascades.

@@ -7,7 +7,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class PriceScenarioRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IPriceScenarioRepository
+public sealed class PriceScenarioRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IPriceScenarioRepository
 {
     public Task<IReadOnlyList<PriceScenario>> GetAllAsync(CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<PriceScenario>>(

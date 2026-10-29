@@ -1,7 +1,7 @@
 namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>One ingredient (a raw material of the Ingredient type) composing a sub-assembly, in grams.</summary>
-public class SubAssemblyLine
+public sealed class SubAssemblyLine
 {
     public int Id { get; set; }
 

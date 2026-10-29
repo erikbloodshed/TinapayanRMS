@@ -1,6 +1,7 @@
 using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
@@ -85,6 +86,18 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _editingCostBufferPercent, value);
     }
 
+    /// <summary>What Price Rounding offers: none, then each step CostingRules.PriceRoundingSteps allows.</summary>
+    public IReadOnlyList<PriceRoundingOption> PriceRoundingOptions { get; } =
+        [.. CostingRules.PriceRoundingSteps.Select(step => new PriceRoundingOption(step, step == 0m ? "None" : $"Up to the next {step:0.00}"))];
+
+    private PriceRoundingOption _editingPriceRounding = null!;
+    /// <summary>What a suggested price is rounded up to a multiple of, for the rounded figures beside the exact ones.</summary>
+    public PriceRoundingOption EditingPriceRounding
+    {
+        get => _editingPriceRounding;
+        set => this.RaiseAndSetIfChanged(ref _editingPriceRounding, value);
+    }
+
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
 
@@ -102,6 +115,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
         _repository = repository;
         _validator = validator;
         _costRecalculator = costRecalculator;
+        EditingPriceRounding = PriceRoundingOptions[0];
 
         // What's saved replaces the fields: an unsaved edit doesn't outlive the dialog it was typed in.
         LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
@@ -115,6 +129,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
             EditingVatPercent = defaults.VatPercent;
             EditingWastagePercent = defaults.WastagePercent;
             EditingCostBufferPercent = defaults.CostBufferPercent;
+            EditingPriceRounding = PriceRoundingOptions.FirstOrDefault(o => o.Step == defaults.PriceRoundingStep) ?? PriceRoundingOptions[0];
         }));
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
@@ -145,6 +160,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
                     VatPercent = EditingVatPercent,
                     WastagePercent = EditingWastagePercent,
                     CostBufferPercent = EditingCostBufferPercent,
+                    PriceRoundingStep = EditingPriceRounding.Step,
                 },
                 CancellationToken.None);
             SuccessMessage = "Costing defaults saved. New products and raw materials start with them, and every product is priced with the wastage.";
@@ -179,4 +195,10 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
         var verb = result.IngredientsCorrected + result.SubAssembliesCorrected == 1 ? "was" : "were";
         return $"Costs recalculated: {string.Join(" and ", parts)} {verb} out of date, and {(verb == "was" ? "is" : "are")} right now.";
     }
+}
+
+/// <summary>A choice of Settings' Price Rounding: the step, and how it reads, "Up to the next 0.25".</summary>
+public sealed record PriceRoundingOption(decimal Step, string Label)
+{
+    public override string ToString() => Label;
 }

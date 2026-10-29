@@ -39,6 +39,8 @@ The SfDataGrid component offers:
 - **Styling**: Conditional styling, themes, and complete visual customization
 - **Performance**: UI virtualization, on-demand loading, and optimized rendering
 - **Selection**: Multiple selection modes (row, cell, extended) with programmatic control
+- **Filter Editor**: Visual filter expression builder with AND/OR logic, nested groups, and Filter Editor Panel
+- **Resizing**: Interactive column and row resizing with constraints, hidden column/row support, and resize events
 
 ## Documentation and Navigation Guide
 
@@ -81,6 +83,7 @@ The SfDataGrid component offers:
 - 15+ built-in column types with usage scenarios
 - Manual column definition in XAML and code-behind
 - Column properties and configuration options
+- Character casing for text input (CharacterCasing: Upper, Lower, Normal)
 - Column manipulation methods
 - AllowResizing and column width management
 - AllowDraggingColumns for reordering
@@ -110,6 +113,27 @@ The SfDataGrid component offers:
 - Star column sizer ratios and weights
 - Font-based width calculation strategies
 
+#### Column and Row Resizing
+
+📄 **Read:** [references/resizing.md](references/resizing.md)
+
+**When to read:**
+- Enabling interactive column or row resizing
+- Restricting resizing to specific columns
+- Setting minimum and maximum column width constraints
+- Allowing users to resize hidden columns or rows
+- Canceling or detecting resize operations programmatically
+
+**Covers:**
+- AllowResizingColumns at grid level and GridColumn.AllowResizing at column level
+- AllowResizingRows for interactive row height adjustment
+- MinWidth and MaxWidth constraints respected during resize
+- AllowResizingHiddenColumns and AllowResizingHiddenRows (resize indicator for hidden items)
+- Canceling column resize via ResizingColumns event (e.Cancel)
+- Detecting resize completion (ColumnResizingReason.Resized, e.Width)
+- Canceling row resize via RowResizing event (e.Cancel)
+- Detecting row resize completion (RowResizingReason.Resized, e.Height)
+
 ### Data Operations
 
 #### Sorting
@@ -122,10 +146,12 @@ The SfDataGrid component offers:
 - Adding programmatic sorting
 - Creating custom sort logic
 - Handling tri-state sorting
+- Controlling initial sort direction
 - Responding to sorting events
 
 **Covers:**
 - AllowSorting property for enabling sort functionality
+- InitialSortDirection at grid and column level for first-click sort direction
 - SortColumnDescriptions collection for programmatic sorting
 - AllowSorting at column level
 - Custom IComparer implementation for sort logic
@@ -156,6 +182,28 @@ The SfDataGrid component offers:
 - FilterChanged and FilterChanging events
 - RefreshFilter() method usage
 - Filter row customization
+
+#### Filter Editor
+
+📄 **Read:** [references/filter-editor.md](references/filter-editor.md)
+
+**When to read:**
+- Enabling the advanced visual Filter Editor for complex filter expressions
+- Showing the Filter Editor Panel above or below the grid
+- Building multi-condition filter expressions with AND/OR operators and nested groups
+- Suspending and resuming filtering without losing filter criteria
+- Understanding how Filter Editor synchronizes with other filtering mechanisms
+
+**Covers:**
+- Enabling Filter Editor (EnableFilterEditor property)
+- Opening Filter Editor from column popup and Filter Editor Panel
+- Apply / OK / Cancel actions in the Filter Editor
+- FilterPanelPosition property (Top / Bottom / None) to show the Filter Editor Panel
+- Expand/collapse filter expression in the panel
+- Enable/suspend filtering via panel checkbox
+- Closing the Filter Editor Panel (hides panel without clearing filters)
+- Filter synchronization with Checkbox Filter UI, Advanced Filter UI, Filter Row, and FilterPredicates
+- Limitations (only SfDataGrid.Columns, View.Filter delegate not shown)
 
 #### Grouping
 
@@ -524,6 +572,40 @@ dataGrid.View.Filter = (obj) =>
 dataGrid.View.RefreshFilter();
 ```
 
+### Enable Filter Editor with Panel
+
+```xml
+<syncfusion:SfDataGrid x:Name="dataGrid"
+                       AllowFiltering="True"
+                       EnableFilterEditor="True"
+                       FilterPanelPosition="Bottom"
+                       ItemsSource="{Binding Orders}" />
+```
+
+### Column and Row Resizing
+
+```xml
+<syncfusion:SfDataGrid AllowResizingColumns="True"
+                       AllowResizingRows="True"
+                       AllowResizingHiddenColumns="True"
+                       ItemsSource="{Binding Orders}" />
+```
+
+```csharp
+// Cancel resizing for a specific column
+dataGrid.ResizingColumns += (sender, e) =>
+{
+    if (e.ColumnIndex == 0) e.Cancel = true;
+};
+
+// Detect when resize is complete
+dataGrid.ResizingColumns += (sender, e) =>
+{
+    if (e.Reason == ColumnResizingReason.Resized)
+        Debug.WriteLine($"Column resized to {e.Width}px");
+};
+```
+
 ### Selection Handling
 
 ```csharp
@@ -570,7 +652,15 @@ dataGrid.ExportToExcel(dataGrid.View, options);
 - **ColumnSizer**: Auto-sizing strategy for columns
 - **FrozenColumnsCount**: Number of columns frozen from left (int)
 - **AllowResizingColumns**: Enable column resizing (bool)
+- **AllowResizingRows**: Enable row height resizing (bool)
+- **AllowResizingHiddenColumns**: Show resize indicator for hidden columns (bool)
+- **AllowResizingHiddenRows**: Show resize indicator for hidden rows (bool)
 - **AllowDraggingColumns**: Enable column reordering (bool)
+
+### Filter Editor Properties
+
+- **EnableFilterEditor**: Enable the visual Filter Editor for building complex filter expressions (bool)
+- **FilterPanelPosition**: Position of the Filter Editor Panel (Top / Bottom / None)
 
 ### Selection Properties
 

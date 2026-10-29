@@ -20,7 +20,7 @@ namespace TinapayanRMS.UI.Controls;
 /// double's exact binary value: 6.6699999999999999289457264240. Decimal parses the double's text instead.
 /// </para>
 /// </summary>
-public class NumericColumn : GridNumericColumn
+public sealed class NumericColumn : GridNumericColumn
 {
     public NumericColumn()
     {

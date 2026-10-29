@@ -7,7 +7,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// row owns its PackagingLine rows. (Recipe sub-assemblies are shared by linking the sub-assembly itself: see
 /// ProductSubAssemblyUsage.)
 /// </summary>
-public class PackagingLink
+public sealed class PackagingLink
 {
     public int Id { get; set; }
 

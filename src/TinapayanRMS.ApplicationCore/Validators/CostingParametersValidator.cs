@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.ApplicationCore.Validators;
 
 /// <summary>Friendly, UI-facing pre-check mirroring CostingRules.EnsureValidParameters.</summary>
-public class CostingParametersValidator : AbstractValidator<CostingParameters>
+public sealed class CostingParametersValidator : AbstractValidator<CostingParameters>
 {
     public CostingParametersValidator()
     {

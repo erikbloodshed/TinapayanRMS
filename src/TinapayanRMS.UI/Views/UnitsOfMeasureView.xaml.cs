@@ -5,7 +5,7 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Views;
 
 /// <summary>The Settings dialog's Units of Measure tab. SettingsWindow registers its delete confirmation.</summary>
-public partial class UnitsOfMeasureView : UserControl
+public sealed partial class UnitsOfMeasureView : UserControl
 {
     public UnitsOfMeasureView(UnitsOfMeasureViewModel viewModel)
     {

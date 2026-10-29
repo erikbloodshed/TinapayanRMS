@@ -9,6 +9,9 @@ Handle user interactions and drag-drop operations with Kanban events. Respond to
 - [CardDragStart Event](#carddragstart-event)
 - [CardDragOver Event](#carddragover-event)
 - [CardDragEnd Event](#carddrop-event)
+- [Column Drag-Drop Events](#column-drag-drop-events)
+- [CardSelected Event](#cardselected-event)
+- [CardDeselected Event](#carddeselected-event)
 - [Common Patterns](#common-patterns)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
@@ -33,6 +36,11 @@ Handle user interactions and drag-drop operations with Kanban events. Respond to
 | `CardDragLeave` | Fires when drag operation leave | KanbanDragLeaveEventArgs |
 | `ColumnGenerated` | Fires when column is generated | KanbanColumnGeneratedEventArgs |
 | `ColumnsGenerated` | Fires when columns is generated | KanbanColumnsGeneratedEventArgs |
+| `ColumnDragStarting` | Fires when a column begins to be dragged | KanbanColumnDragStartingEventArgs |
+| `ColumnDragOver` | Fires while dragging a column over another column | KanbanColumnDragOverEventArgs |
+| `ColumnDrop` | Fires when a dragged column is dropped at a new position | KanbanColumnDropEventArgs |
+| `CardSelected` | Fires when one or more cards are selected | KanbanCardSelectedEventArgs |
+| `CardDeselected` | Fires when one or more cards are deselected | KanbanCardDeselectedEventArgs |
 
 ## CardTapped Event
 
@@ -96,7 +104,8 @@ private void OnCardDragStarting(object sender, KanbanDragStartEventArgs e)
 public class KanbanDragStartEventArgs
 {
     // The card being dragged
-    public KanbanCardItem Card { get; }
+    public bool IsCancel { get; set; }
+    public bool KeepCard { get; set; }
 }
 ```
 ## CardDragOver Event
@@ -161,9 +170,197 @@ private void OnCardDrop(object sender, KanbanDragEndEventArgs e)
     UpdateCardOnDrop(e);
 
     // Refresh column if using sorting
-    kanban.RefreshKanbanColumn(e.TargetKey.ToString());
 }
 ```
+
+## Column Drag-Drop Events
+
+Column reordering (enabled with `AllowColumnReorder="True"`) exposes a dedicated event lifecycle similar to card drag-and-drop. Use these events to track, validate, or cancel column reorder operations.
+
+### Available Column Events
+
+| Event | Description | Event Args |
+|-------|-------------|------------|
+| `ColumnDragStarting` | Fires when a column begins to be dragged | KanbanColumnDragStartingEventArgs |
+| `ColumnDragOver` | Fires while a column is dragged over another column | KanbanColumnDragOverEventArgs |
+| `ColumnDrop` | Fires when a dragged column is dropped at a new position | KanbanColumnDropEventArgs |
+
+### ColumnDragStarting Event
+
+Occurs when a column begins to be dragged. Set `e.Cancel` to `true` to prevent the column from being dragged.
+
+**Event Arguments:**
+- `Column` - The source column being dragged.
+- `ColumnIndex` - The index of the dragged column within the Kanban column collection.
+- `Cancel` - Determines whether the column drag operation should be canceled.
+
+```xml
+<kanban:SfKanban x:Name="kanban"
+                 ItemsSource="{Binding TaskDetails}"
+                 AutoGenerateColumns="False"
+                 AllowColumnReorder="True"
+                 ColumnDragStarting="OnKanbanColumnDragStarting">
+    <kanban:KanbanColumn Title="To Do" Categories="Open" />
+    <kanban:KanbanColumn Title="In Progress" Categories="In Progress" />
+    <kanban:KanbanColumn Title="Done" Categories="Done" />
+</kanban:SfKanban>
+```
+
+**C#:**
+```csharp
+this.kanban.AllowColumnReorder = true;
+this.kanban.ColumnDragStarting += this.OnKanbanColumnDragStarting;
+
+private void OnKanbanColumnDragStarting(object sender, KanbanColumnDragStartingEventArgs e)
+{
+    var column = e.Column;
+    int columnIndex = e.ColumnIndex;
+
+    // Optional: cancel the drag based on business rules
+    // e.Cancel = true;
+}
+```
+
+### ColumnDragOver Event
+
+Occurs when a column is dragged over another column.
+
+**Event Arguments:**
+- `SourceColumn` - The column where the drag operation originated.
+- `CurrentColumn` - The current column over which the dragged column is positioned.
+- `PreviousColumnIndex` - The previous column index before entering the current column.
+- `CurrentColumnIndex` - The current column index over which the dragged column is positioned.
+
+```csharp
+this.kanban.ColumnDragOver += this.OnKanbanColumnDragOver;
+
+private void OnKanbanColumnDragOver(object sender, KanbanColumnDragOverEventArgs e)
+{
+    var sourceColumn = e.SourceColumn;
+    var currentColumn = e.CurrentColumn;
+    int previousColumnIndex = e.PreviousColumnIndex;
+    int currentColumnIndex = e.CurrentColumnIndex;
+}
+```
+
+### ColumnDrop Event
+
+Occurs when a dragged column is dropped into a new position.
+
+**Event Arguments:**
+- `SourceColumn` - The column from which the drag operation originated.
+- `PreviousColumnIndex` - The column index before the drop.
+- `TargetColumn` - The column onto which the dragged column is dropped.
+- `TargetColumnIndex` - The index where the column is dropped.
+
+```csharp
+this.kanban.ColumnDrop += this.OnKanbanColumnDrop;
+
+private void OnKanbanColumnDrop(object sender, KanbanColumnDropEventArgs e)
+{
+    var sourceColumn = e.SourceColumn;
+    var targetColumn = e.TargetColumn;
+    int previousColumnIndex = e.PreviousColumnIndex;
+    int targetColumnIndex = e.TargetColumnIndex;
+
+    // Persist the new column order in user settings or backend
+    SaveColumnOrder();
+}
+```
+
+### Column Reorder Requirements
+
+- Set `AllowColumnReorder` to `true` on `SfKanban` (default is `false`)
+- Column drag events do not fire unless reordering is enabled
+- Events fire on the UI thread, matching card drag behavior
+
+## CardSelected Event
+
+The `CardSelected` event occurs when one or more cards are selected in the Kanban board. The event is raised once per selection update cycle. Requires `CardSelectionType` to be set to `Single` or `Multiple` (selection events do not fire for `None`).
+
+**Event Arguments Properties:**
+| Property | Description |
+|----------|-------------|
+| `SelectedCard` | The card that initiated the selection operation |
+| `SelectedCards` | The collection of cards currently selected in the Kanban board |
+| `SelectedCardIndex` | The index of the selected card that initiated the selection operation |
+| `IsControlKeyPressed` | Whether the Control key was pressed during the selection |
+| `IsShiftKeyPressed` | Whether the Shift key was pressed during the selection |
+| `Column` | The Kanban column associated with the selection |
+
+### Basic Example
+
+```xml
+<kanban:SfKanban x:Name="kanban"
+                 ItemsSource="{Binding TaskDetails}"
+                 CardSelectionType="Multiple"
+                 CardSelected="OnKanbanCardSelected">
+</kanban:SfKanban>
+```
+
+**C#:**
+```csharp
+this.kanban.ItemsSource = new ViewModel().TaskDetails;
+this.kanban.CardSelectionType = KanbanCardSelectionType.Multiple;
+this.kanban.CardSelected += this.OnKanbanCardSelected;
+
+private void OnKanbanCardSelected(object sender, KanbanCardSelectedEventArgs e)
+{
+    var selectedCard = e.SelectedCard;
+    var selectedCards = e.SelectedCards;
+    int selectedCardIndex = e.SelectedCardIndex;
+    bool isControlKeyPressed = e.IsControlKeyPressed;
+    bool isShiftKeyPressed = e.IsShiftKeyPressed;
+    var column = e.Column;
+
+    // Example: enable a bulk-action toolbar when multiple cards are selected
+    bool hasMultiSelection = selectedCards != null && selectedCards.Count > 1;
+    UpdateBulkActionsToolbar(hasMultiSelection);
+}
+```
+
+**Why:** Use `SelectedCards` to operate on the full selection (bulk operations), and `SelectedCard`/`SelectedCardIndex` to identify which card triggered the update. The key-state properties (`IsControlKeyPressed`, `IsShiftKeyPressed`) allow distinguishing additive selection from plain clicks.
+
+## CardDeselected Event
+
+The `CardDeselected` event occurs when one or more cards are deselected in the Kanban board. The event is raised once per deselection update cycle.
+
+**Event Arguments Properties:**
+| Property | Description |
+|----------|-------------|
+| `DeselectedCard` | The card that initiated the deselection operation |
+| `DeselectedCards` | The collection of cards that are deselected in the Kanban board |
+| `IsControlKeyPressed` | Whether the Control key was pressed during the deselection |
+| `IsShiftKeyPressed` | Whether the Shift key was pressed during the deselection |
+| `Column` | The Kanban column associated with the deselection |
+
+### Basic Example
+
+```xml
+<kanban:SfKanban x:Name="kanban"
+                 ItemsSource="{Binding TaskDetails}"
+                 CardSelectionType="Multiple"
+                 CardDeselected="OnKanbanCardDeselected">
+</kanban:SfKanban>
+```
+
+**C#:**
+```csharp
+this.kanban.ItemsSource = new ViewModel().TaskDetails;
+this.kanban.CardSelectionType = KanbanCardSelectionType.Multiple;
+this.kanban.CardDeselected += this.OnKanbanCardDeselected;
+
+private void OnKanbanCardDeselected(object sender, KanbanCardDeselectedEventArgs e)
+{
+    var deselectedCard = e.DeselectedCard;
+    var deselectedCards = e.DeselectedCards;
+    bool isControlKeyPressed = e.IsControlKeyPressed;
+    bool isShiftKeyPressed = e.IsShiftKeyPressed;
+    var column = e.Column;
+}
+```
+
+**Why:** Pair `CardSelected` with `CardDeselected` to keep dependent UI (toolbars, status bars, command `CanExecute` states) synchronized with the actual selection at all times.
 
 ## Complete Event Flow Example
 
@@ -295,7 +492,6 @@ private void OnCardDragOver(object sender, KanbanDragOverEventArgs e)
 - **CardTappedCommand:** MVVM alternative to CardTapped event
 - **Async Operations:** Supported in event handlers (use async void)
 - **Thread Safety:** Events fire on UI thread
-- **Event Arguments:** All are read-only, provide access to event context
 - **RefreshKanbanColumn():** Required for sorting/WIP limits after drops
 
 ## Example Use Cases

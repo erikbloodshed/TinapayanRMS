@@ -8,7 +8,7 @@ namespace TinapayanRMS.UI.Views.Products;
 /// packaging, with the forms that add and edit them, and Add and Delete Sub-Assembly buttons. Inherits the
 /// Products screen's DataContext (ProductsViewModel).
 /// </summary>
-public partial class RecipeStructureCard : UserControl
+public sealed partial class RecipeStructureCard : UserControl
 {
     public RecipeStructureCard()
     {

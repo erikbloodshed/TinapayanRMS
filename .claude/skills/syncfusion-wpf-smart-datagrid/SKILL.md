@@ -81,6 +81,16 @@ The **SfSmartDataGrid** enhances traditional data grid functionality with:
 - Using default highlight brush
 - Clearing highlights selectively (all, row-only, cell-only)
 
+### AI Exporting
+📄 **Read:** [references/ai-exporting.md](references/ai-exporting.md)
+- Exporting grid data to Excel format using natural language commands
+- Exporting grid data to PDF format using natural language commands
+- Exporting to both Excel and PDF formats simultaneously
+- Understanding what data is included in exports (filters, sorting, visible rows)
+- Natural language syntax patterns for export commands
+- Choosing appropriate format based on use case (Excel for analysis, PDF for archival)
+- Exporting filtered and sorted data with current state
+
 ### Customization and Events
 📄 **Read:** [references/customization-events.md](references/customization-events.md)
 - Setting CurrentUser for message differentiation
@@ -242,7 +252,7 @@ SmartGrid.AssistViewRequest += (sender, e) =>
 | `CurrentUser` | Author | Identifies user for AssistView message alignment (required) |
 | `Suggestions` | ObservableCollection\<string\> | Predefined prompts shown in AssistView |
 | `Prompt` | string | Initial prompt auto-executed on AssistView open |
-| `EnableSmartActions` | bool | Enable/disable AI-powered actions (default: false) |
+| `EnableSmartActions` | bool | Enable/disable AI-powered actions (default: false). Required for Smart/AI capabilities including natural language sorting, filtering, grouping, and highlighting. Part of Syncfusion.SfSmartComponents.WPF assembly features (see [docs/getting-started.md](../../docs/getting-started.md#assembly-deployment) for assembly details). |
 | `HighlightBrush` | SolidColorBrush | Default brush for highlighting without color specified |
 | `AutoGenerateColumns` | bool | Auto-generate columns from data model properties |
 | `ColumnSizer` | GridLengthUnitType | Column sizing mode (Star, Auto, None) |

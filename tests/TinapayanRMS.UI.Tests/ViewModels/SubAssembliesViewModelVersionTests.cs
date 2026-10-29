@@ -57,6 +57,32 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
     }
 
     [Fact]
+    public async Task Saving_new_lines_asks_first_with_what_they_do_to_each_linking_products_base_cost()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
+        var (_, doughId) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
+
+        // Pandesal takes 10 g a piece, which costs the same from a smaller batch; Pandesal x 8 takes a tenth of the batch,
+        // 25.00 of flour, so 2.50 and the shop's 3% wastage, 2.575, which 450 g makes 2.3175.
+        var packId = await AddProductAsync("Pandesal x 8");
+        await SaveRecipeAsync(packId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.Yield, 10m)]));
+
+        List<string> asked = [];
+        var viewModel = await OpenAsync(doughId, asksAboutCosts: true);
+        viewModel.ConfirmDelete.RegisterHandler(context => { asked.Add(context.Input); context.SetOutput(false); });
+        viewModel.Lines.Single().Grams = 450m;
+        await viewModel.SaveCommand.Execute();
+
+        asked.Should().ContainSingle().Which.Should().Be(
+            "Saving Pandesal Dough changes the base cost of 1 product, for one sellable unit:\n\nPandesal x 8: 2.58 → 2.32 (-0.26)\n\nSave it?");
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.SubAssemblyLines.Single(l => l.SubAssemblyId == doughId).Grams.Should().Be(500m, "No keeps it unsaved");
+        }
+    }
+
+    [Fact]
     public async Task A_rename_records_no_version()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -136,19 +162,20 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
         await new ProductVersionRepository(factory).AddAsync(productId, content, DateTime.Now, null, Cancellation);
     }
 
-    private async Task<SubAssembliesViewModel> OpenAsync(int subAssemblyId)
+    private async Task<SubAssembliesViewModel> OpenAsync(int subAssemblyId, bool asksAboutCosts = false)
     {
-        var viewModel = CreateViewModel();
+        var viewModel = CreateViewModel(asksAboutCosts);
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRow = viewModel.Rows.Single(r => r.Id == subAssemblyId);
         await WaitUntilAsync(() => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}, error={viewModel.ErrorMessage}");
         return viewModel;
     }
 
-    private SubAssembliesViewModel CreateViewModel()
+    private SubAssembliesViewModel CreateViewModel(bool asksAboutCosts = false)
     {
         ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
+        var productRepository = new ProductRepository(factory);
 
         return new SubAssembliesViewModel(
             new SubAssemblyRepository(factory),
@@ -160,7 +187,20 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
             new SubAssemblyRoleValidator(),
             new InMemoryViewStateStore(),
             VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger(),
+            asksAboutCosts
+                ? new SharedRecipeImpact(
+                    new SubAssemblyRepository(factory),
+                    productRepository,
+                    new SavedProductReader(
+                        new PackagingLinkRepository(factory),
+                        new ProductSubAssemblyUsageRepository(factory),
+                        new PackagingLineRepository(factory),
+                        new CostingParametersRepository(factory),
+                        new SubAssemblyLineRepository(factory),
+                        productRepository,
+                        new CostingDefaultsRepository(factory)))
+                : null);
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, Func<string> describe)

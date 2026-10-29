@@ -20,7 +20,7 @@ public partial class SavedPlanEntityType
             "TinapayanRMS.Domain.Entities.SavedPlan",
             typeof(SavedPlan),
             baseEntityType,
-            propertyCount: 4,
+            propertyCount: 5,
             navigationCount: 1,
             unnamedIndexCount: 1,
             keyCount: 1);
@@ -44,6 +44,15 @@ public partial class SavedPlanEntityType
             sentinel: false);
         halfBatches.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         halfBatches.AddAnnotation("Relational:ColumnName", "half_batches");
+
+        var makeOn = runtimeEntityType.AddProperty(
+            "MakeOn",
+            typeof(DateOnly?),
+            propertyInfo: typeof(SavedPlan).GetProperty("MakeOn", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(SavedPlan).GetField("<MakeOn>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true);
+        makeOn.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        makeOn.AddAnnotation("Relational:ColumnName", "make_on");
 
         var name = runtimeEntityType.AddProperty(
             "Name",

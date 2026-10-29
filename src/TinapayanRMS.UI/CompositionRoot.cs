@@ -74,6 +74,8 @@ public static class CompositionRoot
                 services.AddSingleton<IDatabaseBackups>(provider => new DatabaseBackups(
                     provider.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>(), DatabaseBackups.DefaultFolder, backupToolsFolder));
                 services.AddSingleton<SavedProductReader>();
+                services.AddSingleton<MaterialCostShares>();
+                services.AddSingleton<SharedRecipeImpact>();
                 services.AddSingleton<ProductVersionRecorder>();
                 services.AddSingleton<VersionedSaves>();
                 services.AddSingleton<IViewStateStore>(new JsonViewStateStore(JsonViewStateStore.DefaultFilePath));
@@ -96,6 +98,7 @@ public static class CompositionRoot
                 services.AddSingleton<SubAssembliesViewModel>();
                 services.AddSingleton<ProductsViewModel>();
                 services.AddSingleton<ReportsViewModel>();
+                services.AddSingleton<QuickFindViewModel>();
                 services.AddSingleton<ProductionPlanViewModel>();
                 services.AddSingleton<PriceSimulatorViewModel>();
                 services.AddSingleton<PrintTabViewModel>();
@@ -110,8 +113,12 @@ public static class CompositionRoot
                     provider.GetRequiredService<IViewStateStore>(), on => VimKeys.State.IsEnabled = on));
 
                 // A restore replaces everything every screen holds, so the app starts again after one (App.RestartAfterExit).
+                services.AddSingleton<AutomaticBackups>();
                 services.AddSingleton(provider => new DatabaseBackupsViewModel(
-                    provider.GetRequiredService<IDatabaseBackups>(), message => ((App)Application.Current).RestartAfterExit(message), provider.GetRequiredService<ILogger>()));
+                    provider.GetRequiredService<IDatabaseBackups>(),
+                    message => ((App)Application.Current).RestartAfterExit(message),
+                    provider.GetRequiredService<ILogger>(),
+                    provider.GetRequiredService<AutomaticBackups>()));
             });
     }
 }

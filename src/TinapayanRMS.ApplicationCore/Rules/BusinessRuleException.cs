@@ -8,7 +8,7 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 /// InvalidOperationExceptions too ("Sequence contains no elements", a connection pool that ran out), and those are bugs or
 /// failures, not something the user can put right.
 /// </summary>
-public class BusinessRuleException : InvalidOperationException
+public sealed class BusinessRuleException : InvalidOperationException
 {
     public BusinessRuleException()
     {

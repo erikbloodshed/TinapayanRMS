@@ -18,7 +18,7 @@ namespace TinapayanRMS.UI.Views.Products;
 /// onto a folder moves them there; a right-click opens a menu of what can be done with the row, or with the list; F2, Del
 /// and Enter work on the row picked. Inherits the Products screen's DataContext (ProductsViewModel).
 /// </summary>
-public partial class ProductListCard : UserControl
+public sealed partial class ProductListCard : UserControl
 {
     /// <summary>How long the notice of a move shows before hiding itself; checked again later while the mouse is over it.</summary>
     private readonly DispatcherTimer _moveNoticeTimer = new() { Interval = TimeSpan.FromSeconds(8) };

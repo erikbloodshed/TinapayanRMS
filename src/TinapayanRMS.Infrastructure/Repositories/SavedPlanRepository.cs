@@ -7,14 +7,14 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class SavedPlanRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ISavedPlanRepository
+public sealed class SavedPlanRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : ISavedPlanRepository
 {
     public Task<IReadOnlyList<SavedPlan>> GetAllAsync(CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<SavedPlan>>(
             async dbContext =>
             {
                 var plans = await dbContext.QueryAsync<SavedPlan>(
-                    $"SELECT {Columns.Of<SavedPlan>("p")} FROM saved_plans p ORDER BY p.saved_at DESC, p.name", null, cancellationToken);
+                    $"SELECT {Columns.Of<SavedPlan>("p")} FROM saved_plans p ORDER BY coalesce(p.make_on, p.saved_at::date) DESC, p.saved_at DESC, p.name", null, cancellationToken);
                 var lines = (await dbContext.QueryAsync<SavedPlanLine>(
                         $"SELECT {Columns.Of<SavedPlanLine>("l")} FROM saved_plan_lines l ORDER BY l.sort_order, l.id", null, cancellationToken))
                     .ToLookup(l => l.SavedPlanId);
@@ -27,7 +27,8 @@ public class SavedPlanRepository(IDbContextFactory<TinapayanRMSDbContext> dbCont
             },
             cancellationToken);
 
-    public async Task<int> SaveAsync(string name, IReadOnlyList<SavedPlanLine> lines, bool halfBatches, DateTime savedAt, CancellationToken cancellationToken)
+    public async Task<int> SaveAsync(
+        string name, IReadOnlyList<SavedPlanLine> lines, bool halfBatches, DateOnly? makeOn, DateTime savedAt, CancellationToken cancellationToken)
     {
         SavedPlanRules.EnsureValid(name, lines);
         name = name.Trim();
@@ -49,7 +50,14 @@ public class SavedPlanRepository(IDbContextFactory<TinapayanRMSDbContext> dbCont
 
         plan.SavedAt = savedAt;
         plan.HalfBatches = halfBatches;
-        plan.Lines = [.. lines.Select((line, i) => new SavedPlanLine { ProductId = line.ProductId, Units = line.Units, SortOrder = i })];
+        plan.MakeOn = makeOn;
+        plan.Lines =
+        [
+            .. lines.Select((line, i) => new SavedPlanLine
+            {
+                ProductId = line.ProductId, Units = line.Units, MadeUnits = line.MadeUnits, LeftoverUnits = line.LeftoverUnits, SortOrder = i,
+            }),
+        ];
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

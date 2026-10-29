@@ -18,6 +18,12 @@ public interface IProductVersionRepository
     Task<bool> HasAnyAsync(int productId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Each product's latest version saved on or before <paramref name="asOf"/> (2026-10-29, Reports' Margin Erosion), in one
+    /// read; a product with none by then isn't there.
+    /// </summary>
+    Task<IReadOnlyList<ProductVersion>> GetLatestAsOfAsync(DateTime asOf, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Records <paramref name="content"/> as the product's next version, numbered after its latest, unless it holds the same
     /// recipe and price as the latest (ProductVersionRules.IsSameRecipe): then nothing is written and null comes back.
     /// Refused when the product doesn't exist, or the note is too long.

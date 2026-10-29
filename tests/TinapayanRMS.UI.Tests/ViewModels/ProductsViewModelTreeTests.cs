@@ -559,6 +559,160 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.ProductTree.StageFolder(stage).Children.OfType<ProductFolderNode>().Single(f => f.Title == title);
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
+    [Fact]
+    public async Task A_product_whose_current_price_earns_less_than_its_target_markup_is_flagged_in_the_list()
+    {
+        var fillingId = await AddRoleAsync("Filling");
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.25m);
+        var (shortId, _) = await AddProductWithSubAssemblyAsync("Ube Pandesal", fillingId, [(ubeId, 100m)], weightPerPiece: 10m);
+        var (enoughId, _) = await AddProductWithSubAssemblyAsync("Ube Roll", fillingId, [(ubeId, 100m)], weightPerPiece: 10m);
+
+        // 2.50 of ube a piece and a 30% target: 3.00 earns well under it, 10.00 well over, whatever the VAT.
+        await PriceAsync(shortId, currentPrice: 3m, targetMarkupPercent: 30m);
+        await PriceAsync(enoughId, currentPrice: 10m, targetMarkupPercent: 30m);
+
+        var viewModel = await LoadedViewModelAsync();
+        await WaitUntilSettledAsync(() => viewModel.ProductTree.Find(shortId)!.IsBelowTargetMarkup, () => "not flagged yet");
+
+        viewModel.ProductTree.Find(enoughId)!.IsBelowTargetMarkup.Should().BeFalse();
+    }
+
+    private async Task PriceAsync(int productId, decimal currentPrice, decimal targetMarkupPercent)
+    {
+        await using var dbContext = CreateDbContext();
+        var product = await dbContext.Products.SingleAsync(p => p.Id == productId, Cancellation);
+        product.CurrentPrice = currentPrice;
+        if (await dbContext.CostingParameters.SingleOrDefaultAsync(c => c.ProductId == productId, Cancellation) is { } costing)
+        {
+            costing.MarginPercent = targetMarkupPercent;
+        }
+        else
+        {
+            dbContext.CostingParameters.Add(new CostingParameters { ProductId = productId, MarginPercent = targetMarkupPercent });
+        }
+
+        await dbContext.SaveChangesAsync(Cancellation);
+    }
+
+    [Fact]
+    public async Task Picking_another_product_over_unsaved_changes_asks_and_Cancel_stays_on_them()
+    {
+        var breadsId = await AddProductCategoryAsync("Breads");
+        var mamonId = await SaveProductAsync("Mamon", breadsId);
+        var pandesalId = await SaveProductAsync("Pandesal", breadsId);
+        var viewModel = await OpenedViewModelAsync(mamonId);
+        var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.Cancel);
+        viewModel.EditingName = "Mamon Tostado";
+
+        Click(viewModel, viewModel.ProductTree.Find(pandesalId)!);
+        await WaitUntilSettledAsync(() => asked.Count == 1, () => $"asked={asked.Count}");
+
+        asked.Single().Should().StartWith("Save the changes to Mamon Tostado?");
+        viewModel.SelectedProduct!.Id.Should().Be(mamonId);
+        viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.ProductTree.Find(mamonId), "the list goes back to the row showing");
+        viewModel.EditingName.Should().Be("Mamon Tostado");
+        viewModel.History.IsDirty.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(UnsavedChangesAnswer.Save, "Mamon Tostado")]
+    [InlineData(UnsavedChangesAnswer.DontSave, "Mamon")]
+    public async Task Picking_another_product_over_unsaved_changes_opens_it_once_they_are_saved_or_not(UnsavedChangesAnswer answer, string savedName)
+    {
+        var breadsId = await AddProductCategoryAsync("Breads");
+        var mamonId = await SaveProductAsync("Mamon", breadsId);
+        var pandesalId = await SaveProductAsync("Pandesal", breadsId);
+        var viewModel = await OpenedViewModelAsync(mamonId);
+        AnswerUnsavedChanges(viewModel, answer);
+        viewModel.EditingName = "Mamon Tostado";
+
+        Click(viewModel, viewModel.ProductTree.Find(pandesalId)!);
+        await WaitUntilSettledAsync(
+            () => viewModel.SelectedProduct?.Id == pandesalId && viewModel.AreDetailsReady && !viewModel.History.IsDirty,
+            () => $"selected={viewModel.SelectedProduct?.Id} ready={viewModel.AreDetailsReady}");
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.EditingName.Should().Be("Pandesal");
+        (await NameOfAsync(mamonId)).Should().Be(savedName);
+    }
+
+    [Fact]
+    public async Task New_over_unsaved_changes_asks_and_Cancel_keeps_them()
+    {
+        var breadsId = await AddProductCategoryAsync("Breads");
+        var mamonId = await SaveProductAsync("Mamon", breadsId);
+        var viewModel = await OpenedViewModelAsync(mamonId);
+        var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.Cancel);
+        viewModel.EditingName = "Mamon Tostado";
+
+        await viewModel.NewCommand.Execute();
+
+        asked.Should().ContainSingle();
+        viewModel.SelectedProduct!.Id.Should().Be(mamonId);
+        viewModel.EditingName.Should().Be("Mamon Tostado");
+    }
+
+    [Fact]
+    public async Task Clone_over_unsaved_changes_asks_first_and_Cancel_makes_nothing()
+    {
+        var breadsId = await AddProductCategoryAsync("Breads");
+        var mamonId = await SaveProductAsync("Mamon", breadsId);
+        var viewModel = await OpenedViewModelAsync(mamonId);
+        var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.Cancel);
+        viewModel.EditingName = "Mamon Tostado";
+        viewModel.EditingCloneName = "Mamon Ube";
+
+        await viewModel.CloneCommand.Execute();
+
+        asked.Should().ContainSingle();
+        viewModel.Products.Should().NotContain(p => p.Name == "Mamon Ube");
+        viewModel.SelectedProduct!.Id.Should().Be(mamonId);
+        viewModel.EditingName.Should().Be("Mamon Tostado");
+    }
+
+    [Fact]
+    public async Task Leaving_the_screen_without_saving_puts_the_form_back_as_it_was_saved()
+    {
+        var breadsId = await AddProductCategoryAsync("Breads");
+        var mamonId = await SaveProductAsync("Mamon", breadsId);
+        var viewModel = await OpenedViewModelAsync(mamonId);
+        AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
+        viewModel.EditingName = "Mamon Tostado";
+
+        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue();
+
+        await WaitUntilSettledAsync(
+            () => viewModel.EditingName == "Mamon" && viewModel.AreDetailsReady && !viewModel.History.IsDirty,
+            () => $"name={viewModel.EditingName}");
+        viewModel.SelectedProduct!.Id.Should().Be(mamonId);
+        (await NameOfAsync(mamonId)).Should().Be("Mamon");
+    }
+
+    /// <summary>Answers the question about unsaved changes with <paramref name="answer"/>, collecting each question asked.</summary>
+    private static List<string> AnswerUnsavedChanges(ProductsViewModel viewModel, UnsavedChangesAnswer answer)
+    {
+        List<string> asked = [];
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(context =>
+        {
+            asked.Add(context.Input);
+            context.SetOutput(answer);
+        });
+        return asked;
+    }
+
+    /// <summary>A click on <paramref name="row"/>, as the tree makes one: the rows picked replaced by it.</summary>
+    private static void Click(ProductsViewModel viewModel, object row)
+    {
+        viewModel.SelectedTreeNodes.Clear();
+        viewModel.SelectedTreeNodes.Add(row);
+    }
+
+    private async Task<string> NameOfAsync(int productId)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.Products.Where(p => p.Id == productId).Select(p => p.Name).SingleAsync(Cancellation);
+    }
+
     private static async Task RunAsync(TreeMenuItem item)
     {
         switch (item.Command)

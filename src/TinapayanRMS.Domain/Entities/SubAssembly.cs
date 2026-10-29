@@ -8,7 +8,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// product's variants (Create Variant), which link it. Either way one
 /// first written in a product's Recipe Structure is named after that product and its role.
 /// </summary>
-public class SubAssembly
+public sealed class SubAssembly
 {
     public int Id { get; set; }
 

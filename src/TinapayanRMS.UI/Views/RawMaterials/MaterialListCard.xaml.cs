@@ -19,7 +19,7 @@ namespace TinapayanRMS.UI.Views.RawMaterials;
 /// right-click opens a menu of what can be done with the row, or with the list; F2, Del and Enter work on the row picked.
 /// Inherits the Raw Materials screen's DataContext (RawMaterialsViewModel).
 /// </summary>
-public partial class MaterialListCard : UserControl
+public sealed partial class MaterialListCard : UserControl
 {
     /// <summary>How long the notice of a move shows before hiding itself; checked again later while the mouse is over it.</summary>
     private readonly DispatcherTimer _moveNoticeTimer = new() { Interval = TimeSpan.FromSeconds(8) };

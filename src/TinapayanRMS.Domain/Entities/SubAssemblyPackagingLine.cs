@@ -5,7 +5,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// the Packaging role, such as a gift box with its ribbon and tag. A product whose packaging links the set takes one
 /// set per piece, so these lines read as its per-piece packaging lines. Costed on read, like those.
 /// </summary>
-public class SubAssemblyPackagingLine
+public sealed class SubAssemblyPackagingLine
 {
     public int Id { get; set; }
 

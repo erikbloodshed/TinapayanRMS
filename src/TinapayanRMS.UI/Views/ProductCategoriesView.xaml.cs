@@ -5,7 +5,7 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Views;
 
 /// <summary>The Settings dialog's Product Categories tab. SettingsWindow registers its delete confirmation.</summary>
-public partial class ProductCategoriesView : UserControl
+public sealed partial class ProductCategoriesView : UserControl
 {
     public ProductCategoriesView(ProductCategoriesViewModel viewModel)
     {

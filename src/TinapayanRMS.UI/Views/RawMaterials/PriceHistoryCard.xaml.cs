@@ -6,7 +6,7 @@ namespace TinapayanRMS.UI.Views.RawMaterials;
 /// Raw Materials' Price History for a saved purchased material, with Delete Price. Inherits the Raw
 /// Materials screen's DataContext (RawMaterialsViewModel).
 /// </summary>
-public partial class PriceHistoryCard : UserControl
+public sealed partial class PriceHistoryCard : UserControl
 {
     public PriceHistoryCard()
     {

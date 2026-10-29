@@ -11,7 +11,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// own buffer: changing those defaults never touches a saved one. The wastage is different: it isn't a starting value
 /// but the one figure every product is priced with, so changing it reprices them all.
 /// </summary>
-public class CostingDefaults
+public sealed class CostingDefaults
 {
     /// <summary>The one row's id.</summary>
     public const int SingletonId = 1;
@@ -56,4 +56,10 @@ public class CostingDefaults
     /// its folder's stage, and a clone or variant starts in Research and Development whatever this is.
     /// </summary>
     public ProductStage NewProductStage { get; set; } = DefaultNewProductStage;
+
+    /// <summary>
+    /// What a suggested price is rounded up to a multiple of, such as 0.25 or 1 (2026-10-29): a price the shop would charge.
+    /// 0 for none. Only the rounded figures shown beside the costing's exact ones follow it (CostingRules.RoundPriceUp).
+    /// </summary>
+    public decimal PriceRoundingStep { get; set; }
 }

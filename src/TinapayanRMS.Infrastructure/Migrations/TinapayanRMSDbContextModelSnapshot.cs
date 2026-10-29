@@ -16,14 +16,14 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261027045800_DropIngredientBomLines";
+    public override string LastMigrationId => "20261029053556_SavedPlanDayAndResults";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
 #pragma warning disable 612, 618
         modelBuilder
             .HasAnnotation("Npgsql:CollationDefinition:case_insensitive", "und-u-ks-level2,und-u-ks-level2,icu,False")
-            .HasAnnotation("ProductVersion", "11.0.0-rc.2.26504.105")
+            .HasAnnotation("ProductVersion", "11.0.0-rc.3.26522.148")
             .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
         NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -69,6 +69,11 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("numeric(18,4)")
                     .HasColumnName("overhead_percent");
 
+                b.Property<decimal>("PriceRoundingStep")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("price_rounding_step");
+
                 b.Property<decimal>("VatPercent")
                     .HasPrecision(18, 4)
                     .HasColumnType("numeric(18,4)")
@@ -87,6 +92,8 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("costing_defaults", t =>
                     {
                         t.HasCheckConstraint("CK_CostingDefaults_CostBufferPercent", "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");
+
+                        t.HasCheckConstraint("CK_CostingDefaults_PriceRoundingStep", "price_rounding_step IN (0, 0.25, 0.5, 1, 5, 10)");
 
                         t.HasCheckConstraint("CK_CostingDefaults_SingleRow", "id = 1");
 
@@ -454,6 +461,11 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnName("name")
                     .UseCollation("case_insensitive");
 
+                b.Property<decimal?>("WastagePercent")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("wastage_percent");
+
                 b.HasKey("Id")
                     .HasName("pk_product_categories");
 
@@ -461,7 +473,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .IsUnique()
                     .HasDatabaseName("ix_product_categories_name");
 
-                b.ToTable("product_categories");
+                b.ToTable("product_categories", t =>
+                    {
+                        t.HasCheckConstraint("CK_ProductCategories_WastagePercent", "wastage_percent IS NULL OR (wastage_percent >= 0 AND wastage_percent <= 100)");
+                    });
             });
 
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductComponent", b =>
@@ -647,6 +662,12 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnName("name")
                     .UseCollation("case_insensitive");
 
+                b.Property<string>("PreferredBrand")
+                    .HasMaxLength(100)
+                    .HasColumnType("character varying(100)")
+                    .HasColumnName("preferred_brand")
+                    .UseCollation("case_insensitive");
+
                 b.Property<string>("Source")
                     .IsRequired()
                     .HasMaxLength(20)
@@ -656,6 +677,11 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                 b.Property<int?>("SubAssemblyId")
                     .HasColumnType("integer")
                     .HasColumnName("sub_assembly_id");
+
+                b.Property<decimal?>("TargetCostBufferPercent")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("target_cost_buffer_percent");
 
                 b.Property<string>("Type")
                     .IsRequired()
@@ -707,6 +733,8 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                         t.HasCheckConstraint("CK_RawMaterials_OnlyIngredientsAreMade", "type = 'Ingredient' OR source = 'Purchased'");
 
                         t.HasCheckConstraint("CK_RawMaterials_SubAssemblyMatchesSource", "(source = 'Made') = (sub_assembly_id IS NOT NULL)");
+
+                        t.HasCheckConstraint("CK_RawMaterials_TargetCostBufferPercent", "target_cost_buffer_percent IS NULL OR (target_cost_buffer_percent >= 0 AND target_cost_buffer_percent <= 100)");
                     });
             });
 
@@ -885,6 +913,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("boolean")
                     .HasColumnName("half_batches");
 
+                b.Property<DateOnly?>("MakeOn")
+                    .HasColumnType("date")
+                    .HasColumnName("make_on");
+
                 b.Property<string>("Name")
                     .IsRequired()
                     .HasMaxLength(100)
@@ -915,6 +947,16 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
                 NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
 
+                b.Property<decimal?>("LeftoverUnits")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("leftover_units");
+
+                b.Property<decimal?>("MadeUnits")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("made_units");
+
                 b.Property<int>("ProductId")
                     .HasColumnType("integer")
                     .HasColumnName("product_id");
@@ -943,6 +985,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
                 b.ToTable("saved_plan_lines", t =>
                     {
+                        t.HasCheckConstraint("CK_SavedPlanLines_LeftoverUnits", "leftover_units IS NULL OR (made_units IS NOT NULL AND leftover_units >= 0 AND leftover_units <= made_units)");
+
+                        t.HasCheckConstraint("CK_SavedPlanLines_MadeUnits", "made_units IS NULL OR made_units >= 0");
+
                         t.HasCheckConstraint("CK_SavedPlanLines_Units", "units > 0");
                     });
             });

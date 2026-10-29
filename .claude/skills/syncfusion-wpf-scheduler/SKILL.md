@@ -23,6 +23,8 @@ Use this skill when the user needs to:
 - Display appointments across different timezones
 - Implement drag-and-drop appointment rescheduling
 - Create custom appointment editors or views
+- Import or export appointments to/from standard iCalendar (.ics) files
+- Highlight restricted date ranges in TimelineMonth with special time regions
 
 ## Component Overview
 
@@ -37,6 +39,8 @@ Use this skill when the user needs to:
 - **Customization:** Extensive styling, templates, and appearance options
 - **Accessibility:** WCAG compliance with full keyboard navigation
 - **Advanced Features:** Load-on-demand, reminders, localization
+- **ICS (iCalendar) Import/Export:** Round-trip appointments with standard RFC 5545 .ics files
+- **Special Time Regions in TimelineMonth:** Opt-in date-column-spanning blocks via `TimelineViewSettings.ShowMonthTimeRegions`
 
 ## Documentation and Navigation Guide
 
@@ -59,6 +63,7 @@ Use this skill when the user needs to:
 - Time interval and slot height customization
 - Working days and hours configuration
 - Special time regions (lunch breaks, holidays)
+- Special time regions in TimelineMonth via `ShowMonthTimeRegions`
 - Selection restrictions in timeslots
 
 ### Appointments and Data
@@ -81,6 +86,14 @@ Use this skill when the user needs to:
 - Drag-and-drop functionality
 - Rescheduling appointments
 - Drag-drop restrictions and events
+
+### ICS Import and Export
+📄 **Read:** [references/ics-import-export.md](references/ics-import-export.md)
+- `ExportToICalendar(fileName)` — write all appointments to `.ics` (Downloads folder)
+- `ImportICalendar()` — open a file picker and parse the selected `.ics`
+- RFC 5545 mapping (VCALENDAR / VEVENT / RRULE / EXDATE / RECURRENCE-ID)
+- Round-tripping recurrence patterns and changed occurrences
+- Timezone handling on export and import
 
 ### Resource Management
 📄 **Read:** [references/resource-grouping.md](references/resource-grouping.md)
@@ -265,6 +278,35 @@ var globalMeeting = new ScheduleAppointment
 Schedule.TimeZone = TimeZoneInfo.Local.Id;
 ```
 
+### Pattern 5: Import / Export iCalendar (RFC 5545)
+
+```csharp
+// Export all appointments to a .ics file in the user's Downloads folder
+await Schedule.ExportToICalendar("TeamCalendar");
+
+// Import appointments from a .ics file chosen via the system file picker
+await Schedule.ImportICalendar();
+```
+
+### Pattern 6: Special Time Regions in TimelineMonth
+
+```csharp
+// Switch to TimelineMonth and enable special time region rendering
+Schedule.ViewType = SchedulerViewType.TimelineMonth;
+Schedule.TimelineViewSettings.ShowMonthTimeRegions = true;
+
+// Add a region spanning several days (time-of-day is ignored in TimelineMonth)
+Schedule.TimelineViewSettings.SpecialTimeRegions.Add(new SpecialTimeRegion
+{
+    StartTime = new DateTime(2026, 6, 10),
+    EndTime = new DateTime(2026, 6, 14),
+    Text = "Audit Week",
+    Background = new SolidColorBrush(Color.FromRgb(0xF5, 0xE1, 0xB4)),
+    Foreground = Brushes.Black,
+    CanEdit = false // blocks drag-drop and new appointments in those columns
+});
+```
+
 ## Key Properties Overview
 
 ### Core Properties
@@ -274,16 +316,16 @@ Schedule.TimeZone = TimeZoneInfo.Local.Id;
 | **ViewType** | SchedulerViewType | Sets the view (Day, Week, WorkWeek, Month, TimelineDay, TimelineWeek, TimelineWorkWeek, TimelineMonth) | Month |
 | **ItemsSource** | IEnumerable | Appointment collection to display | null |
 | **DisplayDate** | DateTime | Currently displayed date | DateTime.Now |
-| **SelectedDate** | DateTime | Currently selected date | DateTime.Now |
+| **SelectedDate** | DateTime? | Currently selected date | null |
 | **FirstDayOfWeek** | DayOfWeek | Starting day of the week | Sunday |
-| **TimeZone** | string | Scheduler's timezone identifier | Local |
+| **TimeZone** | string | Scheduler's timezone identifier (falls back to `TimeZoneInfo.Local.Id` when null) | null |
 
 ### View Navigation & Configuration
 
 | Property | Type | Description | Default |
 |----------|------|-------------|---------|
 | **AllowedViewTypes** | SchedulerViewType | Allowed view types for navigation | All |
-| **AllowViewNavigation** | bool | Enable/disable view navigation | true |
+| **AllowViewNavigation** | bool | Enable navigation from week/month/timeline-month to day/timeline-day on header tap | false |
 | **ShowDatePickerButton** | bool | Show date picker button in header | true |
 
 ### Date Range Properties
@@ -292,7 +334,7 @@ Schedule.TimeZone = TimeZoneInfo.Local.Id;
 |----------|------|-------------|---------|
 | **MinimumDate** | DateTime | Minimum date that can be displayed | DateTime.MinValue |
 | **MaximumDate** | DateTime | Maximum date that can be displayed | DateTime.MaxValue |
-| **BlackoutDates** | ObservableCollection\<DateTime\> | Dates where interaction is disabled (TimelineMonth only) | null |
+| **BlackoutDates** | ObservableCollection\<DateTime\> | Dates where interaction is disabled (Month and TimelineMonth views) | null |
 
 ### Data Binding & Mapping
 
@@ -305,9 +347,12 @@ Schedule.TimeZone = TimeZoneInfo.Local.Id;
 
 | Property | Type | Description | Default |
 |----------|------|-------------|---------|
-| **HeaderHeight** | double | Height of the scheduler header | 50 |
-| **HeaderDateFormat** | string | Date format string in header | "MMMM yyyy" |
+| **HeaderHeight** | double | Height of the scheduler header (the date-picker / month-name header above the view) | 32 (WPF) / 40 (WinUI) |
 | **HeaderTemplate** | DataTemplate | Custom template for header | null |
+| **ViewHeaderHeight** | double | Height of the per-day/per-resource column header inside Day/Week/Timeline views (on `ViewSettingsBase`) | 50 |
+| **ViewHeaderDateFormat** | string | Date format string for the per-column view header (on `TimeSlotViewSettings`) | "%d" |
+| **ViewHeaderDayFormat** | string | Day-of-week format string for the per-column view header (on `ViewSettingsBase`) | (defaults to abbreviated day name) |
+| **ViewHeaderTemplate** | DataTemplate | Custom template for per-column view headers | null |
 
 ### Resource Scheduling
 
@@ -339,7 +384,7 @@ Schedule.TimeZone = TimeZoneInfo.Local.Id;
 | **ShowBusyIndicator** | bool | Shows loading indicator during operations | false |
 | **EnableToolTip** | bool | Enable tooltips on appointments | true |
 | **ToolTipTemplate** | DataTemplate | Custom template for tooltips | null |
-| **EnableReminder** | bool | Enable reminder functionality | false |
+| **EnableReminder** | bool | Enable reminder functionality | true |
 
 ### Context Menus
 
@@ -358,14 +403,14 @@ Schedule.TimeZone = TimeZoneInfo.Local.Id;
 
 | Property | Type | Description | Default |
 |----------|------|-------------|---------|
-| **AppointmentEditFlag** | AppointmentEditFlag | Controls which edit operations are allowed | All |
-| **AppointmentResizeController** | IAppointmentResizeController | Custom resize behavior controller | null |
+| **AppointmentEditFlag** | AppointmentEditFlag | Controls which edit operations are allowed (Add, Edit, Resize, DragDrop) | Add \| Edit \| Resize \| DragDrop |
+| **AppointmentResizeController** | AppointmentResizeController | Custom resize behavior controller | new AppointmentResizeController(this) |
 
 ### Load On Demand
 
 | Property | Type | Description | Default |
 |----------|------|-------------|---------|
-| **LoadOnDemandCommand** | ICommand | Command executed when loading appointments on demand | null |
+| **LoadOnDemandCommand** | ICommand | Command invoked to load appointments for the visible date range on demand | null |
 
 ## Key Methods
 
@@ -375,6 +420,8 @@ Schedule.TimeZone = TimeZoneInfo.Local.Id;
 | **Backward()** | Navigate backward by one view interval |
 | **SchedulerDateToPoint(DateTime)** | Convert date to screen coordinates |
 | **PointToSchedulerDate(Point)** | Convert screen coordinates to date/time |
+| **ExportToICalendar(string fileName = null)** | Asynchronously exports all appointments to an `.ics` file written to the user's Downloads folder. Returns `Task<bool>` (true on success). |
+| **ImportICalendar()** | Asynchronously opens a file picker and parses the selected `.ics` file into the scheduler. Returns `Task<bool>` (true on success). |
 
 ## Key Events
 
@@ -416,6 +463,9 @@ Schedule.TimeZone = TimeZoneInfo.Local.Id;
 - **Timezones:** Always specify timezones for global applications
 - **Resources:** ResourceIdCollection must match ResourceCollection IDs
 - **Views:** Choose appropriate view based on use case (Day for detailed, Month for overview)
+- **TimelineMonth Special Time Regions:** Opt-in via `TimelineViewSettings.ShowMonthTimeRegions = true`. Time-of-day is ignored in TimelineMonth — only the date portion of `StartTime` / `EndTime` controls the rendered span.
+- **ICS Export Location:** `ExportToICalendar` always writes to the user's Downloads folder (`%USERPROFILE%\Downloads`). The `.ics` extension is appended automatically.
+- **ICS Duplicate Handling:** `ImportICalendar` skips appointments whose `Id` already exists and changed occurrences whose `RecurrenceId` already exists, so re-importing the same file is idempotent.
 
 ## Next Steps
 

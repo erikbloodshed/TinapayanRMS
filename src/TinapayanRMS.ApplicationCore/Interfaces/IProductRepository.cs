@@ -139,6 +139,13 @@ public interface IProductRepository
     /// </summary>
     Task<IReadOnlyList<ProductComponent>> GetComponentsAsync(int productId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The Wastage % each of <paramref name="productIds"/> is priced with because its category sets one
+    /// (ProductCategory.WastagePercent), by product id. A product without a category, or whose category leaves it to the
+    /// shop-wide one, isn't in it.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, decimal>> GetCategoryWastageForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
+
     /// <summary>GetComponentsAsync for several composites at once, in one query: each one's lines in its Products table's order.</summary>
     Task<IReadOnlyList<ProductComponent>> GetComponentsForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
 

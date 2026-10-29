@@ -9,6 +9,7 @@
 - [Column Header Customization](#column-header-customization)
 - [Expand/Collapse Columns](#expandcollapse-columns)
 - [Drag and Drop Configuration](#drag-and-drop-configuration)
+- [Column Reordering](#column-reordering)
 - [Drag-Drop Placeholders](#drag-drop-placeholders)
 - [Work-in-Progress (WIP) Limits](#work-in-progress-wip-limits)
 - [Troubleshooting](#troubleshooting)
@@ -197,7 +198,7 @@ public class TaskViewModel
 
 ```
 
-**Important:** ColumnMappingPath only works with properties of `KanbanModel` when using default model.
+**Important:** ColumnMappingPath is specifically used when ItemsSource is populated with custom objects, and it maps the custom model property used for column categorization.
 
 ### Category Matching Rules
 
@@ -259,7 +260,7 @@ Full control over header appearance:
                 
                 <!-- Column Name -->
                 <TextBlock Grid.Row="0"
-                          Text="{Binding HeaderText}"
+                          Text="{Binding Title}"
                           FontWeight="Bold"
                           FontSize="14"
                           Foreground="DarkBlue"
@@ -272,7 +273,7 @@ Full control over header appearance:
                     <TextBlock Text="Items: " 
                               FontSize="11"
                               Foreground="Black"/>
-                    <TextBlock Text="{Binding CardsCount}" 
+                    <TextBlock Text="{Binding Cards.Count}" 
                               FontSize="11"
                               FontWeight="Bold"
                               Foreground="Black"/>
@@ -367,6 +368,43 @@ By default, users can collapse/expand columns by tapping toggle button in column
                      Categories="Archived" 
                      AllowDrag="False" />
 ```
+
+## Column Reordering
+
+Columns can be reordered within the Kanban board using built-in drag-and-drop. Enable this by setting the `AllowColumnReorder` property of `SfKanban` to `true`. The default value is `false`.
+
+### Enable Column Reordering
+
+**XAML:**
+```xml
+<syncfusion:SfKanban AllowColumnReorder="True"
+                     ItemsSource="{Binding TaskDetails}">
+    <syncfusion:KanbanColumn Title="To Do" Categories="Open" />
+    <syncfusion:KanbanColumn Title="In Progress" Categories="In Progress" />
+    <syncfusion:KanbanColumn Title="Done" Categories="Done" />
+</syncfusion:SfKanban>
+```
+
+**C#:**
+```csharp
+SfKanban kanban = new SfKanban();
+kanban.AllowColumnReorder = true;
+kanban.AutoGenerateColumns = false;
+kanban.Columns.Add(new KanbanColumn() { Title = "To Do", Categories = "Open" });
+kanban.Columns.Add(new KanbanColumn() { Title = "In Progress", Categories = "In Progress" });
+kanban.Columns.Add(new KanbanColumn() { Title = "Done", Categories = "Done" });
+```
+
+**Behavior:**
+- Dragging a column header moves the entire column (header and cards)
+- The column is inserted at the drop position, shifting other columns
+- Works with manually defined columns (`AutoGenerateColumns="False"`)
+- Column reordering events (`ColumnDragStarting`, `ColumnDragOver`, `ColumnDrop`) allow validation and tracking of reorder operations (see [events.md](events.md))
+
+**When to Use:**
+- Users need to customize workflow stage order at runtime
+- Prioritizing frequently used columns
+- Reorganizing boards per team preference
 
 ## Drag-Drop Placeholders
 

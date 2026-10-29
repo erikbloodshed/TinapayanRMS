@@ -444,6 +444,24 @@ public double SelectedEnd
 
 ### Scenario 2: Date Range Selection (using numeric values)
 
+```csharp
+public class CustomLabelItem
+{
+    public string label { get; set; }
+    public double value { get; set; }
+}
+
+public ObservableCollection<CustomLabelItem> MonthLabels { get; } =
+    new ObservableCollection<CustomLabelItem>
+    {
+        new CustomLabelItem { label = "Jan", value = 0 },
+        new CustomLabelItem { label = "Apr", value = 90 },
+        new CustomLabelItem { label = "Jul", value = 180 },
+        new CustomLabelItem { label = "Oct", value = 270 },
+        new CustomLabelItem { label = "Dec", value = 365 }
+    };
+```
+
 ```xaml
 <editors:SfRangeSlider
     Width="450"
@@ -454,17 +472,10 @@ public double SelectedEnd
     ShowRange="True"
     AllowRangeDrag="True"
     ShowCustomLabels="True"
+    CustomLabels="{Binding MonthLabels}"
     TickFrequency="30"
     TickPlacement="BottomRight"
-    ThumbInterval="7">
-    <editors:SfRangeSlider.CustomLabels>
-        <editors:LabelItem Content="Jan" Position="0"/>
-        <editors:LabelItem Content="Apr" Position="90"/>
-        <editors:LabelItem Content="Jul" Position="180"/>
-        <editors:LabelItem Content="Oct" Position="270"/>
-        <editors:LabelItem Content="Dec" Position="365"/>
-    </editors:SfRangeSlider.CustomLabels>
-</editors:SfRangeSlider>
+    ThumbInterval="7" />
 ```
 
 ### Scenario 3: Temperature Range Control
