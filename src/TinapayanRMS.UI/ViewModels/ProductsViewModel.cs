@@ -23,7 +23,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// (IProductRepository.SaveAsync). A composite product's recipe is the products it holds instead, in its Products tab
 /// (<see cref="ProductComponents.ComponentEdits"/>), each bringing its recipe cost.
 /// </summary>
-public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen, IRecordScreen, IRevertScreen
+public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen, IRecordScreen, IRevertScreen, IUnsavedChangesScreen
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Scaling, then Clone.</summary>
     public const int RecipeTab = 0;
@@ -1334,10 +1334,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             }
         }));
 
-        NewCommand = ReactiveCommand.Create(() => StartNewProduct());
-        NewCompositeCommand = ReactiveCommand.Create(() => StartNewProduct(isComposite: true));
-        NewCompositeProductInCommand = ReactiveCommand.Create<ProductFolderNode?>(folder => StartNewProduct(
-            folder?.Stage, folder?.CategoryId, isComposite: true));
+        // A new product replaces the one showing, so its unsaved changes are asked about first.
+        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => StartNewProduct()));
+        NewCompositeCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => StartNewProduct(isComposite: true)));
+        NewCompositeProductInCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(folder => AfterUnsavedChangesAsync(() => StartNewProduct(
+            folder?.Stage, folder?.CategoryId, isComposite: true)));
         RemoveComponentCommand = ReactiveCommand.Create(
             () => AsUndoStep(() => ComponentsTable.ComponentEdits.Remove(ComponentsTable.SelectedComponentEdit!)),
             ComponentsTable.WhenAnyValue(c => c.SelectedComponentEdit).Select(row => row is not null));
@@ -1348,7 +1349,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
         UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveProductsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
         DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
-        NewProductInCommand = ReactiveCommand.Create<ProductFolderNode?>(folder => StartNewProduct(folder?.Stage, folder?.CategoryId));
+        NewProductInCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(folder => AfterUnsavedChangesAsync(
+            () => StartNewProduct(folder?.Stage, folder?.CategoryId)));
         RenameProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(RenameProductAsync);
         CloneProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => MakeFromWithPromptAsync(
             leaf,
@@ -1479,26 +1481,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }),
         History.WhenAnyValue(h => h.IsDirty));
 
-        // Revert reads the picked product's detail again, which replaces the recipe, packaging, packs and costing
-        // wholesale, so anything staged but unsaved goes: a section added or edited in the form included, since the
-        // form has no discard of its own. A new product was never saved, so it goes back to being a blank one.
+        // Revert puts the form back as the product was last saved (RevertToSavedAsync), once it's confirmed.
         RevertCommand = ReactiveCommand.CreateFromTask(() => RunWithConfirmationAsync(
             "Undo every change made since this product was last saved?",
             async () =>
             {
-                if (SelectedProduct is not { } product)
+                await RevertToSavedAsync();
+                if (SelectedProduct is { } product)
                 {
-                    StartNewProduct(_newProductInDefaultStage ? null : NewProductStage, _newProductCategoryId, IsEditingComposite);
-                    History.Clear();
-                    return;
+                    SuccessMessage = $"{product.Name} was put back as it was last saved.";
                 }
-
-                History.Clear();
-                CloseUsageForm();
-                Packaging.SelectedLineEdit = null;
-                LoadIntoForm(product);
-                await LoadProductDetailAsync(product, CancellationToken.None);
-                SuccessMessage = $"{product.Name} was put back as it was last saved.";
             }));
 
         // Restore puts the picked version into the form, as Revert puts the saved product there, but as an undo step of
@@ -1737,10 +1729,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>
     /// Makes a product named <paramref name="name"/> from <paramref name="sourceProductId"/> as saved (a clone or a
     /// variant) with its first version, noted "<paramref name="madeAs"/>" the source, both or neither
-    /// (VersionedSaves.MakeProductFromAsync), and opens it.
+    /// (VersionedSaves.MakeProductFromAsync), and opens it. Opening it replaces the product showing, so that one's unsaved
+    /// changes are asked about first: saved, they're in what's copied.
     /// </summary>
-    private Task MakeFromAsync(int sourceProductId, string name, Func<int, string, CancellationToken, Task<int>> make, string madeAs) =>
-        RunSafelyAsync(async () =>
+    private async Task MakeFromAsync(int sourceProductId, string name, Func<int, string, CancellationToken, Task<int>> make, string madeAs)
+    {
+        if (!await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
         {
             var newId = await Task.Run(() => _versionedSaves.MakeProductFromAsync(
                 sourceProductId, name, make, madeAs, DateTime.Now, CancellationToken.None));
@@ -1748,6 +1747,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             await LoadCommand.Execute();
             SelectedProduct = Products.FirstOrDefault(p => p.Id == newId);
         });
+    }
 
     /// <summary>The list's Clone and Create Variant: asks for the new product's name first, starting from "… Copy".</summary>
     private async Task MakeFromWithPromptAsync(
@@ -1778,14 +1778,24 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 await LoadCommand.Execute();
             });
 
-    /// <summary>Takes <paramref name="product"/> out of the Deleted folder, back to its own, and opens it, as a click on it would.</summary>
-    private Task RestoreProductAsync(Product product) =>
-        RunSafelyAsync(async () =>
+    /// <summary>
+    /// Takes <paramref name="product"/> out of the Deleted folder, back to its own, and opens it, as a click on it would,
+    /// asking about the unsaved changes of the product showing first.
+    /// </summary>
+    private async Task RestoreProductAsync(Product product)
+    {
+        if (!await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
         {
             await _productRepository.RestoreAsync(product.Id, CancellationToken.None);
             await LoadCommand.Execute();
             TrySelectProduct(product.Id);
         });
+    }
 
     /// <summary>Deletes <paramref name="product"/>, from the Deleted folder, for good once it's confirmed.</summary>
     private Task DeletePermanentlyAsync(Product product) =>
@@ -1865,6 +1875,23 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>
+    /// <see cref="OpenProduct"/>, asking first about the unsaved changes of the product showing when another is to replace
+    /// it; a deleted one is only picked in the Deleted folder, and replaces nothing. False when the user stays on it.
+    /// </summary>
+    public async Task<bool> OpenProductAsync(int productId)
+    {
+        if (productId != SelectedProduct?.Id
+            && DeletedProducts.All(p => p.Id != productId)
+            && !await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return false;
+        }
+
+        OpenProduct(productId);
+        return true;
+    }
+
+    /// <summary>
     /// Starts a new product that links a standalone sub-assembly, for Sub-Assemblies' New Product. It waits for the next
     /// LoadCommand, which showing the screen runs, so the sub-assembly is found as it's saved now: it may have been made or
     /// renamed there since this screen last loaded.
@@ -1873,6 +1900,63 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         _productToOpen = null;
         _subAssemblyToStartFrom = subAssemblyId;
+    }
+
+    /// <summary><see cref="StartNewProductFrom"/>, asking first about the unsaved changes of the product showing. False when the user stays on it.</summary>
+    public async Task<bool> StartNewProductFromAsync(int subAssemblyId)
+    {
+        if (!await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return false;
+        }
+
+        StartNewProductFrom(subAssemblyId);
+        return true;
+    }
+
+    public bool HasUnsavedChanges => History.IsDirty;
+
+    /// <inheritdoc/>
+    public Task<bool> ResolveUnsavedChangesAsync(bool revert) => AskAboutUnsavedChangesAsync(
+        History.IsDirty,
+        !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim()
+            : SelectedProduct?.Name ?? (IsEditingComposite ? "the new composite product" : "the new product"),
+        async () =>
+        {
+            await SaveCommand.Execute();
+            return !History.IsDirty;
+        },
+        revert ? RevertToSavedAsync : null);
+
+    /// <summary>Runs <paramref name="then"/>, which replaces the product showing, once its unsaved changes are saved or thrown away.</summary>
+    private async Task AfterUnsavedChangesAsync(Action then)
+    {
+        if (await ResolveUnsavedChangesAsync(revert: false))
+        {
+            then();
+        }
+    }
+
+    /// <summary>
+    /// Puts the form back as the product was last saved: Revert, and Don't Save on leaving the screen. It reads the picked
+    /// product's detail again, which replaces the recipe, packaging, packs and costing wholesale, so anything staged but
+    /// unsaved goes: a section added or edited in the form included, since the form has no discard of its own. A new
+    /// product was never saved, so it goes back to being a blank one.
+    /// </summary>
+    private async Task RevertToSavedAsync()
+    {
+        if (SelectedProduct is not { } product)
+        {
+            StartNewProduct(_newProductInDefaultStage ? null : NewProductStage, _newProductCategoryId, IsEditingComposite);
+            History.Clear();
+            return;
+        }
+
+        History.Clear();
+        CloseUsageForm();
+        Packaging.SelectedLineEdit = null;
+        LoadIntoForm(product);
+        await LoadProductDetailAsync(product, CancellationToken.None);
     }
 
     /// <summary>
@@ -1905,7 +1989,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             return false;
         }
 
-        OpenProduct(product.Id);
+        _ = OpenProductAsync(product.Id);
         return true;
     }
 
@@ -1986,8 +2070,28 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // A deleted product's row is picked as a folder's is, leaving the form as it is: it's there to restore.
         if (!_treeSelection.IsSyncing && first is ProductLeafNode { IsDeleted: false } leaf && leaf.Product.Id != SelectedProduct?.Id)
         {
-            SelectedProduct = leaf.Product;
+            if (History.IsDirty)
+            {
+                _ = PickAfterAskingAsync(leaf.Product.Id);
+            }
+            else
+            {
+                SelectedProduct = leaf.Product;
+            }
         }
+    }
+
+    /// <summary>
+    /// Another product's row picked while the form holds unsaved changes: the list goes back to the row of the product
+    /// showing, and the one picked opens once the changes are saved or thrown away.
+    /// </summary>
+    private async Task PickAfterAskingAsync(int productId)
+    {
+        // The tree calls TreeSelectionChanged in the middle of changing its selection: going on once that's over lets the
+        // list take the row of the product showing back.
+        await Task.Yield();
+        SyncTreeSelection();
+        await OpenProductAsync(productId);
     }
 
     private async Task MoveProductsAsync(IReadOnlyList<ProductMove> moves, bool isUndo)

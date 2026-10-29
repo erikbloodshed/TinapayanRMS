@@ -503,6 +503,107 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(rawMaterialId)).Single(i => i.Header == "Move to").Items.Single(i => i.Header == category);
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
+    [Fact]
+    public async Task Picking_another_material_over_unsaved_changes_asks_and_Cancel_stays_on_them()
+    {
+        var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
+        var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
+        var cakeFlourId = await AddIngredientAsync("Cake Flour", flourId);
+        var viewModel = await OpenedViewModelAsync(breadFlourId);
+        var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.Cancel);
+        viewModel.EditingName = "Strong Bread Flour";
+
+        Click(viewModel, viewModel.RawMaterialTree.Find(cakeFlourId)!);
+        await WaitUntilSettledAsync(() => asked.Count == 1, () => $"asked={asked.Count}");
+
+        asked.Single().Should().StartWith("Save the changes to Strong Bread Flour?");
+        viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
+        viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.RawMaterialTree.Find(breadFlourId), "the list goes back to the row showing");
+        viewModel.EditingName.Should().Be("Strong Bread Flour");
+        viewModel.History.IsDirty.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(UnsavedChangesAnswer.Save, "Strong Bread Flour")]
+    [InlineData(UnsavedChangesAnswer.DontSave, "Bread Flour")]
+    public async Task Picking_another_material_over_unsaved_changes_opens_it_once_they_are_saved_or_not(UnsavedChangesAnswer answer, string savedName)
+    {
+        var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
+        var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
+        var cakeFlourId = await AddIngredientAsync("Cake Flour", flourId);
+        var viewModel = await OpenedViewModelAsync(breadFlourId);
+        AnswerUnsavedChanges(viewModel, answer);
+        viewModel.EditingName = "Strong Bread Flour";
+
+        Click(viewModel, viewModel.RawMaterialTree.Find(cakeFlourId)!);
+        await WaitUntilSettledAsync(
+            () => viewModel.SelectedRawMaterial?.Id == cakeFlourId && viewModel.AreDetailsReady && !viewModel.History.IsDirty,
+            () => $"selected={viewModel.SelectedRawMaterial?.Id} ready={viewModel.AreDetailsReady}");
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.EditingName.Should().Be("Cake Flour");
+        (await NameOfAsync(breadFlourId)).Should().Be(savedName);
+    }
+
+    [Fact]
+    public async Task New_over_unsaved_changes_asks_and_Cancel_keeps_them()
+    {
+        var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
+        var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
+        var viewModel = await OpenedViewModelAsync(breadFlourId);
+        var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.Cancel);
+        viewModel.EditingName = "Strong Bread Flour";
+
+        await viewModel.NewCommand.Execute();
+
+        asked.Should().ContainSingle();
+        viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
+        viewModel.EditingName.Should().Be("Strong Bread Flour");
+    }
+
+    [Fact]
+    public async Task Leaving_the_screen_without_saving_puts_the_form_back_as_it_was_saved()
+    {
+        var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
+        var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
+        var viewModel = await OpenedViewModelAsync(breadFlourId);
+        AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
+        viewModel.EditingName = "Strong Bread Flour";
+
+        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue();
+
+        await WaitUntilSettledAsync(
+            () => viewModel.EditingName == "Bread Flour" && viewModel.AreDetailsReady && !viewModel.History.IsDirty,
+            () => $"name={viewModel.EditingName}");
+        viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
+        (await NameOfAsync(breadFlourId)).Should().Be("Bread Flour");
+    }
+
+    /// <summary>Answers the question about unsaved changes with <paramref name="answer"/>, collecting each question asked.</summary>
+    private static List<string> AnswerUnsavedChanges(RawMaterialsViewModel viewModel, UnsavedChangesAnswer answer)
+    {
+        List<string> asked = [];
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(context =>
+        {
+            asked.Add(context.Input);
+            context.SetOutput(answer);
+        });
+        return asked;
+    }
+
+    /// <summary>A click on <paramref name="row"/>, as the tree makes one: the rows picked replaced by it.</summary>
+    private static void Click(RawMaterialsViewModel viewModel, object row)
+    {
+        viewModel.SelectedTreeNodes.Clear();
+        viewModel.SelectedTreeNodes.Add(row);
+    }
+
+    private async Task<string> NameOfAsync(int rawMaterialId)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.RawMaterials.Where(m => m.Id == rawMaterialId).Select(m => m.Name).SingleAsync(Cancellation);
+    }
+
     private static async Task RunAsync(TreeMenuItem item)
     {
         switch (item.Command)

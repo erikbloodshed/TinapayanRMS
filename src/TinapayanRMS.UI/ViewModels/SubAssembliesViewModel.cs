@@ -20,7 +20,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// follow every change saved here) or copy them, from their recipe on the Products screen. One Save writes
 /// the name, the role and the lines together.
 /// </summary>
-public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDisposable, IRecordScreen
+public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDisposable, IRecordScreen, IUnsavedChangesScreen
 {
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _lineRepository;
@@ -564,7 +564,9 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             }
         }));
 
-        NewCommand = ReactiveCommand.Create(() => ClearForm());
+        // A new sub-assembly replaces the one showing, so its unsaved changes are asked about first. Copy doesn't ask: the
+        // copy holds them.
+        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => ClearForm()));
 
         CopyCommand = ReactiveCommand.Create(CopyForm, this.WhenAnyValue(x => x.SelectedRow).Select(row => row is not null));
 
@@ -648,8 +650,8 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
         UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveSubAssembliesAsync(_moveUndo, isUndo: true)), hasMoveNotice);
         DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
-        NewSubAssemblyInCommand = ReactiveCommand.Create<SubAssemblyFolderNode?>(folder => ClearForm(
-            folder is null ? null : Roles.FirstOrDefault(r => r.Id == folder.RoleId)));
+        NewSubAssemblyInCommand = ReactiveCommand.CreateFromTask<SubAssemblyFolderNode?>(folder => AfterUnsavedChangesAsync(() => ClearForm(
+            folder is null ? null : Roles.FirstOrDefault(r => r.Id == folder.RoleId))));
         RenameSubAssemblyCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(RenameSubAssemblyAsync);
         DeleteSubAssemblyCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(leaf => DeleteSubAssemblyAsync(leaf.Row));
         MakeInHouseIngredientCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(leaf => RunSafelyAsync(() => MakeInHouseIngredientAsync(leaf.Row)));
@@ -936,6 +938,49 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         _subAssemblyToOpen = TrySelectSubAssembly(subAssemblyId) ? null : subAssemblyId;
     }
 
+    /// <summary>
+    /// <see cref="OpenSubAssembly"/>, asking first about the unsaved changes of the sub-assembly showing when another is to
+    /// replace it. False when the user stays on it.
+    /// </summary>
+    public async Task<bool> OpenSubAssemblyAsync(int subAssemblyId)
+    {
+        if (subAssemblyId != SelectedRow?.Id && !await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return false;
+        }
+
+        OpenSubAssembly(subAssemblyId);
+        return true;
+    }
+
+    public bool HasUnsavedChanges => History.IsDirty;
+
+    /// <inheritdoc/>
+    public Task<bool> ResolveUnsavedChangesAsync(bool revert) => AskAboutUnsavedChangesAsync(
+        History.IsDirty,
+        !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim() : SelectedRow?.Name ?? "the new sub-assembly",
+        async () =>
+        {
+            await SaveCommand.Execute();
+            return !History.IsDirty;
+        },
+        revert ? RevertToSavedAsync : null);
+
+    /// <summary>Runs <paramref name="then"/>, which replaces the sub-assembly showing, once its unsaved changes are saved or thrown away.</summary>
+    private async Task AfterUnsavedChangesAsync(Action then)
+    {
+        if (await ResolveUnsavedChangesAsync(revert: false))
+        {
+            then();
+        }
+    }
+
+    /// <summary>
+    /// Don't Save on leaving the screen: the form goes back to the sub-assembly as it was last saved, its lines read again.
+    /// A new one (or a copy) was never saved, so it goes back to a blank one.
+    /// </summary>
+    private Task RevertToSavedAsync() => LoadIntoFormAsync(SelectedRow);
+
     /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the sub-assembly the name means best.</summary>
     public bool OpenByName(string text)
     {
@@ -944,7 +989,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             return false;
         }
 
-        OpenSubAssembly(row.Id);
+        _ = OpenSubAssemblyAsync(row.Id);
         return true;
     }
 
@@ -1021,8 +1066,28 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         // which then finds its row first already and leaves the collection alone, as it must mid-change.
         if (!_treeSelection.IsSyncing && first is SubAssemblyLeafNode leaf && leaf.Row.Id != SelectedRow?.Id)
         {
-            SelectedRow = leaf.Row;
+            if (History.IsDirty)
+            {
+                _ = PickAfterAskingAsync(leaf.Row.Id);
+            }
+            else
+            {
+                SelectedRow = leaf.Row;
+            }
         }
+    }
+
+    /// <summary>
+    /// Another sub-assembly's row picked while the form holds unsaved changes: the list goes back to the row of the one
+    /// showing, and the one picked opens once the changes are saved or thrown away.
+    /// </summary>
+    private async Task PickAfterAskingAsync(int subAssemblyId)
+    {
+        // The tree calls TreeSelectionChanged in the middle of changing its selection: going on once that's over lets the
+        // list take the row of the sub-assembly showing back.
+        await Task.Yield();
+        SyncTreeSelection();
+        await OpenSubAssemblyAsync(subAssemblyId);
     }
 
     /// <summary>

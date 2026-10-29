@@ -728,7 +728,7 @@ public RawMaterialsView(RawMaterialsViewModel viewModel)
 {
     InitializeComponent();
     DataContext = viewModel;
-    viewModel.RegisterNativeMessageBoxHandler();   // ConfirmDelete as a Yes/No MessageBox
+    viewModel.RegisterNativeMessageBoxHandler();   // ConfirmDelete as a Yes/No MessageBox, ConfirmUnsavedChanges as Yes/No/Cancel
     // … handlers for the screen's other Interactions (prompts) …
 }
 ```
@@ -831,7 +831,7 @@ The rules for ViewModels:
 - **Switching to the latest inner observable** is written `Observable.Switch(source)`, never `source.Switch()`. ReactiveUI imports `ReactiveUI.Binding` into every file, and that namespace has a `Switch` of its own that clashes with Rx's (error CS0121). `ViewModelBase.LoadLatest` uses it to load a selection's details, so a newer pick cancels an older load that is still running.
 - **Lists** are a DynamicData `SourceCache<T, int>` bound with `Connect().SortAndBind(out collection, comparer).Subscribe()`, or an `ObservableCollection<T>` of editable rows.
 - **Several reads at once** start in parallel with `Task.Run`, are awaited together with `Task.WhenAll`, and are applied in one step on the UI thread. Code inside `Task.Run` calls repositories only and never touches ViewModel state. (`ProductsViewModel`'s `LoadCommand` starts about a dozen reads at once this way.)
-- **Dialogs and prompts** are `Interaction`s that the view handles: `ConfirmDelete` (a Yes/No `MessageBox`, through `RegisterNativeMessageBoxHandler`), `ExportToExcel` (a Save dialog and the export, through `RegisterExcelExport`), `PromptForName` and `PromptForNewCategory` (`TextPromptWindow.Prompt`), and the Products and Sub-Assemblies screens' `PromptForMadeIngredient` (`TextPromptWindow.PromptWithChoice`, a name box with a picker under it, taking a `ChoicePromptRequest` that `MadeIngredientPrompt` builds for both).
+- **Dialogs and prompts** are `Interaction`s that the view handles: `ConfirmDelete` (a Yes/No `MessageBox`, through `RegisterNativeMessageBoxHandler`), `ConfirmUnsavedChanges` (Yes / No / Cancel for Save / Don't Save / Cancel, through the same), `ExportToExcel` (a Save dialog and the export, through `RegisterExcelExport`), `PromptForName` and `PromptForNewCategory` (`TextPromptWindow.Prompt`), and the Products and Sub-Assemblies screens' `PromptForMadeIngredient` (`TextPromptWindow.PromptWithChoice`, a name box with a picker under it, taking a `ChoicePromptRequest` that `MadeIngredientPrompt` builds for both).
  Tests register handlers of their own.
 
 - **One screen asks another for something** through an `IObservable<T>` backed by a `Subject<T>`: `ProductOpenRequests` (from Raw Materials, Sub-Assemblies and Reports), `RawMaterialOpenRequests` (from Reports), `NewProductRequests` (from Sub-Assemblies' New Product, handled by `ProductsViewModel.StartNewProductFrom`), `SubAssemblyOpenRequests` and `PrintRequests` (from Products). `MainWindow` subscribes to them, calls the target screen's `Open*` (or `StartNewProductFrom`) method and shows its tab, so the ViewModels never know about each other.
@@ -856,6 +856,7 @@ Undo and redo follow the Memento pattern:
 - **Behaviours mark where a step starts and ends**: `controls:FieldUndoStep.Recorder="{Binding}"` makes one step of a visit to a field, and `controls:GridUndoSteps.Recorder="{Binding}"` makes one step of each change in a grid.
 - **`UndoShortcuts`** sends Ctrl+Z and Ctrl+Y to the screen under the cursor, through its `IUndoScreen`. It's a class handler on `PreviewKeyDown`, because Syncfusion's number boxes take both keys for their own undo.
 - **`History.IsDirty`** compares the form with the snapshot it was last saved or loaded with. It decides whether Save is offered, whether Back and Forward may change the record a screen has open, and whether a printout says "Includes unsaved changes".
+- **A dirty form is never left without asking.** Products, Raw Materials and Sub-Assemblies are `IUnsavedChangesScreen`s: `ResolveUnsavedChangesAsync(revert)` asks Save / Don't Save / Cancel through `ConfirmUnsavedChanges` (`ViewModelBase.AskAboutUnsavedChangesAsync`) and says whether the form may be left. A screen asks before its own form shows another record (a list pick, through `PickAfterAskingAsync`; New; the `Open*Async` methods the links call). `MainWindow` asks before the screen is left: a tab change is undone and redone once answered (`TurnBackToUnsaved`), links go through `OpenOnAsync`, Back and Forward peek at `NavigationHistory.BackTarget`/`ForwardTarget` first, and `OnClosing` asks before the app closes. With `revert`, Don't Save also puts the form back as saved. Products and Print count as one screen. A new path that replaces a form's record, or leaves a screen, goes through one of these.
 - **An edit the form hasn't seen yet keeps Save offered** (`IUndoRecorder.IsEditPending`): a grid cell being typed into, and an add row with something typed into it until the row is added or dropped. The click on Save is what ends the edit, so a Save that went disabled as the edit ended would lose that click.
 
 ### Navigation history

@@ -39,6 +39,12 @@ public sealed class NavigationHistory(int depth = 50) : ReactiveObject
     public bool CanGoBack => _back.Count > 0;
     public bool CanGoForward => _forward.Count > 0;
 
+    /// <summary>The stop Back would return to, without going there; null when there's none.</summary>
+    public ScreenVisit? BackTarget => _back.Count > 0 ? _back[^1] : null;
+
+    /// <summary>The stop Forward would step into, without going there; null when there's none.</summary>
+    public ScreenVisit? ForwardTarget => _forward.Count > 0 ? _forward[^1] : null;
+
     /// <summary>The screen showing when the window opens: where the history starts, with nothing either side of it.</summary>
     public void Start(ScreenVisit visit)
     {

@@ -42,6 +42,12 @@ public partial class App : Application
     // Set by RestartAfterExit: the app starts again once this one has closed.
     private bool _restartOnExit;
 
+    /// <summary>
+    /// Closing to start again after a restore (RestartAfterExit). The main window doesn't ask about unsaved changes then:
+    /// the restore replaced the data they were made to, and its question already said they'd be lost.
+    /// </summary>
+    public bool IsRestarting => _restartOnExit;
+
     static App()
     {
         Log.Logger = new LoggerConfiguration()

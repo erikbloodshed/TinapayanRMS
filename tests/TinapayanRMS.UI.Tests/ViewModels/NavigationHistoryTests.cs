@@ -37,6 +37,24 @@ public class NavigationHistoryTests
     }
 
     [Fact]
+    public void BackTarget_and_ForwardTarget_say_where_a_step_would_go_without_taking_it()
+    {
+        var history = new NavigationHistory();
+        history.Start(new ScreenVisit(AppScreen.Products, null));
+        history.BackTarget.Should().BeNull();
+        history.ForwardTarget.Should().BeNull();
+
+        history.Visit(new ScreenVisit(AppScreen.Products, 1), AppScreen.SubAssemblies);
+        history.BackTarget.Should().Be(new ScreenVisit(AppScreen.Products, 1));
+        history.BackTarget.Should().Be(new ScreenVisit(AppScreen.Products, 1), "asking twice goes nowhere");
+        history.CanGoBack.Should().BeTrue();
+
+        history.GoBack(new ScreenVisit(AppScreen.SubAssemblies, 7));
+        history.BackTarget.Should().BeNull();
+        history.ForwardTarget.Should().Be(new ScreenVisit(AppScreen.SubAssemblies, 7));
+    }
+
+    [Fact]
     public void A_screen_changed_after_going_back_drops_what_Forward_held()
     {
         var history = new NavigationHistory();

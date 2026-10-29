@@ -150,7 +150,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 ### The main window
 
 - **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports**, **Production Plan** and **Price Simulator**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
-- **Tabs**: each screen opens in a tab along the top. The app starts with **Raw Materials**, **Sub-Assemblies** and **Products** open; open the others from the menu. A tab you close can be opened again from the menu. Each tab keeps its place, such as the record you were looking at and anything you haven't saved, until you close the app.
+- **Tabs**: each screen opens in a tab along the top. The app starts with **Raw Materials**, **Sub-Assemblies** and **Products** open; open the others from the menu. A tab you close can be opened again from the menu. Each tab keeps its place, such as the record you were looking at, until you close the app. A tab with changes you haven't saved asks about them before you leave it (see [Editing and saving](#editing-and-saving)).
 - **Back and Forward** (the arrows at the top right, next to the minimize button, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, like a web browser.
 - Changes made on one tab show up on another tab the next time you switch to it.
 
@@ -170,6 +170,11 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 - **Revert**, on the Products screen only, puts the whole product back as it was last saved.
 - **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly or Packaging) can be typed into. Typing narrows the list to matching names and highlights the best match: the name you typed in full, or else the first name that starts with what you typed, or else the first that contains it. **Enter** or **Tab** picks the highlighted name, so "marg" and Enter picks Margarine. **Down** and **Up** move the highlight to the other names. Clicking or tabbing into a picker selects its text, so what you type replaces it. Click again to put the cursor where you click. A picker that can't be left empty, such as a raw material's **Type** or **Source**, shows its value again if you delete its text and move on.
 - **New** starts a blank record. **Delete** asks before deleting anything.
+- **Changes you haven't saved are never left behind without asking.** When a product, sub-assembly or raw material, new or saved, has changes you haven't saved and you go somewhere else, a message asks **Save the changes to …?** It asks when you go to another tab (or close the one showing), pick another item in the list, press **New**, click a **Used By** tile or another link, press **Back** or **Forward**, use **Clone** or **Create Variant**, or close the app.
+  - **Yes** saves them, then goes on. If the save is refused, for example because a field is missing, you stay, and the red notice says why.
+  - **No** throws them away, then goes on. If you were leaving the tab, the item is put back as it was last saved, so the changes aren't there when you come back.
+  - **Cancel** keeps them, and you stay where you were.
+  - Going between **Products** and the **Print** tab doesn't ask, since Print shows the product with your changes. Nor does **Copy** on the Sub-Assemblies screen, since the copy holds them.
 - A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use. It also says when the app couldn't reach its database, or the database didn't answer in time. Nothing is saved then, and the screen keeps working: once the database answers again, try again, or pick the record again.
 - If something goes wrong that the app didn't expect, a message says what happened and that the app is still running, and the details go in the [log files](#14-troubleshooting-and-questions). Nothing you haven't saved is lost.
 
@@ -1326,6 +1331,9 @@ Purchased materials are costed at their **buffered cost**, which stays fixed unt
 
 **I changed Quantity Required and the packaging looks wrong.**
 Packaging quantities are per sellable unit and aren't rescaled. Update the Packaging tab by hand, or link a packaging set made for that pack size.
+
+**A message asks "Save the changes to …?" when I click somewhere else.**
+The product, sub-assembly or raw material showing has changes you haven't saved. **Yes** saves them, **No** throws them away, and **Cancel** keeps you where you are. See [Editing and saving](#editing-and-saving).
 
 **The app shows an error about the licence when it starts.**
 The app needs a licence key for its screen components, set on the computer by whoever installed it. Ask them to check it.

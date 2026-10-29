@@ -146,6 +146,8 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         Edit(viewModel, () => viewModel.EditingName = "Renamed again");
         viewModel.History.CanUndo.Should().BeTrue();
 
+        // New over unsaved changes asks about them first: not saving them is how they're left behind.
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         await viewModel.NewCommand.Execute();
         viewModel.History.CanUndo.Should().BeFalse("a new material has no history of its own");
     }

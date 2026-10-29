@@ -1,4 +1,5 @@
-﻿using System.Reactive.Linq;
+﻿using System.ComponentModel;
+using System.Reactive.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -30,6 +31,16 @@ public partial class MainWindow : AppWindow, IVimHost
 
     // Set while Back or Forward shows a tab, so the switch isn't recorded as a new step.
     private bool _isRestoringHistory;
+
+    // The screens whose forms can hold unsaved changes, by the tabs that show them. Print is Products' too: it prints the
+    // product as Products shows it, unsaved edits and all (the user's choice), so moving between the two asks nothing.
+    private readonly Dictionary<TabItemExt, IUnsavedChangesScreen> _unsavedChangesScreens = [];
+
+    // Set while a change of tab is undone to ask about the unsaved changes of the screen it left (TurnBackToUnsaved).
+    private bool _isTurningBack;
+
+    // Set once every screen's unsaved changes are saved or thrown away, so the close that follows goes ahead.
+    private bool _isCloseConfirmed;
 
     private readonly UnitsOfMeasureViewModel _unitsOfMeasureViewModel;
     private readonly CategoriesViewModel _categoriesViewModel;
@@ -109,6 +120,11 @@ public partial class MainWindow : AppWindow, IVimHost
         _historyScreens[PriceSimulatorTab] = new(AppScreen.PriceSimulator, () => null, null, () => false);
         _historyScreens[PrintTab] = new(AppScreen.Print, () => null, null, () => false);
 
+        _unsavedChangesScreens[RawMaterialsTab] = rawMaterialsViewModel;
+        _unsavedChangesScreens[SubAssembliesTab] = subAssembliesViewModel;
+        _unsavedChangesScreens[ProductsTab] = productsViewModel;
+        _unsavedChangesScreens[PrintTab] = productsViewModel;
+
         // A Print on Products (the header's, its open form applied, or a folder's or the list's): the Print tab with that
         // choice, which it prepares as it's shown.
         productsViewModel.PrintRequests.Subscribe(scope =>
@@ -118,49 +134,29 @@ public partial class MainWindow : AppWindow, IVimHost
         });
 
         // A Used By tile on Sub-Assemblies or Raw Materials, or a double-clicked row of Reports' Product Cost Summary or the Price Simulator, opens its
-        // product on Products. Picked before the tab shows, so a list not loaded yet has the product waiting for the load
-        // that showing the tab starts.
+        // product on Products (OpenOnAsync).
         subAssembliesViewModel.ProductOpenRequests
             .Merge(rawMaterialsViewModel.ProductOpenRequests)
             .Merge(reportsViewModel.ProductOpenRequests)
             .Merge(priceSimulatorViewModel.ProductOpenRequests)
-            .Subscribe(productId =>
-            {
-                productsViewModel.OpenProduct(productId);
-                ShowTab(ProductsTab);
-            });
+            .Subscribe(productId => _ = OpenOnAsync(ProductsTab, () => productsViewModel.OpenProductAsync(productId)));
 
         // Sub-Assemblies' New Product starts a new product on Products that links the sub-assembly. It waits for the load
         // that showing the tab starts, so the sub-assembly is found as it's saved now.
         subAssembliesViewModel.NewProductRequests.Subscribe(subAssemblyId =>
-        {
-            productsViewModel.StartNewProductFrom(subAssemblyId);
-            ShowTab(ProductsTab);
-        });
+            _ = OpenOnAsync(ProductsTab, () => productsViewModel.StartNewProductFromAsync(subAssemblyId)));
 
-        // A double-clicked row of Reports' Raw Materials Price Summary opens its material on Raw Materials, the same way.
-        reportsViewModel.RawMaterialOpenRequests.Subscribe(rawMaterialId =>
-        {
-            rawMaterialsViewModel.OpenRawMaterial(rawMaterialId);
-            ShowTab(RawMaterialsTab);
-        });
-
-        // A made ingredient's Used By tile on Sub-Assemblies opens it on Raw Materials, the same way.
-        subAssembliesViewModel.RawMaterialOpenRequests.Subscribe(rawMaterialId =>
-        {
-            rawMaterialsViewModel.OpenRawMaterial(rawMaterialId);
-            ShowTab(RawMaterialsTab);
-        });
+        // A double-clicked row of Reports' Raw Materials Price Summary, or a made ingredient's Used By tile on Sub-Assemblies,
+        // opens its material on Raw Materials, the same way.
+        reportsViewModel.RawMaterialOpenRequests
+            .Merge(subAssembliesViewModel.RawMaterialOpenRequests)
+            .Subscribe(rawMaterialId => _ = OpenOnAsync(RawMaterialsTab, () => rawMaterialsViewModel.OpenRawMaterialAsync(rawMaterialId)));
 
         // And the other way: a linked badge on Products, or a made ingredient's Recipe card on Raw Materials, opens its
         // standalone sub-assembly on Sub-Assemblies.
         productsViewModel.SubAssemblyOpenRequests
             .Merge(rawMaterialsViewModel.SubAssemblyOpenRequests)
-            .Subscribe(subAssemblyId =>
-            {
-                subAssembliesViewModel.OpenSubAssembly(subAssemblyId);
-                ShowTab(SubAssembliesTab);
-            });
+            .Subscribe(subAssemblyId => _ = OpenOnAsync(SubAssembliesTab, () => subAssembliesViewModel.OpenSubAssemblyAsync(subAssemblyId)));
 
         // The tab that's selected at startup; every later switch goes through SelectionChanged.
         Loaded += (_, _) =>
@@ -232,13 +228,21 @@ public partial class MainWindow : AppWindow, IVimHost
     /// Goes back or forward one screen, and reopens the record that screen had open — unless its form holds unsaved
     /// changes, which Back never throws away: the screen then shows as it is. The record is asked for before the tab
     /// shows, as the links between screens do, so a list not loaded yet opens it once the load that showing the tab
-    /// starts brings it in. False when there was nowhere to go.
+    /// starts brings it in. The screen left is asked about its own unsaved changes first, and the step only taken once
+    /// they're saved or thrown away, so a Cancel leaves the history where it was. False when there was nowhere to go.
     /// </summary>
     private bool NavigateHistory(bool back)
     {
-        if (MainTabControl.SelectedItem is not TabItemExt currentTab || !_historyScreens.TryGetValue(currentTab, out var current))
+        if (MainTabControl.SelectedItem is not TabItemExt currentTab || !_historyScreens.TryGetValue(currentTab, out var current)
+            || (back ? _navigation.BackTarget : _navigation.ForwardTarget) is not { } next)
         {
             return false;
+        }
+
+        if (UnsavedChangesLeft(currentTab, _historyScreens.First(pair => pair.Value.Screen == next.Screen).Key) is { } unsaved)
+        {
+            _ = NavigateHistoryAfterAskingAsync(unsaved, back);
+            return true;
         }
 
         var leaving = current.Visit();
@@ -264,6 +268,133 @@ public partial class MainWindow : AppWindow, IVimHost
         }
 
         return true;
+    }
+
+    private async Task NavigateHistoryAfterAskingAsync(IUnsavedChangesScreen screen, bool back)
+    {
+        if (await screen.ResolveUnsavedChangesAsync(revert: true))
+        {
+            NavigateHistory(back);
+        }
+    }
+
+    /// <summary>
+    /// A link from one screen to a record on another: the screen showing is left, its unsaved changes asked about first;
+    /// <paramref name="open"/> opens the record, the other screen asking about its own; then its tab shows. The record is
+    /// opened before the tab shows, so a list not loaded yet has it waiting for the load that showing the tab starts.
+    /// </summary>
+    private async Task OpenOnAsync(TabItemExt tab, Func<Task<bool>> open)
+    {
+        if (MainTabControl.SelectedItem is TabItemExt showing
+            && UnsavedChangesLeft(showing, tab) is { } screen
+            && !await screen.ResolveUnsavedChangesAsync(revert: true))
+        {
+            return;
+        }
+
+        if (await open())
+        {
+            ShowTab(tab);
+        }
+    }
+
+    /// <summary>
+    /// The screen whose unsaved changes a move from <paramref name="from"/> to <paramref name="to"/> would leave: null when
+    /// <paramref name="from"/>'s form holds none, or <paramref name="to"/> shows the same screen (Products and Print).
+    /// </summary>
+    private IUnsavedChangesScreen? UnsavedChangesLeft(TabItemExt from, TabItemExt to) =>
+        _unsavedChangesScreens.TryGetValue(from, out var screen)
+        && screen.HasUnsavedChanges
+        && !(_unsavedChangesScreens.TryGetValue(to, out var arriving) && ReferenceEquals(arriving, screen))
+            ? screen
+            : null;
+
+    /// <summary>
+    /// A tab picked (the tab strip, the menu, gt, a command, or the tab showing closed with its ✕) while the screen left holds
+    /// unsaved changes: the screen left shows again at once, and the tab picked once the changes are saved or thrown away.
+    /// Don't Save puts the screen back as it was saved, so they aren't there to come back to. TabControlExt has no change of
+    /// selection to cancel, so it's undone instead; a tab closed opens again until then. False when nothing unsaved is left.
+    /// </summary>
+    private bool TurnBackToUnsaved(SelectionChangedEventArgs e)
+    {
+        if (e.RemovedItems.OfType<TabItemExt>().FirstOrDefault() is not { } leftTab
+            || e.AddedItems.OfType<TabItemExt>().FirstOrDefault() is not { } pickedTab
+            || UnsavedChangesLeft(leftTab, pickedTab) is not { } screen)
+        {
+            return false;
+        }
+
+        var wasClosed = leftTab.Visibility != Visibility.Visible;
+        _isTurningBack = true;
+        try
+        {
+            leftTab.Visibility = Visibility.Visible;
+            MainTabControl.SelectedItem = leftTab;
+        }
+        finally
+        {
+            _isTurningBack = false;
+        }
+
+        // Asked once the tab control is done changing its selection.
+        Dispatcher.InvokeAsync(async () =>
+        {
+            if (await screen.ResolveUnsavedChangesAsync(revert: true))
+            {
+                ShowTab(pickedTab);
+                if (wasClosed)
+                {
+                    leftTab.Visibility = Visibility.Collapsed;
+                }
+            }
+        });
+
+        return true;
+    }
+
+    /// <summary>
+    /// Closing the app with unsaved changes asks about them first (CloseAfterAskingAsync), and a Cancel keeps it open. Not
+    /// when it's closing to start again after a restore, which already said they'd be lost.
+    /// </summary>
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (e.Cancel
+            || _isCloseConfirmed
+            || Application.Current is App { IsRestarting: true }
+            || !_unsavedChangesScreens.Values.Any(screen => screen.HasUnsavedChanges))
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        Dispatcher.InvokeAsync(CloseAfterAskingAsync);
+    }
+
+    /// <summary>
+    /// Asks about each screen's unsaved changes, the one showing first, each shown as it's asked about, then closes the app;
+    /// a Cancel stops there and keeps it open.
+    /// </summary>
+    private async Task CloseAfterAskingAsync()
+    {
+        var showing = MainTabControl.SelectedItem as TabItemExt;
+        HashSet<IUnsavedChangesScreen> asked = [];
+        foreach (var (tab, screen) in _unsavedChangesScreens.OrderBy(pair => pair.Key == showing ? 0 : 1))
+        {
+            if (!asked.Add(screen) || !screen.HasUnsavedChanges)
+            {
+                continue;
+            }
+
+            ShowTab(tab);
+            if (!await screen.ResolveUnsavedChangesAsync(revert: false))
+            {
+                return;
+            }
+        }
+
+        _isCloseConfirmed = true;
+        Close();
     }
 
     /// <summary>
@@ -407,8 +538,9 @@ public partial class MainWindow : AppWindow, IVimHost
 
     private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // SelectionChanged bubbles, so a grid or picker inside a tab raises it here too.
-        if (!ReferenceEquals(e.OriginalSource, MainTabControl))
+        // SelectionChanged bubbles, so a grid or picker inside a tab raises it here too. A change undone by TurnBackToUnsaved
+        // is no move: the screen left never stopped showing.
+        if (!ReferenceEquals(e.OriginalSource, MainTabControl) || _isTurningBack || (IsLoaded && TurnBackToUnsaved(e)))
         {
             return;
         }

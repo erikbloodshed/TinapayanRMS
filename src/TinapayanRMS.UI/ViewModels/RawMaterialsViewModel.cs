@@ -23,7 +23,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// units, brand prices and a made ingredient's sub-assembly and add-ins are all edited in memory, and Save
 /// writes them together. The sub-assembly's own lines are only shown: they're written on the Sub-Assemblies screen.
 /// </summary>
-public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen, IRecordScreen
+public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen, IRecordScreen, IUnsavedChangesScreen
 {
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
@@ -1235,7 +1235,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             }
         }));
 
-        NewCommand = ReactiveCommand.Create(() => ClearForm());
+        // A new material replaces the one showing, so its unsaved changes are asked about first.
+        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => ClearForm()));
 
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
 
@@ -1377,10 +1378,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
         UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveMaterialsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
         DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
-        NewMaterialInCommand = ReactiveCommand.Create<RawMaterialFolderNode?>(folder => ClearForm(
+        NewMaterialInCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode?>(folder => AfterUnsavedChangesAsync(() => ClearForm(
             folder?.Type ?? RawMaterialType.Ingredient,
             folder?.CategoryId,
-            folder?.CategoryType == RawMaterialCategoryType.Made ? RawMaterialSource.Made : RawMaterialSource.Purchased));
+            folder?.CategoryType == RawMaterialCategoryType.Made ? RawMaterialSource.Made : RawMaterialSource.Purchased)));
         RenameMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(RenameMaterialAsync);
         DeleteMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(leaf => DeleteRawMaterialAsync(leaf.RawMaterial));
         NewCategoryCommand = ReactiveCommand.CreateFromTask<RawMaterialCategoryType>(NewCategoryAsync);
@@ -2346,6 +2347,60 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         _rawMaterialToOpen = TrySelectRawMaterial(rawMaterialId) ? null : rawMaterialId;
     }
 
+    /// <summary>
+    /// <see cref="OpenRawMaterial"/>, asking first about the unsaved changes of the material showing when another is to
+    /// replace it. False when the user stays on it.
+    /// </summary>
+    public async Task<bool> OpenRawMaterialAsync(int rawMaterialId)
+    {
+        if (rawMaterialId != SelectedRawMaterial?.Id && !await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return false;
+        }
+
+        OpenRawMaterial(rawMaterialId);
+        return true;
+    }
+
+    public bool HasUnsavedChanges => History.IsDirty;
+
+    /// <inheritdoc/>
+    public Task<bool> ResolveUnsavedChangesAsync(bool revert) => AskAboutUnsavedChangesAsync(
+        History.IsDirty,
+        !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim() : SelectedRawMaterial?.Name ?? "the new raw material",
+        async () =>
+        {
+            await SaveCommand.Execute();
+            return !History.IsDirty;
+        },
+        revert ? RevertToSavedAsync : null);
+
+    /// <summary>Runs <paramref name="then"/>, which replaces the material showing, once its unsaved changes are saved or thrown away.</summary>
+    private async Task AfterUnsavedChangesAsync(Action then)
+    {
+        if (await ResolveUnsavedChangesAsync(revert: false))
+        {
+            then();
+        }
+    }
+
+    /// <summary>
+    /// Don't Save on leaving the screen: the form goes back to the material as it was last saved, read again, since its
+    /// alternative units write through to the copy the list holds. A new material was never saved, so it goes back to a
+    /// blank one.
+    /// </summary>
+    private async Task RevertToSavedAsync()
+    {
+        if (SelectedRawMaterial is { } material)
+        {
+            await ReloadSavedRawMaterialAsync(material.Id);
+        }
+        else
+        {
+            ClearForm();
+        }
+    }
+
     /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the material the name means best.</summary>
     public bool OpenByName(string text)
     {
@@ -2354,7 +2409,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             return false;
         }
 
-        OpenRawMaterial(material.Id);
+        _ = OpenRawMaterialAsync(material.Id);
         return true;
     }
 
@@ -2520,8 +2575,28 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // which then finds its row first already and leaves the collection alone, as it must mid-change.
         if (!_treeSelection.IsSyncing && first is RawMaterialLeafNode leaf && leaf.RawMaterial.Id != SelectedRawMaterial?.Id)
         {
-            SelectedRawMaterial = leaf.RawMaterial;
+            if (History.IsDirty)
+            {
+                _ = PickAfterAskingAsync(leaf.RawMaterial.Id);
+            }
+            else
+            {
+                SelectedRawMaterial = leaf.RawMaterial;
+            }
         }
+    }
+
+    /// <summary>
+    /// Another material's row picked while the form holds unsaved changes: the list goes back to the row of the material
+    /// showing, and the one picked opens once the changes are saved or thrown away.
+    /// </summary>
+    private async Task PickAfterAskingAsync(int rawMaterialId)
+    {
+        // The tree calls TreeSelectionChanged in the middle of changing its selection: going on once that's over lets the
+        // list take the row of the material showing back.
+        await Task.Yield();
+        SyncTreeSelection();
+        await OpenRawMaterialAsync(rawMaterialId);
     }
 
     /// <summary>
