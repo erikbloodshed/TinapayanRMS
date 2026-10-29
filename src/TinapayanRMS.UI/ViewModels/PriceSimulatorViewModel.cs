@@ -55,22 +55,10 @@ public sealed class PriceSimulatorProductRow(Product product, ProductCostSummary
     /// The price, with VAT, that earns today's markup with the changes (PriceChangeRules.PriceToKeepMarkup): the current
     /// price, for a product no change reaches. Null without a current price.
     /// </summary>
-    public decimal? PriceToKeepMarkup =>
-        PriceChangeRules.PriceToKeepMarkup(now.CurrentPrice, BaseCost, SimulatedBaseCost, now.VatPercent, simulated.VatPercent);
-
-    /// <summary>
-    /// <see cref="PriceToKeepMarkup"/> rounded up to a price to charge (Settings' Price Rounding, 2026-10-29), for a product a
-    /// change reaches: what Set Current Prices sets. The current price as it is for one no change reaches; null without one.
-    /// </summary>
-    public decimal? PriceToCharge => PriceToKeepMarkup is { } price
-        ? IsAffected ? CostingRules.RoundPriceUp(price, simulated.PriceRoundingStep) : price
-        : null;
-
-    /// <summary>A change reaches it and <see cref="PriceToCharge"/> isn't its current price: what Set Current Prices would change.</summary>
-    public bool HasNewPriceToCharge => IsAffected && PriceToCharge is { } price && price != CurrentPrice;
+    public decimal? PriceToKeepMarkup => PriceChangeRules.PriceToKeepMarkup(now.CurrentPrice, BaseCost, SimulatedBaseCost);
 
     /// <summary>Whether any change reaches it. Exact: both figures come from the same arithmetic, so an untouched product's are equal.</summary>
-    public bool IsAffected => SimulatedBaseCost != BaseCost || simulated.VatPercent != now.VatPercent;
+    public bool IsAffected => SimulatedBaseCost != BaseCost;
 }
 
 /// <summary>
@@ -114,9 +102,6 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     private Dictionary<int, SavedProduct> _simulated = [];
     private IReadOnlyList<(PrintedPriceChange Change, IReadOnlySet<int> Reaches)> _tried = [];
 
-    /// <summary>The costing changes the last recalculation tried, for the report: each reaches every product.</summary>
-    private IReadOnlyList<PrintedPriceChange> _costingTried = [];
-
     private CostBasis _costBasis;
     /// <summary>
     /// Which of the materials' costs every figure is at (2026-10-24, at the user's request): buffered, as always, until the
@@ -155,88 +140,6 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
 
     /// <summary>The price changes being tried, as typed in the table.</summary>
     public ObservableCollection<SimulatedPriceChange> Changes { get; } = [];
-
-    private IReadOnlyList<RawMaterialCategory> _categories = [];
-    /// <summary>The categories with a purchased material in them: what Add Category's picker offers.</summary>
-    public IReadOnlyList<RawMaterialCategory> Categories
-    {
-        get => _categories;
-        private set => this.RaiseAndSetIfChanged(ref _categories, value);
-    }
-
-    private RawMaterialCategory? _categoryToChange;
-    /// <summary>The category Add Category puts a change in for each of its priced materials (2026-10-29: "all Dairy +5%").</summary>
-    public RawMaterialCategory? CategoryToChange
-    {
-        get => _categoryToChange;
-        set => this.RaiseAndSetIfChanged(ref _categoryToChange, value);
-    }
-
-    private decimal? _categoryChangePercent;
-    public decimal? CategoryChangePercent
-    {
-        get => _categoryChangePercent;
-        set => this.RaiseAndSetIfChanged(ref _categoryChangePercent, value);
-    }
-
-    /// <summary>
-    /// A row at <see cref="CategoryChangePercent"/> for every material in <see cref="CategoryToChange"/> with a price, or that
-    /// percent put on its row already in the table. A material with no price is left out, and the message names it.
-    /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> AddCategoryChangeCommand { get; }
-
-    private decimal? _simulatedWastagePercent;
-    /// <summary>
-    /// The shop-wide Wastage % to try in place of Settings' (2026-10-29, the costing changes); null keeps it. Like the price
-    /// changes, nothing real changes, and it isn't kept with a scenario.
-    /// </summary>
-    public decimal? SimulatedWastagePercent
-    {
-        get => _simulatedWastagePercent;
-        set => SetCostingChange(ref _simulatedWastagePercent, value);
-    }
-
-    private decimal? _simulatedVatPercent;
-    /// <summary>The VAT % to try for every product in place of its own; null keeps each one's.</summary>
-    public decimal? SimulatedVatPercent
-    {
-        get => _simulatedVatPercent;
-        set => SetCostingChange(ref _simulatedVatPercent, value);
-    }
-
-    private decimal? _laborChangePoints;
-    /// <summary>Percentage points every product's Labor % moves by, up or down, never below 0; null leaves each one's.</summary>
-    public decimal? LaborChangePoints
-    {
-        get => _laborChangePoints;
-        set => SetCostingChange(ref _laborChangePoints, value);
-    }
-
-    private decimal? _overheadChangePoints;
-    public decimal? OverheadChangePoints
-    {
-        get => _overheadChangePoints;
-        set => SetCostingChange(ref _overheadChangePoints, value);
-    }
-
-    private decimal? _administrativeChangePoints;
-    public decimal? AdministrativeChangePoints
-    {
-        get => _administrativeChangePoints;
-        set => SetCostingChange(ref _administrativeChangePoints, value);
-    }
-
-    private void SetCostingChange(ref decimal? field, decimal? value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
-    {
-        if (field == value)
-        {
-            return;
-        }
-
-        field = value;
-        this.RaisePropertyChanged(propertyName);
-        Recalculate();
-    }
 
     /// <summary>Purchased ingredients and packaging, by name: what a price change can be tried on.</summary>
     private IReadOnlyList<RawMaterial> _materials = [];
@@ -334,16 +237,6 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
 
     /// <summary>
-    /// Sets the Current Price of the products picked, or of every product the table shows, to its Price to Charge
-    /// (2026-10-29, at the user's request), once it's confirmed: only those a change reaches whose price would move. The
-    /// raw material prices don't change. Each product changed gets a version. Offered only with VersionedSaves to write it.
-    /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> SetCurrentPricesCommand { get; }
-
-    /// <summary>What Set Current Prices writes with its versions; null in a screen built without it.</summary>
-    private readonly VersionedSaves? _versionedSaves;
-
-    /// <summary>
     /// Input: the report's sets, the one to show first first: the selected products, when any are, then all the products
     /// shown. The View shows them in a print pane.
     /// </summary>
@@ -362,11 +255,9 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         IRawMaterialBrandPriceRepository brandPriceRepository,
         IPriceScenarioRepository scenarioRepository,
         SavedProductReader savedProducts,
-        ILogger logger,
-        VersionedSaves? versionedSaves = null)
+        ILogger logger)
         : base(logger)
     {
-        _versionedSaves = versionedSaves;
         _productRepository = productRepository;
         _rawMaterialRepository = rawMaterialRepository;
         _bomLineRepository = bomLineRepository;
@@ -381,8 +272,6 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         {
             _data = await Task.Run(ReadAsync);
             Materials = [.. _data.Materials.Values.Where(m => m.Source == RawMaterialSource.Purchased).OrderBy(m => m.Name)];
-            Categories = [.. Materials.Select(m => m.Category).OfType<RawMaterialCategory>().DistinctBy(c => c.Id).OrderBy(c => c.Name)];
-            CategoryToChange = Categories.FirstOrDefault(c => c.Id == CategoryToChange?.Id);
             ShowScenarios(_data.Scenarios);
 
             // Each change is pointed at today's copy of its material and price; one whose material is gone goes.
@@ -405,16 +294,10 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
             () => { Changes.Remove(SelectedChange!); },
             this.WhenAnyValue(x => x.SelectedChange).Select(change => change is not null));
         // Starting over: the table empties, and no scenario is open any more.
-        // Every figure today's again: the costing changes go too, though a scenario never kept them.
         ClearCommand = ReactiveCommand.Create(() =>
         {
             Changes.Clear();
             ShowOpenScenario(null);
-            SimulatedWastagePercent = null;
-            SimulatedVatPercent = null;
-            LaborChangePoints = null;
-            OverheadChangePoints = null;
-            AdministrativeChangePoints = null;
         });
         OpenScenarioCommand = ReactiveCommand.CreateFromTask<PriceScenario>(OpenScenarioAsync);
         SaveScenarioCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(SaveScenarioAsync));
@@ -429,10 +312,6 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         });
         PrintCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () => await ShowPrint.Handle(PrintChoices(DateTime.Now))));
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
-        SetCurrentPricesCommand = ReactiveCommand.CreateFromTask(SetCurrentPricesAsync, Observable.Return(versionedSaves is not null));
-        AddCategoryChangeCommand = ReactiveCommand.Create(
-            AddCategoryChange,
-            this.WhenAnyValue(x => x.CategoryToChange, x => x.CategoryChangePercent, (category, percent) => category is not null && percent is not null));
 
         // A newer change cancels a recalculation still running, and one that's refused (a price of 0) says why and keeps
         // the figures it had, until the change is put right.
@@ -460,13 +339,11 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         EnsureNoMaterialTwice(newCosts.Select(c => c.MaterialId));
 
         List<PrintedPriceChange> printed = [.. tried.Select(t => Printed(t.Change))];
-        var costing = new SimulatedCosting(SimulatedWastagePercent, SimulatedVatPercent, LaborChangePoints, OverheadChangePoints, AdministrativeChangePoints);
-        costing.EnsureValid();
         var (rows, simulatedById, reaches) = await Task.Run(
             () =>
             {
                 var repriced = IngredientCostRules.Reprice(data.Materials, data.BomLines, newCosts.ToDictionary(c => c.MaterialId, c => (c.Cost, c.BufferedCost)));
-                var details = SavedProductReader.PricedAt(data.Details, repriced).ToDictionary(d => d.Key, d => costing.Apply(d.Value));
+                var details = SavedProductReader.PricedAt(data.Details, repriced);
                 Dictionary<int, SavedProduct> simulatedById = [];
                 foreach (var product in data.Products)
                 {
@@ -487,9 +364,6 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         _now = now;
         _simulated = simulatedById;
         _tried = [.. printed.Zip(reaches)];
-        // The Wastage % now, when every product has the same one: a category can set its own (2026-10-29).
-        var wastagesNow = data.Details.Values.Select(d => d.WastagePercent).Distinct().ToList();
-        _costingTried = costing.Printed(wastagesNow is [var wastageNow] ? wastageNow : null);
         ShowRows();
     }
 
@@ -683,78 +557,12 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
             foreach (var row in rows)
             {
                 var materialIds = PriceSimulatorReport.MaterialIdsOf(row.ProductId, data.Details);
-                IReadOnlyList<PrintedPriceChange> reaching = [.. _tried.Where(t => t.Reaches.Overlaps(materialIds)).Select(t => t.Change), .. _costingTried];
+                IReadOnlyList<PrintedPriceChange> reaching = [.. _tried.Where(t => t.Reaches.Overlaps(materialIds)).Select(t => t.Change)];
                 printouts.Add(PriceSimulatorReport.Printout(_now[row.ProductId], _simulated[row.ProductId], reaching, printedAt));
             }
         }
 
-        return PriceSimulatorReport.Set(printouts, [.. _tried.Select(t => t.Change), .. _costingTried], printedAt);
-    }
-
-    private void AddCategoryChange()
-    {
-        ErrorMessage = null;
-        SuccessMessage = null;
-        if (CategoryToChange is not { } category || CategoryChangePercent is not { } percent)
-        {
-            return;
-        }
-
-        List<string> noPrice = [];
-        var added = 0;
-        foreach (var material in Materials.Where(m => m.CategoryId == category.Id))
-        {
-            if (Find(material.Id) is not { Unit.Price: not null })
-            {
-                noPrice.Add(material.Name);
-                continue;
-            }
-
-            var change = Changes.FirstOrDefault(c => c.MaterialId == material.Id);
-            if (change is null)
-            {
-                change = NewChange();
-                change.MaterialId = material.Id;
-                Changes.Add(change);
-            }
-
-            change.ChangePercent = percent;
-            added++;
-        }
-
-        SuccessMessage = string.Create(System.Globalization.CultureInfo.CurrentCulture, $"{category.Name}: {added} {(added == 1 ? "material" : "materials")} at {percent:+0.##;-0.##;0}%.")
-            + (noPrice.Count > 0 ? $" Left out, with no price to change: {string.Join(", ", noPrice)}." : string.Empty);
-    }
-
-    private async Task SetCurrentPricesAsync()
-    {
-        ErrorMessage = null;
-        SuccessMessage = null;
-        List<PriceSimulatorProductRow> picked = [.. SelectedProducts.OfType<PriceSimulatorProductRow>()];
-        List<PriceSimulatorProductRow> rows = [.. (picked.Count > 0 ? picked : ShownProducts()).Where(r => r.HasNewPriceToCharge)];
-        if (rows.Count == 0)
-        {
-            ErrorMessage = picked.Count > 0
-                ? "None of the products picked has a new price to charge: no change reaches it, it has no Current Price, or it's at its Price to Charge already."
-                : "No product shown has a new price to charge: try a price change that reaches one with a Current Price.";
-            return;
-        }
-
-        var what = rows.Count == 1 ? rows[0].ProductName : $"{rows.Count} products";
-        if (!await ConfirmDelete.Handle(
-                $"Set the Current Price of {what} to its Price to Charge, the price that keeps today's markup with these changes? "
-                + "The raw material prices don't change: record those on Raw Materials when they do. A version is recorded for each product."))
-        {
-            return;
-        }
-
-        await RunSafelyAsync(async () =>
-        {
-            var versioned = await Task.Run(() => _versionedSaves!.SetCurrentPricesAsync(
-                [.. rows.Select(r => (r.ProductId, r.PriceToCharge!.Value))], "Current Price set from the Price Simulator", DateTime.Now, CancellationToken.None));
-            await LoadCommand.Execute();
-            SuccessMessage = $"Set the Current Price of {what}." + (ProductVersionRecorder.RecordedMessage(versioned) is { } recorded ? $" {recorded}" : string.Empty);
-        });
+        return PriceSimulatorReport.Set(printouts, [.. _tried.Select(t => t.Change)], printedAt);
     }
 
     /// <summary>A price change as the table shows it, for the report. Only a row with its new price worked out is tried.</summary>

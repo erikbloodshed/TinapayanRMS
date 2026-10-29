@@ -173,6 +173,7 @@ Build phase by phase. Do not jump ahead to a later phase's concerns while workin
 | 2026-10-29 | **Wastage per category**, at the user's request: a product category's own Wastage % (Settings → Product Categories) prices its products in place of the shop-wide one; blank keeps the shop-wide one. Also: the Price Simulator's "As now" boxes now show their placeholder (`WatermarkTextIsVisible`). Migration `ProductCategoryWastagePercent` | Done |
 | 2026-10-29 | **Cost by preferred brand**, at the user's request: Raw Materials' **Cost From** costs a purchased material at a brand picked instead of the dearest (`RawMaterial.PreferredBrand`, `RawMaterialRules.FindCostBrandPrice`); the average wasn't built. Also fixed: Undo left the Cost Buffer % box stale. Migration `RawMaterialPreferredBrand` | Done |
 | 2026-10-29 | **Plans by date** and **record actual results**, at the user's request: a saved plan's **Make On** day (the list in its order, today's opening by itself) and each line's **Made** and **Left Over**, which Reports' new **Production Results** adds up by category against its Wastage %. Migration `SavedPlanDayAndResults` | Done |
+| 2026-10-29 | **Dropped**, at the user's request ("it's confusing"): the Price Simulator's Price to Charge and Set Current Prices, and its Whole Category and Costing changes, both reverted whole | Done |
 
 ## Open items (for later phases)
 

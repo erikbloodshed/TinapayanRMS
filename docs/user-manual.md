@@ -983,16 +983,6 @@ The top table holds the changes to try, one row per raw material:
 
 **Remove Line** takes the picked row away, and **Clear All** takes them all away, so every figure is today's again.
 
-**Whole Category**, under the table, tries one change on every material in a category: pick the category, type the **Change %**, and press **Add Category**. Each material in it with a price gets a row at that change (one already in the table takes the change instead), and the message names any left out because they have no price yet. For example, *Dairy* at **5** puts every dairy material up 5%.
-
-**Costing**, under that, tries changes to the costing itself, on every product. Leave a box blank to keep its figure as it is now:
-
-- **Wastage %**: the wastage to try on every product, in place of the shop's in Settings and any category's own. The report lists it with today's figure beside it when every product has the same one today.
-- **VAT %**: the VAT to try on every product.
-- **Labor ± pts**, **Overhead ± pts** and **Admin ± pts**: how many percentage points each product's own percentage moves, up or down, such as **2** or **-1.5**. A percentage never goes below 0.
-
-The costing changes aren't kept with a scenario, and **Clear All** takes them away too. A VAT change moves **Price to Keep Markup** as well, since VAT goes on top of the markup.
-
 A change moves the material's cost and its buffered cost by the same amount, as typing its Cost Buffer % again after a real price change would. It reaches every made ingredient using the material and every linked ingredient cut from it, as a real price change does. For example, a rise in eggs reaches egg white and the custard made with it.
 
 ### Scenarios
@@ -1017,10 +1007,7 @@ The lower table shows every product for one sellable unit, at buffered costs, no
 - **Suggested Price** and **Simulated Suggested Price**: the Costing tab's Total Selling Price.
 - **Current Price**: what you charge now, VAT included, as entered on **Products**. Blank when none is entered.
 - **Markup %** and **Simulated Markup %**: what the product's current price earns, now and with the changes. Blank for a product with no current price.
-- **Price to Keep Markup**: the price that earns today's **Markup %** with the changes. It moves with the base cost: a base cost up 5% gives a price 5% higher. A product no change reaches keeps its current price. Blank for a product with no current price. The figure isn't rounded.
-- **Price to Charge**: **Price to Keep Markup** rounded up as Settings → Costing Defaults → **Price Rounding** says, for a product a change reaches; the current price for one no change reaches. With no rounding set it's the same as Price to Keep Markup.
-
-**Set Current Prices** puts the new prices on the products: it sets each product's **Current Price** to its **Price to Charge**. It takes the products you've picked in the table (click one, or several with **Ctrl** or **Shift**), or with none picked, every product the table shows. Only products a change reaches and whose price would move are changed. It asks first, saying how many. The raw material prices themselves don't change: record those on Raw Materials when they do. A version is recorded for each product changed, noted *Current Price set from the Price Simulator*, so its History tab shows it and **Restore** can put the old price back.
+- **Price to Keep Markup**: the price that earns today's **Markup %** with the changes. It moves with the base cost: a base cost up 5% gives a price 5% higher. A product no change reaches keeps its current price. Blank for a product with no current price. The figure isn't rounded, so round it to a price you'd charge.
 
 A composite product moves with the products it holds. Tick **Only affected products** to hide the products no change reaches. Sort by **Simulated Markup %** to see which products would earn the least. Filter by product or category from the funnel in its heading, and double-click a product to open it.
 
@@ -1291,7 +1278,7 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 1. Open the **Price Simulator** from the menu.
 2. In the top table, pick the raw material and type its **Change %**, such as **8**, or its **New Price**.
 3. Tick **Only affected products** and sort by **Simulated Markup %**.
-4. Read **Price to Keep Markup** for what to charge to keep each product's markup, and **Price to Charge** for it rounded. To charge that, pick the products and press **Set Current Prices**, or change a product's **Current Price** on **Products**.
+4. Read **Price to Keep Markup** for what to charge to keep each product's markup. Change a product's **Current Price** on **Products**.
 5. To see why a product moves, Ctrl-click it and any others, press **Print Report**, and read each product's ingredients and costing, now and with the change. Print it, or save it as a PDF.
 6. To keep the changes for another day, press **Save Scenario** and name it. Click it in the **Scenarios** list to open it again.
 7. To make the price real, record it on **Raw Materials** as in [Record a price increase](#record-a-price-increase). The Price Simulator never changes a price itself.

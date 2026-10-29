@@ -30,7 +30,6 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <Grid>
@@ -157,74 +156,6 @@
                         <controls:NumericColumn MappingName="ChangePercent" HeaderText="Change %" NumberDecimalDigits="2" Width="110" AllowNullValue="True" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
-
-                <!--
-                    2026-10-29: a whole category at one change, which fills the table above with a row for each of its priced
-                    materials; and changes to the costing itself, tried on every product. Blank boxes leave a figure as it is.
-                -->
-                <StackPanel Grid.Row="3" Grid.Column="2" Margin="0,10,0,0">
-                    <WrapPanel>
-                        <TextBlock Text="Whole Category" Style="{StaticResource FormLabelStyle}" />
-                        <syncfusion:ComboBoxAdv Width="200"
-                                                ItemsSource="{Binding Categories}"
-                                                SelectedItem="{Binding CategoryToChange, Mode=TwoWay}"
-                                                DisplayMemberPath="Name"
-                                                DefaultText="Category" />
-                        <TextBlock Text="Change %" VerticalAlignment="Center" Margin="10,0,6,0" />
-                        <syncfusion:DoubleTextBox Width="90"
-                                                  NumberDecimalDigits="2"
-                                                  UseNullOption="True"
-                                                  Value="{Binding CategoryChangePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
-                        <syncfusion:ButtonAdv Label="Add Category"
-                                              Margin="8,0,0,0"
-                                              IconTemplate="{StaticResource AddIconTemplate}"
-                                              Command="{Binding AddCategoryChangeCommand}"
-                                              ToolTip="Puts a row in the table for every material in the category that has a price, at this change, or gives the change to its row already there." />
-                    </WrapPanel>
-                    <WrapPanel Margin="0,8,0,0">
-                        <TextBlock Text="Costing" Style="{StaticResource FormLabelStyle}" />
-                        <TextBlock Text="Wastage %" VerticalAlignment="Center" Margin="0,0,6,0" />
-                        <syncfusion:DoubleTextBox Width="80"
-                                                  NumberDecimalDigits="2"
-                                                  UseNullOption="True"
-                                                  WatermarkText="As now"
-                                                  WatermarkTextIsVisible="True"
-                                                  ToolTip="The Wastage % to try on every product, in place of Settings' shop-wide one and any category's own. Blank keeps them."
-                                                  Value="{Binding SimulatedWastagePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
-                        <TextBlock Text="VAT %" VerticalAlignment="Center" Margin="12,0,6,0" />
-                        <syncfusion:DoubleTextBox Width="80"
-                                                  NumberDecimalDigits="2"
-                                                  UseNullOption="True"
-                                                  WatermarkText="As now"
-                                                  WatermarkTextIsVisible="True"
-                                                  ToolTip="The VAT % to try on every product. Blank keeps each one's."
-                                                  Value="{Binding SimulatedVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
-                        <TextBlock Text="Labor ± pts" VerticalAlignment="Center" Margin="12,0,6,0" />
-                        <syncfusion:DoubleTextBox Width="80"
-                                                  NumberDecimalDigits="2"
-                                                  UseNullOption="True"
-                                                  WatermarkText="As now"
-                                                  WatermarkTextIsVisible="True"
-                                                  ToolTip="Percentage points every product's Labor % moves by, up or down, never below 0. Blank keeps each one's."
-                                                  Value="{Binding LaborChangePoints, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
-                        <TextBlock Text="Overhead ± pts" VerticalAlignment="Center" Margin="12,0,6,0" />
-                        <syncfusion:DoubleTextBox Width="80"
-                                                  NumberDecimalDigits="2"
-                                                  UseNullOption="True"
-                                                  WatermarkText="As now"
-                                                  WatermarkTextIsVisible="True"
-                                                  ToolTip="Percentage points every product's Overhead % moves by, up or down, never below 0. Blank keeps each one's."
-                                                  Value="{Binding OverheadChangePoints, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
-                        <TextBlock Text="Admin ± pts" VerticalAlignment="Center" Margin="12,0,6,0" />
-                        <syncfusion:DoubleTextBox Width="80"
-                                                  NumberDecimalDigits="2"
-                                                  UseNullOption="True"
-                                                  WatermarkText="As now"
-                                                  WatermarkTextIsVisible="True"
-                                                  ToolTip="Percentage points every product's Administrative % moves by, up or down, never below 0. Blank keeps each one's."
-                                                  Value="{Binding AdministrativeChangePoints, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
-                    </WrapPanel>
-                </StackPanel>
             </Grid>
         </Border>
 
@@ -233,7 +164,6 @@
                 <Grid DockPanel.Dock="Top">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
@@ -262,14 +192,6 @@
                                           ToolTip="{Binding CostBasisButtonTooltip}"
                                           VerticalAlignment="Center"
                                           Margin="0,0,8,0" />
-                    <!-- Writes: each product's Current Price to its Price to Charge, after a question that says how many -->
-                    <syncfusion:ButtonAdv Grid.Column="4"
-                                          Label="Set Current Prices"
-                                          IconTemplate="{StaticResource ApplyIconTemplate}"
-                                          Command="{Binding SetCurrentPricesCommand}"
-                                          ToolTip="Sets the Current Price of the products picked, or of every product shown, to its Price to Charge: only those a change reaches. Asks first. The raw material prices don't change."
-                                          VerticalAlignment="Center"
-                                          Margin="0,0,8,0" />
                     <syncfusion:ButtonAdv Grid.Column="3"
                                           Label="Print Report"
                                           IconTemplate="{StaticResource PrintIconTemplate}"
@@ -277,7 +199,7 @@
                                           ToolTip="Previews and prints each product's recipe and costing with the price changes, beside today's: the products picked in the table, or every product it shows."
                                           VerticalAlignment="Center"
                                           Margin="0,0,8,0" />
-                    <syncfusion:ButtonAdv Grid.Column="5"
+                    <syncfusion:ButtonAdv Grid.Column="4"
                                           Label="Export to Excel"
                                           IconTemplate="{StaticResource ExportIconTemplate}"
                                           Command="{Binding ExportCommand}"
@@ -332,7 +254,6 @@
                         <controls:NumericColumn MappingName="MarkupPercent" HeaderText="Markup %" NumberDecimalDigits="2" AllowNullValue="True" />
                         <controls:NumericColumn MappingName="SimulatedMarkupPercent" HeaderText="Simulated Markup %" NumberDecimalDigits="2" AllowNullValue="True" />
                         <controls:NumericColumn MappingName="PriceToKeepMarkup" HeaderText="Price to Keep Markup" NumberDecimalDigits="2" AllowNullValue="True" />
-                        <controls:NumericColumn MappingName="PriceToCharge" HeaderText="Price to Charge" NumberDecimalDigits="2" AllowNullValue="True" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
             </DockPanel>

@@ -29,14 +29,6 @@ public static class PriceChangeRules
     public static decimal? PriceToKeepMarkup(decimal? currentPrice, decimal baseCost, decimal newBaseCost) =>
         currentPrice is { } price && baseCost > 0m ? price * newBaseCost / baseCost : null;
 
-    /// <summary>
-    /// <see cref="PriceToKeepMarkup(decimal?, decimal, decimal)"/> with the VAT changing too (2026-10-29, the Price Simulator's
-    /// costing changes): the VAT on top moves from <paramref name="vatPercent"/> to <paramref name="newVatPercent"/> as well, so
-    /// a ₱11.20 price with 12% VAT on a ₱10.00 price before it is ₱11.50 at 15%, the base cost unchanged.
-    /// </summary>
-    public static decimal? PriceToKeepMarkup(decimal? currentPrice, decimal baseCost, decimal newBaseCost, decimal vatPercent, decimal newVatPercent) =>
-        PriceToKeepMarkup(currentPrice, baseCost, newBaseCost) is { } price ? price * (1m + newVatPercent / 100m) / (1m + vatPercent / 100m) : null;
-
     public static void EnsureValidChange(decimal changePercent)
     {
         if (changePercent <= -100m)

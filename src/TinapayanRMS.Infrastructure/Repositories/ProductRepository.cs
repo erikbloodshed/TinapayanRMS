@@ -161,36 +161,6 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task SetCurrentPricesAsync(IReadOnlyCollection<(int ProductId, decimal CurrentPrice)> prices, CancellationToken cancellationToken)
-    {
-        if (prices.Count == 0)
-        {
-            return;
-        }
-
-        if (prices.Any(p => p.CurrentPrice < 0m))
-        {
-            throw new BusinessRuleException("A current price can't be negative.");
-        }
-
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var productIds = prices.Select(p => p.ProductId).Distinct().ToList();
-        var products = await dbContext.Products.Where(p => productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, cancellationToken);
-        if (productIds.Where(id => !products.ContainsKey(id)).ToList() is [var missingId, ..])
-        {
-            throw new BusinessRuleException($"Product {missingId} does not exist.");
-        }
-
-        var now = dbContext.LocalNow();
-        foreach (var (productId, currentPrice) in prices)
-        {
-            products[productId].CurrentPrice = currentPrice;
-            products[productId].UpdatedAt = now;
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-    }
-
     public async Task RenameAsync(int productId, string name, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
