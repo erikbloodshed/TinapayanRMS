@@ -22,7 +22,8 @@ internal sealed class PostgresTools(string? configuredFolder)
     /// <summary>
     /// Runs <paramref name="tool"/> against the server <paramref name="connection"/> names and returns what it wrote out. A
     /// tool that fails throws <see cref="PostgresToolException"/> with what it wrote as its error; one that's cancelled is
-    /// stopped.
+    /// stopped. .NET 11's <see cref="Process.RunAndCaptureTextAsync(ProcessStartInfo, CancellationToken)"/> reads both of its
+    /// pipes as it runs, so neither fills up and stalls it.
     /// </summary>
     public async Task<string> RunAsync(
         string tool, NpgsqlConnectionStringBuilder connection, IEnumerable<string> arguments, CancellationToken cancellationToken)
@@ -42,20 +43,16 @@ internal sealed class PostgresTools(string? configuredFolder)
         }
 
         SetConnection(startInfo.Environment, connection);
-        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException($"{tool} didn't start.");
-        var output = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-        var error = process.StandardError.ReadToEndAsync(CancellationToken.None);
-        try
+
+        // Cancelled while it's writing, it's stopped and this throws. Cancelled once it has written everything, it's
+        // stopped too, and its exit status says so. The backups never ask for parallel jobs, so the tool is one process.
+        var run = await Process.RunAndCaptureTextAsync(startInfo, cancellationToken);
+        if (run.ExitStatus.Canceled)
         {
-            await process.WaitForExitAsync(cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            process.Kill(entireProcessTree: true);
-            throw;
+            throw new OperationCanceledException(cancellationToken);
         }
 
-        return process.ExitCode == 0 ? await output : throw new PostgresToolException(tool, (await error).Trim());
+        return run.ExitStatus.ExitCode == 0 ? run.StandardOutput : throw new PostgresToolException(tool, run.StandardError.Trim());
     }
 
     /// <summary>

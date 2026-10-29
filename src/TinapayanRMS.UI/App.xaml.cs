@@ -351,7 +351,7 @@ public sealed partial class App : Application
 
         if (_restartOnExit && Environment.ProcessPath is { } path)
         {
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = false, WorkingDirectory = AppContext.BaseDirectory })?.Dispose();
+            Process.StartAndForget(new ProcessStartInfo(path) { WorkingDirectory = AppContext.BaseDirectory });
         }
     }
 
