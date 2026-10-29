@@ -169,11 +169,18 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     /// <summary>The Raw Materials Price Summary to an Excel workbook, as its grid shows it.</summary>
     public ReactiveCommand<RxVoid, RxVoid> ExportRawMaterialPricesCommand { get; }
 
+    /// <summary>The Product Cost Summary's filters, sort and columns, kept between runs (Controls/GridLayoutKeeping).</summary>
+    public GridLayoutStore ProductCostsLayout { get; }
+
+    /// <summary>The Raw Materials Price Summary's sort and filters, kept between runs.</summary>
+    public GridLayoutStore RawMaterialPricesLayout { get; }
+
     public ReportsViewModel(
         IRawMaterialPriceHistoryRepository priceHistoryRepository,
         IRawMaterialRepository rawMaterialRepository,
         IProductRepository productRepository,
         SavedProductReader savedProducts,
+        IViewStateStore viewState,
         ILogger logger)
         : base(logger)
     {
@@ -181,6 +188,8 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         _rawMaterialRepository = rawMaterialRepository;
         _productRepository = productRepository;
         _savedProducts = savedProducts;
+        ProductCostsLayout = new GridLayoutStore(viewState, "reports-product-costs");
+        RawMaterialPricesLayout = new GridLayoutStore(viewState, "reports-raw-material-prices");
 
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
         OpenRawMaterialCommand = ReactiveCommand.Create<int>(_rawMaterialOpenRequests.OnNext);

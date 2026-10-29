@@ -171,7 +171,7 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 ### Where the app writes
 
 - **Logs**: `logs/tinapayanrms-<date>.log` beside the executable. In a debug build that's `src/TinapayanRMS.UI/bin/Debug/net10.0-windows10.0.19041.0/win-x64/logs/`. There's one file a day, and the last 31 are kept.
-- **View state**: `%LocalAppData%\TinapayanRMS\view-state.json` remembers which tree folders were left open (on Sub-Assemblies, which were left closed), and whether the Vim keys are on (`"vim-keys": ["on"]`). It's safe to delete.
+- **View state**: `%LocalAppData%\TinapayanRMS\view-state.json` remembers which tree folders were left open (on Sub-Assemblies, which were left closed), whether the Vim keys are on (`"vim-keys": ["on"]`), the production plan, and the Reports tables' filters, sort and hidden columns (`reports-*`, through `GridLayoutStore` and `Controls/GridLayoutKeeping`, which any other grid can use the same way). It's safe to delete.
 - **Backups**: `%ProgramData%\TinapayanRMS\Backups`, one folder for every Windows user of the computer. `pg_dump` writes the `.backup` files as the user running the app. The app creates this folder and, as its owner, gives `BUILTIN\Users` Modify on it, inherited by every file, so anyone using the app can copy, restore and delete any backup ([BackupFolder](../src/TinapayanRMS.Infrastructure/Services/BackupFolder.cs)). The `.bak` files SQL Server wrote before the move to PostgreSQL (2026-10-21) are no longer listed and can't be restored. The tests use `%ProgramData%\TinapayanRMS\Test Backups\<guid>` and delete it afterwards.
 
 ### Command reference

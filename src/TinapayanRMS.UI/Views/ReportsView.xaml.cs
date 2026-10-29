@@ -1,6 +1,7 @@
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Syncfusion.UI.Xaml.Grid;
+using TinapayanRMS.UI.Controls;
 using TinapayanRMS.UI.Exporting;
 using TinapayanRMS.UI.ViewModels;
 
@@ -17,6 +18,10 @@ public partial class ReportsView : UserControl
         ColumnChoices.ItemsSource = ProductCostsGrid.Columns
             .Where(column => column.MappingName != nameof(ProductCostRow.ProductName))
             .ToList();
+
+        // Each table's filters, sort and columns are as they were left, the last time the app ran.
+        GridLayoutKeeping.Keep(ProductCostsGrid, viewModel.ProductCostsLayout);
+        GridLayoutKeeping.Keep(RawMaterialPricesGrid, viewModel.RawMaterialPricesLayout);
 
         // Each tab's Export to Excel writes its own table, on a sheet named after it.
         viewModel.RegisterExcelExport(this, title =>
