@@ -56,12 +56,14 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
     {
         var breads = await SeedCategoryAsync("Breads");
         var cakes = await SeedCategoryAsync("Cakes");
-        var repository = CreateRepository();
+        var clock = new TestClock(new DateTime(2026, 10, 1, 9, 0, 0));
+        var repository = new ProductRepository(CreateDbContextFactory(clock));
         var id = await repository.SaveAsync(
             new Product { Name = "Mamon", Description = "Soft chiffon cake", CategoryId = breads.Id, QuantityRequired = 6, CurrentPrice = 120m },
             recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
         var before = (await repository.GetByIdAsync(id, Cancellation))!;
 
+        clock.Advance(TimeSpan.FromHours(1));
         await repository.MoveAsync([new ProductMove(id, ProductStage.Production, cakes.Id)], Cancellation);
 
         var moved = (await repository.GetByIdAsync(id, Cancellation))!;
@@ -72,7 +74,8 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         moved.Description.Should().Be("Soft chiffon cake");
         moved.QuantityRequired.Should().Be(6);
         moved.CurrentPrice.Should().Be(120m);
-        moved.UpdatedAt.Should().BeOnOrAfter(before.UpdatedAt!.Value, "a move is a change to the product");
+        before.UpdatedAt.Should().Be(clock.Now - TimeSpan.FromHours(1));
+        moved.UpdatedAt.Should().Be(clock.Now, "a move is a change to the product");
     }
 
     [Fact]

@@ -138,7 +138,7 @@ A new section in a **product-owned** role, such as a Topping or a Filling, start
 
 Each recipe line also shows a percentage.
 
-- **Baker's %**: tick the **Base** box on one or more lines, usually the flour. Every line is then shown as a percentage of the ticked lines' total weight. You can type either the grams or the baker's %, and the other is worked out.
+- **Baker's %**: tick the **Base** box on one or more lines, usually the flour. Every line is then shown as a percentage of the ticked lines' total weight. You can type either the grams or the baker's %, and the other is worked out. You can tick a line's Base while you're still typing the line. The empty row at the bottom shows no box until you start typing into it.
 - **Absolute %**: with nothing ticked, each line is shown as its share of the whole batch. This figure is read-only.
 
 The column heading changes to show which one you're looking at. Only the grams are ever used for costing.

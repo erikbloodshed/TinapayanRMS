@@ -17,165 +17,6 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// A row in the Alternative Units grid and a box in the Unit Conversion Overview: one of the form's
-/// alternative units, already saved (its Unit has an Id) or not yet (Id 0). Typed straight into: the grid's
-/// unit cell sets <see cref="UnitOfMeasureId"/>, which the row resolves to its unit of measure, and the multiplier
-/// cell sets <see cref="BaseUnitsPerUnit"/>. Both write through to <see cref="Unit"/>, which Save writes. A row can be
-/// half filled in; Save checks them all first. A standard unit of the base unit's kind (a kilogram of an ingredient) takes
-/// its fixed multiplier as it's picked, and its multiplier can't be typed (StandardUnitRules).
-/// </summary>
-public sealed class RawMaterialUnitRow : ReactiveObject
-{
-    /// <summary>Looks up a unit of measure by id as the screen has it.</summary>
-    private readonly Func<int, UnitOfMeasure?>? _findUnitOfMeasure;
-
-    /// <summary>A standard unit's fixed multiplier for the screen's material as it now is, or null for one that's typed.</summary>
-    private readonly Func<UnitOfMeasure, decimal?>? _standardMultiplier;
-
-    /// <summary>An empty row, for the grid to compare an add row against (controls:GridAddNewRow.DropWhenUntouched).</summary>
-    public RawMaterialUnitRow()
-        : this(new RawMaterialUnit(), string.Empty, findUnitOfMeasure: null, standardMultiplier: null)
-    {
-    }
-
-    /// <param name="findUnitOfMeasure">Resolves a picked unit of measure, so a row names its unit as soon as it's picked, even in the add row.</param>
-    /// <param name="standardMultiplier">A standard unit's fixed multiplier for the material (StandardUnitRules), or null to type it.</param>
-    public RawMaterialUnitRow(
-        RawMaterialUnit unit,
-        string baseUnitAbbreviation,
-        Func<int, UnitOfMeasure?>? findUnitOfMeasure,
-        Func<UnitOfMeasure, decimal?>? standardMultiplier)
-    {
-        Unit = unit;
-        _baseUnitAbbreviation = baseUnitAbbreviation;
-        _findUnitOfMeasure = findUnitOfMeasure;
-        _standardMultiplier = standardMultiplier;
-        ApplyStandardMultiplier();
-    }
-
-    public RawMaterialUnit Unit { get; }
-
-    /// <summary>The unit of measure picked in the grid; null until one is.</summary>
-    public int? UnitOfMeasureId
-    {
-        get => Unit.UnitOfMeasureId > 0 ? Unit.UnitOfMeasureId : null;
-        set
-        {
-            if (value == UnitOfMeasureId)
-            {
-                return;
-            }
-
-            Unit.UnitOfMeasureId = value ?? 0;
-            Unit.UnitOfMeasure = value is { } id ? _findUnitOfMeasure?.Invoke(id) : null;
-            this.RaisePropertyChanged();
-            RaiseUnitOfMeasureChanged();
-            ApplyStandardMultiplier();
-        }
-    }
-
-    /// <summary>Points the row at the screen's current copy of its unit of measure, so one renamed in Settings shows its new name.</summary>
-    public void RefreshUnitOfMeasure()
-    {
-        if (UnitOfMeasureId is { } id && _findUnitOfMeasure?.Invoke(id) is { } refreshed && !ReferenceEquals(refreshed, Unit.UnitOfMeasure))
-        {
-            Unit.UnitOfMeasure = refreshed;
-            RaiseUnitOfMeasureChanged();
-            ApplyStandardMultiplier();
-        }
-    }
-
-    /// <summary>The fixed multiplier of the row's unit when it's a standard unit of the base unit's kind; null while it's typed.</summary>
-    public decimal? StandardMultiplier => Unit.UnitOfMeasure is { } unitOfMeasure ? _standardMultiplier?.Invoke(unitOfMeasure) : null;
-
-    /// <summary>Whether the multiplier cell can be typed into (controls:GridCellEditing.AllowWhen): not for a standard unit.</summary>
-    public bool CanTypeMultiplier => StandardMultiplier is null;
-
-    /// <summary>
-    /// Gives a standard unit its fixed multiplier: when it's picked, renamed into one in Settings, or the material's base
-    /// unit or type changes under it. Anything else keeps the multiplier typed.
-    /// </summary>
-    public void ApplyStandardMultiplier()
-    {
-        if (StandardMultiplier is { } standard)
-        {
-            BaseUnitsPerUnit = standard;
-        }
-
-        this.RaisePropertyChanged(nameof(CanTypeMultiplier));
-    }
-
-    public string UnitName => Unit.UnitOfMeasure?.Name ?? "?";
-
-    /// <summary>Empty until a unit is picked, so the add row stays blank.</summary>
-    public string Abbreviation => Unit.UnitOfMeasure?.Abbreviation ?? string.Empty;
-
-    /// <summary>How many base units one of this unit holds: 25,000 for a 25 kg bag of an ingredient.</summary>
-    public decimal BaseUnitsPerUnit
-    {
-        get => Unit.BaseUnitsPerUnit;
-        set
-        {
-            if (value == Unit.BaseUnitsPerUnit)
-            {
-                return;
-            }
-
-            Unit.BaseUnitsPerUnit = value;
-            this.RaisePropertyChanged();
-            this.RaisePropertyChanged(nameof(BaseEquivalentText));
-        }
-    }
-
-    private string _baseUnitAbbreviation;
-    /// <summary>The base unit's abbreviation, which a new packaging material can still change.</summary>
-    public string BaseUnitAbbreviation
-    {
-        get => _baseUnitAbbreviation;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _baseUnitAbbreviation, value);
-            this.RaisePropertyChanged(nameof(BaseEquivalentText));
-        }
-    }
-
-    /// <summary>E.g. "25,000 g" or "1,000 cm".</summary>
-    public string BaseEquivalentText => $"{Unit.BaseUnitsPerUnit:#,0.####} {BaseUnitAbbreviation}";
-
-    private void RaiseUnitOfMeasureChanged()
-    {
-        this.RaisePropertyChanged(nameof(UnitName));
-        this.RaisePropertyChanged(nameof(Abbreviation));
-    }
-}
-
-/// <summary>A row in the Price History grid: the entry, the unit it was priced in, and what that comes to per base unit.</summary>
-public sealed class RawMaterialPriceRow(RawMaterialPriceHistory entry, string baseUnitName)
-{
-    public RawMaterialPriceHistory Entry { get; } = entry;
-
-    public DateOnly Date => Entry.Date;
-
-    public string UnitName => Entry.Unit?.UnitOfMeasure?.Name ?? baseUnitName;
-
-    public string Brand => Entry.Brand ?? string.Empty;
-
-    public decimal Price => Entry.Price;
-
-    public decimal CostPerBaseUnit => UnitConversionRules.CostPerBaseUnit(Entry.Price, Entry.Unit?.BaseUnitsPerUnit);
-}
-
-/// <summary>What the Usage Example worked out: the calculated (true) cost, and that with the material's buffer on top.</summary>
-public sealed record UsageExampleResult(
-    string Title,
-    decimal QuantityInBaseUnits,
-    string BaseUnitAbbreviation,
-    decimal CostPerBaseUnit,
-    decimal TotalCost,
-    decimal BufferPercent,
-    decimal BufferedTotalCost);
-
-/// <summary>
 /// The Raw Materials screen: ingredients and packaging in one list. A material's type decides which
 /// parts of its details apply — an ingredient is measured in grams and can be made from a sub-assembly, a
 /// packaging material has a base unit of its own and is always purchased. Its details, alternative
@@ -217,26 +58,21 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>The view state key the open folders of the Raw Materials list are kept under (IViewStateStore).</summary>
     public const string OpenFoldersKey = "RawMaterials.OpenFolders";
 
-    private readonly IViewStateStore _viewStateStore;
     private readonly ICostingDefaultsRepository _costingDefaultsRepository;
 
     // What a new material's Cost Buffer % starts at (Settings → Costing Defaults), as of the last LoadCommand.
     private decimal _defaultCostBufferPercent = CostingDefaults.DefaultCostBufferPercent;
 
-    /// <summary>The open folders last written to the view state, so a write is only made for a change.</summary>
-    private IReadOnlyList<string> _writtenOpenFolders;
+    private readonly FolderStateWriter _openFoldersWriter;
 
-    private readonly IDisposable _openFoldersWriter;
-
-    /// <summary>Held while writing the open folders, which the throttled writer does off the UI thread and Dispose on it.</summary>
-    private readonly Lock _openFoldersLock = new();
+    private readonly TreeSelection _treeSelection = new();
 
     /// <summary>
     /// The rows picked in the Raw Materials list, bound to the tree's SelectedItems, which it shares: one row, or several
     /// with Ctrl or Shift held. Its first is <see cref="SelectedTreeNode"/>. The tree changes it as rows are clicked, and
     /// this screen as SelectedRawMaterial changes (SyncTreeSelection), as the Products screen does its own.
     /// </summary>
-    public ObservableCollection<object> SelectedTreeNodes { get; } = [];
+    public ObservableCollection<object> SelectedTreeNodes => _treeSelection.Nodes;
 
     private object? _selectedTreeNode;
     /// <summary>
@@ -248,31 +84,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public object? SelectedTreeNode
     {
         get => _selectedTreeNode;
-        set
-        {
-            if (value is null)
-            {
-                if (SelectedTreeNodes.Count > 0)
-                {
-                    SelectedTreeNodes.Clear();
-                }
-            }
-            else if (SelectedTreeNodes.Count != 1 || !ReferenceEquals(SelectedTreeNodes[0], value))
-            {
-                SelectedTreeNodes.Clear();
-                SelectedTreeNodes.Add(value);
-            }
-        }
+        set => _treeSelection.Pick(value);
     }
 
     /// <summary>The materials picked in the list, in the order they were picked.</summary>
     public IReadOnlyList<RawMaterialLeafNode> SelectedTreeMaterials => [.. SelectedTreeNodes.OfType<RawMaterialLeafNode>()];
-
-    /// <summary>
-    /// Set while the list's selection changes for a reason that's no pick of the user's: SyncTreeSelection moving it to
-    /// SelectedRawMaterial, or the tree dropping a row from it as the row moves to another folder.
-    /// </summary>
-    private bool _isSyncingTreeSelection;
 
     private string? _moveNotice;
     /// <summary>
@@ -1041,19 +857,12 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         _rawMaterialValidator = rawMaterialValidator;
         _unitValidator = unitValidator;
         _brandPriceValidator = brandPriceValidator;
-        _viewStateStore = viewStateStore;
         _costingDefaultsRepository = costingDefaultsRepository;
 
-        // The list's folders open as they were left last time, and the ones open are written for next time once they've
-        // settled after a change, off the UI thread, as on the Products screen; Dispose writes any change still waiting.
+        // The list's folders open as they were left last time, and the ones open are written for next time
+        // (FolderStateWriter), as on the Products screen; Dispose writes any change still waiting.
         RawMaterialTree = new RawMaterialTree(viewStateStore.ReadList(OpenFoldersKey));
-
-        // As they start, so nothing is written until a folder is opened or closed, not even the first time.
-        _writtenOpenFolders = RawMaterialTree.OpenFolderKeys();
-        _openFoldersWriter = RawMaterialTree.ExpansionChanged
-            .Select(_ => RawMaterialTree.OpenFolderKeys())
-            .Throttle(TimeSpan.FromMilliseconds(500))
-            .Subscribe(WriteOpenFolders);
+        _openFoldersWriter = new FolderStateWriter(viewStateStore, OpenFoldersKey, RawMaterialTree.ExpansionChanged, RawMaterialTree.OpenFolderKeys);
 
         SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();
 
@@ -2674,15 +2483,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     {
         // The tree drops a row from its selection as the row leaves its folder, which is no pick of the user's: with
         // several picked, the first left would otherwise become SelectedTreeNode, and its material the one picked.
-        _isSyncingTreeSelection = true;
-        try
-        {
-            RawMaterialTree.Refresh(Categories, VisibleRawMaterials, isFiltered: SearchText.Trim().Length > 0);
-        }
-        finally
-        {
-            _isSyncingTreeSelection = false;
-        }
+        _treeSelection.Quietly(() => RawMaterialTree.Refresh(Categories, VisibleRawMaterials, isFiltered: SearchText.Trim().Length > 0));
 
         // A folder picked stays picked. Otherwise the row goes back to the material picked: one moved to another folder
         // leaves the tree's selection as it goes, and one a search hid gets its row back when the search ends.
@@ -2696,32 +2497,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// Puts SelectedRawMaterial's row first among the rows picked in the list, and so makes it SelectedTreeNode: alone,
     /// unless it's picked already, when the rows picked with it stay. Nothing picked, or a search hiding it, picks no row.
     /// </summary>
-    private void SyncTreeSelection()
-    {
-        var row = SelectedRawMaterial is { } material ? RawMaterialTree.Find(material.Id) : null;
-        var at = row is null ? -1 : SelectedTreeNodes.IndexOf(row);
-        if (at == 0)
-        {
-            return;
-        }
-
-        _isSyncingTreeSelection = true;
-        try
-        {
-            if (at > 0)
-            {
-                SelectedTreeNodes.Move(at, 0);
-            }
-            else
-            {
-                SelectedTreeNode = row;
-            }
-        }
-        finally
-        {
-            _isSyncingTreeSelection = false;
-        }
-    }
+    private void SyncTreeSelection() =>
+        _treeSelection.BringFirst(SelectedRawMaterial is { } material ? RawMaterialTree.Find(material.Id) : null);
 
     /// <summary>
     /// The list's selection changed: by a click (or several, with Ctrl or Shift), or by this screen. Its first row is
@@ -2741,7 +2518,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         // The tree calls this in the middle of changing SelectedItems: picking the material leads to SyncTreeSelection,
         // which then finds its row first already and leaves the collection alone, as it must mid-change.
-        if (!_isSyncingTreeSelection && first is RawMaterialLeafNode leaf && leaf.RawMaterial.Id != SelectedRawMaterial?.Id)
+        if (!_treeSelection.IsSyncing && first is RawMaterialLeafNode leaf && leaf.RawMaterial.Id != SelectedRawMaterial?.Id)
         {
             SelectedRawMaterial = leaf.RawMaterial;
         }
@@ -2777,30 +2554,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             History.RewriteAll(snapshot => snapshot with { CategoryId = onForm.CategoryId });
         }
 
-        RestoreTreeSelection(picked);
+        // Picks again the rows the tree dropped from its selection as they moved.
+        _treeSelection.Restore(picked, r => r is not RawMaterialLeafNode leaf || RawMaterialTree.Find(leaf.RawMaterial.Id) == leaf);
 
         _moveUndo = isUndo ? [] : undo;
         MoveNotice = isUndo ? null : MoveNoticeFor(moves);
-    }
-
-    /// <summary>Picks again the rows of <paramref name="picked"/> the tree dropped from its selection as they moved.</summary>
-    private void RestoreTreeSelection(IReadOnlyList<object> picked)
-    {
-        _isSyncingTreeSelection = true;
-        try
-        {
-            foreach (var row in picked.Where(r => r is not RawMaterialLeafNode leaf || RawMaterialTree.Find(leaf.RawMaterial.Id) == leaf))
-            {
-                if (!SelectedTreeNodes.Contains(row))
-                {
-                    SelectedTreeNodes.Add(row);
-                }
-            }
-        }
-        finally
-        {
-            _isSyncingTreeSelection = false;
-        }
     }
 
     /// <summary>
@@ -3078,24 +2836,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             });
     }
 
-    /// <summary>Writes the list's open folders for next time, when they differ from what was written last.</summary>
-    private void WriteOpenFolders(IReadOnlyList<string> openFolders)
-    {
-        lock (_openFoldersLock)
-        {
-            if (!openFolders.SequenceEqual(_writtenOpenFolders, StringComparer.Ordinal))
-            {
-                _viewStateStore.WriteList(OpenFoldersKey, openFolders);
-                _writtenOpenFolders = openFolders;
-            }
-        }
-    }
-
     public void Dispose()
     {
         // A change still settling when the app closes is written now, rather than lost.
         _openFoldersWriter.Dispose();
-        WriteOpenFolders(RawMaterialTree.OpenFolderKeys());
         RawMaterialTree.Dispose();
 
         _rawMaterialCache.Dispose();

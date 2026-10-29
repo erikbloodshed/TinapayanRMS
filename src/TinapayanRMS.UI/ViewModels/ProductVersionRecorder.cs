@@ -148,11 +148,10 @@ public sealed class ProductVersionRecorder(
             return [];
         }
 
-        var productsRead = productRepository.GetByIdsAsync(productIds, cancellationToken);
-        var detailsRead = savedProducts.ReadDetailsAsync(productIds, cancellationToken);
-        await Task.WhenAll(productsRead, detailsRead);
-        var details = await detailsRead;
-        return (await productsRead).ToDictionary(
+        // One after the other: a Save captures and records inside its unit of work, whose reads share one connection.
+        var products = await productRepository.GetByIdsAsync(productIds, cancellationToken);
+        var details = await savedProducts.ReadDetailsAsync(productIds, cancellationToken);
+        return products.ToDictionary(
             p => p.Id,
             p => new CapturedProduct(ProductVersionSnapshot.From(p, details[p.Id]), p.UpdatedAt));
     }

@@ -140,27 +140,22 @@ public sealed class SavedProductReader(
             holders = [.. components.Select(c => c.ComponentProductId).Where(productIdsRead.Add)];
         }
 
-        // The rest at once, each on its own context: a read is mostly a round trip's wait. Only the sections' lines wait,
-        // for the sections.
+        // The rest one at a time, not side by side (2026-10-28): a Save reads through here inside its unit of work, whose
+        // reads share one connection (IUnitOfWork). Measured against the dev database (68 products), every product's
+        // detail took 31 ms this way against 22 ms side by side, and one product's 13 ms against 12.
         List<int> ids = [.. productIdsRead];
-        var linksRead = packagingLinkRepository.GetForProductsAsync(ids, cancellationToken);
-        var packagingRead = packagingLineRepository.GetEffectiveForProductsAsync(ids, cancellationToken);
-        var costingsRead = costingParametersRepository.GetForProductsAsync(ids, cancellationToken);
-        var addInsRead = usageRepository.GetAddInsForProductsAsync(ids, cancellationToken);
-        var usagesRead = usageRepository.GetForProductsAsync(ids, cancellationToken);
-        var sectionLinesRead = ReadSectionLinesAsync(usagesRead, cancellationToken);
-        var defaultsRead = costingDefaultsRepository.GetAsync(cancellationToken);
-        await Task.WhenAll(linksRead, packagingRead, costingsRead, addInsRead, usagesRead, sectionLinesRead, defaultsRead);
-        var wastagePercent = (await defaultsRead).WastagePercent;
+        var linksByProduct = (await packagingLinkRepository.GetForProductsAsync(ids, cancellationToken)).ToDictionary(l => l.ProductId);
+        var packagingByProduct = await packagingLineRepository.GetEffectiveForProductsAsync(ids, cancellationToken);
+        var costingsByProduct = (await costingParametersRepository.GetForProductsAsync(ids, cancellationToken)).ToDictionary(c => c.ProductId);
+        var addIns = await usageRepository.GetAddInsForProductsAsync(ids, cancellationToken);
+        var usages = await usageRepository.GetForProductsAsync(ids, cancellationToken);
+        var sectionLines = await subAssemblyLineRepository.GetForSubAssembliesAsync([.. usages.Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
+        var wastagePercent = (await costingDefaultsRepository.GetAsync(cancellationToken)).WastagePercent;
 
-        var linksByProduct = (await linksRead).ToDictionary(l => l.ProductId);
-        var packagingByProduct = await packagingRead;
-        var costingsByProduct = (await costingsRead).ToDictionary(c => c.ProductId);
-        var usages = await usagesRead;
         var usagesByProduct = usages.ToLookup(u => u.ProductId);
         var productIdByUsage = usages.ToDictionary(u => u.Id, u => u.ProductId);
-        var addInsByProduct = (await addInsRead).ToLookup(a => productIdByUsage[a.UsageId]);
-        var sectionLinesBySubAssembly = (await sectionLinesRead).ToLookup(l => l.SubAssemblyId);
+        var addInsByProduct = addIns.ToLookup(a => productIdByUsage[a.UsageId]);
+        var sectionLinesBySubAssembly = sectionLines.ToLookup(l => l.SubAssemblyId);
 
         // Each product put together from what was read, a composite's products before it: what one brings is its own
         // costing worked out, at both bases, once however many composites hold it.
@@ -220,11 +215,6 @@ public sealed class SavedProductReader(
         return details;
     }
 
-    private async Task<IReadOnlyList<SubAssemblyLine>> ReadSectionLinesAsync(
-        Task<IReadOnlyList<ProductSubAssemblyUsage>> usagesRead, CancellationToken cancellationToken) =>
-        await subAssemblyLineRepository.GetForSubAssembliesAsync(
-            [.. (await usagesRead).Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
-
     /// <summary>
     /// What one of each product brings into a composite, as it's saved: its recipe (sub-assemblies, ingredients) cost for
     /// one sellable unit, which is the Sub-assemblies figure on its Costing tab, and its packaging cost, the Packaging figure
@@ -238,12 +228,9 @@ public sealed class SavedProductReader(
         }
 
         // Read again rather than taken from the screen's list, which may be older than a quantity required saved since.
-        var productsRead = productRepository.GetByIdsAsync(productIds, cancellationToken);
-        var detailsRead = ReadDetailsAsync(productIds, cancellationToken);
-        await Task.WhenAll(productsRead, detailsRead);
-
-        var details = await detailsRead;
-        return (await productsRead).ToDictionary(p => p.Id, p => ComponentCostsOf(p, details[p.Id]));
+        var products = await productRepository.GetByIdsAsync(productIds, cancellationToken);
+        var details = await ReadDetailsAsync(productIds, cancellationToken);
+        return products.ToDictionary(p => p.Id, p => ComponentCostsOf(p, details[p.Id]));
     }
 
     /// <summary>

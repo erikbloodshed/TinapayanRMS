@@ -3,6 +3,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure.Queries;
+using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
@@ -28,7 +29,7 @@ public class ProductVersionRepository(IDbContextFactory<TinapayanRMSDbContext> d
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         // Serializable, so two Saves recording at once can't both read the same latest and take the same number.
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
         if (!await dbContext.Products.AnyAsync(p => p.Id == productId, cancellationToken))
         {
             throw new BusinessRuleException($"Product {productId} does not exist.");
@@ -60,7 +61,7 @@ public class ProductVersionRepository(IDbContextFactory<TinapayanRMSDbContext> d
 
         // Serializable, as AddAsync's. Every product's latest comes in one read, however many products there are
         // (2026-10-17: a call of AddAsync each was 209 commands for a sub-assembly 40 products link).
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
         List<int> productIds = [.. drafts.Select(d => d.ProductId).Distinct()];
         var latestByProduct = await dbContext.Products
             .Where(p => productIds.Contains(p.Id))

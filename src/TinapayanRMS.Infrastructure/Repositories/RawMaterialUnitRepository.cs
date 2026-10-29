@@ -24,7 +24,7 @@ public class RawMaterialUnitRepository(IDbContextFactory<TinapayanRMSDbContext> 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         // One transaction for the unit, the cost and its cascade, so none of them can disagree.
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         if (await UpdateAsync(dbContext, unit, cancellationToken))
         {
             // Every made ingredient using this one and every sub-assembly using any of them.

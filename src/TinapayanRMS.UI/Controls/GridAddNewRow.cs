@@ -1,12 +1,14 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.UI.Xaml.Grid.Cells;
 using Syncfusion.UI.Xaml.Grid.Helpers;
 using Syncfusion.UI.Xaml.ScrollAxis;
+using TinapayanRMS.UI.Converters;
 
 namespace TinapayanRMS.UI.Controls;
 
@@ -23,7 +25,7 @@ namespace TinapayanRMS.UI.Controls;
 /// grid with row selection, the default <c>SelectionUnit</c>.</item>
 /// <item><c>controls:GridAddNewRow.HideCheckBoxes="True"</c> leaves a <c>GridCheckBoxColumn</c>'s cell blank in the add row, so
 /// the row stays the plain empty row the other grids show, instead of offering a tick for a line that doesn't exist yet
-/// (<see cref="AddRowHiddenCheckBoxRenderer"/>). The tick appears once the line is committed.</item>
+/// (<see cref="AddRowHiddenCheckBoxRenderer"/>). The tick appears once a line is being typed into the row.</item>
 /// <item><c>controls:GridAddNewRow.ItemDropped="{Binding DropNewLine}"</c>, beside an ItemFactory, tells the screen when the
 /// add row's item is thrown away rather than committed: Esc, an untouched row left, or the lines changed under it. A
 /// screen that follows the item as it's typed (the Production Plan works its plan out from it) lets go of it then. Set it
@@ -279,20 +281,39 @@ internal sealed class UntouchedAddRowSelectionController(SfDataGrid grid) : Grid
 }
 
 /// <summary>
-/// A <c>GridCheckBoxColumn</c>'s renderer that hides the tick in the add row. The same checkbox serves every row as rows
-/// scroll and recycle, and the grid re-initializes it each time (<c>OnUpdateEditBinding</c> calls
-/// <see cref="OnInitializeEditElement"/>), so it's shown again whenever the row it lands on is a real one.
+/// A <c>GridCheckBoxColumn</c>'s renderer that hides the tick in the add row until a line is being typed into it. The same
+/// checkbox serves every row as rows scroll and recycle, and the grid re-initializes it each time (<c>OnUpdateEditBinding</c>
+/// calls <see cref="OnInitializeEditElement"/>), so it's shown again whenever the row it lands on is a real one.
+/// <para>
+/// In the add row it follows its DataContext, which is the add row's item from the moment the row is opened until it's
+/// committed or dropped, and null otherwise; the grid doesn't initialize the cell again in between. Hidden for the whole
+/// add row, the Base box couldn't be ticked while its line was being typed: the user typed the ingredient and grams,
+/// reached for Base on the same row and found nothing there until the line was added (2026-10-28, reported on a new
+/// sub-assembly and a new product's section). Ticked there, the tick goes into the item and is added with it.
+/// </para>
 /// </summary>
 public sealed class AddRowHiddenCheckBoxRenderer : GridCellCheckBoxRenderer
 {
     public const string CellType = "CheckBox";
 
+    private static readonly NotNullToVisibilityConverter ShownWithItem = new();
+
     public override void OnInitializeEditElement(DataColumnBase dataColumn, System.Windows.Controls.CheckBox uiElement, object dataContext)
     {
         base.OnInitializeEditElement(dataColumn, uiElement, dataContext);
-        if (dataColumn is not null && uiElement is not null)
+        if (dataColumn is null || uiElement is null)
         {
-            uiElement.Visibility = DataGrid.IsAddNewIndex(dataColumn.RowIndex) ? Visibility.Hidden : Visibility.Visible;
+            return;
+        }
+
+        if (DataGrid.IsAddNewIndex(dataColumn.RowIndex))
+        {
+            // No path: the checkbox's own DataContext.
+            uiElement.SetBinding(UIElement.VisibilityProperty, new Binding { Converter = ShownWithItem });
+        }
+        else
+        {
+            uiElement.ClearValue(UIElement.VisibilityProperty);
         }
     }
 }

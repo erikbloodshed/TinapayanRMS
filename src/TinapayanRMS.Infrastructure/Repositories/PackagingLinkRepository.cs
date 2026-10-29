@@ -5,6 +5,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Queries;
+using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
@@ -63,7 +64,7 @@ public class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbContext> db
 
         // The link goes and the lines it showed take its place in one transaction (2026-10-03): they were two saves on two
         // contexts, so lines refused after the link had gone left the product with no packaging at all.
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         var link = await dbContext.PackagingLinks.FirstOrDefaultAsync(l => l.ProductId == productId, cancellationToken);
         if (link is null)
         {

@@ -180,7 +180,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             Cancellation);
         await AddBoxAsync(boxId);
         await SetCostingAsync(boxId);
-        var products = await OpenProductsAsync("Pasalubong Box", vm => vm.ComponentEdits.Count == 2 && vm.HasPackaging);
+        var products = await OpenProductsAsync("Pasalubong Box", vm => vm.ComponentsTable.ComponentEdits.Count == 2 && vm.HasPackaging);
 
         var screen = products.PreparePrintout().Printout!;
         var saved = (await CreateReader().ReadAsync(products.SelectedProduct!, Cancellation)).ToPrintout(screen.PrintedAt);
@@ -291,6 +291,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory),
             new ProductCloner(factory),
+            CreateUnitOfWork(),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),

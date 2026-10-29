@@ -6,7 +6,7 @@ using Syncfusion.Windows.Shared;
 namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
-/// Lets WPF handle a ChromelessWindow's DPI changes again. With UseNativeChrome, ChromelessWindow (Syncfusion 34.2.9 to 35.1.37)
+/// Lets WPF handle a ChromelessWindow's DPI changes again. With UseNativeChrome, ChromelessWindow (Syncfusion 34.2.9 to 35.1.42)
 /// adds a window hook that marks every WM_DPICHANGED handled and does nothing else. WPF calls a window's hooks before
 /// its own handling, so the message never reaches it. When the window moved to a monitor with another scale, WPF kept
 /// drawing at the old monitor's DPI and Windows didn't resize the window. On this machine's 100% secondary monitor,

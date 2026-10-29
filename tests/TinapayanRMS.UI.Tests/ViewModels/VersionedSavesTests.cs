@@ -1,0 +1,139 @@
+using AwesomeAssertions;
+using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.Tests.Common.Fixtures;
+using TinapayanRMS.UI.Tests.Fixtures;
+using TinapayanRMS.UI.ViewModels;
+
+namespace TinapayanRMS.UI.Tests.ViewModels;
+
+/// <summary>
+/// The saves that record versions (VersionedSaves), each written with its versions or not at all: a version that can't be
+/// recorded takes its save back. The versions a save records, and their notes, are in the screens' *VersionTests.
+/// </summary>
+[Collection(DatabaseCollection.Name)]
+public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
+{
+    private const string Refused = "Simulated: the version couldn't be written.";
+
+    [Fact]
+    public async Task SaveProduct_records_how_it_stood_then_the_product_as_saved()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
+        var (pandesalId, _) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
+        var products = new ProductRepository(CreateDbContextFactory());
+        var product = (await products.GetByIdAsync(pandesalId, Cancellation))!;
+        var priceBefore = product.CurrentPrice;
+        product.CurrentPrice = 7m;
+
+        var saved = await CreateSaves().SaveProductAsync(product, null, null, null, null, false, DateTime.Now, Cancellation);
+
+        saved.Product.CurrentPrice.Should().Be(7m);
+        saved.Detail.Usages.Should().ContainSingle();
+        var versions = await new ProductVersionRepository(CreateDbContextFactory()).GetForProductAsync(pandesalId, Cancellation);
+        versions.Select(v => v.Note).Should().Equal(null, ProductVersionRules.BaselineNote);
+        versions.Select(v => ProductVersionContent.FromJson(v.Content).CurrentPrice).Should().Equal(7m, priceBefore);
+    }
+
+    [Fact]
+    public async Task SaveProduct_whose_version_is_refused_saves_nothing()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
+        var (pandesalId, _) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
+        var products = new ProductRepository(CreateDbContextFactory());
+
+        // A version to start from, so its Save writes the product before the version that's refused.
+        var versions = new ProductVersionRepository(CreateDbContextFactory());
+        await CreateSaves().SaveProductAsync((await products.GetByIdAsync(pandesalId, Cancellation))!, null, null, null, null, false, DateTime.Now, Cancellation);
+        var versionCount = (await versions.GetForProductAsync(pandesalId, Cancellation)).Count;
+
+        var product = (await products.GetByIdAsync(pandesalId, Cancellation))!;
+        product.Name = "Pandesal Classic";
+        var save = () => CreateSaves(refuseVersions: true).SaveProductAsync(product, null, null, null, null, false, DateTime.Now, Cancellation);
+
+        await save.Should().ThrowAsync<TimeoutException>().WithMessage(Refused);
+        (await products.GetByIdAsync(pandesalId, Cancellation))!.Name.Should().Be("Pandesal");
+        (await versions.GetForProductAsync(pandesalId, Cancellation)).Should().HaveCount(versionCount);
+    }
+
+    [Fact]
+    public async Task SaveSubAssembly_whose_products_versions_are_refused_saves_nothing()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
+        var (_, doughId) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
+        var subAssemblies = new SubAssemblyRepository(CreateDbContextFactory());
+
+        var save = () => CreateSaves(refuseVersions: true).SaveSubAssemblyAsync(
+            doughId,
+            "Pandesal Dough",
+            cancellationToken => subAssemblies.SaveStandaloneAsync(
+                new SubAssembly { Id = doughId, Name = "Pandesal Dough", RoleId = doughRoleId }, [new RecipeLine(flourId, 450m)], cancellationToken),
+            DateTime.Now,
+            Cancellation);
+
+        await save.Should().ThrowAsync<TimeoutException>().WithMessage(Refused);
+        var lines = await new SubAssemblyLineRepository(CreateDbContextFactory()).GetForSubAssembliesAsync([doughId], Cancellation);
+        lines.Single().Grams.Should().Be(500m);
+    }
+
+    [Fact]
+    public async Task MakeProductFrom_whose_first_version_is_refused_makes_nothing()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
+        var (pandesalId, _) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
+        var cloner = new ProductCloner(CreateDbContextFactory());
+
+        var make = () => CreateSaves(refuseVersions: true).MakeProductFromAsync(
+            pandesalId, "Pandesal Copy", cloner.CloneAsync, ProductsViewModel.ClonedFrom, DateTime.Now, Cancellation);
+
+        await make.Should().ThrowAsync<TimeoutException>().WithMessage(Refused);
+        (await new ProductRepository(CreateDbContextFactory()).GetAllAsync(Cancellation)).Select(p => p.Name).Should().Equal("Pandesal");
+    }
+
+    private VersionedSaves CreateSaves(bool refuseVersions = false)
+    {
+        var factory = CreateDbContextFactory();
+        var saves = VersionRecorders.CreateSaves(factory, CreateUnitOfWork());
+        if (!refuseVersions)
+        {
+            return saves;
+        }
+
+        var productRepository = new ProductRepository(factory);
+        var versions = new RefusingVersions(new ProductVersionRepository(factory));
+        var reader = new SavedProductReader(
+            new PackagingLinkRepository(factory),
+            new ProductSubAssemblyUsageRepository(factory),
+            new PackagingLineRepository(factory),
+            new CostingParametersRepository(factory),
+            new SubAssemblyLineRepository(factory),
+            productRepository,
+            new CostingDefaultsRepository(factory));
+        return new VersionedSaves(CreateUnitOfWork(), productRepository, versions, reader, new ProductVersionRecorder(reader, productRepository, versions));
+    }
+
+    /// <summary>The real version repository, except that every version it's asked to write is refused, as a database might.</summary>
+    private sealed class RefusingVersions(IProductVersionRepository inner) : IProductVersionRepository
+    {
+        public Task<IReadOnlyList<ProductVersion>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
+            inner.GetForProductAsync(productId, cancellationToken);
+
+        public Task<bool> HasAnyAsync(int productId, CancellationToken cancellationToken) => inner.HasAnyAsync(productId, cancellationToken);
+
+        public Task<ProductVersion?> AddAsync(
+            int productId, ProductVersionContent content, DateTime savedAt, string? note, CancellationToken cancellationToken) =>
+            throw new TimeoutException(Refused);
+
+        public Task<IReadOnlyList<ProductVersion?>> AddRangeAsync(IReadOnlyList<ProductVersionDraft> drafts, CancellationToken cancellationToken) =>
+            throw new TimeoutException(Refused);
+
+        public Task SetNoteAsync(int versionId, string? note, CancellationToken cancellationToken) => inner.SetNoteAsync(versionId, note, cancellationToken);
+    }
+}

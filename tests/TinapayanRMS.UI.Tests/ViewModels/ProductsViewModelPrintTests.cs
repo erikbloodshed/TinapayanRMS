@@ -53,7 +53,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
 
         printout.Packaging.Should().NotBeNull();
         printout.Packaging!.Lines.Should().Equal(new PrintedPackagingLine("Gift Box", 1m, "pc", 30m, 30m));
-        printout.Costs.Should().BeSameAs(viewModel.Costs, "the costing is the Costing tab's");
+        printout.Costs.Should().BeSameAs(viewModel.Costing.Costs, "the costing is the Costing tab's");
         printout.Scaling.Should().BeNull("the Recipe tab was showing");
     }
 
@@ -83,15 +83,15 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
     public async Task Print_applies_a_line_typed_into_the_open_form_and_notes_the_unsaved_change()
     {
         var (viewModel, sugarId) = await OpenOneSubAssemblyProductAsync();
-        viewModel.IsUsageFormOpen.Should().BeTrue();
-        viewModel.FormLines.Add(new IngredientLineRow { IngredientId = sugarId, Grams = 500m });
+        viewModel.UsageForm.IsUsageFormOpen.Should().BeTrue();
+        viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = sugarId, Grams = 500m });
 
         var printout = await PrintAsync(viewModel);
 
         printout.Sections.Single().Lines.Select(l => (l.Ingredient, l.Grams)).Should().Equal(("Flour", 1000m), ("Sugar", 500m));
         printout.SaveNote.Should().Be(ProductPrintout.UnsavedChangesNote);
         viewModel.UsageEdits.Single().Lines.Should().HaveCount(2, "the form was applied, as Save applies it");
-        viewModel.IsUsageFormOpen.Should().BeTrue("its tab shows it again, as after a Save");
+        viewModel.UsageForm.IsUsageFormOpen.Should().BeTrue("its tab shows it again, as after a Save");
 
         // Applying it was one step, which Undo takes back.
         viewModel.TryUndo().Should().BeTrue();
@@ -102,7 +102,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
     public async Task A_form_a_rule_refuses_shows_why_and_nothing_opens()
     {
         var (viewModel, sugarId) = await OpenOneSubAssemblyProductAsync();
-        viewModel.FormLines.Add(new IngredientLineRow { IngredientId = sugarId });
+        viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = sugarId });
         var requests = 0;
         using var subscription = viewModel.PrintRequests.Subscribe(_ => requests++);
 
@@ -120,7 +120,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         (await PrintAsync(viewModel)).SaveNote.Should().BeNull();
 
         viewModel.EditingName = "Ube Roll Deluxe";
-        viewModel.FormLines.Add(new IngredientLineRow { IngredientId = sugarId, Grams = 250m });
+        viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = sugarId, Grams = 250m });
         var (printout, problem) = viewModel.PreparePrintout();
 
         problem.Should().BeNull();
@@ -135,7 +135,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         var (viewModel, sugarId) = await OpenOneSubAssemblyProductAsync();
         await PrintAsync(viewModel);
 
-        viewModel.FormLines.Add(new IngredientLineRow { IngredientId = sugarId });
+        viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = sugarId });
         var (printout, problem) = viewModel.PreparePrintout();
 
         printout.Should().BeNull("the tab keeps the pages it has");
@@ -184,7 +184,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         await SaveRecipeAsync(productId, new RecipeDraft(
             [new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m)], []));
 
-        return (await OpenAsync(productId, vm => vm.FormLines.Count == 1), sugarId);
+        return (await OpenAsync(productId, vm => vm.UsageForm.FormLines.Count == 1), sugarId);
     }
 
     /// <summary>A box a piece, saved straight to the product.</summary>
@@ -214,7 +214,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await WaitUntilSettledAsync(
             () => viewModel.AreDetailsReady && ready(viewModel),
-            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.FormLines.Count}");
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
         return viewModel;
     }
 
@@ -232,6 +232,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory),
             new ProductCloner(factory),
+            CreateUnitOfWork(),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),

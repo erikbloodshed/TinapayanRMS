@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Data.Common;
+using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure;
@@ -9,6 +10,15 @@ public class TinapayanRMSDbContext : DbContext
         : base(options)
     {
     }
+
+    /// <summary>
+    /// The clock every save stamps its times from: UpdatedAt, DeletedAt and CostUpdatedAt. The system's, unless the factory
+    /// that made the context was given another (SharedTransactionDbContextFactory), as a test gives one it moves by hand.
+    /// </summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
+
+    /// <summary>The shop's local time now, by <see cref="Clock"/>: what every saved time is (see ConfigureConventions).</summary>
+    public DateTime LocalNow() => Clock.GetLocalNow().DateTime;
 
     /// <summary>
     /// Every string column's collation: case-insensitive but accent-sensitive, as SQL Server's default was until the move
@@ -25,9 +35,20 @@ public class TinapayanRMSDbContext : DbContext
     public static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, string connectionString) =>
         options.UseNpgsql(connectionString, npgsql => npgsql.SetPostgresVersion(18, 0)).UseSnakeCaseNamingConvention();
 
+    /// <summary>
+    /// The same, on <paramref name="connection"/>, which a context made with them uses but never closes: the connection a
+    /// unit of work's contexts share (SharedTransactionDbContextFactory).
+    /// </summary>
+    public static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, DbConnection connection) =>
+        options.UseNpgsql(connection, npgsql => npgsql.SetPostgresVersion(18, 0)).UseSnakeCaseNamingConvention();
+
     /// <summary>The options <see cref="Configure"/> builds, for a context made by hand rather than by the factory.</summary>
     public static DbContextOptions<TinapayanRMSDbContext> CreateOptions(string connectionString) =>
         (DbContextOptions<TinapayanRMSDbContext>)Configure(new DbContextOptionsBuilder<TinapayanRMSDbContext>(), connectionString).Options;
+
+    /// <summary>The options <see cref="Configure(DbContextOptionsBuilder, DbConnection)"/> builds.</summary>
+    public static DbContextOptions<TinapayanRMSDbContext> CreateOptions(DbConnection connection) =>
+        (DbContextOptions<TinapayanRMSDbContext>)Configure(new DbContextOptionsBuilder<TinapayanRMSDbContext>(), connection).Options;
 
     public DbSet<UnitOfMeasure> UnitsOfMeasure => Set<UnitOfMeasure>();
 
@@ -106,7 +127,7 @@ public class TinapayanRMSDbContext : DbContext
 
     private void StampCostUpdatedAt()
     {
-        var now = DateTime.Now;
+        var now = LocalNow();
         foreach (var entry in ChangeTracker.Entries<RawMaterial>())
         {
             var costChanged = entry.State switch
@@ -144,7 +165,7 @@ public class TinapayanRMSDbContext : DbContext
         configurationBuilder.Properties<decimal>().HavePrecision(18, DecimalScale);
         configurationBuilder.Properties<string>().UseCollation(CaseInsensitiveCollation);
 
-        // The shop's local time, stamped with DateTime.Now. Npgsql maps a DateTime to timestamptz by default, which only
+        // The shop's local time, stamped by LocalNow(). Npgsql maps a DateTime to timestamptz by default, which only
         // takes UTC values.
         configurationBuilder.Properties<DateTime>().HaveColumnType("timestamp without time zone");
     }

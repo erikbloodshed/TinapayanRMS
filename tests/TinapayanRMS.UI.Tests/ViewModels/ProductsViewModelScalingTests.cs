@@ -71,7 +71,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
             null,
             null,
             Cancellation);
-        var viewModel = await OpenAsync(boxId, vm => vm.ComponentEdits.Count == 2 && vm.ComponentEdits.All(r => r.RecipeCost is not null));
+        var viewModel = await OpenAsync(boxId, vm => vm.ComponentsTable.ComponentEdits.Count == 2 && vm.ComponentsTable.ComponentEdits.All(r => r.RecipeCost is not null));
 
         viewModel.ScalingUnits = 5;
         viewModel.SelectedDetailsTab = ProductsViewModel.ScalingTab;
@@ -96,8 +96,8 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == cheeseRollId);
         await WaitUntilSettledAsync(
-            () => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == cheeseRollId && viewModel.FormLines.Count == 1,
-            () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.FormLines.Count}");
+            () => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == cheeseRollId && viewModel.UsageForm.FormLines.Count == 1,
+            () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.UsageForm.FormLines.Count}");
 
         viewModel.ScalingUnits.Should().Be(25);
         viewModel.ScalingRows.Single().Detail.Should().Be("3 batches · 30 pcs (5 extra)");
@@ -136,8 +136,8 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await WaitUntilSettledAsync(
-            () => viewModel.AreDetailsReady && (ready?.Invoke(viewModel) ?? viewModel.FormLines.Count == 2),
-            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.FormLines.Count}");
+            () => viewModel.AreDetailsReady && (ready?.Invoke(viewModel) ?? viewModel.UsageForm.FormLines.Count == 2),
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
         return viewModel;
     }
 
@@ -155,6 +155,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
             new CostingDefaultsRepository(factory),
             new PackagingLinkRepository(factory),
             new ProductCloner(factory),
+            CreateUnitOfWork(),
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
