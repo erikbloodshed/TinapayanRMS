@@ -16,6 +16,16 @@ public class PriceChangeRulesTests
     }
 
     [Fact]
+    public void The_price_to_keep_a_markup_moves_with_the_VAT_too()
+    {
+        // ₱11.20 with 12% VAT is ₱10 before it: at 15% the same markup is ₱11.50, and the base cost up 10% too makes it ₱12.65.
+        PriceChangeRules.PriceToKeepMarkup(11.2m, 6m, 6m, 12m, 15m).Should().Be(11.5m);
+        PriceChangeRules.PriceToKeepMarkup(11.2m, 6m, 6.6m, 12m, 15m).Should().Be(12.65m);
+        PriceChangeRules.PriceToKeepMarkup(11.2m, 6m, 6.6m, 12m, 12m).Should().Be(PriceChangeRules.PriceToKeepMarkup(11.2m, 6m, 6.6m));
+        PriceChangeRules.PriceToKeepMarkup(null, 6m, 6m, 12m, 15m).Should().BeNull();
+    }
+
+    [Fact]
     public void The_price_to_keep_a_markup_moves_with_the_base_cost_and_earns_the_same_markup()
     {
         // ₱10 on a ₱6 base cost, the base cost up 10% to ₱6.60: ₱11 keeps the markup, VAT and all.

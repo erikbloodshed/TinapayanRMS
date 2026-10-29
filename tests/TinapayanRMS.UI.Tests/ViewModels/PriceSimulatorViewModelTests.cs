@@ -465,6 +465,60 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
     private static PriceSimulatorProductRow? Row(PriceSimulatorViewModel viewModel, int productId) => viewModel.Products.FirstOrDefault(r => r.ProductId == productId);
 
     [Fact]
+    public Task A_whole_category_gets_a_row_for_each_priced_material_and_names_the_ones_left_out() => StaThread.RunAsync(async () =>
+    {
+        var bakery = await AddBakeryAsync();
+        var viewModel = await CreateLoadedViewModelAsync();
+
+        // The egg and the flour share a category; only the egg has a price. The egg white is cut from it, not bought.
+        viewModel.CategoryToChange = viewModel.Categories.Single();
+        viewModel.CategoryChangePercent = 5m;
+        await viewModel.AddCategoryChangeCommand.Execute();
+
+        viewModel.Changes.Should().ContainSingle().Which.MaterialId.Should().Be(bakery.EggId);
+        viewModel.Changes.Single().ChangePercent.Should().Be(5m);
+        viewModel.SuccessMessage.Should().Be("Ingredients: 1 material at +5%. Left out, with no price to change: Flour.");
+
+        // Again at another percent: the row already there takes it, rather than a second one.
+        viewModel.CategoryChangePercent = -2m;
+        await viewModel.AddCategoryChangeCommand.Execute();
+        viewModel.Changes.Should().ContainSingle().Which.ChangePercent.Should().Be(-2m);
+    });
+
+    [Fact]
+    public Task Costing_changes_reprice_every_product_and_Clear_All_takes_them_back() => StaThread.RunAsync(async () =>
+    {
+        var bakery = await AddBakeryAsync();
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.Products.Single(p => p.Id == bakery.PandesalId).CurrentPrice = 3m;
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var viewModel = await CreateLoadedViewModelAsync();
+        await WaitUntilSettledAsync(() => Row(viewModel, bakery.PandesalId) is not null, () => "no rows yet");
+        var before = Row(viewModel, bakery.PandesalId)!;
+
+        // Labor up 10 points, on the pandesal's 1,000 g of flour at 0.05 for 20 pieces: 2.50 of ingredients, so 0.25 more.
+        viewModel.LaborChangePoints = 10m;
+        await WaitUntilSettledAsync(() => Row(viewModel, bakery.PandesalId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+        var pandesal = Row(viewModel, bakery.PandesalId)!;
+        pandesal.SimulatedBaseCost.Should().Be(before.BaseCost + 0.25m);
+        pandesal.PriceToKeepMarkup.Should().BeGreaterThan(3m);
+
+        // A VAT of 10% more on top moves the price to keep the markup by its own factor too.
+        viewModel.LaborChangePoints = null;
+        viewModel.SimulatedVatPercent = 10m;
+        await WaitUntilSettledAsync(() => Row(viewModel, bakery.PandesalId)?.SimulatedBaseCost == before.BaseCost, () => "not yet");
+        Row(viewModel, bakery.PandesalId)!.PriceToKeepMarkup.Should().Be(
+            PriceChangeRules.PriceToKeepMarkup(3m, before.BaseCost, before.BaseCost, 0m, 10m), "the bakery's products have no VAT of their own");
+
+        await viewModel.ClearCommand.Execute();
+        await WaitUntilSettledAsync(() => Row(viewModel, bakery.PandesalId)?.IsAffected == false, () => "not yet");
+        viewModel.SimulatedVatPercent.Should().BeNull();
+    });
+
+    [Fact]
     public Task Set_Current_Prices_sets_each_affected_product_to_its_price_to_charge_with_a_version() => StaThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();

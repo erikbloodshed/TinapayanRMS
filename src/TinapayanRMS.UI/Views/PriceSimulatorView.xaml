@@ -30,6 +30,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <Grid>
@@ -156,6 +157,69 @@
                         <controls:NumericColumn MappingName="ChangePercent" HeaderText="Change %" NumberDecimalDigits="2" Width="110" AllowNullValue="True" />
                     </syncfusion:SfDataGrid.Columns>
                 </syncfusion:SfDataGrid>
+
+                <!--
+                    2026-10-29: a whole category at one change, which fills the table above with a row for each of its priced
+                    materials; and changes to the costing itself, tried on every product. Blank boxes leave a figure as it is.
+                -->
+                <StackPanel Grid.Row="3" Grid.Column="2" Margin="0,10,0,0">
+                    <WrapPanel>
+                        <TextBlock Text="Whole Category" Style="{StaticResource FormLabelStyle}" />
+                        <syncfusion:ComboBoxAdv Width="200"
+                                                ItemsSource="{Binding Categories}"
+                                                SelectedItem="{Binding CategoryToChange, Mode=TwoWay}"
+                                                DisplayMemberPath="Name"
+                                                DefaultText="Category" />
+                        <TextBlock Text="Change %" VerticalAlignment="Center" Margin="10,0,6,0" />
+                        <syncfusion:DoubleTextBox Width="90"
+                                                  NumberDecimalDigits="2"
+                                                  UseNullOption="True"
+                                                  Value="{Binding CategoryChangePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
+                        <syncfusion:ButtonAdv Label="Add Category"
+                                              Margin="8,0,0,0"
+                                              IconTemplate="{StaticResource AddIconTemplate}"
+                                              Command="{Binding AddCategoryChangeCommand}"
+                                              ToolTip="Puts a row in the table for every material in the category that has a price, at this change, or gives the change to its row already there." />
+                    </WrapPanel>
+                    <WrapPanel Margin="0,8,0,0">
+                        <TextBlock Text="Costing" Style="{StaticResource FormLabelStyle}" />
+                        <TextBlock Text="Wastage %" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <syncfusion:DoubleTextBox Width="80"
+                                                  NumberDecimalDigits="2"
+                                                  UseNullOption="True"
+                                                  WatermarkText="As now"
+                                                  ToolTip="The shop-wide Wastage % to try in place of Settings'. Blank keeps it."
+                                                  Value="{Binding SimulatedWastagePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
+                        <TextBlock Text="VAT %" VerticalAlignment="Center" Margin="12,0,6,0" />
+                        <syncfusion:DoubleTextBox Width="80"
+                                                  NumberDecimalDigits="2"
+                                                  UseNullOption="True"
+                                                  WatermarkText="As now"
+                                                  ToolTip="The VAT % to try on every product. Blank keeps each one's."
+                                                  Value="{Binding SimulatedVatPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
+                        <TextBlock Text="Labor ± pts" VerticalAlignment="Center" Margin="12,0,6,0" />
+                        <syncfusion:DoubleTextBox Width="80"
+                                                  NumberDecimalDigits="2"
+                                                  UseNullOption="True"
+                                                  WatermarkText="As now"
+                                                  ToolTip="Percentage points every product's Labor % moves by, up or down, never below 0. Blank keeps each one's."
+                                                  Value="{Binding LaborChangePoints, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
+                        <TextBlock Text="Overhead ± pts" VerticalAlignment="Center" Margin="12,0,6,0" />
+                        <syncfusion:DoubleTextBox Width="80"
+                                                  NumberDecimalDigits="2"
+                                                  UseNullOption="True"
+                                                  WatermarkText="As now"
+                                                  ToolTip="Percentage points every product's Overhead % moves by, up or down, never below 0. Blank keeps each one's."
+                                                  Value="{Binding OverheadChangePoints, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
+                        <TextBlock Text="Admin ± pts" VerticalAlignment="Center" Margin="12,0,6,0" />
+                        <syncfusion:DoubleTextBox Width="80"
+                                                  NumberDecimalDigits="2"
+                                                  UseNullOption="True"
+                                                  WatermarkText="As now"
+                                                  ToolTip="Percentage points every product's Administrative % moves by, up or down, never below 0. Blank keeps each one's."
+                                                  Value="{Binding AdministrativeChangePoints, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
+                    </WrapPanel>
+                </StackPanel>
             </Grid>
         </Border>
 

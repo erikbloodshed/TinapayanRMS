@@ -928,6 +928,16 @@ The top table holds the changes to try, one row per raw material:
 
 **Remove Line** takes the picked row away, and **Clear All** takes them all away, so every figure is today's again.
 
+**Whole Category**, under the table, tries one change on every material in a category: pick the category, type the **Change %**, and press **Add Category**. Each material in it with a price gets a row at that change (one already in the table takes the change instead), and the message names any left out because they have no price yet. For example, *Dairy* at **5** puts every dairy material up 5%.
+
+**Costing**, under that, tries changes to the costing itself, on every product. Leave a box blank to keep its figure as it is now:
+
+- **Wastage %**: the shop-wide wastage to try in place of the one in Settings.
+- **VAT %**: the VAT to try on every product.
+- **Labor ± pts**, **Overhead ± pts** and **Admin ± pts**: how many percentage points each product's own percentage moves, up or down, such as **2** or **-1.5**. A percentage never goes below 0.
+
+The costing changes aren't kept with a scenario, and **Clear All** takes them away too. A VAT change moves **Price to Keep Markup** as well, since VAT goes on top of the markup.
+
 A change moves the material's cost and its buffered cost by the same amount, as typing its Cost Buffer % again after a real price change would. It reaches every made ingredient using the material and every linked ingredient cut from it, as a real price change does. For example, a rise in eggs reaches egg white and the custard made with it.
 
 ### Scenarios
