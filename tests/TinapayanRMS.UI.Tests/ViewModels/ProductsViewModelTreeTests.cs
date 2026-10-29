@@ -560,6 +560,41 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
     [Fact]
+    public async Task A_product_whose_current_price_earns_less_than_its_target_markup_is_flagged_in_the_list()
+    {
+        var fillingId = await AddRoleAsync("Filling");
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.25m);
+        var (shortId, _) = await AddProductWithSubAssemblyAsync("Ube Pandesal", fillingId, [(ubeId, 100m)], weightPerPiece: 10m);
+        var (enoughId, _) = await AddProductWithSubAssemblyAsync("Ube Roll", fillingId, [(ubeId, 100m)], weightPerPiece: 10m);
+
+        // 2.50 of ube a piece and a 30% target: 3.00 earns well under it, 10.00 well over, whatever the VAT.
+        await PriceAsync(shortId, currentPrice: 3m, targetMarkupPercent: 30m);
+        await PriceAsync(enoughId, currentPrice: 10m, targetMarkupPercent: 30m);
+
+        var viewModel = await LoadedViewModelAsync();
+        await WaitUntilSettledAsync(() => viewModel.ProductTree.Find(shortId)!.IsBelowTargetMarkup, () => "not flagged yet");
+
+        viewModel.ProductTree.Find(enoughId)!.IsBelowTargetMarkup.Should().BeFalse();
+    }
+
+    private async Task PriceAsync(int productId, decimal currentPrice, decimal targetMarkupPercent)
+    {
+        await using var dbContext = CreateDbContext();
+        var product = await dbContext.Products.SingleAsync(p => p.Id == productId, Cancellation);
+        product.CurrentPrice = currentPrice;
+        if (await dbContext.CostingParameters.SingleOrDefaultAsync(c => c.ProductId == productId, Cancellation) is { } costing)
+        {
+            costing.MarginPercent = targetMarkupPercent;
+        }
+        else
+        {
+            dbContext.CostingParameters.Add(new CostingParameters { ProductId = productId, MarginPercent = targetMarkupPercent });
+        }
+
+        await dbContext.SaveChangesAsync(Cancellation);
+    }
+
+    [Fact]
     public async Task Picking_another_product_over_unsaved_changes_asks_and_Cancel_stays_on_them()
     {
         var breadsId = await AddProductCategoryAsync("Breads");

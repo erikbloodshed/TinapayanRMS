@@ -170,6 +170,12 @@ public sealed class ProductCostSummary
     /// <summary>The current price doesn't cover the base cost: a negative markup, which the header shows in red.</summary>
     public bool IsCurrentPriceBelowCost => CurrentMarkupPercent < 0;
 
+    /// <summary>
+    /// The current price earns less than the costing's Markup % (2026-10-29, at the user's request), compared as they're shown,
+    /// to 2 decimals, so a price that rounds to the target isn't flagged: amber in the header, the Products list and Reports.
+    /// </summary>
+    public bool IsBelowTargetMarkup => CurrentMarkupPercent is { } earned && Math.Round(earned, 2) < Math.Round(MarginPercent, 2);
+
     public decimal SubAssembliesShare => CostingRules.PercentOf(SubAssemblies, SellingPrice);
 
     public decimal PackagingShare => CostingRules.PercentOf(Packaging, SellingPrice);

@@ -15,9 +15,13 @@
         <Style x:Key="FigureAmountStyle" TargetType="TextBlock" BasedOn="{StaticResource FigureValueStyle}">
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
-        <!-- The markup the current price earns: red when the price doesn't cover the base cost -->
+        <!-- The markup the current price earns: amber when it's short of the target markup, red when the price doesn't cover the base cost -->
         <Style x:Key="CurrentMarkupStyle" TargetType="TextBlock" BasedOn="{StaticResource FigureAmountStyle}">
             <Style.Triggers>
+                <DataTrigger Binding="{Binding Costing.Costs.IsBelowTargetMarkup}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource WarningForegroundBrush}" />
+                    <Setter Property="ToolTip" Value="Short of the Markup % the Costing tab aims for" />
+                </DataTrigger>
                 <DataTrigger Binding="{Binding Costing.Costs.IsCurrentPriceBelowCost}" Value="True">
                     <Setter Property="Foreground" Value="{StaticResource ErrorForegroundBrush}" />
                 </DataTrigger>

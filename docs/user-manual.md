@@ -597,6 +597,8 @@ Right-click menus:
 
 **New Product Here** and **New Composite Product Here** file the new product in that folder when you save it. **New** from the header puts it in the stage set in Settings → Costing Defaults, Production unless you change it.
 
+A ⚠ after a product's name means its **Current Price** earns less than the **Markup Metric** on its Costing tab. The marks are worked out from the products as saved, a moment after the list loads, so a product you've just saved shows its new mark the next time the Products tab opens.
+
 Each product's name starts with a small full-colour picture of what it is: a round bread for **Breads**, a loaf for **Loaves**, a strawberry cake for **Cakes**, a cupcake for **Pastries** and a roll cake for **Rolls**. A composite product always has a bag of breads, whatever its category. A product in any other category, or in none, has no picture.
 
 ### The header
@@ -606,7 +608,7 @@ The header has the product's name and **New**, **Save**, **Undo**, **Redo**, **R
 - **Material Cost**: sub-assemblies plus packaging. For a composite product, its products' recipe cost and its own sub-assemblies, plus its own packaging, and its products' packaging too when it includes theirs.
 - **Base Cost**: materials plus wastage, labour, overhead and administrative.
 - **Current Price**: what the shop charges now.
-- **Markup %**: what the current price actually earns on the base cost, with VAT taken out. Compare it with the markup you set on the Costing tab.
+- **Markup %**: what the current price actually earns on the base cost, with VAT taken out. Compare it with the markup you set on the Costing tab. It shows in amber when it's less than that markup, and in red when the price doesn't even cover the base cost.
 - **Last Updated**.
 
 Below the header are the fields you fill in:
@@ -867,8 +869,10 @@ One row for every product, as it's saved:
 - **Base Cost** and **Suggested Price**: as the product's Costing tab works them out. The base cost is the six costs before it added up, and the suggested price is the Costing tab's **Total Selling Price**.
 - **Current Price**: what the shop charges now, as entered on the product. Blank if none is entered.
 - **Markup %**: what the current price earns on the base cost, as the product's header shows it. Blank without a current price.
+- **Target Markup %**: the **Markup Metric** on the product's Costing tab, what you're aiming for.
+- **Short By**: how many percentage points **Markup %** is under **Target Markup %**. Blank when it isn't short, or there's no current price.
 
-Sort by **Markup %** to see which products earn the least.
+Sort by **Markup %** to see which products earn the least, or by **Short By** to see which fall furthest short of what you're aiming for.
 
 To show only some products, click the funnel in the **Product**, **Stage** or **Category** heading. Untick what you don't want to see, or untick **(Select All)** and tick only what you do, then click **OK**. The search box at the top finds a name in a long list. A funnel with a dot shows that its column is filtered, and filters in more than one column work together: **Stage** set to Production and **Category** set to Breads shows only the breads in production. **Clear Filter** at the top of the list shows everything in that column again. The filters stay as you set them, even after you close the app: Reports opens with them the next time.
 
@@ -1181,7 +1185,7 @@ The app keeps costs at full precision and rounds them only for display. So a tot
 
 ### Check whether a product's price still earns enough
 
-Open the product and compare the header's **Markup %**, which is what the current price earns, with the **Markup Metric** on the Costing tab, which is what you're aiming for. For an overview of all products, look at **Reports → Product Cost Summary** and sort by **Markup %**.
+Open the product and compare the header's **Markup %**, which is what the current price earns, with the **Markup Metric** on the Costing tab, which is what you're aiming for: the header's figure is amber when it's short. In the Products list, a ⚠ marks every product that's short. For an overview of all products, look at **Reports → Product Cost Summary** and sort by **Short By**.
 
 ### Bring back a deleted product
 

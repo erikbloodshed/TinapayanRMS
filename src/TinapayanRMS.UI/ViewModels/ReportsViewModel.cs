@@ -60,6 +60,15 @@ public sealed class ProductCostRow(Product product, ProductCostSummary costs)
 
     /// <summary>The markup the current price earns, as the Products header shows it; null without a current price.</summary>
     public decimal? MarkupPercent => costs.CurrentMarkupPercent;
+
+    /// <summary>The markup the costing aims for, the Costing tab's Markup Metric.</summary>
+    public decimal TargetMarkupPercent => costs.MarginPercent;
+
+    /// <summary>
+    /// How many percentage points the current price's markup is short of <see cref="TargetMarkupPercent"/> (2026-10-29); null
+    /// when it isn't short, or there's no current price. Sorting by it puts the furthest short first.
+    /// </summary>
+    public decimal? ShortOfTargetMarkup => costs.IsBelowTargetMarkup ? costs.MarginPercent - costs.CurrentMarkupPercent : null;
 }
 
 /// <summary>

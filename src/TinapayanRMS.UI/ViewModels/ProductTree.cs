@@ -30,6 +30,17 @@ public abstract class ProductTreeNode : ReactiveObject
 
     /// <summary>Which image goes before a product's name (ProductListCard); always none for a folder.</summary>
     public virtual ProductIcon IconKind => ProductIcon.None;
+
+    private bool _isBelowTargetMarkup;
+    /// <summary>
+    /// A product whose current price earns less than its target markup (ProductCostSummary.IsBelowTargetMarkup): a flag after
+    /// its name. Worked out in the background after each load; never set on a folder.
+    /// </summary>
+    public bool IsBelowTargetMarkup
+    {
+        get => _isBelowTargetMarkup;
+        set => this.RaiseAndSetIfChanged(ref _isBelowTargetMarkup, value);
+    }
 }
 
 /// <summary>

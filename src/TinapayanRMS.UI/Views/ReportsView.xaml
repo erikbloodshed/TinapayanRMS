@@ -131,6 +131,8 @@
                                     <controls:NumericColumn MappingName="SuggestedPrice" HeaderText="Suggested Price" NumberDecimalDigits="2" MinimumWidth="102" />
                                     <controls:NumericColumn MappingName="CurrentPrice" HeaderText="Current Price" NumberDecimalDigits="2" AllowNullValue="True" MinimumWidth="84" />
                                     <controls:NumericColumn MappingName="MarkupPercent" HeaderText="Markup %" NumberDecimalDigits="2" AllowNullValue="True" MinimumWidth="84" />
+                                    <controls:NumericColumn MappingName="TargetMarkupPercent" HeaderText="Target Markup %" NumberDecimalDigits="2" MinimumWidth="84" />
+                                    <controls:NumericColumn MappingName="ShortOfTargetMarkup" HeaderText="Short By" NumberDecimalDigits="2" AllowNullValue="True" MinimumWidth="70" />
                                 </syncfusion:SfDataGrid.Columns>
                             </syncfusion:SfDataGrid>
                         </DockPanel>

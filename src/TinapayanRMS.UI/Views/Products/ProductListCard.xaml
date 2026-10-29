@@ -205,6 +205,15 @@
                                 <TextBlock x:Name="Title"
                                            Text="{Binding Title}"
                                            VerticalAlignment="Center" />
+                                <!-- A product whose current price earns less than its target markup (ProductTreeNode.IsBelowTargetMarkup) -->
+                                <TextBlock Text="&#xE7BA;"
+                                           Style="{StaticResource IconGlyphStyle}"
+                                           FontSize="12"
+                                           Foreground="{StaticResource WarningForegroundBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0,0,0"
+                                           ToolTip="Its current price earns less than its target markup"
+                                           Visibility="{Binding IsBelowTargetMarkup, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                 <!-- A folder's products, muted after its name: which are empty shows without opening them -->
                                 <TextBlock x:Name="Count"
                                            Text="{Binding ProductCount, StringFormat='({0})'}"

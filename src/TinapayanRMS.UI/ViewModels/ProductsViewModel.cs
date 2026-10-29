@@ -545,6 +545,28 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         private set => this.RaiseAndSetIfChanged(ref _scalingPiecesText, value);
     }
 
+    /// <summary>The products each load brings, whose markups the list's flags are worked out from.</summary>
+    private readonly Subject<IReadOnlyList<Product>> _markupChecks = new();
+
+    /// <summary>
+    /// Flags each product in the list whose current price earns less than its target markup (2026-10-29): every product
+    /// priced as saved, as Reports prices them (SavedProductReader.ReadAllAsync, a dozen or so queries however many there are),
+    /// off the UI thread. A product's flag follows its Save at the next load.
+    /// </summary>
+    private async Task FlagBelowTargetMarkupAsync(IReadOnlyList<Product> products, CancellationToken cancellationToken)
+    {
+        var saved = await Task.Run(() => _savedProducts.ReadAllAsync(products, CostBasis.Buffered, cancellationToken), cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var below = saved.Where(s => s.Costs.IsBelowTargetMarkup).Select(s => s.Product.Id).ToHashSet();
+        foreach (var product in products)
+        {
+            if (ProductTree.Find(product.Id) is { } leaf)
+            {
+                leaf.IsBelowTargetMarkup = below.Contains(product.Id);
+            }
+        }
+    }
+
     private IReadOnlyList<RawMaterial> _scalingIngredients = [];
     /// <summary>
     /// The ingredients the recipe takes, wherever they are in it (RecipeScaler.IngredientsOf): what the Scaling tab's "from
@@ -1005,6 +1027,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         this.WhenAnyValue(x => x.Costing.Costs, x => x.ScalingUnits, x => x.SelectedDetailsTab)
             .Where(_ => SelectedDetailsTab == ScalingTab)
             .Subscribe(_ => RefreshScaling());
+        // The list's flags for a price short of its target markup, after each load: a newer load cancels one still working.
+        LoadLatest(_markupChecks, FlagBelowTargetMarkupAsync);
+
         this.WhenAnyValue(x => x.ScalingHaveIngredient, x => x.ScalingHaveUnit, x => x.ScalingHaveAmount)
             .Where(_ => SelectedDetailsTab == ScalingTab)
             .Subscribe(_ => RefreshScaling());
@@ -1353,6 +1378,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 DeletedProducts = deleted;
                 _productCache.MergeFrom(products);
                 RefreshProductTree();
+                _markupChecks.OnNext(products);
                 _linkable = linkable;
                 _packagingSets = packagingSets;
                 RefreshCostingDefaults(costingDefaults);
@@ -5171,5 +5197,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _subAssemblyOpenRequests.Dispose();
         _printRequests.Dispose();
         _versionReads.Dispose();
+        _markupChecks.Dispose();
     }
 }
