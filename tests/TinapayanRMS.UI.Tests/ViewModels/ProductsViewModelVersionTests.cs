@@ -459,7 +459,12 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         shared.Should().Be(alone, "a new price changes no other product, so the three sharing Pandesal's dough aren't read");
     }
 
-    /// <summary>The commands a Save of a new current price takes, with the product's History tab hidden.</summary>
+    /// <summary>
+    /// The commands a Save of a new current price takes, with the product's History tab hidden: its own, and those of the
+    /// reload's below-markup flags, which read every product in the background whatever the Save changed. Counted once
+    /// they're all done, since that read is still going when the Save returns, and how far it had got varied the count
+    /// (2026-10-30: 53 to 56, in a test run on its own).
+    /// </summary>
     private async Task<int> CommandsSavingPriceAsync(int productId)
     {
         var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 1);
@@ -468,7 +473,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         using (var counter = SqlCommandCounter.Start())
         {
             await viewModel.SaveCommand.Execute();
-            commands = counter.Commands;
+            commands = await counter.SettledAsync();
         }
 
         viewModel.ErrorMessage.Should().BeNull();
