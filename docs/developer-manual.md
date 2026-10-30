@@ -154,7 +154,7 @@ Run every command from the repository root.
    dotnet ef database update --project src/TinapayanRMS.Infrastructure
    ```
 7. **Run the app:** `dotnet run --project src/TinapayanRMS.UI`. With an empty database, follow the user manual's [First-time setup](user-manual.md#3-first-time-setup).
-8. **Run the tests:** `dotnet test --solution TinapayanRMS.slnx`. The first run creates the test databases `tinapayanrms_test_infrastructure` and `tinapayanrms_test_ui`. The tests never touch `tinapayanrms`.
+8. **Run the tests:** `dotnet test --solution TinapayanRMS.slnx`. The first run creates the test databases `tinapayanrms_test_infrastructure`, `tinapayanrms_test_ui` and `tinapayanrms_test_mcp`. The tests never touch `tinapayanrms`.
 
 ### Connection strings
 
@@ -191,6 +191,7 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 | Regenerate the compiled model, after any model change | `dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels` |
 | Publish the app (ReadyToRun, to `src/TinapayanRMS.UI/bin/Release/net11.0-windows10.0.19041.0/win-x64/publish/`) | `dotnet publish src/TinapayanRMS.UI` |
 | Query the database | `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U tinapayanrms -d tinapayanrms -c "SELECT name, cost_per_base_unit FROM raw_materials"` |
+| Run the MCP server by hand (an AI assistant starts it from `.mcp.json`; see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)) | `dotnet run --project src/TinapayanRMS.Mcp -c Release` |
 
 The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test.runner`). VSTest-style flags such as `--filter` and `--collect` don't work: use the `--filter-*` options and `--coverage` instead.
 
@@ -219,16 +220,18 @@ A change is done when:
 | `src/TinapayanRMS.ApplicationCore` | `net11.0` | Domain; FluentValidation | `Interfaces/`, `Rules/`, `Validators/` |
 | `src/TinapayanRMS.Infrastructure` | `net11.0` | Domain, ApplicationCore; EF Core (Npgsql, with EFCore.NamingConventions), Dapper | `TinapayanRMSDbContext` and its design-time factory at the root; `Configurations/`, `Migrations/`, `CompiledModels/`, `Queries/`, `Repositories/`, `Services/` |
 | `src/TinapayanRMS.UI` | `net11.0-windows10.0.19041.0` | All three; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion | App startup at the root; `Views/`, `ViewModels/`, `Controls/`, `Converters/`, `Printing/`, `Exporting/`, `Vim/`, `Themes/`, `Assets/Icons/` |
+| `src/TinapayanRMS.Mcp` | `net11.0-windows10.0.19041.0` | UI; ModelContextProtocol | An MCP server for AI coding assistants (see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)): `Program` and `ReadOnlyConnection` at the root; `Tools/`, `Results/`, `Serialization/` |
 | `tests/TinapayanRMS.ApplicationCore.Tests` | `net11.0` | Domain, ApplicationCore | Rule and validator tests, with no database |
 | `tests/TinapayanRMS.Infrastructure.Tests` | `net11.0` | Infrastructure, Tests.Common | Persistence tests against the project's own database |
 | `tests/TinapayanRMS.UI.Tests` | `net11.0-windows10.0.19041.0` | UI, Tests.Common | ViewModel, control, printing, export, converter and Vim-key tests |
+| `tests/TinapayanRMS.Mcp.Tests` | `net11.0-windows10.0.19041.0` | Mcp, Tests.Common | The MCP server's tools against the project's own database |
 | `tests/TinapayanRMS.Tests.Common` | `net11.0` | Infrastructure; Respawn | The shared database fixtures. It's a plain library, not a test project. |
 
-The two UI projects target Windows SDK 10.0.19041 because ReactiveUI.WPF needs it. The bare `net11.0-windows` moniker resolves to `windows7.0`, which is too low.
+The UI projects, and the MCP ones that reference them, target Windows SDK 10.0.19041 because ReactiveUI.WPF needs it. The bare `net11.0-windows` moniker resolves to `windows7.0`, which is too low.
 
 ### Folders are namespaces
 
-Every folder in a project is a sub-namespace: `src/TinapayanRMS.UI/ViewModels/` holds `TinapayanRMS.UI.ViewModels`. A new file goes in the folder for its kind, never at a project root. Only app-startup plumbing (`App`, `CompositionRoot`, `ReactiveUIBootstrapper`, `ConfirmDeleteHandlerRegistration`, `BindingErrorLog`) and the DbContext pair sit at a root. Code in a sub-namespace sees its parent namespaces without a `using`; sibling folders need one.
+Every folder in a project is a sub-namespace: `src/TinapayanRMS.UI/ViewModels/` holds `TinapayanRMS.UI.ViewModels`. A new file goes in the folder for its kind, never at a project root. Only app-startup plumbing (`App`, `CompositionRoot`, `ReactiveUIBootstrapper`, `ConfirmDeleteHandlerRegistration`, `BindingErrorLog`, and the MCP server's `Program` and `ReadOnlyConnection`) and the DbContext pair sit at a root. Code in a sub-namespace sees its parent namespaces without a `using`; sibling folders need one.
 
 | A new… | Goes in | Its tests go in |
 |---|---|---|
@@ -259,7 +262,7 @@ A file can hold a few small, closely related types, such as a tree's rows in `Pr
 
 ### Other files at the root
 
-`.claude/`, `apm.yml`, `apm.lock.yaml` and `skills-lock.json` hold AI-assistant tooling: Syncfusion's WPF agent skills, and a UI-builder agent. You don't need them to build or run the app. However, the `syncfusion-wpf-*` skills in `.claude/skills/` are readable Markdown guides to each Syncfusion control.
+`.claude/`, `apm.yml`, `apm.lock.yaml` and `skills-lock.json` hold AI-assistant tooling: Syncfusion's WPF agent skills, and a UI-builder agent. You don't need them to build or run the app. However, the `syncfusion-wpf-*` skills in `.claude/skills/` are readable Markdown guides to each Syncfusion control. `.mcp.json` tells an AI assistant how to start the MCP server, `src/TinapayanRMS.Mcp` (see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)).
 
 ### A reading order for the code
 
@@ -1046,7 +1049,7 @@ The plan also follows the add row's line (`_newLine`, made by `NewLine`) while i
 ### How the tests work
 
 - **Nothing is mocked.** Rules are tested as pure functions. Repositories, services and ViewModels are tested on a real PostgreSQL database that Respawn resets before every test. Grid behaviours are tested in real `SfDataGrid`s in windows placed off-screen.
-- **Each database-backed project has its own database**: `tinapayanrms_test_infrastructure` and `tinapayanrms_test_ui`. `dotnet test --solution` runs the projects side by side, and a shared database would be reset under the other project's running test.
+- **Each database-backed project has its own database**: `tinapayanrms_test_infrastructure`, `tinapayanrms_test_ui` and `tinapayanrms_test_mcp`. `dotnet test --solution` runs the projects side by side, and a shared database would be reset under the other project's running test.
 - **Each database is migrated once per test run**, by the fixture's `MigrateAsync`.
 - **Respawn clears every table** except `__EFMigrationsHistory` before each test (it truncates them, and tries again if PostgreSQL ends the truncate as a deadlock with a read the last test left running). That includes rows the migrations seeded, so a test creates every row it needs.
 
@@ -1055,6 +1058,7 @@ The plan also follows the add row's line (`_newLine`, made by `NewLine`) while i
 | `ApplicationCore.Tests` | `Rules/` and `Validators/`, as pure functions | Nothing |
 | `Infrastructure.Tests` | `Persistence/` (repositories and the cascade), `Queries/` (`ColumnsTests`), `Services/` (`JsonViewStateStoreTests`, and `DatabaseBackupsTests`, which run the real `pg_dump` and `pg_restore`) | PostgreSQL, with its command-line tools |
 | `UI.Tests` | `ViewModels/` on real repositories, `Controls/` in off-screen grids, `Printing/`, `Converters/`, `CompositionRootTests` | PostgreSQL; the licence key for the tests that build Syncfusion controls |
+| `Mcp.Tests` | `Tools/` (`CostingToolsTests`): the tools read through the server's read-only connection, priced as the screens price, and the connection refusing a write | PostgreSQL |
 | `Tests.Common` | Nothing: it's the shared fixture library | — |
 
 ### The database fixtures
@@ -1311,6 +1315,7 @@ Respawn picks up the new table by itself.
 | Settings → Database says backups need `pg_dump` and `pg_restore` | PostgreSQL's command-line tools aren't in `C:\Program Files\PostgreSQL\<version>\bin` or on the `PATH` | Install them, or set `Backups:ToolsFolder` in `appsettings.json` |
 | The build fails with `CS0103: The name 'InitializeComponent' does not exist`, or `CS2001` for `*.g.cs` files, all against a `*_wpftmp.csproj` | The WPF markup pass has gone stale | Run `dotnet clean src/TinapayanRMS.UI`, build the UI project on its own, then build the solution |
 | The build can't copy `TinapayanRMS.UI.exe` or a DLL | The app is running | Close it |
+| An AI assistant's TinapayanRMS tools give figures from before your change | The MCP server is still running the build it started with | Restart it (`/mcp` in Claude Code). It builds again as it starts |
 | `--filter` isn't recognised, or zero tests ran | VSTest flags under Microsoft.Testing.Platform | Use `--filter-class`, `--filter-method` and `--coverage` |
 | Some UI tests are reported as skipped | No licence key | Set `SYNCFUSION_LICENSE_KEY` |
 | A binding silently does nothing | A binding error | Check the Debug build's log for `WPF binding` warnings |
@@ -1333,6 +1338,24 @@ To drive the running app (launch it on the secondary monitor, click, type, captu
 - UI Automation's `FocusedElement` reports the window, not the grid, while an `SfDataGrid` has the keyboard. Judge a grid's focus from the screen instead, for example by whether the current cell's border moves with the keys.
 - `new App()` posts WPF's startup to the dispatcher, so a harness that runs the dispatcher also runs `OnStartup`, which shows the real main window. Collect what it posts and abort it first.
 - A file-based harness also needs `#:property PublishAot=false` (WPF can't be trimmed), a `DispatcherSynchronizationContext` on its thread (or a ViewModel's `await` comes back on the thread pool and the screen stays empty), and the UI assembly as `Application.ResourceAssembly`, where a view's `/Assets/...` images are.
+
+### Checking costs from an AI assistant
+
+A product's cost and selling price aren't stored, so SQL can't show them: they're worked out when they're read (see [Stored and computed costs](#stored-and-computed-costs)). [src/TinapayanRMS.Mcp](../src/TinapayanRMS.Mcp) is a [Model Context Protocol](https://modelcontextprotocol.io) server, built on the official C# SDK (the `ModelContextProtocol` package), that gives an AI coding assistant such as Claude Code these figures. It works them out with the app's own code and reads the dev database `tinapayanrms`. Its tools are in [CostingTools](../src/TinapayanRMS.Mcp/Tools/CostingTools.cs):
+
+| Tool | What it returns | Worked out by |
+|---|---|---|
+| `list_products` | Every product, or those whose name has some text in it, each with its base cost, suggested and rounded selling price, current price and markup | `SavedProductReader.ReadAllAsync`, as Reports prices them |
+| `get_product_costing` | One product as the Products screen shows it once opened: each section's batch, lines, add-ins and cost per piece, a composite's products, its packaging, and the Costing tab down to the selling price | `SavedProductReader.ReadAsync` |
+| `simulate_price_changes` | What-if: new prices or percentage changes for purchased materials, the made and linked ingredients each reaches, and every product they reach with its cost, suggested price and markup now and with the changes | The Price Simulator's code: `SimulatedPriceChange`, `IngredientCostRules.Reprice`, `SavedProductReader.PricedAt` and `Build`, and `PriceSimulatorProductRow` |
+
+Each tool takes a product or material by its name, or by a part of it that names only one. A name that matches nothing, or several, comes back as an error that lists the candidates. Each tool also takes `unbuffered`, which prices at the materials' true costs, as the Products screen's Unbuffered switch does. The JSON it returns has every decimal rounded to 6 places (`ToolJson`), though the figures are worked out at full precision.
+
+- **It can't write.** [ReadOnlyConnection](../src/TinapayanRMS.Mcp/ReadOnlyConnection.cs) adds `Options=-c default_transaction_read_only=on` to the connection string from `appsettings.json`, so PostgreSQL refuses any INSERT, UPDATE or DELETE, whatever code runs it. `CostingToolsTests` reads through that connection, and checks that a write is refused.
+- **Its figures are the screens'.** The project references the UI project and builds its host with `CompositionRoot`, because the pricing (`SavedProductReader`) and the simulator's arithmetic live there. A change to how a product is priced reaches the tools without any change here. A change to the signature of one of those types can break this project's build.
+- **Claude Code starts it** from [.mcp.json](../.mcp.json) with `dotnet run --project src/TinapayanRMS.Mcp -c Release`. Claude Code asks you to approve a project's server the first time. The first start takes about 20 seconds, because it builds the Release configuration first. Release keeps its files in `bin/Release`, so a running server doesn't lock the Debug files that `dotnet build` and `dotnet test` write. It's rebuilt each time it starts, so restart it in Claude Code (`/mcp`) to pick up a change.
+- **Nothing but the protocol may reach standard output.** The host has no console logging. Anything a tool printed with `Console.WriteLine` would break the connection.
+- **To add a tool**, add a method marked `[McpServerTool]` (with `ReadOnly = true`) to `CostingTools`, or to a new `[McpServerToolType]` class in `Tools/`, which `WithToolsFromAssembly` finds. Give the method and each parameter a `[Description]`: that's all the assistant reads about it. Put its result records in `Results/`. Throw `McpException` for a refusal the assistant should read; the SDK replaces any other exception's message with a generic one. Test it in `Mcp.Tests/Tools/` on a read-only connection, as `CostingToolsTests.CreateTools` does.
 
 ---
 

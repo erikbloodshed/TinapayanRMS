@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A Model Context Protocol server over stdio, for AI coding tools: reads and prices the dev database's products with
+       the app's own code, and never writes (Program). It references the UI project because the pricing lives there
+       (SavedProductReader, the Price Simulator's SimulatedPriceChange), so its figures are the screens'. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TinapayanRMS.UI\TinapayanRMS.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TinapayanRMS.Mcp.Tests" />
+  </ItemGroup>
+
+</Project>

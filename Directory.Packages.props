@@ -19,6 +19,8 @@
     <PackageVersion Include="FluentValidation" Version="12.2.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EFCoreVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsVersion)" />
+    <!-- The official MCP C# SDK, for TinapayanRMS.Mcp. 2.3.0 was out under two weeks when this was added (2026-10-30). -->
+    <PackageVersion Include="ModelContextProtocol" Version="2.2.0" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="11.0.0-rc.3" />
     <PackageVersion Include="ReactiveUI.WPF" Version="26.0.1" />
     <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
