@@ -22,8 +22,8 @@ namespace TinapayanRMS.RecipeApi.Tests.Endpoints;
 
 /// <summary>
 /// The Recipe API against a real database, through the host Program builds (the app's CompositionRoot with the API on
-/// top and a read-only connection), served in memory: the mixes and their lines as saved, a plan's batches as the
-/// Production Plan screen works them out, the key when one is set, and no writes.
+/// top and a read-only connection), served in memory: the mixes and their lines as saved, the ingredients, BOMs,
+/// materials and product recipes TinapayanPreweigh plans from, the key when one is set, and no writes.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
@@ -91,49 +91,6 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         mix.Lines.Should().Equal(new MixLine(bakery.WaterId, "Water", 300m, false), new MixLine(bakery.FlourId, "Flour", 600m, false));
         pandesalDough.Lines.Should().Equal(new MixLine(bakery.FlourId, "Flour", 1000m, true), new MixLine(bakery.WaterId, "Water", 500m, false));
         (await host.GetTestClient().GetAsync("/api/v1/mixes/999999", Cancellation)).StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    [Fact]
-    public async Task A_plan_rounds_each_mix_up_to_its_batches_as_the_Production_Plan_does()
-    {
-        var bakery = await AddBakeryAsync();
-        using var host = await StartAsync();
-
-        var whole = await PlanAsync(host, new PlanRequest([new PlanOrder(bakery.PandesalId, 45m)], HalfBatches: false));
-        var halves = await PlanAsync(host, new PlanRequest([new PlanOrder(bakery.PandesalId, 45m)], HalfBatches: true));
-
-        var mix = whole.Mixes.Should().ContainSingle().Subject;
-        mix.SubAssemblyId.Should().Be(bakery.PandesalDoughId);
-        mix.Name.Should().Be("Pandesal Dough");
-        mix.Role.Should().Be("Dough");
-        mix.For.Should().Be("Pandesal 45 pcs");
-        mix.Batches.Should().Be(2m, "45 pieces at 30 a batch is 1.5 batches, rounded up to whole ones");
-        mix.BatchWeight.Should().Be(1500m);
-        mix.LinesPerBatch.Should().Equal(new PlanLine(bakery.FlourId, "Flour", 1000m), new PlanLine(bakery.WaterId, "Water", 500m));
-        whole.Prepared.Should().BeEmpty();
-        whole.Issues.Should().BeEmpty();
-        halves.Mixes.Single().Batches.Should().Be(1.5m);
-    }
-
-    [Fact]
-    public async Task A_plan_lists_a_made_ingredient_to_prepare_with_what_its_made_from_scaled_to_the_grams_needed()
-    {
-        var fillingId = await AddRoleAsync("Filling", sortOrder: 3);
-        var eggId = await AddIngredientAsync("Egg");
-        var milkId = await AddIngredientAsync("Milk");
-        var custardId = await AddMadeIngredientAsync("Custard", [(eggId, 100m), (milkId, 300m)]);
-        var (tartId, _) = await AddProductWithSubAssemblyAsync("Egg Tart", fillingId, [(custardId, 1000m)], weightPerPiece: 50m);
-        using var host = await StartAsync();
-
-        var plan = await PlanAsync(host, new PlanRequest([new PlanOrder(tartId, 20m)], HalfBatches: false));
-
-        plan.Mixes.Should().ContainSingle().Which.LinesPerBatch.Should().Equal(new PlanLine(custardId, "Custard", 1000m));
-        var prepared = plan.Prepared.Should().ContainSingle().Subject;
-        prepared.IngredientId.Should().Be(custardId);
-        prepared.SubAssemblyId.Should().Be(await RecipeIdOfAsync(custardId));
-        prepared.Name.Should().Be("Custard");
-        prepared.Grams.Should().Be(1000m, "20 tarts at 50 g take one 1,000 g batch of filling");
-        prepared.Lines.Should().Equal(new PlanLine(eggId, "Egg", 250m), new PlanLine(milkId, "Milk", 750m));
     }
 
     [Fact]
@@ -212,42 +169,6 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
     }
 
     [Fact]
-    public async Task A_plan_of_nothing_no_units_or_an_unknown_product_is_refused_with_why()
-    {
-        var bakery = await AddBakeryAsync();
-        using var host = await StartAsync();
-        var client = host.GetTestClient();
-
-        var empty = await client.PostAsJsonAsync("/api/v1/plan", new PlanRequest([], false), Cancellation);
-        var noUnits = await client.PostAsJsonAsync("/api/v1/plan", new PlanRequest([new PlanOrder(bakery.PandesalId, 0m)], false), Cancellation);
-        var unknown = await client.PostAsJsonAsync("/api/v1/plan", new PlanRequest([new PlanOrder(999999, 5m)], false), Cancellation);
-
-        empty.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await ErrorOf(empty)).Should().Be("Give at least one product to make.");
-        noUnits.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await ErrorOf(noUnits)).Should().Be($"Product {bakery.PandesalId}: its units must be above 0.");
-        unknown.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await ErrorOf(unknown)).Should().Be("No product in use has id 999999.");
-    }
-
-    [Fact]
-    public async Task The_saved_plans_come_with_their_products_names()
-    {
-        var bakery = await AddBakeryAsync();
-        await new SavedPlanRepository(CreateDbContextFactory()).SaveAsync(
-            "Saturday", [new SavedPlanLine { ProductId = bakery.PandesalId, Units = 120m }], halfBatches: true, new DateOnly(2026, 11, 7), new DateTime(2026, 11, 6, 17, 0, 0), Cancellation);
-        using var host = await StartAsync();
-
-        var plans = await GetAsync<List<SavedPlanInfo>>(host, "/api/v1/plans");
-
-        var plan = plans.Should().ContainSingle().Subject;
-        plan.Name.Should().Be("Saturday");
-        plan.MakeOn.Should().Be(new DateOnly(2026, 11, 7));
-        plan.HalfBatches.Should().BeTrue();
-        plan.Lines.Should().Equal(new PlanOrder(bakery.PandesalId, 120m, "Pandesal"));
-    }
-
-    [Fact]
     public async Task With_a_key_set_a_request_without_it_is_refused()
     {
         using var host = await StartAsync(key: "s3cret");
@@ -294,13 +215,6 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
 
     private static async Task<T> GetAsync<T>(IHost host, string path) =>
         (await host.GetTestClient().GetFromJsonAsync<T>(path, JsonSerializerOptions.Web, Cancellation))!;
-
-    private static async Task<PlanResult> PlanAsync(IHost host, PlanRequest request)
-    {
-        var response = await host.GetTestClient().PostAsJsonAsync("/api/v1/plan", request, Cancellation);
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<PlanResult>(JsonSerializerOptions.Web, Cancellation))!;
-    }
 
     private static Task<HttpResponseMessage> SendAsync(HttpClient client, string path, string key)
     {

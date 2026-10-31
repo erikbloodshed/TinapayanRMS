@@ -35,11 +35,6 @@ public sealed partial class PrintPreviewWindow : AppWindow
         Heading.Text = $"Print: {Title}";
         SfSkinManager.SetTheme(this, theme);
 
-        // A plan has only its costs to leave out; products have their recipe and their costing.
-        var isPlan = set.Plan is not null;
-        PlanCosts.Visibility = isPlan ? Visibility.Visible : Visibility.Collapsed;
-        ProductParts.Visibility = isPlan ? Visibility.Collapsed : Visibility.Visible;
-
         // Both go with the window: disposed when it closes.
         var manager = new ProductPrintManager(set);
         var preview = new PrintPreview(manager);

@@ -126,34 +126,5 @@ public sealed record SectionInfo(
     IReadOnlyList<PlanLine> Lines,
     IReadOnlyList<PlanLine> AddIns);
 
-/// <summary>A production plan saved on the Production Plan screen.</summary>
-/// <param name="MakeOn">The day it's for, when one was given.</param>
-public sealed record SavedPlanInfo(int Id, string Name, DateTime SavedAt, DateOnly? MakeOn, bool HalfBatches, IReadOnlyList<PlanOrder> Lines);
-
-/// <summary>A product to make and how many of its sellable units. Product is its name, filled in on the way out.</summary>
-public sealed record PlanOrder(int ProductId, decimal Units, string? Product = null);
-
-/// <summary>What /plan works out: the products to make, and whether mixes may be rounded up to half batches.</summary>
-public sealed record PlanRequest(IReadOnlyList<PlanOrder> Orders, bool HalfBatches);
-
-/// <summary>
-/// A production plan worked out as the Production Plan screen works it out: each mix in its batches, the made ingredients
-/// to prepare for them, and what it couldn't work out.
-/// </summary>
-public sealed record PlanResult(IReadOnlyList<PlannedMixInfo> Mixes, IReadOnlyList<PreparedInfo> Prepared, IReadOnlyList<string> Issues);
-
-/// <summary>
-/// One mix to make, named as the screen's Mixing Sheet names it. A product's own add-ins make a mix of their own, so a
-/// sub-assembly can come more than once, under different names ("Sweet Dough + Ube Flavour").
-/// </summary>
-/// <param name="For">The products it's for and the pieces each takes ("Ube Roll 40 pcs").</param>
-/// <param name="Batches">Whole batches, or half ones when the plan allows them.</param>
-/// <param name="LinesPerBatch">The sub-assembly's lines, then the add-ins, grams per batch.</param>
-public sealed record PlannedMixInfo(int SubAssemblyId, string Name, string Role, string For, decimal Batches, decimal BatchWeight, IReadOnlyList<PlanLine> LinesPerBatch);
-
-/// <summary>A made ingredient the mixes take, and what to make the grams they need from.</summary>
-/// <param name="SubAssemblyId">The sub-assembly it's made from, whose lines (and its add-ins) <paramref name="Lines"/> are.</param>
-/// <param name="Lines">Its ingredients, scaled to <paramref name="Grams"/>: grams in all, not per batch.</param>
-public sealed record PreparedInfo(int IngredientId, int? SubAssemblyId, string Name, decimal Grams, IReadOnlyList<PlanLine> Lines);
-
+/// <summary>An ingredient and its grams: a line of a section of a product's recipe, or one of its add-ins.</summary>
 public sealed record PlanLine(int IngredientId, string Ingredient, decimal Grams);

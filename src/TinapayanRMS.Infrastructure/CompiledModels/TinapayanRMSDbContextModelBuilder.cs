@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels;
 public partial class TinapayanRMSDbContextModel
 {
     private TinapayanRMSDbContextModel()
-        : base(skipDetectChanges: false, modelId: new Guid("f7c1aa31-2948-4598-b6ad-116e17e6f58a"), entityTypeCount: 25)
+        : base(skipDetectChanges: false, modelId: new Guid("f7cce05d-e809-435b-84c3-2e6dc8bdf3b8"), entityTypeCount: 23)
     {
     }
 
@@ -35,8 +35,6 @@ public partial class TinapayanRMSDbContextModel
         var rawMaterialCategory = RawMaterialCategoryEntityType.Create(this);
         var rawMaterialPriceHistory = RawMaterialPriceHistoryEntityType.Create(this);
         var rawMaterialUnit = RawMaterialUnitEntityType.Create(this);
-        var savedPlan = SavedPlanEntityType.Create(this);
-        var savedPlanLine = SavedPlanLineEntityType.Create(this);
         var subAssembly = SubAssemblyEntityType.Create(this);
         var subAssemblyLine = SubAssemblyLineEntityType.Create(this);
         var subAssemblyPackagingLine = SubAssemblyPackagingLineEntityType.Create(this);
@@ -71,8 +69,6 @@ public partial class TinapayanRMSDbContextModel
         RawMaterialPriceHistoryEntityType.CreateForeignKey2(rawMaterialPriceHistory, rawMaterialUnit);
         RawMaterialUnitEntityType.CreateForeignKey1(rawMaterialUnit, rawMaterial);
         RawMaterialUnitEntityType.CreateForeignKey2(rawMaterialUnit, unitOfMeasure);
-        SavedPlanLineEntityType.CreateForeignKey1(savedPlanLine, product);
-        SavedPlanLineEntityType.CreateForeignKey2(savedPlanLine, savedPlan);
         SubAssemblyEntityType.CreateForeignKey1(subAssembly, product);
         SubAssemblyEntityType.CreateForeignKey2(subAssembly, subAssemblyRole);
         SubAssemblyLineEntityType.CreateForeignKey1(subAssemblyLine, rawMaterial);
@@ -100,8 +96,6 @@ public partial class TinapayanRMSDbContextModel
         RawMaterialCategoryEntityType.CreateAnnotations(rawMaterialCategory);
         RawMaterialPriceHistoryEntityType.CreateAnnotations(rawMaterialPriceHistory);
         RawMaterialUnitEntityType.CreateAnnotations(rawMaterialUnit);
-        SavedPlanEntityType.CreateAnnotations(savedPlan);
-        SavedPlanLineEntityType.CreateAnnotations(savedPlanLine);
         SubAssemblyEntityType.CreateAnnotations(subAssembly);
         SubAssemblyLineEntityType.CreateAnnotations(subAssemblyLine);
         SubAssemblyPackagingLineEntityType.CreateAnnotations(subAssemblyPackagingLine);

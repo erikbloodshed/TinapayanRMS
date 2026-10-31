@@ -10,7 +10,6 @@ public enum AppScreen
     Products,
     Reports,
     PriceSimulator,
-    ProductionPlan,
     Print,
 }
 

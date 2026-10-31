@@ -56,7 +56,6 @@ public static class RecipeApiHost
                         var api = endpoints.MapGroup("/api/v1");
                         CatalogEndpoints.Map(api);
                         MixEndpoints.Map(api);
-                        PlanEndpoints.Map(api);
                         ProductRecipeEndpoints.Map(api);
                     });
                 });

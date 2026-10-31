@@ -34,8 +34,6 @@ public class VimCommandLineTests
     [InlineData("pro", AppScreen.Products)]
     [InlineData("products", AppScreen.Products)]
     [InlineData("rep", AppScreen.Reports)]
-    [InlineData("pl", AppScreen.ProductionPlan)]
-    [InlineData("plan", AppScreen.ProductionPlan)]
     [InlineData("si", AppScreen.PriceSimulator)]
     [InlineData("simulator", AppScreen.PriceSimulator)]
     [InlineData("pri", AppScreen.Print)]

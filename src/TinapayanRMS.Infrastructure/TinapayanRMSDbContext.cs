@@ -96,10 +96,6 @@ public sealed class TinapayanRMSDbContext : DbContext
 
     public DbSet<PriceScenarioLine> PriceScenarioLines => Set<PriceScenarioLine>();
 
-    public DbSet<SavedPlan> SavedPlans => Set<SavedPlan>();
-
-    public DbSet<SavedPlanLine> SavedPlanLines => Set<SavedPlanLine>();
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasCollation(CaseInsensitiveCollation, locale: "und-u-ks-level2", provider: "icu", deterministic: false);

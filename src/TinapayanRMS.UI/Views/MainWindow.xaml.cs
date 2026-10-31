@@ -60,7 +60,6 @@ public sealed partial class MainWindow : AppWindow, IVimHost
         SubAssembliesViewModel subAssembliesViewModel,
         ProductsViewModel productsViewModel,
         ReportsViewModel reportsViewModel,
-        ProductionPlanViewModel productionPlanViewModel,
         PriceSimulatorViewModel priceSimulatorViewModel,
         UnitsOfMeasureViewModel unitsOfMeasureViewModel,
         CategoriesViewModel categoriesViewModel,
@@ -87,7 +86,6 @@ public sealed partial class MainWindow : AppWindow, IVimHost
         _screenFactories[SubAssembliesTab] = () => new SubAssembliesView(subAssembliesViewModel);
         _screenFactories[ProductsTab] = () => new ProductsView(productsViewModel);
         _screenFactories[ReportsTab] = () => new ReportsView(reportsViewModel);
-        _screenFactories[ProductionPlanTab] = () => new ProductionPlanView(productionPlanViewModel);
         _screenFactories[PriceSimulatorTab] = () => new PriceSimulatorView(priceSimulatorViewModel);
         _screenFactories[PrintTab] = () => new ProductPrintView(printTabViewModel);
         Closed += (_, _) => (PrintTab.Content as ProductPrintView)?.Dispose();
@@ -100,14 +98,12 @@ public sealed partial class MainWindow : AppWindow, IVimHost
         SubAssembliesNavItem.Tag = SubAssembliesTab;
         ProductsNavItem.Tag = ProductsTab;
         ReportsNavItem.Tag = ReportsTab;
-        ProductionPlanNavItem.Tag = ProductionPlanTab;
         PriceSimulatorNavItem.Tag = PriceSimulatorTab;
 
         _loadCommands[RawMaterialsTab] = rawMaterialsViewModel.LoadCommand;
         _loadCommands[SubAssembliesTab] = subAssembliesViewModel.LoadCommand;
         _loadCommands[ProductsTab] = productsViewModel.LoadCommand;
         _loadCommands[ReportsTab] = reportsViewModel.LoadCommand;
-        _loadCommands[ProductionPlanTab] = productionPlanViewModel.LoadCommand;
         _loadCommands[PriceSimulatorTab] = priceSimulatorViewModel.LoadCommand;
 
         // Print's load prepares its pages again: This product as Products shows it now, so the tab follows the edits made
@@ -122,7 +118,6 @@ public sealed partial class MainWindow : AppWindow, IVimHost
         _historyScreens[ProductsTab] = new(AppScreen.Products,
             () => productsViewModel.SelectedProduct?.Id, productsViewModel.OpenProduct, () => productsViewModel.History.IsDirty);
         _historyScreens[ReportsTab] = new(AppScreen.Reports, () => null, null, () => false);
-        _historyScreens[ProductionPlanTab] = new(AppScreen.ProductionPlan, () => null, null, () => false);
         _historyScreens[PriceSimulatorTab] = new(AppScreen.PriceSimulator, () => null, null, () => false);
         _historyScreens[PrintTab] = new(AppScreen.Print, () => null, null, () => false);
 

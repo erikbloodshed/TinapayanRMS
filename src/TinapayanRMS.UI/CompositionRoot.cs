@@ -66,7 +66,6 @@ public static class CompositionRoot
                 services.AddSingleton<IPackagingLinkRepository, PackagingLinkRepository>();
                 services.AddSingleton<IProductVersionRepository, ProductVersionRepository>();
                 services.AddSingleton<IPriceScenarioRepository, PriceScenarioRepository>();
-                services.AddSingleton<ISavedPlanRepository, SavedPlanRepository>();
                 services.AddSingleton<IProductCloner, ProductCloner>();
                 services.AddSingleton<ICostRecalculator, CostRecalculator>();
                 // Backups:ToolsFolder, when set, is the folder holding pg_dump and pg_restore; otherwise they're looked for.
@@ -99,7 +98,6 @@ public static class CompositionRoot
                 services.AddSingleton<ProductsViewModel>();
                 services.AddSingleton<ReportsViewModel>();
                 services.AddSingleton<QuickFindViewModel>();
-                services.AddSingleton<ProductionPlanViewModel>();
                 services.AddSingleton<PriceSimulatorViewModel>();
                 services.AddSingleton<PrintTabViewModel>();
                 services.AddSingleton<UnitsOfMeasureViewModel>();

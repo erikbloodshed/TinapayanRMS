@@ -12,7 +12,8 @@ using TinapayanRMS.UI.Tests.Fixtures;
 namespace TinapayanRMS.UI.Tests.Controls;
 
 /// <summary>
-/// The Production Plan's lines table, as the app sets it up: a product picked from a drop-down that's typed into, units,
+/// A lines table as the app sets them up (the Production Plan's, retired on 2026-10-31 when planning moved to TinapayanPreweigh,
+/// and the screens that take lines the same way): a product picked from a drop-down that's typed into, units,
 /// and a pieces column Tab skips. Tab from the add row's last cell adds the line and opens the next add row
 /// (UntouchedAddRowSelectionController.ProcessKeyDown). A pick reaches the line only when its edit is committed, since
 /// AutoCompleteDropDownRenderer makes the column's UpdateTrigger Explicit, so retyping it and pressing Esc leaves the line
@@ -141,9 +142,9 @@ public class GridAddNewRowTabTests
     [Fact]
     public void A_plan_add_row_left_untouched_is_dropped_not_added_as_a_blank_line()
     {
-        // The Production Plan's own line type, whose add row Tab now opens straight after a line: an add row is only
+        // A line type whose add row Tab opens straight after a line (the Production Plan's was the first): an add row is only
         // known to be untouched against a row made with a parameterless constructor.
-        var lines = new ObservableCollection<TinapayanRMS.UI.ViewModels.PlanLineRow>();
+        var lines = new ObservableCollection<Line>();
         OffscreenGrid.Run(
             () =>
             {
@@ -159,10 +160,10 @@ public class GridAddNewRowTabTests
                 };
                 grid.Columns.Add(new GridMultiColumnDropDownList { MappingName = "ProductId", ItemsSource = Products, DisplayMember = nameof(Product.Name), ValueMember = nameof(Product.Id), AllowNullInput = true });
                 grid.Columns.Add(new NumericColumn { MappingName = "Units", AllowNullValue = true });
-                grid.Columns.Add(new GridTextColumn { MappingName = "PiecesText", AllowEditing = false, AllowFocus = false });
+                grid.Columns.Add(new GridTextColumn { MappingName = nameof(Line.Pieces), AllowEditing = false, AllowFocus = false });
                 AutoCompleteDropDown.SetIsEnabled(grid, true);
                 GridAddNewRow.SetDropWhenUntouched(grid, true);
-                GridAddNewRow.SetItemFactory(grid, () => new TinapayanRMS.UI.ViewModels.PlanLineRow(_ => null));
+                GridAddNewRow.SetItemFactory(grid, () => new Line());
                 return grid;
             },
             grid =>
@@ -222,7 +223,7 @@ public class GridAddNewRowTabTests
         }
     }
 
-    /// <summary>One line and an add row, with ProductionPlanView's columns and add-row behaviours.</summary>
+    /// <summary>One line and an add row, with the lines table's columns and add-row behaviours.</summary>
     private static SfDataGrid LinesGrid()
     {
         var grid = new SfDataGrid

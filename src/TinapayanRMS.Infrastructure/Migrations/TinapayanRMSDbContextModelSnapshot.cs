@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261029053556_SavedPlanDayAndResults";
+    public override string LastMigrationId => "20261031071249_RetireProductionPlan";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -900,99 +900,6 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("raw_material_units");
             });
 
-        modelBuilder.Entity("TinapayanRMS.Domain.Entities.SavedPlan", b =>
-            {
-                var id = b.Property<int>("Id")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("integer")
-                    .HasColumnName("id");
-
-                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
-
-                b.Property<bool>("HalfBatches")
-                    .HasColumnType("boolean")
-                    .HasColumnName("half_batches");
-
-                b.Property<DateOnly?>("MakeOn")
-                    .HasColumnType("date")
-                    .HasColumnName("make_on");
-
-                b.Property<string>("Name")
-                    .IsRequired()
-                    .HasMaxLength(100)
-                    .HasColumnType("character varying(100)")
-                    .HasColumnName("name")
-                    .UseCollation("case_insensitive");
-
-                b.Property<DateTime>("SavedAt")
-                    .HasColumnType("timestamp without time zone")
-                    .HasColumnName("saved_at");
-
-                b.HasKey("Id")
-                    .HasName("pk_saved_plans");
-
-                b.HasIndex("Name")
-                    .IsUnique()
-                    .HasDatabaseName("ix_saved_plans_name");
-
-                b.ToTable("saved_plans");
-            });
-
-        modelBuilder.Entity("TinapayanRMS.Domain.Entities.SavedPlanLine", b =>
-            {
-                var id = b.Property<int>("Id")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("integer")
-                    .HasColumnName("id");
-
-                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
-
-                b.Property<decimal?>("LeftoverUnits")
-                    .HasPrecision(18, 4)
-                    .HasColumnType("numeric(18,4)")
-                    .HasColumnName("leftover_units");
-
-                b.Property<decimal?>("MadeUnits")
-                    .HasPrecision(18, 4)
-                    .HasColumnType("numeric(18,4)")
-                    .HasColumnName("made_units");
-
-                b.Property<int>("ProductId")
-                    .HasColumnType("integer")
-                    .HasColumnName("product_id");
-
-                b.Property<int>("SavedPlanId")
-                    .HasColumnType("integer")
-                    .HasColumnName("saved_plan_id");
-
-                b.Property<int>("SortOrder")
-                    .HasColumnType("integer")
-                    .HasColumnName("sort_order");
-
-                b.Property<decimal>("Units")
-                    .HasPrecision(18, 4)
-                    .HasColumnType("numeric(18,4)")
-                    .HasColumnName("units");
-
-                b.HasKey("Id")
-                    .HasName("pk_saved_plan_lines");
-
-                b.HasIndex("ProductId")
-                    .HasDatabaseName("ix_saved_plan_lines_product_id");
-
-                b.HasIndex("SavedPlanId")
-                    .HasDatabaseName("ix_saved_plan_lines_saved_plan_id");
-
-                b.ToTable("saved_plan_lines", t =>
-                    {
-                        t.HasCheckConstraint("CK_SavedPlanLines_LeftoverUnits", "leftover_units IS NULL OR (made_units IS NOT NULL AND leftover_units >= 0 AND leftover_units <= made_units)");
-
-                        t.HasCheckConstraint("CK_SavedPlanLines_MadeUnits", "made_units IS NULL OR made_units >= 0");
-
-                        t.HasCheckConstraint("CK_SavedPlanLines_Units", "units > 0");
-                    });
-            });
-
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssembly", b =>
             {
                 var id = b.Property<int>("Id")
@@ -1577,27 +1484,6 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                 b.Navigation("UnitOfMeasure");
             });
 
-        modelBuilder.Entity("TinapayanRMS.Domain.Entities.SavedPlanLine", b =>
-            {
-                b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
-                    .WithMany()
-                    .HasForeignKey("ProductId")
-                    .OnDelete(DeleteBehavior.Cascade)
-                    .IsRequired()
-                    .HasConstraintName("fk_saved_plan_lines_products_product_id");
-
-                b.HasOne("TinapayanRMS.Domain.Entities.SavedPlan", "SavedPlan")
-                    .WithMany("Lines")
-                    .HasForeignKey("SavedPlanId")
-                    .OnDelete(DeleteBehavior.Cascade)
-                    .IsRequired()
-                    .HasConstraintName("fk_saved_plan_lines_saved_plans_saved_plan_id");
-
-                b.Navigation("Product");
-
-                b.Navigation("SavedPlan");
-            });
-
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssembly", b =>
             {
                 b.HasOne("TinapayanRMS.Domain.Entities.Product", "OwnerProduct")
@@ -1697,11 +1583,6 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.RawMaterial", b =>
             {
                 b.Navigation("Units");
-            });
-
-        modelBuilder.Entity("TinapayanRMS.Domain.Entities.SavedPlan", b =>
-            {
-                b.Navigation("Lines");
             });
 #pragma warning restore 612, 618
     }

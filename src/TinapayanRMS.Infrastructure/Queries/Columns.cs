@@ -42,8 +42,6 @@ internal static class Columns
         [typeof(ProductVersion)] = ["id", "product_id", "number", "saved_at", "note", "content"],
         [typeof(PriceScenario)] = ["id", "name", "saved_at"],
         [typeof(PriceScenarioLine)] = ["id", "price_scenario_id", "raw_material_id", "change_percent", "new_price", "sort_order"],
-        [typeof(SavedPlan)] = ["id", "name", "saved_at", "make_on", "half_batches"],
-        [typeof(SavedPlanLine)] = ["id", "saved_plan_id", "product_id", "units", "made_units", "leftover_units", "sort_order"],
     };
 
     /// <summary><typeparamref name="T"/>'s columns qualified by <paramref name="alias"/>, for a SELECT list.</summary>

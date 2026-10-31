@@ -149,7 +149,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 
 ### The main window
 
-- **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports**, **Production Plan** and **Price Simulator**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
+- **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports** and **Price Simulator**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
 - **Tabs**: each screen opens in a tab along the top. The app starts with **Raw Materials**, **Sub-Assemblies** and **Products** open; open the others from the menu. A tab you close can be opened again from the menu. Each tab keeps its place, such as the record you were looking at, until you close the app. A tab with changes you haven't saved asks about them before you leave it (see [Editing and saving](#editing-and-saving)).
 - **Back and Forward** (the arrows at the top right, next to the minimize button, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, like a web browser.
 - **Find** (the magnifier at the top right, before Back, or **Ctrl+K** from anywhere) looks up any raw material, sub-assembly or product by name and opens it on its own screen. Type part of the name: every word you type has to be in the name, in any order, and capitals and accents don't matter, so `ube ensay` finds *Ube Macapuno Ensaymada*. The closest names come first, with what each one is (Raw Material, Made Ingredient, Sub-Assembly or Product) and its category or role. **Up** and **Down** pick one, **Enter** or a double-click opens it, and **Esc** closes Find (press it twice with the Vim keys on: the first press only leaves Insert). The best 50 matches are listed; type more of the name to narrow them. Your last search is still there, highlighted, the next time you open Find. A sub-assembly that belongs to one product isn't listed: find the product instead. Deleted products aren't listed either. If the screen you're leaving has unsaved changes, you're asked about them first, as with any link between screens.
@@ -632,7 +632,7 @@ Below the header are the fields you fill in:
 - It stays on when you open another product, until you switch it off or close the app. The app always starts on buffered costs.
 - **Print** uses whichever costs the screen shows (see [Printing](#8-printing-recipes-and-costings)).
 
-Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage and category are all kept. Until you restore it, no picker, report, print, Price Simulator or Production Plan includes it.
+Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage and category are all kept. Until you restore it, no picker, report, print or Price Simulator includes it, and TinapayanPreweigh's copy leaves it out.
 
 - **Restore** (right-click it in the Deleted folder) puts it back in its folder and opens it. If its category was deleted in the meantime, it comes back in **Uncategorized**.
 - **Delete Permanently** asks first and can't be undone. The product's own sub-assemblies are deleted with it. Its linked sub-assemblies stay on the Sub-Assemblies screen. Deleting a composite product leaves the products it holds as they are.
@@ -848,7 +848,7 @@ While the Products screen shows unbuffered costs, everything printed, a single p
 
 Close the Print tab with its ✕.
 
-A production plan prints from the **Production Plan** screen's own **Print**: see [Production Plan](#11-production-plan). A report of what price changes would do prints from the **Price Simulator**: see [Printing a Price Simulator report](#printing-a-price-simulator-report).
+A production plan prints from TinapayanPreweigh's **Plan** tab: see [Production Plan](#11-production-plan). A report of what price changes would do prints from the **Price Simulator**: see [Printing a Price Simulator report](#printing-a-price-simulator-report).
 
 ### Printing a scaled recipe
 
@@ -942,16 +942,7 @@ How each product's markup at its **Current Price** has moved since a day you pic
 
 ### Production Results
 
-How the saved Production Plans actually turned out, by product category: for every product whose **Made** is typed on a saved plan (see [Record what was made](#record-what-was-made)). Everything is in pieces, so a Box of 8 counts as 8 pieces and boxes and single pieces add up together.
-
-- **Plans**: how many saved plans have a result for the category.
-- **Planned (pcs)** and **Made (pcs)**: the pieces planned and made, on the lines with a result.
-- **Short %**: how far the pieces made fell short of those planned. Below 0 means more were made than planned.
-- **Left Over (pcs)** and **Left Over %**: the pieces left unsold, and their share of those made.
-- **Wastage %**: the [Wastage %](#wastage) the category's products are priced with: its own (Settings → Product Categories) or the shop's.
-- **Note**: says *Short by more than its Wastage %* when the shortfall is bigger than the wastage allows for. If a category keeps showing it, its Wastage % may be set too low.
-
-A product deleted since isn't counted.
+Production Results moved to TinapayanPreweigh's **Plan** tab on 2026-10-31, with the saved plans whose results it adds up (see [Production Plan](#11-production-plan)).
 
 ### Exporting to Excel
 
@@ -1040,77 +1031,7 @@ The first page lists the **Price Changes** tried, then every product with its **
 
 ## 11. Production Plan
 
-**Production Plan** works out what to make and what to buy for a day's or a week's baking, and what it sells for.
-
-### Saved plans
-
-At the top left, **Saved Plans** lists the plans saved under a name, such as *Saturday* or *Fiesta order*, with their **Make On** day. They're in order of that day, newest first; a plan with no day goes by the day it was saved.
-
-- **Save Plan** asks for a name and saves the products in the plan, what was **Made** and **Left Over**, whether it's in half batches, and its **Make On** day. With a saved plan open, the name starts as its own, so saving again updates it. Saving under another plan's name asks first, then replaces that plan.
-- Click a plan in the list to open it. Its products replace the ones in the table. If the table holds a plan that isn't saved, you're asked first. A product deleted since the plan was saved is left out, and a message says so.
-- **Delete Plan** deletes the open plan, after asking. Its products stay in the table.
-
-Saved plans are kept in the database, so everyone using the app on this computer sees them, and they're in every backup. A product deleted for good is taken out of every saved plan.
-
-**Make On**, above the Plan table, is the day the plan is to be made. Pick it from the calendar; **No Day** takes it away, for a plan made any day, such as a weekday's usual. It's saved with the plan. When you open the Production Plan with an empty table and nothing open, the plan saved for today opens by itself.
-
-### The plan
-
-Under it, the **Plan** table lists the products to make:
-
-- **Product**: pick one. Type to search the list. Products in Research and Development can be planned too.
-- **Units**: how many sellable units to make. That's pieces for a product sold by the piece, or boxes for a Box of 8.
-- **Pieces**: what the units come to. A composite product shows none, since it's one unit of other products.
-- **Sales**: what the units sell for, at the product's **Current Price**, with VAT.
-- **Profit**: what they earn over the product's base cost (its ingredients, packaging, wastage, labor, overhead and administrative), once the VAT is taken out.
-- <a id="record-what-was-made"></a>**Made** and **Left Over**: once the plan's been baked and sold, how many units were actually made, and how many of those were left unsold, in the same units. Fill them in and **Save Plan**: Reports' [Production Results](#production-results) adds them up, to show whether the [Wastage %](#wastage) is right. Left Over can't be more than Made, and needs Made typed first. They change nothing to make or buy.
-
-Under the table are the plan's total **Sales**, **Profit** and **Profit Margin** (the profit as a share of the sales before VAT, as on the Products screen's Costing tab). A product with no Current Price is counted at the selling price its costing works out, and a note in orange names it.
-
-A product listed twice is made once, its units added together. **Remove Line** takes the picked line out, and **Clear Plan** empties the table and closes the open saved plan.
-
-The Mixing Sheet and the Purchase Requisition change as you type. A new line on the table's bottom row counts as soon as its product and units are in, before you leave the row. Without Vim keys, press **Esc** twice to throw the new line away, and the tables go back to how they were. With Vim keys on, Esc keeps it, as it keeps whatever you typed in a cell.
-The plan in the table is kept for you on this computer, with the saved plan you have open. It's there again the next time you open the app, worked out from the products and prices as they are then. A product deleted since is left out.
-
-### Mixing Sheet
-
-Each mix to make, in whole batches:
-
-- **Mix**: the sub-assembly, such as *Sweet Dough*, or a product's own section, such as *Ube Roll Filling*.
-- **For**: the products it's for, and how many pieces each takes from it. A row grows to show the whole list when it runs to more than one line.
-- **Batches** and **Weight (g)**: the batches to make, and what they weigh before baking.
-- **Spare**: the batches are rounded up, so they make more than the plan needs. Spare is how many more pieces that is, such as **30 pcs**. For a mix shared by several products it says how many more of each, such as *Ube Roll 30 pcs or Cheese Roll 25 pcs*: it's the same dough either way.
-
-**Use the spare**, under the table, has a button for each product whose spare pieces can go into the plan with no more mixing, such as **30 Ube Roll**. Press it to add those units to the product's line in the plan. The figure is in sellable units (whole boxes for a Box of 8), and it's only as many as **every** mix of the product has room for: if its dough has 30 pieces spare but its filling only 10 before it needs another batch, the button says 10. A product whose mixes have no room, such as one with a topping made a batch per piece, gets no button. For a mix shared by several products, each gets a button, but the spare is used once: after you press one, the others work out again.
-
-Click the arrow at the start of a row to open it and see what goes into the mix: each ingredient, its grams **Per Batch**, and the **Total (g)** for all the batches. A row stays open while you change the plan.
-
-Tick **Half batches** at the top when the kitchen can mix half a batch. Each mix is then rounded up to the next half batch instead of a whole one: 1.2 batches are 1.5, not 2. The tick is kept with the plan, and saved with a saved plan.
-
-Products sharing a sub-assembly share its batches: two products needing 0.4 of a batch each make 1 batch between them, not 2. A product that adds its own add-ins to a linked recipe needs batches with the add-ins in, so that's a mix of its own, its name followed by the add-ins.
-
-A made ingredient the mixes use, such as a syrup, is listed under the mixes with the grams to prepare. Open its row to see what it's made from, in grams. A composite product makes the products it holds, times how many of each it holds.
-
-Under the table, a note in orange says what couldn't be planned, such as a section with no weight per piece or yield yet.
-
-### Purchase Requisition
-
-Everything to buy for the plan, ingredients first, then packaging:
-
-- **Needed**, in the material's base unit (grams for an ingredient).
-- **Cost**: what the amount needed costs, at buffered costs.
-- **Buy** and **Per**: whole units to buy, in the unit of the brand price its cost comes from (its Cost From brand, or the dearest), such as **2** *sack*. It's rounded up. A material with no price yet shows no Buy.
-- **Buy Cost**: what the whole units to buy cost at that brand's price: the money to take to the market.
-
-**Total Cost** and **Buy Cost** for the whole plan are at the top.
-
-A made ingredient is bought as what it's made of. Egg white and yolk are bought as the eggs they come from: 300 g of white and 120 g of yolk take the same eggs, so only the larger amount of eggs is listed, and any whole egg the plan uses comes on top. Packaging is listed for every sellable unit. A composite product's products bring theirs only when it includes its products' packaging.
-
-### Printing and exporting
-
-**Print** opens the plan in a print preview: what to make with its sales and profit, the mixing sheet with each mix's ingredients and spare pieces, and the purchase requisition with its Buy Cost. A saved plan that's open is named in the title. Clear **Costs** at the bottom to print it without the sales, profit and costs, for the kitchen or the market. **Export to Excel** saves the plan, the mixing sheet and the purchase requisition on three sheets of one workbook. Each mix's ingredients are listed under it, grouped so Excel can fold them away.
-
----
+Production planning moved to **TinapayanPreweigh**, the app that weighs ingredients out ahead of mixing, on 2026-10-31, and this screen was taken out of TinapayanRMS. Preweigh's **Plan** tab does everything it did: the plan of products and units, half batches and the day, the Mixing Sheet with Use the spare, the Purchase Requisition, the plan's sales and profit, saved plans, what was made and left over, Production Results, printing and Export to Excel. It works from a copy of this app's recipes, ingredients, prices and costs, which it brings up to date through the Recipe API (see [Share the recipes with TinapayanPreweigh](#share-the-recipes-with-tinapayanpreweigh)). Change a recipe or a price here, then press **Sync** in Preweigh.
 
 ## 12. How costs are worked out
 
@@ -1265,13 +1186,7 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 
 ### Plan a day's baking
 
-1. Open **Production Plan** from the menu.
-2. For a plan you make often, click it in **Saved Plans**. Otherwise, in the **Plan** table, pick each product and type how many to make.
-3. Check the **Mixing Sheet** for how many batches of each mix to make, and read any orange note under it. Open a mix's row to see its ingredients, and look at **Spare**: if a mix makes 30 pieces more than you need, you can add up to 30 to the plan for no extra mixing. **Use the spare** under the table adds them with one press. Tick **Half batches** if the kitchen can mix half a batch.
-4. Check **Sales** and **Profit** under the Plan table, and the **Buy Cost** of the Purchase Requisition: the money to take to the market.
-5. To keep the plan for another day, pick its **Make On** day, press **Save Plan** and name it. On that day it opens by itself, if the Plan table is empty.
-6. Press **Print**, clear **Costs** for the kitchen, and print. Or press **Export to Excel** to send the purchase requisition on.
-7. After the day's baking and selling, open the plan again, type each product's **Made** and **Left Over**, and press **Save Plan**.
+Plan it in TinapayanPreweigh's **Plan** tab: see [Production Plan](#11-production-plan).
 
 ### See what a price rise would do
 
@@ -1330,12 +1245,12 @@ Or type the packaging straight into the pack product's Packaging tab, then press
 
 ### Share the recipes with TinapayanPreweigh
 
-TinapayanPreweigh, the app for weighing ingredients out ahead of mixing, reads its recipes from TinapayanRMS. It reads them through the **Recipe API**, a small program that runs in the background on the PC that holds the TinapayanRMS database. The Recipe API only reads. It never changes a recipe, a price or anything else.
+TinapayanPreweigh, the app for weighing ingredients out ahead of mixing, keeps a copy of TinapayanRMS's recipes, ingredients, prices and costs, and plans production from it. It copies them through the **Recipe API**, a small program that runs in the background on the PC that holds the TinapayanRMS database. The Recipe API only reads. It never changes a recipe, a price or anything else.
 
 1. On the PC that holds the TinapayanRMS database, open PowerShell **as an administrator**, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Install-RecipeApi.ps1`. It installs the Recipe API, starts it, and starts it again each time you sign in to Windows. Running it as an administrator also lets the other PCs on the shop's network reach it.
 2. In TinapayanPreweigh's **Settings**, type the Recipe API's address. Use `http://localhost:5290` when Preweigh runs on the same PC, or `http://` and that PC's name or network address followed by `:5290` when it runs on another PC. Then press **Test connection**.
 
-The Recipe API runs only while someone is signed in to Windows on that PC. Preweigh can't start new weighing sheets while it isn't running, but packs already recorded stay as they are. To remove the Recipe API, run `scripts\Uninstall-RecipeApi.ps1` the same way.
+The Recipe API runs only while someone is signed in to Windows on that PC. Preweigh keeps working from its own copy of the recipes while it isn't running; it just doesn't see changes made here until it can sync again. To remove the Recipe API, run `scripts\Uninstall-RecipeApi.ps1` the same way.
 
 ---
 
