@@ -403,6 +403,7 @@ Take a user who types a new price for cake flour on Raw Materials and presses **
 | `GET /status` | `{ app, apiVersion }`, to check the address and key | — |
 | `GET /ingredients` | Every ingredient (not packaging), with its category and source, a made one's weight loss and sub-assembly, and a linked one's ingredient and weight share | `IRawMaterialRepository.GetAllAsync` |
 | `GET /boms` | Every made ingredient's BOM lines in order: its sub-assembly's lines, then its add-ins (`isAddIn`) | `IIngredientBomLineRepository.GetAllAsync` |
+| `GET /materials` | Every raw material, packaging included: its type, base unit, buffered cost per base unit, and the purchase unit and price of the brand its cost comes from (`PurchaseUnit.Of`), as the purchase requisition prices them | `IRawMaterialRepository.GetAllAsync`, `IRawMaterialBrandPriceRepository.GetAllAsync` |
 | `GET /categories` | The Ingredient and Made categories | `IRawMaterialCategoryRepository.GetAllAsync` |
 | `GET /products?search=` | The products in use, each with its category, stage and pieces per unit | `IProductRepository.GetAllAsync` |
 | `GET /products/recipes` | Each product in use as the Production Plan reads it: pieces per unit, a composite's products, and each section's sub-assembly, name, role, piece size (`authoredField`, `authoredValue`), lines and add-ins, grams per batch, and the Wastage % it's priced with. No packaging | `SavedProductReader.ReadAllAsync` |

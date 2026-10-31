@@ -177,6 +177,21 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         section.Lines.Should().Equal(new PlanLine(bakery.FlourId, "Flour", 1000m), new PlanLine(bakery.WaterId, "Water", 500m));
         section.AddIns.Should().BeEmpty();
         pandesal.WastagePercent.Should().BeGreaterThanOrEqualTo(0m);
+        pandesal.PackagingPerUnit.Should().BeEmpty();
+        pandesal.IncludesComponentPackaging.Should().BeFalse();
+        pandesal.Costing.CurrentPrice.Should().BeNull("none was set");
+        pandesal.Costing.SellingPrice.Should().BeGreaterThanOrEqualTo(pandesal.Costing.BaseCost);
+    }
+
+    [Fact]
+    public async Task Every_material_comes_with_its_base_unit_buffered_cost_and_what_its_bought_in()
+    {
+        var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.08m, bufferedCostPerGram: 0.09m);
+        using var host = await StartAsync();
+
+        var materials = await GetAsync<List<MaterialInfo>>(host, "/api/v1/materials");
+
+        materials.Single(m => m.Id == sugarId).Should().Be(new MaterialInfo(sugarId, "Sugar", "Ingredient", "g", 0.09m, null, 1m, null));
     }
 
     [Fact]

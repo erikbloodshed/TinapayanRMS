@@ -62,12 +62,49 @@ public sealed record MixLine(int IngredientId, string Ingredient, decimal Grams,
 /// The Wastage % it's priced with, its category's or the shop-wide one: what TinapayanPreweigh's Production Results set
 /// what fell short against.
 /// </param>
+/// <param name="PackagingPerUnit">Its packaging for one sellable unit, in each material's base unit (/materials).</param>
+/// <param name="IncludesComponentPackaging">A composite that brings its products' packaging too.</param>
+/// <param name="Costing">What it sells for and costs, as the Products screen prices it at buffered costs.</param>
 public sealed record ProductRecipeInfo(
     int ProductId,
     int QuantityRequired,
     IReadOnlyList<ComponentInfo> Components,
     IReadOnlyList<SectionInfo> Sections,
-    decimal WastagePercent);
+    decimal WastagePercent,
+    IReadOnlyList<PackagingPerUnitInfo> PackagingPerUnit,
+    bool IncludesComponentPackaging,
+    ProductCostingInfo Costing);
+
+/// <summary>A packaging material a sellable unit takes, and how much of it in the material's base unit.</summary>
+public sealed record PackagingPerUnitInfo(int MaterialId, decimal BaseQuantity);
+
+/// <summary>
+/// A product's price and cost for one sellable unit (2026-10-31, for TinapayanPreweigh's plan sales and profit).
+/// </summary>
+/// <param name="CurrentPrice">The price it sells at, with VAT; null when none is set, and its worked-out price stands in.</param>
+/// <param name="SellingPrice">The price its costing works out, with VAT.</param>
+/// <param name="BaseCost">Its ingredients, packaging, wastage, labor, overhead and administrative, VAT out.</param>
+public sealed record ProductCostingInfo(decimal? CurrentPrice, decimal SellingPrice, decimal VatPercent, decimal BaseCost);
+
+/// <summary>
+/// A raw material, ingredient or packaging, as a purchase requisition needs it (2026-10-31, for TinapayanPreweigh): its base
+/// unit and buffered cost, and what it's bought in at its cost brand's price.
+/// </summary>
+/// <param name="Type">Ingredient or Packaging.</param>
+/// <param name="Unit">Its base unit's abbreviation: "g" for an ingredient, "pc" or "m" for packaging.</param>
+/// <param name="CostPerBaseUnit">Its buffered cost per base unit; 0 with none yet.</param>
+/// <param name="BuyUnit">What it's bought in, "sack"; null with no price.</param>
+/// <param name="BaseUnitsPerBuyUnit">Base units in one: 25,000 for a 25 kg sack.</param>
+/// <param name="BuyUnitPrice">What one costs at the brand price its cost comes from; null with no price.</param>
+public sealed record MaterialInfo(
+    int Id,
+    string Name,
+    string Type,
+    string Unit,
+    decimal CostPerBaseUnit,
+    string? BuyUnit,
+    decimal BaseUnitsPerBuyUnit,
+    decimal? BuyUnitPrice);
 
 /// <summary>A product in a composite, and how many of its sellable units go in one of the composite.</summary>
 public sealed record ComponentInfo(int ProductId, int Quantity);
