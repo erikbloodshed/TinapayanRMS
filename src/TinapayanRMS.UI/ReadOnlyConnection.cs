@@ -2,12 +2,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
 
-namespace TinapayanRMS.Mcp;
+namespace TinapayanRMS.UI;
 
 /// <summary>
-/// Makes the server's database connection read-only: every transaction on it starts read-only
-/// (default_transaction_read_only), so PostgreSQL refuses an INSERT, UPDATE or DELETE whatever code runs it. The server
-/// reads the dev database the app saves to, and its tools only read, but this doesn't rest on that.
+/// Makes a server's database connection read-only: every transaction on it starts read-only
+/// (default_transaction_read_only), so PostgreSQL refuses an INSERT, UPDATE or DELETE whatever code runs it. The MCP
+/// server and the Recipe API read the database the app saves to, and only read, but this doesn't rest on that. Both build
+/// their hosts from CompositionRoot, so it sits beside it.
 /// </summary>
 public static class ReadOnlyConnection
 {

@@ -147,6 +147,7 @@ Run every command from the repository root.
    ```powershell
    [Environment]::SetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", "<your key>", "User")
    ```
+   If you use an AI assistant, also set `SYNCFUSION_API_KEY` the same way, to the API key from your syncfusion.com account. Syncfusion's documentation MCP server needs it (see [Working with Syncfusion](#working-with-syncfusion)). The build doesn't.
 4. **Install the EF Core tools** at the `EFCoreVersion` in `Directory.Packages.props`: `dotnet tool update --global dotnet-ef --version 11.0.0-rc.3.26522.148`.
 5. **Build:** `dotnet build TinapayanRMS.slnx`.
 6. **Create the database.** This creates `tinapayanrms` and applies every migration, including the rows the migrations seed, such as the starting sub-assembly roles:
@@ -192,6 +193,8 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 | Publish the app (ReadyToRun, to `src/TinapayanRMS.UI/bin/Release/net11.0-windows10.0.19041.0/win-x64/publish/`) | `dotnet publish src/TinapayanRMS.UI` |
 | Query the database | `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U tinapayanrms -d tinapayanrms -c "SELECT name, cost_per_base_unit FROM raw_materials"` |
 | Run the MCP server by hand (an AI assistant starts it from `.mcp.json`; see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)) | `dotnet run --project src/TinapayanRMS.Mcp -c Release` |
+| Run the Recipe API (see [The Recipe API](#the-recipe-api)), then try it | `dotnet run --project src/TinapayanRMS.RecipeApi`, then `curl http://localhost:5290/api/v1/mixes` |
+| Install the Recipe API for this Windows user, starting at sign-in (in an administrator PowerShell to let the LAN in) | `powershell -ExecutionPolicy Bypass -File scripts/Install-RecipeApi.ps1` |
 
 The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test.runner`). VSTest-style flags such as `--filter` and `--collect` don't work: use the `--filter-*` options and `--coverage` instead.
 
@@ -220,18 +223,20 @@ A change is done when:
 | `src/TinapayanRMS.ApplicationCore` | `net11.0` | Domain; FluentValidation | `Interfaces/`, `Rules/`, `Validators/` |
 | `src/TinapayanRMS.Infrastructure` | `net11.0` | Domain, ApplicationCore; EF Core (Npgsql, with EFCore.NamingConventions), Dapper | `TinapayanRMSDbContext` and its design-time factory at the root; `Configurations/`, `Migrations/`, `CompiledModels/`, `Queries/`, `Repositories/`, `Services/` |
 | `src/TinapayanRMS.UI` | `net11.0-windows10.0.19041.0` | All three; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion | App startup at the root; `Views/`, `ViewModels/`, `Controls/`, `Converters/`, `Printing/`, `Exporting/`, `Vim/`, `Themes/`, `Assets/Icons/` |
-| `src/TinapayanRMS.Mcp` | `net11.0-windows10.0.19041.0` | UI; ModelContextProtocol | An MCP server for AI coding assistants (see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)): `Program` and `ReadOnlyConnection` at the root; `Tools/`, `Results/`, `Serialization/` |
+| `src/TinapayanRMS.Mcp` | `net11.0-windows10.0.19041.0` | UI; ModelContextProtocol | An MCP server for AI coding assistants (see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)): `Program` at the root; `Tools/`, `Results/`, `Serialization/` |
+| `src/TinapayanRMS.RecipeApi` | `net11.0-windows10.0.19041.0` | UI; ASP.NET Core (a framework reference) | A read-only HTTP API for the shop's other apps (see [The Recipe API](#the-recipe-api)): `Program`, `RecipeApiHost` and `recipeapi.json` at the root; `Contracts/`, `Endpoints/` |
 | `tests/TinapayanRMS.ApplicationCore.Tests` | `net11.0` | Domain, ApplicationCore | Rule and validator tests, with no database |
 | `tests/TinapayanRMS.Infrastructure.Tests` | `net11.0` | Infrastructure, Tests.Common | Persistence tests against the project's own database |
 | `tests/TinapayanRMS.UI.Tests` | `net11.0-windows10.0.19041.0` | UI, Tests.Common | ViewModel, control, printing, export, converter and Vim-key tests |
 | `tests/TinapayanRMS.Mcp.Tests` | `net11.0-windows10.0.19041.0` | Mcp, Tests.Common | The MCP server's tools against the project's own database |
+| `tests/TinapayanRMS.RecipeApi.Tests` | `net11.0-windows10.0.19041.0` | RecipeApi, Tests.Common; ASP.NET Core's TestHost | The Recipe API, served in memory, against the project's own database |
 | `tests/TinapayanRMS.Tests.Common` | `net11.0` | Infrastructure; Respawn | The shared database fixtures. It's a plain library, not a test project. |
 
-The UI projects, and the MCP ones that reference them, target Windows SDK 10.0.19041 because ReactiveUI.WPF needs it. The bare `net11.0-windows` moniker resolves to `windows7.0`, which is too low.
+The UI projects, and the MCP and Recipe API ones that reference them, target Windows SDK 10.0.19041 because ReactiveUI.WPF needs it. The bare `net11.0-windows` moniker resolves to `windows7.0`, which is too low.
 
 ### Folders are namespaces
 
-Every folder in a project is a sub-namespace: `src/TinapayanRMS.UI/ViewModels/` holds `TinapayanRMS.UI.ViewModels`. A new file goes in the folder for its kind, never at a project root. Only app-startup plumbing (`App`, `CompositionRoot`, `ReactiveUIBootstrapper`, `ConfirmDeleteHandlerRegistration`, `BindingErrorLog`, and the MCP server's `Program` and `ReadOnlyConnection`) and the DbContext pair sit at a root. Code in a sub-namespace sees its parent namespaces without a `using`; sibling folders need one.
+Every folder in a project is a sub-namespace: `src/TinapayanRMS.UI/ViewModels/` holds `TinapayanRMS.UI.ViewModels`. A new file goes in the folder for its kind, never at a project root. Only app-startup plumbing (`App`, `CompositionRoot`, `ReactiveUIBootstrapper`, `ConfirmDeleteHandlerRegistration`, `BindingErrorLog`, `ReadOnlyConnection`, the MCP server's `Program`, and the Recipe API's `Program` and `RecipeApiHost`) and the DbContext pair sit at a root. Code in a sub-namespace sees its parent namespaces without a `using`; sibling folders need one.
 
 | A new… | Goes in | Its tests go in |
 |---|---|---|
@@ -262,7 +267,7 @@ A file can hold a few small, closely related types, such as a tree's rows in `Pr
 
 ### Other files at the root
 
-`.claude/`, `apm.yml`, `apm.lock.yaml` and `skills-lock.json` hold AI-assistant tooling: Syncfusion's WPF agent skills, and a UI-builder agent. You don't need them to build or run the app. However, the `syncfusion-wpf-*` skills in `.claude/skills/` are readable Markdown guides to each Syncfusion control. `.mcp.json` tells an AI assistant how to start the MCP server, `src/TinapayanRMS.Mcp` (see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)).
+`.claude/`, `apm.yml`, `apm.lock.yaml` and `skills-lock.json` hold AI-assistant tooling: Syncfusion's WPF agent skills, and a UI-builder agent. You don't need them to build or run the app. However, the `syncfusion-wpf-*` skills in `.claude/skills/` are readable Markdown guides to each Syncfusion control. `.mcp.json` tells an AI assistant how to start two MCP servers: this repo's `src/TinapayanRMS.Mcp` (see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)), and Syncfusion's documentation server, `syncfusion-wpf` (see [Working with Syncfusion](#working-with-syncfusion)).
 
 ### A reading order for the code
 
@@ -388,6 +393,32 @@ Take a user who types a new price for cake flour on Raw Materials and presses **
 | Tests on a real database, with nothing mocked | They catch what mocks miss: SQL, constraints and EF Core's behaviour | [Development Environment](../PLAN.md#development-environment) |
 | Syncfusion controls over native ones | The whole UI picks up the theme consistently | [Syncfusion notes](plan/syncfusion.md) |
 | AwesomeAssertions, not FluentAssertions | FluentAssertions 8 needs a paid licence for commercial use | [Tech Stack](../PLAN.md#tech-stack) |
+
+### The Recipe API
+
+[src/TinapayanRMS.RecipeApi](../src/TinapayanRMS.RecipeApi) lets the shop's other apps read the recipes, on this PC or another one on the LAN. TinapayanPreweigh (`../TinapayanPreweigh`) is the first. It's a small ASP.NET Core server, with minimal-API endpoints and JSON in camelCase, under `/api/v1`:
+
+| Endpoint | What it returns | Read through |
+|---|---|---|
+| `GET /status` | `{ app, apiVersion }`, to check the address and key | — |
+| `GET /ingredients` | Every ingredient (not packaging), with its category and source, a made one's weight loss and sub-assembly, and a linked one's ingredient and weight share | `IRawMaterialRepository.GetAllAsync` |
+| `GET /boms` | Every made ingredient's BOM lines in order: its sub-assembly's lines, then its add-ins (`isAddIn`) | `IIngredientBomLineRepository.GetAllAsync` |
+| `GET /categories` | The Ingredient and Made categories | `IRawMaterialCategoryRepository.GetAllAsync` |
+| `GET /products?search=` | The products in use, each with its category, stage and pieces per unit | `IProductRepository.GetAllAsync` |
+| `GET /products/recipes` | Each product in use as the Production Plan reads it: pieces per unit, a composite's products, and each section's sub-assembly, name, role, piece size (`authoredField`, `authoredValue`), lines and add-ins, grams per batch, and the Wastage % it's priced with. No packaging | `SavedProductReader.ReadAllAsync` |
+| `GET /mixes` | Every sub-assembly with lines that isn't a packaging set, a product's own included, with its role and batch weight | `ISubAssemblyRepository.GetLinkableAsync` |
+| `GET /mixes/details` | Every mix as `/mixes` lists them, each with its lines as `/mixes/{id}` gives them: what TinapayanPreweigh's sync copies in one call | `ISubAssemblyRepository.GetLinkableAsync`, `ISubAssemblyLineRepository.GetForSubAssembliesAsync` |
+| `GET /mixes/{id}` | One mix and its lines, grams per batch, in the recipe's order, each with `isFormulaBase` | `ISubAssemblyLineRepository.GetForSubAssembliesAsync` |
+| `GET /plans` | The Production Plan's saved plans, each line with its product's name (a deleted product's lines left out) | `ISavedPlanRepository.GetAllAsync` |
+| `POST /plan` | For `{ orders: [{ productId, units }], halfBatches }`: each mix in its batches with its lines per batch, the made ingredients to prepare with their scaled ingredients, and the plan's issues | `ProductionPlanRules.Plan`, named by `ProductionPlanBuilder.MixName`, `ForText` and `NoteOf` |
+
+- **It can't write.** Its host is `CompositionRoot`'s with the web server on top (`RecipeApiHost.AddRecipeApi`), on the read-only connection the MCP server uses ([ReadOnlyConnection](../src/TinapayanRMS.UI/ReadOnlyConnection.cs)). `/plan` is a POST only because the orders go in its body.
+- **Planning is moving to TinapayanPreweigh** (2026-10-31). Preweigh copies `/ingredients`, `/boms` and `/products/recipes` (and the rest) into its own database and runs its own port of `ProductionPlanRules`. So a change to how the Production Plan works out batches is a change to Preweigh's copy too, until RMS's Production Plan screen and `/plan` are retired.
+- **Its figures are the Production Plan screen's.** `/plan` reads what that screen reads (`ProductionPlanViewModel.ReadAsync`, but brand prices) and runs the same `ProductionPlanRules.Plan`, so its batches, mix names and notes are the Mixing Sheet's. A mix with a product's own add-ins is a mix of its own ("Sweet Dough + Ube Flavour").
+- **The contract is `Contracts/RecipeContracts.cs`.** The apps that call it keep their own copies of those records, so add to a record rather than renaming or removing a field, or start `/api/v2`.
+- **Where it listens, and its key**, are in `recipeapi.json` beside it: Kestrel's `http://*:5290`, every address, so the LAN can reach it, and `RecipeApi:Key`. With a key set, a request without it in an `X-Api-Key` header gets a 401. A `BusinessRuleException` comes back as a 400 with its message, an unknown id as a 404, both as `{ error }`. The database is the app's own `appsettings.json`'s.
+- **Installing it**: `scripts/Install-RecipeApi.ps1` publishes it to `%LocalAppData%\Programs\TinapayanRMS.RecipeApi`, puts a shortcut in the Startup folder that starts it hidden at sign-in, and starts it. It runs as the signed-in user, not as a service, so it finds that user's `pgpass.conf`. Run in an administrator PowerShell, it also adds a Windows Firewall rule for port 5290, on private networks and from the local subnet only. `scripts/Uninstall-RecipeApi.ps1` takes it all away again. It logs to `logs/tinapayanrms-recipeapi-*.log` beside it.
+- **Tested by** `RecipeApiTests`, through the host `Program` builds, served in memory by ASP.NET Core's `TestServer` on the project's own database (`tinapayanrms_test_recipeapi`).
 
 ---
 
@@ -962,7 +993,7 @@ The app extends Syncfusion's controls with **attached behaviours** in `Controls/
 
 - **Prefer a Syncfusion control** to its native WPF equivalent (`ButtonAdv` over `Button`, `TabControlExt` over `TabControl`, `ComboBoxAdv`, `SfDataGrid`, `SfTextBoxExt`, `DoubleTextBox`), so the whole UI picks up the theme. Use a native control only when Syncfusion has none that fits.
 - **To add a control**, add its package's `PackageReference` (with no version) to the UI project, and a `PackageVersion` at `$(SyncfusionVersion)` in `Directory.Packages.props` if it's a new package. The theme package already styles every control.
-- **To learn how a control is meant to be used**, start with its `syncfusion-wpf-*` skill in `.claude/skills/`. Then read the Sample Browser source in `C:\Users\Public\Documents\Syncfusion\WPF\34.2.2\SampleBrowser\` (a v34 install, older than the packages), and grep file contents there, because the demo file names often don't name the control. Only then decompile the assembly with `ilspycmd`: the packages are in `%UserProfile%\.nuget\packages\syncfusion.*\<version>\lib\`.
+- **To learn how a control is meant to be used**, start with its `syncfusion-wpf-*` skill in `.claude/skills/`. Then ask Syncfusion's MCP server, `syncfusion-wpf`, which searches Syncfusion's current documentation (its one tool is `search_docs`). `.mcp.json` runs it with `dotnet dnx Syncfusion.WPF.MCP --yes`, which needs no install, and passes it the API key from the `SYNCFUSION_API_KEY` user environment variable. That key isn't the licence key: generate it in your syncfusion.com account. Without it, only that server fails to start. Then read the Sample Browser source in `C:\Users\Public\Documents\Syncfusion\WPF\34.2.2\SampleBrowser\` (a v34 install, older than the packages), and grep file contents there, because the demo file names often don't name the control. Only then decompile the assembly with `ilspycmd`: the packages are in `%UserProfile%\.nuget\packages\syncfusion.*\<version>\lib\`.
 - **Known traps:**
   - Bind an editable `DoubleTextBox`'s `Value` with `UpdateSourceTrigger=PropertyChanged`. Otherwise the ViewModel only sees the value when the box loses focus, and the buttons and figures that depend on it lag behind.
   - A two-way `DoubleTextBox` or `PercentTextBox` bound to a `decimal` takes `Converter={StaticResource DecimalValueConverter}` on its binding. Without it, WPF's own conversion keeps the box's `double` at its exact binary value, so 28.35 typed reaches the ViewModel as 28.349999999999997868371792719 (see [Precision and rounding](#precision-and-rounding)).
@@ -1049,7 +1080,7 @@ The plan also follows the add row's line (`_newLine`, made by `NewLine`) while i
 ### How the tests work
 
 - **Nothing is mocked.** Rules are tested as pure functions. Repositories, services and ViewModels are tested on a real PostgreSQL database that Respawn resets before every test. Grid behaviours are tested in real `SfDataGrid`s in windows placed off-screen.
-- **Each database-backed project has its own database**: `tinapayanrms_test_infrastructure`, `tinapayanrms_test_ui` and `tinapayanrms_test_mcp`. `dotnet test --solution` runs the projects side by side, and a shared database would be reset under the other project's running test.
+- **Each database-backed project has its own database**: `tinapayanrms_test_infrastructure`, `tinapayanrms_test_ui`, `tinapayanrms_test_mcp` and `tinapayanrms_test_recipeapi`. `dotnet test --solution` runs the projects side by side, and a shared database would be reset under the other project's running test.
 - **Each database is migrated once per test run**, by the fixture's `MigrateAsync`.
 - **Respawn clears every table** except `__EFMigrationsHistory` before each test (it truncates them, and tries again if PostgreSQL ends the truncate as a deadlock with a read the last test left running). That includes rows the migrations seeded, so a test creates every row it needs.
 
@@ -1059,6 +1090,7 @@ The plan also follows the add row's line (`_newLine`, made by `NewLine`) while i
 | `Infrastructure.Tests` | `Persistence/` (repositories and the cascade), `Queries/` (`ColumnsTests`), `Services/` (`JsonViewStateStoreTests`, and `DatabaseBackupsTests`, which run the real `pg_dump` and `pg_restore`) | PostgreSQL, with its command-line tools |
 | `UI.Tests` | `ViewModels/` on real repositories, `Controls/` in off-screen grids, `Printing/`, `Converters/`, `CompositionRootTests` | PostgreSQL; the licence key for the tests that build Syncfusion controls |
 | `Mcp.Tests` | `Tools/` (`CostingToolsTests`): the tools read through the server's read-only connection, priced as the screens price, and the connection refusing a write | PostgreSQL |
+| `RecipeApi.Tests` | `Endpoints/` (`RecipeApiTests`): each endpoint served in memory on the API's read-only connection, the key when one is set, and the connection refusing a write | PostgreSQL |
 | `Tests.Common` | Nothing: it's the shared fixture library | — |
 
 ### The database fixtures
@@ -1290,7 +1322,7 @@ Respawn picks up the new table by itself.
 ### Use a new Syncfusion control
 
 1. Add its package to the UI project, as in [Working with Syncfusion](#working-with-syncfusion).
-2. Learn how it's meant to be set up from its skill, then the Sample Browser, then `ilspycmd`.
+2. Learn how it's meant to be set up from its skill, then the `syncfusion-wpf` MCP server, then the Sample Browser, then `ilspycmd`.
 3. Check that it doesn't change how other controls are themed (remember the `SfTreeGrid` trap).
 4. Check it in the running app at the app's text size.
 
@@ -1351,7 +1383,7 @@ A product's cost and selling price aren't stored, so SQL can't show them: they'r
 
 Each tool takes a product or material by its name, or by a part of it that names only one. A name that matches nothing, or several, comes back as an error that lists the candidates. Each tool also takes `unbuffered`, which prices at the materials' true costs, as the Products screen's Unbuffered switch does. The JSON it returns has every decimal rounded to 6 places (`ToolJson`), though the figures are worked out at full precision.
 
-- **It can't write.** [ReadOnlyConnection](../src/TinapayanRMS.Mcp/ReadOnlyConnection.cs) adds `Options=-c default_transaction_read_only=on` to the connection string from `appsettings.json`, so PostgreSQL refuses any INSERT, UPDATE or DELETE, whatever code runs it. `CostingToolsTests` reads through that connection, and checks that a write is refused.
+- **It can't write.** [ReadOnlyConnection](../src/TinapayanRMS.UI/ReadOnlyConnection.cs) (in the UI project since 2026-10-31, which the Recipe API shares) adds `Options=-c default_transaction_read_only=on` to the connection string from `appsettings.json`, so PostgreSQL refuses any INSERT, UPDATE or DELETE, whatever code runs it. `CostingToolsTests` reads through that connection, and checks that a write is refused.
 - **Its figures are the screens'.** The project references the UI project and builds its host with `CompositionRoot`, because the pricing (`SavedProductReader`) and the simulator's arithmetic live there. A change to how a product is priced reaches the tools without any change here. A change to the signature of one of those types can break this project's build.
 - **Claude Code starts it** from [.mcp.json](../.mcp.json) with `dotnet run --project src/TinapayanRMS.Mcp -c Release`. Claude Code asks you to approve a project's server the first time. The first start takes about 20 seconds, because it builds the Release configuration first. Release keeps its files in `bin/Release`, so a running server doesn't lock the Debug files that `dotnet build` and `dotnet test` write. It's rebuilt each time it starts, so restart it in Claude Code (`/mcp`) to pick up a change.
 - **Nothing but the protocol may reach standard output.** The host has no console logging. Anything a tool printed with `Console.WriteLine` would break the connection.

@@ -3,6 +3,13 @@
     "tinapayanrms": {
       "command": "dotnet",
       "args": ["run", "--project", "src/TinapayanRMS.Mcp", "-c", "Release"]
+    },
+    "syncfusion-wpf": {
+      "command": "dotnet",
+      "args": ["dnx", "Syncfusion.WPF.MCP", "--yes"],
+      "env": {
+        "Syncfusion_API_Key": "${SYNCFUSION_API_KEY}"
+      }
     }
   }
 }

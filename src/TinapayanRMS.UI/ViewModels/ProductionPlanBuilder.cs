@@ -303,7 +303,7 @@ public static class ProductionPlanBuilder
     /// What the kitchen calls a mix: a linked sub-assembly's own name ("Sweet Dough"), or a product's own section by the
     /// product and its tab ("Ube Roll Filling"); with the add-ins that make it a mix of its own ("Sweet Dough + Ube Flavour").
     /// </summary>
-    private static string MixName(PlannedMix mix, IReadOnlyDictionary<int, SavedProduct> products, Func<int, string> nameOf)
+    public static string MixName(PlannedMix mix, IReadOnlyDictionary<int, SavedProduct> products, Func<int, string> nameOf)
     {
         var product = products[mix.Uses[0].ProductId];
         var section = product.Sections.First(s => s.SubAssemblyId == mix.SubAssemblyId);
@@ -312,7 +312,7 @@ public static class ProductionPlanBuilder
     }
 
     /// <summary>"Ube Roll 40 pcs, Cheese Roll 60 pcs": each product the mix is for, and the pieces it takes from it.</summary>
-    private static string ForText(IReadOnlyList<PlannedUse> uses, IReadOnlyDictionary<int, SavedProduct> products) =>
+    public static string ForText(IReadOnlyList<PlannedUse> uses, IReadOnlyDictionary<int, SavedProduct> products) =>
         string.Join(", ", uses
             .GroupBy(u => u.ProductId)
             .Select(g => string.Create(CultureInfo.CurrentCulture, $"{products[g.Key].Product.Name} {g.Sum(u => u.Pieces):#,0.##} pcs")));
@@ -358,7 +358,8 @@ public static class ProductionPlanBuilder
         };
     }
 
-    private static string NoteOf(PlanIssue issue, IReadOnlyDictionary<int, SavedProduct> products, Func<int, string> nameOf)
+    /// <summary>What the screen's notes, and the Recipe API's issues, say of something the plan couldn't work out.</summary>
+    public static string NoteOf(PlanIssue issue, IReadOnlyDictionary<int, SavedProduct> products, Func<int, string> nameOf)
     {
         string? ProductName(int productId) => products.GetValueOrDefault(productId)?.Product.Name;
 

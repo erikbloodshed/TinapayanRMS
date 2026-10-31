@@ -1328,6 +1328,15 @@ Right-click the category's folder in the Products list and choose **Print Folder
 
 Or type the packaging straight into the pack product's Packaging tab, then press **Move to Sub-Assemblies** and Save. The set is made from those lines and linked for you.
 
+### Share the recipes with TinapayanPreweigh
+
+TinapayanPreweigh, the app for weighing ingredients out ahead of mixing, reads its recipes from TinapayanRMS. It reads them through the **Recipe API**, a small program that runs in the background on the PC that holds the TinapayanRMS database. The Recipe API only reads. It never changes a recipe, a price or anything else.
+
+1. On the PC that holds the TinapayanRMS database, open PowerShell **as an administrator**, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Install-RecipeApi.ps1`. It installs the Recipe API, starts it, and starts it again each time you sign in to Windows. Running it as an administrator also lets the other PCs on the shop's network reach it.
+2. In TinapayanPreweigh's **Settings**, type the Recipe API's address. Use `http://localhost:5290` when Preweigh runs on the same PC, or `http://` and that PC's name or network address followed by `:5290` when it runs on another PC. Then press **Test connection**.
+
+The Recipe API runs only while someone is signed in to Windows on that PC. Preweigh can't start new weighing sheets while it isn't running, but packs already recorded stay as they are. To remove the Recipe API, run `scripts\Uninstall-RecipeApi.ps1` the same way.
+
 ---
 
 ## 14. Troubleshooting and questions
