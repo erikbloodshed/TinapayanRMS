@@ -13,6 +13,9 @@ public interface IDatabaseBackups
     /// <summary>Every backup in <see cref="Folder"/>, newest first; none while the folder doesn't exist yet.</summary>
     IReadOnlyList<DatabaseBackup> List();
 
+    /// <summary>The newest backup in <see cref="Folder"/> taken of this database (BackupRules.Newest); null when it has none.</summary>
+    Task<DatabaseBackup?> NewestAsync(CancellationToken cancellationToken);
+
     /// <summary>Backs the database up now, to a new file in <see cref="Folder"/>.</summary>
     Task<DatabaseBackup> BackUpAsync(BackupKind kind, CancellationToken cancellationToken);
 

@@ -18,6 +18,18 @@ public static class BackupRules
     /// <summary>pg_dump's custom format, the one pgAdmin names .backup too.</summary>
     public const string Extension = ".backup";
 
+    /// <summary>
+    /// Added to a backup's name while it's still being written or copied: "….backup.partial". It's never listed, counted as
+    /// the day's backup or restored, so a file cut short can't be taken for a whole one.
+    /// </summary>
+    public const string PartialSuffix = ".partial";
+
+    /// <summary>
+    /// How long the database can go without a backup before an automatic backup that fails is worth interrupting someone
+    /// for. A failure sooner than this may well put itself right at the next check, and shows on the Database tab anyway.
+    /// </summary>
+    public static readonly TimeSpan OverdueAfter = TimeSpan.FromDays(3);
+
     public const string NotADatabaseBackupText = "That file isn't a backup of a whole database, so it can't be restored.";
 
     public const string NewerPostgresText =
@@ -114,6 +126,19 @@ public static class BackupRules
     /// </summary>
     public static IReadOnlyList<DatabaseBackup> AutomaticToDelete(IEnumerable<DatabaseBackup> backups, string databaseName, int keep = AutomaticBackupsKept) =>
         [.. AutomaticOf(backups, databaseName).OrderByDescending(backup => backup.TakenAt).Skip(keep)];
+
+    /// <summary>
+    /// <paramref name="databaseName"/>'s newest backup, of any kind but one copied in, whose name dates it to when it arrived
+    /// rather than to the data it holds. Null when it has none. Another database's in the same folder don't count.
+    /// </summary>
+    public static DatabaseBackup? Newest(IEnumerable<DatabaseBackup> backups, string databaseName) =>
+        backups
+            .Where(backup => backup.Kind != BackupKind.CopiedIn && string.Equals(backup.DatabaseName, databaseName, StringComparison.OrdinalIgnoreCase))
+            .MaxBy(backup => backup.TakenAt);
+
+    /// <summary>Whether <paramref name="newest"/> is too old to go on relying on at <paramref name="now"/>, or there's none at all (<see cref="OverdueAfter"/>).</summary>
+    public static bool IsOverdue(DatabaseBackup? newest, DateTime now) =>
+        newest is null || now - newest.TakenAt >= OverdueAfter;
 
     private static IEnumerable<DatabaseBackup> AutomaticOf(IEnumerable<DatabaseBackup> backups, string databaseName) =>
         backups.Where(backup => backup.Kind == BackupKind.Automatic && string.Equals(backup.DatabaseName, databaseName, StringComparison.OrdinalIgnoreCase));

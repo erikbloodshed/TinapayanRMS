@@ -295,6 +295,17 @@ public static class RawMaterialRules
         return dearest;
     }
 
+    /// <summary>
+    /// A material's name as it's saved: without spaces at either end, and refused when there's nothing else. PostgreSQL's
+    /// collation counts a space at the end, so "Flour " would get past the unique index beside "Flour", where SQL Server's
+    /// ignored it (found 2026-11-03, by a code review).
+    /// </summary>
+    public static string StoredName(string name)
+    {
+        var trimmed = name.Trim();
+        return trimmed.Length > 0 ? trimmed : throw new BusinessRuleException("Every raw material needs a name.");
+    }
+
     /// <summary>A brand name as it's saved: trimmed, and null when there's none.</summary>
     public static string? NormalizeBrand(string? brand) =>
         string.IsNullOrWhiteSpace(brand) ? null : brand.Trim();

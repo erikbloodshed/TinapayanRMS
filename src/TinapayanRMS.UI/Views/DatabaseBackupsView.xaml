@@ -20,13 +20,25 @@
                            Margin="0,0,0,12"
                            Text="Copies of all of the app's data. One is taken automatically each day, when the app starts or within the hour while it stays open, and the last 14 of those are kept. Set a second folder, such as a USB stick or a OneDrive folder, and each one is copied there too, so a broken computer doesn't take every copy with it." />
 
-                <!-- Where they're kept, label on the left as every form's is -->
+                <!-- Where they're kept, label on the left as every form's is, and why the last automatic backup wasn't taken -->
                 <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="1"
+                               Grid.Column="1"
+                               Grid.ColumnSpan="2"
+                               Margin="0,4,0,0"
+                               Text="{Binding BackupProblemText}"
+                               Foreground="{StaticResource WarningForegroundBrush}"
+                               TextWrapping="Wrap"
+                               Visibility="{Binding BackupProblemText, Converter={StaticResource NotNullToVisibilityConverter}}" />
                     <TextBlock Text="Folder" Style="{StaticResource FormLabelStyle}" />
                     <TextBlock Grid.Column="1" Text="{Binding Folder}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Folder}" />
                     <syncfusion:ButtonAdv Grid.Column="2"

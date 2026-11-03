@@ -163,6 +163,7 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
 
     public async Task RenameAsync(int productId, string name, CancellationToken cancellationToken)
     {
+        name = ProductRules.StoredName(name);
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         var existing = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == productId, cancellationToken)
@@ -364,6 +365,7 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
     /// </summary>
     internal static async Task<Product> AddAsync(TinapayanRMSDbContext dbContext, Product product, CancellationToken cancellationToken)
     {
+        product.Name = ProductRules.StoredName(product.Name);
         CompositeProductRules.EnsureOneUnit(product.IsComposite, product.QuantityRequired);
         CompositeProductRules.EnsureComponentPackagingOnComposite(product.IsComposite, product.IncludesComponentPackaging);
         await EnsureNameNotHeldByDeletedAsync(dbContext, 0, product.Name, cancellationToken);
@@ -386,10 +388,11 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         CompositeProductRules.EnsureKindUnchanged(existing.IsComposite, product.IsComposite);
         CompositeProductRules.EnsureOneUnit(existing.IsComposite, product.QuantityRequired);
         CompositeProductRules.EnsureComponentPackagingOnComposite(existing.IsComposite, product.IncludesComponentPackaging);
-        await EnsureNameNotHeldByDeletedAsync(dbContext, existing.Id, product.Name, cancellationToken);
+        var name = ProductRules.StoredName(product.Name);
+        await EnsureNameNotHeldByDeletedAsync(dbContext, existing.Id, name, cancellationToken);
 
         var oldName = existing.Name;
-        existing.Name = product.Name;
+        existing.Name = name;
         existing.Description = product.Description;
         existing.CategoryId = product.CategoryId;
         existing.QuantityRequired = product.QuantityRequired;

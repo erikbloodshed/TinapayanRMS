@@ -1526,7 +1526,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             var product = new Product
             {
                 Id = _editingId,
-                Name = EditingName,
+                Name = EditingName.Trim(),
                 Description = string.IsNullOrWhiteSpace(EditingDescription) ? null : EditingDescription.Trim(),
                 CategoryId = EditingCategory?.Id,
                 QuantityRequired = EditingQuantityRequired,

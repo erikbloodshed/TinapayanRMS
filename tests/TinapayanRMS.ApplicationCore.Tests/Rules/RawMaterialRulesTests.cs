@@ -787,6 +787,25 @@ public class RawMaterialRulesTests
         act.Should().Throw<BusinessRuleException>().WithMessage(message);
     }
 
+    [Theory]
+    [InlineData("Flour", "Flour")]
+    [InlineData("Flour ", "Flour")]
+    [InlineData("  Bread Flour  ", "Bread Flour")]
+    public void A_name_is_stored_without_spaces_at_either_end(string name, string expected)
+    {
+        RawMaterialRules.StoredName(name).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_name_with_nothing_but_spaces_is_refused(string name)
+    {
+        var act = () => RawMaterialRules.StoredName(name);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage("Every raw material needs a name.");
+    }
+
     [Fact]
     public void BusinessRuleException_is_still_an_InvalidOperationException()
     {

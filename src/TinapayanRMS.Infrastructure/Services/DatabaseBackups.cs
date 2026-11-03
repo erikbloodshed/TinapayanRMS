@@ -14,7 +14,8 @@ namespace TinapayanRMS.Infrastructure.Services;
 /// </summary>
 /// <param name="folder">Where the backups go: <see cref="DefaultFolder"/>, or a test's own folder.</param>
 /// <param name="toolsFolder">The folder holding pg_dump and pg_restore (Backups:ToolsFolder), or null to look for them.</param>
-public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory, string folder, string? toolsFolder = null)
+/// <param name="toolTimeout">How long pg_dump or pg_restore may run before it's stopped; half an hour unless a test says otherwise.</param>
+public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory, string folder, string? toolsFolder = null, TimeSpan? toolTimeout = null)
     : IDatabaseBackups, IDisposable
 {
     /// <summary>%ProgramData%\TinapayanRMS\Backups: one folder for everyone using the app on this computer, as the database is.</summary>
@@ -34,7 +35,13 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
     /// </summary>
     private const int MaintenanceCommandTimeoutSeconds = 600;
 
-    private readonly PostgresTools _tools = new(toolsFolder);
+    /// <summary>
+    /// How old a partial file must be before it's taken for one left behind (a computer turned off mid-way) and deleted.
+    /// Far longer than a tool may run, so it's never one a backup in another copy of the app is still writing.
+    /// </summary>
+    private static readonly TimeSpan PartialAbandonedAfter = TimeSpan.FromDays(1);
+
+    private readonly PostgresTools _tools = new(toolsFolder, toolTimeout);
 
     /// <summary>
     /// The day's automatic backup starts in the background at startup, while Settings may already be taking one or
@@ -48,6 +55,9 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
         Directory.Exists(folder)
             ? [.. new DirectoryInfo(folder).EnumerateFiles("*" + BackupRules.Extension).Select(Describe).OrderByDescending(b => b.TakenAt)]
             : [];
+
+    public async Task<DatabaseBackup?> NewestAsync(CancellationToken cancellationToken) =>
+        BackupRules.Newest(List(), (await TargetAsync(cancellationToken)).Database);
 
     public async Task<DatabaseBackup> BackUpAsync(BackupKind kind, CancellationToken cancellationToken)
     {
@@ -130,9 +140,13 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
 
     public void Dispose() => _turn.Dispose();
 
-    /// <summary>Where a new backup goes: a name no file in the folder has yet (BackupRules.FreeFileNameFor), so it overwrites none.</summary>
+    /// <summary>
+    /// Where a new backup goes: a name no file in the folder has yet, whole or still being written
+    /// (BackupRules.FreeFileNameFor), so it overwrites none.
+    /// </summary>
     private string FreePath(string databaseName, BackupKind kind, DateTime takenAt) =>
-        Path.Combine(folder, BackupRules.FreeFileNameFor(databaseName, kind, takenAt, name => File.Exists(Path.Combine(folder, name))));
+        Path.Combine(folder, BackupRules.FreeFileNameFor(databaseName, kind, takenAt, name =>
+            File.Exists(Path.Combine(folder, name)) || File.Exists(Path.Combine(folder, name + BackupRules.PartialSuffix))));
 
     /// <summary>Creates the folder if it's missing, open to every Windows user of the computer (BackupFolder).</summary>
     private void PrepareFolder()
@@ -153,21 +167,29 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
             ? new(file.FullName, databaseName, kind, takenAt, file.Length)
             : new(file.FullName, null, BackupKind.CopiedIn, file.LastWriteTime, file.Length);
 
+    /// <summary>
+    /// pg_dump writes to a partial file, which only takes the backup's name once pg_dump has finished without an error.
+    /// So whatever stops it part-way (a power cut, the process killed) leaves nothing that reads as a backup. pg_dump makes
+    /// its file before it even connects, and under the backup's own name a stray one counted as the day's backup, so
+    /// none was taken that day (found 2026-11-03, by a code review).
+    /// </summary>
     private async Task<DatabaseBackup> BackUpInTurnAsync(Target target, BackupKind kind, DateTime takenAt, CancellationToken cancellationToken)
     {
         PrepareFolder();
         var path = FreePath(target.Database, kind, takenAt);
+        var partial = path + BackupRules.PartialSuffix;
         try
         {
-            await _tools.RunAsync("pg_dump", target.Connection, ["--format=custom", "--file", path, "--dbname", target.Database], cancellationToken);
+            await _tools.RunAsync("pg_dump", target.Connection, ["--format=custom", "--file", partial, "--dbname", target.Database], cancellationToken);
+            File.Move(partial, path);
         }
         catch
         {
-            // Whatever pg_dump wrote before it stopped isn't a backup.
-            File.Delete(path);
+            DeleteIfPossible(partial);
             throw;
         }
 
+        DeleteAbandonedPartials();
         if (kind == BackupKind.Automatic)
         {
             DeleteOldAutomaticBackups(target.Database);
@@ -184,14 +206,32 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
     {
         foreach (var old in BackupRules.AutomaticToDelete(List(), databaseName))
         {
-            try
+            DeleteIfPossible(old.Path);
+        }
+    }
+
+    /// <summary>Partial files a run that never finished left behind: nothing will ever make them whole.</summary>
+    private void DeleteAbandonedPartials()
+    {
+        foreach (var file in new DirectoryInfo(folder).EnumerateFiles("*" + BackupRules.PartialSuffix))
+        {
+            if (DateTime.UtcNow - file.LastWriteTimeUtc > PartialAbandonedAfter)
             {
-                File.Delete(old.Path);
+                DeleteIfPossible(file.FullName);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // Tried again after the next automatic backup.
-            }
+        }
+    }
+
+    /// <summary>Deletes a file that's in the way but isn't what matters: one that can't be deleted now is tried again later, and hides no other failure.</summary>
+    private static void DeleteIfPossible(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Open in another program, or a tool that's stopped but hasn't let go of it yet.
         }
     }
 
@@ -345,11 +385,30 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
         await ExecuteAsync(connection, $"DROP DATABASE IF EXISTS {Quote(database)}", cancellationToken);
     }
 
+    /// <summary>
+    /// Copies to a partial file beside <paramref name="to"/>, written out to the disk and only then given its name, replacing
+    /// a file there. A USB stick pulled out part-way leaves nothing that reads as a backup, and the file it would have
+    /// replaced as it was.
+    /// </summary>
     private static async Task CopyAsync(string from, string to, CancellationToken cancellationToken)
     {
-        await using var source = new FileStream(from, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
-        await using var destination = new FileStream(to, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
-        await source.CopyToAsync(destination, cancellationToken);
+        var partial = to + BackupRules.PartialSuffix;
+        try
+        {
+            await using (var source = new FileStream(from, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true))
+            await using (var destination = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+            {
+                await source.CopyToAsync(destination, cancellationToken);
+                destination.Flush(flushToDisk: true);
+            }
+
+            File.Move(partial, to, overwrite: true);
+        }
+        catch
+        {
+            DeleteIfPossible(partial);
+            throw;
+        }
     }
 
     /// <summary>The database the app uses, and how to reach its server, from the app's own connection string.</summary>

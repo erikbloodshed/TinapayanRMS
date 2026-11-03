@@ -8,6 +8,9 @@ public sealed class SubAssemblyLineConfiguration : IEntityTypeConfiguration<SubA
 {
     public void Configure(EntityTypeBuilder<SubAssemblyLine> builder)
     {
+        // Backstop for SubAssemblyRules.EnsureValidLines.
+        builder.ToTable(t => t.HasCheckConstraint("CK_SubAssemblyLines_Grams", "grams > 0"));
+
         // Deleting the sub-assembly takes its own lines with it.
         builder.HasOne(l => l.SubAssembly)
             .WithMany()

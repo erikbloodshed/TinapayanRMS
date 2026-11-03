@@ -2224,6 +2224,39 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         return category.Id;
     }
 
+    [Fact]
+    public async Task A_name_with_spaces_round_it_is_saved_and_shown_without_them()
+    {
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        TypeName(viewModel, " Pandesal ");
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.EditingName == "Pandesal", () => $"name=[{viewModel.EditingName}]");
+        viewModel.History.IsDirty.Should().BeFalse("what's showing is what was saved");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.Products.SingleAsync(Cancellation)).Name.Should().Be("Pandesal");
+    }
+
+    [Fact]
+    public async Task A_name_taken_but_for_a_space_at_the_end_is_refused_and_not_saved_beside_it()
+    {
+        await SaveProductAsync("Pandesal", null);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        TypeName(viewModel, "Pandesal ");
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().Be(Failure.DuplicateNameText);
+        await using var dbContext = CreateDbContext();
+        (await dbContext.Products.CountAsync(Cancellation)).Should().Be(1);
+    }
+
     /// <summary>A product with nothing but its name and category, saved through the repository, which files it in Research and Development.</summary>
     private Task<int> SaveProductAsync(string name, int? categoryId) =>
         new ProductRepository(CreateDbContextFactory()).SaveAsync(

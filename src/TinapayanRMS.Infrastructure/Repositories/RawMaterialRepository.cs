@@ -234,7 +234,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
         var existing = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == id, cancellationToken)
             ?? throw new BusinessRuleException($"Raw material {id} does not exist.");
 
-        existing.Name = name;
+        existing.Name = RawMaterialRules.StoredName(name);
         existing.UpdatedAt = dbContext.LocalNow();
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -364,6 +364,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
     /// </summary>
     internal static async Task<bool> AddAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
     {
+        material.Name = RawMaterialRules.StoredName(material.Name);
         RawMaterialRules.EnsureFieldsMatchType(material);
         RawMaterialRules.EnsureFieldsMatchSource(material);
         RawMaterialRules.EnsureValidCostBuffer(material.CostBufferPercent);
@@ -549,7 +550,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
 
         // Field by field, not a blind Update(): CostPerBaseUnit and BufferedCostPerBaseUnit are owned
         // by the price-history and BOM rollups, and the units by RawMaterialUnitRepository, not by this form.
-        existing.Name = material.Name;
+        existing.Name = RawMaterialRules.StoredName(material.Name);
         existing.CategoryId = material.CategoryId;
         existing.WeightLossPercent = material.WeightLossPercent;
         existing.SubAssemblyId = material.SubAssemblyId;

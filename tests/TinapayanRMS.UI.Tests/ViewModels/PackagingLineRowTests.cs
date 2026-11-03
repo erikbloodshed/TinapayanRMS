@@ -13,6 +13,22 @@ public class PackagingLineRowTests
 {
     public PackagingLineRowTests() => ReactiveUIBootstrapper.EnsureInitialized();
 
+    /// <summary>
+    /// One such row used to throw on every read, and every read of all the products failed with it (Reports, Print, the
+    /// Recipe API). The database refuses one now (CK_PackagingLines_AuthoredQuantity), so this is only ever an edit from
+    /// before it or outside it, which should cost nothing and be there to put right.
+    /// </summary>
+    [Theory]
+    [InlineData(PackagingLineAuthoredField.QtyPerUnit)]
+    [InlineData(PackagingLineAuthoredField.UnitsPerPackagingUnit)]
+    public void A_saved_line_with_a_quantity_of_0_reads_as_costing_nothing(PackagingLineAuthoredField authoredField)
+    {
+        var row = PackagingLineRow.FromSaved(new PackagingLine { PackagingMaterial = Box(), AuthoredField = authoredField, QtyPerUnit = 0m, UnitsPerPackagingUnit = 0m });
+
+        row.QtyPerUnit.Should().Be(0m);
+        row.CostPerUnit.Should().Be(0m);
+    }
+
     private static UnitOfMeasure Unit(string abbreviation) => new() { Name = abbreviation, Abbreviation = abbreviation };
 
     /// <summary>Ribbon at ₱0.05 a cm buffered (₱0.04 unbuffered), also bought by the 1,000 cm roll (RawMaterialUnit 7).</summary>

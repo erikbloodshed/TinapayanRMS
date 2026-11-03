@@ -7,8 +7,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Services;
 
 /// <summary>
 /// PostgresTools running PostgreSQL's own tools as the backups do: what a tool writes out comes back, one that fails
-/// throws what it wrote, and a cancelled run throws. None of them reaches the server: pg_dump's <c>--version</c> and
-/// pg_restore's <c>--list</c> of a file don't connect.
+/// throws what it wrote, and a cancelled run throws. Only the first reaches the server, reading the schema of its
+/// maintenance database: every run is given --no-password, and pg_dump's <c>--version</c> only works as its first argument.
 /// </summary>
 public sealed class PostgresToolsTests
 {
@@ -19,9 +19,9 @@ public sealed class PostgresToolsTests
     [Fact]
     public async Task A_tool_that_succeeds_returns_what_it_wrote()
     {
-        var output = await new PostgresTools(null).RunAsync("pg_dump", Connection, ["--version"], Cancellation);
+        var output = await new PostgresTools(null).RunAsync("pg_dump", Connection, ["--schema-only", "--dbname", "postgres"], Cancellation);
 
-        output.Should().StartWith("pg_dump (PostgreSQL)");
+        output.Should().Contain("PostgreSQL database dump");
     }
 
     [Fact]

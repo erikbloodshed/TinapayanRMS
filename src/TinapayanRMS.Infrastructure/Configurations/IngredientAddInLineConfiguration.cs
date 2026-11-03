@@ -8,6 +8,9 @@ public sealed class IngredientAddInLineConfiguration : IEntityTypeConfiguration<
 {
     public void Configure(EntityTypeBuilder<IngredientAddInLine> builder)
     {
+        // Backstop for AddInRules.EnsureValid.
+        builder.ToTable(t => t.HasCheckConstraint("CK_IngredientAddInLines_Grams", "grams > 0"));
+
         // Deleting the made ingredient takes its own add-ins with it.
         builder.HasOne(l => l.Ingredient)
             .WithMany()

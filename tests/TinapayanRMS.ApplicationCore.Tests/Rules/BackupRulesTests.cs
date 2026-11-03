@@ -168,6 +168,45 @@ public class BackupRulesTests
         another.Should().Throw<BusinessRuleException>().WithMessage(BackupRules.NotThisAppsText);
     }
 
+    [Fact]
+    public void A_file_still_being_written_isnt_read_as_a_backup()
+    {
+        var name = BackupRules.FileNameFor("TinapayanRMS", BackupKind.Automatic, Morning) + BackupRules.PartialSuffix;
+
+        BackupRules.TryParse(name, out _, out _, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void The_newest_backup_is_this_databases_of_any_kind_but_one_copied_in()
+    {
+        var newest = Backup(BackupKind.Manual, Morning.AddDays(-1));
+        List<DatabaseBackup> backups =
+        [
+            Backup(BackupKind.Automatic, Morning.AddDays(-3)),
+            newest,
+            Backup(BackupKind.CopiedIn, Morning),
+            Backup(BackupKind.Manual, Morning, "TinapayanRMS_Copy"),
+        ];
+
+        BackupRules.Newest(backups, "tinapayanrms").Should().BeSameAs(newest);
+        BackupRules.Newest([], "TinapayanRMS").Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(2.9, false)]
+    [InlineData(3, true)]
+    [InlineData(20, true)]
+    public void A_backup_is_overdue_three_days_on(double daysOld, bool overdue)
+    {
+        BackupRules.IsOverdue(Backup(BackupKind.Automatic, Morning.AddDays(-daysOld)), Morning).Should().Be(overdue);
+    }
+
+    [Fact]
+    public void Having_no_backup_at_all_is_overdue()
+    {
+        BackupRules.IsOverdue(null, Morning).Should().BeTrue();
+    }
+
     private static DatabaseBackup Backup(BackupKind kind, DateTime takenAt, string databaseName = "TinapayanRMS") =>
         new($"{kind}-{takenAt:O}.backup", databaseName, kind, takenAt, 1024);
 }

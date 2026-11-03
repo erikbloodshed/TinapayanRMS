@@ -6,6 +6,7 @@ using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -71,6 +72,114 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         backup.SizeBytes.Should().BeGreaterThan(0);
         Path.GetFileName(backup.Path).Should().StartWith(_database.Name + "_").And.EndWith("_manual.backup");
         _backups.List().Should().ContainSingle().Which.Path.Should().Be(backup.Path);
+    }
+
+    [Fact]
+    public async Task A_backup_leaves_only_itself_in_the_folder()
+    {
+        var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
+
+        Directory.GetFiles(_folder).Should().ContainSingle().Which.Should().Be(backup.Path, "the partial file it was written to has taken its name");
+    }
+
+    /// <summary>
+    /// What another Windows user, or a lost pgpass.conf, comes to. Asked to prompt, pg_dump waits on a console nobody can see
+    /// for ever; this one's timeout only keeps a regression from hanging the test run, as it would hang the app's backups.
+    /// </summary>
+    [Fact]
+    public async Task With_no_password_to_be_had_a_backup_fails_at_once_and_says_why()
+    {
+        var noPassword = new NpgsqlConnectionStringBuilder(_database.ConnectionString) { Passfile = Path.Combine(_folder, "no such file.conf") };
+        using var backups = new DatabaseBackups(new SharedTransactionDbContextFactory(noPassword.ConnectionString), _folder, toolTimeout: TimeSpan.FromSeconds(30));
+
+        var backUp = () => backups.BackUpAsync(BackupKind.Manual, Cancellation);
+
+        (await backUp.Should().ThrowAsync<PostgresToolException>()).Which.Error.Should().Contain("no password supplied");
+        Directory.GetFiles(_folder).Should().BeEmpty("nothing of it is left behind");
+    }
+
+    /// <summary>pg_dump waits for as long as a table it needs is held, and nothing else ends that wait. What it left isn't a backup, and it holds no one up.</summary>
+    [Fact]
+    public async Task A_tool_that_hangs_is_stopped_and_lets_the_next_backup_through()
+    {
+        var today = new DateTime(2026, 10, 3, 8, 0, 0);
+        using var backups = new DatabaseBackups(_database.CreateDbContextFactory(), _folder, toolTimeout: TimeSpan.FromSeconds(3));
+        await using (var holder = _database.CreateDbContext())
+        {
+            await using var holding = await holder.Database.BeginTransactionAsync(Cancellation);
+            await holder.Database.ExecuteSqlRawAsync("LOCK TABLE raw_material_categories IN ACCESS EXCLUSIVE MODE", Cancellation);
+
+            var backUp = () => backups.BackUpDailyIfDueAsync(today, Cancellation);
+
+            await backUp.Should().ThrowAsync<TimeoutException>();
+            backups.List().Should().BeEmpty("what it wrote before it was stopped isn't a backup");
+        }
+
+        var next = await backups.BackUpDailyIfDueAsync(today, Cancellation);
+
+        next.Should().NotBeNull("the one that was stopped wasn't the day's backup, and let go of its turn");
+        backups.List().Should().ContainSingle().Which.Path.Should().Be(next!.Path);
+    }
+
+    [Fact]
+    public async Task A_partial_file_isnt_a_backup_its_name_isnt_reused_and_it_goes_once_its_old()
+    {
+        Directory.CreateDirectory(_folder);
+        var today = new DateTime(2026, 10, 3, 8, 0, 0);
+        var name = BackupRules.FileNameFor(_database.Name, BackupKind.Automatic, today);
+        var abandoned = Path.Combine(_folder, name + BackupRules.PartialSuffix);
+        var stillBeingWritten = Path.Combine(_folder, BackupRules.FileNameFor(_database.Name, BackupKind.Manual, today) + BackupRules.PartialSuffix);
+        await File.WriteAllTextAsync(abandoned, "cut short", Cancellation);
+        File.SetLastWriteTimeUtc(abandoned, DateTime.UtcNow.AddDays(-2));
+        await File.WriteAllTextAsync(stillBeingWritten, "in another copy of the app", Cancellation);
+
+        _backups.List().Should().BeEmpty("neither reads as a backup");
+        (await _backups.NewestAsync(Cancellation)).Should().BeNull();
+
+        var taken = await _backups.BackUpDailyIfDueAsync(today, Cancellation);
+
+        taken.Should().NotBeNull("a file cut short isn't the day's backup");
+        Path.GetFileName(taken!.Path).Should().NotBe(name, "that name was in use");
+        File.Exists(abandoned).Should().BeFalse("nothing will ever finish it");
+        File.Exists(stillBeingWritten).Should().BeTrue("another copy of the app may still be writing it");
+    }
+
+    [Fact]
+    public async Task A_copy_that_doesnt_finish_leaves_the_file_it_would_replace_as_it_was()
+    {
+        var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
+        var stick = Directory.CreateTempSubdirectory("backup-stick-").FullName;
+        try
+        {
+            var destination = Path.Combine(stick, Path.GetFileName(backup.Path));
+            await File.WriteAllTextAsync(destination, "yesterday's", Cancellation);
+
+            var cutShort = () => _backups.CopyToAsync(backup, destination, new CancellationToken(canceled: true));
+
+            await cutShort.Should().ThrowAsync<OperationCanceledException>();
+            (await File.ReadAllTextAsync(destination, Cancellation)).Should().Be("yesterday's");
+            Directory.GetFiles(stick).Should().ContainSingle("nothing of the copy is left behind");
+
+            await _backups.CopyToAsync(backup, destination, Cancellation);
+
+            new FileInfo(destination).Length.Should().Be(backup.SizeBytes, "a copy that finishes replaces it");
+            Directory.GetFiles(stick).Should().ContainSingle();
+        }
+        finally
+        {
+            Directory.Delete(stick, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task The_newest_backup_is_the_one_just_taken()
+    {
+        (await _backups.NewestAsync(Cancellation)).Should().BeNull("there are none yet");
+
+        await _backups.BackUpDailyIfDueAsync(new DateTime(2026, 10, 2, 8, 0, 0), Cancellation);
+        var newest = await _backups.BackUpDailyIfDueAsync(new DateTime(2026, 10, 3, 8, 0, 0), Cancellation);
+
+        (await _backups.NewestAsync(Cancellation))!.Path.Should().Be(newest!.Path);
     }
 
     [Fact]

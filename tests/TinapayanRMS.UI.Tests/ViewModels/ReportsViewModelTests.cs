@@ -227,7 +227,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
     {
         var viewModel = CreateViewModel();
         viewModel.ExportToExcel.RegisterHandler(_ =>
-            throw new IOException("The process cannot access the file because it is being used by another process."));
+            throw new IOException("The process cannot access the file because it is being used by another process.", unchecked((int)0x80070020)));
 
         await viewModel.ExportProductCostsCommand.Execute();
 

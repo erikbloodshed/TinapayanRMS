@@ -2,6 +2,7 @@ using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.UI.ViewModels;
 
@@ -36,6 +37,13 @@ public readonly record struct Failure(string Text, bool IsRejection)
 
     public const string NoAccessText = "Windows didn't allow the app to use that file or folder. Pick another one.";
 
+    public const string FileMissingText = "That file or folder isn't there any more. It may have been moved or deleted.";
+
+    /// <summary>What Windows reports for a file another program has open (ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION).</summary>
+    private const int SharingViolation = unchecked((int)0x80070020);
+
+    private const int LockViolation = unchecked((int)0x80070021);
+
     public static Failure Of(Exception exception) => exception switch
     {
         BusinessRuleException rule => new(rule.Message, IsRejection: true),
@@ -50,8 +58,14 @@ public readonly record struct Failure(string Text, bool IsRejection)
         TimeoutException => new(TimedOutText, IsRejection: false),
 
         // A file the app writes or reads, such as an exported workbook: the user can close it elsewhere or pick another place.
-        IOException => new(FileInUseText, IsRejection: true),
+        // Only one another program has open is said to be that: a missing file, or a full disk, has its own words.
+        FileNotFoundException or DirectoryNotFoundException => new(FileMissingText, IsRejection: true),
+        IOException { HResult: SharingViolation or LockViolation } => new(FileInUseText, IsRejection: true),
+        IOException io => new($"Couldn't read or write the file: {FirstLine(io.Message)}", IsRejection: true),
         UnauthorizedAccessException => new(NoAccessText, IsRejection: true),
+
+        // pg_dump or pg_restore said why it stopped, in words whoever looks into it needs.
+        PostgresToolException tool => new($"PostgreSQL's {tool.Tool} reported a problem: {FirstLine(tool.Error)}", IsRejection: false),
         _ => new($"Something went wrong, and the details went to the log: {FirstLine(exception.Message)}", IsRejection: false),
     };
 
@@ -102,7 +116,8 @@ public readonly record struct Failure(string Text, bool IsRejection)
         : index?.EndsWith("_abbreviation", StringComparison.OrdinalIgnoreCase) == true ? "That abbreviation is already in use."
         : "That's already there, and it can only be there once.";
 
-    private static string FirstLine(string message)
+    /// <summary>The first line of a message: what an exception's says, without what it carries after that.</summary>
+    public static string FirstLine(string message)
     {
         var end = message.IndexOfAny(['\r', '\n']);
         return (end < 0 ? message : message[..end]).Trim();

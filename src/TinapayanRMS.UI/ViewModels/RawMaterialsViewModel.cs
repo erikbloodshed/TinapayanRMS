@@ -256,7 +256,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>
     /// Flags EditingName as taken the moment it's left (SummaryHeaderCard's NameTextBox LostFocus), rather than
     /// waiting for Save to hit the same message from the unique-index violation (ViewModelBase.RunSafelyAsync).
-    /// Case-insensitive and trimmed, matching the database's default collation the unique index relies on. Fixing
+    /// Trimmed, as Save stores it, and case-insensitive, as the collation the unique index relies on is. Fixing
     /// the name and leaving the field again clears the message this raised, without touching an unrelated one.
     /// </summary>
     public void CheckNameAvailability()
@@ -1352,7 +1352,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             var material = new RawMaterial
             {
                 Id = _editingId,
-                Name = EditingName,
+                Name = EditingName.Trim(),
                 Type = type,
                 CategoryId = EditingCategory?.Id ?? 0,
                 Source = source,

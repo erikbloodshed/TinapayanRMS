@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -60,6 +61,21 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         var act = () => dbContext.SubAssemblies.Where(s => s.Id == subAssemblyId).ExecuteDeleteAsync(Cancellation);
 
         await act.Should().ThrowAsync<Npgsql.PostgresException>();
+    }
+
+    [Theory]
+    [InlineData(PackagingLineAuthoredField.QtyPerUnit)]
+    [InlineData(PackagingLineAuthoredField.UnitsPerPackagingUnit)]
+    public async Task SetLinesAsync_refuses_a_line_of_0_by_saying_so_rather_than_dividing_by_it(PackagingLineAuthoredField authoredField)
+    {
+        var categoryId = await SeedPackagingCategoryAsync("Boxes");
+        var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
+        var boxId = await SeedPackagingMaterialAsync("Gift Box", categoryId, pieceId, purchaseUnitQty: 1m, currentCost: 30m);
+        var productId = await SeedProductAsync("Gift Box Set");
+
+        var act = () => CreatePackagingLineRepository().SetLinesAsync(productId, [(boxId, null, authoredField, 0m)], Cancellation);
+
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("A packaging line's quantity must be positive.");
     }
 
     [Fact]

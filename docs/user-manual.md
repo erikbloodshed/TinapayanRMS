@@ -360,7 +360,9 @@ Backups of all of the app's data: every raw material, price, sub-assembly, produ
   - **Before restore**: the safety backup a restore takes of the data it replaces.
   - **Copied in**: a backup brought in with **Restore from File…**.
   - Only automatic backups are ever deleted by the app. Delete others in File Explorer when you no longer need them.
-- **Also Copy To** is a second folder each automatic backup is copied to as well, such as a USB stick that stays plugged in or a OneDrive folder. Press **Choose…** to pick it: the newest automatic backup is copied there straight away. The newest 14 automatic backups are kept there too; nothing else in the folder is touched. **Stop Copying** stops it, and leaves what was copied. If the folder isn't there when a backup is taken (the USB stick was taken out), the backup is still taken here, and a note in amber says it wasn't copied. The folder is kept for you on this computer.
+- **Also Copy To** is a second folder each automatic backup is copied to as well, such as a USB stick that stays plugged in or a OneDrive folder. Press **Choose…** to pick it: the newest automatic backup is copied there straight away. The newest 14 automatic backups are kept there too; nothing else in the folder is touched. **Stop Copying** stops it, and leaves what was copied. If the folder isn't there when a backup is taken (the USB stick was taken out), the backup is still taken here, and a note in amber says it wasn't copied. The note stays until a copy goes through or you change the folder. The folder is kept for you on this computer.
+- If an automatic backup can't be taken, a note in amber under **Folder** says why, and the app tries again within the hour. The note stays until one is taken, even if you close the app and open it again. If they keep failing, and the newest backup is three days old or more, a message says so once each time the app is opened. Ask whoever set up the app to look into it.
+- A file in the folder ending in *.partial* is a backup still being written, or one that was cut short, by a power cut for example. It isn't listed, it can't be restored, and the app deletes one that's left behind after a day.
 - **Back Up Now** takes a backup straight away.
 - **Copy to…** copies the backup picked in the list somewhere else, such as a USB stick. Do this now and then: backups kept only on this computer are lost with it if it breaks.
 - **Restore** puts the backup picked in the list back, in place of all of the app's data. It asks first, saying when the backup was taken. Then it takes a safety backup of the data as it is, puts the backup back, and the app closes and opens again. Anything saved since the backup was taken is lost, and so is anything not yet saved on another screen.
@@ -1293,6 +1295,18 @@ The file you're saving over is open, usually in Excel. Close it there and try ag
 **"Windows didn't allow the app to use that file or folder. Pick another one."**
 The folder is protected, such as a system folder. Save in Documents, on the Desktop or on a USB stick instead.
 
+**"That file or folder isn't there any more. It may have been moved or deleted."**
+The file or folder was moved or deleted after you picked it, or the USB stick it was on was taken out. Pick it again, or pick another one.
+
+**"Couldn't read or write the file: …"**
+Windows couldn't finish with the file, for the reason it gives, such as a full disk. Put that right or pick another place, then try again.
+
+**"PostgreSQL's pg_dump reported a problem: …"** or **"PostgreSQL's pg_restore reported a problem: …"**
+PostgreSQL's own tool stopped a backup or restore, for the reason it gives. No backup was made and the data wasn't changed. Ask whoever set up the computer to look into it. *No password supplied* means this Windows user has no password file for the database.
+
+**A message says TinapayanRMS couldn't start.**
+Something the app needs before it can open is missing or wrong, such as its settings file. The message says what, and where the log is, and the app closes after it. Ask whoever installs the app to look into it, and give them the log.
+
 **"Backups need PostgreSQL's pg_dump and pg_restore, and they weren't found on this computer."**
 Backups are taken by PostgreSQL's own tools, which come with PostgreSQL. Ask whoever set up the computer to install PostgreSQL's command-line tools, or to tell the app where they are.
 
@@ -1318,7 +1332,7 @@ A figure has more digits than the app keeps, for example a price typed with too 
 Something happened that the app didn't expect. It's in the log file, which helps whoever looks after the app. If anything on the screen looks wrong afterwards, save what you can, then close the app and open it again. If such messages keep coming, the app closes by itself.
 
 **"That name is already in use."** or **"That abbreviation is already in use."**
-Names must be unique within each list: raw materials, sub-assemblies, products, categories, roles and units. A unit's abbreviation must be unique too. Upper and lower case count as the same.
+Names must be unique within each list: raw materials, sub-assemblies, products, categories, roles and units. A unit's abbreviation must be unique too. Upper and lower case count as the same. Spaces at the start or end of a name don't count either: they're taken off when it's saved.
 
 **Letters don't type, or a table cell won't start an edit when I type.**
 The Vim keys are on, and the top right of the window says NORMAL. Click the field or cell, or press **i**, to type. Turn them off in Settings → Keyboard. See [Vim keys](#vim-keys).

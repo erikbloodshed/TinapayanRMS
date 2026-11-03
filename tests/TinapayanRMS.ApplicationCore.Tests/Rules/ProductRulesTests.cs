@@ -6,6 +6,25 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 public class ProductRulesTests
 {
+    [Theory]
+    [InlineData("Pandesal", "Pandesal")]
+    [InlineData("Pandesal ", "Pandesal")]
+    [InlineData("  Cheese Roll  ", "Cheese Roll")]
+    public void A_name_is_stored_without_spaces_at_either_end(string name, string expected)
+    {
+        ProductRules.StoredName(name).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_name_with_nothing_but_spaces_is_refused(string name)
+    {
+        var act = () => ProductRules.StoredName(name);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage("Every product needs a name.");
+    }
+
     [Fact]
     public void EnsureValidUsages_accepts_an_empty_list()
     {
@@ -209,6 +228,14 @@ public class ProductRulesTests
         unitsPerPackagingUnit.Should().Be(1m / 12m);
     }
 
+
+    [Theory]
+    [InlineData(PackagingLineAuthoredField.QtyPerUnit)]
+    [InlineData(PackagingLineAuthoredField.UnitsPerPackagingUnit)]
+    public void ReconcileReciprocal_of_0_is_0_rather_than_a_division_by_zero(PackagingLineAuthoredField authoredField)
+    {
+        ProductRules.ReconcileReciprocal(authoredField, 0m).Should().Be((0m, 0m));
+    }
 
     [Fact]
     public void ReconcileReciprocal_rejects_an_undefined_authored_field()

@@ -6,6 +6,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure;
+using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.UI.Tests.Fixtures;
 using TinapayanRMS.UI.ViewModels;
@@ -224,6 +225,37 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         {
             File.Delete(path);
         }
+    }
+
+    [Fact]
+    public async Task A_file_or_folder_that_isnt_there_says_so_and_not_to_close_it_elsewhere()
+    {
+        var missingFile = Path.Combine(Path.GetTempPath(), $"TinapayanRMS missing {Guid.NewGuid():N}.backup");
+        var inMissingFolder = Path.Combine(Path.GetTempPath(), $"TinapayanRMS missing {Guid.NewGuid():N}", "report.xlsx");
+
+        var file = await FailureOfAsync(() => File.ReadAllBytesAsync(missingFile, Cancellation));
+        var folder = await FailureOfAsync(() => File.WriteAllBytesAsync(inMissingFolder, [1, 2, 3], Cancellation));
+
+        file.Should().Be(new Failure(Failure.FileMissingText, IsRejection: true));
+        folder.Should().Be(new Failure(Failure.FileMissingText, IsRejection: true));
+    }
+
+    [Fact]
+    public void Any_other_trouble_with_a_file_says_what_windows_said_and_not_to_close_it_elsewhere()
+    {
+        var failure = Failure.Of(new IOException("There is not enough space on the disk." + Environment.NewLine + "   at Somewhere()"));
+
+        failure.Should().Be(new Failure("Couldn't read or write the file: There is not enough space on the disk.", IsRejection: true));
+    }
+
+    [Fact]
+    public void A_backup_tool_that_stopped_says_why_in_its_own_words()
+    {
+        var failure = Failure.Of(new PostgresToolException(
+            "pg_dump", "pg_dump: error: connection to server failed: fe_sendauth: no password supplied" + Environment.NewLine + "pg_dump: more"));
+
+        failure.Should().Be(new Failure(
+            "PostgreSQL's pg_dump reported a problem: pg_dump: error: connection to server failed: fe_sendauth: no password supplied", IsRejection: false));
     }
 
     [Fact]

@@ -466,6 +466,43 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     [Fact]
+    public async Task A_name_with_spaces_round_it_is_saved_and_shown_without_them()
+    {
+        var viewModel = CreateViewModel();
+        await SeedCategoryAsync("Sugars");
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = " Brown Sugar ";
+        PickCategory(viewModel);
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.EditingName.Should().Be("Brown Sugar");
+        viewModel.SuccessMessage.Should().Be("Brown Sugar was saved.");
+        viewModel.History.IsDirty.Should().BeFalse("what's showing is what was saved");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.SingleAsync(Cancellation)).Name.Should().Be("Brown Sugar");
+    }
+
+    [Fact]
+    public async Task A_name_taken_but_for_a_space_at_the_end_is_refused_and_not_saved_beside_it()
+    {
+        await SeedPurchasedIngredientAsync("Flour");
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        await viewModel.NewCommand.Execute();
+        viewModel.EditingName = "Flour ";
+        PickCategory(viewModel);
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().Be("That name is already in use.");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.CountAsync(Cancellation)).Should().Be(1);
+    }
+
+    [Fact]
     public async Task Leaving_the_name_field_flags_a_name_already_taken()
     {
         await SeedPurchasedIngredientAsync("Flour");

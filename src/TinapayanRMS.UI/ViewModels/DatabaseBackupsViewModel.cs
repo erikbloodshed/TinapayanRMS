@@ -82,6 +82,9 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
     /// <summary>Why the last automatic copy didn't go through, in amber under the folder; null when it did.</summary>
     public string? CopyProblemText => _automatic?.LastCopyProblem;
 
+    /// <summary>Why the last automatic backup wasn't taken, in amber under the backups folder; null when it was.</summary>
+    public string? BackupProblemText => _automatic?.LastBackupProblem;
+
     /// <summary>Output: the folder to copy automatic backups to, or null when cancelled. The View shows a folder dialog.</summary>
     public Interaction<RxVoid, string?> ChooseCopyFolder { get; } = new();
 
@@ -115,7 +118,7 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
                     await WhileBusyAsync("Copying…", () => Task.Run(() => _automatic.CopyAsync(newest, CancellationToken.None)));
                 }
 
-                RaiseCopyFolderChanged();
+                RaiseAutomaticBackupsChanged();
                 SuccessMessage = CopyProblemText is null
                     ? $"Each automatic backup is copied to {folder} too{(newest is null ? "." : ", starting with the newest.")}"
                     : null;
@@ -125,7 +128,7 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
             () =>
             {
                 _automatic!.CopyFolder = null;
-                RaiseCopyFolderChanged();
+                RaiseAutomaticBackupsChanged();
             },
             Observable.Return(automatic is not null));
 
@@ -135,7 +138,7 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
         LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
             await RefreshAsync(SelectedBackup?.Backup.Path);
-            RaiseCopyFolderChanged();
+            RaiseAutomaticBackupsChanged();
         }));
 
         BackUpNowCommand = ReactiveCommand.CreateFromTask(
@@ -271,9 +274,10 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
         }
     }
 
-    private void RaiseCopyFolderChanged()
+    private void RaiseAutomaticBackupsChanged()
     {
         this.RaisePropertyChanged(nameof(CopyFolderText));
         this.RaisePropertyChanged(nameof(CopyProblemText));
+        this.RaisePropertyChanged(nameof(BackupProblemText));
     }
 }

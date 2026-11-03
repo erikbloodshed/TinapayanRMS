@@ -32,6 +32,9 @@ public sealed partial class App : Application
     /// <summary>The height of every text box and button, in device-independent pixels.</summary>
     private const double ControlHeight = 24;
 
+    /// <summary>Where the log is written, beside the app.</summary>
+    private static readonly string LogFolder = Path.Combine(AppContext.BaseDirectory, "logs");
+
     private IHost? _host;
 
     private readonly UnhandledErrorGuard _errorGuard = new();
@@ -53,7 +56,7 @@ public sealed partial class App : Application
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .WriteTo.File(
-                Path.Combine(AppContext.BaseDirectory, "logs", "tinapayanrms-.log"),
+                Path.Combine(LogFolder, "tinapayanrms-.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 31,
                 formatProvider: CultureInfo.InvariantCulture)
@@ -223,6 +226,24 @@ public sealed partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
+        // Until the main window shows there's nothing to carry on in, so a failure says why and closes the app.
+        if (!AppStartup.TryStart(() => ShowMainWindow(e.Args), LogFolder, Log.Logger, message => ShowError(message, MessageBoxImage.Error), Shutdown))
+        {
+            return;
+        }
+
+        _ = WarnOfPendingMigrationsAsync(_host!.Services.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>());
+        // The day's automatic backup now, and checked again every hour, so a copy left open over midnight takes the next day's.
+        var automaticBackups = _host.Services.GetRequiredService<AutomaticBackups>();
+        _ = BackUpDailyAsync(automaticBackups);
+        _backupTimer = new DispatcherTimer { Interval = AutomaticBackups.CheckEvery };
+        _backupTimer.Tick += (_, _) => _ = BackUpDailyAsync(automaticBackups);
+        _backupTimer.Start();
+    }
+
+    /// <summary>The theme, the host and the main window: everything the app needs before there's a window to show a failure in.</summary>
+    private void ShowMainWindow(string[] args)
+    {
         // Re-colors the theme's primary accent (buttons, grid selection, tab/drawer
         // indicators, focus rings) to the app's Catppuccin Latte Sky, with text on it in Sky's Ink
         // (white on Sky is only 2.8:1; see Themes/Palette.xaml). PrimaryBackground's setter
@@ -237,7 +258,7 @@ public sealed partial class App : Application
             "Windows11Light",
             ThemeSettings(new SolidColorBrush((Color)Resources["LatteSkyColor"]), new SolidColorBrush((Color)Resources["LatteSkyInkColor"])));
 
-        _host = CompositionRoot.CreateHostBuilder(e.Args).Build();
+        _host = CompositionRoot.CreateHostBuilder(args).Build();
         _host.Start();
 
         // On if this Windows user turned them on in Settings' Keyboard tab.
@@ -246,14 +267,6 @@ public sealed partial class App : Application
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         SfSkinManager.SetTheme(mainWindow, new Theme("Windows11Light"));
         mainWindow.Show();
-
-        _ = WarnOfPendingMigrationsAsync(_host.Services.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>());
-        // The day's automatic backup now, and checked again every hour, so a copy left open over midnight takes the next day's.
-        var automaticBackups = _host.Services.GetRequiredService<AutomaticBackups>();
-        _ = BackUpDailyAsync(automaticBackups);
-        _backupTimer = new DispatcherTimer { Interval = AutomaticBackups.CheckEvery };
-        _backupTimer.Tick += (_, _) => _ = BackUpDailyAsync(automaticBackups);
-        _backupTimer.Start();
     }
 
     // Checks every hour whether the day's automatic backup is due (OnStartup).
@@ -261,14 +274,25 @@ public sealed partial class App : Application
 
     /// <summary>
     /// The day's automatic backup, the first time the app starts each day (Settings → Database), off the UI thread once
-    /// the window shows, so the app starts no later. It says nothing on screen: a backup that couldn't be taken is logged,
-    /// and the next start tries again, since none was taken that day.
+    /// the window shows, so the app starts no later. A backup that couldn't be taken is logged and shown on the Database
+    /// tab, and the next check tries again, since none was taken that day. It only interrupts when they've been failing
+    /// long enough for the newest backup to have got old (AutomaticBackups.OverdueWarningAsync).
     /// </summary>
-    private static async Task BackUpDailyAsync(AutomaticBackups backups)
+    private async Task BackUpDailyAsync(AutomaticBackups backups)
     {
         try
         {
-            await Task.Run(() => backups.RunAsync(DateTime.Now, CancellationToken.None));
+            var warning = await Task.Run(async () =>
+            {
+                var now = DateTime.Now;
+                await backups.RunAsync(now, CancellationToken.None);
+                return await backups.OverdueWarningAsync(now, CancellationToken.None);
+            });
+
+            if (warning is not null)
+            {
+                ShowError(warning, MessageBoxImage.Warning);
+            }
         }
         catch (Exception ex)
         {
