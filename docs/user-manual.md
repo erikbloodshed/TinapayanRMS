@@ -1348,6 +1348,18 @@ A figure has more digits than the app keeps, for example a price typed with too 
 **A message says something went wrong, and that the app is still running.**
 Something happened that the app didn't expect. It's in the log file, which helps whoever looks after the app. If anything on the screen looks wrong afterwards, save what you can, then close the app and open it again. If such messages keep coming, the app closes by itself.
 
+**Opening the app brings up the window that's already open, not a new one.**
+Only one copy of TinapayanRMS opens at a time, because a save in one copy could overwrite what was saved in the other, with neither saying so. This doesn't stop another Windows user on the same PC, or another PC using the same database, so take care not to work on the same thing at the same time.
+
+**"TinapayanRMS is already open, but it isn't answering."**
+The copy that's open has stopped responding, or is busy with something long. Give it a moment. If its window doesn't come back, end it in Task Manager, then open the app again. Anything it hadn't saved is lost.
+
+**"TinapayanRMS is already open, in a way this copy can't reach."**
+It was started as an administrator, or under another Windows user. Use that window, or close it, then open the app again.
+
+**"TinapayanRMS is already open from another folder."**
+There's more than one copy of the app on this PC, and it's the other one that's open. Press **OK** and that one comes to the front. To use the one you just started, close that one first.
+
 **"That name is already in use."** or **"That abbreviation is already in use."**
 Names must be unique within each list: raw materials, sub-assemblies, products, categories, roles and units. A unit's abbreviation must be unique too. Upper and lower case count as the same. Spaces at the start or end of a name don't count either: they're taken off when it's saved.
 

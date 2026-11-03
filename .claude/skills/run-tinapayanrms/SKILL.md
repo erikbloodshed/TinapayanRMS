@@ -76,6 +76,9 @@ dotnet test --solution TinapayanRMS.slnx
 
 ## Gotchas
 
+- **Only one copy runs.** A second start brings the open copy to the front and exits, so with the user's published copy
+  open, a new build never starts, and `launch` drives the old one: check `Get-Process TinapayanRMS.UI | Select Id,Path`.
+  From another folder it shows a message first, which waits for an answer that only `screen` can see.
 - **The tests never load a view.** A wrong `{Binding}` path fails silently at runtime (a blank field, a dead button), so
   a ViewModel or XAML change is only checked once a shot shows the field filled.
 - **Popups aren't in a window shot.** `shot` uses PrintWindow on MainWindow, which leaves out drop-downs

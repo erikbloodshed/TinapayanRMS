@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +39,9 @@ public sealed partial class App : Application
     private IHost? _host;
 
     private readonly UnhandledErrorGuard _errorGuard = new();
+
+    // Keeps the app to this copy, from before the window shows until the log is closed.
+    private readonly SingleInstanceGuard _singleInstance = new(SingleInstanceGuard.AppName);
 
     // Set while an unhandled exception's message is up, so another arriving meanwhile is only logged.
     private bool _isShowingError;
@@ -226,11 +230,20 @@ public sealed partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
+        if (!ClaimApp())
+        {
+            Shutdown();
+            return;
+        }
+
         // Until the main window shows there's nothing to carry on in, so a failure says why and closes the app.
         if (!AppStartup.TryStart(() => ShowMainWindow(e.Args), LogFolder, Log.Logger, message => ShowError(message, MessageBoxImage.Error), Shutdown))
         {
             return;
         }
+
+        // Only now: another copy started before this one's window showed has been waiting for it to come up.
+        _singleInstance.Listen(() => Dispatcher.InvokeAsync(BringToFront));
 
         _ = WarnOfPendingMigrationsAsync(_host!.Services.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>());
         // The day's automatic backup now, and checked again every hour, so a copy left open over midnight takes the next day's.
@@ -239,6 +252,44 @@ public sealed partial class App : Application
         _backupTimer = new DispatcherTimer { Interval = AutomaticBackups.CheckEvery };
         _backupTimer.Tick += (_, _) => _ = BackUpDailyAsync(automaticBackups);
         _backupTimer.Start();
+    }
+
+    /// <summary>
+    /// Whether this is the copy that's open. It isn't when another has the app, which is asked to come to the front instead
+    /// (SingleInstanceGuard): this copy then has nothing to do but close, and it hasn't logged or started anything by then.
+    /// </summary>
+    private bool ClaimApp()
+    {
+        if (_singleInstance.TryClaim())
+        {
+            return true;
+        }
+
+        if (SingleInstanceGuard.OpenCopyElsewhere() is { } elsewhere)
+        {
+            ShowError(SingleInstanceGuard.ElsewhereText(elsewhere), MessageBoxImage.Information);
+        }
+
+        var outcome = _singleInstance.AskOpenCopyToComeForward(SingleInstanceGuard.Patience);
+        if (SingleInstanceGuard.TextOf(outcome) is { } text)
+        {
+            ShowError(text, MessageBoxImage.Warning);
+        }
+
+        return outcome == SingleInstanceOutcome.Claimed;
+    }
+
+    /// <summary>
+    /// What another copy asks for as it closes. With the window gone, this one is on its way out, so it isn't answered for,
+    /// and the copy that asked gets the app once this one has closed.
+    /// </summary>
+    private void BringToFront()
+    {
+        if (MainWindow is { IsVisible: true } window)
+        {
+            SingleInstanceGuard.BringToFront(new WindowInteropHelper(window).Handle);
+            _singleInstance.CameForward();
+        }
     }
 
     /// <summary>The theme, the host and the main window: everything the app needs before there's a window to show a failure in.</summary>
@@ -302,7 +353,8 @@ public sealed partial class App : Application
 
     /// <summary>
     /// Says <paramref name="message"/>, then closes the app and starts it again: after a restore, which replaces everything
-    /// every screen holds. The new copy starts once this one has finished closing (OnExit), with its log written and closed.
+    /// every screen holds. The new copy starts once this one has finished closing (OnExit), with its log written and closed
+    /// and the app let go, or it would find this one still open and close again.
     /// </summary>
     public void RestartAfterExit(string message)
     {
@@ -372,6 +424,7 @@ public sealed partial class App : Application
         _host?.Dispose();
         Log.CloseAndFlush();
         base.OnExit(e);
+        _singleInstance.Dispose();
 
         if (_restartOnExit && Environment.ProcessPath is { } path)
         {
