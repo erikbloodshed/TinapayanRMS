@@ -36,6 +36,7 @@
     <ProjectReference Include="..\TinapayanRMS.Domain\TinapayanRMS.Domain.csproj" />
     <ProjectReference Include="..\TinapayanRMS.ApplicationCore\TinapayanRMS.ApplicationCore.csproj" />
     <ProjectReference Include="..\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.Pricing\TinapayanRMS.Pricing.csproj" />
   </ItemGroup>
 
   <ItemGroup>

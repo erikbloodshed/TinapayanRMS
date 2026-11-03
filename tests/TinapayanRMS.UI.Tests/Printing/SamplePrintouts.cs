@@ -1,3 +1,4 @@
+using TinapayanRMS.Pricing;
 using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Tests.Printing;

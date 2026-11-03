@@ -2,8 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 using TinapayanRMS.RecipeApi.Contracts;
-using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.RecipeApi.Endpoints;
 

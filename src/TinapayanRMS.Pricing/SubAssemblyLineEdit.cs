@@ -2,7 +2,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing;
 
 /// <summary>One ingredient line of a sub-assembly, saved or not: grams of an ingredient, costed at its buffered (or true) cost per gram.</summary>
 public sealed class SubAssemblyLineEdit(RawMaterial ingredient, decimal grams, bool isFormulaBase = false, decimal? authoredBakersPercent = null)

@@ -1,6 +1,8 @@
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.UI.ViewModels;
 
@@ -57,8 +59,8 @@ public static class MarginErosionAnalysis
             rows.Add(new MarginErosionRow(
                 saved.Product.Id,
                 saved.Product.Name,
-                ProductFolderNode.StageTitle(saved.Product.Stage),
-                saved.Product.Category?.Name ?? ProductFolderNode.UncategorizedTitle,
+                ProductRules.StageTitle(saved.Product.Stage),
+                saved.Product.Category?.Name ?? ProductRules.UncategorizedTitle,
                 version.Number,
                 version.SavedAt,
                 then.BaseCost,

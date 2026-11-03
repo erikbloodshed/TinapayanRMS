@@ -148,10 +148,7 @@ public sealed class ProductComponentRow : ReactiveObject
     }
 
     /// <summary>What the Costing tab and the printout call the line: "Ensaymada × 6".</summary>
-    public string LineName => LineNameFor(Product?.Name ?? string.Empty, Quantity ?? 0);
-
-    /// <summary>"Ensaymada × 6": a product in a composite, and how many of it go in.</summary>
-    public static string LineNameFor(string productName, int quantity) => $"{productName} × {quantity}";
+    public string LineName => CompositeProductRules.LineName(Product?.Name ?? string.Empty, Quantity ?? 0);
 
     /// <summary>Nothing typed into it: the grid's add row left as it was, which isn't a line at all.</summary>
     private bool IsBlank => ComponentProductId is null && Quantity is null or 0;

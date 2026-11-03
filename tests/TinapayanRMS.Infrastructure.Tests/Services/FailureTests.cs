@@ -8,10 +8,9 @@ using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
-using TinapayanRMS.UI.Tests.Fixtures;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Infrastructure.Tests.Fixtures;
 
-namespace TinapayanRMS.UI.Tests.ViewModels;
+namespace TinapayanRMS.Infrastructure.Tests.Services;
 
 /// <summary>
 /// What a screen's error notice says for each kind of failure, from real database errors (2026-10-03). Until then every

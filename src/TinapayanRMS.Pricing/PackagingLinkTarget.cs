@@ -1,7 +1,7 @@
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing;
 
 /// <summary>
 /// What a product's per-piece packaging links: a standalone packaging set from the Sub-Assemblies screen

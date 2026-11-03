@@ -3,9 +3,10 @@
     Installs the Recipe API on this PC for the Windows user running it, or updates the copy already installed.
 
 .DESCRIPTION
-    Publishes TinapayanRMS.RecipeApi (Release) to a folder of the user's own, gives it a key if it has none, puts a
-    "TinapayanRMS Recipe API" shortcut in the Startup folder, which starts it hidden at sign-in, and starts it now. It's
-    what lets TinapayanBMS, on this PC or another one on the LAN, read the recipes.
+    Publishes TinapayanRMS.RecipeApi (Release), copies it to a folder of the user's own, gives it a key if it has none, puts
+    a "TinapayanRMS Recipe API" shortcut in the Startup folder, which starts it hidden at sign-in, and starts it now. It's
+    what lets TinapayanBMS, on this PC or another one on the LAN, read the recipes. Whatever an earlier version left in that
+    folder goes, apart from its recipeapi.json and its logs.
 
     The API runs as the signed-in Windows user, not as a Windows service: PostgreSQL is reached with the password in that
     user's %APPDATA%\postgresql\pgpass.conf. It reads the database in appsettings.json (the app's own) through a read-only
@@ -79,6 +80,16 @@ if (Test-Path -LiteralPath $settingsFile) {
     }
 }
 
+# Published to a folder of its own first, so a build that fails leaves the copy that's running alone.
+$published = Join-Path ([IO.Path]::GetTempPath()) "TinapayanRMS.RecipeApi.$([Guid]::NewGuid().ToString('N'))"
+Write-Host 'Publishing...'
+dotnet publish $project --configuration Release --output $published --nologo
+if ($LASTEXITCODE -ne 0) {
+    $failedWith = $LASTEXITCODE
+    Remove-Item -LiteralPath $published -Recurse -Force -ErrorAction SilentlyContinue
+    throw "dotnet publish failed with exit code $failedWith."
+}
+
 # The files of a running copy are locked: stop it first. Only the copy in the install folder, not one run from source.
 $running = Get-Process -Name 'TinapayanRMS.RecipeApi' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
 if ($running) {
@@ -87,18 +98,21 @@ if ($running) {
     $running | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue
 }
 
-Write-Host "Publishing to $InstallFolder ..."
-dotnet publish $project --configuration Release --output $InstallFolder --nologo
-$published = $LASTEXITCODE
+# The folder is made to hold what was published and no more: publishing straight into it never takes away what an earlier
+# version needed and this one doesn't (2026-11-04: 67 MB of WPF and Syncfusion, once the API stopped using them). What's
+# installed of recipeapi.json is left as it is, with its key, and so is the logs folder.
+Write-Host "Copying to $InstallFolder ..."
+& robocopy $published $InstallFolder /MIR /XD logs /XF recipeapi.json /NFL /NDL /NJH /NJS /NP | Out-Null
+$copied = $LASTEXITCODE
+if ($copied -ge 8) {
+    Remove-Item -LiteralPath $published -Recurse -Force -ErrorAction SilentlyContinue
+    throw "Copying to $InstallFolder failed (robocopy's exit code $copied). If it's in use, close what has it open and run this again."
+}
 
-# Publishing can put the repo's recipeapi.json, which has no key, over the installed one. The key goes back even if
-# publishing then failed, or the next install would make a new one and every app would have to be given it again.
-if ($key) {
-    Set-ApiKey $key
+if (-not (Test-Path -LiteralPath $settingsFile)) {
+    Copy-Item -LiteralPath (Join-Path $published 'recipeapi.json') -Destination $settingsFile
 }
-if ($published -ne 0) {
-    throw "dotnet publish failed with exit code $published."
-}
+Remove-Item -LiteralPath $published -Recurse -Force
 
 $isNewKey = -not $key
 if ($isNewKey) {

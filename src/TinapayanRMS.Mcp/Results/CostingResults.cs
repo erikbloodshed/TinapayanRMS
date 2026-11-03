@@ -1,6 +1,7 @@
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Mcp.Results;
 
@@ -24,7 +25,7 @@ public sealed record ProductListing(
     public static ProductListing From(SavedProduct saved) => new(
         saved.Product.Name,
         CategoryOf(saved.Product),
-        ProductFolderNode.StageTitle(saved.Product.Stage),
+        ProductRules.StageTitle(saved.Product.Stage),
         saved.Product.IsComposite,
         saved.Product.QuantityRequired,
         saved.Costs.BaseCost,
@@ -34,7 +35,7 @@ public sealed record ProductListing(
         saved.Costs.CurrentMarkupPercent,
         saved.Costs.IsBelowTargetMarkup);
 
-    internal static string CategoryOf(Product product) => product.Category?.Name ?? ProductFolderNode.UncategorizedTitle;
+    internal static string CategoryOf(Product product) => product.Category?.Name ?? ProductRules.UncategorizedTitle;
 }
 
 /// <summary>A product as the Products screen shows it once opened: its recipe, packaging and costing.</summary>
@@ -54,7 +55,7 @@ public sealed record ProductCostSheet(
     public static ProductCostSheet From(SavedProduct saved) => new(
         saved.Product.Name,
         ProductListing.CategoryOf(saved.Product),
-        ProductFolderNode.StageTitle(saved.Product.Stage),
+        ProductRules.StageTitle(saved.Product.Stage),
         saved.Product.IsComposite,
         saved.Product.QuantityRequired,
         saved.CostBasis.ToString(),

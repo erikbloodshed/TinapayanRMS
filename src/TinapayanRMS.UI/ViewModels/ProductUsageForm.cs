@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using ReactiveUI;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.UI.ViewModels;
 

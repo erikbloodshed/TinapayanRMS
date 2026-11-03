@@ -1,4 +1,4 @@
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing;
 
 /// <summary>
 /// One sub-assembly's part of the Costing Summary's Sub-assemblies row: what it costs in one sellable unit,

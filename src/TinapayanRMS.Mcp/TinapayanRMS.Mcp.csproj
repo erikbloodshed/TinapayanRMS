@@ -1,12 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- A Model Context Protocol server over stdio, for AI coding tools: reads and prices the dev database's products with
-       the app's own code, and never writes (Program). It references the UI project because the pricing lives there
-       (SavedProductReader, the Price Simulator's SimulatedPriceChange), so its figures are the screens'. -->
+       the app's own code, and never writes (Program). It prices with TinapayanRMS.Pricing (SavedProductReader, the Price
+       Simulator's SimulatedPriceChange), so its figures are the screens', and has nothing of the UI. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
-    <UseWPF>true</UseWPF>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,7 +12,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TinapayanRMS.UI\TinapayanRMS.UI.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.Pricing\TinapayanRMS.Pricing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The app's own, so it reads the database the app saves to. -->
+    <Content Include="..\TinapayanRMS.UI\appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

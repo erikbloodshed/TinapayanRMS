@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TinapayanRMS.Pricing\TinapayanRMS.Pricing.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.Tests.Common\TinapayanRMS.Tests.Common.csproj" />
+  </ItemGroup>
+
+</Project>

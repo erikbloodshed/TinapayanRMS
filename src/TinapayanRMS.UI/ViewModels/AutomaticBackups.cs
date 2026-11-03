@@ -1,6 +1,7 @@
 using System.IO;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Infrastructure.Services;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI.ViewModels;

@@ -4,6 +4,7 @@ using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.UI.ViewModels;
 

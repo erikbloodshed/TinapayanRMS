@@ -1,7 +1,7 @@
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing;
 
 /// <summary>
 /// What a purchased material is bought in, as the Price Simulator and Production Plan screens talk about it: the unit of the

@@ -2,6 +2,7 @@ using System.Globalization;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.UI.ViewModels;
 

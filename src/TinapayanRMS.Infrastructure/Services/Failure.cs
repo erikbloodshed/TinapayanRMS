@@ -2,9 +2,8 @@ using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using TinapayanRMS.ApplicationCore.Rules;
-using TinapayanRMS.Infrastructure.Services;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Infrastructure.Services;
 
 /// <summary>
 /// What a screen tells the user when something failed, and how it's logged (2026-10-03). A rule's refusal is shown in its

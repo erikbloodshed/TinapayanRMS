@@ -7,6 +7,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Pricing;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.UI.Tests.Fixtures;
 using TinapayanRMS.UI.ViewModels;

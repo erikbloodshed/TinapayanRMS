@@ -7,16 +7,18 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Serilog;
 using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.Pricing;
 using TinapayanRMS.RecipeApi.Contracts;
 using TinapayanRMS.RecipeApi.Endpoints;
-using TinapayanRMS.UI.ViewModels;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.RecipeApi;
 
 /// <summary>
-/// Puts the Recipe API's web server on the app's host. Kestrel listens where recipeapi.json's Kestrel section says
+/// Puts the Recipe API's web server on a host with the app's database (DatabaseHost). Kestrel listens where recipeapi.json's Kestrel section says
 /// (every address, port 5290, so another PC on the LAN can reach it). With RecipeApi:Key set, as the installer sets it, every
 /// request must carry it in an X-Api-Key header. With none set, only this PC is answered, so a copy run without a key isn't
 /// open to the LAN (2026-11-03: it used to answer anyone who could reach the port, with every cost and price). What goes
@@ -38,7 +40,12 @@ public static class RecipeApiHost
             .ConfigureWebHost(web =>
             {
                 web.UseKestrel((context, kestrel) => kestrel.Configure(context.Configuration.GetSection("Kestrel")));
-                web.ConfigureServices(services => services.AddRouting());
+                web.ConfigureServices(services =>
+                {
+                    services.AddRouting();
+                    services.AddSingleton<SavedProductReader>();
+                    services.AddSingleton(Log.Logger);
+                });
                 web.Configure((context, app) =>
                 {
                     var key = context.Configuration["RecipeApi:Key"];

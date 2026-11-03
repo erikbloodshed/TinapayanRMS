@@ -1,6 +1,7 @@
 using System.Globalization;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.UI.ViewModels;
 
@@ -11,7 +12,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// </summary>
 /// <param name="ProductName">The header's title: the product's name, or "New product" for one not named yet.</param>
 /// <param name="CategoryName">Its category, or "Uncategorized".</param>
-/// <param name="StageTitle">"Production" or "Research and Development" (ProductFolderNode.StageTitle).</param>
+/// <param name="StageTitle">"Production" or "Research and Development" (ProductRules.StageTitle).</param>
 /// <param name="CostUnitCaption">What the costing is for: "Per piece", or "Per unit of 8 pieces".</param>
 /// <param name="LastUpdatedText">When it was last saved, "Sep 14, 2026, 6:27 PM", or "—".</param>
 /// <param name="SaveNote"><see cref="NotSavedNote"/>, <see cref="UnsavedChangesNote"/>, or null when it's the product as saved.</param>
@@ -270,3 +271,33 @@ public sealed record PrintedPriceChange(string Material, string? Per, decimal? C
 /// </summary>
 /// <param name="Changes">The changes reaching the product, through its own ingredients and packaging or the products it holds; none when no change does.</param>
 public sealed record PrintedSimulation(ProductCostSummary Now, IReadOnlyList<PrintedPriceChange> Changes);
+
+/// <summary>What Print puts on paper for a saved product.</summary>
+public static class SavedProductPrintout
+{
+    /// <summary>The product as saved, so with no save note.</summary>
+    public static ProductPrintout ToPrintout(this SavedProduct saved, DateTime printedAt) => new(
+        saved.Product.Name,
+        saved.Product.Category?.Name ?? ProductRules.UncategorizedTitle,
+        ProductRules.StageTitle(saved.Product.Stage),
+        ProductPrintout.CostUnitCaptionFor(saved.Product.QuantityRequired, saved.Product.IsComposite),
+        ProductPrintout.LastUpdatedTextFor(saved.Product.UpdatedAt),
+        null,
+        printedAt,
+        [.. saved.Sections.Select(s => PrintedSection.From(s, saved.CostBasis))],
+        saved.HasPackaging ? PrintedPackaging.From(saved.PackagingLines, saved.PackagingLinkedTo) : null,
+        saved.Costs,
+        saved.Product.IsComposite
+            ? [.. saved.Components.Select(c => saved.Product.IncludesComponentPackaging
+                ? new PrintedComponent(
+                    c.Component.ComponentProduct!.Name,
+                    c.Component.Quantity,
+                    c.RecipeCostAt(saved.CostBasis),
+                    c.CostAt(saved.CostBasis) + c.PackagingCostAt(saved.CostBasis),
+                    c.Costs.PackagingAt(saved.CostBasis))
+                : new PrintedComponent(c.Component.ComponentProduct!.Name, c.Component.Quantity, c.RecipeCostAt(saved.CostBasis), c.CostAt(saved.CostBasis)))]
+            : null)
+    {
+        CostBasis = saved.CostBasis,
+    };
+}

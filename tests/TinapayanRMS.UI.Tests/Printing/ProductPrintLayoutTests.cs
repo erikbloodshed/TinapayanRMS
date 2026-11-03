@@ -5,6 +5,7 @@ using System.Windows.Documents;
 using AwesomeAssertions;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 using TinapayanRMS.UI.Printing;
 using TinapayanRMS.UI.Tests.Fixtures;
 using TinapayanRMS.UI.ViewModels;

@@ -1,9 +1,8 @@
 using AwesomeAssertions;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.UI.ViewModels;
 
-namespace TinapayanRMS.UI.Tests.ViewModels;
+namespace TinapayanRMS.Pricing.Tests;
 
 /// <summary>
 /// The row behind every packaging table: a quantity typed in the material's base unit or in one of its alternative
@@ -11,8 +10,6 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// </summary>
 public class PackagingLineRowTests
 {
-    public PackagingLineRowTests() => ReactiveUIBootstrapper.EnsureInitialized();
-
     /// <summary>
     /// One such row used to throw on every read, and every read of all the products failed with it (Reports, Print, the
     /// Recipe API). The database refuses one now (CK_PackagingLines_AuthoredQuantity), so this is only ever an edit from

@@ -2,10 +2,10 @@ using System.Globalization;
 using System.IO;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using TinapayanRMS.Infrastructure;
 using TinapayanRMS.RecipeApi;
-using TinapayanRMS.UI;
 
-// The app's own host (CompositionRoot), so every repository and reader is registered as the screens' are, with the
+// The host the app starts from too (DatabaseHost), so every repository is registered as the screens' are, with the
 // Recipe API's web server on top. Its database connection is read-only (ReadOnlyConnection), so PostgreSQL itself
 // refuses a write. It logs to a file beside it, as the app does.
 Log.Logger = new LoggerConfiguration()
@@ -18,7 +18,7 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
-    await CompositionRoot.CreateHostBuilder(args)
+    await DatabaseHost.CreateBuilder()
         .AddRecipeApi()
         .ConfigureAppConfiguration(ReadOnlyConnection.Apply)
         .UseSerilog()

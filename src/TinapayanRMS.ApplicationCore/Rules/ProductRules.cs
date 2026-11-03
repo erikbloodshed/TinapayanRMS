@@ -4,6 +4,12 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 
 public static class ProductRules
 {
+    /// <summary>What a product with no category is filed under: its folder in the list, and its category on a report or a printout.</summary>
+    public const string UncategorizedTitle = "Uncategorized";
+
+    /// <summary>What a stage is called: "Production" or "Research and Development".</summary>
+    public static string StageTitle(ProductStage stage) => stage == ProductStage.Production ? "Production" : "Research and Development";
+
     /// <summary>
     /// How a product is named where it's in the way of something (a refusal, a Used By tile): "Cheese Roll (deleted)" for
     /// one in the Deleted folder, which still holds what it uses until it's deleted permanently.

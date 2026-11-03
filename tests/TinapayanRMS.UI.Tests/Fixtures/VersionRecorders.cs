@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Pricing;
 using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Tests.Fixtures;

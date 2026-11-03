@@ -1,11 +1,9 @@
-using System.Reactive.Linq;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing;
 
 /// <summary>
 /// One sub-assembly in the product's recipe, saved or not: a section of the Recipe Structure, called by its
@@ -15,7 +13,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// Sub-Assemblies screen, at the product's own piece size). Its batch totals come from its lines, so they follow its
 /// ingredients' costs.
 /// </summary>
-public sealed class ProductUsageEdit : ReactiveObject
+public sealed class ProductUsageEdit : ObservableRow
 {
     /// <summary>
     /// Sections show in role order (SubAssemblyRole.SortOrder); several in one role, in the order they were saved,
@@ -352,28 +350,6 @@ public sealed class ProductUsageEdit : ReactiveObject
         decimal authoredValue,
         IReadOnlyList<SubAssemblyLineEdit> addIns) =>
         new(SubAssemblyId, Role, lines, authoredField, authoredValue, LinkedName, addIns, Name, savedLines: _savedLines, linkedOwner: LinkedOwner);
-
-    /// <summary>Whether <paramref name="other"/> shows the same thing: the same role and names, piece size, and lines and add-ins at the same costs.</summary>
-    public bool ShowsSameAs(ProductUsageEdit other) =>
-        SubAssemblyId == other.SubAssemblyId
-        && IsOwned == other.IsOwned
-        && IsReleasing == other.IsReleasing
-        && ToMadeIngredient == other.ToMadeIngredient
-        && CollectionMerge.HasSameValues(Role, other.Role)
-        && LinkedName == other.LinkedName
-        && LinkedOwner == other.LinkedOwner
-        && Name == other.Name
-        && AuthoredField == other.AuthoredField
-        && AuthoredValue == other.AuthoredValue
-        && AreLinkedLinesEdited == other.AreLinkedLinesEdited
-        && Lines.Count == other.Lines.Count
-        && Lines.Zip(other.Lines).All(pair =>
-            pair.First.Grams == pair.Second.Grams
-            && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
-            && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent
-            && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient))
-        && AddIns.Count == other.AddIns.Count
-        && AddIns.Zip(other.AddIns).All(pair => pair.First.Grams == pair.Second.Grams && CollectionMerge.HasSameValues(pair.First.Ingredient, pair.Second.Ingredient));
 
     /// <summary>Whether two sets of lines would save the same: the same ingredients, grams and base ticks, in the same order, whatever they cost.</summary>
     private static bool HaveSameRecipe(IReadOnlyList<SubAssemblyLineEdit> a, IReadOnlyList<SubAssemblyLineEdit> b) =>

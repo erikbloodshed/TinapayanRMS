@@ -14,9 +14,8 @@ using TinapayanRMS.Mcp.Results;
 using TinapayanRMS.Mcp.Serialization;
 using TinapayanRMS.Mcp.Tests.Fixtures;
 using TinapayanRMS.Mcp.Tools;
+using TinapayanRMS.Pricing;
 using TinapayanRMS.Tests.Common.Fixtures;
-using TinapayanRMS.UI;
-using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.Mcp.Tests.Tools;
 
@@ -209,7 +208,6 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
     /// <summary>The tools as the server makes them, on a read-only connection to the test database (ReadOnlyConnection).</summary>
     private CostingTools CreateTools()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = new SharedTransactionDbContextFactory(ReadOnlyConnection.Of(fixture.ConnectionString));
         var productRepository = new ProductRepository(factory);
         return new CostingTools(
@@ -229,7 +227,6 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
 
     private async Task<SavedProduct> ReadAsync(int productId)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
         var productRepository = new ProductRepository(factory);
         var reader = new SavedProductReader(

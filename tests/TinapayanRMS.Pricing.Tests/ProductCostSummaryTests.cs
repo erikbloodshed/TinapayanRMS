@@ -1,8 +1,6 @@
 using AwesomeAssertions;
-using TinapayanRMS.Domain.Entities;
-using TinapayanRMS.UI.ViewModels;
 
-namespace TinapayanRMS.UI.Tests.ViewModels;
+namespace TinapayanRMS.Pricing.Tests;
 
 public class ProductCostSummaryTests
 {
@@ -39,14 +37,6 @@ public class ProductCostSummaryTests
     }
 
     [Fact]
-    public void No_current_price_is_never_short_and_the_report_says_by_how_much_one_is()
-    {
+    public void No_current_price_is_never_short() =>
         new ProductCostSummary([("Dough", 20m)], 1, [], 0m, 0m, 0m, 30m, 0m, null).IsBelowTargetMarkup.Should().BeFalse();
-
-        var row = new ProductCostRow(new Product { Name = "Pandesal" }, new ProductCostSummary([("Dough", 20m)], 1, [], 0m, 0m, 0m, 30m, 0m, 25m));
-        row.TargetMarkupPercent.Should().Be(30m);
-        row.ShortOfTargetMarkup.Should().Be(5m, "25.00 on 20.00 earns 25%");
-        new ProductCostRow(new Product { Name = "Pandesal" }, new ProductCostSummary([("Dough", 20m)], 1, [], 0m, 0m, 0m, 30m, 0m, 27m))
-            .ShortOfTargetMarkup.Should().BeNull();
-    }
 }

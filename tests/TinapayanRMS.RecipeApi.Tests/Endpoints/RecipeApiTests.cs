@@ -15,16 +15,15 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.RecipeApi.Contracts;
 using TinapayanRMS.RecipeApi.Tests.Fixtures;
 using TinapayanRMS.Tests.Common.Fixtures;
-using TinapayanRMS.UI;
-using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.RecipeApi.Tests.Endpoints;
 
 /// <summary>
-/// The Recipe API against a real database, through the host Program builds (the app's CompositionRoot with the API on
+/// The Recipe API against a real database, through the host Program builds (DatabaseHost with the API on
 /// top and a read-only connection), served in memory: the mixes and their lines as saved, the ingredients, BOMs,
 /// materials and product recipes TinapayanBMS plans from, who it answers, what it says when something goes wrong, and no
 /// writes.
@@ -315,7 +314,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
     /// </summary>
     private async Task<IHost> StartAsync(string? key = null, string? connectionString = null, ICostingDefaultsRepository? costingDefaults = null)
     {
-        var host = CompositionRoot.CreateHostBuilder([])
+        var host = DatabaseHost.CreateBuilder()
             .AddRecipeApi(web => web.UseTestServer())
             .ConfigureAppConfiguration(config => config.AddInMemoryCollection(
             [

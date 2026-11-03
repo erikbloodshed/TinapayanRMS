@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using Syncfusion.SfSkinManager;
 using Syncfusion.UI.Xaml.Grid;
+using TinapayanRMS.Pricing;
 using TinapayanRMS.UI.Exporting;
 using TinapayanRMS.UI.ViewModels;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
