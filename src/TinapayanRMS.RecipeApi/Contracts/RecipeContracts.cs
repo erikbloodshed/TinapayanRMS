@@ -27,7 +27,7 @@ public sealed record IngredientInfo(
     int? SubAssemblyId);
 
 /// <summary>
-/// One line of a made ingredient's bill of materials (2026-10-31, for TinapayanPreweigh's planning). /boms gives each
+/// One line of a made ingredient's bill of materials (2026-10-31, for TinapayanBMS's planning). /boms gives each
 /// made ingredient's lines in its BOM's order: the lines of the sub-assembly it's made from, then its own add-ins.
 /// </summary>
 public sealed record BomLineInfo(int IngredientId, int ComponentIngredientId, decimal Grams, bool IsAddIn);
@@ -54,12 +54,12 @@ public sealed record MixDetail(MixInfo Mix, IReadOnlyList<MixLine> Lines);
 public sealed record MixLine(int IngredientId, string Ingredient, decimal Grams, bool IsFormulaBase);
 
 /// <summary>
-/// What a product is made of, as the Production Plan reads it (2026-10-31, for TinapayanPreweigh's planning): a
+/// What a product is made of, as the Production Plan reads it (2026-10-31, for TinapayanBMS's planning): a
 /// composite's products, or its sections in the recipe's order.
 /// </summary>
 /// <param name="QuantityRequired">How many pieces make one sellable unit.</param>
 /// <param name="WastagePercent">
-/// The Wastage % it's priced with, its category's or the shop-wide one: what TinapayanPreweigh's Production Results set
+/// The Wastage % it's priced with, its category's or the shop-wide one: what TinapayanBMS's Production Results set
 /// what fell short against.
 /// </param>
 /// <param name="PackagingPerUnit">Its packaging for one sellable unit, in each material's base unit (/materials).</param>
@@ -79,7 +79,7 @@ public sealed record ProductRecipeInfo(
 public sealed record PackagingPerUnitInfo(int MaterialId, decimal BaseQuantity);
 
 /// <summary>
-/// A product's price and cost for one sellable unit (2026-10-31, for TinapayanPreweigh's plan sales and profit).
+/// A product's price and cost for one sellable unit (2026-10-31, for TinapayanBMS's plan sales and profit).
 /// </summary>
 /// <param name="CurrentPrice">The price it sells at, with VAT; null when none is set, and its worked-out price stands in.</param>
 /// <param name="SellingPrice">The price its costing works out, with VAT.</param>
@@ -87,7 +87,7 @@ public sealed record PackagingPerUnitInfo(int MaterialId, decimal BaseQuantity);
 public sealed record ProductCostingInfo(decimal? CurrentPrice, decimal SellingPrice, decimal VatPercent, decimal BaseCost);
 
 /// <summary>
-/// A raw material, ingredient or packaging, as a purchase requisition needs it (2026-10-31, for TinapayanPreweigh): its base
+/// A raw material, ingredient or packaging, as a purchase requisition needs it (2026-10-31, for TinapayanBMS): its base
 /// unit and buffered cost, and what it's bought in at its cost brand's price.
 /// </summary>
 /// <param name="Type">Ingredient or Packaging.</param>

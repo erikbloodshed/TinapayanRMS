@@ -632,7 +632,7 @@ Below the header are the fields you fill in:
 - It stays on when you open another product, until you switch it off or close the app. The app always starts on buffered costs.
 - **Print** uses whichever costs the screen shows (see [Printing](#8-printing-recipes-and-costings)).
 
-Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage and category are all kept. Until you restore it, no picker, report, print or Price Simulator includes it, and TinapayanPreweigh's copy leaves it out.
+Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage and category are all kept. Until you restore it, no picker, report, print or Price Simulator includes it, and TinapayanBMS's copy leaves it out.
 
 - **Restore** (right-click it in the Deleted folder) puts it back in its folder and opens it. If its category was deleted in the meantime, it comes back in **Uncategorized**.
 - **Delete Permanently** asks first and can't be undone. The product's own sub-assemblies are deleted with it. Its linked sub-assemblies stay on the Sub-Assemblies screen. Deleting a composite product leaves the products it holds as they are.
@@ -848,7 +848,7 @@ While the Products screen shows unbuffered costs, everything printed, a single p
 
 Close the Print tab with its ✕.
 
-A production plan prints from TinapayanPreweigh's **Plan** tab: see [Production Plan](#11-production-plan). A report of what price changes would do prints from the **Price Simulator**: see [Printing a Price Simulator report](#printing-a-price-simulator-report).
+A production plan prints from TinapayanBMS's **Plan** tab: see [Production Plan](#11-production-plan). A report of what price changes would do prints from the **Price Simulator**: see [Printing a Price Simulator report](#printing-a-price-simulator-report).
 
 ### Printing a scaled recipe
 
@@ -942,7 +942,7 @@ How each product's markup at its **Current Price** has moved since a day you pic
 
 ### Production Results
 
-Production Results moved to TinapayanPreweigh's **Plan** tab on 2026-10-31, with the saved plans whose results it adds up (see [Production Plan](#11-production-plan)).
+Production Results moved to TinapayanBMS's **Plan** tab on 2026-10-31, with the saved plans whose results it adds up (see [Production Plan](#11-production-plan)).
 
 ### Exporting to Excel
 
@@ -1031,7 +1031,7 @@ The first page lists the **Price Changes** tried, then every product with its **
 
 ## 11. Production Plan
 
-Production planning moved to **TinapayanPreweigh**, the app that weighs ingredients out ahead of mixing, on 2026-10-31, and this screen was taken out of TinapayanRMS. Preweigh's **Plan** tab does everything it did: the plan of products and units, half batches and the day, the Mixing Sheet with Use the spare, the Purchase Requisition, the plan's sales and profit, saved plans, what was made and left over, Production Results, printing and Export to Excel. It works from a copy of this app's recipes, ingredients, prices and costs, which it brings up to date through the Recipe API (see [Share the recipes with TinapayanPreweigh](#share-the-recipes-with-tinapayanpreweigh)). Change a recipe or a price here, then press **Sync** in Preweigh.
+Production planning moved to **TinapayanBMS**, the app that weighs ingredients out ahead of mixing, on 2026-10-31, and this screen was taken out of TinapayanRMS. TinapayanBMS's **Plan** tab does everything it did: the plan of products and units, half batches and the day, the Mixing Sheet with Use the spare, the Purchase Requisition, the plan's sales and profit, saved plans, what was made and left over, Production Results, printing and Export to Excel. It works from a copy of this app's recipes, ingredients, prices and costs, which it brings up to date through the Recipe API (see [Share the recipes with TinapayanBMS](#share-the-recipes-with-tinapayanbms)). Change a recipe or a price here, then press **Sync** in TinapayanBMS.
 
 ## 12. How costs are worked out
 
@@ -1186,7 +1186,7 @@ Right-click it in the Products list and choose **Promote to Production**, or dra
 
 ### Plan a day's baking
 
-Plan it in TinapayanPreweigh's **Plan** tab: see [Production Plan](#11-production-plan).
+Plan it in TinapayanBMS's **Plan** tab: see [Production Plan](#11-production-plan).
 
 ### See what a price rise would do
 
@@ -1243,14 +1243,14 @@ Right-click the category's folder in the Products list and choose **Print Folder
 
 Or type the packaging straight into the pack product's Packaging tab, then press **Move to Sub-Assemblies** and Save. The set is made from those lines and linked for you.
 
-### Share the recipes with TinapayanPreweigh
+### Share the recipes with TinapayanBMS
 
-TinapayanPreweigh, the app for weighing ingredients out ahead of mixing, keeps a copy of TinapayanRMS's recipes, ingredients, prices and costs, and plans production from it. It copies them through the **Recipe API**, a small program that runs in the background on the PC that holds the TinapayanRMS database. The Recipe API only reads. It never changes a recipe, a price or anything else.
+TinapayanBMS, the app for weighing ingredients out ahead of mixing, keeps a copy of TinapayanRMS's recipes, ingredients, prices and costs, and plans production from it. It copies them through the **Recipe API**, a small program that runs in the background on the PC that holds the TinapayanRMS database. The Recipe API only reads. It never changes a recipe, a price or anything else.
 
 1. On the PC that holds the TinapayanRMS database, open PowerShell **as an administrator**, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Install-RecipeApi.ps1`. It installs the Recipe API, starts it, and starts it again each time you sign in to Windows. Running it as an administrator also lets the other PCs on the shop's network reach it.
-2. In TinapayanPreweigh's **Settings**, type the Recipe API's address. Use `http://localhost:5290` when Preweigh runs on the same PC, or `http://` and that PC's name or network address followed by `:5290` when it runs on another PC. Then press **Test connection**.
+2. In TinapayanBMS's **Settings**, type the Recipe API's address. Use `http://localhost:5290` when TinapayanBMS runs on the same PC, or `http://` and that PC's name or network address followed by `:5290` when it runs on another PC. Then press **Test connection**.
 
-The Recipe API runs only while someone is signed in to Windows on that PC. Preweigh keeps working from its own copy of the recipes while it isn't running; it just doesn't see changes made here until it can sync again. To remove the Recipe API, run `scripts\Uninstall-RecipeApi.ps1` the same way.
+The Recipe API runs only while someone is signed in to Windows on that PC. TinapayanBMS keeps working from its own copy of the recipes while it isn't running; it just doesn't see changes made here until it can sync again. To remove the Recipe API, run `scripts\Uninstall-RecipeApi.ps1` the same way.
 
 ---
 

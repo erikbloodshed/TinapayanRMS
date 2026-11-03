@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- A read-only HTTP API over the LAN for the shop's other apps (TinapayanPreweigh first): the mixes, ingredients,
+  <!-- A read-only HTTP API over the LAN for the shop's other apps (TinapayanBMS first): the mixes, ingredients,
        products and saved plans, and a production plan worked out with the app's own code (Program). It references the UI
        project because the plan's naming and the saved products' reading live there (ProductionPlanBuilder,
        SavedProductReader), so its figures are the Production Plan screen's. -->

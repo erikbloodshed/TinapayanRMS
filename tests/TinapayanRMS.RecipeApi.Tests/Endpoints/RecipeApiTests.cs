@@ -23,7 +23,7 @@ namespace TinapayanRMS.RecipeApi.Tests.Endpoints;
 /// <summary>
 /// The Recipe API against a real database, through the host Program builds (the app's CompositionRoot with the API on
 /// top and a read-only connection), served in memory: the mixes and their lines as saved, the ingredients, BOMs,
-/// materials and product recipes TinapayanPreweigh plans from, the key when one is set, and no writes.
+/// materials and product recipes TinapayanBMS plans from, the key when one is set, and no writes.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)

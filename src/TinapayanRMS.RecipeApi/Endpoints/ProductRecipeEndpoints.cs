@@ -8,7 +8,7 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.RecipeApi.Endpoints;
 
 /// <summary>
-/// Every product's recipe as the Production Plan reads it (2026-10-31): what TinapayanPreweigh plans from now that planning
+/// Every product's recipe as the Production Plan reads it (2026-10-31): what TinapayanBMS plans from now that planning
 /// moves there. The products are read as saved, as /plan reads them (SavedProductReader.ReadAllAsync), and given in the
 /// terms ProductionPlanBuilder.RecipeOf hands ProductionPlanRules, packaging left out.
 /// </summary>

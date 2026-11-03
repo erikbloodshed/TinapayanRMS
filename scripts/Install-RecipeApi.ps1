@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Publishes TinapayanRMS.RecipeApi (Release) to a folder of the user's own, puts a "TinapayanRMS Recipe API" shortcut in
-    the Startup folder, which starts it hidden at sign-in, and starts it now. It's what lets TinapayanPreweigh, on this PC
+    the Startup folder, which starts it hidden at sign-in, and starts it now. It's what lets TinapayanBMS, on this PC
     or another one on the LAN, read the recipes.
 
     The API runs as the signed-in Windows user, not as a Windows service: PostgreSQL is reached with the password in that
@@ -58,7 +58,7 @@ if (-not $NoStartup) {
     $shortcut.Arguments = "-NoProfile -WindowStyle Hidden -Command `"$start`""
     $shortcut.WorkingDirectory = $InstallFolder
     $shortcut.WindowStyle = 7
-    $shortcut.Description = 'Starts the TinapayanRMS Recipe API at sign-in, for TinapayanPreweigh.'
+    $shortcut.Description = 'Starts the TinapayanRMS Recipe API at sign-in, for TinapayanBMS.'
     $shortcut.Save()
     Write-Host "Starts at sign-in: $startup"
 }

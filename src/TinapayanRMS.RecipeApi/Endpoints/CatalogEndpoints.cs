@@ -22,7 +22,7 @@ public static class CatalogEndpoints
                     m.Id, m.Name, m.CategoryId, m.Category?.Name ?? string.Empty, m.Source.ToString(), m.WeightLossPercent, m.LinkedToId, m.WeightSharePercent, m.SubAssemblyId))
                 .ToList());
 
-        // Each made ingredient's lines in its BOM's order, which is how TinapayanPreweigh's planning opens them.
+        // Each made ingredient's lines in its BOM's order, which is how TinapayanBMS's planning opens them.
         api.MapGet("/boms", async (IIngredientBomLineRepository bomLines, CancellationToken cancellationToken) =>
             (await bomLines.GetAllAsync(cancellationToken))
                 .Select(l => new BomLineInfo(l.IngredientId, l.ComponentIngredientId, l.Grams, l.IsAddIn))
