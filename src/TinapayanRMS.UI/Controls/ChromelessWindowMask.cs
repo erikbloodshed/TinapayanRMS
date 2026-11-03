@@ -5,7 +5,7 @@ using Syncfusion.Windows.Shared;
 namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
-/// Takes ChromelessWindow's content mask off. Its Windows11 template (Syncfusion 34.2.9 to 35.1.42) masks the whole window with an
+/// Takes ChromelessWindow's content mask off. Its Windows11 template (Syncfusion 34.2.9 to 35.1.43) masks the whole window with an
 /// OpacityMask, a VisualBrush of an inner border (BorderMask), and ChromelessWindow applies it again whenever it updates
 /// the window region (SetBorderMask, from its WM_SIZE hook and its StateChanged handler). The mask only rounds the
 /// content's bottom corners to the window's CornerRadius. After a restore from the taskbar WPF can draw a frame before

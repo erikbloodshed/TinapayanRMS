@@ -8,7 +8,7 @@
     <!-- Microsoft.Extensions.* ships with the .NET runtime: keep it on the same release. -->
     <MicrosoftExtensionsVersion>11.0.0-rc.3.26522.148</MicrosoftExtensionsVersion>
     <!-- Every Syncfusion package must be on the same version: upgrade them together. -->
-    <SyncfusionVersion>35.1.42</SyncfusionVersion>
+    <SyncfusionVersion>35.1.43</SyncfusionVersion>
   </PropertyGroup>
   <ItemGroup Label="Application">
     <PackageVersion Include="Dapper" Version="2.1.89" />
@@ -19,8 +19,8 @@
     <PackageVersion Include="FluentValidation" Version="12.2.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EFCoreVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsVersion)" />
-    <!-- The official MCP C# SDK, for TinapayanRMS.Mcp. 2.3.0 was out under two weeks when this was added (2026-10-30). -->
-    <PackageVersion Include="ModelContextProtocol" Version="2.2.0" />
+    <!-- The official MCP C# SDK, for TinapayanRMS.Mcp. -->
+    <PackageVersion Include="ModelContextProtocol" Version="2.3.1" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="11.0.0-rc.3" />
     <PackageVersion Include="ReactiveUI.WPF" Version="26.0.1" />
     <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
