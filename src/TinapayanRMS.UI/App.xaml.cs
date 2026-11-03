@@ -10,7 +10,6 @@ using System.Windows.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using ReactiveUI;
 using Serilog;
 using Syncfusion.Licensing;
 using Syncfusion.SfSkinManager;
@@ -230,7 +229,7 @@ public sealed partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
-        if (!ClaimApp())
+        if (!_singleInstance.Claim(SingleInstanceGuard.Patience, SingleInstanceGuard.OpenCopyElsewhere, ShowError))
         {
             Shutdown();
             return;
@@ -252,31 +251,6 @@ public sealed partial class App : Application
         _backupTimer = new DispatcherTimer { Interval = AutomaticBackups.CheckEvery };
         _backupTimer.Tick += (_, _) => _ = BackUpDailyAsync(automaticBackups);
         _backupTimer.Start();
-    }
-
-    /// <summary>
-    /// Whether this is the copy that's open. It isn't when another has the app, which is asked to come to the front instead
-    /// (SingleInstanceGuard): this copy then has nothing to do but close, and it hasn't logged or started anything by then.
-    /// </summary>
-    private bool ClaimApp()
-    {
-        if (_singleInstance.TryClaim())
-        {
-            return true;
-        }
-
-        if (SingleInstanceGuard.OpenCopyElsewhere() is { } elsewhere)
-        {
-            ShowError(SingleInstanceGuard.ElsewhereText(elsewhere), MessageBoxImage.Information);
-        }
-
-        var outcome = _singleInstance.AskOpenCopyToComeForward(SingleInstanceGuard.Patience);
-        if (SingleInstanceGuard.TextOf(outcome) is { } text)
-        {
-            ShowError(text, MessageBoxImage.Warning);
-        }
-
-        return outcome == SingleInstanceOutcome.Claimed;
     }
 
     /// <summary>
@@ -392,12 +366,7 @@ public sealed partial class App : Application
         }
 
         Log.Warning("The database is missing {Count} migrations: {Migrations}", pending.Count, pending);
-        ShowError(
-            $"The database is out of date for this version of TinapayanRMS: {pending.Count} "
-            + $"{(pending.Count == 1 ? "update hasn't" : "updates haven't")} been applied to it, so some screens won't work."
-            + Environment.NewLine + Environment.NewLine
-            + "Close the app and apply them (dotnet ef database update), then open it again.",
-            MessageBoxImage.Warning);
+        ShowError(AppStartup.PendingMigrationsText(pending.Count), MessageBoxImage.Warning);
     }
 
     /// <summary>
@@ -434,13 +403,11 @@ public sealed partial class App : Application
 
     /// <summary>
     /// An exception nothing else caught on the UI thread: logged, said in a message, and the app carries on with whatever
-    /// hasn't been saved still there (UnhandledErrorGuard says when it shouldn't). A failure ReactiveUI was left holding
-    /// (a command's or an observable's) arrives wrapped in its UnhandledErrorException, and it's the cause inside that's
-    /// worth showing.
+    /// hasn't been saved still there (UnhandledErrorGuard says when it shouldn't, and what to say).
     /// </summary>
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        var exception = e.Exception is UnhandledErrorException { InnerException: { } inner } ? inner : e.Exception;
+        var exception = UnhandledErrorGuard.CauseOf(e.Exception);
         Log.Error(exception, "Unhandled exception on the UI thread");
         if (!_errorGuard.Admit(DateTime.Now))
         {
@@ -449,12 +416,7 @@ public sealed partial class App : Application
         }
 
         e.Handled = true;
-        ShowError(
-            Failure.Of(exception).Text
-            + Environment.NewLine + Environment.NewLine
-            + "The app is still running, and nothing you haven't saved was lost. "
-            + "If something looks wrong, save what you can, then close the app and open it again.",
-            MessageBoxImage.Error);
+        ShowError(UnhandledErrorGuard.CarryOnText(exception), MessageBoxImage.Error);
     }
 
     /// <summary>A message over the main window. One at a time: another arriving while one is up is only logged.</summary>

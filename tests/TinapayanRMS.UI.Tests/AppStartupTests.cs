@@ -73,6 +73,12 @@ public class AppStartupTests
         said.Should().Contain("The cause.").And.NotContain("Somewhere");
     }
 
+    [Theory]
+    [InlineData(1, "1 update hasn't been applied")]
+    [InlineData(3, "3 updates haven't been applied")]
+    public void A_database_behind_this_version_says_by_how_much_and_what_to_do(int count, string expected) =>
+        AppStartup.PendingMigrationsText(count).Should().Contain(expected).And.Contain("dotnet ef database update");
+
     private bool TryStart(Action start) => AppStartup.TryStart(start, LogFolder, CreateLogger(), _said.Add, _exitCodes.Add);
 
     private Logger CreateLogger() => new LoggerConfiguration().WriteTo.Sink(new ListSink(_logged)).CreateLogger();

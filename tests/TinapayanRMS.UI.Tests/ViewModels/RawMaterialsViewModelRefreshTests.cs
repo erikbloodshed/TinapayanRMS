@@ -1590,6 +1590,35 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingCategory!.Name.Should().Be("Dry goods");
     }
 
+    // Nothing awaits this: the picker starts it, from the keyboard or the focus leaving.
+    [Fact]
+    public async Task A_prompt_for_a_new_category_that_fails_says_so_and_the_next_one_works()
+    {
+        var viewModel = CreateViewModel();
+        var failing = true;
+        viewModel.PromptForNewCategory.RegisterHandler(interaction =>
+        {
+            if (failing)
+            {
+                throw new InvalidOperationException("The prompt couldn't open.");
+            }
+
+            interaction.SetOutput("Dry goods");
+        });
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.BeginCategoryEdit();
+        TypeCategory(viewModel, "Dry");
+        await viewModel.CommitCategoryTextAsync();
+
+        viewModel.ErrorMessage.Should().Contain("The prompt couldn't open.");
+
+        failing = false;
+        await viewModel.CommitCategoryTextAsync();
+
+        viewModel.EditingCategory!.Name.Should().Be("Dry goods");
+    }
+
     [Fact]
     public async Task Typing_a_name_that_isnt_a_category_asks_to_add_it_and_files_the_material_under_it()
     {

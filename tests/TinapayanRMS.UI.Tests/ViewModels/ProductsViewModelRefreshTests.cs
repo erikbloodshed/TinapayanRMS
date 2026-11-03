@@ -1949,6 +1949,35 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.Categories.Select(c => c.Name).Should().Equal("Cakes & Tortes");
     }
 
+    // Nothing awaits this: the picker starts it, from the keyboard or the focus leaving.
+    [Fact]
+    public async Task A_prompt_for_a_new_category_that_fails_says_so_and_the_next_one_works()
+    {
+        var viewModel = CreateViewModel();
+        var failing = true;
+        viewModel.PromptForNewCategory.RegisterHandler(interaction =>
+        {
+            if (failing)
+            {
+                throw new InvalidOperationException("The prompt couldn't open.");
+            }
+
+            interaction.SetOutput("Pastries");
+        });
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.BeginCategoryEdit();
+        viewModel.CategorySearchText = "Pas";
+        await viewModel.CommitCategoryTextAsync();
+
+        viewModel.ErrorMessage.Should().Contain("The prompt couldn't open.");
+
+        failing = false;
+        await viewModel.CommitCategoryTextAsync();
+
+        viewModel.EditingCategory!.Name.Should().Be("Pastries");
+    }
+
     [Fact]
     public async Task Typing_a_name_that_isnt_a_category_asks_to_add_it_and_picks_it_for_the_product()
     {

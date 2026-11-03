@@ -2068,7 +2068,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         if (SelectedProduct is not { } product)
         {
             StartNewProduct(_newProductInDefaultStage ? null : NewProductStage, _newProductCategoryId, IsEditingComposite);
-            History.Clear();
             return;
         }
 
@@ -2109,7 +2108,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             return false;
         }
 
-        _ = OpenProductAsync(product.Id);
+        _ = RunSafelyAsync(() => OpenProductAsync(product.Id));
         return true;
     }
 
@@ -2192,7 +2191,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             if (History.IsDirty)
             {
-                _ = PickAfterAskingAsync(leaf.Product.Id);
+                _ = RunSafelyAsync(() => PickAfterAskingAsync(leaf.Product.Id));
             }
             else
             {
@@ -5170,6 +5169,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
             // The picker shows the category it now holds rather than what was typed: the new one, or the one put back.
             CategorySearchText = EditingCategory?.Name ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            // Nothing awaits this: it's the picker's, from the keyboard or the focus leaving.
+            ShowFailure(ex);
         }
         finally
         {

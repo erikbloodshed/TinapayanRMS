@@ -1,3 +1,6 @@
+using ReactiveUI;
+using TinapayanRMS.UI.ViewModels;
+
 namespace TinapayanRMS.UI;
 
 /// <summary>
@@ -27,4 +30,18 @@ public sealed class UnhandledErrorGuard
         _recent.Enqueue(now);
         return _recent.Count <= MaxFailures;
     }
+
+    /// <summary>
+    /// What's worth showing of an exception: a failure ReactiveUI was left holding (a command's or an observable's) arrives
+    /// wrapped in its UnhandledErrorException, and it's the cause inside.
+    /// </summary>
+    public static Exception CauseOf(Exception exception) =>
+        exception is UnhandledErrorException { InnerException: { } inner } ? inner : exception;
+
+    /// <summary>What the app says about <paramref name="cause"/> as it carries on.</summary>
+    public static string CarryOnText(Exception cause) =>
+        Failure.Of(cause).Text
+        + Environment.NewLine + Environment.NewLine
+        + "The app is still running, and nothing you haven't saved was lost. "
+        + "If something looks wrong, save what you can, then close the app and open it again.";
 }

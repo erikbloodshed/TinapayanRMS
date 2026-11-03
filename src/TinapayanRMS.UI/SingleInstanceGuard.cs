@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Windows;
 
 namespace TinapayanRMS.UI;
 
@@ -69,6 +70,35 @@ public sealed class SingleInstanceGuard(string name) : IDisposable
     private RegisteredWaitHandle? _listening;
     private bool _hasApp;
     private bool _isOutOfReach;
+
+    /// <summary>
+    /// What a copy does as it starts, and whether it's the one that's open. If another has the app, that one's asked to come
+    /// to the front instead, and this copy has nothing to do but close: it hasn't logged or started anything by then. Another
+    /// build from another folder is said first, and so is one that can't be brought forward.
+    /// </summary>
+    /// <param name="patience">How long to wait for the open copy to answer: <see cref="Patience"/>.</param>
+    /// <param name="openCopyElsewhere">Where the open copy runs from, when that isn't here: <see cref="OpenCopyElsewhere"/>.</param>
+    /// <param name="say">Tells the user something.</param>
+    public bool Claim(TimeSpan patience, Func<string?> openCopyElsewhere, Action<string, MessageBoxImage> say)
+    {
+        if (TryClaim())
+        {
+            return true;
+        }
+
+        if (openCopyElsewhere() is { } elsewhere)
+        {
+            say(ElsewhereText(elsewhere), MessageBoxImage.Information);
+        }
+
+        var outcome = AskOpenCopyToComeForward(patience);
+        if (TextOf(outcome) is { } text)
+        {
+            say(text, MessageBoxImage.Warning);
+        }
+
+        return outcome == SingleInstanceOutcome.Claimed;
+    }
 
     /// <summary>
     /// Takes the app if nothing else has it, and returns whether it did. A copy that crashed holding it counts as nothing:

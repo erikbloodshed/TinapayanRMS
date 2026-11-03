@@ -2598,7 +2598,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             return false;
         }
 
-        _ = OpenRawMaterialAsync(material.Id);
+        _ = RunSafelyAsync(() => OpenRawMaterialAsync(material.Id));
         return true;
     }
 
@@ -2664,6 +2664,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
             // The picker shows the category it now holds rather than what was typed: the new one, or the one put back.
             CategorySearchText = EditingCategory?.Name ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            // Nothing awaits this: it's the picker's, from the keyboard or the focus leaving.
+            ShowFailure(ex);
         }
         finally
         {
@@ -2766,7 +2771,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         {
             if (History.IsDirty)
             {
-                _ = PickAfterAskingAsync(leaf.RawMaterial.Id);
+                _ = RunSafelyAsync(() => PickAfterAskingAsync(leaf.RawMaterial.Id));
             }
             else
             {

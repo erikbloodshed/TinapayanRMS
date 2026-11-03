@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using System.Windows;
 using AwesomeAssertions;
 
 namespace TinapayanRMS.UI.Tests;
@@ -182,6 +183,85 @@ public class SingleInstanceGuardTests
         second.Ask(Plenty).Should().Be(SingleInstanceOutcome.OutOfReach);
     }
 
+    // What a copy does as it starts, all the way through (App.OnStartup)
+
+    [Fact]
+    public void A_copy_starting_with_the_app_free_says_nothing()
+    {
+        using var copy = new Copy(_name, claim: false);
+        List<string> said = [];
+
+        copy.Claim(Plenty, () => null, (text, _) => said.Add(text)).Should().BeTrue();
+
+        said.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_copy_starting_with_the_app_open_closes_without_a_word_once_that_one_comes_forward()
+    {
+        using var open = new Copy(_name);
+        open.Guard.Listen(open.Guard.CameForward);
+        using var second = new Copy(_name, claim: false);
+        List<string> said = [];
+
+        second.Claim(Plenty, () => null, (text, _) => said.Add(text)).Should().BeFalse();
+
+        said.Should().BeEmpty();
+    }
+
+    // The message waits on an answer, and the copy only comes forward after: in front, it would cover the message.
+    [Fact]
+    public void A_copy_starting_with_another_build_open_says_where_that_runs_from_before_it_comes_forward()
+    {
+        const string Elsewhere = @"C:\Published\TinapayanRMS.UI.exe";
+        using var open = new Copy(_name);
+        var asked = 0;
+        open.Guard.Listen(() =>
+        {
+            Interlocked.Increment(ref asked);
+            open.Guard.CameForward();
+        });
+        using var second = new Copy(_name, claim: false);
+        List<(string Text, MessageBoxImage Image)> said = [];
+        var askedWhenSaid = -1;
+
+        var claimed = second.Claim(Plenty, () => Elsewhere, (text, image) =>
+        {
+            said.Add((text, image));
+            askedWhenSaid = Volatile.Read(ref asked);
+        });
+
+        claimed.Should().BeFalse();
+        said.Should().Equal((SingleInstanceGuard.ElsewhereText(Elsewhere), MessageBoxImage.Information));
+        askedWhenSaid.Should().Be(0);
+        Volatile.Read(ref asked).Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void A_copy_starting_with_a_frozen_one_open_says_so_rather_than_vanish()
+    {
+        using var open = new Copy(_name);
+        using var second = new Copy(_name, claim: false);
+        List<(string Text, MessageBoxImage Image)> said = [];
+
+        second.Claim(Briefly, () => null, (text, image) => said.Add((text, image))).Should().BeFalse();
+
+        said.Should().Equal((SingleInstanceGuard.NotAnsweringText, MessageBoxImage.Warning));
+    }
+
+    [Fact]
+    public void A_copy_starting_as_the_open_one_closes_carries_on_without_a_word()
+    {
+        var open = new Copy(_name);
+        using var second = new Copy(_name, claim: false);
+        using var closes = new Timer(_ => open.Dispose(), null, Briefly, Timeout.InfiniteTimeSpan);
+        List<string> said = [];
+
+        second.Claim(Plenty, () => null, (text, _) => said.Add(text)).Should().BeTrue();
+
+        said.Should().BeEmpty();
+    }
+
     [Fact]
     public void Closing_is_safe_whether_or_not_it_ever_had_the_app()
     {
@@ -224,7 +304,7 @@ public class SingleInstanceGuardTests
         private readonly BlockingCollection<Action> _work = new();
         private readonly Thread _thread;
 
-        public Copy(string name)
+        public Copy(string name, bool claim = true)
         {
             Guard = new SingleInstanceGuard(name);
             _thread = new Thread(() =>
@@ -238,7 +318,7 @@ public class SingleInstanceGuardTests
                 IsBackground = true,
             };
             _thread.Start();
-            HasApp = OnItsThread(Guard.TryClaim);
+            HasApp = claim && OnItsThread(Guard.TryClaim);
         }
 
         public SingleInstanceGuard Guard { get; }
@@ -250,6 +330,13 @@ public class SingleInstanceGuardTests
             var outcome = OnItsThread(() => Guard.AskOpenCopyToComeForward(patience));
             HasApp |= outcome == SingleInstanceOutcome.Claimed;
             return outcome;
+        }
+
+        public bool Claim(TimeSpan patience, Func<string?> openCopyElsewhere, Action<string, MessageBoxImage> say)
+        {
+            var claimed = OnItsThread(() => Guard.Claim(patience, openCopyElsewhere, say));
+            HasApp |= claimed;
+            return claimed;
         }
 
         /// <summary>Ends its thread without letting go.</summary>

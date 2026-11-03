@@ -45,4 +45,11 @@ public static class AppStartup
         + Failure.FirstLine(exception.Message)
         + Environment.NewLine + Environment.NewLine
         + $"The details are in the log, in {logFolder}.";
+
+    /// <summary>What the app says when the database is behind this version of it, by <paramref name="count"/> migrations.</summary>
+    public static string PendingMigrationsText(int count) =>
+        $"The database is out of date for this version of TinapayanRMS: {count} "
+        + $"{(count == 1 ? "update hasn't" : "updates haven't")} been applied to it, so some screens won't work."
+        + Environment.NewLine + Environment.NewLine
+        + "Close the app and apply them (dotnet ef database update), then open it again.";
 }

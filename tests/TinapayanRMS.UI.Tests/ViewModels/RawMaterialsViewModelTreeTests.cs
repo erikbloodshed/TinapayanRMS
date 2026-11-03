@@ -579,6 +579,50 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         (await NameOfAsync(breadFlourId)).Should().Be("Bread Flour");
     }
 
+    // No puts a new material back blank. What's typed into it next has to count, or it's lost with no question asked.
+    [Fact]
+    public async Task What_is_typed_after_no_on_a_new_material_counts_as_unsaved()
+    {
+        var viewModel = await LoadedViewModelAsync();
+        var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
+        viewModel.EditingName = "Bread Flour";
+        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue();
+        viewModel.EditingName.Should().BeEmpty();
+        viewModel.History.IsDirty.Should().BeFalse();
+
+        viewModel.EditingName = "Strong Bread Flour";
+
+        viewModel.History.IsDirty.Should().BeTrue();
+        await viewModel.ResolveUnsavedChangesAsync(revert: false);
+        asked.Should().HaveCount(2);
+    }
+
+    // A second click on the way somewhere while the question's still up: it stays, and isn't asked twice.
+    [Fact]
+    public async Task A_second_question_while_one_is_up_is_turned_away()
+    {
+        var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
+        var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
+        var viewModel = await OpenedViewModelAsync(breadFlourId);
+        var answer = new TaskCompletionSource<UnsavedChangesAnswer>();
+        var asked = 0;
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(async context =>
+        {
+            asked++;
+            context.SetOutput(await answer.Task);
+        });
+        viewModel.EditingName = "Strong Bread Flour";
+
+        var first = viewModel.ResolveUnsavedChangesAsync(revert: false);
+        var second = await viewModel.ResolveUnsavedChangesAsync(revert: false);
+
+        second.Should().BeFalse();
+        asked.Should().Be(1);
+
+        answer.SetResult(UnsavedChangesAnswer.DontSave);
+        (await first).Should().BeTrue("the first is still answered");
+    }
+
     /// <summary>Answers the question about unsaved changes with <paramref name="answer"/>, collecting each question asked.</summary>
     private static List<string> AnswerUnsavedChanges(RawMaterialsViewModel viewModel, UnsavedChangesAnswer answer)
     {

@@ -1,4 +1,6 @@
 using AwesomeAssertions;
+using ReactiveUI;
+using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Tests;
 
@@ -43,4 +45,25 @@ public class UnhandledErrorGuardTests
             guard.Admit(Start + (UnhandledErrorGuard.Window * i)).Should().BeTrue();
         }
     }
+
+    [Fact]
+    public void What_ReactiveUI_was_left_holding_is_shown_by_its_cause()
+    {
+        var cause = new TimeoutException();
+
+        UnhandledErrorGuard.CauseOf(new UnhandledErrorException("Wrapped by ReactiveUI.", cause)).Should().BeSameAs(cause);
+    }
+
+    [Fact]
+    public void Anything_else_is_shown_as_it_is()
+    {
+        var failure = new InvalidOperationException();
+
+        UnhandledErrorGuard.CauseOf(failure).Should().BeSameAs(failure);
+        UnhandledErrorGuard.CauseOf(new UnhandledErrorException("Nothing inside it.")).Should().BeOfType<UnhandledErrorException>();
+    }
+
+    [Fact]
+    public void The_message_says_what_went_wrong_and_that_the_app_carries_on() =>
+        UnhandledErrorGuard.CarryOnText(new TimeoutException()).Should().StartWith(Failure.TimedOutText).And.Contain("still running");
 }
