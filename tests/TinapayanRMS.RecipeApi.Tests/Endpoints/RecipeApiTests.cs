@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using AwesomeAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -10,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -17,13 +19,15 @@ using TinapayanRMS.RecipeApi.Contracts;
 using TinapayanRMS.RecipeApi.Tests.Fixtures;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.UI;
+using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.RecipeApi.Tests.Endpoints;
 
 /// <summary>
 /// The Recipe API against a real database, through the host Program builds (the app's CompositionRoot with the API on
 /// top and a read-only connection), served in memory: the mixes and their lines as saved, the ingredients, BOMs,
-/// materials and product recipes TinapayanBMS plans from, the key when one is set, and no writes.
+/// materials and product recipes TinapayanBMS plans from, who it answers, what it says when something goes wrong, and no
+/// writes.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
@@ -185,6 +189,114 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
     }
 
     [Fact]
+    public async Task With_a_key_set_this_PC_needs_it_too_and_another_PC_gets_in_with_it()
+    {
+        using var host = await StartAsync(key: "s3cret");
+
+        (await SendFromAsync(host, "127.0.0.1")).Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        (await SendFromAsync(host, "192.168.1.20")).Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        (await SendFromAsync(host, "127.0.0.1", "s3cret")).Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        (await SendFromAsync(host, "192.168.1.20", "s3cret")).Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+    }
+
+    // ::ffff: is how Kestrel, listening on every address, reports whoever came over IPv4.
+    [Theory]
+    [InlineData("127.0.0.1")]
+    [InlineData("::1")]
+    [InlineData("::ffff:127.0.0.1")]
+    public async Task With_no_key_set_this_PC_is_answered(string address)
+    {
+        using var host = await StartAsync();
+
+        (await SendFromAsync(host, address)).Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+    }
+
+    [Theory]
+    [InlineData("192.168.1.20")]
+    [InlineData("::ffff:192.168.1.20")]
+    [InlineData("fe80::1")]
+    public async Task With_no_key_set_another_PC_is_refused_and_told_why(string address)
+    {
+        using var host = await StartAsync();
+
+        var context = await SendFromAsync(host, address);
+
+        context.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+        (await JsonSerializer.DeserializeAsync<ApiError>(context.Response.Body, JsonSerializerOptions.Web, Cancellation))!.Error.Should().Be(RecipeApiHost.NoKeyText);
+    }
+
+    [Theory]
+    [InlineData("/api/v1/status")]
+    [InlineData("/api/v1/ingredients")]
+    [InlineData("/api/v1/boms")]
+    [InlineData("/api/v1/materials")]
+    [InlineData("/api/v1/categories")]
+    [InlineData("/api/v1/products")]
+    [InlineData("/api/v1/products/recipes")]
+    [InlineData("/api/v1/mixes")]
+    [InlineData("/api/v1/mixes/details")]
+    [InlineData("/api/v1/mixes/1")]
+    public async Task A_database_that_cant_be_reached_comes_back_as_a_503_saying_so(string path)
+    {
+        using var host = await StartAsync(connectionString: "Host=localhost;Port=1;Database=tinapayanrms;Username=tinapayanrms;Timeout=10");
+
+        var response = await host.GetTestClient().GetAsync(path, Cancellation);
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await ErrorOf(response)).Should().Be(Failure.UnreachableText);
+    }
+
+    [Fact]
+    public async Task A_timeout_comes_back_as_a_503_saying_so()
+    {
+        using var host = await StartAsync(costingDefaults: new FailingCostingDefaults(new TimeoutException("Execution Timeout Expired.")));
+
+        var response = await host.GetTestClient().GetAsync("/api/v1/status", Cancellation);
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await ErrorOf(response)).Should().Be(Failure.TimedOutText);
+    }
+
+    [Fact]
+    public async Task A_bug_comes_back_as_a_500_without_its_details()
+    {
+        using var host = await StartAsync(costingDefaults: new FailingCostingDefaults(new InvalidOperationException("column secret_column does not exist")));
+
+        var response = await host.GetTestClient().GetAsync("/api/v1/status", Cancellation);
+
+        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        (await ErrorOf(response)).Should().Be(RecipeApiHost.UnexpectedText);
+    }
+
+    // 42703 a column this version expects, 57014 a statement that ran out of time, XX000 PostgreSQL's own internal error,
+    // whose words Failure would hand on and a caller shouldn't see.
+    [Theory]
+    [InlineData("42703", HttpStatusCode.ServiceUnavailable, Failure.OutOfDateText)]
+    [InlineData("57014", HttpStatusCode.ServiceUnavailable, Failure.TimedOutText)]
+    [InlineData("XX000", HttpStatusCode.InternalServerError, RecipeApiHost.UnexpectedText)]
+    public async Task What_the_server_says_comes_back_in_a_fixed_sentence(string sqlState, HttpStatusCode status, string text)
+    {
+        var refusal = new PostgresException("secret_column went wrong", "ERROR", "ERROR", sqlState);
+        using var host = await StartAsync(costingDefaults: new FailingCostingDefaults(refusal));
+
+        var response = await host.GetTestClient().GetAsync("/api/v1/status", Cancellation);
+
+        response.StatusCode.Should().Be(status);
+        (await ErrorOf(response)).Should().Be(text);
+    }
+
+    [Fact]
+    public async Task A_rules_refusal_comes_back_as_a_400_in_its_own_words()
+    {
+        using var host = await StartAsync(costingDefaults: new FailingCostingDefaults(new BusinessRuleException("That won't do.")));
+
+        var response = await host.GetTestClient().GetAsync("/api/v1/status", Cancellation);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ErrorOf(response)).Should().Be("That won't do.");
+    }
+
+    [Fact]
     public async Task Its_connection_refuses_a_write()
     {
         using var host = await StartAsync();
@@ -197,20 +309,53 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
             .WithInnerException<PostgresException>().Which.SqlState.Should().Be(PostgresErrorCodes.ReadOnlySqlTransaction);
     }
 
-    /// <summary>The API as Program builds it, on the test database and served in memory, with <paramref name="key"/> as its key.</summary>
-    private async Task<IHost> StartAsync(string? key = null)
+    /// <summary>
+    /// The API as Program builds it, on the test database (or <paramref name="connectionString"/>) and served in memory, with
+    /// <paramref name="key"/> as its key, and <paramref name="costingDefaults"/> in place of what /status reads.
+    /// </summary>
+    private async Task<IHost> StartAsync(string? key = null, string? connectionString = null, ICostingDefaultsRepository? costingDefaults = null)
     {
         var host = CompositionRoot.CreateHostBuilder([])
             .AddRecipeApi(web => web.UseTestServer())
             .ConfigureAppConfiguration(config => config.AddInMemoryCollection(
             [
-                new("ConnectionStrings:Default", fixture.ConnectionString),
+                new("ConnectionStrings:Default", connectionString ?? fixture.ConnectionString),
                 new("RecipeApi:Key", key ?? string.Empty),
             ]))
             .ConfigureAppConfiguration(ReadOnlyConnection.Apply)
+            .ConfigureServices(services =>
+            {
+                if (costingDefaults is not null)
+                {
+                    services.AddSingleton(costingDefaults);
+                }
+            })
             .Build();
         await host.StartAsync(Cancellation);
         return host;
+    }
+
+    /// <summary>/status as if from <paramref name="address"/>, which only the in-memory server's own context can say.</summary>
+    private static Task<HttpContext> SendFromAsync(IHost host, string address, string? key = null) =>
+        host.GetTestServer().SendAsync(
+            context =>
+            {
+                context.Request.Method = HttpMethods.Get;
+                context.Request.Path = "/api/v1/status";
+                context.Connection.RemoteIpAddress = IPAddress.Parse(address);
+                if (key is not null)
+                {
+                    context.Request.Headers[RecipeApiHost.ApiKeyHeader] = key;
+                }
+            },
+            Cancellation);
+
+    /// <summary>What /status reads, failing with <paramref name="failure"/>.</summary>
+    private sealed class FailingCostingDefaults(Exception failure) : ICostingDefaultsRepository
+    {
+        public Task<CostingDefaults> GetAsync(CancellationToken cancellationToken) => Task.FromException<CostingDefaults>(failure);
+
+        public Task SetAsync(CostingDefaults defaults, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private static async Task<T> GetAsync<T>(IHost host, string path) =>
