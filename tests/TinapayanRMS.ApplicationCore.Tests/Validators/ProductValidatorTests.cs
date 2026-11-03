@@ -61,13 +61,13 @@ public class ProductValidatorTests
         _validator.Validate(product).IsValid.Should().BeFalse();
     }
 
+    public static TheoryData<decimal?> CurrentPrices => [(decimal?)null, 0m, 25.5m];
+
     [Theory]
-    [InlineData(null)]
-    [InlineData(0.0)]
-    [InlineData(25.5)]
-    public void Accepts_no_current_price_or_one_of_zero_or_more(double? currentPrice)
+    [MemberData(nameof(CurrentPrices))]
+    public void Accepts_no_current_price_or_one_of_zero_or_more(decimal? currentPrice)
     {
-        var product = new Product { Name = "Ensaymada", CurrentPrice = (decimal?)currentPrice };
+        var product = new Product { Name = "Ensaymada", CurrentPrice = currentPrice };
 
         _validator.Validate(product).IsValid.Should().BeTrue();
     }

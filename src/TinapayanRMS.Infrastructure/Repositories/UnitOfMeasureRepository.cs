@@ -6,7 +6,7 @@ using TinapayanRMS.Infrastructure.Queries;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IUnitOfMeasureRepository
+public sealed class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IUnitOfMeasureRepository
 {
     public Task<IReadOnlyList<UnitOfMeasure>> GetAllAsync(CancellationToken cancellationToken) =>
         dbContextFactory.QueryAsync<UnitOfMeasure>(

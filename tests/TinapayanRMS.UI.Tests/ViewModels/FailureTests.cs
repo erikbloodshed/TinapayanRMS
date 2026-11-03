@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.UI.Tests.Fixtures;
 using TinapayanRMS.UI.ViewModels;
@@ -122,6 +123,78 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         });
 
         failure.Should().Be(new Failure(Failure.UnreachableText, IsRejection: false));
+    }
+
+    [Fact]
+    public async Task A_database_that_cant_be_reached_by_a_query_says_so()
+    {
+        // Through EF Core, whose execution strategy wrapped a transient failure in an InvalidOperationException until
+        // Npgsql 11, which read as a bug.
+        var failure = await FailureOfAsync(async () =>
+        {
+            await using var dbContext = new TinapayanRMSDbContext(TinapayanRMSDbContext.CreateOptions(
+                "Host=localhost;Port=1;Database=tinapayanrms;Username=tinapayanrms;Timeout=10"));
+            await dbContext.ProductCategories.CountAsync(Cancellation);
+        });
+
+        failure.Should().Be(new Failure(Failure.UnreachableText, IsRejection: false));
+    }
+
+    [Fact]
+    public async Task A_save_that_clashes_with_another_says_the_database_was_busy()
+    {
+        await AddCategoryAsync("Breads");
+
+        // A serializable transaction reads the category, another change renames it and commits, and then the first renames
+        // it too: PostgreSQL refuses that update (40001), which Npgsql 11 throws as a DbUpdateConcurrencyException.
+        var failure = await FailureOfAsync(async () =>
+        {
+            await using var dbContext = CreateDbContext();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, Cancellation);
+            var category = await dbContext.RawMaterialCategories.SingleAsync(c => c.Name == "Breads", Cancellation);
+
+            await using (var other = CreateDbContext())
+            {
+                await other.RawMaterialCategories.ExecuteUpdateAsync(s => s.SetProperty(c => c.Name, "Rolls"), Cancellation);
+            }
+
+            category.Name = "Pastries";
+            await dbContext.SaveChangesAsync(Cancellation);
+        });
+
+        failure.Should().Be(new Failure("The database was busy with another change. Try again.", IsRejection: false));
+    }
+
+    [Fact]
+    public void A_deadlock_in_a_save_says_the_database_was_busy()
+    {
+        var deadlock = new PostgresException("deadlock detected", "ERROR", "ERROR", PostgresErrorCodes.DeadlockDetected);
+
+        Failure.Of(new DbUpdateConcurrencyException("An error occurred while saving the entity changes.", deadlock))
+            .Should().Be(new Failure("The database was busy with another change. Try again.", IsRejection: false));
+    }
+
+    [Fact]
+    public async Task Saving_what_another_screen_deleted_says_to_open_it_again()
+    {
+        await AddCategoryAsync("Breads");
+
+        var failure = await FailureOfAsync(async () =>
+        {
+            await using var dbContext = CreateDbContext();
+            var category = await dbContext.RawMaterialCategories.SingleAsync(c => c.Name == "Breads", Cancellation);
+
+            await using (var other = CreateDbContext())
+            {
+                await other.RawMaterialCategories.ExecuteDeleteAsync(Cancellation);
+            }
+
+            category.Name = "Rolls";
+            await dbContext.SaveChangesAsync(Cancellation);
+        });
+
+        failure.Should().Be(new Failure(
+            "It was changed or deleted on another screen in the meantime. Open it again, then make the change.", IsRejection: true));
     }
 
     [Fact]

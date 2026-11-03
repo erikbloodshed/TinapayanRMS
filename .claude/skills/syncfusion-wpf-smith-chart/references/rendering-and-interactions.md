@@ -181,6 +181,13 @@ public class TransmissionViewModel
             new TransmissionData { Resistance = 3.5, Reactance = 0.0 }
         };
     }
+    
+    public event PropertyChangedEventHandler PropertyChanged;
+ 
+    protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+    {
+        PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(propertyName));
+    }
 }
 
 // Use with Impedance

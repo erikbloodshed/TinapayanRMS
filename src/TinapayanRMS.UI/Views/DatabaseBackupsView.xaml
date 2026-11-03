@@ -18,7 +18,7 @@
                 <TextBlock DockPanel.Dock="Top"
                            Style="{StaticResource CaptionStyle}"
                            Margin="0,0,0,12"
-                           Text="Copies of all of the app's data. One is taken automatically the first time the app starts each day, and the last 14 of those are kept. Copy one to a USB stick now and then, so a broken computer doesn't take every copy with it." />
+                           Text="Copies of all of the app's data. One is taken automatically each day, when the app starts or within the hour while it stays open, and the last 14 of those are kept. Set a second folder, such as a USB stick or a OneDrive folder, and each one is copied there too, so a broken computer doesn't take every copy with it." />
 
                 <!-- Where they're kept, label on the left as every form's is -->
                 <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
@@ -35,6 +35,42 @@
                                           ToolTip="Shows the backups folder in File Explorer."
                                           Margin="8,0,0,0"
                                           Click="OpenFolder_Click" />
+                </Grid>
+
+                <!-- 2026-10-29: a second folder each automatic backup is copied to as well, and why the last copy failed -->
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Also Copy To" Style="{StaticResource FormLabelStyle}" />
+                    <TextBlock Grid.Column="1" Text="{Binding CopyFolderText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding CopyFolderText}" />
+                    <syncfusion:ButtonAdv Grid.Column="2"
+                                          Label="Choose…"
+                                          IconTemplate="{StaticResource FolderIconTemplate}"
+                                          Command="{Binding ChooseCopyFolderCommand}"
+                                          ToolTip="A second folder each automatic backup is copied to as well, keeping the newest 14 there too. Kept for you on this computer."
+                                          Margin="8,0,0,0" />
+                    <syncfusion:ButtonAdv Grid.Column="3"
+                                          Label="Stop Copying"
+                                          IconTemplate="{StaticResource CancelIconTemplate}"
+                                          Command="{Binding ClearCopyFolderCommand}"
+                                          ToolTip="Stops copying automatic backups to the second folder. What's there stays."
+                                          Margin="8,0,0,0" />
+                    <TextBlock Grid.Row="1"
+                               Grid.Column="1"
+                               Grid.ColumnSpan="3"
+                               Margin="0,4,0,0"
+                               Text="{Binding CopyProblemText}"
+                               Foreground="{StaticResource WarningForegroundBrush}"
+                               TextWrapping="Wrap"
+                               Visibility="{Binding CopyProblemText, Converter={StaticResource NotNullToVisibilityConverter}}" />
                 </Grid>
 
                 <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">

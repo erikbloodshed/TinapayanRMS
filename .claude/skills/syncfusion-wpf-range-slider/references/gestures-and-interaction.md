@@ -110,7 +110,7 @@ SfRangeSlider rangeSlider = new SfRangeSlider()
     Value = 50,
     TickFrequency = 10,
     TickPlacement = Syncfusion.Windows.Controls.Input.TickPlacement.BottomRight,
-    SnapsTo = Syncfusion.Windows.Controls.Input.SnapsTo.Ticks,
+    SnapsTo = SliderSnapsTo.Ticks,
     Focusable = true
 };
 ```
@@ -196,7 +196,7 @@ SfRangeSlider rangeSlider = new SfRangeSlider()
     Minimum = 0,
     Value = 50,
     SmallChange = 10,
-    SnapsTo = Syncfusion.Windows.Controls.Input.SnapsTo.StepValues
+    SnapsTo = SliderSnapsTo.StepValues
 };
 ```
 

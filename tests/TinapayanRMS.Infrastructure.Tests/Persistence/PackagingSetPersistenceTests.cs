@@ -82,17 +82,17 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var repository = new ProductRepository(CreateDbContextFactory());
 
         var id = await repository.SaveAsync(
-            new Product { Name = "Small" }, recipe: null, new PackagingLinkDraft(null, setId), packagingLines: null, costing: null, Cancellation);
+            new Product { Name = "Small" }, recipe: null, new PackagingLinkDraft.Set(setId), packagingLines: null, costing: null, Cancellation);
         (await CreatePackagingLinkRepository().GetForProductAsync(id, Cancellation))!.LinkedSubAssemblyId.Should().Be(setId, "a new product can link on its first save");
 
         await repository.SaveAsync(
-            new Product { Id = id, Name = "Small" }, recipe: null, new PackagingLinkDraft(bigId, null), packagingLines: null, costing: null, Cancellation);
+            new Product { Id = id, Name = "Small" }, recipe: null, new PackagingLinkDraft.OtherProduct(bigId), packagingLines: null, costing: null, Cancellation);
         (await CreatePackagingLinkRepository().GetForProductAsync(id, Cancellation))!.LinkedProductId.Should().Be(bigId);
 
         await repository.SaveAsync(
             new Product { Id = id, Name = "Small" },
             recipe: null,
-            PackagingLinkDraft.None,
+            new PackagingLinkDraft.None(),
             [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 2m)],
             costing: null,
             Cancellation);
@@ -118,7 +118,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         await new ProductRepository(CreateDbContextFactory()).SaveAsync(
             new Product { Id = productId, Name = "Ensaymada" },
             recipe: null,
-            PackagingLinkDraft.NewSet,
+            new PackagingLinkDraft.NewSet(),
             [(ribbonId, rollId, PackagingLineAuthoredField.QtyPerUnit, 0.03m), (boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)],
             costing: null,
             Cancellation);
@@ -147,7 +147,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var id = await new ProductRepository(CreateDbContextFactory()).SaveAsync(
             new Product { Name = "Ensaymada" },
             recipe: null,
-            PackagingLinkDraft.NewSet,
+            new PackagingLinkDraft.NewSet(),
             [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 2m)],
             costing: null,
             Cancellation);
@@ -165,7 +165,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var productId = await AddProductAsync("Ensaymada");
 
         var act = () => new ProductRepository(CreateDbContextFactory()).SaveAsync(
-            new Product { Id = productId, Name = "Ensaymada Big" }, recipe: null, PackagingLinkDraft.NewSet, [], costing: null, Cancellation);
+            new Product { Id = productId, Name = "Ensaymada Big" }, recipe: null, new PackagingLinkDraft.NewSet(), [], costing: null, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*at least one line*");
         await using var dbContext = CreateDbContext();
@@ -182,7 +182,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         await CreatePackagingLinkRepository().SetLinkAsync(bId, aId, Cancellation);
 
         var act = () => new ProductRepository(CreateDbContextFactory()).SaveAsync(
-            new Product { Id = aId, Name = "A renamed" }, recipe: null, new PackagingLinkDraft(bId, null), packagingLines: null, costing: null, Cancellation);
+            new Product { Id = aId, Name = "A renamed" }, recipe: null, new PackagingLinkDraft.OtherProduct(bId), packagingLines: null, costing: null, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*circular*");
         await using var dbContext = CreateDbContext();

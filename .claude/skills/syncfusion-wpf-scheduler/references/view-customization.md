@@ -10,6 +10,11 @@
   - [Selection Restriction](#selection-restriction)
   - [Merging Adjacent Regions](#merging-adjacent-regions)
   - [Appearance Customization](#appearance-customization)
+  - [Special Time Regions in TimelineMonth](#special-time-regions-in-timelinemonth)
+    - [Enabling ShowMonthTimeRegions](#enabling-showmonthtimeregions)
+    - [How Regions Are Rendered in TimelineMonth](#how-regions-are-rendered-in-timelinemonth)
+    - [Drag-and-Drop Behavior](#drag-and-drop-behavior)
+  - [Resource-Bound Special Time Regions](#resource-bound-special-time-regions)
 
 ## Overview
 
@@ -191,7 +196,7 @@ When customizing time intervals and working hours, the scheduler calculates time
 
 ## Special Time Regions
 
-Special time regions allow you to highlight and restrict specific time periods (like lunch breaks, holidays, or blocked times) in Day, Week, WorkWeek, and Timeline views.
+Special time regions allow you to highlight and restrict specific time periods (like lunch breaks, holidays, or blocked times) in Day, Week, WorkWeek, Timeline (Day/Week/WorkWeek), and TimelineMonth views (when `TimelineViewSettings.ShowMonthTimeRegions` is enabled).
 
 ### Creating Special Regions
 
@@ -348,6 +353,100 @@ var gradientRegion = new SpecialTimeRegion
 };
 ```
 
+### Special Time Regions in TimelineMonth
+
+The `TimelineMonth` view normally does not render time regions. You can opt-in to render them as **date-column-spanning blocks** by setting `TimelineViewSettings.ShowMonthTimeRegions` to `true`.
+
+#### Enabling ShowMonthTimeRegions
+
+`ShowMonthTimeRegions` is a `bool` property on `TimelineViewSettings` (default `false`). When enabled, every `SpecialTimeRegion` in `Schedule.TimelineViewSettings.SpecialTimeRegions` is considered for rendering when the active view is `TimelineMonth`.
+
+**XAML:**
+
+```xaml
+<syncfusion:SfScheduler x:Name="Schedule" ViewType="TimelineMonth">
+    <syncfusion:SfScheduler.TimelineViewSettings>
+        <syncfusion:TimelineViewSettings ShowMonthTimeRegions="True">
+            <syncfusion:TimelineViewSettings.SpecialTimeRegions>
+                <syncfusion:SpecialTimeRegion
+                    StartTime="2026/06/10"
+                    EndTime="2026/06/14"
+                    Text="Audit Week"
+                    Background="#FFF5E1B4"
+                    Foreground="Black"
+                    CanEdit="False" />
+            </syncfusion:TimelineViewSettings.SpecialTimeRegions>
+        </syncfusion:TimelineViewSettings>
+    </syncfusion:SfScheduler.TimelineViewSettings>
+</syncfusion:SfScheduler>
+```
+
+**C#:**
+
+```csharp
+Schedule.ViewType = SchedulerViewType.TimelineMonth;
+Schedule.TimelineViewSettings.ShowMonthTimeRegions = true;
+
+Schedule.TimelineViewSettings.SpecialTimeRegions.Add(new SpecialTimeRegion
+{
+    StartTime = new DateTime(2026, 6, 10),
+    EndTime = new DateTime(2026, 6, 14),
+    Text = "Audit Week",
+    Background = new SolidColorBrush(Color.FromRgb(0xF5, 0xE1, 0xB4)),
+    Foreground = Brushes.Black,
+    CanEdit = false
+});
+```
+
+#### How Regions Are Rendered in TimelineMonth
+
+When `ShowMonthTimeRegions` is `true` and the active view is `TimelineMonth`:
+
+- Each region is rendered as a block that spans the date columns between `SpecialTimeRegion.ActualStartTime.Date` and `SpecialTimeRegion.ActualEndTime.Date` (inclusive of the start, exclusive of the end).
+- **Time-of-day is ignored** in TimelineMonth — only the date portion of `ActualStartTime` / `ActualEndTime` matters. A region from `2026/06/10 09:00` to `2026/06/14 18:00` occupies the same horizontal range as one from `2026/06/10 00:00` to `2026/06/14 23:59`.
+- The region's width is calculated from the date-column width of the timeline (`SpecialTimeRegionHelper.GetTimelineMonthRegionWidth`). Block height is controlled by the row layout of the timeline view.
+- `Background` controls the fill and `Text` is rendered inside the block. `Foreground` is honored when set. The `SpecialTimeRegionTemplate` defined on `TimelineViewSettings` (if any) is used in place of the default renderer.
+- A region with `CanEdit = false` blocks drag-and-drop / drag-resize / new-appointment creation in those columns. A region with `CanEdit = true` (default) is a visual highlight only — appointment creation is still allowed on those dates.
+- Recurring regions (`RecurrenceRule`) expand to every occurrence whose date falls inside the visible TimelineMonth range, with `RecurrenceExceptionDates` excluded as usual.
+- Regions with `ResourceIdCollection` are only rendered in columns for the listed resource IDs when `ResourceGroupType` is set. If a region has no `ResourceIdCollection`, it is treated as applying to all resources (visible only when `ResourceGroupType` is `None` or `Date`).
+
+#### Drag-and-Drop Behavior
+
+`ShowMonthTimeRegions = true` enforces the following interaction rules in TimelineMonth:
+
+- **Appointment drag-and-drop**: dragging an appointment onto a TimelineMonth column that falls within a `CanEdit = false` region's date range is blocked. The drop is rejected.
+- **Appointment resize**: resizing an appointment to cross into a `CanEdit = false` region's date range is blocked.
+- **New appointment creation**: tapping or double-tapping a TimelineMonth column that falls within a `CanEdit = false` region's date range does not open the appointment editor.
+- Programmatic changes (`Schedule.ItemsSource.Add(...)`, property updates) are **not** blocked — only user-driven interactions through the view are.
+
+### Resource-Bound Special Time Regions
+
+Special time regions can be scoped to specific resources by setting `ResourceIdCollection`. When `SfScheduler.ResourceGroupType` is `Resource` or `Date`, only regions whose `ResourceIdCollection` matches the resource(s) shown in that column are rendered.
+
+```csharp
+Schedule.ViewType = SchedulerViewType.TimelineWeek;
+Schedule.ResourceCollection = new ObservableCollection<SchedulerResource>
+{
+    new SchedulerResource { Id = "1001", Name = "Dr. Smith" },
+    new SchedulerResource { Id = "1002", Name = "Dr. Jones" }
+};
+Schedule.ResourceGroupType = ResourceGroupType.Resource;
+
+Schedule.TimelineViewSettings.SpecialTimeRegions.Add(new SpecialTimeRegion
+{
+    StartTime = new DateTime(2026, 6, 15, 9, 0, 0),
+    EndTime = new DateTime(2026, 6, 15, 10, 0, 0),
+    Text = "Surgery",
+    CanEdit = false,
+    Background = Brushes.IndianRed,
+    ResourceIdCollection = new ObservableCollection<object> { "1001" }
+});
+```
+
+**Notes:**
+- A region without a `ResourceIdCollection` (or with an empty one) is considered "all resources" and is rendered only when `ResourceGroupType` is `None` or `Date`.
+- For TimelineMonth with `ShowMonthTimeRegions = true`, the same resource-binding rules apply — the region block is only painted for the columns matching its `ResourceIdCollection`.
+
 ## Common Use Cases
 
 ### Use Case 1: Office Hours with Lunch Break
@@ -413,10 +512,29 @@ Schedule.TimelineViewSettings.SpecialTimeRegions.Add(new SpecialTimeRegion
 });
 ```
 
+### Use Case 4: TimelineMonth Date Range Block
+
+Block a multi-day window in TimelineMonth to prevent scheduling during a maintenance window. Time-of-day is ignored — only the date portion matters.
+
+```csharp
+Schedule.ViewType = SchedulerViewType.TimelineMonth;
+Schedule.TimelineViewSettings.ShowMonthTimeRegions = true;
+
+Schedule.TimelineViewSettings.SpecialTimeRegions.Add(new SpecialTimeRegion
+{
+    StartTime = new DateTime(2026, 6, 10),
+    EndTime = new DateTime(2026, 6, 14),
+    Text = "Maintenance Window",
+    CanEdit = false,
+    Background = new SolidColorBrush(Color.FromArgb(120, 255, 0, 0))
+});
+```
+
 ## Next Steps
 
 - **Appointments** - Learn how appointments interact with special time regions
 - **Events** - Handle selection and interaction events for time slots
 - **UI Features** - Further customize headers and visual elements
+- **ICS Import/Export** - Round-trip appointments with standard `.ics` files (see [ics-import-export.md](ics-import-export.md))
 
 For appointment management, see [appointments.md](appointments.md).

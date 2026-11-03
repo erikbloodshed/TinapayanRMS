@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class SubAssemblyRoleConfiguration : IEntityTypeConfiguration<SubAssemblyRole>
+public sealed class SubAssemblyRoleConfiguration : IEntityTypeConfiguration<SubAssemblyRole>
 {
     public void Configure(EntityTypeBuilder<SubAssemblyRole> builder)
     {

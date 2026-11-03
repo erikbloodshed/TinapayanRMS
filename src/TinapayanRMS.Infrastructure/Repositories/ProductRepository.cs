@@ -9,7 +9,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductRepository
+public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductRepository
 {
     private static readonly string ProductWithCategorySql = $"""
         SELECT {Columns.Of<Product>("p")}, {Columns.Of<ProductCategory>("c")}
@@ -36,6 +36,24 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 
     public Task<IReadOnlyList<ProductComponent>> GetComponentsForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(dbContext => ProductComponentRepository.GetForProductsAsync(dbContext, productIds, cancellationToken), cancellationToken);
+
+    public async Task<IReadOnlyDictionary<int, decimal>> GetCategoryWastageForProductsAsync(
+        IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
+        productIds.Count == 0
+            ? new Dictionary<int, decimal>()
+            : (await dbContextFactory.QueryAsync<CategoryWastageRow>(
+                $"""
+                SELECT p.id AS product_id, c.wastage_percent
+                FROM products p
+                JOIN product_categories c ON c.id = p.category_id
+                WHERE c.wastage_percent IS NOT NULL AND p.id IN ({DapperReads.IdsTable})
+                """,
+                new { ids = DapperReads.IdList(productIds) },
+                cancellationToken))
+            .ToDictionary(r => r.ProductId, r => r.WastagePercent);
+
+    /// <summary>A product whose category sets its own Wastage %.</summary>
+    private sealed record CategoryWastageRow(int ProductId, decimal WastagePercent);
 
     public Task<IReadOnlyList<ProductComponent>> GetAllComponentsAsync(CancellationToken cancellationToken) =>
         dbContextFactory.QueryAsync<ProductComponent>(
@@ -217,7 +235,7 @@ public class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> dbContex
 
         // Move to Sub-Assemblies: the lines go to a new packaging set, which the packaging links in their place. After
         // the recipe, so the set's name is kept apart from the sub-assemblies this save has just made.
-        if (packagingLink is { IsNewSet: true })
+        if (packagingLink is PackagingLinkDraft.NewSet)
         {
             await PackagingLinkRepository.LinkNewSetAsync(dbContext, fields.Id, packagingLines ?? [], cancellationToken);
         }

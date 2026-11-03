@@ -8,7 +8,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IPackagingLineRepository
+public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IPackagingLineRepository
 {
     public Task<IReadOnlyList<PackagingLine>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(

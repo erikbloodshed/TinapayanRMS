@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure;
 
-public class TinapayanRMSDbContext : DbContext
+public sealed class TinapayanRMSDbContext : DbContext
 {
     public TinapayanRMSDbContext(DbContextOptions<TinapayanRMSDbContext> options)
         : base(options)
@@ -30,7 +30,7 @@ public class TinapayanRMSDbContext : DbContext
     /// <summary>
     /// Points <paramref name="options"/> at PostgreSQL with snake_case table and column names. The app, `dotnet ef` and
     /// the tests all come through here, so none of them can disagree with the names the Dapper reads are written against.
-    /// The server is PostgreSQL 18, and Npgsql 10 otherwise writes its SQL for 14.
+    /// The server is PostgreSQL 18, and Npgsql 11 otherwise writes its SQL for 16.
     /// </summary>
     public static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, string connectionString) =>
         options.UseNpgsql(connectionString, npgsql => npgsql.SetPostgresVersion(18, 0)).UseSnakeCaseNamingConvention();
@@ -95,10 +95,6 @@ public class TinapayanRMSDbContext : DbContext
     public DbSet<PriceScenario> PriceScenarios => Set<PriceScenario>();
 
     public DbSet<PriceScenarioLine> PriceScenarioLines => Set<PriceScenarioLine>();
-
-    public DbSet<SavedPlan> SavedPlans => Set<SavedPlan>();
-
-    public DbSet<SavedPlanLine> SavedPlanLines => Set<SavedPlanLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

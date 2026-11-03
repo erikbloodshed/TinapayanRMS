@@ -67,6 +67,32 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
     }
 
     [Fact]
+    public async Task A_preferred_brand_costs_the_material_and_what_its_made_into_and_dropping_it_goes_back_to_the_dearest()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var repository = CreateRepository();
+        var flour = PurchasedIngredient("Flour", categoryId);
+        flour.PreferredBrand = " Gold ";
+        var flourId = await repository.SaveAsync(flour, [], [("Kingbake", null, 0.05m), ("Gold", null, 0.04m)], addIns: null, Cancellation);
+        var doughId = await AddMadeIngredientAsync("Dough Base", [(flourId, 1000m)]);
+
+        var saved = await repository.GetByIdAsync(flourId, Cancellation);
+        saved!.PreferredBrand.Should().Be("Gold", "trimmed as brands are");
+        saved.CostPerBaseUnit.Should().Be(0.04m, "Gold's price, not Kingbake's dearer one");
+        (await repository.GetByIdAsync(doughId, Cancellation))!.CostPerBaseUnit.Should().Be(0.04m);
+
+        var dearest = PurchasedIngredient("Flour", categoryId, flourId);
+        dearest.BufferedCostPerBaseUnit = saved.BufferedCostPerBaseUnit;
+        await repository.SaveAsync(dearest, [], [("Kingbake", null, 0.05m), ("Gold", null, 0.04m)], addIns: null, Cancellation);
+
+        (await repository.GetByIdAsync(flourId, Cancellation))!.CostPerBaseUnit.Should().Be(0.05m, "no brand picked: the dearest");
+        (await repository.GetByIdAsync(doughId, Cancellation))!.CostPerBaseUnit.Should().Be(0.05m, "the cascade carries it up");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterialPriceHistories.AsNoTracking().OrderBy(h => h.Id).Select(h => h.Brand).ToListAsync(Cancellation))
+            .Should().Equal("Gold", "Kingbake");
+    }
+
+    [Fact]
     public async Task A_new_packaging_material_is_saved_with_its_base_unit_a_unit_and_a_price()
     {
         var categoryId = await SeedCategoryAsync();

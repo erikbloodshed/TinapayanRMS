@@ -48,7 +48,7 @@ public static class W {
 [void][W]::SetThreadDpiAwarenessContext([IntPtr](-4))
 
 $Root = (Resolve-Path "$PSScriptRoot\..\..\..").Path
-$Exe = Join-Path $Root 'src\TinapayanRMS.UI\bin\Debug\net10.0-windows10.0.19041.0\win-x64\TinapayanRMS.UI.exe'
+$Exe = Join-Path $Root 'src\TinapayanRMS.UI\bin\Debug\net11.0-windows10.0.19041.0\win-x64\TinapayanRMS.UI.exe'
 $Shots = Join-Path $env:TEMP 'tinapayanrms-shots'
 New-Item -ItemType Directory -Force $Shots | Out-Null
 

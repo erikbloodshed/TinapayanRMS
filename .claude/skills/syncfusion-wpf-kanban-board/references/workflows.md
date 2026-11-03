@@ -92,14 +92,14 @@ kanban.Workflows = new WorkflowCollection()
     new KanbanWorkflow() 
     { 
         Category = "Open", 
-        AllowedTransitions = { "In Progress" } 
+        AllowedTransitions = new List<object>() { "In Progress" } 
     },
     
     // In Progress -> Closed or Won't Fix
     new KanbanWorkflow() 
     { 
         Category = "In Progress", 
-        AllowedTransitions = { "Closed", "Won't Fix" } 
+        AllowedTransitions = new List<object>() { "Closed", "Won't Fix" } 
     }
 };
 ```
@@ -115,7 +115,6 @@ kanban.Workflows = new WorkflowCollection()
 - Open → Closed ✗
 - Open → Won't Fix ✗
 - In Progress → Open ✗
-- Closed → (anywhere) ✗ (no workflow defined)
 
 ## Workflow Patterns
 
@@ -276,7 +275,7 @@ To make a column read-only (no drops from or to):
 <kanban:KanbanColumn Title="Done" 
                      Categories="Done" 
                      AllowDrag="False" 
-                     AllowDrop="False" />
+                    />
 ```
 
 ## Workflow Rules
@@ -284,13 +283,10 @@ To make a column read-only (no drops from or to):
 ### Rule 1: Exact Category Match
 Workflow Category must match card's Category value exactly (case-sensitive)
 
-### Rule 2: Undefined Workflow
-If no workflow is defined for a category, cards can move to ANY column
-
-### Rule 3: Empty AllowedTransitions
+### Rule 2: Empty AllowedTransitions
 If AllowedTransitions is empty, cards cannot be moved to ANY column
 
-### Rule 4: Multi-Category Columns
+### Rule 3: Multi-Category Columns
 Use exact Category value in workflow, not column's Categories string
 
 **Example:**

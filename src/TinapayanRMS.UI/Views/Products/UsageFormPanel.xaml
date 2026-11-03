@@ -694,7 +694,7 @@
                         <syncfusion:DoubleTextBox Grid.Column="1"
                                                   Width="80"
                                                   controls:FieldUndoStep.Recorder="{Binding}"
-                                                  Value="{Binding UsageForm.EditingUsageWeightPerPiece, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  Value="{Binding UsageForm.EditingUsageWeightPerPiece, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                   NumberDecimalDigits="2"
                                                   ToolTip="What one piece takes of the batch's total weight. Type it, and the yield is worked out." />
                     </Grid>
@@ -709,7 +709,7 @@
                         <syncfusion:DoubleTextBox Grid.Column="1"
                                                   Width="80"
                                                   controls:FieldUndoStep.Recorder="{Binding}"
-                                                  Value="{Binding UsageForm.EditingUsageYield, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  Value="{Binding UsageForm.EditingUsageYield, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                   NumberDecimalDigits="2"
                                                   ToolTip="Pieces one batch makes. Type it, and the weight per piece is worked out." />
                     </Grid>

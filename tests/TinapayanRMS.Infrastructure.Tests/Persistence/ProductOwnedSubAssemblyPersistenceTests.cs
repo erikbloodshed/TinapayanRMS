@@ -28,8 +28,8 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
     private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());
 
     private static NewSubAssemblyDraft Own(
-        int roleId, IReadOnlyList<RecipeLine> lines, int id = 0, string? sectionName = null, decimal weightPerPiece = 10m, bool isOwn = false, bool release = false) =>
-        new(roleId, lines, UsageAuthoredField.WeightPerPiece, weightPerPiece, sectionName) { Id = id, IsOwn = isOwn, Release = release };
+        int roleId, IReadOnlyList<RecipeLine> lines, int id = 0, string? sectionName = null, decimal weightPerPiece = 10m, SectionPlacement? placement = null) =>
+        new(roleId, lines, UsageAuthoredField.WeightPerPiece, weightPerPiece, sectionName) { Id = id, Placement = placement ?? new SectionPlacement.ByRole() };
 
     private async Task<SubAssembly?> FindAsync(int id)
     {
@@ -158,7 +158,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(houseDoughId, UsageAuthoredField.WeightPerPiece, 50m)]));
 
         // Unlink: the linked dough's lines, as a new section of the product's own.
-        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m, isOwn: true)], []));
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m, placement: new SectionPlacement.ProductsOwn())], []));
 
         (await SubAssembliesAsync()).Should().Equal(("House Dough", null), ("Cheese Roll Dough", productId));
         (await CreateSubAssemblyRepository().GetStandaloneAsync(Cancellation)).Select(s => s.Name).Should().Equal(["House Dough"], "the copy isn't on the Sub-Assemblies screen");
@@ -170,10 +170,10 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         await link.Should().ThrowAsync<InvalidOperationException>().WithMessage("*is Cheese Roll's own, so it can't be linked*");
 
         // Saved again with its id, as the Products form does, and in another role that isn't product-owned: still its own.
-        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 900m)], id: ownId, isOwn: true)], []));
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 900m)], id: ownId, placement: new SectionPlacement.ProductsOwn())], []));
         (await FindAsync(ownId))!.OwnerProductId.Should().Be(productId);
 
-        await SaveRecipeAsync(productId, new RecipeDraft([Own(toppingRoleId, [(flourId, 900m)], id: ownId, isOwn: true)], []));
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(toppingRoleId, [(flourId, 900m)], id: ownId, placement: new SectionPlacement.ProductsOwn())], []));
         var moved = (await FindAsync(ownId))!;
         moved.OwnerProductId.Should().Be(productId, "it was never the role's, so moving it doesn't release it");
         moved.Name.Should().Be("Cheese Roll Topping");
@@ -191,7 +191,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
 
         // Moved with a line typed in the same save: the lines are written as they show, then it's released.
         await SaveRecipeAsync(productId, new RecipeDraft(
-            [Own(fillingRoleId, [(cheeseId, 100m), (milkId, 50m)], id: fillingId, sectionName: "Cheese", weightPerPiece: 12m, release: true)], []));
+            [Own(fillingRoleId, [(cheeseId, 100m), (milkId, 50m)], id: fillingId, sectionName: "Cheese", weightPerPiece: 12m, placement: new SectionPlacement.MoveToSubAssemblies())], []));
 
         var moved = (await FindAsync(fillingId))!;
         moved.OwnerProductId.Should().BeNull("it's on the Sub-Assemblies screen now, even in a product-owned role");
@@ -219,10 +219,10 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         var doughRoleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour");
         var productId = await AddProductAsync("Cheese Roll");
-        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], isOwn: true)], []));
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], placement: new SectionPlacement.ProductsOwn())], []));
         var doughId = await SubAssemblyIdAsync(productId, doughRoleId);
 
-        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], id: doughId, isOwn: true, release: true)], []));
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], id: doughId, placement: new SectionPlacement.MoveToSubAssemblies())], []));
 
         (await SubAssembliesAsync()).Should().Equal(("Cheese Roll Dough", null));
         (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Single().SubAssemblyId.Should().Be(doughId);
@@ -235,7 +235,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         var cheeseId = await AddIngredientAsync("Cheese");
         var productId = await AddProductAsync("Cheese Roll");
 
-        await SaveRecipeAsync(productId, new RecipeDraft([Own(fillingRoleId, [(cheeseId, 100m)], isOwn: true, release: true)], []));
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(fillingRoleId, [(cheeseId, 100m)], placement: new SectionPlacement.MoveToSubAssemblies())], []));
 
         (await SubAssembliesAsync()).Should().Equal(("Cheese Roll Filling", null));
     }
@@ -246,7 +246,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         var doughRoleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour");
         var sourceId = await AddProductAsync("Cheese Roll");
-        await SaveRecipeAsync(sourceId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], isOwn: true)], []));
+        await SaveRecipeAsync(sourceId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], placement: new SectionPlacement.ProductsOwn())], []));
         var sourceDoughId = await SubAssemblyIdAsync(sourceId, doughRoleId);
 
         var cloneId = await new ProductCloner(CreateDbContextFactory()).CloneAsync(sourceId, "Cheese Roll Mini", Cancellation);
@@ -263,7 +263,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         var doughRoleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour");
         var productId = await AddProductAsync("Cheese Roll");
-        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], isOwn: true)], []));
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 1000m)], placement: new SectionPlacement.ProductsOwn())], []));
         var role = await RoleAsync(doughRoleId);
 
         role.Name = "Bread Dough";

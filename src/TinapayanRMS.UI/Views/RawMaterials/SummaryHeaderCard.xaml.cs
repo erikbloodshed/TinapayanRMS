@@ -9,7 +9,7 @@ namespace TinapayanRMS.UI.Views.RawMaterials;
 /// New/Save/Delete, and its type, category, source and weight loss. Inherits the Raw Materials
 /// screen's DataContext (RawMaterialsViewModel).
 /// </summary>
-public partial class SummaryHeaderCard : UserControl
+public sealed partial class SummaryHeaderCard : UserControl
 {
     public SummaryHeaderCard()
     {

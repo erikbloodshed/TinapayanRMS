@@ -11,7 +11,7 @@ namespace TinapayanRMS.Infrastructure.Repositories;
 /// The log of prices a material has been costed at. Entries are added by RawMaterialBrandPriceRepository
 /// when a material's cost moves; deleting one only tidies the log, and never reprices anything.
 /// </summary>
-public class RawMaterialPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialPriceHistoryRepository
+public sealed class RawMaterialPriceHistoryRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IRawMaterialPriceHistoryRepository
 {
     /// <summary>Newest first, each with its unit (if any) and that unit's unit of measure.</summary>
     public Task<IReadOnlyList<RawMaterialPriceHistory>> GetForRawMaterialAsync(int rawMaterialId, CancellationToken cancellationToken) =>

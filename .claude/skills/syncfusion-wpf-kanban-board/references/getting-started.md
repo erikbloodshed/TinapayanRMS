@@ -223,7 +223,7 @@ kanban.ItemsSource = new ViewModel().TaskDetails;
 
 ### Step 3: Define Indicator Colors
 
-Map `IndicatorColorKey` values to actual colors:
+Map `ColorKey` values to each indicator key:
 
 **XAML:**
 ```xml
@@ -427,7 +427,7 @@ Apply built-in themes to the `Kanban` using `SfSkinManager`.
 - Office2019Colorful / Office2019Black / Office2019White
 - SystemTheme
 - Material3Light / Material3Dark
-- Windows11LighT / Windows11Dark
+- Windows11Light / Windows11Dark
 
 ### Applying Theme via SfSkinManager
 
@@ -504,7 +504,7 @@ public ObservableCollection<KanbanModel> Tasks { get; set; }
                          Categories="Open,New" />
     <kanban:KanbanColumn Title="Active" 
                          Categories="In Progress" 
-                         MaximumCount="5" />
+                         MaximumLimit="5" />
     <kanban:KanbanColumn Title="Complete" 
                          Categories="Done,Closed" />
 </kanban:SfKanban>

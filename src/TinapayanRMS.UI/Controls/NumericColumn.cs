@@ -14,14 +14,20 @@ namespace TinapayanRMS.UI.Controls;
 /// the constructor instead, and any of them set in XAML still wins because XAML assigns its
 /// attributes after the constructor runs. Out of the box GridNumericColumn doesn't group at all
 /// (NumberGroupSizes is [0]) and centres its header.
+/// <para>
+/// It also parses an edit as a decimal (ParsingMode Decimal), so 6.67 typed is 6.67. The editor holds a double, and
+/// the default (ParsingMode Double) hands that to WPF to turn into the row's decimal, which since .NET 11 keeps the
+/// double's exact binary value: 6.6699999999999999289457264240. Decimal parses the double's text instead.
+/// </para>
 /// </summary>
-public class NumericColumn : GridNumericColumn
+public sealed class NumericColumn : GridNumericColumn
 {
     public NumericColumn()
     {
         NumberGroupSeparator = ",";
         NumberGroupSizes = [3];
         HorizontalHeaderContentAlignment = HorizontalAlignment.Right;
+        ParsingMode = ParseMode.Decimal;
     }
 
     public static readonly DependencyProperty TypedDecimalDigitsProperty = DependencyProperty.Register(

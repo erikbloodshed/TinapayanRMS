@@ -7,7 +7,7 @@ namespace TinapayanRMS.UI.Views.RawMaterials;
 /// one's weight and cost, and what they work out to. Inherits the Raw Materials screen's DataContext
 /// (RawMaterialsViewModel).
 /// </summary>
-public partial class LinkedCostCard : UserControl
+public sealed partial class LinkedCostCard : UserControl
 {
     public LinkedCostCard()
     {

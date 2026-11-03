@@ -9,7 +9,7 @@ using TinapayanRMS.Infrastructure.Services;
 
 namespace TinapayanRMS.Infrastructure.Repositories;
 
-public class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IPackagingLinkRepository
+public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IPackagingLinkRepository
 {
     // ProductId is unique, so there's at most one link.
     public async Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
@@ -90,21 +90,27 @@ public class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbContext> db
     /// Makes <paramref name="productId"/>'s packaging link what <paramref name="link"/> says, on the caller's context and
     /// saved: another product's packaging, a packaging set, or (<see cref="PackagingLinkDraft.None"/>) no link at all.
     /// Removing a link here drops it and nothing more: unlike RemoveLinkAsync, the caller writes whatever lines the
-    /// product owns from then on (ProductRepository.SaveAsync, whose form already holds them).
+    /// product owns from then on (ProductRepository.SaveAsync, whose form already holds them). A new set made of the
+    /// product's lines (<see cref="PackagingLinkDraft.NewSet"/>) is linked by <see cref="LinkNewSetAsync"/> instead.
     /// </summary>
     internal static async Task SetAsync(TinapayanRMSDbContext dbContext, int productId, PackagingLinkDraft link, CancellationToken cancellationToken)
     {
-        if (link.LinkedSubAssemblyId is { } setId)
+        switch (link)
         {
-            await SetSetLinkAsync(dbContext, productId, setId, cancellationToken);
-        }
-        else if (link.LinkedProductId is { } linkedProductId)
-        {
-            await SetProductLinkAsync(dbContext, productId, linkedProductId, cancellationToken);
-        }
-        else
-        {
-            await dbContext.PackagingLinks.Where(l => l.ProductId == productId).ExecuteDeleteAsync(cancellationToken);
+            case PackagingLinkDraft.Set(var setId):
+                await SetSetLinkAsync(dbContext, productId, setId, cancellationToken);
+                break;
+
+            case PackagingLinkDraft.OtherProduct(var linkedProductId):
+                await SetProductLinkAsync(dbContext, productId, linkedProductId, cancellationToken);
+                break;
+
+            case PackagingLinkDraft.None:
+                await dbContext.PackagingLinks.Where(l => l.ProductId == productId).ExecuteDeleteAsync(cancellationToken);
+                break;
+
+            case PackagingLinkDraft.NewSet:
+                throw new ArgumentException("A new set is made of the product's lines, so LinkNewSetAsync links it.", nameof(link));
         }
     }
 

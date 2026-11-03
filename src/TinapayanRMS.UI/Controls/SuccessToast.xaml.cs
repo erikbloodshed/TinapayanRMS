@@ -14,7 +14,7 @@ namespace TinapayanRMS.UI.Controls;
 /// after it opens, unless the mouse is over it; its close button hides it at once. RunSafelyAsync
 /// clears the message before every action, so a second save shows it again, and an error replaces it.
 /// </summary>
-public partial class SuccessToast : UserControl
+public sealed partial class SuccessToast : UserControl
 {
     public static readonly DependencyProperty MessageProperty = DependencyProperty.Register(
         nameof(Message), typeof(string), typeof(SuccessToast), new PropertyMetadata(null, OnMessageChanged));

@@ -10,45 +10,51 @@ using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI.ViewModels;
 
-public enum PrintScopeKind
-{
-    ThisProduct,
-    Folder,
-    AllProducts,
-}
-
 /// <summary>
 /// What the Print tab prints: the product the Products screen has open, a folder of the Products list (a stage, or a
 /// category or Uncategorized in one), or every product.
 /// </summary>
 /// <param name="Label">What the tab's Print choice reads: "This product", "Breads · Production", "All products".</param>
-/// <param name="Title">A set's title over its contents, and in the job's name; null for This product.</param>
-public sealed record PrintScope(PrintScopeKind Kind, string Label, string? Title = null, ProductStage Stage = default, int? CategoryId = null, bool IsStage = false)
+public closed record PrintScope(string Label)
 {
-    public static PrintScope ThisProduct { get; } = new(PrintScopeKind.ThisProduct, "This product");
-
-    public static PrintScope AllProducts { get; } = new(PrintScopeKind.AllProducts, "All products", "All Products");
-
-    /// <summary>A folder of the list: "Production" for a stage's, "Breads · Production" for a category's, or "Uncategorized · Production".</summary>
-    public static PrintScope Folder(ProductFolderNode folder)
-    {
-        var title = folder.IsStage ? folder.Title : $"{folder.Title} · {ProductFolderNode.StageTitle(folder.Stage)}";
-        return new(PrintScopeKind.Folder, title, title, folder.Stage, folder.CategoryId, folder.IsStage);
-    }
+    /// <summary>A set's title over its contents, and in the job's name; null for This product.</summary>
+    public virtual string? Title => null;
 
     /// <summary>
     /// <paramref name="product"/> is in the set: any product for All products; for a folder, its stage's, and in a
     /// category's folder that category's, in Uncategorized a product with none.
     /// </summary>
-    public bool Holds(Product product) => Kind switch
+    public bool Holds(Product product) => this switch
     {
-        PrintScopeKind.AllProducts => true,
-        PrintScopeKind.Folder => product.Stage == Stage && (IsStage || product.CategoryId == CategoryId),
-        _ => false,
+        ThisProduct => false,
+        Folder folder => product.Stage == folder.Stage && (folder.IsStage || product.CategoryId == folder.CategoryId),
+        AllProducts => true,
     };
 
-    /// <summary>Its label, which a screen reader reads for the dropdown's choice.</summary>
-    public override string ToString() => Label;
+    /// <summary>
+    /// Its label, which a screen reader reads for the dropdown's choice. Sealed, so each case keeps it rather than
+    /// a record's own "Folder { Label = … }".
+    /// </summary>
+    public sealed override string ToString() => Label;
+
+    /// <summary>The product the Products screen has open, unsaved edits included.</summary>
+    public sealed record ThisProduct() : PrintScope("This product");
+
+    /// <summary>A folder of the list: "Production" for a stage's, "Breads · Production" for a category's, or "Uncategorized · Production".</summary>
+    public sealed record Folder(string Label, ProductStage Stage, int? CategoryId, bool IsStage) : PrintScope(Label)
+    {
+        public Folder(ProductFolderNode folder)
+            : this(folder.IsStage ? folder.Title : $"{folder.Title} · {ProductFolderNode.StageTitle(folder.Stage)}", folder.Stage, folder.CategoryId, folder.IsStage)
+        {
+        }
+
+        public override string? Title => Label;
+    }
+
+    public sealed record AllProducts() : PrintScope("All products")
+    {
+        public override string? Title => "All Products";
+    }
 }
 
 /// <summary>
@@ -86,9 +92,9 @@ public sealed class PrintTabViewModel : ViewModelBase
     }
 
     /// <summary>The choices the tab offers: This product, the folder a menu asked for (while there is one), All products.</summary>
-    public ObservableCollection<PrintScope> Scopes { get; } = [PrintScope.ThisProduct, PrintScope.AllProducts];
+    public ObservableCollection<PrintScope> Scopes { get; } = [new PrintScope.ThisProduct(), new PrintScope.AllProducts()];
 
-    private PrintScope _selectedScope = PrintScope.ThisProduct;
+    private PrintScope _selectedScope = new PrintScope.ThisProduct();
     /// <summary>The choice showing. The dropdown clears its pick while the folder it showed goes, and that's ignored.</summary>
     public PrintScope SelectedScope
     {
@@ -135,9 +141,9 @@ public sealed class PrintTabViewModel : ViewModelBase
     /// </summary>
     public void Pick(PrintScope scope)
     {
-        if (scope.Kind == PrintScopeKind.Folder && !Scopes.Contains(scope))
+        if (scope is PrintScope.Folder && !Scopes.Contains(scope))
         {
-            foreach (var folder in Scopes.Where(s => s.Kind == PrintScopeKind.Folder).ToList())
+            foreach (var folder in Scopes.OfType<PrintScope.Folder>().ToList())
             {
                 Scopes.Remove(folder);
             }
@@ -161,11 +167,14 @@ public sealed class PrintTabViewModel : ViewModelBase
         var preparing = new CancellationTokenSource();
         var previous = _preparing;
         _preparing = preparing;
-        previous?.Cancel();
+        if (previous is not null)
+        {
+            await previous.CancelAsync();
+        }
 
         try
         {
-            if (SelectedScope.Kind == PrintScopeKind.ThisProduct)
+            if (SelectedScope is PrintScope.ThisProduct)
             {
                 PrepareThisProduct();
             }
@@ -196,13 +205,20 @@ public sealed class PrintTabViewModel : ViewModelBase
 
     private void PrepareThisProduct()
     {
-        var (printout, problem) = _products.PreparePrintout();
-        Note = problem is null
-            ? null
-            : $"These pages are the product as it was: the open sub-assembly form on Products can't be applied yet. {problem}";
-        if (printout is not null)
+        switch (_products.PreparePrintout())
         {
-            PrintSet = ProductPrintSet.Of(printout);
+            case ProductPrintout printout:
+                Note = null;
+                PrintSet = ProductPrintSet.Of(printout);
+                break;
+
+            case PrintProblem(var problem):
+                Note = $"These pages are the product as it was: the open sub-assembly form on Products can't be applied yet. {problem}";
+                break;
+
+            case null:
+                Note = null;
+                break;
         }
     }
 

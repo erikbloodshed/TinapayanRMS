@@ -5,6 +5,32 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 public class CostingRulesTests
 {
+    public static TheoryData<decimal, decimal, decimal> PricesRoundedUp => new()
+    {
+        { 43.24m, 0.25m, 43.25m },
+        { 43.25m, 0.25m, 43.25m },
+        { 43.24m, 1m, 44m },
+        { 43.24m, 5m, 45m },
+        { 43.2401m, 0m, 43.2401m },
+    };
+
+    [Theory]
+    [MemberData(nameof(PricesRoundedUp))]
+    public void RoundPriceUp_goes_up_to_the_next_multiple_never_down(decimal price, decimal step, decimal expected) =>
+        CostingRules.RoundPriceUp(price, step).Should().Be(expected);
+
+    [Fact]
+    public void EnsureValidPriceRoundingStep_takes_only_the_offered_steps()
+    {
+        foreach (var step in CostingRules.PriceRoundingSteps)
+        {
+            CostingRules.EnsureValidPriceRoundingStep(step);
+        }
+
+        var act = () => CostingRules.EnsureValidPriceRoundingStep(0.3m);
+        act.Should().Throw<BusinessRuleException>();
+    }
+
     [Fact]
     public void EnsureValidParameters_rejects_negative_labor_cost()
     {
@@ -160,12 +186,13 @@ public class CostingRulesTests
         act.Should().NotThrow();
     }
 
+    public static TheoryData<decimal> WastagesOutOfRange => [-0.01m, 100.01m];
+
     [Theory]
-    [InlineData(-0.01)]
-    [InlineData(100.01)]
-    public void EnsureValidWastage_refuses_a_wastage_outside_0_to_100(double wastagePercent)
+    [MemberData(nameof(WastagesOutOfRange))]
+    public void EnsureValidWastage_refuses_a_wastage_outside_0_to_100(decimal wastagePercent)
     {
-        var act = () => CostingRules.EnsureValidWastage((decimal)wastagePercent);
+        var act = () => CostingRules.EnsureValidWastage(wastagePercent);
 
         act.Should().Throw<BusinessRuleException>().WithMessage("*wastage*");
     }

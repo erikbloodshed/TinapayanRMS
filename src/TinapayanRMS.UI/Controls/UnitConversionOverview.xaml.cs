@@ -10,7 +10,7 @@ namespace TinapayanRMS.UI.Controls;
 /// pointing down into the item's base unit. Each item in ItemsSource needs a UnitName and a
 /// BaseEquivalentText property, which the ingredient and packaging unit rows both have.
 /// </summary>
-public partial class UnitConversionOverview : UserControl
+public sealed partial class UnitConversionOverview : UserControl
 {
     public static readonly DependencyProperty ItemsSourceProperty = DependencyProperty.Register(
         nameof(ItemsSource), typeof(IEnumerable), typeof(UnitConversionOverview), new PropertyMetadata(null, OnItemsSourceChanged));

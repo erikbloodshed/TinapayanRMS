@@ -217,15 +217,18 @@ Apply predefined color schemes to series.
 Add watermark text to the chart:
 
 ```xml
-<syncfusion:SfChart Watermark="Confidential">
-    <syncfusion:SfChart.WatermarkStyle>
-        <Style TargetType="TextBlock">
-            <Setter Property="FontSize" Value="60"/>
-            <Setter Property="Foreground" Value="LightGray"/>
-            <Setter Property="Opacity" Value="0.3"/>
-        </Style>
-    </syncfusion:SfChart.WatermarkStyle>
-</syncfusion:SfChart>
+<chart:SfChart.Watermark>
+    <chart:Watermark
+        VerticalAlignment="Center"
+        HorizontalAlignment="Center">
+        <chart:Watermark.Content>
+            <TextBlock
+                Text="Metals"
+                FontSize="70"
+                Foreground="Black"/>
+        </chart:Watermark.Content>
+    </chart:Watermark>
+</chart:SfChart.Watermark>
 ```
 
 ## Themes

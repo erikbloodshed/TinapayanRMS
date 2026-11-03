@@ -5,7 +5,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// or a new price per its purchase unit. Exactly one of the two is stored, so a scenario opened after the price has moved
 /// applies a percentage to the price then, and keeps a typed price as it was.
 /// </summary>
-public class PriceScenarioLine
+public sealed class PriceScenarioLine
 {
     public int Id { get; set; }
 

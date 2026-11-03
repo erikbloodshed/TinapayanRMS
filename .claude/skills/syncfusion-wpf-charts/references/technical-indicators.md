@@ -244,9 +244,9 @@ Combine indicators for comprehensive analysis:
                              YAxis="{Binding ElementName=rsiAxis}"/>
     
     <!-- Axes -->
-    <syncfusion:SfChart.SecondaryAxis>
+    <syncfusion:SfChart.PrimaryAxis>
         <syncfusion:NumericalAxis x:Name="primaryAxis"/>
-    </syncfusion:SfChart.SecondaryAxis>
+    </syncfusion:SfChart.PrimaryAxis>
     
     <syncfusion:SfChart.SecondaryAxis>
         <syncfusion:NumericalAxis x:Name="rsiAxis"

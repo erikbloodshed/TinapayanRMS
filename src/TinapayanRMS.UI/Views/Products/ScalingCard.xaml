@@ -36,6 +36,59 @@
             </TextBlock>
         </Grid>
 
+        <!--
+            The other way round (2026-10-29): how many sellable units an amount of one ingredient makes, the most whose
+            whole batches it's enough for. Scale to puts that in Sellable Units. Nothing here is saved.
+        -->
+        <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="From What You Have" Style="{StaticResource FormLabelStyle}" />
+            <syncfusion:ComboBoxAdv Grid.Column="1"
+                                    ItemsSource="{Binding ScalingIngredients}"
+                                    SelectedItem="{Binding ScalingHaveIngredient, Mode=TwoWay}"
+                                    DisplayMemberPath="Name"
+                                    IsEditable="True"
+                                    AutoCompleteMode="Suggest"
+                                    DefaultText="Ingredient"
+                                    ToolTip="An ingredient there's only so much of: the tab works out how many it makes." />
+            <syncfusion:DoubleTextBox Grid.Column="2"
+                                      Width="110"
+                                      Margin="8,0,0,0"
+                                      MinValue="0"
+                                      NumberDecimalDigits="2"
+                                      UseNullOption="True"
+                                      WatermarkText="Amount"
+                                      Value="{Binding ScalingHaveAmount, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
+            <syncfusion:ComboBoxAdv Grid.Column="3"
+                                    Width="90"
+                                    Margin="6,0,0,0"
+                                    ItemsSource="{Binding ScalingHaveUnits}"
+                                    SelectedItem="{Binding ScalingHaveUnit, Mode=TwoWay}"
+                                    DisplayMemberPath="Name"
+                                    ToolTip="Grams, or one of the ingredient's own units." />
+            <syncfusion:ButtonAdv Grid.Column="4"
+                                  Margin="10,0,0,0"
+                                  Label="{Binding ScaleToHaveLabel}"
+                                  IconTemplate="{StaticResource ApplyIconTemplate}"
+                                  Command="{Binding ScaleToHaveCommand}"
+                                  Visibility="{Binding HasScalingHaveMakes, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                  ToolTip="Puts this in Sellable Units, so the table shows it." />
+            <TextBlock Grid.Column="5"
+                       Margin="10,0,0,0"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       Text="{Binding ScalingHaveText}"
+                       Style="{StaticResource CaptionStyle}" />
+        </Grid>
+
         <TextBlock DockPanel.Dock="Top"
                    Margin="0,0,0,8"
                    TextWrapping="Wrap"

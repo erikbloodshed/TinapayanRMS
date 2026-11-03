@@ -27,7 +27,7 @@ using TinapayanRMS.UI.Views;
 
 namespace TinapayanRMS.UI;
 
-public partial class App : Application
+public sealed partial class App : Application
 {
     /// <summary>The height of every text box and button, in device-independent pixels.</summary>
     private const double ControlHeight = 24;
@@ -41,6 +41,12 @@ public partial class App : Application
 
     // Set by RestartAfterExit: the app starts again once this one has closed.
     private bool _restartOnExit;
+
+    /// <summary>
+    /// Closing to start again after a restore (RestartAfterExit). The main window doesn't ask about unsaved changes then:
+    /// the restore replaced the data they were made to, and its question already said they'd be lost.
+    /// </summary>
+    public bool IsRestarting => _restartOnExit;
 
     static App()
     {
@@ -242,23 +248,27 @@ public partial class App : Application
         mainWindow.Show();
 
         _ = WarnOfPendingMigrationsAsync(_host.Services.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>());
-        _ = BackUpDailyAsync(_host.Services.GetRequiredService<IDatabaseBackups>());
+        // The day's automatic backup now, and checked again every hour, so a copy left open over midnight takes the next day's.
+        var automaticBackups = _host.Services.GetRequiredService<AutomaticBackups>();
+        _ = BackUpDailyAsync(automaticBackups);
+        _backupTimer = new DispatcherTimer { Interval = AutomaticBackups.CheckEvery };
+        _backupTimer.Tick += (_, _) => _ = BackUpDailyAsync(automaticBackups);
+        _backupTimer.Start();
     }
+
+    // Checks every hour whether the day's automatic backup is due (OnStartup).
+    private DispatcherTimer? _backupTimer;
 
     /// <summary>
     /// The day's automatic backup, the first time the app starts each day (Settings → Database), off the UI thread once
     /// the window shows, so the app starts no later. It says nothing on screen: a backup that couldn't be taken is logged,
     /// and the next start tries again, since none was taken that day.
     /// </summary>
-    private static async Task BackUpDailyAsync(IDatabaseBackups backups)
+    private static async Task BackUpDailyAsync(AutomaticBackups backups)
     {
         try
         {
-            var backup = await Task.Run(() => backups.BackUpDailyIfDueAsync(DateTime.Now, CancellationToken.None));
-            if (backup is not null)
-            {
-                Log.Information("Took the day's automatic backup: {Path}", backup.Path);
-            }
+            await Task.Run(() => backups.RunAsync(DateTime.Now, CancellationToken.None));
         }
         catch (Exception ex)
         {
@@ -341,7 +351,7 @@ public partial class App : Application
 
         if (_restartOnExit && Environment.ProcessPath is { } path)
         {
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = false, WorkingDirectory = AppContext.BaseDirectory })?.Dispose();
+            Process.StartAndForget(new ProcessStartInfo(path) { WorkingDirectory = AppContext.BaseDirectory });
         }
     }
 

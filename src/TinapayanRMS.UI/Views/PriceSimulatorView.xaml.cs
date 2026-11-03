@@ -10,7 +10,7 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 namespace TinapayanRMS.UI.Views;
 
 /// <summary>The Price Simulator screen: price changes to try, and every product's figures with them.</summary>
-public partial class PriceSimulatorView : UserControl
+public sealed partial class PriceSimulatorView : UserControl
 {
     public PriceSimulatorView(PriceSimulatorViewModel viewModel)
     {

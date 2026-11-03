@@ -5,7 +5,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// everything it used at that moment. Self-contained (<see cref="Content"/> points at nothing), so a material, sub-assembly
 /// or role deleted since leaves it readable. Recorded only when the recipe or price differs from the version before.
 /// </summary>
-public class ProductVersion
+public sealed class ProductVersion
 {
     public int Id { get; set; }
 

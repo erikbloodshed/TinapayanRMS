@@ -7,7 +7,7 @@ using TinapayanRMS.Infrastructure.Repositories;
 
 namespace TinapayanRMS.Infrastructure.Services;
 
-public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductCloner
+public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductCloner
 {
     public Task<int> CloneAsync(int sourceProductId, string newProductName, CancellationToken cancellationToken) =>
         CreateFromAsync(sourceProductId, newProductName, asVariant: false, cancellationToken);
@@ -160,7 +160,7 @@ public class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbContextFac
                     SubAssemblyRules.SectionLabel(subAssembly.Name, sourceName, subAssembly.Role!.Name))
                 {
                     // Its own whatever its role: the source's may have been unlinked in a role that isn't product-owned.
-                    IsOwn = true,
+                    Placement = new SectionPlacement.ProductsOwn(),
                 });
                 continue;
             }

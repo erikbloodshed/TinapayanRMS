@@ -8,7 +8,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// list, alternative units and price history; the type decides where a material can be used and
 /// what its base unit is (TinapayanRMS.ApplicationCore.RawMaterialRules).
 /// </summary>
-public class RawMaterial
+public sealed class RawMaterial
 {
     public int Id { get; set; }
 
@@ -76,6 +76,21 @@ public class RawMaterial
     /// always 0: its components are already buffered, so it adds none of its own.
     /// </summary>
     public decimal CostBufferPercent { get; set; }
+
+    /// <summary>
+    /// Purchased only: the buffer percent last typed for it, 0 to 100 (2026-10-29), which <see cref="CostBufferPercent"/> drifts
+    /// from as prices change, since the buffered cost stays fixed. What Re-apply Target puts back on top of the dearest brand.
+    /// Null for one saved before it was kept, which takes <see cref="CostBufferPercent"/> as it was last saved instead
+    /// (RawMaterialRules.TargetBufferPercentOf), and for a made or linked ingredient.
+    /// </summary>
+    public decimal? TargetCostBufferPercent { get; set; }
+
+    /// <summary>
+    /// Purchased only: the brand its cost comes from (2026-10-29, at the user's request: cost by preferred brand), the
+    /// dearest of that brand's prices when it's priced in more than one unit. Null for the dearest brand, as before, which
+    /// is also what a brand that no longer has a price falls back to (RawMaterialRules.FindCostBrandPrice).
+    /// </summary>
+    public string? PreferredBrand { get; set; }
 
     /// <summary>
     /// The cost of one base unit with the buffer on top: what recipes, sub-assemblies, packaging lines

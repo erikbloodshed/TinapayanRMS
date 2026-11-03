@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class UsageAddInLineConfiguration : IEntityTypeConfiguration<UsageAddInLine>
+public sealed class UsageAddInLineConfiguration : IEntityTypeConfiguration<UsageAddInLine>
 {
     public void Configure(EntityTypeBuilder<UsageAddInLine> builder)
     {

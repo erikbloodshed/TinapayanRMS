@@ -58,12 +58,7 @@
                 </StackPanel>
                 <StackPanel x:Name="IncludeBar" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="Include" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,0" />
-                    <CheckBox x:Name="PlanCosts"
-                              Content="Costs"
-                              IsChecked="{Binding IncludeCosting, Mode=TwoWay}"
-                              ToolTip="Each material's cost, and the total. Without them the purchase requisition shows only the amounts, for the kitchen or the market."
-                              VerticalAlignment="Center" />
-                    <StackPanel x:Name="ProductParts" Orientation="Horizontal" Visibility="Collapsed">
+                    <StackPanel x:Name="ProductParts" Orientation="Horizontal">
                         <CheckBox Content="Recipe"
                                   IsChecked="{Binding IncludeRecipe, Mode=TwoWay}"
                                   IsEnabled="{Binding IncludeCosting}"

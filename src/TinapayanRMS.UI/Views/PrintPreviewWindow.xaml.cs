@@ -15,7 +15,7 @@ namespace TinapayanRMS.UI.Views;
 /// the pane goes into it: a PrintPreview already in a window when SfSkinManager themes the window throws
 /// (PrintPreviewThemeOrderTests), so whoever opens this mustn't theme it again.
 /// </summary>
-public partial class PrintPreviewWindow : AppWindow
+public sealed partial class PrintPreviewWindow : AppWindow
 {
     /// <summary>One printout: the Production Plan's.</summary>
     public PrintPreviewWindow(ProductPrintSet set, Theme theme)
@@ -34,11 +34,6 @@ public partial class PrintPreviewWindow : AppWindow
         Title = set.Title ?? "Print";
         Heading.Text = $"Print: {Title}";
         SfSkinManager.SetTheme(this, theme);
-
-        // A plan has only its costs to leave out; products have their recipe and their costing.
-        var isPlan = set.Plan is not null;
-        PlanCosts.Visibility = isPlan ? Visibility.Visible : Visibility.Collapsed;
-        ProductParts.Visibility = isPlan ? Visibility.Collapsed : Visibility.Visible;
 
         // Both go with the window: disposed when it closes.
         var manager = new ProductPrintManager(set);

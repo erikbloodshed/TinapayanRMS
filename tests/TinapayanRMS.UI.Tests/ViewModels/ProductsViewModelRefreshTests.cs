@@ -624,6 +624,30 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.History.IsDirty.Should().BeFalse("the shop's wastage isn't an edit of the product");
     }
 
+    [Fact]
+    public async Task A_category_with_its_own_wastage_prices_the_product_put_in_it_at_once()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 1700m)], weightPerPiece: 60m);
+        var categories = new ProductCategoryRepository(CreateDbContextFactory());
+        await categories.AddAsync(new ProductCategory { Name = "Breads", WastagePercent = 10m }, Cancellation);
+        await categories.AddAsync(new ProductCategory { Name = "Cakes" }, Cancellation);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single();
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+        viewModel.Costing.Costs.WastagePercent.Should().Be(3m, "no category: the shop-wide one");
+
+        viewModel.EditingCategory = viewModel.Categories.Single(c => c.Name == "Breads");
+
+        viewModel.Costing.Costs.WastagePercent.Should().Be(10m);
+        viewModel.Costing.Costs.Wastage.Should().Be(0.3m, "10% of the ₱3 a piece takes");
+
+        viewModel.EditingCategory = viewModel.Categories.Single(c => c.Name == "Cakes");
+        viewModel.Costing.Costs.WastagePercent.Should().Be(3m, "Cakes leaves it to the shop-wide one");
+    }
+
     /// <summary>
     /// A section made in a product-owned role is written for the one piece it goes into, so its form starts at a yield
     /// of 1 where any other starts with no size: the weight per piece is the whole batch, and

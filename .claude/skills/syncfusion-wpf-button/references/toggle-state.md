@@ -7,7 +7,7 @@ scenario where a button represents a persistent on/off state.
 ## Table of Contents
 - [Enabling Toggle Behavior](#enabling-toggle-behavior)
 - [Setting Initial Checked State](#setting-initial-checked-state)
-- [Checked and Unchecked Events](#checked-and-unchecked-events)
+- [Checked Event](#checked-event)
 - [Click Event](#click-event)
 - [Combining Toggle with MVVM](#combining-toggle-with-mvvm)
 - [Common Patterns](#common-patterns)
@@ -17,7 +17,7 @@ scenario where a button represents a persistent on/off state.
 ## Enabling Toggle Behavior
 
 Set `IsCheckable="True"` to make the button act as a toggle. When clicked, it alternates between
-checked and unchecked states, visually highlighting when active.
+checked state, visually highlighting when active.
 
 ```xaml
 <syncfusion:ButtonAdv Label="Bold"
@@ -59,36 +59,26 @@ button.IsChecked = true;  // Starts in checked/on state
 
 ---
 
-## Checked and Unchecked Events
+## Checked Event
 
-Subscribe to `Checked` and `Unchecked` to respond when the toggle state changes.
+Subscribe to `Checked` to respond when the toggle state changes.
 
 **XAML:**
 ```xaml
 <syncfusion:ButtonAdv Label="Bold"
                       IsCheckable="True"
-                      Checked="Bold_Checked"
-                      Unchecked="Bold_Unchecked"/>
+                      Checked="Bold_Checked"/>
 ```
 
 **Code-behind:**
 ```csharp
 private void Bold_Checked(object sender, RoutedEventArgs e)
 {
-    // Apply bold formatting
-    richTextBox.Selection.ApplyPropertyValue(
-        TextElement.FontWeightProperty, FontWeights.Bold);
-}
-
-private void Bold_Unchecked(object sender, RoutedEventArgs e)
-{
-    // Remove bold formatting
-    richTextBox.Selection.ApplyPropertyValue(
-        TextElement.FontWeightProperty, FontWeights.Normal);
+    // Apply bold formatting.
 }
 ```
 
-> **Note:** `Checked` and `Unchecked` only fire when `IsCheckable="True"`. On a standard
+> **Note:** `Checked` only fire when `IsCheckable="True"`. On a standard
 > (non-checkable) button, these events never trigger.
 
 ---
@@ -182,16 +172,19 @@ public class EditorViewModel : INotifyPropertyChanged
                       SizeMode="Normal"
                       SmallIcon="Images/sidebar.png"
                       IsCheckable="True"
-                      Checked="ShowSidebar"
-                      Unchecked="HideSidebar"/>
+                      Checked="OnChecked"/>
 ```
 
 ```csharp
-private void ShowSidebar(object sender, RoutedEventArgs e) =>
-    SidebarColumn.Width = new GridLength(250);
-
-private void HideSidebar(object sender, RoutedEventArgs e) =>
-    SidebarColumn.Width = new GridLength(0);
+private void OnChecked(object sender, RoutedEventArgs e)
+{
+    var button = sender as ButtonAdv;
+    if (button != null)
+    {
+        this.sidebarToggle.Width = button.IsChecked == true ? 100 : 350;
+        this.sidebarToggle.Height = button.IsChecked == true ? 50 : 100;
+    }
+}
 ```
 
 ### Read Current State in Code

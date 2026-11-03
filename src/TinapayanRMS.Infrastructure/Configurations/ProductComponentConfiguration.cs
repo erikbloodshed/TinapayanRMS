@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class ProductComponentConfiguration : IEntityTypeConfiguration<ProductComponent>
+public sealed class ProductComponentConfiguration : IEntityTypeConfiguration<ProductComponent>
 {
     public void Configure(EntityTypeBuilder<ProductComponent> builder)
     {

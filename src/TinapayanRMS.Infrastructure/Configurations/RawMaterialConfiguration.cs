@@ -4,12 +4,15 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class RawMaterialConfiguration : IEntityTypeConfiguration<RawMaterial>
+public sealed class RawMaterialConfiguration : IEntityTypeConfiguration<RawMaterial>
 {
     public void Configure(EntityTypeBuilder<RawMaterial> builder)
     {
         // Ingredients and packaging share one list, so a name is unique across both types.
         builder.Property(m => m.Name).HasMaxLength(100).IsRequired();
+
+        // A brand as its prices name it (RawMaterialBrandPrice.Brand), 2026-10-29.
+        builder.Property(m => m.PreferredBrand).HasMaxLength(100);
         builder.HasIndex(m => m.Name).IsUnique();
 
         builder.Property(m => m.Type)
@@ -76,6 +79,11 @@ public class RawMaterialConfiguration : IEntityTypeConfiguration<RawMaterial>
             table.HasCheckConstraint(
                 "CK_RawMaterials_CostBufferPercent",
                 "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");
+
+            // The same range as the buffer itself, which it's typed as.
+            table.HasCheckConstraint(
+                "CK_RawMaterials_TargetCostBufferPercent",
+                "target_cost_buffer_percent IS NULL OR (target_cost_buffer_percent >= 0 AND target_cost_buffer_percent <= 100)");
         });
     }
 }

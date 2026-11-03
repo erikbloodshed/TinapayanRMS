@@ -76,7 +76,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
 
         // The Print tab, shown again with the Recipe tab showing on Products, follows it.
         viewModel.SelectedDetailsTab = ProductsViewModel.RecipeTab;
-        viewModel.PreparePrintout().Printout!.Scaling.Should().BeNull();
+        viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Which.Scaling.Should().BeNull();
     }
 
     [Fact]
@@ -121,10 +121,9 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
 
         viewModel.EditingName = "Ube Roll Deluxe";
         viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = sugarId, Grams = 250m });
-        var (printout, problem) = viewModel.PreparePrintout();
+        var printout = viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Subject;
 
-        problem.Should().BeNull();
-        printout!.ProductName.Should().Be("Ube Roll Deluxe");
+        printout.ProductName.Should().Be("Ube Roll Deluxe");
         printout.Sections.Single().Lines.Select(l => (l.Ingredient, l.Grams)).Should().Equal(("Flour", 1000m), ("Sugar", 250m));
         printout.SaveNote.Should().Be(ProductPrintout.UnsavedChangesNote);
     }
@@ -136,9 +135,8 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         await PrintAsync(viewModel);
 
         viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = sugarId });
-        var (printout, problem) = viewModel.PreparePrintout();
+        var problem = viewModel.PreparePrintout().Value.Should().BeOfType<PrintProblem>("the tab keeps the pages it has").Subject.Message;
 
-        printout.Should().BeNull("the tab keeps the pages it has");
         problem.Should().Contain("Sugar");
         viewModel.ErrorMessage.Should().Be(problem, "Products shows it too, for when it's next shown");
     }
@@ -169,9 +167,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
 
         viewModel.ErrorMessage.Should().BeNull();
         requests.Should().Be(1, "Print asks for the Print tab");
-        var (printout, problem) = viewModel.PreparePrintout();
-        problem.Should().BeNull();
-        return printout ?? throw new InvalidOperationException("The Print tab got no printout.");
+        return viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>("the Print tab gets the pages").Subject;
     }
 
     /// <summary>A saved product with one Dough of 1,000 g of flour, opened with its form showing, and the id of an ingredient it doesn't use.</summary>

@@ -66,7 +66,6 @@ public static class CompositionRoot
                 services.AddSingleton<IPackagingLinkRepository, PackagingLinkRepository>();
                 services.AddSingleton<IProductVersionRepository, ProductVersionRepository>();
                 services.AddSingleton<IPriceScenarioRepository, PriceScenarioRepository>();
-                services.AddSingleton<ISavedPlanRepository, SavedPlanRepository>();
                 services.AddSingleton<IProductCloner, ProductCloner>();
                 services.AddSingleton<ICostRecalculator, CostRecalculator>();
                 // Backups:ToolsFolder, when set, is the folder holding pg_dump and pg_restore; otherwise they're looked for.
@@ -74,6 +73,8 @@ public static class CompositionRoot
                 services.AddSingleton<IDatabaseBackups>(provider => new DatabaseBackups(
                     provider.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>(), DatabaseBackups.DefaultFolder, backupToolsFolder));
                 services.AddSingleton<SavedProductReader>();
+                services.AddSingleton<MaterialCostShares>();
+                services.AddSingleton<SharedRecipeImpact>();
                 services.AddSingleton<ProductVersionRecorder>();
                 services.AddSingleton<VersionedSaves>();
                 services.AddSingleton<IViewStateStore>(new JsonViewStateStore(JsonViewStateStore.DefaultFilePath));
@@ -96,7 +97,7 @@ public static class CompositionRoot
                 services.AddSingleton<SubAssembliesViewModel>();
                 services.AddSingleton<ProductsViewModel>();
                 services.AddSingleton<ReportsViewModel>();
-                services.AddSingleton<ProductionPlanViewModel>();
+                services.AddSingleton<QuickFindViewModel>();
                 services.AddSingleton<PriceSimulatorViewModel>();
                 services.AddSingleton<PrintTabViewModel>();
                 services.AddSingleton<UnitsOfMeasureViewModel>();
@@ -110,8 +111,12 @@ public static class CompositionRoot
                     provider.GetRequiredService<IViewStateStore>(), on => VimKeys.State.IsEnabled = on));
 
                 // A restore replaces everything every screen holds, so the app starts again after one (App.RestartAfterExit).
+                services.AddSingleton<AutomaticBackups>();
                 services.AddSingleton(provider => new DatabaseBackupsViewModel(
-                    provider.GetRequiredService<IDatabaseBackups>(), message => ((App)Application.Current).RestartAfterExit(message), provider.GetRequiredService<ILogger>()));
+                    provider.GetRequiredService<IDatabaseBackups>(),
+                    message => ((App)Application.Current).RestartAfterExit(message),
+                    provider.GetRequiredService<ILogger>(),
+                    provider.GetRequiredService<AutomaticBackups>()));
             });
     }
 }

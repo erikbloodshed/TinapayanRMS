@@ -34,7 +34,7 @@
                 <TextBlock Grid.Column="0" Text="Use Quantity" Style="{StaticResource FieldLabelStyle}" />
                 <syncfusion:DoubleTextBox Grid.Row="1"
                                           Grid.Column="0"
-                                          Value="{Binding ExampleQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          Value="{Binding ExampleQuantity, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           NumberDecimalDigits="2" />
 
                 <syncfusion:ComboBoxAdv Grid.RowSpan="2"

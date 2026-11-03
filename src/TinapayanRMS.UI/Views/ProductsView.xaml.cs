@@ -5,7 +5,7 @@ using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Views;
 
-public partial class ProductsView : UserControl
+public sealed partial class ProductsView : UserControl
 {
     public ProductsView(ProductsViewModel viewModel)
     {

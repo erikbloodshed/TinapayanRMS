@@ -16,6 +16,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// apart from raw material categories (CategoriesViewModel).
 /// Picking a category loads it for renaming; New, or finishing a Save or Delete, clears the form, so
 /// the next Save always adds a category rather than renaming the last one touched.
+/// A category can set the Wastage % its products are priced with in place of the shop-wide one (2026-10-29).
 /// </summary>
 public sealed class ProductCategoriesViewModel : ViewModelBase, IDisposable
 {
@@ -40,6 +41,15 @@ public sealed class ProductCategoriesViewModel : ViewModelBase, IDisposable
     {
         get => _editingName;
         set => this.RaiseAndSetIfChanged(ref _editingName, value);
+    }
+
+    private decimal? _editingWastagePercent;
+
+    /// <summary>The Wastage % the category's products are priced with; null (blank) for the shop-wide one.</summary>
+    public decimal? EditingWastagePercent
+    {
+        get => _editingWastagePercent;
+        set => this.RaiseAndSetIfChanged(ref _editingWastagePercent, value);
     }
 
     private readonly ObservableAsPropertyHelper<string> _formTitle;
@@ -72,6 +82,7 @@ public sealed class ProductCategoriesViewModel : ViewModelBase, IDisposable
             {
                 _editingId = category!.Id;
                 EditingName = category.Name;
+                EditingWastagePercent = category.WastagePercent;
             });
 
         // Runs each time Settings opens and after this tab's own saves. It merges rather than
@@ -92,7 +103,7 @@ public sealed class ProductCategoriesViewModel : ViewModelBase, IDisposable
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
-            var category = new ProductCategory { Id = _editingId, Name = EditingName.Trim() };
+            var category = new ProductCategory { Id = _editingId, Name = EditingName.Trim(), WastagePercent = EditingWastagePercent };
 
             var validation = _categoryValidator.Validate(category);
             if (!validation.IsValid)
@@ -129,6 +140,7 @@ public sealed class ProductCategoriesViewModel : ViewModelBase, IDisposable
         SelectedCategory = null;
         _editingId = 0;
         EditingName = string.Empty;
+        EditingWastagePercent = null;
     }
 
     public void Dispose() => _categoryCache.Dispose();

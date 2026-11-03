@@ -142,6 +142,19 @@
     <controls:AppWindow.RightHeaderItemsSource>
         <collections:ArrayList>
             <vim:VimModeIndicator />
+            <!-- Find (2026-10-29): every raw material, sub-assembly and product by name, opened on its own screen. Built as Back is -->
+            <Button x:Name="FindButton"
+                    Width="40"
+                    Height="32"
+                    Focusable="False"
+                    WindowChrome.IsHitTestVisibleInChrome="True"
+                    Style="{DynamicResource {skinManager:ThemeKey Key=WPFGlyphButtonStyle, Theme={x:Type sfTheme:Windows11LightSkinHelper}}}"
+                    Template="{DynamicResource WPFGlyphWindowButtonTemplate}"
+                    ToolTip="Find a raw material, sub-assembly or product (Ctrl+K)"
+                    AutomationProperties.Name="Find"
+                    Click="FindButton_Click">
+                <TextBlock Text="&#xE721;" Style="{StaticResource IconGlyphStyle}" FontSize="12" />
+            </Button>
             <Button x:Name="BackButton"
                     Width="40"
                     Height="32"
@@ -258,13 +271,6 @@
                                     <TextBlock Text="Reports" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ListBoxItem>
-                            <!-- Production Plan: CheckList, what to make and buy -->
-                            <ListBoxItem x:Name="ProductionPlanNavItem" AutomationProperties.Name="Production Plan">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE9D5;" Style="{StaticResource DrawerIconStyle}" />
-                                    <TextBlock Text="Production Plan" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </ListBoxItem>
                             <!-- Price Simulator: Lightbulb, an idea tried before it's real -->
                             <ListBoxItem x:Name="PriceSimulatorNavItem" AutomationProperties.Name="Price Simulator">
                                 <StackPanel Orientation="Horizontal">
@@ -334,7 +340,6 @@
                         from the menu, as a closed tab does, and load when first shown.
                     -->
                     <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" Visibility="Collapsed" />
-                    <syncfusion:TabItemExt x:Name="ProductionPlanTab" Header="Production Plan" Visibility="Collapsed" />
                     <syncfusion:TabItemExt x:Name="PriceSimulatorTab" Header="Price Simulator" Visibility="Collapsed" />
                     <!--
                         Print, opened by the Products header's Print and closed with its ✕ (hidden, as CloseMode says);

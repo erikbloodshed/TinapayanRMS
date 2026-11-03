@@ -126,6 +126,24 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
         await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("Circular packaging link detected.");
     }
 
+    [Fact]
+    public async Task A_product_whose_category_sets_its_own_wastage_is_priced_with_it_and_the_rest_with_the_shop_wides()
+    {
+        var setup = await SetUpAsync();
+        var (productIds, _) = await AddProductsAsync(setup, "Pandesal", 2);
+        await new ProductCategoryRepository(CreateDbContextFactory()).AddAsync(new ProductCategory { Name = "Breads", WastagePercent = 10m }, Cancellation);
+        await using (var dbContext = CreateDbContext())
+        {
+            var breadsId = await dbContext.ProductCategories.Select(c => c.Id).SingleAsync(Cancellation);
+            await dbContext.Products.Where(p => p.Id == productIds[0]).ExecuteUpdateAsync(s => s.SetProperty(p => p.CategoryId, breadsId), Cancellation);
+        }
+
+        var details = await CreateReader().ReadDetailsAsync(productIds, Cancellation);
+
+        details[productIds[0]].WastagePercent.Should().Be(10m);
+        details[productIds[1]].WastagePercent.Should().Be(CostingDefaults.DefaultWastagePercent, "no category: Settings' shop-wide one");
+    }
+
     private sealed record Setup(int RoleId, int FlourId, int BoxId);
 
     /// <summary>A Dough role, flour at 0.05 a gram, and a box at 5.00 a piece.</summary>

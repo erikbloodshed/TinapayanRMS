@@ -6,7 +6,7 @@ namespace TinapayanRMS.UI.Views.RawMaterials;
 /// Raw Materials' Purchase Cost Setup: the price of one purchase unit, and what it comes to per
 /// base unit. Inherits the Raw Materials screen's DataContext (RawMaterialsViewModel).
 /// </summary>
-public partial class PurchaseCostSetupCard : UserControl
+public sealed partial class PurchaseCostSetupCard : UserControl
 {
     public PurchaseCostSetupCard()
     {

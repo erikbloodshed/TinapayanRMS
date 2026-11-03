@@ -98,7 +98,7 @@ public class ExcelExportTests
             flourRow.Should().Be(headingRow + 1);
             flourCells.Should().ContainInConsecutiveOrder("Bread Flour", "2,500.5");
             var gramsColumn = Array.IndexOf(flourCells, "2,500.5") + 1;
-            sheet.Range[flourRow, gramsColumn].Number.Should().Be(2500.45, "the file keeps the grams the screen rounds");
+            sheet.Range[flourRow, gramsColumn].Number.Should().Be(2500.46, "the file keeps the grams the screen rounds");
             sheet.Range[flourRow, gramsColumn].NumberFormat.Should().Be("#,##0.0", "a details cell takes its own column's decimals");
             sheet.Range[headingRow, Array.IndexOf(headingCells, "Ingredient") + 1].CellStyle.Font.Bold.Should().BeTrue();
         }));
@@ -213,9 +213,11 @@ public class ExcelExportTests
     /// <summary>A table like the Mixing Sheet: each mix's row opens to show its ingredients, in a grid of their own.</summary>
     private static SfDataGrid MixesGrid()
     {
+        // 2500.46, not a midpoint like 2500.45: on .NET 11 XlsIO's own DisplayText rounds that one down to 2,500.4 (it
+        // takes the double at its exact binary value, 2500.4499…), though Excel shows the file's 2500.45 as 2,500.5.
         var grid = new SfDataGrid
         {
-            ItemsSource = new ObservableCollection<Mix> { new("Sweet Dough", 2m, [new Ingredient("Bread Flour", 2500.45m)]) },
+            ItemsSource = new ObservableCollection<Mix> { new("Sweet Dough", 2m, [new Ingredient("Bread Flour", 2500.46m)]) },
             AutoGenerateColumns = false,
             AutoGenerateRelations = false,
             Height = 300,

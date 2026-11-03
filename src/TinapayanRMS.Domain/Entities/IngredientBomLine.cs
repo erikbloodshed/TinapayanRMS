@@ -5,7 +5,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// and its own add-ins (IngredientAddInLine) give it: read, never stored (2026-10-27; until then a table of the made
 /// ingredient's own lines). Both ends are raw materials of the Ingredient type.
 /// </summary>
-public class IngredientBomLine
+public sealed class IngredientBomLine
 {
     /// <summary>The made ingredient this line belongs to.</summary>
     public int IngredientId { get; set; }

@@ -5,7 +5,7 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Views;
 
 /// <summary>The Settings dialog's Roles tab. SettingsWindow registers its delete confirmation.</summary>
-public partial class SubAssemblyRolesView : UserControl
+public sealed partial class SubAssemblyRolesView : UserControl
 {
     public SubAssemblyRolesView(SubAssemblyRolesViewModel viewModel)
     {

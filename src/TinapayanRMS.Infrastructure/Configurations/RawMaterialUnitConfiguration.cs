@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Configurations;
 
-public class RawMaterialUnitConfiguration : IEntityTypeConfiguration<RawMaterialUnit>
+public sealed class RawMaterialUnitConfiguration : IEntityTypeConfiguration<RawMaterialUnit>
 {
     public void Configure(EntityTypeBuilder<RawMaterialUnit> builder)
     {

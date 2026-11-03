@@ -86,7 +86,7 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
     }
 
     /// <summary>The packaging set linked packaging comes from, whose badge opens it on Sub-Assemblies; null for another product's, or none.</summary>
-    public int? PackagingLinkedSetId => LinkTarget?.SubAssemblyId;
+    public int? PackagingLinkedSetId => (LinkTarget as PackagingLinkTarget.Set)?.SubAssemblyId;
 
     public bool IsPackagingLinkedToSet => PackagingLinkedSetId is not null;
 
@@ -168,8 +168,7 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
     /// a set made of its own lines (Move to Sub-Assemblies) is PackagingLinkDraft.NewSet.
     /// </summary>
     public PackagingLinkDraft? ChangedLink() =>
-        IsPackagingMoving ? PackagingLinkDraft.NewSet
+        IsPackagingMoving ? new PackagingLinkDraft.NewSet()
         : LinkTarget?.Key == _savedLinkKey ? null
-        : LinkTarget is { } target ? new PackagingLinkDraft(target.ProductId, target.SubAssemblyId)
-        : PackagingLinkDraft.None;
+        : LinkTarget?.ToDraft() ?? new PackagingLinkDraft.None();
 }

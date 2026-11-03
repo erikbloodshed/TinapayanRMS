@@ -950,6 +950,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingSource = RawMaterialSource.Made;
         viewModel.AddInEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single().Id, Grams = 100m });
 
+        // New over unsaved changes asks about them first: not saving them is how they're left behind.
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         await viewModel.NewCommand.Execute();
 
         viewModel.UnitRows.Should().BeEmpty();
@@ -1419,6 +1421,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
         viewModel.EditingCostBufferPercent.Should().Be(4m);
 
+        // New over unsaved changes asks about them first: not saving them is how they're left behind.
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         await viewModel.NewCommand.Execute();
         viewModel.EditingCostBufferPercent.Should().Be(15m, "the next new material starts at the new default");
     }
@@ -1437,6 +1441,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingCostBufferPercent = 5m;
         viewModel.ExampleQuantity = 3m;
 
+        // New over unsaved changes asks about them first: not saving them is how they're left behind.
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         await viewModel.NewCommand.Execute();
 
         viewModel.EditingName.Should().BeEmpty();

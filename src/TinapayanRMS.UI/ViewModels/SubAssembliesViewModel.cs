@@ -20,7 +20,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// follow every change saved here) or copy them, from their recipe on the Products screen. One Save writes
 /// the name, the role and the lines together.
 /// </summary>
-public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDisposable, IRecordScreen
+public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDisposable, IRecordScreen, IUnsavedChangesScreen
 {
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _lineRepository;
@@ -224,6 +224,34 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         private set => this.RaiseAndSetIfChanged(ref _batchCost, value);
     }
 
+    private decimal? _scaleTo;
+    /// <summary>What Scale makes the batch, or its base, weigh, in grams (2026-10-29). Not part of the sub-assembly.</summary>
+    public decimal? ScaleTo
+    {
+        get => _scaleTo;
+        set => this.RaiseAndSetIfChanged(ref _scaleTo, value);
+    }
+
+    /// <summary>What Scale can make weigh <see cref="ScaleTo"/>: the whole batch, or the lines ticked as its base.</summary>
+    public IReadOnlyList<BatchScaleOption> ScaleOptions { get; } =
+    [
+        new(BatchScaleBasis.Batch, "the whole batch"),
+        new(BatchScaleBasis.Base, "the base (ticked lines)"),
+    ];
+
+    private BatchScaleOption _scaleOption = null!;
+    public BatchScaleOption ScaleOption
+    {
+        get => _scaleOption;
+        set => this.RaiseAndSetIfChanged(ref _scaleOption, value);
+    }
+
+    /// <summary>
+    /// Every line's grams by the factor that makes the batch, or its base, weigh <see cref="ScaleTo"/>, as one undo step
+    /// (2026-10-29, at the user's request: "make it 5 kg"). A line typed as a baker's percentage keeps it and follows the base.
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> ScaleCommand { get; }
+
     private decimal _costPerGram;
     public decimal CostPerGram
     {
@@ -377,9 +405,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         IValidator<SubAssemblyRole> roleValidator,
         IViewStateStore viewStateStore,
         VersionedSaves versionedSaves,
-        ILogger logger)
+        ILogger logger,
+        SharedRecipeImpact? recipeImpact = null)
         : base(logger)
     {
+        _recipeImpact = recipeImpact;
         _subAssemblyRepository = subAssemblyRepository;
         _versionedSaves = versionedSaves;
         _lineRepository = lineRepository;
@@ -564,7 +594,9 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             }
         }));
 
-        NewCommand = ReactiveCommand.Create(() => ClearForm());
+        // A new sub-assembly replaces the one showing, so its unsaved changes are asked about first. Copy doesn't ask: the
+        // copy holds them.
+        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => ClearForm()));
 
         CopyCommand = ReactiveCommand.Create(CopyForm, this.WhenAnyValue(x => x.SelectedRow).Select(row => row is not null));
 
@@ -623,6 +655,24 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
                 List<RecipeLine> recipeLines = [.. lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
                 save = cancellationToken => _subAssemblyRepository.SaveStandaloneAsync(subAssembly, recipeLines, cancellationToken);
+
+                // A saved one that products link: what it does to their costs is asked about first (2026-10-29).
+                if (_recipeImpact is not null && subAssembly.Id != 0)
+                {
+                    List<SubAssemblyLine> newLines =
+                    [
+                        .. lines.Select((l, i) => new SubAssemblyLine
+                        {
+                            SubAssemblyId = subAssembly.Id, IngredientId = l.Ingredient.Id, Ingredient = l.Ingredient, Grams = l.Grams,
+                            IsFormulaBase = l.IsFormulaBase, AuthoredBakersPercent = l.AuthoredBakersPercent, SortOrder = i,
+                        }),
+                    ];
+                    var impacts = await Task.Run(() => _recipeImpact.ReadAsync(subAssembly.Id, newLines, CancellationToken.None));
+                    if (impacts.Count > 0 && !await ConfirmDelete.Handle(SharedRecipeImpact.Question(name, impacts, MadeIngredients.Count)))
+                    {
+                        return;
+                    }
+                }
             }
 
             // Written with a version of each product using it that this Save changes, both or neither (VersionedSaves).
@@ -648,8 +698,8 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
         UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveSubAssembliesAsync(_moveUndo, isUndo: true)), hasMoveNotice);
         DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
-        NewSubAssemblyInCommand = ReactiveCommand.Create<SubAssemblyFolderNode?>(folder => ClearForm(
-            folder is null ? null : Roles.FirstOrDefault(r => r.Id == folder.RoleId)));
+        NewSubAssemblyInCommand = ReactiveCommand.CreateFromTask<SubAssemblyFolderNode?>(folder => AfterUnsavedChangesAsync(() => ClearForm(
+            folder is null ? null : Roles.FirstOrDefault(r => r.Id == folder.RoleId))));
         RenameSubAssemblyCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(RenameSubAssemblyAsync);
         DeleteSubAssemblyCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(leaf => DeleteSubAssemblyAsync(leaf.Row));
         MakeInHouseIngredientCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(leaf => RunSafelyAsync(() => MakeInHouseIngredientAsync(leaf.Row)));
@@ -658,6 +708,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         DeleteRoleCommand = ReactiveCommand.CreateFromTask<SubAssemblyFolderNode>(DeleteRoleAsync);
         ExpandAllCommand = ReactiveCommand.Create(SubAssemblyTree.ExpandAll);
         CollapseAllCommand = ReactiveCommand.Create(SubAssemblyTree.CollapseAll);
+
+        ScaleOption = ScaleOptions[0];
+        ScaleCommand = ReactiveCommand.Create(
+            ScaleBatch,
+            this.WhenAnyValue(x => x.ScaleTo, x => x.BatchWeight, x => x.IsPackaging, (to, weight, isPackaging) => to is > 0m && weight > 0m && !isPackaging));
 
         // The line selected in whichever table is showing.
         RemoveLineCommand = ReactiveCommand.Create(
@@ -698,6 +753,32 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         get => History.IsEditPending;
         set => History.IsEditPending = value;
     }
+
+    private void ScaleBatch()
+    {
+        ErrorMessage = null;
+        var from = ScaleOption.Basis == BatchScaleBasis.Base ? _formulaBase : BatchWeight;
+        if (from <= 0m || ScaleTo is not { } to || to <= 0m)
+        {
+            ErrorMessage = "Nothing is ticked as the base, so there's no base to scale. Tick the base lines, or scale the whole batch.";
+            return;
+        }
+
+        AsUndoStep(() =>
+        {
+            // Lines typed in grams are scaled; a line typed as a percentage follows the base, which is among them.
+            foreach (var line in Lines.Where(l => l.Ingredient is not null && l.AuthoredBakersPercent is null && l.Grams is not null))
+            {
+                line.Grams = SubAssemblyRules.ScaledGrams(line.Grams!.Value, from, to);
+            }
+
+            RecomputeFormulaBase();
+            RecomputeTotals();
+        });
+    }
+
+    /// <summary>What a Save of a recipe products link is asked about with; null in a screen built without it.</summary>
+    private readonly SharedRecipeImpact? _recipeImpact;
 
     /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>
     private void AsUndoStep(Action change)
@@ -936,6 +1017,49 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         _subAssemblyToOpen = TrySelectSubAssembly(subAssemblyId) ? null : subAssemblyId;
     }
 
+    /// <summary>
+    /// <see cref="OpenSubAssembly"/>, asking first about the unsaved changes of the sub-assembly showing when another is to
+    /// replace it. False when the user stays on it.
+    /// </summary>
+    public async Task<bool> OpenSubAssemblyAsync(int subAssemblyId)
+    {
+        if (subAssemblyId != SelectedRow?.Id && !await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return false;
+        }
+
+        OpenSubAssembly(subAssemblyId);
+        return true;
+    }
+
+    public bool HasUnsavedChanges => History.IsDirty;
+
+    /// <inheritdoc/>
+    public Task<bool> ResolveUnsavedChangesAsync(bool revert) => AskAboutUnsavedChangesAsync(
+        History.IsDirty,
+        !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim() : SelectedRow?.Name ?? "the new sub-assembly",
+        async () =>
+        {
+            await SaveCommand.Execute();
+            return !History.IsDirty;
+        },
+        revert ? RevertToSavedAsync : null);
+
+    /// <summary>Runs <paramref name="then"/>, which replaces the sub-assembly showing, once its unsaved changes are saved or thrown away.</summary>
+    private async Task AfterUnsavedChangesAsync(Action then)
+    {
+        if (await ResolveUnsavedChangesAsync(revert: false))
+        {
+            then();
+        }
+    }
+
+    /// <summary>
+    /// Don't Save on leaving the screen: the form goes back to the sub-assembly as it was last saved, its lines read again.
+    /// A new one (or a copy) was never saved, so it goes back to a blank one.
+    /// </summary>
+    private Task RevertToSavedAsync() => LoadIntoFormAsync(SelectedRow);
+
     /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the sub-assembly the name means best.</summary>
     public bool OpenByName(string text)
     {
@@ -944,7 +1068,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             return false;
         }
 
-        OpenSubAssembly(row.Id);
+        _ = OpenSubAssemblyAsync(row.Id);
         return true;
     }
 
@@ -1021,8 +1145,28 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         // which then finds its row first already and leaves the collection alone, as it must mid-change.
         if (!_treeSelection.IsSyncing && first is SubAssemblyLeafNode leaf && leaf.Row.Id != SelectedRow?.Id)
         {
-            SelectedRow = leaf.Row;
+            if (History.IsDirty)
+            {
+                _ = PickAfterAskingAsync(leaf.Row.Id);
+            }
+            else
+            {
+                SelectedRow = leaf.Row;
+            }
         }
+    }
+
+    /// <summary>
+    /// Another sub-assembly's row picked while the form holds unsaved changes: the list goes back to the row of the one
+    /// showing, and the one picked opens once the changes are saved or thrown away.
+    /// </summary>
+    private async Task PickAfterAskingAsync(int subAssemblyId)
+    {
+        // The tree calls TreeSelectionChanged in the middle of changing its selection: going on once that's over lets the
+        // list take the row of the sub-assembly showing back.
+        await Task.Yield();
+        SyncTreeSelection();
+        await OpenSubAssemblyAsync(subAssemblyId);
     }
 
     /// <summary>

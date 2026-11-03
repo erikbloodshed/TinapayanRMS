@@ -9,7 +9,7 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>A row of the Sub-Assemblies list's tree (SubAssemblyTree): a role's folder, or a sub-assembly in one.</summary>
-public abstract class SubAssemblyTreeNode : ReactiveObject
+public closed class SubAssemblyTreeNode : ReactiveObject
 {
     public abstract string Title { get; }
 
@@ -226,7 +226,7 @@ public sealed class SubAssemblyTree : IDisposable
         {
             SubAssemblyFolderNode folder => (folder.RoleId, folder.IsPackaging),
             SubAssemblyLeafNode leaf => (leaf.SubAssembly.RoleId, IsPackagingSet(leaf.SubAssembly)),
-            _ => null,
+            null => null,
         };
 
         return place is { } to && to.IsPackaging == IsPackagingSet(subAssembly) && to.RoleId != subAssembly.RoleId

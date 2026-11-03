@@ -384,7 +384,7 @@ chart3D.PrimaryAxis = new CategoryAxis3D();
 chart3D.SecondaryAxis = new NumericalAxis3D();
 
 // Depth axis as Category for series labels
-NumericalAxis3D depthAxis = new CategoryAxis3D();
+CategoryAxis3D depthAxis = new CategoryAxis3D();
 chart3D.DepthAxis = depthAxis;
 
 // Add multiple series

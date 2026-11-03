@@ -17,36 +17,45 @@ Add Excel-like comment indicators to cells. A small red triangle appears in the 
 
 ```csharp
 // Attach a comment to a cell
-gridControl.Model[3, 2].CommentTip.Text = "Reviewed by Finance on 2026-03-24";
+gridControl.Model[3, 2].Comment = "Reviewed by Finance on 2026-03-24";
 
 // Style the comment popup
-gridControl.Model[3, 2].CommentTip.Background = Brushes.LightYellow;
-gridControl.Model[3, 2].CommentTip.Foreground = Brushes.DarkRed;
+gridControl.Model[3, 2].Background = Brushes.LightYellow;
+gridControl.Model[3, 2].Foreground = Brushes.DarkRed;
 
-// Show the comment indicator (red triangle)
-gridControl.Model[3, 2].ShowComment = true;
+// Enable the comment service in GridControl
+GridCommentService.SetShowComment(gridControl, true);
 ```
 
-### Show comment tip programmatically
+### ToolTip for row and column
 
 ```csharp
-// Force the comment to appear without hovering
-gridControl.ShowCommentTip(3, 2);
+//Adding tooltip to the specific row
+gridcontrol.Model.RowStyles[1].ToolTip = "First row";
+gridcontrol.Model.RowStyles[1].ShowTooltip = true;
+
+//Adding tooltip to the specific column
+gridcontrol.Model.ColStyles[1].ToolTip = "First column";
+gridcontrol.Model.ColStyles[1].ShowTooltip = true;
 ```
 
 ---
 
 ## Input Message Tips
 
-Input message tips provide guidance when a cell becomes active — similar to Excel's data validation tooltip.
+Input message tips provide guidance when a cell becomes active — similar to Excel’s data validation tooltip.
+
+```xml
+<syncfusion:GridControl
+    x:Name="gridControl"
+    syncfusion:GridTooltipService.ShowTooltips="True" />
 
 ```csharp
-// Set an input message on a cell
-gridControl.Model[4, 3].InputTip.Text  = "Enter a value between 1 and 100";
-gridControl.Model[4, 3].InputTip.Title = "Valid Range";
-gridControl.Model[4, 3].ShowInputTip   = true;
-```
+// Set an input message tip on a cell
+gridControl.Model[4, 3].DataValidationTooltip = "Enter a value between 1 and 100";
+gridControl.Model[4, 3].ShowDataValidationTooltip = true;
 
+```
 The tip appears automatically when the user activates the cell.
 
 ---
@@ -64,12 +73,12 @@ For dynamic tooltips based on cell content, generate the tooltip text in `QueryC
 ```csharp
 gridControl.QueryCellInfo += (s, e) =>
 {
-    if (e.Cell.RowIndex > 0 && e.Cell.ColumnIndex == 4)
-    {
-        var val = GetValue(e.Cell.RowIndex, 4);
-        e.Style.CellValue = val;
-        e.Style.ToolTip   = $"Raw: {GetRawValue(e.Cell.RowIndex)}";
-    }
+    if (e.Cell.RowIndex == 1 && e.Cell.ColumnIndex == 1)
+        {
+            e.Style.Enabled = false;
+            e.Style.ToolTip = " Grid (" + e.Cell.RowIndex + "," + e.Cell.ColumnIndex + ") ";
+            e.Style.ShowTooltip = false;
+        }
 };
 ```
 
@@ -88,26 +97,37 @@ gridControl.Model[2, 2].HorizontalAlignment = HorizontalAlignment.Center;
 
 ### Covered ranges with different layouts
 
+Covered cells are cells that span across neighboring rows or columns and behave as a single cell both visually and programmatically.
+
 ```csharp
-// Query whether a cell is part of a covered range
-var coverInfo = gridControl.CoveredCells.FindRange(row, col);
-if (coverInfo != null)
-{
-    bool isTopLeft = coverInfo.Top == row && coverInfo.Left == col;
-}
+// Create covered cell ranges
+gridControl.Model.CoveredCells.Add(new CoveredCellInfo(6, 4, 7, 4));
+gridControl.Model.CoveredCells.Add(new CoveredCellInfo(9, 4, 11, 6));
+
+// Customize the top-left cell of the covered range
+var cell = gridControl.Model[6, 4];
+cell.CellValue = "Row spanned cell";
+cell.HorizontalAlignment = HorizontalAlignment.Center;
+cell.Background = Brushes.BlanchedAlmond;
+
+cell = gridControl.Model[9, 4];
+cell.CellValue = "Row and column spanned cell";
+cell.HorizontalAlignment = HorizontalAlignment.Center;
+cell.Background = Brushes.BlanchedAlmond;
+
 ```
 
 ### Cell margins and padding
 
 ```csharp
 // Add interior padding around cell content
-gridControl.Model[6, 2].CellMargins = new Thickness(4, 2, 4, 2);
+gridControl.Model[6, 2].BorderMargins = new CellMarginsInfo(4, 2, 4, 2);
 ```
 
 ### Word wrap
 
 ```csharp
-gridControl.Model[7, 2].WrapText = true;
+gridControl.Model[7, 2].TextWrapping = TextWrapping.Wrap;
 gridControl.Model.RowHeights[7]  = 60; // allow room for wrapped text
 ```
 
@@ -115,22 +135,20 @@ gridControl.Model.RowHeights[7]  = 60; // allow room for wrapped text
 
 ## Autofit Rows and Columns
 
-Resize a row or column to fit its content automatically:
+GridControl provides support to autofit rows and columns based on the content of cells.
 
 ```csharp
-// Autofit a specific column to its content width
-gridControl.Model.ColStyles[3].AutoFit = true;
+// Autofit a single row
+gridControl.Model.ResizeRowsToFit(GridRangeInfo.Row(2),GridResizeToFitOptions.NoShrinkSize);
 
-// Autofit row height to content
-gridControl.Model.RowStyles[5].AutoFit = true;
+// Autofit a range of rows
+gridControl.Model.ResizeRowsToFit(GridRangeInfo.Rows(3, 6),GridResizeToFitOptions.NoShrinkSize);
 
-// Trigger autofit programmatically for all columns
-for (int col = 1; col <= gridControl.Model.ColumnCount; col++)
-    gridControl.AutoFitColumnWidth(col);
+// Autofit a single column
+gridControl.Model.ResizeColumnsToFit(GridRangeInfo.Col(2),GridResizeToFitOptions.NoShrinkSize);
 
-// Trigger autofit for all rows
-for (int row = 1; row <= gridControl.Model.RowCount; row++)
-    gridControl.AutoFitRowHeight(row);
+// Autofit a range of columns
+gridControl.Model.ResizeColumnsToFit(GridRangeInfo.Cols(3, 6),GridResizeToFitOptions.NoShrinkSize);
 ```
 
 ---
@@ -174,46 +192,32 @@ printManager.Print();
 
 ## Serialization
 
-Save and restore the complete state of a GridModel (data, styles, row/column dimensions) to/from XML.
+Serialization allows you to save and restore the complete state of the GridControl, including data, structure, and styles.
 
 ### Save grid state to XML file
 
 ```csharp
-using (var stream = new FileStream(@"C:\Data\GridState.xml", FileMode.Create))
-{
-    var writer = new GridModelXmlSerializer();
-    writer.Serialize(gridControl.Model, stream);
-}
+// Serialize GridControl state to an XML file
+gridControl.Model.Serialize("GridState.xml");
 ```
-
 ### Restore grid state from XML file
 
 ```csharp
-using (var stream = new FileStream(@"C:\Data\GridState.xml", FileMode.Open))
-{
-    var reader = new GridModelXmlSerializer();
-    reader.Deserialize(gridControl.Model, stream);
-}
+// Deserialize GridControl state from an XML file
+gridControl.Model.Deserialize("GridState.xml");
 ```
 
-### Save/restore to string (for database storage)
+### Save grid state to a string
 
 ```csharp
-// Serialize to string
-string xmlState;
-using (var ms = new MemoryStream())
-{
-    var writer = new GridModelXmlSerializer();
-    writer.Serialize(gridControl.Model, ms);
-    xmlState = Encoding.UTF8.GetString(ms.ToArray());
-}
+// Serialize GridControl state as a string
+string xmlState = gridControl.Model.SerializeAsString();
+```
+### Restore grid state from a string
 
-// Deserialize from string
-using (var ms = new MemoryStream(Encoding.UTF8.GetBytes(xmlState)))
-{
-    var reader = new GridModelXmlSerializer();
-    reader.Deserialize(gridControl.Model, ms);
-}
+```csharp
+// Deserialize GridControl state from a string
+gridControl.Model.DeserializeFromString(xmlState);
 ```
 
 > Serialization captures: cell values, styles, row/column sizes, frozen row/column counts, covered cells, and base style definitions. It does not capture event handlers or runtime-only state.

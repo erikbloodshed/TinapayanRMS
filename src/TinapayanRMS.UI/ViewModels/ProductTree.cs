@@ -10,7 +10,7 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>A row of the Products list's tree (ProductTree): a folder, or a product in one.</summary>
-public abstract class ProductTreeNode : ReactiveObject
+public closed class ProductTreeNode : ReactiveObject
 {
     public abstract string Title { get; }
 
@@ -30,6 +30,17 @@ public abstract class ProductTreeNode : ReactiveObject
 
     /// <summary>Which image goes before a product's name (ProductListCard); always none for a folder.</summary>
     public virtual ProductIcon IconKind => ProductIcon.None;
+
+    private bool _isBelowTargetMarkup;
+    /// <summary>
+    /// A product whose current price earns less than its target markup (ProductCostSummary.IsBelowTargetMarkup): a flag after
+    /// its name. Worked out in the background after each load; never set on a folder.
+    /// </summary>
+    public bool IsBelowTargetMarkup
+    {
+        get => _isBelowTargetMarkup;
+        set => this.RaiseAndSetIfChanged(ref _isBelowTargetMarkup, value);
+    }
 }
 
 /// <summary>
@@ -364,7 +375,7 @@ public sealed class ProductTree : IDisposable
             ProductFolderNode { IsStage: true } stage => (stage.Stage, product.CategoryId),
             ProductFolderNode folder => (folder.Stage, folder.CategoryId),
             ProductLeafNode leaf => (leaf.Product.Stage, leaf.Product.CategoryId),
-            _ => null,
+            null => null,
         };
 
         return place is { } to && (to.Stage != product.Stage || to.CategoryId != product.CategoryId)

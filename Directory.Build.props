@@ -1,15 +1,18 @@
 <Project>
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <!-- For the UI and Tests projects. ReactiveUI.WPF needs Windows SDK 10.0.19041 or later,
-         and the bare net10.0-windows moniker resolves to windows7.0. -->
-    <WindowsTargetFramework>net10.0-windows10.0.19041.0</WindowsTargetFramework>
+         and the bare net11.0-windows moniker resolves to windows7.0. -->
+    <WindowsTargetFramework>net11.0-windows10.0.19041.0</WindowsTargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- The SDK's built-in .NET analyzers at their Recommended rule set, tracking the SDK's latest
          rules. Per-folder exceptions live in .editorconfig. -->
     <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <!-- .NET 11's runtime async: async methods compile to the runtime's own support for them rather
+         than to state machines. Still an opt-in compiler feature in RC3. -->
+    <Features>$(Features);runtime-async=on</Features>
   </PropertyGroup>
 
 </Project>

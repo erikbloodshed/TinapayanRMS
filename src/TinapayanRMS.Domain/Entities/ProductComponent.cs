@@ -8,7 +8,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// products' packaging (Product.IncludesComponentPackaging), which then joins the composite's. A component can itself be a
 /// composite, as long as no composite ends up containing itself.
 /// </summary>
-public class ProductComponent
+public sealed class ProductComponent
 {
     public int Id { get; set; }
 

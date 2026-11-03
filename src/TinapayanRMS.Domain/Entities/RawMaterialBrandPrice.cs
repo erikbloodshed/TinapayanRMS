@@ -6,7 +6,7 @@ namespace TinapayanRMS.Domain.Entities;
 /// unit (TinapayanRMS.ApplicationCore.RawMaterialRules.ApplyBrandPrices). Price history only logs the
 /// price that set the cost.
 /// </summary>
-public class RawMaterialBrandPrice
+public sealed class RawMaterialBrandPrice
 {
     public int Id { get; set; }
 

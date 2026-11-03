@@ -13,7 +13,7 @@ namespace TinapayanRMS.UI.Views;
 /// <see cref="PromptWithChoice"/> adds a picker under the box: Move to In-House's name and Made category.
 /// Chromeless: the card's own heading carries the title, and dragging it moves the dialog.
 /// </summary>
-public partial class TextPromptWindow : Window
+public sealed partial class TextPromptWindow : Window
 {
     private TextPromptWindow(string title, string label, string initialValue, string? message)
     {

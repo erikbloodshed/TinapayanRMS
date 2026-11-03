@@ -202,19 +202,19 @@ public static class RawMaterialRules
     }
 
     /// <summary>
-    /// Recomputes CostPerBaseUnit from the brand prices: the dearest of them per base unit, each price
-    /// divided by the base units in the unit it's for (null for a price per base unit), so the material
-    /// is costed at the most it's bought for. BufferedCostPerBaseUnit is a fixed amount the prices don't
+    /// Recomputes CostPerBaseUnit from the brand prices: the one <see cref="FindCostBrandPrice"/> picks (the material's
+    /// preferred brand, else the dearest) per base unit, its price divided by the base units in the unit it's for (null
+    /// for a price per base unit), so by default the material is costed at the most it's bought for. BufferedCostPerBaseUnit is a fixed amount the prices don't
     /// move: it's only worked out here (the cost with the material's buffer on top) the first time the
     /// material is priced, while it's still 0, and it goes back to 0 when no prices are left. After that
     /// it changes only when it's typed or recalculated on the screen. Call after the brand prices change,
     /// and after one of their units changes its multiplier. Returns the index of the brand price the cost
     /// came from.
     /// </summary>
-    public static int? ApplyBrandPrices(RawMaterial material, IReadOnlyList<(decimal Price, decimal? BaseUnitsPerUnit)> brandPrices)
+    public static int? ApplyBrandPrices(RawMaterial material, IReadOnlyList<(string? Brand, decimal Price, decimal? BaseUnitsPerUnit)> brandPrices)
     {
         // Worked out at full precision and rounded only as it's stored, the buffered cost from the cost before rounding.
-        var dearest = FindDearestBrandPrice(brandPrices);
+        var dearest = FindCostBrandPrice(brandPrices, material.PreferredBrand);
         var cost = dearest is { } index
             ? UnitConversionRules.CostPerBaseUnit(brandPrices[index].Price, brandPrices[index].BaseUnitsPerUnit)
             : 0m;
@@ -241,6 +241,38 @@ public static class RawMaterialRules
     /// had: a Save logged the same price in price history again, and moved the cost's date (found 2026-10-03).
     /// </summary>
     public static decimal StoredCost(decimal cost) => decimal.Round(cost, StoredCostScale, MidpointRounding.AwayFromZero);
+
+    /// <summary>ApplyBrandPrices for prices without brands: the dearest is the cost.</summary>
+    public static int? ApplyBrandPrices(RawMaterial material, IReadOnlyList<(decimal Price, decimal? BaseUnitsPerUnit)> brandPrices) =>
+        ApplyBrandPrices(material, [.. brandPrices.Select(p => ((string?)null, p.Price, p.BaseUnitsPerUnit))]);
+
+    /// <summary>
+    /// The index of the brand price a material's cost comes from (2026-10-29): the dearest per base unit of
+    /// <paramref name="preferredBrand"/>'s prices, matched as brands are (trimmed, whatever the case); the dearest of them
+    /// all when no brand is preferred, or the one preferred has no price. Null for no prices.
+    /// </summary>
+    public static int? FindCostBrandPrice(IReadOnlyList<(string? Brand, decimal Price, decimal? BaseUnitsPerUnit)> brandPrices, string? preferredBrand)
+    {
+        if (NormalizeBrand(preferredBrand) is { } wanted)
+        {
+            List<int> ofBrand = [.. Enumerable.Range(0, brandPrices.Count)
+                .Where(i => string.Equals(NormalizeBrand(brandPrices[i].Brand), wanted, StringComparison.OrdinalIgnoreCase))];
+            if (FindDearestBrandPrice([.. ofBrand.Select(i => (brandPrices[i].Price, brandPrices[i].BaseUnitsPerUnit))]) is { } dearestOfBrand)
+            {
+                return ofBrand[dearestOfBrand];
+            }
+        }
+
+        return FindDearestBrandPrice([.. brandPrices.Select(p => (p.Price, p.BaseUnitsPerUnit))]);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="preferredBrand"/> is one of <paramref name="brands"/>, so the cost comes from it rather than
+    /// from the dearest brand. False for none preferred.
+    /// </summary>
+    public static bool IsBrandPriced(IEnumerable<string?> brands, string? preferredBrand) =>
+        NormalizeBrand(preferredBrand) is { } wanted
+        && brands.Any(b => string.Equals(NormalizeBrand(b), wanted, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// The index of the brand price that costs the most per base unit (the first, on a tie), or null for
@@ -321,6 +353,35 @@ public static class RawMaterialRules
     /// </summary>
     public static decimal CostBufferPercentOf(decimal cost, decimal bufferedCost) =>
         (bufferedCost / cost - 1) * 100m;
+
+    /// <summary>
+    /// The buffer percent a purchased material is meant to have (2026-10-29): the one last typed for it, or for one saved
+    /// before that was kept, its buffer percent as last saved.
+    /// </summary>
+    public static decimal TargetBufferPercentOf(RawMaterial material) => material.TargetCostBufferPercent ?? material.CostBufferPercent;
+
+    /// <summary>
+    /// The buffer a purchased material's fixed buffered cost now makes over its dearest brand, in percent; null for one
+    /// that isn't purchased, or has no price yet.
+    /// </summary>
+    public static decimal? CurrentBufferPercentOf(RawMaterial material) =>
+        material.Source == RawMaterialSource.Purchased && material.CostPerBaseUnit > 0m && material.BufferedCostPerBaseUnit > 0m
+            ? CostBufferPercentOf(material.CostPerBaseUnit, material.BufferedCostPerBaseUnit)
+            : null;
+
+    /// <summary>
+    /// A purchased material whose buffer has worn below its target as its prices rose (2026-10-29, Reports' Cost Buffers):
+    /// by a tenth of a point or more, so a buffered cost typed to the centavo in a sack or a bag, which comes a hair under
+    /// its percent, isn't counted (found on the dev data: 9.98% against 10%).
+    /// </summary>
+    public static bool IsBufferBelowTarget(RawMaterial material) =>
+        CurrentBufferPercentOf(material) is { } now && Math.Round(now, 1) < Math.Round(TargetBufferPercentOf(material), 1);
+
+    /// <summary>
+    /// A buffer that has drifted from its target, either way, by a tenth of a point or more, as <see cref="IsBufferBelowTarget"/>
+    /// counts it: the Raw Materials form's Re-apply Target shows.
+    /// </summary>
+    public static bool IsOffTarget(decimal bufferPercent, decimal targetPercent) => Math.Round(bufferPercent, 1) != Math.Round(targetPercent, 1);
 
     /// <summary>A cost buffer is at least 0% (none) and at most 100% (double the cost).</summary>
     public static void EnsureValidCostBuffer(decimal bufferPercent)

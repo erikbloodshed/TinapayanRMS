@@ -1,4 +1,3 @@
-````markdown
 # Populating Items — Advanced
 
 Advanced container customization, style selectors, virtualization, selection APIs, and flow-direction considerations.
@@ -22,5 +21,3 @@ Use `SelectedItem`, `SelectedIndex`, and selection commands. Handle `SelectionCh
 ## Flow Direction
 
 Set `FlowDirection="RightToLeft"` for RTL languages; ensure templates and layout adapt appropriately.
-
-````

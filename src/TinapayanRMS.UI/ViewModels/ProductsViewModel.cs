@@ -23,7 +23,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// (IProductRepository.SaveAsync). A composite product's recipe is the products it holds instead, in its Products tab
 /// (<see cref="ProductComponents.ComponentEdits"/>), each bringing its recipe cost.
 /// </summary>
-public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen, IRecordScreen, IRevertScreen
+public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen, IRecordScreen, IRevertScreen, IUnsavedChangesScreen
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Scaling, then Clone.</summary>
     public const int RecipeTab = 0;
@@ -545,6 +545,111 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         private set => this.RaiseAndSetIfChanged(ref _scalingPiecesText, value);
     }
 
+    /// <summary>The products each load brings, whose markups the list's flags are worked out from.</summary>
+    private readonly Subject<IReadOnlyList<Product>> _markupChecks = new();
+
+    /// <summary>
+    /// Flags each product in the list whose current price earns less than its target markup (2026-10-29): every product
+    /// priced as saved, as Reports prices them (SavedProductReader.ReadAllAsync, a dozen or so queries however many there are),
+    /// off the UI thread. A product's flag follows its Save at the next load.
+    /// </summary>
+    private async Task FlagBelowTargetMarkupAsync(IReadOnlyList<Product> products, CancellationToken cancellationToken)
+    {
+        var saved = await Task.Run(() => _savedProducts.ReadAllAsync(products, CostBasis.Buffered, cancellationToken), cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var below = saved.Where(s => s.Costs.IsBelowTargetMarkup).Select(s => s.Product.Id).ToHashSet();
+        foreach (var product in products)
+        {
+            if (ProductTree.Find(product.Id) is { } leaf)
+            {
+                leaf.IsBelowTargetMarkup = below.Contains(product.Id);
+            }
+        }
+    }
+
+    private IReadOnlyList<RawMaterial> _scalingIngredients = [];
+    /// <summary>
+    /// The ingredients the recipe takes, wherever they are in it (RecipeScaler.IngredientsOf): what the Scaling tab's "from
+    /// what you have" picker offers (2026-10-29).
+    /// </summary>
+    public IReadOnlyList<RawMaterial> ScalingIngredients
+    {
+        get => _scalingIngredients;
+        private set => this.RaiseAndSetIfChanged(ref _scalingIngredients, value);
+    }
+
+    private RawMaterial? _scalingHaveIngredient;
+    /// <summary>The ingredient there's a limited amount of, which the units it's enough for are worked out from. Not saved.</summary>
+    public RawMaterial? ScalingHaveIngredient
+    {
+        get => _scalingHaveIngredient;
+        set
+        {
+            if (ReferenceEquals(_scalingHaveIngredient, value))
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _scalingHaveIngredient, value);
+            var previous = ScalingHaveUnit;
+            ScalingHaveUnits = IngredientAmountUnit.For(value);
+            ScalingHaveUnit = ScalingHaveUnits.FirstOrDefault(u => u.Name == previous?.Name) ?? ScalingHaveUnits[0];
+        }
+    }
+
+    private IReadOnlyList<IngredientAmountUnit> _scalingHaveUnits = IngredientAmountUnit.For(null);
+    /// <summary>What the amount can be typed in: grams, and the ingredient's own units (a kilo, a bag, a tray).</summary>
+    public IReadOnlyList<IngredientAmountUnit> ScalingHaveUnits
+    {
+        get => _scalingHaveUnits;
+        private set => this.RaiseAndSetIfChanged(ref _scalingHaveUnits, value);
+    }
+
+    private IngredientAmountUnit? _scalingHaveUnit = IngredientAmountUnit.Gram;
+    public IngredientAmountUnit? ScalingHaveUnit
+    {
+        get => _scalingHaveUnit;
+        set => this.RaiseAndSetIfChanged(ref _scalingHaveUnit, value);
+    }
+
+    private decimal? _scalingHaveAmount;
+    /// <summary>How much of <see cref="ScalingHaveIngredient"/> there is, in <see cref="ScalingHaveUnit"/>.</summary>
+    public decimal? ScalingHaveAmount
+    {
+        get => _scalingHaveAmount;
+        set => this.RaiseAndSetIfChanged(ref _scalingHaveAmount, value);
+    }
+
+    private int _scalingHaveMakes;
+    /// <summary>The most sellable units the amount there is makes (RecipeScaler.UnitsFrom); 0 for none, or nothing asked.</summary>
+    public int ScalingHaveMakes
+    {
+        get => _scalingHaveMakes;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _scalingHaveMakes, value);
+            this.RaisePropertyChanged(nameof(ScaleToHaveLabel));
+            this.RaisePropertyChanged(nameof(HasScalingHaveMakes));
+        }
+    }
+
+    /// <summary>Whether the amount there is makes any: Scale to only shows when it does.</summary>
+    public bool HasScalingHaveMakes => _scalingHaveMakes > 0;
+
+    /// <summary>The button that scales the tab to <see cref="ScalingHaveMakes"/>: "Scale to 12".</summary>
+    public string ScaleToHaveLabel => $"Scale to {ScalingHaveMakes:#,0}";
+
+    private string _scalingHaveText = string.Empty;
+    /// <summary>What the amount there is makes, "Makes 12 (uses 2,400 g of the 2,500 g)", or why it makes none; empty with nothing asked.</summary>
+    public string ScalingHaveText
+    {
+        get => _scalingHaveText;
+        private set => this.RaiseAndSetIfChanged(ref _scalingHaveText, value);
+    }
+
+    /// <summary>Sets the Scaling tab's Sellable Units to what the amount there is makes.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ScaleToHaveCommand { get; }
+
     /// <summary>Every made ingredient's BOM lines, by made ingredient, read with every LoadCommand: what the Scaling tab opens a made ingredient into.</summary>
     private ILookup<int, IngredientBomLine> _bomLines = Array.Empty<IngredientBomLine>().ToLookup(l => l.IngredientId);
 
@@ -577,8 +682,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     // What the product had when it was loaded, so Save only sends the parts that changed.
     private RecipeDraft _savedRecipe = new([], []);
 
-    // The shop-wide Wastage % every product is priced with (Settings → Costing Defaults), as of the last LoadCommand.
+    // The shop-wide Wastage % (Settings → Costing Defaults), as of the last LoadCommand: what a product is priced with unless
+    // its category sets its own (EditingCategory.WastagePercent, 2026-10-29).
     private decimal _wastagePercent = CostingDefaults.DefaultWastagePercent;
+
+    /// <summary>What the Costing tab's rounded selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep).</summary>
+    private decimal _priceRoundingStep;
 
     // The stage New files a product in (Settings → Costing Defaults), as of the last LoadCommand.
     private ProductStage _defaultNewProductStage = CostingDefaults.DefaultNewProductStage;
@@ -922,6 +1031,15 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         this.WhenAnyValue(x => x.Costing.Costs, x => x.ScalingUnits, x => x.SelectedDetailsTab)
             .Where(_ => SelectedDetailsTab == ScalingTab)
             .Subscribe(_ => RefreshScaling());
+        // The list's flags for a price short of its target markup, after each load: a newer load cancels one still working.
+        LoadLatest(_markupChecks, FlagBelowTargetMarkupAsync);
+
+        this.WhenAnyValue(x => x.ScalingHaveIngredient, x => x.ScalingHaveUnit, x => x.ScalingHaveAmount)
+            .Where(_ => SelectedDetailsTab == ScalingTab)
+            .Subscribe(_ => RefreshScaling());
+        ScaleToHaveCommand = ReactiveCommand.Create(
+            () => { ScalingUnits = ScalingHaveMakes; },
+            this.WhenAnyValue(x => x.ScalingHaveMakes).Select(units => units > 0));
 
         _showLinks =this.WhenAnyValue(x => x.SelectedProduct)
             .Select(product => product is not null)
@@ -1137,7 +1255,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .Where(_ => !IsRestoring)
             .Subscribe(_ => RecomputeCosts());
 
-        this.WhenAnyValue(x => x.EditingCurrentPrice, x => x.EditingQuantityRequired)
+        // The category too: it can set the Wastage % the product is priced with.
+        this.WhenAnyValue(x => x.EditingCurrentPrice, x => x.EditingQuantityRequired, x => x.EditingCategory)
             .Where(_ => !IsRestoring)
             .Subscribe(_ => RecomputeCosts());
 
@@ -1264,6 +1383,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 DeletedProducts = deleted;
                 _productCache.MergeFrom(products);
                 RefreshProductTree();
+                _markupChecks.OnNext(products);
                 _linkable = linkable;
                 _packagingSets = packagingSets;
                 RefreshCostingDefaults(costingDefaults);
@@ -1334,10 +1454,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             }
         }));
 
-        NewCommand = ReactiveCommand.Create(() => StartNewProduct());
-        NewCompositeCommand = ReactiveCommand.Create(() => StartNewProduct(isComposite: true));
-        NewCompositeProductInCommand = ReactiveCommand.Create<ProductFolderNode?>(folder => StartNewProduct(
-            folder?.Stage, folder?.CategoryId, isComposite: true));
+        // A new product replaces the one showing, so its unsaved changes are asked about first.
+        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => StartNewProduct()));
+        NewCompositeCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => StartNewProduct(isComposite: true)));
+        NewCompositeProductInCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(folder => AfterUnsavedChangesAsync(() => StartNewProduct(
+            folder?.Stage, folder?.CategoryId, isComposite: true)));
         RemoveComponentCommand = ReactiveCommand.Create(
             () => AsUndoStep(() => ComponentsTable.ComponentEdits.Remove(ComponentsTable.SelectedComponentEdit!)),
             ComponentsTable.WhenAnyValue(c => c.SelectedComponentEdit).Select(row => row is not null));
@@ -1348,7 +1469,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
         UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveProductsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
         DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
-        NewProductInCommand = ReactiveCommand.Create<ProductFolderNode?>(folder => StartNewProduct(folder?.Stage, folder?.CategoryId));
+        NewProductInCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(folder => AfterUnsavedChangesAsync(
+            () => StartNewProduct(folder?.Stage, folder?.CategoryId)));
         RenameProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(RenameProductAsync);
         CloneProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => MakeFromWithPromptAsync(
             leaf,
@@ -1367,8 +1489,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         RenameCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(RenameCategoryAsync);
         DeleteCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(DeleteCategoryAsync);
         ExpandAllCommand = ReactiveCommand.Create<ProductFolderNode?>(ProductTree.ExpandAll);
-        PrintFolderCommand = ReactiveCommand.Create<ProductFolderNode>(folder => _printRequests.OnNext(PrintScope.Folder(folder)));
-        PrintAllCommand = ReactiveCommand.Create(() => _printRequests.OnNext(PrintScope.AllProducts));
+        PrintFolderCommand = ReactiveCommand.Create<ProductFolderNode>(folder => _printRequests.OnNext(new PrintScope.Folder(folder)));
+        PrintAllCommand = ReactiveCommand.Create(() => _printRequests.OnNext(new PrintScope.AllProducts()));
         CollapseAllCommand = ReactiveCommand.Create<ProductFolderNode?>(ProductTree.CollapseAll);
 
         OpenSubAssemblyCommand = ReactiveCommand.Create<int>(_subAssemblyOpenRequests.OnNext);
@@ -1479,26 +1601,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }),
         History.WhenAnyValue(h => h.IsDirty));
 
-        // Revert reads the picked product's detail again, which replaces the recipe, packaging, packs and costing
-        // wholesale, so anything staged but unsaved goes: a section added or edited in the form included, since the
-        // form has no discard of its own. A new product was never saved, so it goes back to being a blank one.
+        // Revert puts the form back as the product was last saved (RevertToSavedAsync), once it's confirmed.
         RevertCommand = ReactiveCommand.CreateFromTask(() => RunWithConfirmationAsync(
             "Undo every change made since this product was last saved?",
             async () =>
             {
-                if (SelectedProduct is not { } product)
+                await RevertToSavedAsync();
+                if (SelectedProduct is { } product)
                 {
-                    StartNewProduct(_newProductInDefaultStage ? null : NewProductStage, _newProductCategoryId, IsEditingComposite);
-                    History.Clear();
-                    return;
+                    SuccessMessage = $"{product.Name} was put back as it was last saved.";
                 }
-
-                History.Clear();
-                CloseUsageForm();
-                Packaging.SelectedLineEdit = null;
-                LoadIntoForm(product);
-                await LoadProductDetailAsync(product, CancellationToken.None);
-                SuccessMessage = $"{product.Name} was put back as it was last saved.";
             }));
 
         // Restore puts the picked version into the form, as Revert puts the saved product there, but as an undo step of
@@ -1534,7 +1646,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     ApplyOpenForm();
                 }
 
-                _printRequests.OnNext(PrintScope.ThisProduct);
+                _printRequests.OnNext(new PrintScope.ThisProduct());
                 return Task.CompletedTask;
             }));
 
@@ -1737,10 +1849,17 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>
     /// Makes a product named <paramref name="name"/> from <paramref name="sourceProductId"/> as saved (a clone or a
     /// variant) with its first version, noted "<paramref name="madeAs"/>" the source, both or neither
-    /// (VersionedSaves.MakeProductFromAsync), and opens it.
+    /// (VersionedSaves.MakeProductFromAsync), and opens it. Opening it replaces the product showing, so that one's unsaved
+    /// changes are asked about first: saved, they're in what's copied.
     /// </summary>
-    private Task MakeFromAsync(int sourceProductId, string name, Func<int, string, CancellationToken, Task<int>> make, string madeAs) =>
-        RunSafelyAsync(async () =>
+    private async Task MakeFromAsync(int sourceProductId, string name, Func<int, string, CancellationToken, Task<int>> make, string madeAs)
+    {
+        if (!await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
         {
             var newId = await Task.Run(() => _versionedSaves.MakeProductFromAsync(
                 sourceProductId, name, make, madeAs, DateTime.Now, CancellationToken.None));
@@ -1748,6 +1867,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             await LoadCommand.Execute();
             SelectedProduct = Products.FirstOrDefault(p => p.Id == newId);
         });
+    }
 
     /// <summary>The list's Clone and Create Variant: asks for the new product's name first, starting from "… Copy".</summary>
     private async Task MakeFromWithPromptAsync(
@@ -1778,14 +1898,24 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 await LoadCommand.Execute();
             });
 
-    /// <summary>Takes <paramref name="product"/> out of the Deleted folder, back to its own, and opens it, as a click on it would.</summary>
-    private Task RestoreProductAsync(Product product) =>
-        RunSafelyAsync(async () =>
+    /// <summary>
+    /// Takes <paramref name="product"/> out of the Deleted folder, back to its own, and opens it, as a click on it would,
+    /// asking about the unsaved changes of the product showing first.
+    /// </summary>
+    private async Task RestoreProductAsync(Product product)
+    {
+        if (!await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
         {
             await _productRepository.RestoreAsync(product.Id, CancellationToken.None);
             await LoadCommand.Execute();
             TrySelectProduct(product.Id);
         });
+    }
 
     /// <summary>Deletes <paramref name="product"/>, from the Deleted folder, for good once it's confirmed.</summary>
     private Task DeletePermanentlyAsync(Product product) =>
@@ -1865,6 +1995,23 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>
+    /// <see cref="OpenProduct"/>, asking first about the unsaved changes of the product showing when another is to replace
+    /// it; a deleted one is only picked in the Deleted folder, and replaces nothing. False when the user stays on it.
+    /// </summary>
+    public async Task<bool> OpenProductAsync(int productId)
+    {
+        if (productId != SelectedProduct?.Id
+            && DeletedProducts.All(p => p.Id != productId)
+            && !await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return false;
+        }
+
+        OpenProduct(productId);
+        return true;
+    }
+
+    /// <summary>
     /// Starts a new product that links a standalone sub-assembly, for Sub-Assemblies' New Product. It waits for the next
     /// LoadCommand, which showing the screen runs, so the sub-assembly is found as it's saved now: it may have been made or
     /// renamed there since this screen last loaded.
@@ -1873,6 +2020,63 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         _productToOpen = null;
         _subAssemblyToStartFrom = subAssemblyId;
+    }
+
+    /// <summary><see cref="StartNewProductFrom"/>, asking first about the unsaved changes of the product showing. False when the user stays on it.</summary>
+    public async Task<bool> StartNewProductFromAsync(int subAssemblyId)
+    {
+        if (!await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return false;
+        }
+
+        StartNewProductFrom(subAssemblyId);
+        return true;
+    }
+
+    public bool HasUnsavedChanges => History.IsDirty;
+
+    /// <inheritdoc/>
+    public Task<bool> ResolveUnsavedChangesAsync(bool revert) => AskAboutUnsavedChangesAsync(
+        History.IsDirty,
+        !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim()
+            : SelectedProduct?.Name ?? (IsEditingComposite ? "the new composite product" : "the new product"),
+        async () =>
+        {
+            await SaveCommand.Execute();
+            return !History.IsDirty;
+        },
+        revert ? RevertToSavedAsync : null);
+
+    /// <summary>Runs <paramref name="then"/>, which replaces the product showing, once its unsaved changes are saved or thrown away.</summary>
+    private async Task AfterUnsavedChangesAsync(Action then)
+    {
+        if (await ResolveUnsavedChangesAsync(revert: false))
+        {
+            then();
+        }
+    }
+
+    /// <summary>
+    /// Puts the form back as the product was last saved: Revert, and Don't Save on leaving the screen. It reads the picked
+    /// product's detail again, which replaces the recipe, packaging, packs and costing wholesale, so anything staged but
+    /// unsaved goes: a section added or edited in the form included, since the form has no discard of its own. A new
+    /// product was never saved, so it goes back to being a blank one.
+    /// </summary>
+    private async Task RevertToSavedAsync()
+    {
+        if (SelectedProduct is not { } product)
+        {
+            StartNewProduct(_newProductInDefaultStage ? null : NewProductStage, _newProductCategoryId, IsEditingComposite);
+            History.Clear();
+            return;
+        }
+
+        History.Clear();
+        CloseUsageForm();
+        Packaging.SelectedLineEdit = null;
+        LoadIntoForm(product);
+        await LoadProductDetailAsync(product, CancellationToken.None);
     }
 
     /// <summary>
@@ -1905,7 +2109,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             return false;
         }
 
-        OpenProduct(product.Id);
+        _ = OpenProductAsync(product.Id);
         return true;
     }
 
@@ -1986,8 +2190,28 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // A deleted product's row is picked as a folder's is, leaving the form as it is: it's there to restore.
         if (!_treeSelection.IsSyncing && first is ProductLeafNode { IsDeleted: false } leaf && leaf.Product.Id != SelectedProduct?.Id)
         {
-            SelectedProduct = leaf.Product;
+            if (History.IsDirty)
+            {
+                _ = PickAfterAskingAsync(leaf.Product.Id);
+            }
+            else
+            {
+                SelectedProduct = leaf.Product;
+            }
         }
+    }
+
+    /// <summary>
+    /// Another product's row picked while the form holds unsaved changes: the list goes back to the row of the product
+    /// showing, and the one picked opens once the changes are saved or thrown away.
+    /// </summary>
+    private async Task PickAfterAskingAsync(int productId)
+    {
+        // The tree calls TreeSelectionChanged in the middle of changing its selection: going on once that's over lets the
+        // list take the row of the product showing back.
+        await Task.Yield();
+        SyncTreeSelection();
+        await OpenProductAsync(productId);
     }
 
     private async Task MoveProductsAsync(IReadOnlyList<ProductMove> moves, bool isUndo)
@@ -2438,13 +2662,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     private static PackagingLineState CaptureLine(PackagingLineRow row) => new(row.PackagingMaterialId, row.UnitId, row.QtyPerUnit);
 
-    private RecipeTabChoice CaptureTabChoice() => SelectedRecipeTab switch
+    private RecipeTabChoice? CaptureTabChoice() => SelectedRecipeTab switch
     {
-        SubAssemblyRecipeTab tab => new RecipeTabChoice(RecipeTabKind.Usage, RecipeTabs.OfType<SubAssemblyRecipeTab>().ToList().IndexOf(tab)),
-        AddSubAssemblyRecipeTab => new RecipeTabChoice(RecipeTabKind.AddSubAssembly, -1),
-        PackagingRecipeTab => new RecipeTabChoice(RecipeTabKind.Packaging, -1),
-        ComponentsRecipeTab => new RecipeTabChoice(RecipeTabKind.Components, -1),
-        _ => new RecipeTabChoice(RecipeTabKind.None, -1),
+        SubAssemblyRecipeTab tab => new RecipeTabChoice.Usage(RecipeTabs.OfType<SubAssemblyRecipeTab>().ToList().IndexOf(tab)),
+        AddSubAssemblyRecipeTab => new RecipeTabChoice.AddSubAssembly(),
+        PackagingRecipeTab => new RecipeTabChoice.Packaging(),
+        ComponentsRecipeTab => new RecipeTabChoice.Components(),
+        null => null,
     };
 
     /// <summary>
@@ -2518,12 +2742,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
                 SelectedRecipeTab = snapshot.SelectedTab switch
                 {
-                    { Kind: RecipeTabKind.Usage, UsageIndex: var index } =>
-                        RecipeTabs.OfType<SubAssemblyRecipeTab>().ElementAtOrDefault(index),
-                    { Kind: RecipeTabKind.AddSubAssembly } => RecipeTabs.Contains(AddSubAssemblyTab) ? AddSubAssemblyTab : null,
-                    { Kind: RecipeTabKind.Packaging } => PackagingTabIfShown,
-                    { Kind: RecipeTabKind.Components } => ComponentsTabIfShown,
-                    _ => null,
+                    RecipeTabChoice.Usage(var index) => RecipeTabs.OfType<SubAssemblyRecipeTab>().ElementAtOrDefault(index),
+                    RecipeTabChoice.AddSubAssembly => RecipeTabs.Contains(AddSubAssemblyTab) ? AddSubAssemblyTab : null,
+                    RecipeTabChoice.Packaging => PackagingTabIfShown,
+                    RecipeTabChoice.Components => ComponentsTabIfShown,
+                    null => null,
                 };
             }
             finally
@@ -2676,10 +2899,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var untouchedNewProduct = _editingId == 0 && Costing.ShowsDefaults;
         Costing.SetDefaults(defaults);
         _defaultNewProductStage = defaults.NewProductStage;
-        if (_wastagePercent != defaults.WastagePercent)
+        if (_wastagePercent != defaults.WastagePercent || _priceRoundingStep != defaults.PriceRoundingStep)
         {
             // Every product is priced with it, the one open included: its Costing tab follows at once.
             _wastagePercent = defaults.WastagePercent;
+            _priceRoundingStep = defaults.PriceRoundingStep;
             RecomputeCosts();
         }
         if (_editingId == 0 && _newProductInDefaultStage)
@@ -2740,9 +2964,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             {
                 // The product's own keeps its id, so Save rewrites it in place; a new section's is 0.
                 Id = u.SubAssemblyId,
-                IsOwn = u.IsOwned,
-                Release = u.IsReleasing,
-                ToMadeIngredient = u.ToMadeIngredient,
+                Placement = u.ToMadeIngredient is { } made ? new SectionPlacement.MoveToInHouse(made)
+                    : u.IsReleasing ? new SectionPlacement.MoveToSubAssemblies()
+                    : u.IsOwned ? new SectionPlacement.ProductsOwn()
+                    : new SectionPlacement.ByRole(),
             })],
             [.. UsageEdits.Where(u => u.IsLinked).Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
             {
@@ -2777,9 +3002,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         && a.New.Count == b.New.Count
         && a.New.Zip(b.New).All(pair =>
             pair.First.Id == pair.Second.Id
-            && pair.First.IsOwn == pair.Second.IsOwn
-            && pair.First.Release == pair.Second.Release
-            && pair.First.ToMadeIngredient == pair.Second.ToMadeIngredient
+            && pair.First.Placement == pair.Second.Placement
 
             && pair.First.RoleId == pair.Second.RoleId
             && pair.First.SectionName == pair.Second.SectionName
@@ -2931,11 +3154,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             if (versionLink.SubAssemblyId is { } setId && subAssembliesNow.TryGetValue(setId, out var set))
             {
-                link = PackagingLinkTarget.ForSet(setId, set.Name);
+                link = new PackagingLinkTarget.Set(setId, set.Name);
             }
             else if (versionLink.ProductId is { } linkedProductId && Products.FirstOrDefault(p => p.Id == linkedProductId) is { } linkedProduct)
             {
-                link = PackagingLinkTarget.ForProduct(linkedProductId, linkedProduct.Name);
+                link = new PackagingLinkTarget.OtherProduct(linkedProductId, linkedProduct.Name);
             }
         }
 
@@ -2982,16 +3205,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             packagingLines = [.. Packaging.LineEdits.Select(CaptureLine)];
         }
-        else if (link.SubAssemblyId is { } setId)
-        {
-            packagingLines = [.. (await Task.Run(() => _subAssemblyRepository.GetPackagingLinesAsync(setId, CancellationToken.None)))
-                .Select(l => new PackagingLineState(l.PackagingMaterialId, l.UnitId, l.QtyPerSet))];
-        }
         else
         {
-            packagingLines = [.. (await Task.Run(() => _packagingLineRepository.GetEffectiveForProductAsync(link.ProductId!.Value, CancellationToken.None)))
-                .Select(l => PackagingLineRow.FromSaved(l))
-                .Select(r => new PackagingLineState(r.PackagingMaterialId, r.UnitId, r.QtyPerUnit))];
+            packagingLines = link switch
+            {
+                PackagingLinkTarget.Set(var setId, _) => [.. (await Task.Run(() => _subAssemblyRepository.GetPackagingLinesAsync(setId, CancellationToken.None)))
+                    .Select(l => new PackagingLineState(l.PackagingMaterialId, l.UnitId, l.QtyPerSet))],
+                PackagingLinkTarget.OtherProduct(var linkedProductId, _) => [.. (await Task.Run(() => _packagingLineRepository.GetEffectiveForProductAsync(linkedProductId, CancellationToken.None)))
+                    .Select(l => PackagingLineRow.FromSaved(l))
+                    .Select(r => new PackagingLineState(r.PackagingMaterialId, r.UnitId, r.QtyPerUnit))],
+            };
         }
 
         // Another product picked while that was read: the version isn't this one's.
@@ -3060,9 +3283,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     IncludesComponentPackaging = content.IncludesComponentPackaging,
                     Costing = (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent, costing.VatPercent),
                     Usages = sections,
-                    SelectedTab = sections.Count > 0 ? new RecipeTabChoice(RecipeTabKind.Usage, 0)
-                        : product.IsComposite ? new RecipeTabChoice(RecipeTabKind.Components, -1)
-                        : new RecipeTabChoice(RecipeTabKind.Packaging, -1),
+                    SelectedTab = sections.Count > 0 ? new RecipeTabChoice.Usage(0)
+                        : product.IsComposite ? new RecipeTabChoice.Components()
+                        : new RecipeTabChoice.Packaging(),
                     HasAddSubAssemblyTab = false,
                     HasPackaging = link is not null || packagingLines.Count > 0,
                     PackagingLink = link,
@@ -3283,10 +3506,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         IReadOnlyList<PackagingLineRow> packagingRows = [];
         if (source?.PackagingTarget is { } packaging)
         {
-            packagingRows = packaging.SubAssemblyId is { } setId
-                ? [.. (await _subAssemblyRepository.GetPackagingLinesAsync(setId, cancellationToken))
-                    .Select(l => new PackagingLineRow(FindPackagingMaterial(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId))]
-                : [.. (await _packagingLineRepository.GetEffectiveForProductAsync(packaging.ProductId!.Value, cancellationToken)).Select(PackagingLineRow.FromSaved)];
+            packagingRows = packaging switch
+            {
+                PackagingLinkTarget.Set(var setId, _) => [.. (await _subAssemblyRepository.GetPackagingLinesAsync(setId, cancellationToken))
+                    .Select(l => new PackagingLineRow(FindPackagingMaterial(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId))],
+                PackagingLinkTarget.OtherProduct(var productId, _) =>
+                    [.. (await _packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken)).Select(PackagingLineRow.FromSaved)],
+            };
         }
         else if (source?.SubAssembly is { } subAssembly)
         {
@@ -4061,12 +4287,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
                 break;
 
-            default:
-                if (tab is not null)
-                {
-                    _lastRecipeContentTab = tab;
-                }
+            case PackagingRecipeTab or ComponentsRecipeTab:
+                _lastRecipeContentTab = tab;
+                break;
 
+            case null:
                 break;
         }
 
@@ -4352,7 +4577,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             IsEditingComposite,
             IsEditingComposite && UsageEdits.Count > 0,
             componentPackaging,
-            _wastagePercent);
+            EditingCategory?.WastagePercent ?? _wastagePercent,
+            _priceRoundingStep);
     }
 
     /// <summary>
@@ -4379,6 +4605,39 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ScalingPiecesText = EditingQuantityRequired > 1
             ? $"= {RecipeScalingRules.PiecesFor(ScalingUnits, EditingQuantityRequired):#,0} pieces"
             : string.Empty;
+        RefreshScalingFromHave(scaler, recipe);
+    }
+
+    /// <summary>
+    /// The Scaling tab's "from what you have" (2026-10-29): the ingredients the recipe takes, kept picked while it still
+    /// takes it, and how many sellable units the amount typed of it makes.
+    /// </summary>
+    private void RefreshScalingFromHave(RecipeScaler scaler, ScalingRecipe recipe)
+    {
+        var ingredients = scaler.IngredientsOf(recipe, _detailProductId);
+        if (!ingredients.Select(i => i.Id).SequenceEqual(ScalingIngredients.Select(i => i.Id)))
+        {
+            ScalingIngredients = ingredients;
+        }
+
+        if (ScalingHaveIngredient is { } picked && ingredients.FirstOrDefault(i => i.Id == picked.Id) is var kept && !ReferenceEquals(kept, picked))
+        {
+            ScalingHaveIngredient = kept;
+        }
+
+        if (ScalingHaveIngredient is not { } ingredient || ScalingHaveAmount is not > 0m || ScalingHaveUnit is not { } unit)
+        {
+            ScalingHaveMakes = 0;
+            ScalingHaveText = string.Empty;
+            return;
+        }
+
+        var grams = ScalingHaveAmount.Value * unit.Grams;
+        var makes = scaler.UnitsFrom(recipe, _detailProductId, ingredient.Id, grams);
+        ScalingHaveMakes = makes;
+        ScalingHaveText = makes > 0
+            ? $"Makes {RecipeScaler.UnitsText(makes, EditingQuantityRequired)}, using {RecipeScaler.GramsText(scaler.GramsOf(recipe, makes, _detailProductId, ingredient.Id))} of the {RecipeScaler.GramsText(grams)}."
+            : $"Not enough for one: one takes {RecipeScaler.GramsText(scaler.GramsOf(recipe, 1m, _detailProductId, ingredient.Id))}.";
     }
 
     /// <summary>A product a composite holds, as saved and priced at the screen's cost basis; null while it hasn't been read.</summary>
@@ -4413,7 +4672,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     productsRead.TryAdd(held.Id, held);
                 }
 
-                return productsRead.Values.Where(p => details.ContainsKey(p.Id)).Select(p => (p, details[p.Id])).ToList();
+                List<(Product Product, ProductDetail Detail)> found = [];
+                foreach (var product in productsRead.Values)
+                {
+                    if (details.TryGetValue(product.Id, out var detail))
+                    {
+                        found.Add((product, detail));
+                    }
+                }
+
+                return found;
             });
         }
         catch (Exception ex)
@@ -4444,23 +4712,23 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>
     /// The product the screen has open, as the Print tab shows it: asked for each time that tab is shown, so it follows
     /// the edits made here since, and the product opened here since (the user's choice, 2026-09-27). A sub-assembly form
-    /// left open is applied first, as Print applies it. Null for the printout while the details are still arriving, or
-    /// when a rule refuses the form, with its message as the problem (and on this screen, for when it's next shown):
-    /// the tab then keeps what it had.
+    /// left open is applied first, as Print applies it. Empty while the details are still arriving, and a
+    /// <see cref="PrintProblem"/> when a rule refuses the form, with its message (shown on this screen too, for when it's
+    /// next shown): the tab then keeps what it had.
     /// </summary>
-    public (ProductPrintout? Printout, string? Problem) PreparePrintout()
+    public PreparedPrintout PreparePrintout()
     {
         if (!AreDetailsReady)
         {
-            return (null, null);
+            return default;
         }
 
         // With the History tab showing, the pages are the version picked there, as the Scaling tab's are the recipe scaled.
         if (SelectedDetailsTab == HistoryTab)
         {
             return VersionHistory.SelectedRow is { } row && SelectedProduct is { } product
-                ? (VersionPrintout(row, product), null)
-                : (null, null);
+                ? VersionPrintout(row, product)
+                : default(PreparedPrintout);
         }
 
         try
@@ -4470,10 +4738,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         catch (BusinessRuleException ex)
         {
             ErrorMessage = ex.Message;
-            return (null, ex.Message);
+            return new PrintProblem(ex.Message);
         }
 
-        return (CurrentPrintout(), null);
+        return CurrentPrintout();
     }
 
     /// <summary>
@@ -4945,5 +5213,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _subAssemblyOpenRequests.Dispose();
         _printRequests.Dispose();
         _versionReads.Dispose();
+        _markupChecks.Dispose();
     }
 }

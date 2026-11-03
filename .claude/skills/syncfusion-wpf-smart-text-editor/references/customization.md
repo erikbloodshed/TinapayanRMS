@@ -217,53 +217,6 @@ Customize the background color and styling of the suggestion popup using the `Su
 </smarttexteditor:SfSmartTextEditor>
 ```
 
-### Advanced Popup Styling
-
-```xaml
-<smarttexteditor:SfSmartTextEditor SuggestionDisplayMode="Popup">
-    <smarttexteditor:SfSmartTextEditor.SuggestionPopupStyle>
-        <Style TargetType="smarttexteditor:SuggestionPopup">
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="Background" Value="#0078D4" />
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="12,6"/>
-            <Setter Property="BorderBrush" Value="#005A9E"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="4"/>
-        </Style>
-    </smarttexteditor:SfSmartTextEditor.SuggestionPopupStyle>
-</smarttexteditor:SfSmartTextEditor>
-```
-
-### Material Design Popup
-
-```xaml
-<smarttexteditor:SfSmartTextEditor SuggestionDisplayMode="Popup">
-    <smarttexteditor:SfSmartTextEditor.SuggestionPopupStyle>
-        <Style TargetType="smarttexteditor:SuggestionPopup">
-            <Setter Property="Background" Value="#6200EE" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="16,8"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect Color="Black" Opacity="0.2" 
-                                     ShadowDepth="2" BlurRadius="8"/>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </smarttexteditor:SfSmartTextEditor.SuggestionPopupStyle>
-</smarttexteditor:SfSmartTextEditor>
-```
-
-**Popup Styling Tips:**
-- Use high contrast between background and foreground
-- Add padding for comfortable touch targets
-- Consider rounded corners for modern appearance
-- Use shadows for depth and visual separation
-
 ## Maximum Input Length
 
 Set a limit on the number of characters users can enter using the `MaxLength` property. This is useful for validation, database constraints, or UI requirements.

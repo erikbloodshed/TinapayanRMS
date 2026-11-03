@@ -281,7 +281,6 @@ var folder = node.Content as FolderModel;
 if (folder != null)
 {
     folder.FolderName = "New Name";
-    treeView.RefreshView(); // Manual refresh required
 }
 ```
 
@@ -309,7 +308,6 @@ if (index >= 0)
 // Unbound Mode: Replace content
 var node = treeView.Nodes[0];
 node.Content = newFolderModel;
-treeView.RefreshView();
 ```
 
 ## Refreshing View
@@ -325,18 +323,6 @@ public ObservableCollection<FolderModel> Folders { get; set; }
 **Changes trigger auto-refresh:**
 - Add/Remove items
 - Property changes (with `INotifyPropertyChanged`)
-
-### Manual Refresh (Unbound Mode)
-
-Call `RefreshView()` after changes:
-
-```csharp
-// Update content
-treeView.Nodes[0].Content = newData;
-
-// Refresh UI
-treeView.RefreshView();
-```
 
 ### Refresh Specific Node
 
@@ -479,7 +465,6 @@ void MoveNode(FolderModel source, FolderModel newParent)
 **Changes not reflecting:**
 - Check if using `ObservableCollection`
 - Verify `INotifyPropertyChanged` implementation
-- Call `RefreshView()` in Unbound Mode
 
 **Delete key not working:**
 - Ensure `AllowDeleting="True"`

@@ -11,7 +11,7 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>A row of the Raw Materials list's tree (RawMaterialTree): a folder, or a material in one.</summary>
-public abstract class RawMaterialTreeNode : ReactiveObject
+public closed class RawMaterialTreeNode : ReactiveObject
 {
     public abstract string Title { get; }
 
@@ -278,7 +278,7 @@ public sealed class RawMaterialTree : IDisposable
                 leaf.RawMaterial.Category?.Type ?? RawMaterialRules.CategoryTypeFor(leaf.RawMaterial.Type, leaf.RawMaterial.Source),
                 leaf.RawMaterial.CategoryId),
             // A type's own folder holds categories, not materials; null is a drop on nothing.
-            _ => null,
+            RawMaterialFolderNode or null => null,
         };
 
         return place is { } to

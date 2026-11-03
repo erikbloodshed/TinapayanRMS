@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 
@@ -22,7 +23,7 @@ public static class StandardUnitRules
     /// <summary>A standard unit's size in its kind's smallest reference unit: grams, millimetres or millilitres.</summary>
     private sealed record StandardUnit(Kind Kind, decimal Size);
 
-    private static readonly Dictionary<string, StandardUnit> ByName = Build(
+    private static readonly FrozenDictionary<string, StandardUnit> ByName = Build(
         (new StandardUnit(Kind.Mass, 0.001m), ["milligram", "milligramme", "mg"]),
         (new StandardUnit(Kind.Mass, 1m), ["gram", "gramme", "g"]),
         (new StandardUnit(Kind.Mass, 1000m), ["kilogram", "kilogramme", "kilo", "kg"]),
@@ -61,10 +62,16 @@ public static class StandardUnitRules
         return multiplier > 0 ? multiplier : null;
     }
 
-    private static StandardUnit? Find(UnitOfMeasure unit) =>
-        ByName.GetValueOrDefault(unit.Name.Trim()) ?? ByName.GetValueOrDefault(unit.Abbreviation.Trim());
+    /// <summary><see cref="ByName"/> looked up by a trimmed span of a name, so a lookup doesn't allocate the trimmed copy.</summary>
+    private static readonly FrozenDictionary<string, StandardUnit>.AlternateLookup<ReadOnlySpan<char>> BySpan =
+        ByName.GetAlternateLookup<ReadOnlySpan<char>>();
 
-    private static Dictionary<string, StandardUnit> Build(params (StandardUnit Unit, string[] Names)[] units) =>
+    private static StandardUnit? Find(UnitOfMeasure unit) =>
+        BySpan.TryGetValue(unit.Name.AsSpan().Trim(), out var byName) ? byName
+        : BySpan.TryGetValue(unit.Abbreviation.AsSpan().Trim(), out var byAbbreviation) ? byAbbreviation
+        : null;
+
+    private static FrozenDictionary<string, StandardUnit> Build(params (StandardUnit Unit, string[] Names)[] units) =>
         units.SelectMany(u => u.Names.Select(name => (name, u.Unit)))
-            .ToDictionary(p => p.name, p => p.Unit, StringComparer.OrdinalIgnoreCase);
+            .ToFrozenDictionary(p => p.name, p => p.Unit, StringComparer.OrdinalIgnoreCase);
 }

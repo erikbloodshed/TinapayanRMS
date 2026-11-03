@@ -47,7 +47,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         viewModel.History.IsDirty.Should().BeFalse("the switch isn't an edit");
         viewModel.History.CanUndo.Should().BeFalse();
 
-        var printout = viewModel.PreparePrintout().Printout!;
+        var printout = viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Subject;
         printout.CostBasis.Should().Be(CostBasis.Unbuffered);
         printout.Sections.Single().CostPerPiece.Should().Be(2.00m);
         printout.Sections.Single().Lines.Single().CostPerGram.Should().Be(0.04m);
@@ -59,7 +59,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         viewModel.CostBasisButtonLabel.Should().Be("Unbuffered");
         (viewModel.Costing.Costs.SubAssemblies, viewModel.Costing.Costs.Packaging).Should().Be((2.50m, 30m));
         viewModel.UsageForm.FormLines.Single().CostPerGram.Should().Be(0.05m);
-        viewModel.PreparePrintout().Printout!.CostBasis.Should().Be(CostBasis.Buffered);
+        viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Which.CostBasis.Should().Be(CostBasis.Buffered);
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
 
         viewModel.ComponentsTable.ComponentEdits.Select(r => r.RecipeCost).Should().Equal(2.00m, 4.00m);
         viewModel.Costing.Costs.SubAssemblies.Should().Be(28m, "6 × 2.00 + 4 × 4.00");
-        viewModel.PreparePrintout().Printout!.Components!.Select(c => c.Cost).Should().Equal(12m, 16m);
+        viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Which.Components!.Select(c => c.Cost).Should().Equal(12m, 16m);
         viewModel.History.IsDirty.Should().BeFalse();
     }
 

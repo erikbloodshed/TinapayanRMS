@@ -466,15 +466,15 @@ Then use multiple sparklines or custom styling based on categories.
     MarkerVisibility="Visible"
     Interior="Blue">
     
-    <syncfusion:SfLineSparkline.SegmentTemplateSelector>
-        <syncfusion:SegmentTemplateSelector 
+    <syncfusion:SfLineSparkline.MarkerTemplateSelector>
+        <syncfusion:MarkerTemplateSelector 
             FirstPointBrush="Yellow" 
             LastPointBrush="Yellow"
             HighPointBrush="Red"
             LowPointBrush="Blue"
             MarkerHeight="12" 
             MarkerWidth="12"/>
-    </syncfusion:SfLineSparkline.SegmentTemplateSelector>
+    </syncfusion:SfLineSparkline.MarkerTemplateSelector>
     
 </syncfusion:SfLineSparkline>
 ```

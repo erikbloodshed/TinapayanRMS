@@ -257,7 +257,24 @@ var conference = new ScheduleAppointment
 };
 ```
 
-**Note:** Spanned appointments don't block time slots; they render exclusively in the AllDayAppointmentPanel.
+**Note:** Spanned appointments don't block time slots; by default, they render exclusively in the all-day panel.
+
+### Displaying Spanned Appointments in Time Slots
+
+In Day, Week, and WorkWeek views, set `AllowSpannedAppointmentsInTimeSlots` to `true` to render appointments spanning more than 24 hours inside the timeslot cells instead of the all-day panel. By default, this property is `false`, so spanned appointments appear in the all-day panel.
+
+```csharp
+Schedule.ViewType = SchedulerViewType.Week;
+Schedule.DaysViewSettings.AllowSpannedAppointmentsInTimeSlots = true;
+```
+
+```xaml
+<syncfusion:SfScheduler x:Name="Schedule" ViewType="Week">
+    <syncfusion:SfScheduler.DaysViewSettings>
+        <syncfusion:DaysViewSettings AllowSpannedAppointmentsInTimeSlots="True" />
+    </syncfusion:SfScheduler.DaysViewSettings>
+</syncfusion:SfScheduler>
+```
 
 ## Recurrence Appointments
 

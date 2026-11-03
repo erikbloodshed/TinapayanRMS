@@ -6,7 +6,7 @@ namespace TinapayanRMS.UI.Views.Products;
 /// Products' details form, under the header: the product's name, category and current price, as typed in.
 /// Inherits the Products screen's DataContext (ProductsViewModel).
 /// </summary>
-public partial class ProductDetailsCard : UserControl
+public sealed partial class ProductDetailsCard : UserControl
 {
     public ProductDetailsCard()
     {

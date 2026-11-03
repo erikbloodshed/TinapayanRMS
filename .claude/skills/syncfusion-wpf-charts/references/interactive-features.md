@@ -114,7 +114,7 @@ Display vertical and horizontal lines at cursor position.
 ### Crosshair Customization
 
 ```xml
-<syncfusion:ChartCrossHairBehavior ShowTrackballInfo="True">
+<syncfusion:ChartCrossHairBehavior>
     <syncfusion:ChartCrossHairBehavior.HorizontalLineStyle>
         <Style TargetType="Line">
             <Setter Property="Stroke" Value="Red"/>
@@ -195,15 +195,15 @@ Select entire series:
 ### Selection Style
 
 ```xml
-<syncfusion:ChartSelectionBehavior EnableSegmentSelection="True" SegmentSelectionBrush="Green"/>
+<syncfusion:ChartSelectionBehavior EnableSegmentSelection="True" />
 ```
 
 ### Handle Selection Changed Event
 
 ```xml
-<syncfusion:SfChart>
+<syncfusion:SfChart SelectionChanged="OnSelectionChanged">
     <syncfusion:SfChart.Behaviors>
-        <syncfusion:ChartSelectionBehavior SelectionChanged="OnSelectionChanged"/>
+        <syncfusion:ChartSelectionBehavior />
     </syncfusion:SfChart.Behaviors>
 </syncfusion:SfChart>
 ```

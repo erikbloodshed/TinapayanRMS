@@ -78,6 +78,16 @@ public sealed record ProductPrintout(
 }
 
 /// <summary>
+/// What Print gets from the Products screen (ProductsViewModel.PreparePrintout): the pages of the product it has open, or
+/// why the sub-assembly form left open there can't give them (<see cref="PrintProblem"/>). Empty (<c>default</c>) while
+/// there's nothing to print yet: the details are still arriving, or the History tab has no version picked.
+/// </summary>
+public union PreparedPrintout(ProductPrintout, PrintProblem);
+
+/// <summary>A rule refused the sub-assembly form left open, so Print keeps the pages it had: the rule's message.</summary>
+public sealed record PrintProblem(string Message);
+
+/// <summary>
 /// What one Print puts on paper: one product, as the Products screen shows it, or a set of products as they're saved,
 /// under a title ("All Products", "Breads · Production"), which gives the document a contents page and starts each
 /// product on a page of its own.
@@ -88,12 +98,6 @@ public sealed record ProductPrintSet(string? Title, IReadOnlyList<ProductPrintou
 {
     /// <summary>One product on its own: no contents page.</summary>
     public static ProductPrintSet Of(ProductPrintout printout) => new(null, [printout], printout.PrintedAt);
-
-    /// <summary>The Production Plan screen's plan, printed in place of any product: what to make, the mixes and what to buy.</summary>
-    public static ProductPrintSet Of(PrintedPlan plan, DateTime printedAt) => new("Production Plan", [], printedAt) { Plan = plan };
-
-    /// <summary>A production plan, which a set holding one prints alone; null for products.</summary>
-    public PrintedPlan? Plan { get; init; }
 
     /// <summary>
     /// The Price Simulator report's price changes, every one tried, which its first page lists over its contents; null for any
@@ -266,36 +270,3 @@ public sealed record PrintedPriceChange(string Material, string? Per, decimal? C
 /// </summary>
 /// <param name="Changes">The changes reaching the product, through its own ingredients and packaging or the products it holds; none when no change does.</param>
 public sealed record PrintedSimulation(ProductCostSummary Now, IReadOnlyList<PrintedPriceChange> Changes);
-
-/// <summary>
-/// The Production Plan on paper: the products to make, then the mixing sheet and the purchase requisition as the screen shows
-/// them, and what the plan couldn't work out.
-/// </summary>
-public sealed record PrintedPlan(
-    IReadOnlyList<PlanLineRow> Orders,
-    IReadOnlyList<MixRow> Mixes,
-    IReadOnlyList<PurchaseRequisitionRow> Requisition,
-    decimal TotalCost,
-    IReadOnlyList<string> Notes)
-{
-    /// <summary>The saved plan open in the table, which the title names; null when none is.</summary>
-    public string? PlanName { get; init; }
-
-    /// <summary>Its mixes are in half batches.</summary>
-    public bool HalfBatches { get; init; }
-
-    /// <summary>What the whole purchase units to buy cost, at their brands' prices.</summary>
-    public decimal TotalBuyCost { get; init; }
-
-    /// <summary>What the products to make sell for, with VAT.</summary>
-    public decimal TotalSales { get; init; }
-
-    /// <summary>What they earn over their base cost, VAT out.</summary>
-    public decimal TotalProfit { get; init; }
-
-    /// <summary>The profit as a percentage of the sales before VAT.</summary>
-    public decimal ProfitMarginPercent { get; init; }
-
-    /// <summary>Which products are counted at their worked-out selling price, having no Current Price; null when none are.</summary>
-    public string? SalesNote { get; init; }
-}

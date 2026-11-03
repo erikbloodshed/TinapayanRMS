@@ -19,6 +19,8 @@
             <converters:EmptyStateVisibilityConverter x:Key="EmptyStateVisibilityConverter" />
             <converters:NotNullToVisibilityConverter x:Key="NotNullToVisibilityConverter" />
             <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+            <!-- Every two-way number box bound to a decimal: its double goes in as the decimal it shows (DecimalValueConverter) -->
+            <converters:DecimalValueConverter x:Key="DecimalValueConverter" />
 
             <!--
                 The Unit cell of every packaging grid (a product's Packaging tab, the Add Sub-Assembly form, and a
@@ -550,6 +552,12 @@
                                                       HorizontalAlignment="Center"
                                                       Margin="0,0,0,6" />
                                     <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" />
+                                    <!-- Raw Materials' tiles only: what the material makes up of the product's material cost -->
+                                    <TextBlock Text="{Binding CostShareText}"
+                                               Style="{StaticResource CaptionStyle}"
+                                               TextAlignment="Center"
+                                               Margin="0,2,0,0"
+                                               Visibility="{Binding CostShareText, Converter={StaticResource NotNullToVisibilityConverter}}" />
                                 </StackPanel>
                             </Button>
                         </DataTemplate>

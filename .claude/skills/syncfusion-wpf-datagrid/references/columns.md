@@ -34,6 +34,63 @@ dataGrid.Columns.Add(new GridTextColumn()
 });
 ```
 
+#### Character Casing
+
+Control the casing of text entered by users during editing using the `CharacterCasing` property. The property automatically converts user-entered text to uppercase or lowercase.
+
+**CharacterCasing Options:**
+- `Normal` (default) - No automatic casing conversion
+- `Upper` - Automatically convert to uppercase
+- `Lower` - Automatically convert to lowercase
+
+```xaml
+<syncfusion:SfDataGrid AutoGenerateColumns="False" AllowEditing="True">
+    <syncfusion:SfDataGrid.Columns>
+        <syncfusion:GridTextColumn MappingName="CustomerName" 
+                                   HeaderText="Customer Name" 
+                                   CharacterCasing="Upper" />
+        <syncfusion:GridTextColumn MappingName="Country" 
+                                   HeaderText="Country" 
+                                   CharacterCasing="Lower" />
+        <syncfusion:GridTextColumn MappingName="ShipCity" 
+                                   HeaderText="Ship City"
+                                   CharacterCasing="Normal" />
+    </syncfusion:SfDataGrid.Columns>
+</syncfusion:SfDataGrid>
+```
+
+```csharp
+// Enable editing
+dataGrid.AllowEditing = true;
+
+// Add columns with CharacterCasing
+dataGrid.Columns.Add(new GridTextColumn() 
+{ 
+    MappingName = "CustomerName", 
+    HeaderText = "Customer Name", 
+    CharacterCasing = CharacterCasing.Upper 
+});
+
+dataGrid.Columns.Add(new GridTextColumn() 
+{ 
+    MappingName = "Country", 
+    HeaderText = "Country", 
+    CharacterCasing = CharacterCasing.Lower 
+});
+
+dataGrid.Columns.Add(new GridTextColumn() 
+{ 
+    MappingName = "ShipCity", 
+    HeaderText = "Ship City", 
+    CharacterCasing = CharacterCasing.Normal 
+});
+```
+
+**Important Note:** The `CharacterCasing` property only affects text manually entered by users during editing. It does not apply to:
+- Existing cell values
+- Pasted text
+- Programmatically assigned values
+
 ### GridNumericColumn
 Displays numeric data (int, float, double, decimal).
 

@@ -205,7 +205,8 @@ public event EventHandler<SunburstSelectionChangedEventArgs> SelectionChanged
 private void Chart_SelectionChanged(object sender, SunburstSelectionChangedEventArgs e)
 {
     // Access selected segment
-    string category = e.SelectedSegment.Category;
+    
+    string category = e.SelectedSegment.Category?.ToString();
     double value = e.SelectedSegment.Value;
     int level = e.SelectedSegment.CurrentLevel;
     int index = e.SelectedSegment.SliceIndex;
@@ -288,8 +289,9 @@ Update other UI elements based on selection:
 ```csharp
 private void Chart_SelectionChanged(object sender, SunburstSelectionChangedEventArgs e)
 {
+
     // Update text blocks
-    SelectedCategoryLabel.Text = $"Selected: {e.SelectedSegment.Category}";
+    SelectedCategoryLabel.Text = $"Selected: {e.SelectedSegment.Category?.ToString()}";
     SelectedValueLabel.Text = $"Value: {e.SelectedSegment.Value:N0}";
     
     // Update progress bar
@@ -298,13 +300,13 @@ private void Chart_SelectionChanged(object sender, SunburstSelectionChangedEvent
     ValueProgressBar.Value = percentage;
     
     // Load detailed data for this segment
-    LoadDetailedView(e.SelectedSegment.Category);
+    LoadDetailedView(e.SelectedSegment.Category?.ToString());
 }
 
 private void LoadDetailedView(string category)
 {
     // Load detailed data grid, charts, etc.
-    DetailDataGrid.ItemsSource = GetDetailedData(category);
+    DetailDataGrid.ItemsSource = GetDetailedData(category?.ToString());
 }
 ```
 
@@ -320,7 +322,7 @@ private void Chart_SelectionChanged(object sender, SunburstSelectionChangedEvent
     var selectionInfo = new SelectionInfo
     {
         Timestamp = DateTime.Now,
-        Category = e.SelectedSegment.Category,
+        Category = e.SelectedSegment.Category?.ToString(),
         Value = e.SelectedSegment.Value,
         Level = e.SelectedSegment.CurrentLevel
     };
@@ -351,7 +353,7 @@ Filter other views based on selection:
 ```csharp
 private void Chart_SelectionChanged(object sender, SunburstSelectionChangedEventArgs e)
 {
-    string selectedCategory = e.SelectedSegment.Category;
+    string selectedCategory = e.SelectedSegment.Category?.ToString();
     
     // Filter data grid
     var filteredData = _allData.Where(item => 
@@ -509,7 +511,7 @@ public partial class MainWindow : Window
         if (e.SelectedSegment != null)
         {
             // Update UI elements
-            StatusLabel.Text = $"Selected: {e.SelectedSegment.Category}";
+            StatusLabel.Text = $"Selected: {e.SelectedSegment.Category?.ToString()}";
             ValueLabel.Text = $"Value: {e.SelectedSegment.Value:N2}";
             LevelLabel.Text = $"Level: {e.SelectedSegment.CurrentLevel + 1}";
             
@@ -517,7 +519,7 @@ public partial class MainWindow : Window
             LoadSegmentDetails(e.SelectedSegment);
             
             // Log for analytics
-            LogSelection(e.SelectedSegment.Category, e.SelectedSegment.Value);
+            LogSelection(e.SelectedSegment.Category?.ToString(), e.SelectedSegment.Value);
         }
     }
     

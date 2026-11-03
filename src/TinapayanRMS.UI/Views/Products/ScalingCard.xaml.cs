@@ -7,7 +7,7 @@ namespace TinapayanRMS.UI.Views.Products;
 /// batches with their lines, made ingredients opening into their BOMs, a composite's products, the packaging), each row
 /// with its amount and cost. Inherits the Products screen's DataContext (ProductsViewModel).
 /// </summary>
-public partial class ScalingCard : UserControl
+public sealed partial class ScalingCard : UserControl
 {
     public ScalingCard()
     {
