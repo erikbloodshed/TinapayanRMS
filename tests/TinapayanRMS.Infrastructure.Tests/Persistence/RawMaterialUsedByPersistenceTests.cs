@@ -273,4 +273,70 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(boxId)).Should().BeEmpty("Small's packaging reads through to Big's, which has no box");
         (await UsedByNamesAsync(ribbonId)).Should().Equal("Big", "Small");
     }
+
+    [Fact]
+    public async Task A_loop_of_ingredients_added_outside_the_app_ends_and_still_finds_the_product()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling");
+        var milkId = await AddIngredientAsync("Milk");
+        var custardId = await AddMadeIngredientAsync("Custard", [(milkId, 400m)]);
+        var custardSkinId = await AddLinkedIngredientAsync("Custard Skin", custardId);
+        await AddProductWithSubAssemblyAsync("Custard Cake", fillingRoleId, [(custardSkinId, 300m)]);
+
+        // Custard Skin is cut from Custard, and now Custard is made with Custard Skin: the app refuses that
+        // (IngredientDependencies), so it goes in past the repository.
+        var recipeId = await RecipeIdOfAsync(custardId);
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.SubAssemblyLines.Add(new SubAssemblyLine { SubAssemblyId = recipeId, IngredientId = custardSkinId, Grams = 100m });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        (await UsedByNamesAsync(milkId)).Should().Equal("Custard Cake");
+    }
+
+    /// <summary>
+    /// Ensaymada, of flour in a bag, is in a Pasalubong Box, which is in a Party Package, which is now in that box too: a
+    /// loop of composites, each including the packaging of what it holds. The app refuses one
+    /// (CompositeProductRules.EnsureNoCycle), so the last step goes in past the repository.
+    /// </summary>
+    private async Task<(int FlourId, int BagId)> AddLoopOfCompositesAsync()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour");
+        var bagId = await AddBoxAsync("Bag");
+        var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)]);
+        await SetOwnPackagingAsync(ensaymadaId, bagId);
+        var rollId = await AddProductAsync("Cheese Roll");
+        var products = new ProductRepository(CreateDbContextFactory());
+        var boxId = await products.SaveAsync(
+            new Product { Name = "Pasalubong Box", IsComposite = true, IncludesComponentPackaging = true },
+            new RecipeDraft([], []) { Components = [(ensaymadaId, 6), (rollId, 4)] },
+            null, null, null, Cancellation);
+        var packageId = await products.SaveAsync(
+            new Product { Name = "Party Package", IsComposite = true, IncludesComponentPackaging = true },
+            new RecipeDraft([], []) { Components = [(boxId, 2), (rollId, 6)] },
+            null, null, null, Cancellation);
+
+        await using var dbContext = CreateDbContext();
+        dbContext.ProductComponents.Add(new ProductComponent { ProductId = boxId, ComponentProductId = packageId, Quantity = 1 });
+        await dbContext.SaveChangesAsync(Cancellation);
+        return (flourId, bagId);
+    }
+
+    [Fact]
+    public async Task A_loop_of_composites_added_outside_the_app_ends_for_what_goes_into_their_recipes()
+    {
+        var (flourId, _) = await AddLoopOfCompositesAsync();
+
+        (await UsedByNamesAsync(flourId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
+    }
+
+    [Fact]
+    public async Task A_loop_of_composites_added_outside_the_app_ends_for_the_packaging_they_include()
+    {
+        var (_, bagId) = await AddLoopOfCompositesAsync();
+
+        (await UsedByNamesAsync(bagId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
+    }
 }

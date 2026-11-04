@@ -122,21 +122,6 @@ public static class ProductRules
         subAssemblyTotalCost * weightPerPiece / totalWeight;
 
     /// <summary>
-    /// How many grams of one sub-assembly line go into one piece: the piece is weightPerPiece of the batch,
-    /// so it takes that share of every line that went in. Pass the effective batch's weight, as
-    /// CalculateUsageCostPerPiece takes it.
-    /// </summary>
-    public static decimal CalculateLineGramsPerPiece(decimal lineGrams, decimal weightPerPiece, decimal totalWeight) =>
-        lineGrams * weightPerPiece / totalWeight;
-
-    /// <summary>
-    /// One sub-assembly line's cost per finished piece: the piece's share of the line's grams, at the
-    /// ingredient's cost per gram. A usage's lines add up to its CalculateUsageCostPerPiece.
-    /// </summary>
-    public static decimal CalculateLineCostPerPiece(decimal lineGrams, decimal ingredientCostPerGram, decimal weightPerPiece, decimal totalWeight) =>
-        lineGrams * ingredientCostPerGram * weightPerPiece / totalWeight;
-
-    /// <summary>
     /// A product's packaging lines. Unlike EnsureValidUsages and the ingredient/sub-assembly line rules,
     /// an empty list is deliberately allowed here — a product may legitimately have no packaging lines
     /// entered yet, whereas a sub-assembly with no ingredient lines or a product with no sub-assembly

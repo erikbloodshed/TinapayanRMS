@@ -25,8 +25,8 @@ public static class RecipeScalingRules
 
     /// <summary>
     /// The batches of a section <paramref name="pieces"/> take, not rounded: 160 pieces at 10 g from a 1,000 g batch are 1.6.
-    /// The Production Plan adds these up across the products sharing a batch before rounding up once (<see cref="WholeBatches"/>).
-    /// 0 for a section with no piece size yet, or a batch of nothing.
+    /// <see cref="BatchesFor"/> rounds it up (<see cref="WholeBatches"/>). 0 for a section with no piece size yet, or a batch
+    /// of nothing.
     /// </summary>
     public static decimal BatchRatio(decimal pieces, UsageAuthoredField authoredField, decimal authoredValue, decimal totalWeight)
     {
@@ -49,26 +49,6 @@ public static class RecipeScalingRules
     /// the noise rounding is still a need.
     /// </summary>
     public static decimal WholeBatches(decimal ratio) => ratio > 0m ? Math.Max(1m, Math.Ceiling(Math.Round(ratio, RatioDecimals))) : 0m;
-
-    /// <summary>The smallest part of a batch the Production Plan makes when it's allowed half batches.</summary>
-    public const decimal HalfBatch = 0.5m;
-
-    /// <summary>
-    /// <paramref name="ratio"/> rounded up to half batches, as <see cref="WholeBatches"/> rounds to whole ones (2026-10-24,
-    /// for the Production Plan's Half batches): 1.2 is 1.5 and 1.6 is 2. Anything at all needs half a batch.
-    /// </summary>
-    public static decimal HalfBatches(decimal ratio) =>
-        ratio > 0m ? Math.Max(HalfBatch, Math.Ceiling(Math.Round(ratio, RatioDecimals) / HalfBatch) * HalfBatch) : 0m;
-
-    /// <summary><paramref name="ratio"/> rounded up to half batches when <paramref name="halfBatches"/>, or else to whole ones.</summary>
-    public static decimal BatchesToMake(decimal ratio, bool halfBatches) => halfBatches ? HalfBatches(ratio) : WholeBatches(ratio);
-
-    /// <summary>
-    /// The whole purchase units to buy for <paramref name="baseQuantity"/>: 30,000 g of flour in 25,000 g sacks is 2 sacks.
-    /// Rounded up as batches are, so an exact multiple isn't one more, and 1 g of it is still a sack.
-    /// </summary>
-    public static decimal UnitsToBuy(decimal baseQuantity, decimal baseUnitsPerUnit) =>
-        baseUnitsPerUnit > 0 ? WholeBatches(baseQuantity / baseUnitsPerUnit) : 0m;
 
     /// <summary>The pieces whole batches make beyond what's needed: 2 batches of 100 for 160 pieces leave 40. Never below 0.</summary>
     public static decimal ExtraPieces(decimal batches, decimal yield, decimal pieces) =>

@@ -1,8 +1,8 @@
 <!--
-    A print pane in a dialog of its own, chromeless as Settings is: the Production Plan's printout, or the Price Simulator report,
-    previewed and printed from Syncfusion's PrintPreview. Under it, what to print when there's a choice (the Price Simulator
-    report's selected products or all those shown), and the parts to include: the plan's Costs, or a report's Recipe and
-    Costing, either cleared only while the other is ticked. The pane is put in by code, after the window is themed.
+    A print pane in a dialog of its own, chromeless as Settings is: the Price Simulator report, previewed and printed from
+    Syncfusion's PrintPreview. Under it, what to print when there's a choice (the report's selected products or all those
+    shown), and the parts to include, Recipe and Costing, either cleared only while the other is ticked. The pane is put in
+    by code, after the window is themed.
 -->
 <controls:AppWindow x:Class="TinapayanRMS.UI.Views.PrintPreviewWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"

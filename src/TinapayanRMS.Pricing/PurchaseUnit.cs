@@ -4,10 +4,9 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.Pricing;
 
 /// <summary>
-/// What a purchased material is bought in, as the Price Simulator and Production Plan screens talk about it: the unit of the
-/// brand price its cost comes from (its preferred brand's, else the dearest: RawMaterialRules.ApplyBrandPrices), and that
-/// price; its base unit and
-/// no price while it has none.
+/// What a purchased material is bought in, as the Price Simulator and the Recipe API's /materials talk about it: the unit of
+/// the brand price its cost comes from (its preferred brand's, else the dearest: RawMaterialRules.ApplyBrandPrices), and
+/// that price; its base unit and no price while it has none.
 /// </summary>
 /// <param name="Name">"sack", or the base unit's name, "gram".</param>
 /// <param name="BaseUnitsPerUnit">Base units in one: 25,000 for a 25 kg sack of flour; 1 for the base unit.</param>

@@ -43,8 +43,7 @@ public sealed partial class PriceSimulatorView : UserControl
             ? [.. view.Records.Select(record => record.Data).OfType<PriceSimulatorProductRow>()]
             : viewModel.Products;
 
-        // The report in a print pane of its own, themed as the main window is, after the button's click is over, as the
-        // Production Plan's is.
+        // The report in a print pane of its own, themed as the main window is, after the button's click is over.
         viewModel.ShowPrint.RegisterHandler(async interaction =>
         {
             await Dispatcher.Yield(DispatcherPriority.Background);

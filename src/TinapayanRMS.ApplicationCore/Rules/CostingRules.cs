@@ -81,14 +81,6 @@ public static class CostingRules
     }
 
     /// <summary>
-    /// The profit on one piece as a percentage of the price before VAT: the markup's share of what
-    /// the shop keeps, since VAT is collected for the government. A 30% markup is a 23.08% margin.
-    /// Informational only; the selling price still comes from the markup (CalculateSellingPrice).
-    /// </summary>
-    public static decimal CalculateProfitMarginPercent(decimal baseCost, decimal preVatPrice) =>
-        PercentOf(preVatPrice - baseCost, preVatPrice);
-
-    /// <summary>
     /// The markup a price with VAT actually earns, as a percentage of the base cost: VAT taken out first, as
     /// CalculateSellingPrice adds it last. The price CalculateSellingPrice works out gives back its margin.
     /// </summary>

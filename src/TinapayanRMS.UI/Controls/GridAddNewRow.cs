@@ -28,8 +28,9 @@ namespace TinapayanRMS.UI.Controls;
 /// (<see cref="AddRowHiddenCheckBoxRenderer"/>). The tick appears once a line is being typed into the row.</item>
 /// <item><c>controls:GridAddNewRow.ItemDropped="{Binding DropNewLine}"</c>, beside an ItemFactory, tells the screen when the
 /// add row's item is thrown away rather than committed: Esc, an untouched row left, or the lines changed under it. A
-/// screen that follows the item as it's typed (the Production Plan works its plan out from it) lets go of it then. Set it
-/// to an <c>Action&lt;object&gt;</c>; a committed item reaches the screen through its collection instead.</item>
+/// screen that follows the item as it's typed lets go of it then: the Production Plan did, working its plan out from it,
+/// and no screen has used it since the plan moved to TinapayanBMS (2026-10-31). Set it to an <c>Action&lt;object&gt;</c>;
+/// a committed item reaches the screen through its collection instead.</item>
 /// </list>
 /// </summary>
 public static class GridAddNewRow

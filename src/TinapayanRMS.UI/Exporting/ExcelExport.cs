@@ -21,8 +21,9 @@ namespace TinapayanRMS.UI.Exporting;
 /// one-line ones, so the columns are fitted to what's in them.</item>
 /// </list>
 /// Figures are written as numbers at full precision, and the formats only show them. A grid's groups go as their caption
-/// rows, and a row's details (the Mixing Sheet's ingredients, 2026-10-24) go under it, with their own heading row,
-/// grouped so Excel can fold them away; each detail cell is formatted by the details grid's column. GridFillerRows'
+/// rows, and a row's details go under it, with their own heading row, grouped so Excel can fold them away; each detail
+/// cell is formatted by the details grid's column (2026-10-24, for the Production Plan's Mixing Sheet, whose rows opened to
+/// their ingredients; no table has had details since the plan moved to TinapayanBMS on 2026-10-31). GridFillerRows'
 /// padding is only drawn, never rows of the grid, so there's none to leave out.
 /// </summary>
 public static class ExcelExport
@@ -82,7 +83,7 @@ public static class ExcelExport
             ExportMode = ExportMode.Value,
             CellsExportingEventHandler = (_, e) =>
             {
-                // A cell of a row's details (the Mixing Sheet's ingredients under a mix) is one of the details grid's columns.
+                // A cell of a row's details (as the Mixing Sheet's ingredients were, under a mix) is one of the details grid's columns.
                 var column = ((e.GridViewDefinition as GridViewDefinition)?.DataGrid ?? grid).Columns[e.ColumnName];
                 switch (e.CellType)
                 {

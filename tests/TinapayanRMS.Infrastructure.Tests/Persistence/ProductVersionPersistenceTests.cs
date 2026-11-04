@@ -233,4 +233,26 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         (await products.GetProductsReadingAsync([], [otherId], Cancellation)).Should().Equal(otherId);
         (await products.GetProductsReadingAsync([], [], Cancellation)).Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task A_loop_of_packaging_links_added_outside_the_app_ends_and_still_finds_the_products_reading_it()
+    {
+        var bagId = await AddProductAsync("Gift Bag");
+        var boxId = await AddProductAsync("Gift Box");
+        var setId = await AddProductAsync("Gift Set");
+
+        // Gift Bag reads Gift Box, which reads Gift Bag, and Gift Set reads the bag from outside the loop. The app refuses
+        // the loop (PackagingLinkRules.EnsureNoCycle), so it goes in past the repository.
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.PackagingLinks.AddRange(
+                new PackagingLink { ProductId = bagId, LinkedProductId = boxId },
+                new PackagingLink { ProductId = boxId, LinkedProductId = bagId },
+                new PackagingLink { ProductId = setId, LinkedProductId = bagId });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        (await new ProductRepository(CreateDbContextFactory()).GetProductsReadingAsync([], [bagId], Cancellation))
+            .Should().BeEquivalentTo([bagId, boxId, setId]);
+    }
 }

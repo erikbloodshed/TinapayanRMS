@@ -66,7 +66,9 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         subAssemblyIds.Count == 0 && productIds.Count == 0
             ? Task.FromResult<IReadOnlyList<int>>([])
             : dbContextFactory.QueryAsync<int>(
-                // Packaging links can't go round in a loop (PackagingLinkRules), so the chain ends.
+                // The app refuses a loop of packaging links (PackagingLinkRules), but one left by an edit outside it ran until
+                // the command timed out, and a save waits on this, so chain stops where a product comes round again (CYCLE,
+                // 2026-11-04, as RawMaterialRepository.UsedBySql does).
                 """
                 WITH RECURSIVE seeds AS (
                     SELECT unnest(@productIds) AS product_id
@@ -87,7 +89,7 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
                     SELECT product_id FROM readers
                     UNION ALL
                     SELECT l.product_id FROM packaging_links l JOIN chain c ON c.product_id = l.linked_product_id
-                )
+                ) CYCLE product_id SET is_cycle USING path
                 SELECT DISTINCT p.id FROM chain c JOIN products p ON p.id = c.product_id ORDER BY p.id
                 """,
                 new { subAssemblyIds = DapperReads.IdList(subAssemblyIds), productIds = DapperReads.IdList(productIds) },
