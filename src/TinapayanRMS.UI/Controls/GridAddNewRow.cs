@@ -1,5 +1,4 @@
 using System.Collections.Specialized;
-using System.ComponentModel;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
@@ -26,20 +25,12 @@ namespace TinapayanRMS.UI.Controls;
 /// <item><c>controls:GridAddNewRow.HideCheckBoxes="True"</c> leaves a <c>GridCheckBoxColumn</c>'s cell blank in the add row, so
 /// the row stays the plain empty row the other grids show, instead of offering a tick for a line that doesn't exist yet
 /// (<see cref="AddRowHiddenCheckBoxRenderer"/>). The tick appears once a line is being typed into the row.</item>
-/// <item><c>controls:GridAddNewRow.ItemDropped="{Binding DropNewLine}"</c>, beside an ItemFactory, tells the screen when the
-/// add row's item is thrown away rather than committed: Esc, an untouched row left, or the lines changed under it. A
-/// screen that follows the item as it's typed lets go of it then: the Production Plan did, working its plan out from it,
-/// and no screen has used it since the plan moved to TinapayanBMS (2026-10-31). Set it to an <c>Action&lt;object&gt;</c>;
-/// a committed item reaches the screen through its collection instead.</item>
 /// </list>
 /// </summary>
 public static class GridAddNewRow
 {
     public static readonly DependencyProperty ItemFactoryProperty = DependencyProperty.RegisterAttached(
         "ItemFactory", typeof(Func<object>), typeof(GridAddNewRow), new PropertyMetadata(null, OnItemFactoryChanged));
-
-    public static readonly DependencyProperty ItemDroppedProperty = DependencyProperty.RegisterAttached(
-        "ItemDropped", typeof(Action<object>), typeof(GridAddNewRow), new PropertyMetadata(null));
 
     public static readonly DependencyProperty DropWhenUntouchedProperty = DependencyProperty.RegisterAttached(
         "DropWhenUntouched", typeof(bool), typeof(GridAddNewRow), new PropertyMetadata(false, OnDropWhenUntouchedChanged));
@@ -50,10 +41,6 @@ public static class GridAddNewRow
     public static Func<object>? GetItemFactory(DependencyObject element) => (Func<object>?)element.GetValue(ItemFactoryProperty);
 
     public static void SetItemFactory(DependencyObject element, Func<object>? value) => element.SetValue(ItemFactoryProperty, value);
-
-    public static Action<object>? GetItemDropped(DependencyObject element) => (Action<object>?)element.GetValue(ItemDroppedProperty);
-
-    public static void SetItemDropped(DependencyObject element, Action<object>? value) => element.SetValue(ItemDroppedProperty, value);
 
     public static bool GetDropWhenUntouched(DependencyObject element) => (bool)element.GetValue(DropWhenUntouchedProperty);
 
@@ -109,39 +96,8 @@ public static class GridAddNewRow
     {
         if (sender is SfDataGrid grid && GetItemFactory(grid) is { } factory)
         {
-            var item = factory();
-            e.NewObject = item;
-            WatchForDrop(grid, item);
+            e.NewObject = factory();
         }
-    }
-
-    /// <summary>
-    /// Waits for the add row to finish with <paramref name="item"/>: the view's CurrentAddItem is set to it just after
-    /// this, and moves off it when the row is committed (once it's in the collection) or cancelled (never added). Read
-    /// from the decompiled GridAddNewRowController and CollectionViewAdv (Syncfusion 35.1.41).
-    /// </summary>
-    private static void WatchForDrop(SfDataGrid grid, object item)
-    {
-        if (GetItemDropped(grid) is null || grid.View is not INotifyPropertyChanged view)
-        {
-            return;
-        }
-
-        void Changed(object? sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName != nameof(IEditableCollectionView.CurrentAddItem) || ReferenceEquals(grid.View?.CurrentAddItem, item))
-            {
-                return;
-            }
-
-            view.PropertyChanged -= Changed;
-            if (!(grid.View?.SourceCollection.Cast<object>().Contains(item) ?? false))
-            {
-                GetItemDropped(grid)?.Invoke(item);
-            }
-        }
-
-        view.PropertyChanged += Changed;
     }
 
     private static void OnDropWhenUntouchedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

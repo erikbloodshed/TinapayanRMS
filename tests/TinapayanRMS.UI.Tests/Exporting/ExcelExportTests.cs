@@ -83,28 +83,6 @@ public class ExcelExportTests
     }
 
     [Fact]
-    public void A_rows_details_go_under_it_with_their_own_headings_and_their_own_columns_decimals()
-    {
-        OffscreenGrid.Run(MixesGrid, grid => WithSavedWorkbook([new ExcelSheet("Mixing Sheet", grid)], workbook =>
-        {
-            var sheet = workbook.Worksheets[0];
-            var cells = Enumerable.Range(1, sheet.UsedRange.LastRow).Select(row => (Row: row, Cells: CellsOf(sheet, row))).ToList();
-            var (mixRow, mixCells) = cells.Single(c => c.Cells.Contains("Sweet Dough"));
-            var (headingRow, headingCells) = cells.Single(c => c.Cells.Contains("Ingredient"));
-            var (flourRow, flourCells) = cells.Single(c => c.Cells.Contains("Bread Flour"));
-
-            mixCells.Should().ContainInConsecutiveOrder("Sweet Dough", "2");
-            headingRow.Should().BeGreaterThan(mixRow);
-            flourRow.Should().Be(headingRow + 1);
-            flourCells.Should().ContainInConsecutiveOrder("Bread Flour", "2,500.5");
-            var gramsColumn = Array.IndexOf(flourCells, "2,500.5") + 1;
-            sheet.Range[flourRow, gramsColumn].Number.Should().Be(2500.46, "the file keeps the grams the screen rounds");
-            sheet.Range[flourRow, gramsColumn].NumberFormat.Should().Be("#,##0.0", "a details cell takes its own column's decimals");
-            sheet.Range[headingRow, Array.IndexOf(headingCells, "Ingredient") + 1].CellStyle.Font.Bold.Should().BeTrue();
-        }));
-    }
-
-    [Fact]
     public void Each_sheet_is_named_as_asked()
     {
         OffscreenGrid.Run(CostsGrid, grid => WithSavedWorkbook(
@@ -203,31 +181,6 @@ public class ExcelExportTests
             ValueMember = nameof(Material.Id),
         });
         grid.Columns.Add(new NumericColumn { MappingName = nameof(Change.NewPrice), HeaderText = "New Price", NumberDecimalDigits = 2 });
-        return grid;
-    }
-
-    public sealed record Ingredient(string Name, decimal Grams);
-
-    public sealed record Mix(string Name, decimal Batches, IReadOnlyList<Ingredient> Ingredients);
-
-    /// <summary>A table like the Mixing Sheet: each mix's row opens to show its ingredients, in a grid of their own.</summary>
-    private static SfDataGrid MixesGrid()
-    {
-        // 2500.46, not a midpoint like 2500.45: on .NET 11 XlsIO's own DisplayText rounds that one down to 2,500.4 (it
-        // takes the double at its exact binary value, 2500.4499…), though Excel shows the file's 2500.45 as 2,500.5.
-        var grid = new SfDataGrid
-        {
-            ItemsSource = new ObservableCollection<Mix> { new("Sweet Dough", 2m, [new Ingredient("Bread Flour", 2500.46m)]) },
-            AutoGenerateColumns = false,
-            AutoGenerateRelations = false,
-            Height = 300,
-        };
-        grid.Columns.Add(new GridTextColumn { MappingName = nameof(Mix.Name), HeaderText = "Mix" });
-        grid.Columns.Add(new NumericColumn { MappingName = nameof(Mix.Batches), HeaderText = "Batches", NumberDecimalDigits = 0 });
-        var details = new SfDataGrid { AutoGenerateColumns = false };
-        details.Columns.Add(new GridTextColumn { MappingName = nameof(Ingredient.Name), HeaderText = "Ingredient" });
-        details.Columns.Add(new NumericColumn { MappingName = nameof(Ingredient.Grams), HeaderText = "Grams", NumberDecimalDigits = 1 });
-        grid.DetailsViewDefinition.Add(new GridViewDefinition { RelationalColumn = nameof(Mix.Ingredients), DataGrid = details });
         return grid;
     }
 

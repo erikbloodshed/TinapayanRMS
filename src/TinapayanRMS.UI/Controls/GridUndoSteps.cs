@@ -110,10 +110,10 @@ public static class GridUndoSteps
 
     /// <summary>
     /// Keeps Save offered while <paramref name="item"/>, typed into on the add row, is still waiting to be added, and
-    /// lets it go once the row is committed or dropped (the view's CurrentAddItem moves off it, as GridAddNewRow's
-    /// WatchForDrop reads it). A click on Save is what ends the cell's edit: the cell's renderer ends it as the cursor
-    /// leaves, mid-way through the move to Save. Save measured then saw nothing new, since the add row's line isn't in
-    /// the screen's lines yet, and went disabled under the cursor. Focus fell back into the grid, so GridEditCommit never
+    /// lets it go once the row is committed or dropped (the view's CurrentAddItem moves off it then, read from the
+    /// decompiled GridAddNewRowController and CollectionViewAdv, Syncfusion 35.1.41). A click on Save is what ends the
+    /// cell's edit: the cell's renderer ends it as the cursor leaves, mid-way through the move to Save. Save measured then
+    /// saw nothing new, since the add row's line isn't in the screen's lines yet, and went disabled under the cursor. Focus fell back into the grid, so GridEditCommit never
     /// added the line either, and the click was lost (2026-10-26, reported by the user as an add-in that didn't save).
     /// </summary>
     private static void StayPendingUntilAdded(SfDataGrid grid, IUndoRecorder recorder, object item)
