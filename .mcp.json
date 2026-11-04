@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "tinapayanrms": {
-      "command": "dotnet",
-      "args": ["run", "--project", "src/TinapayanRMS.Mcp", "-c", "Release"]
+      "command": "powershell",
+      "args": ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "scripts/Start-McpServer.ps1"]
     },
     "syncfusion-wpf": {
       "command": "dotnet",
