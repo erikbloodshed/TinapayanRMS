@@ -6,6 +6,25 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 public class ProductRulesTests
 {
+    [Theory]
+    [InlineData("Pandesal", "Pandesal")]
+    [InlineData("Pandesal ", "Pandesal")]
+    [InlineData("  Cheese Roll  ", "Cheese Roll")]
+    public void A_name_is_stored_without_spaces_at_either_end(string name, string expected)
+    {
+        ProductRules.StoredName(name).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_name_with_nothing_but_spaces_is_refused(string name)
+    {
+        var act = () => ProductRules.StoredName(name);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage("Every product needs a name.");
+    }
+
     [Fact]
     public void EnsureValidUsages_accepts_an_empty_list()
     {
@@ -115,37 +134,6 @@ public class ProductRulesTests
     }
 
     [Fact]
-    public void CalculateLineGramsPerPiece_takes_the_pieces_share_of_the_line()
-    {
-        // A 1,200 g dough batch used at 50 g a piece: each piece takes 1/24 of every line.
-        // 300 g of flour in the batch is 12.5 g in a piece.
-        ProductRules.CalculateLineGramsPerPiece(lineGrams: 300m, weightPerPiece: 50m, totalWeight: 1200m)
-            .Should().Be(12.5m);
-    }
-
-    [Fact]
-    public void CalculateLineCostPerPiece_takes_the_pieces_share_of_the_lines_cost()
-    {
-        // 300 g of flour at ₱0.05 a gram costs ₱15 in the batch; a 50 g piece of a 1,200 g batch takes ₱0.625.
-        ProductRules.CalculateLineCostPerPiece(lineGrams: 300m, ingredientCostPerGram: 0.05m, weightPerPiece: 50m, totalWeight: 1200m)
-            .Should().Be(0.625m);
-    }
-
-    [Fact]
-    public void A_usages_line_costs_per_piece_add_up_to_its_cost_per_piece()
-    {
-        // Custard: 60 g of sugar at ₱0.09/g and 40 g of milk at ₱0.10/g, a 100 g batch costing ₱9.40,
-        // used at 25 g a piece.
-        (decimal Grams, decimal CostPerGram)[] lines = [(60m, 0.09m), (40m, 0.10m)];
-        var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(lines);
-
-        var sumOfLines = lines.Sum(l => ProductRules.CalculateLineCostPerPiece(l.Grams, l.CostPerGram, weightPerPiece: 25m, totalWeight));
-
-        sumOfLines.Should().Be(ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece: 25m, totalWeight));
-        sumOfLines.Should().Be(2.35m);
-    }
-
-    [Fact]
     public void EnsureValidPackagingLines_accepts_an_empty_list()
     {
         // Unlike EnsureValidUsages, an empty packaging line list is a valid state — a
@@ -209,6 +197,14 @@ public class ProductRulesTests
         unitsPerPackagingUnit.Should().Be(1m / 12m);
     }
 
+
+    [Theory]
+    [InlineData(PackagingLineAuthoredField.QtyPerUnit)]
+    [InlineData(PackagingLineAuthoredField.UnitsPerPackagingUnit)]
+    public void ReconcileReciprocal_of_0_is_0_rather_than_a_division_by_zero(PackagingLineAuthoredField authoredField)
+    {
+        ProductRules.ReconcileReciprocal(authoredField, 0m).Should().Be((0m, 0m));
+    }
 
     [Fact]
     public void ReconcileReciprocal_rejects_an_undefined_authored_field()

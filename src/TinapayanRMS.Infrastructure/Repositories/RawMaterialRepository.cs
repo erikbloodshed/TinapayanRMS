@@ -41,6 +41,11 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
     /// their packaging only when it includes theirs (products.includes_component_packaging), and then all of it, so
     /// packaging_costs climbs from every product whose packaging cost the material is in to each composite like that
     /// holding it, and on up. A packaging link takes only the lines, so packaging_users doesn't climb through composites.
+    /// feeds, recipe_users and packaging_costs each stop where a row comes round again (CYCLE, 2026-11-04, from a code
+    /// review): the app refuses a loop, but one left by an edit outside it ran until the command timed out after 30
+    /// seconds. A UNION would end it too, but PostgreSQL sizes a UNION's hash table from its row estimate, here thousands
+    /// of times too high, and that made this read about 20 ms slower. packaging_users can't meet a loop: it climbs from
+    /// products that link no other product, and a product links one at most, so one in a loop links only inside it.
     /// </summary>
     private const string UsedBySql = """
         WITH RECURSIVE feeds AS (
@@ -55,7 +60,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
                 UNION ALL
                 SELECT m.linked_to_id, m.id FROM raw_materials m WHERE m.linked_to_id IS NOT NULL
             ) e ON e.source_id = f.id
-        ),
+        ) CYCLE id SET is_cycle USING path,
         section_users AS (
             SELECT u.product_id
             FROM product_sub_assembly_usages u
@@ -71,7 +76,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
             SELECT product_id FROM section_users
             UNION ALL
             SELECT c.product_id FROM product_components c JOIN recipe_users r ON r.product_id = c.component_product_id
-        ),
+        ) CYCLE product_id SET is_cycle USING path,
         packaging_users AS (
             SELECT l.product_id
             FROM packaging_lines l
@@ -92,7 +97,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
             JOIN packaging_costs p ON p.product_id = c.component_product_id
             JOIN products h ON h.id = c.product_id
             WHERE h.includes_component_packaging
-        )
+        ) CYCLE product_id SET is_cycle USING path
         SELECT p.id, p.name, c.name AS category_name, p.deleted_at, p.is_composite
         FROM products p
         LEFT JOIN product_categories c ON c.id = p.category_id
@@ -234,7 +239,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
         var existing = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == id, cancellationToken)
             ?? throw new BusinessRuleException($"Raw material {id} does not exist.");
 
-        existing.Name = name;
+        existing.Name = RawMaterialRules.StoredName(name);
         existing.UpdatedAt = dbContext.LocalNow();
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -364,6 +369,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
     /// </summary>
     internal static async Task<bool> AddAsync(TinapayanRMSDbContext dbContext, RawMaterial material, CancellationToken cancellationToken)
     {
+        material.Name = RawMaterialRules.StoredName(material.Name);
         RawMaterialRules.EnsureFieldsMatchType(material);
         RawMaterialRules.EnsureFieldsMatchSource(material);
         RawMaterialRules.EnsureValidCostBuffer(material.CostBufferPercent);
@@ -549,7 +555,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
 
         // Field by field, not a blind Update(): CostPerBaseUnit and BufferedCostPerBaseUnit are owned
         // by the price-history and BOM rollups, and the units by RawMaterialUnitRepository, not by this form.
-        existing.Name = material.Name;
+        existing.Name = RawMaterialRules.StoredName(material.Name);
         existing.CategoryId = material.CategoryId;
         existing.WeightLossPercent = material.WeightLossPercent;
         existing.SubAssemblyId = material.SubAssemblyId;

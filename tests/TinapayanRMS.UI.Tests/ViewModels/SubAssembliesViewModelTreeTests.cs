@@ -619,6 +619,24 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         (await NameOfAsync(sweetId)).Should().Be("Sweet Dough");
     }
 
+    // No puts a new sub-assembly back blank. What's typed into it next has to count, or it's lost with no question asked.
+    [Fact]
+    public async Task What_is_typed_after_no_on_a_new_sub_assembly_counts_as_unsaved()
+    {
+        var viewModel = await LoadedViewModelAsync();
+        var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
+        viewModel.EditingName = "Sweet Dough";
+        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue();
+        viewModel.EditingName.Should().BeEmpty();
+        viewModel.History.IsDirty.Should().BeFalse();
+
+        viewModel.EditingName = "Sweeter Dough";
+
+        viewModel.History.IsDirty.Should().BeTrue();
+        await viewModel.ResolveUnsavedChangesAsync(revert: false);
+        asked.Should().HaveCount(2);
+    }
+
     /// <summary>Answers the question about unsaved changes with <paramref name="answer"/>, collecting each question asked.</summary>
     private static List<string> AnswerUnsavedChanges(SubAssembliesViewModel viewModel, UnsavedChangesAnswer answer)
     {

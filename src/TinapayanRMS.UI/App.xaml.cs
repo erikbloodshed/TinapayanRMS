@@ -4,12 +4,12 @@ using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using ReactiveUI;
 using Serilog;
 using Syncfusion.Licensing;
 using Syncfusion.SfSkinManager;
@@ -32,9 +32,15 @@ public sealed partial class App : Application
     /// <summary>The height of every text box and button, in device-independent pixels.</summary>
     private const double ControlHeight = 24;
 
+    /// <summary>Where the log is written, beside the app.</summary>
+    private static readonly string LogFolder = Path.Combine(AppContext.BaseDirectory, "logs");
+
     private IHost? _host;
 
     private readonly UnhandledErrorGuard _errorGuard = new();
+
+    // Keeps the app to this copy, from before the window shows until the log is closed.
+    private readonly SingleInstanceGuard _singleInstance = new(SingleInstanceGuard.AppName);
 
     // Set while an unhandled exception's message is up, so another arriving meanwhile is only logged.
     private bool _isShowingError;
@@ -53,7 +59,7 @@ public sealed partial class App : Application
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .WriteTo.File(
-                Path.Combine(AppContext.BaseDirectory, "logs", "tinapayanrms-.log"),
+                Path.Combine(LogFolder, "tinapayanrms-.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 31,
                 formatProvider: CultureInfo.InvariantCulture)
@@ -223,6 +229,46 @@ public sealed partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
+        if (!_singleInstance.Claim(SingleInstanceGuard.Patience, SingleInstanceGuard.OpenCopyElsewhere, ShowError))
+        {
+            Shutdown();
+            return;
+        }
+
+        // Until the main window shows there's nothing to carry on in, so a failure says why and closes the app.
+        if (!AppStartup.TryStart(() => ShowMainWindow(e.Args), LogFolder, Log.Logger, message => ShowError(message, MessageBoxImage.Error), Shutdown))
+        {
+            return;
+        }
+
+        // Only now: another copy started before this one's window showed has been waiting for it to come up.
+        _singleInstance.Listen(() => Dispatcher.InvokeAsync(BringToFront));
+
+        _ = WarnOfPendingMigrationsAsync(_host!.Services.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>());
+        // The day's automatic backup now, and checked again every hour, so a copy left open over midnight takes the next day's.
+        var automaticBackups = _host.Services.GetRequiredService<AutomaticBackups>();
+        _ = BackUpDailyAsync(automaticBackups);
+        _backupTimer = new DispatcherTimer { Interval = AutomaticBackups.CheckEvery };
+        _backupTimer.Tick += (_, _) => _ = BackUpDailyAsync(automaticBackups);
+        _backupTimer.Start();
+    }
+
+    /// <summary>
+    /// What another copy asks for as it closes. With the window gone, this one is on its way out, so it isn't answered for,
+    /// and the copy that asked gets the app once this one has closed.
+    /// </summary>
+    private void BringToFront()
+    {
+        if (MainWindow is { IsVisible: true } window)
+        {
+            SingleInstanceGuard.BringToFront(new WindowInteropHelper(window).Handle);
+            _singleInstance.CameForward();
+        }
+    }
+
+    /// <summary>The theme, the host and the main window: everything the app needs before there's a window to show a failure in.</summary>
+    private void ShowMainWindow(string[] args)
+    {
         // Re-colors the theme's primary accent (buttons, grid selection, tab/drawer
         // indicators, focus rings) to the app's Catppuccin Latte Sky, with text on it in Sky's Ink
         // (white on Sky is only 2.8:1; see Themes/Palette.xaml). PrimaryBackground's setter
@@ -237,7 +283,7 @@ public sealed partial class App : Application
             "Windows11Light",
             ThemeSettings(new SolidColorBrush((Color)Resources["LatteSkyColor"]), new SolidColorBrush((Color)Resources["LatteSkyInkColor"])));
 
-        _host = CompositionRoot.CreateHostBuilder(e.Args).Build();
+        _host = CompositionRoot.CreateHostBuilder(args).Build();
         _host.Start();
 
         // On if this Windows user turned them on in Settings' Keyboard tab.
@@ -246,14 +292,6 @@ public sealed partial class App : Application
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         SfSkinManager.SetTheme(mainWindow, new Theme("Windows11Light"));
         mainWindow.Show();
-
-        _ = WarnOfPendingMigrationsAsync(_host.Services.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>());
-        // The day's automatic backup now, and checked again every hour, so a copy left open over midnight takes the next day's.
-        var automaticBackups = _host.Services.GetRequiredService<AutomaticBackups>();
-        _ = BackUpDailyAsync(automaticBackups);
-        _backupTimer = new DispatcherTimer { Interval = AutomaticBackups.CheckEvery };
-        _backupTimer.Tick += (_, _) => _ = BackUpDailyAsync(automaticBackups);
-        _backupTimer.Start();
     }
 
     // Checks every hour whether the day's automatic backup is due (OnStartup).
@@ -261,14 +299,25 @@ public sealed partial class App : Application
 
     /// <summary>
     /// The day's automatic backup, the first time the app starts each day (Settings → Database), off the UI thread once
-    /// the window shows, so the app starts no later. It says nothing on screen: a backup that couldn't be taken is logged,
-    /// and the next start tries again, since none was taken that day.
+    /// the window shows, so the app starts no later. A backup that couldn't be taken is logged and shown on the Database
+    /// tab, and the next check tries again, since none was taken that day. It only interrupts when they've been failing
+    /// long enough for the newest backup to have got old (AutomaticBackups.OverdueWarningAsync).
     /// </summary>
-    private static async Task BackUpDailyAsync(AutomaticBackups backups)
+    private async Task BackUpDailyAsync(AutomaticBackups backups)
     {
         try
         {
-            await Task.Run(() => backups.RunAsync(DateTime.Now, CancellationToken.None));
+            var warning = await Task.Run(async () =>
+            {
+                var now = DateTime.Now;
+                await backups.RunAsync(now, CancellationToken.None);
+                return await backups.OverdueWarningAsync(now, CancellationToken.None);
+            });
+
+            if (warning is not null)
+            {
+                ShowError(warning, MessageBoxImage.Warning);
+            }
         }
         catch (Exception ex)
         {
@@ -278,7 +327,8 @@ public sealed partial class App : Application
 
     /// <summary>
     /// Says <paramref name="message"/>, then closes the app and starts it again: after a restore, which replaces everything
-    /// every screen holds. The new copy starts once this one has finished closing (OnExit), with its log written and closed.
+    /// every screen holds. The new copy starts once this one has finished closing (OnExit), with its log written and closed
+    /// and the app let go, or it would find this one still open and close again.
     /// </summary>
     public void RestartAfterExit(string message)
     {
@@ -316,12 +366,7 @@ public sealed partial class App : Application
         }
 
         Log.Warning("The database is missing {Count} migrations: {Migrations}", pending.Count, pending);
-        ShowError(
-            $"The database is out of date for this version of TinapayanRMS: {pending.Count} "
-            + $"{(pending.Count == 1 ? "update hasn't" : "updates haven't")} been applied to it, so some screens won't work."
-            + Environment.NewLine + Environment.NewLine
-            + "Close the app and apply them (dotnet ef database update), then open it again.",
-            MessageBoxImage.Warning);
+        ShowError(AppStartup.PendingMigrationsText(pending.Count), MessageBoxImage.Warning);
     }
 
     /// <summary>
@@ -348,6 +393,7 @@ public sealed partial class App : Application
         _host?.Dispose();
         Log.CloseAndFlush();
         base.OnExit(e);
+        _singleInstance.Dispose();
 
         if (_restartOnExit && Environment.ProcessPath is { } path)
         {
@@ -357,13 +403,11 @@ public sealed partial class App : Application
 
     /// <summary>
     /// An exception nothing else caught on the UI thread: logged, said in a message, and the app carries on with whatever
-    /// hasn't been saved still there (UnhandledErrorGuard says when it shouldn't). A failure ReactiveUI was left holding
-    /// (a command's or an observable's) arrives wrapped in its UnhandledErrorException, and it's the cause inside that's
-    /// worth showing.
+    /// hasn't been saved still there (UnhandledErrorGuard says when it shouldn't, and what to say).
     /// </summary>
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        var exception = e.Exception is UnhandledErrorException { InnerException: { } inner } ? inner : e.Exception;
+        var exception = UnhandledErrorGuard.CauseOf(e.Exception);
         Log.Error(exception, "Unhandled exception on the UI thread");
         if (!_errorGuard.Admit(DateTime.Now))
         {
@@ -372,12 +416,7 @@ public sealed partial class App : Application
         }
 
         e.Handled = true;
-        ShowError(
-            Failure.Of(exception).Text
-            + Environment.NewLine + Environment.NewLine
-            + "The app is still running, and nothing you haven't saved was lost. "
-            + "If something looks wrong, save what you can, then close the app and open it again.",
-            MessageBoxImage.Error);
+        ShowError(UnhandledErrorGuard.CarryOnText(exception), MessageBoxImage.Error);
     }
 
     /// <summary>A message over the main window. One at a time: another arriving while one is up is only logged.</summary>

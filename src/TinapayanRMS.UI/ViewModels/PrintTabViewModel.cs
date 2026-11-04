@@ -3,8 +3,10 @@ using System.Reactive.Linq;
 using Npgsql;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
@@ -44,7 +46,7 @@ public closed record PrintScope(string Label)
     public sealed record Folder(string Label, ProductStage Stage, int? CategoryId, bool IsStage) : PrintScope(Label)
     {
         public Folder(ProductFolderNode folder)
-            : this(folder.IsStage ? folder.Title : $"{folder.Title} · {ProductFolderNode.StageTitle(folder.Stage)}", folder.Stage, folder.CategoryId, folder.IsStage)
+            : this(folder.IsStage ? folder.Title : $"{folder.Title} · {ProductRules.StageTitle(folder.Stage)}", folder.Stage, folder.CategoryId, folder.IsStage)
         {
         }
 

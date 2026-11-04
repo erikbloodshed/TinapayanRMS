@@ -11,6 +11,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
@@ -1010,7 +1011,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .ToProperty(this, x => x.HeaderTitle, "New product");
 
         _newProductTag = this.WhenAnyValue(x => x.SelectedProduct, x => x.NewProductStage, (product, stage) =>
-                product is null ? $"Goes in {ProductFolderNode.StageTitle(stage)}" : null)
+                product is null ? $"Goes in {ProductRules.StageTitle(stage)}" : null)
             .ToProperty(this, x => x.NewProductTag);
 
         // A hidden tab can't stay the one showing: leaving a saved product while on Clone or History goes
@@ -1526,7 +1527,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             var product = new Product
             {
                 Id = _editingId,
-                Name = EditingName,
+                Name = EditingName.Trim(),
                 Description = string.IsNullOrWhiteSpace(EditingDescription) ? null : EditingDescription.Trim(),
                 CategoryId = EditingCategory?.Id,
                 QuantityRequired = EditingQuantityRequired,
@@ -2068,7 +2069,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         if (SelectedProduct is not { } product)
         {
             StartNewProduct(_newProductInDefaultStage ? null : NewProductStage, _newProductCategoryId, IsEditingComposite);
-            History.Clear();
             return;
         }
 
@@ -2109,7 +2109,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             return false;
         }
 
-        _ = OpenProductAsync(product.Id);
+        _ = RunSafelyAsync(() => OpenProductAsync(product.Id));
         return true;
     }
 
@@ -2192,7 +2192,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             if (History.IsDirty)
             {
-                _ = PickAfterAskingAsync(leaf.Product.Id);
+                _ = RunSafelyAsync(() => PickAfterAskingAsync(leaf.Product.Id));
             }
             else
             {
@@ -2273,12 +2273,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var first = moves[0];
         if (moves.All(m => m.Stage == first.Stage && m.CategoryId == first.CategoryId))
         {
-            var folder = first.CategoryId is { } id ? Categories.FirstOrDefault(c => c.Id == id)?.Name : ProductFolderNode.UncategorizedTitle;
-            return $"Moved {what} to {ProductFolderNode.StageTitle(first.Stage)} › {folder}";
+            var folder = first.CategoryId is { } id ? Categories.FirstOrDefault(c => c.Id == id)?.Name : ProductRules.UncategorizedTitle;
+            return $"Moved {what} to {ProductRules.StageTitle(first.Stage)} › {folder}";
         }
 
         return moves.All(m => m.Stage == first.Stage)
-            ? $"Moved {what} to {ProductFolderNode.StageTitle(first.Stage)}"
+            ? $"Moved {what} to {ProductRules.StageTitle(first.Stage)}"
             : $"Moved {what}";
     }
 
@@ -4753,7 +4753,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private ProductPrintout CurrentPrintout() => new(
         string.IsNullOrWhiteSpace(EditingName) ? (IsEditingComposite ? "New composite product" : "New product") : EditingName.Trim(),
         EditingCategory?.Name ?? "Uncategorized",
-        ProductFolderNode.StageTitle(SelectedProduct?.Stage ?? NewProductStage),
+        ProductRules.StageTitle(SelectedProduct?.Stage ?? NewProductStage),
         CostUnitCaption,
         LastUpdatedText,
         _detailProductId is null
@@ -4788,8 +4788,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         return SavedProductReader.Build(versionProduct, detail, CostBasis).ToPrintout(DateTime.Now) with
         {
             ProductName = $"{row.Content.ProductName} ({row.Title})",
-            CategoryName = product.Category?.Name ?? ProductFolderNode.UncategorizedTitle,
-            StageTitle = ProductFolderNode.StageTitle(product.Stage),
+            CategoryName = product.Category?.Name ?? ProductRules.UncategorizedTitle,
+            StageTitle = ProductRules.StageTitle(product.Stage),
             LastUpdatedText = row.SavedText,
             SaveNote = ProductPrintout.VersionNote,
         };
@@ -4883,9 +4883,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             List<TreeMenuItem> folders =
             [
                 .. Categories.Select(c => MoveToFolder(c.Name, c.Id)),
-                MoveToFolder(ProductFolderNode.UncategorizedTitle, null),
+                MoveToFolder(ProductRules.UncategorizedTitle, null),
             ];
-            return new(ProductFolderNode.StageTitle(stage)) { Items = folders, IsEnabled = folders.Any(f => f.IsEnabled) };
+            return new(ProductRules.StageTitle(stage)) { Items = folders, IsEnabled = folders.Any(f => f.IsEnabled) };
 
             TreeMenuItem MoveToFolder(string title, int? categoryId)
             {
@@ -5170,6 +5170,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
             // The picker shows the category it now holds rather than what was typed: the new one, or the one put back.
             CategorySearchText = EditingCategory?.Name ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            // Nothing awaits this: it's the picker's, from the keyboard or the focus leaving.
+            ShowFailure(ex);
         }
         finally
         {

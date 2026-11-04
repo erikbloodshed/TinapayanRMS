@@ -1,7 +1,7 @@
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing;
 
 /// <summary>
 /// A raw material's base unit as text: the gram for an ingredient, which has no unit of measure row

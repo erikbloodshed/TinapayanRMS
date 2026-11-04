@@ -8,6 +8,9 @@ public sealed class UsageAddInLineConfiguration : IEntityTypeConfiguration<Usage
 {
     public void Configure(EntityTypeBuilder<UsageAddInLine> builder)
     {
+        // Backstop for AddInRules.EnsureValid.
+        builder.ToTable(t => t.HasCheckConstraint("CK_UsageAddInLines_Grams", "grams > 0"));
+
         // Taking the sub-assembly out of the recipe takes this product's add-ins to it with it. The only
         // cascade path in is Products → ProductSubAssemblyUsages → UsageAddInLines, a chain rather than a
         // second path: a usage's own sub-assembly FK is Restrict.

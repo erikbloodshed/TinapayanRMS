@@ -4,11 +4,28 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 
 public static class ProductRules
 {
+    /// <summary>What a product with no category is filed under: its folder in the list, and its category on a report or a printout.</summary>
+    public const string UncategorizedTitle = "Uncategorized";
+
+    /// <summary>What a stage is called: "Production" or "Research and Development".</summary>
+    public static string StageTitle(ProductStage stage) => stage == ProductStage.Production ? "Production" : "Research and Development";
+
     /// <summary>
     /// How a product is named where it's in the way of something (a refusal, a Used By tile): "Cheese Roll (deleted)" for
     /// one in the Deleted folder, which still holds what it uses until it's deleted permanently.
     /// </summary>
     public static string ListedName(string name, bool isDeleted) => isDeleted ? $"{name} (deleted)" : name;
+
+    /// <summary>
+    /// A product's name as it's saved: without spaces at either end, and refused when there's nothing else. PostgreSQL's
+    /// collation counts a space at the end, so "Pandesal " would get past the unique index beside "Pandesal", where SQL
+    /// Server's ignored it (found 2026-11-03, by a code review).
+    /// </summary>
+    public static string StoredName(string name)
+    {
+        var trimmed = name.Trim();
+        return trimmed.Length > 0 ? trimmed : throw new BusinessRuleException("Every product needs a name.");
+    }
 
     /// <summary>
     /// A product's name is unique among deleted products too, as the one waiting in the Deleted folder keeps it for its
@@ -105,21 +122,6 @@ public static class ProductRules
         subAssemblyTotalCost * weightPerPiece / totalWeight;
 
     /// <summary>
-    /// How many grams of one sub-assembly line go into one piece: the piece is weightPerPiece of the batch,
-    /// so it takes that share of every line that went in. Pass the effective batch's weight, as
-    /// CalculateUsageCostPerPiece takes it.
-    /// </summary>
-    public static decimal CalculateLineGramsPerPiece(decimal lineGrams, decimal weightPerPiece, decimal totalWeight) =>
-        lineGrams * weightPerPiece / totalWeight;
-
-    /// <summary>
-    /// One sub-assembly line's cost per finished piece: the piece's share of the line's grams, at the
-    /// ingredient's cost per gram. A usage's lines add up to its CalculateUsageCostPerPiece.
-    /// </summary>
-    public static decimal CalculateLineCostPerPiece(decimal lineGrams, decimal ingredientCostPerGram, decimal weightPerPiece, decimal totalWeight) =>
-        lineGrams * ingredientCostPerGram * weightPerPiece / totalWeight;
-
-    /// <summary>
     /// A product's packaging lines. Unlike EnsureValidUsages and the ingredient/sub-assembly line rules,
     /// an empty list is deliberately allowed here — a product may legitimately have no packaging lines
     /// entered yet, whereas a sub-assembly with no ingredient lines or a product with no sub-assembly
@@ -139,15 +141,23 @@ public static class ProductRules
         }
     }
 
-    /// <summary>Derives QtyPerUnit and UnitsPerPackagingUnit — exact reciprocals of each other — from whichever one the user actually typed.</summary>
+    /// <summary>
+    /// Derives QtyPerUnit and UnitsPerPackagingUnit — exact reciprocals of each other — from whichever one the user actually
+    /// typed. 0 has no reciprocal, so it comes out as 0 rather than throwing: <see cref="EnsureValidPackagingLines"/> refuses
+    /// it by name on the way in, and on the way out (a row only an edit outside the app could leave, since
+    /// CK_PackagingLines_AuthoredQuantity) the line costs nothing and can be seen and put right. It used to throw on every
+    /// read, which took down Reports, Print and the Recipe API for every product, not just the one with the bad row.
+    /// </summary>
     public static (decimal QtyPerUnit, decimal UnitsPerPackagingUnit) ReconcileReciprocal(
         PackagingLineAuthoredField authoredField, decimal authoredValue) =>
         authoredField switch
         {
-            PackagingLineAuthoredField.QtyPerUnit => (authoredValue, 1m / authoredValue),
-            PackagingLineAuthoredField.UnitsPerPackagingUnit => (1m / authoredValue, authoredValue),
+            PackagingLineAuthoredField.QtyPerUnit => (authoredValue, Reciprocal(authoredValue)),
+            PackagingLineAuthoredField.UnitsPerPackagingUnit => (Reciprocal(authoredValue), authoredValue),
             _ => throw new ArgumentOutOfRangeException(nameof(authoredField)),
         };
+
+    private static decimal Reciprocal(decimal value) => value == 0m ? 0m : 1m / value;
 
     /// <summary>
     /// Cost of one packaging line per sellable unit of the product: QtyPerUnit, in the line's unit,

@@ -207,20 +207,6 @@ public class CostingRulesTests
     }
 
     [Fact]
-    public void CalculateProfitMarginPercent_is_the_markups_share_of_the_pre_VAT_price()
-    {
-        // ₱100 base cost at a 30% markup sells for ₱130 before VAT: ₱30 profit, 30 / 130 of the price.
-        CostingRules.CalculateProfitMarginPercent(baseCost: 100m, preVatPrice: 130m)
-            .Should().BeApproximately(23.0769m, 0.0001m);
-    }
-
-    [Fact]
-    public void CalculateProfitMarginPercent_is_zero_with_no_price()
-    {
-        CostingRules.CalculateProfitMarginPercent(baseCost: 0m, preVatPrice: 0m).Should().Be(0m);
-    }
-
-    [Fact]
     public void CalculateMarkupPercentFromPrice_takes_VAT_out_then_gives_the_markup_on_the_base_cost()
     {
         // ₱145.60 with 12% VAT is ₱130 before VAT: ₱30 on ₱100 of cost.

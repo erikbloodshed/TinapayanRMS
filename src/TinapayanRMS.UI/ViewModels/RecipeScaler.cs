@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.UI.ViewModels;
 
@@ -80,7 +81,7 @@ public sealed class RecipeScaler(
     /// <summary>A product a composite holds: <paramref name="quantity"/> of its sellable units in each of the composite's.</summary>
     private ScalingRow ScaleComponent(Product product, int quantity, decimal units, bool includesPackaging, ImmutableHashSet<int> holders)
     {
-        var name = ProductComponentRow.LineNameFor(product.Name, quantity);
+        var name = CompositeProductRules.LineName(product.Name, quantity);
 
         // Save refuses a composite that holds itself; this only guards against data changed outside the app.
         if (holders.Contains(product.Id))

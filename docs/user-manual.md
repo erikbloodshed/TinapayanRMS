@@ -173,7 +173,7 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 - **New** starts a blank record. **Delete** asks before deleting anything.
 - **Changes you haven't saved are never left behind without asking.** When a product, sub-assembly or raw material, new or saved, has changes you haven't saved and you go somewhere else, a message asks **Save the changes to …?** It asks when you go to another tab (or close the one showing), pick another item in the list, press **New**, click a **Used By** tile or another link, press **Back** or **Forward**, use **Clone** or **Create Variant**, or close the app.
   - **Yes** saves them, then goes on. If the save is refused, for example because a field is missing, you stay, and the red notice says why.
-  - **No** throws them away, then goes on. If you were leaving the tab, the item is put back as it was last saved, so the changes aren't there when you come back.
+  - **No** throws them away, then goes on. If you were leaving the tab, the item is put back as it was last saved, so the changes aren't there when you come back. If it can't be put back, for example because the database isn't answering, the red notice says why and you stay.
   - **Cancel** keeps them, and you stay where you were.
   - Going between **Products** and the **Print** tab doesn't ask, since Print shows the product with your changes. Nor does **Copy** on the Sub-Assemblies screen, since the copy holds them.
 - A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use. It also says when the app couldn't reach its database, or the database didn't answer in time. Nothing is saved then, and the screen keeps working: once the database answers again, try again, or pick the record again.
@@ -360,7 +360,9 @@ Backups of all of the app's data: every raw material, price, sub-assembly, produ
   - **Before restore**: the safety backup a restore takes of the data it replaces.
   - **Copied in**: a backup brought in with **Restore from File…**.
   - Only automatic backups are ever deleted by the app. Delete others in File Explorer when you no longer need them.
-- **Also Copy To** is a second folder each automatic backup is copied to as well, such as a USB stick that stays plugged in or a OneDrive folder. Press **Choose…** to pick it: the newest automatic backup is copied there straight away. The newest 14 automatic backups are kept there too; nothing else in the folder is touched. **Stop Copying** stops it, and leaves what was copied. If the folder isn't there when a backup is taken (the USB stick was taken out), the backup is still taken here, and a note in amber says it wasn't copied. The folder is kept for you on this computer.
+- **Also Copy To** is a second folder each automatic backup is copied to as well, such as a USB stick that stays plugged in or a OneDrive folder. Press **Choose…** to pick it: the newest automatic backup is copied there straight away. The newest 14 automatic backups are kept there too; nothing else in the folder is touched. **Stop Copying** stops it, and leaves what was copied. If the folder isn't there when a backup is taken (the USB stick was taken out), the backup is still taken here, and a note in amber says it wasn't copied. The note stays until a copy goes through or you change the folder. The folder is kept for you on this computer.
+- If an automatic backup can't be taken, a note in amber under **Folder** says why, and the app tries again within the hour. The note stays until one is taken, even if you close the app and open it again. If they keep failing, and the newest backup is three days old or more, a message says so once each time the app is opened. Ask whoever set up the app to look into it.
+- A file in the folder ending in *.partial* is a backup still being written, or one that was cut short, by a power cut for example. It isn't listed, it can't be restored, and the app deletes one that's left behind after a day.
 - **Back Up Now** takes a backup straight away.
 - **Copy to…** copies the backup picked in the list somewhere else, such as a USB stick. Do this now and then: backups kept only on this computer are lost with it if it breaks.
 - **Restore** puts the backup picked in the list back, in place of all of the app's data. It asks first, saying when the backup was taken. Then it takes a safety backup of the data as it is, puts the backup back, and the app closes and opens again. Anything saved since the backup was taken is lost, and so is anything not yet saved on another screen.
@@ -1247,8 +1249,25 @@ Or type the packaging straight into the pack product's Packaging tab, then press
 
 TinapayanBMS, the app for weighing ingredients out ahead of mixing, keeps a copy of TinapayanRMS's recipes, ingredients, prices and costs, and plans production from it. It copies them through the **Recipe API**, a small program that runs in the background on the PC that holds the TinapayanRMS database. The Recipe API only reads. It never changes a recipe, a price or anything else.
 
-1. On the PC that holds the TinapayanRMS database, open PowerShell **as an administrator**, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Install-RecipeApi.ps1`. It installs the Recipe API, starts it, and starts it again each time you sign in to Windows. Running it as an administrator also lets the other PCs on the shop's network reach it.
-2. In TinapayanBMS's **Settings**, type the Recipe API's address. Use `http://localhost:5290` when TinapayanBMS runs on the same PC, or `http://` and that PC's name or network address followed by `:5290` when it runs on another PC. Then press **Test connection**.
+1. On the PC that holds the TinapayanRMS database, open PowerShell **as an administrator**, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Install-RecipeApi.ps1`. It installs the Recipe API, starts it, and starts it again each time you sign in to Windows. Running it as an administrator also lets the other PCs on the shop's network reach it. The first time, it also makes the Recipe API's **key**, a long password for apps, and shows it at the end. Copy it for the next step.
+2. In TinapayanBMS's **Settings**, type the Recipe API's address. Use `http://localhost:5290` when TinapayanBMS runs on the same PC, or `http://` and that PC's name or network address followed by `:5290` when it runs on another PC. Paste the key into **Key**. Then press **Save and Test**.
+
+The Recipe API answers only an app that gives it the key, so other programs on the shop's network can't read your recipes, costs and prices. Every copy of TinapayanBMS uses the same key. To copy it again, run this in PowerShell on the PC with the Recipe API, then paste it where it's needed:
+
+```powershell
+(Get-Content "$env:LOCALAPPDATA\Programs\TinapayanRMS.RecipeApi\recipeapi.json" -Raw | ConvertFrom-Json).RecipeApi.Key | Set-Clipboard
+```
+
+Running the script again, to update the Recipe API, keeps the same key. Removing the Recipe API removes its key too, so after installing it again TinapayanBMS needs the new key in its Settings.
+
+When TinapayanBMS can't get through, what it says points to the reason:
+
+- **"TinapayanRMS didn't accept the key":** the key in its Settings isn't the Recipe API's. Copy it again as above.
+- **"answered with an error (503)":** the Recipe API is running but can't use the database. Check that PostgreSQL is running on that PC, then try again.
+- **"answered with an error (403)":** the Recipe API has no key, so it only answers on its own PC. Run the script in step 1 again. It makes a new key.
+- **"answered with an error (500)":** something unexpected went wrong in the Recipe API.
+
+The Recipe API's log, in the `logs` folder of `%LocalAppData%\Programs\TinapayanRMS.RecipeApi`, says more about an error.
 
 The Recipe API runs only while someone is signed in to Windows on that PC. TinapayanBMS keeps working from its own copy of the recipes while it isn't running; it just doesn't see changes made here until it can sync again. To remove the Recipe API, run `scripts\Uninstall-RecipeApi.ps1` the same way.
 
@@ -1293,6 +1312,18 @@ The file you're saving over is open, usually in Excel. Close it there and try ag
 **"Windows didn't allow the app to use that file or folder. Pick another one."**
 The folder is protected, such as a system folder. Save in Documents, on the Desktop or on a USB stick instead.
 
+**"That file or folder isn't there any more. It may have been moved or deleted."**
+The file or folder was moved or deleted after you picked it, or the USB stick it was on was taken out. Pick it again, or pick another one.
+
+**"Couldn't read or write the file: …"**
+Windows couldn't finish with the file, for the reason it gives, such as a full disk. Put that right or pick another place, then try again.
+
+**"PostgreSQL's pg_dump reported a problem: …"** or **"PostgreSQL's pg_restore reported a problem: …"**
+PostgreSQL's own tool stopped a backup or restore, for the reason it gives. No backup was made and the data wasn't changed. Ask whoever set up the computer to look into it. *No password supplied* means this Windows user has no password file for the database.
+
+**A message says TinapayanRMS couldn't start.**
+Something the app needs before it can open is missing or wrong, such as its settings file. The message says what, and where the log is, and the app closes after it. Ask whoever installs the app to look into it, and give them the log.
+
 **"Backups need PostgreSQL's pg_dump and pg_restore, and they weren't found on this computer."**
 Backups are taken by PostgreSQL's own tools, which come with PostgreSQL. Ask whoever set up the computer to install PostgreSQL's command-line tools, or to tell the app where they are.
 
@@ -1317,8 +1348,20 @@ A figure has more digits than the app keeps, for example a price typed with too 
 **A message says something went wrong, and that the app is still running.**
 Something happened that the app didn't expect. It's in the log file, which helps whoever looks after the app. If anything on the screen looks wrong afterwards, save what you can, then close the app and open it again. If such messages keep coming, the app closes by itself.
 
+**Opening the app brings up the window that's already open, not a new one.**
+Only one copy of TinapayanRMS opens at a time, because a save in one copy could overwrite what was saved in the other, with neither saying so. This doesn't stop another Windows user on the same PC, or another PC using the same database, so take care not to work on the same thing at the same time.
+
+**"TinapayanRMS is already open, but it isn't answering."**
+The copy that's open has stopped responding, or is busy with something long. Give it a moment. If its window doesn't come back, end it in Task Manager, then open the app again. Anything it hadn't saved is lost.
+
+**"TinapayanRMS is already open, in a way this copy can't reach."**
+It was started as an administrator, or under another Windows user. Use that window, or close it, then open the app again.
+
+**"TinapayanRMS is already open from another folder."**
+There's more than one copy of the app on this PC, and it's the other one that's open. Press **OK** and that one comes to the front. To use the one you just started, close that one first.
+
 **"That name is already in use."** or **"That abbreviation is already in use."**
-Names must be unique within each list: raw materials, sub-assemblies, products, categories, roles and units. A unit's abbreviation must be unique too. Upper and lower case count as the same.
+Names must be unique within each list: raw materials, sub-assemblies, products, categories, roles and units. A unit's abbreviation must be unique too. Upper and lower case count as the same. Spaces at the start or end of a name don't count either: they're taken off when it's saved.
 
 **Letters don't type, or a table cell won't start an edit when I type.**
 The Vim keys are on, and the top right of the window says NORMAL. Click the field or cell, or press **i**, to type. Turn them off in Settings → Keyboard. See [Vim keys](#vim-keys).

@@ -8,6 +8,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.Pricing;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.UI.Tests.Fixtures;
 using TinapayanRMS.UI.ViewModels;
@@ -149,6 +150,106 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.Categories.Should().ContainSingle().Which.Name.Should().Be("Breads");
+    }
+
+    // No to "Save the changes?" on leaving a screen reads the record again to put the form back. Nothing awaited the move
+    // to another tab, so a read that failed there was lost: the click did nothing, with no word of why (2026-11-04).
+    [Fact]
+    public async Task Products_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        await AddProductWithSubAssemblyAsync("Almond Bread", roleId, [new RecipeLine(flourId, 1000m)]);
+        var factory = new FailingDbContextFactory(CreateDbContextFactory());
+        var viewModel = CreateProductsViewModel(factory);
+        await viewModel.LoadCommand.Execute();
+        await PickAsync(() => viewModel.SelectedProduct = viewModel.Products.Single(), () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
+        viewModel.EditingName = "Almond Loaf";
+
+        factory.Fail = true;
+        var mayLeave = await viewModel.ResolveUnsavedChangesAsync(revert: true);
+
+        mayLeave.Should().BeFalse("the form couldn't be put back, so it isn't left");
+        viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
+
+        factory.Fail = false;
+        await viewModel.LoadCommand.Execute();
+        await PickAsync(() => { }, () => viewModel.AreDetailsReady);
+        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
+    }
+
+    [Fact]
+    public async Task Raw_materials_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays()
+    {
+        var flourId = await AddIngredientAsync("Flour");
+        await SetPriceAsync(flourId, unitId: null, price: 0.05m);
+        var factory = new FailingDbContextFactory(CreateDbContextFactory());
+        var viewModel = CreateRawMaterialsViewModel(factory);
+        await viewModel.LoadCommand.Execute();
+        await PickAsync(() => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
+        viewModel.EditingName = "Strong Flour";
+
+        factory.Fail = true;
+        var mayLeave = await viewModel.ResolveUnsavedChangesAsync(revert: true);
+
+        mayLeave.Should().BeFalse("the form couldn't be put back, so it isn't left");
+        viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
+        viewModel.EditingName.Should().Be("Strong Flour", "the changes are still there");
+        viewModel.History.IsDirty.Should().BeTrue();
+
+        factory.Fail = false;
+        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
+    }
+
+    [Fact]
+    public async Task Sub_assemblies_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        await AddProductWithSubAssemblyAsync("Almond", roleId, [new RecipeLine(flourId, 1000m)]);
+        var factory = new FailingDbContextFactory(CreateDbContextFactory());
+        var viewModel = CreateSubAssembliesViewModel(factory);
+        await viewModel.LoadCommand.Execute();
+        await PickAsync(() => viewModel.SelectedRow = viewModel.Rows.Single(), () => viewModel.EditingName == "Almond Dough" && viewModel.Lines.Count == 1);
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
+        viewModel.EditingName = "Almond Loaf Dough";
+
+        factory.Fail = true;
+        var mayLeave = await viewModel.ResolveUnsavedChangesAsync(revert: true);
+
+        mayLeave.Should().BeFalse("the form couldn't be put back, so it isn't left");
+        viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
+
+        factory.Fail = false;
+        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
+    }
+
+    // A record opened by the Vim command line's :e name, which nothing awaits.
+    [Fact]
+    public async Task A_question_that_cant_be_asked_says_so_and_stays()
+    {
+        var ids = new List<int>();
+        foreach (var name in new[] { "Butter", "Flour" })
+        {
+            var id = await AddIngredientAsync(name);
+            await SetPriceAsync(id, unitId: null, price: 0.05m);
+            ids.Add(id);
+        }
+
+        var viewModel = CreateRawMaterialsViewModel(new FailingDbContextFactory(CreateDbContextFactory()));
+        await viewModel.LoadCommand.Execute();
+        await PickAsync(() => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == ids[0]), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
+        viewModel.ConfirmUnsavedChanges.RegisterHandler(_ => throw new InvalidOperationException("The question couldn't be asked."));
+        viewModel.EditingName = "Salted Butter";
+
+        viewModel.OpenByName("Flour").Should().BeTrue();
+
+        await PickAsync(() => { }, () => viewModel.ErrorMessage is not null);
+        viewModel.ErrorMessage.Should().Contain("The question couldn't be asked.");
+        viewModel.SelectedRawMaterial!.Id.Should().Be(ids[0], "it stays on the form it was asked to leave");
+        viewModel.EditingName.Should().Be("Salted Butter");
     }
 
     private static async Task PickAsync(Action pick, Func<bool> settled, Func<string>? describe = null)

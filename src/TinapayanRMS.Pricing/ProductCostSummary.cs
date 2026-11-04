@@ -1,7 +1,6 @@
-using System.Reactive.Linq;
 using TinapayanRMS.ApplicationCore.Rules;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing;
 
 /// <summary>
 /// A product's cost for one sellable unit, from its materials to its selling price (cost-plus,

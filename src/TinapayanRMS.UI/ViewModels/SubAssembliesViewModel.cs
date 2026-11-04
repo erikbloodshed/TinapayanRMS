@@ -10,6 +10,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
@@ -1068,7 +1069,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             return false;
         }
 
-        _ = OpenSubAssemblyAsync(row.Id);
+        _ = RunSafelyAsync(() => OpenSubAssemblyAsync(row.Id));
         return true;
     }
 
@@ -1147,7 +1148,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         {
             if (History.IsDirty)
             {
-                _ = PickAfterAskingAsync(leaf.Row.Id);
+                _ = RunSafelyAsync(() => PickAfterAskingAsync(leaf.Row.Id));
             }
             else
             {

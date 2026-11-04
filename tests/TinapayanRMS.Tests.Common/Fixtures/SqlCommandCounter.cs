@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace TinapayanRMS.UI.Tests.Fixtures;
+namespace TinapayanRMS.Tests.Common.Fixtures;
 
 /// <summary>
 /// Counts the SQL commands sent from where it's started, through every await and Task.Run after it, and from nowhere

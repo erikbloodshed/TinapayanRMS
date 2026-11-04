@@ -1,14 +1,13 @@
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing;
 
 /// <summary>
 /// A unit a packaging line's quantity can be entered in: the material's base unit (<see cref="Key"/> 0), or one of
 /// its alternative units by <see cref="RawMaterialUnit"/> id. The same shape as the Purchase Cost Setup grid's
-/// <see cref="PurchaseUnitChoice"/>, and for the same reason: the grid's cell binds a scalar key, not an object.
+/// PurchaseUnitChoice, and for the same reason: the grid's cell binds a scalar key, not an object.
 /// <see cref="UnitCost"/> is what one of this unit costs, buffered unless the row is switched to its true cost — the popup's own first column, so picking a
 /// unit previews what it costs before it's committed.
 /// </summary>
@@ -27,7 +26,7 @@ public sealed record PackagingUnitChoice(int Key, string Abbreviation, decimal B
 /// worked out from; <see cref="UnitCost"/> is what one of the *picked* unit costs, which follows <see cref="UnitKey"/>.
 /// A row can be half filled in: <see cref="CompleteLines"/> checks them all before they're saved.
 /// </summary>
-public sealed class PackagingLineRow : ReactiveObject
+public sealed class PackagingLineRow : ObservableRow
 {
     /// <summary>Looks up a packaging material by id as the screen has it; null for a row the screen resolves itself.</summary>
     private readonly Func<int, RawMaterial?>? _findMaterial;

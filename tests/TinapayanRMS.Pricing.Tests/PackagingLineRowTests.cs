@@ -1,9 +1,8 @@
 using AwesomeAssertions;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.UI.ViewModels;
 
-namespace TinapayanRMS.UI.Tests.ViewModels;
+namespace TinapayanRMS.Pricing.Tests;
 
 /// <summary>
 /// The row behind every packaging table: a quantity typed in the material's base unit or in one of its alternative
@@ -11,7 +10,21 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// </summary>
 public class PackagingLineRowTests
 {
-    public PackagingLineRowTests() => ReactiveUIBootstrapper.EnsureInitialized();
+    /// <summary>
+    /// One such row used to throw on every read, and every read of all the products failed with it (Reports, Print, the
+    /// Recipe API). The database refuses one now (CK_PackagingLines_AuthoredQuantity), so this is only ever an edit from
+    /// before it or outside it, which should cost nothing and be there to put right.
+    /// </summary>
+    [Theory]
+    [InlineData(PackagingLineAuthoredField.QtyPerUnit)]
+    [InlineData(PackagingLineAuthoredField.UnitsPerPackagingUnit)]
+    public void A_saved_line_with_a_quantity_of_0_reads_as_costing_nothing(PackagingLineAuthoredField authoredField)
+    {
+        var row = PackagingLineRow.FromSaved(new PackagingLine { PackagingMaterial = Box(), AuthoredField = authoredField, QtyPerUnit = 0m, UnitsPerPackagingUnit = 0m });
+
+        row.QtyPerUnit.Should().Be(0m);
+        row.CostPerUnit.Should().Be(0m);
+    }
 
     private static UnitOfMeasure Unit(string abbreviation) => new() { Name = abbreviation, Abbreviation = abbreviation };
 

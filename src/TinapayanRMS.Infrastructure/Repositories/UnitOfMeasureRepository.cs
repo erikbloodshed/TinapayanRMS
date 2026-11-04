@@ -15,6 +15,7 @@ public sealed class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbCont
     public async Task AddAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken)
     {
         unitOfMeasure.Name = UnitOfMeasureRules.NormalizeName(unitOfMeasure.Name);
+        unitOfMeasure.Abbreviation = UnitOfMeasureRules.NormalizeAbbreviation(unitOfMeasure.Abbreviation);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         dbContext.UnitsOfMeasure.Add(unitOfMeasure);
@@ -29,7 +30,7 @@ public sealed class UnitOfMeasureRepository(IDbContextFactory<TinapayanRMSDbCont
             ?? throw new BusinessRuleException($"Unit of measure {unitOfMeasure.Id} does not exist.");
 
         existing.Name = UnitOfMeasureRules.NormalizeName(unitOfMeasure.Name);
-        existing.Abbreviation = unitOfMeasure.Abbreviation;
+        existing.Abbreviation = UnitOfMeasureRules.NormalizeAbbreviation(unitOfMeasure.Abbreviation);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

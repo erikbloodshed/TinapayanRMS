@@ -11,6 +11,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
@@ -256,7 +257,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>
     /// Flags EditingName as taken the moment it's left (SummaryHeaderCard's NameTextBox LostFocus), rather than
     /// waiting for Save to hit the same message from the unique-index violation (ViewModelBase.RunSafelyAsync).
-    /// Case-insensitive and trimmed, matching the database's default collation the unique index relies on. Fixing
+    /// Trimmed, as Save stores it, and case-insensitive, as the collation the unique index relies on is. Fixing
     /// the name and leaving the field again clears the message this raised, without touching an unrelated one.
     /// </summary>
     public void CheckNameAvailability()
@@ -1352,7 +1353,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             var material = new RawMaterial
             {
                 Id = _editingId,
-                Name = EditingName,
+                Name = EditingName.Trim(),
                 Type = type,
                 CategoryId = EditingCategory?.Id ?? 0,
                 Source = source,
@@ -2598,7 +2599,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             return false;
         }
 
-        _ = OpenRawMaterialAsync(material.Id);
+        _ = RunSafelyAsync(() => OpenRawMaterialAsync(material.Id));
         return true;
     }
 
@@ -2664,6 +2665,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
             // The picker shows the category it now holds rather than what was typed: the new one, or the one put back.
             CategorySearchText = EditingCategory?.Name ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            // Nothing awaits this: it's the picker's, from the keyboard or the focus leaving.
+            ShowFailure(ex);
         }
         finally
         {
@@ -2766,7 +2772,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         {
             if (History.IsDirty)
             {
-                _ = PickAfterAskingAsync(leaf.RawMaterial.Id);
+                _ = RunSafelyAsync(() => PickAfterAskingAsync(leaf.RawMaterial.Id));
             }
             else
             {

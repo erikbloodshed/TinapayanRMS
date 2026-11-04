@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 using TinapayanRMS.UI.ViewModels;
 
 namespace TinapayanRMS.UI.Tests.ViewModels;

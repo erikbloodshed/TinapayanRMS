@@ -145,7 +145,7 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
         CancellationToken cancellationToken)
     {
         ProductRules.EnsureValidPackagingLines(
-            [.. lines.Select(l => (l.PackagingMaterialId, l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.AuthoredValue : 1m / l.AuthoredValue))]);
+            [.. lines.Select(l => (l.PackagingMaterialId, ProductRules.ReconcileReciprocal(l.AuthoredField, l.AuthoredValue).QtyPerUnit))]);
 
         var productExists = await dbContext.Products.AnyAsync(p => p.Id == productId, cancellationToken);
         if (!productExists)

@@ -6,6 +6,8 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.Pricing;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.UI.Tests.Fixtures;
 using TinapayanRMS.UI.ViewModels;
@@ -21,6 +23,16 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 [Collection(DatabaseCollection.Name)]
 public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
+    [Fact]
+    public void A_row_says_by_how_much_a_current_price_is_short_of_the_target_markup()
+    {
+        var row = new ProductCostRow(new Product { Name = "Pandesal" }, new ProductCostSummary([("Dough", 20m)], 1, [], 0m, 0m, 0m, 30m, 0m, 25m));
+        row.TargetMarkupPercent.Should().Be(30m);
+        row.ShortOfTargetMarkup.Should().Be(5m, "25.00 on 20.00 earns 25%");
+        new ProductCostRow(new Product { Name = "Pandesal" }, new ProductCostSummary([("Dough", 20m)], 1, [], 0m, 0m, 0m, 30m, 0m, 27m))
+            .ShortOfTargetMarkup.Should().BeNull();
+    }
+
     private ReportsViewModel CreateViewModel()
     {
         ReactiveUIBootstrapper.EnsureInitialized();
@@ -227,7 +239,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
     {
         var viewModel = CreateViewModel();
         viewModel.ExportToExcel.RegisterHandler(_ =>
-            throw new IOException("The process cannot access the file because it is being used by another process."));
+            throw new IOException("The process cannot access the file because it is being used by another process.", unchecked((int)0x80070020)));
 
         await viewModel.ExportProductCostsCommand.Execute();
 

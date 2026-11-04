@@ -6,7 +6,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Mcp.Results;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Mcp.Tools;
 

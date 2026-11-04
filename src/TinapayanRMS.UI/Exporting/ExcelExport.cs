@@ -21,9 +21,9 @@ namespace TinapayanRMS.UI.Exporting;
 /// one-line ones, so the columns are fitted to what's in them.</item>
 /// </list>
 /// Figures are written as numbers at full precision, and the formats only show them. A grid's groups go as their caption
-/// rows, and a row's details (the Mixing Sheet's ingredients, 2026-10-24) go under it, with their own heading row,
-/// grouped so Excel can fold them away; each detail cell is formatted by the details grid's column. GridFillerRows'
-/// padding is only drawn, never rows of the grid, so there's none to leave out.
+/// rows. GridFillerRows' padding is only drawn, never rows of the grid, so there's none to leave out. Each cell is
+/// formatted by the grid's own column, as no table has a row's details: a details cell's column would be its
+/// <c>GridViewDefinition</c>'s grid's.
 /// </summary>
 public static class ExcelExport
 {
@@ -82,23 +82,16 @@ public static class ExcelExport
             ExportMode = ExportMode.Value,
             CellsExportingEventHandler = (_, e) =>
             {
-                // A cell of a row's details (the Mixing Sheet's ingredients under a mix) is one of the details grid's columns.
-                var column = ((e.GridViewDefinition as GridViewDefinition)?.DataGrid ?? grid).Columns[e.ColumnName];
+                var column = grid.Columns[e.ColumnName];
                 switch (e.CellType)
                 {
-                    // A details table's headings stand out as the sheet's own do.
-                    case ExportCellType.HeaderCell:
-                        e.Range.CellStyle.Font.Bold = true;
-                        break;
-
                     // A picker column holds an id: its cells go as the name the grid shows.
                     case ExportCellType.RecordCell when column is GridComboBoxColumn or GridMultiColumnDropDownList:
                         e.ExportMode = ExportMode.Text;
                         break;
 
                     // A figure is written here rather than by the converter, which would format it without a thousands
-                    // separator: as a number at full precision, shown with its column's decimals. Each cell is formatted
-                    // by its own column, so a details row's figures keep theirs.
+                    // separator: as a number at full precision, shown with its column's decimals.
                     case ExportCellType.RecordCell when column is GridNumericColumn numeric:
                         if (e.CellValue is { } value)
                         {

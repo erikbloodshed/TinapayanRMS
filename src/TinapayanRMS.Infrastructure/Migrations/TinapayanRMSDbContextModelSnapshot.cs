@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261031071249_RetireProductionPlan";
+    public override string LastMigrationId => "20261103142633_QuantityAndPercentChecks";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -146,7 +146,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .IsUnique()
                     .HasDatabaseName("ix_costing_parameters_product_id");
 
-                b.ToTable("costing_parameters");
+                b.ToTable("costing_parameters", t =>
+                    {
+                        t.HasCheckConstraint("CK_CostingParameters_Percents", "labor_percent >= 0 AND overhead_percent >= 0 AND administrative_percent >= 0 AND margin_percent >= 0 AND vat_percent >= 0");
+                    });
             });
 
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.IngredientAddInLine", b =>
@@ -185,7 +188,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .IsUnique()
                     .HasDatabaseName("ix_ingredient_add_in_lines_ingredient_id_add_in_ingredient_id");
 
-                b.ToTable("ingredient_add_in_lines");
+                b.ToTable("ingredient_add_in_lines", t =>
+                    {
+                        t.HasCheckConstraint("CK_IngredientAddInLines_Grams", "grams > 0");
+                    });
             });
 
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.PackagingLine", b =>
@@ -240,7 +246,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .IsUnique()
                     .HasDatabaseName("ix_packaging_lines_product_id_packaging_material_id");
 
-                b.ToTable("packaging_lines");
+                b.ToTable("packaging_lines", t =>
+                    {
+                        t.HasCheckConstraint("CK_PackagingLines_AuthoredQuantity", "(authored_field = 0 AND qty_per_unit > 0) OR (authored_field = 1 AND units_per_packaging_unit > 0)");
+                    });
             });
 
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.PackagingLink", b =>
@@ -897,7 +906,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .IsUnique()
                     .HasDatabaseName("ix_raw_material_units_raw_material_id_unit_of_measure_id");
 
-                b.ToTable("raw_material_units");
+                b.ToTable("raw_material_units", t =>
+                    {
+                        t.HasCheckConstraint("CK_RawMaterialUnits_BaseUnitsPerUnit", "base_units_per_unit > 0");
+                    });
             });
 
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssembly", b =>
@@ -995,7 +1007,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .IsUnique()
                     .HasDatabaseName("ix_sub_assembly_lines_sub_assembly_id_ingredient_id");
 
-                b.ToTable("sub_assembly_lines");
+                b.ToTable("sub_assembly_lines", t =>
+                    {
+                        t.HasCheckConstraint("CK_SubAssemblyLines_Grams", "grams > 0");
+                    });
             });
 
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.SubAssemblyPackagingLine", b =>
@@ -1208,7 +1223,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .IsUnique()
                     .HasDatabaseName("ix_usage_add_in_lines_usage_id_ingredient_id");
 
-                b.ToTable("usage_add_in_lines");
+                b.ToTable("usage_add_in_lines", t =>
+                    {
+                        t.HasCheckConstraint("CK_UsageAddInLines_Grams", "grams > 0");
+                    });
             });
 
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.CostingParameters", b =>

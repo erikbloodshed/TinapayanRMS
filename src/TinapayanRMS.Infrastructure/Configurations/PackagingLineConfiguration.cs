@@ -8,6 +8,13 @@ public sealed class PackagingLineConfiguration : IEntityTypeConfiguration<Packag
 {
     public void Configure(EntityTypeBuilder<PackagingLine> builder)
     {
+        // Backstop for ProductRules.EnsureValidPackagingLines, on the figure that was typed (authored_field 0 is QtyPerUnit,
+        // 1 UnitsPerPackagingUnit): reading a line divides by it. The other is worked out from it, and can round to 0 at this
+        // column's 4 places, as 1 / 30,000 does, so it's left alone. Applies to the value as stored, after that rounding.
+        builder.ToTable(t => t.HasCheckConstraint(
+            "CK_PackagingLines_AuthoredQuantity",
+            "(authored_field = 0 AND qty_per_unit > 0) OR (authored_field = 1 AND units_per_packaging_unit > 0)"));
+
         // Deleting the product takes its packaging lines with it.
         builder.HasOne(l => l.Product)
             .WithMany()

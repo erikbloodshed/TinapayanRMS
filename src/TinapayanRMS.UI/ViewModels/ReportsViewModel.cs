@@ -7,6 +7,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
@@ -22,9 +23,9 @@ public sealed class ProductCostRow(Product product, ProductCostSummary costs)
 
     public string ProductName => product.Name;
 
-    public string Stage => ProductFolderNode.StageTitle(product.Stage);
+    public string Stage => ProductRules.StageTitle(product.Stage);
 
-    public string Category => product.Category?.Name ?? ProductFolderNode.UncategorizedTitle;
+    public string Category => product.Category?.Name ?? ProductRules.UncategorizedTitle;
 
     /// <summary>
     /// How many pieces the sellable unit holds, which every figure after it is for; none for a composite, which is one unit

@@ -13,7 +13,13 @@ public static class CatalogEndpoints
 
     public static void Map(RouteGroupBuilder api)
     {
-        api.MapGet("/status", () => new ApiStatus("TinapayanRMS", ApiVersion));
+        // Reads something, so an answer means the database is there as well as this server: when it can't be read, this
+        // answers as any other request then does (RecipeApiHost).
+        api.MapGet("/status", async (ICostingDefaultsRepository costingDefaults, CancellationToken cancellationToken) =>
+        {
+            await costingDefaults.GetAsync(cancellationToken);
+            return new ApiStatus("TinapayanRMS", ApiVersion);
+        });
 
         api.MapGet("/ingredients", async (IRawMaterialRepository materials, CancellationToken cancellationToken) =>
             (await materials.GetAllAsync(cancellationToken))

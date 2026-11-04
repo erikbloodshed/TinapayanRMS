@@ -688,6 +688,26 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         (await NameOfAsync(mamonId)).Should().Be("Mamon");
     }
 
+    // No puts a new product back blank. What's typed into it next has to count, or it's lost with no question asked (found
+    // 2026-11-04: what a blank form is measured against was cleared again straight after it was set).
+    [Fact]
+    public async Task What_is_typed_after_no_on_a_new_product_counts_as_unsaved()
+    {
+        var viewModel = await LoadedViewModelAsync();
+        var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
+        viewModel.EditingName = "Mamon";
+        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue();
+        viewModel.EditingName.Should().BeEmpty();
+        viewModel.History.IsDirty.Should().BeFalse();
+        viewModel.History.CanUndo.Should().BeFalse("what was thrown away isn't there to undo back to");
+
+        viewModel.EditingName = "Mamon Tostado";
+
+        viewModel.History.IsDirty.Should().BeTrue();
+        await viewModel.ResolveUnsavedChangesAsync(revert: false);
+        asked.Should().HaveCount(2);
+    }
+
     /// <summary>Answers the question about unsaved changes with <paramref name="answer"/>, collecting each question asked.</summary>
     private static List<string> AnswerUnsavedChanges(ProductsViewModel viewModel, UnsavedChangesAnswer answer)
     {

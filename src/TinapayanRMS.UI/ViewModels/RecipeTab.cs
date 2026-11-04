@@ -1,4 +1,5 @@
 using ReactiveUI;
+using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.UI.ViewModels;
 

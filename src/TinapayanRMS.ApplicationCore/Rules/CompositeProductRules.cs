@@ -9,6 +9,9 @@ public static class CompositeProductRules
     /// <summary>A composite is "two or more products" (the user's definition): six of one product is a Box of 6, which Quantity Required covers.</summary>
     public const int MinimumProducts = 2;
 
+    /// <summary>"Ensaymada × 6": a product in a composite, and how many of it go in, as the Costing tab and the printout call the line.</summary>
+    public static string LineName(string productName, int quantity) => $"{productName} × {quantity}";
+
     /// <summary>
     /// A composite's products: at least <see cref="MinimumProducts"/> different ones, each at a quantity of 1 or more,
     /// none of them the composite itself, and none on two lines (put its quantity on one).

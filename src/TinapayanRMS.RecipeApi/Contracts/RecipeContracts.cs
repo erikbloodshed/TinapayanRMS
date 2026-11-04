@@ -54,7 +54,7 @@ public sealed record MixDetail(MixInfo Mix, IReadOnlyList<MixLine> Lines);
 public sealed record MixLine(int IngredientId, string Ingredient, decimal Grams, bool IsFormulaBase);
 
 /// <summary>
-/// What a product is made of, as the Production Plan reads it (2026-10-31, for TinapayanBMS's planning): a
+/// What a product is made of, as TinapayanBMS plans production from it (2026-10-31, when planning moved there): a
 /// composite's products, or its sections in the recipe's order.
 /// </summary>
 /// <param name="QuantityRequired">How many pieces make one sellable unit.</param>

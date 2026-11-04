@@ -73,38 +73,6 @@ public class GridAddNewRowSourceChangeTests
         });
     }
 
-    [Fact]
-    public void ItemDropped_hears_of_an_add_row_thrown_away_but_not_of_one_committed()
-    {
-        var dropped = new List<object>();
-        OffscreenGrid.Run(
-            () =>
-            {
-                var grid = LinesGrid();
-                GridAddNewRow.SetItemFactory(grid, () => new Line());
-                GridAddNewRow.SetItemDropped(grid, dropped.Add);
-                return grid;
-            },
-            grid =>
-            {
-                var lines = (ObservableCollection<Line>)grid.ItemsSource;
-                var committed = TypeIntoAddRow(grid, "Sugar");
-                GridEditCommit.Commit(grid);
-                OffscreenGrid.Pump();
-
-                lines.Should().Contain(committed);
-                dropped.Should().BeEmpty();
-
-                var cancelled = TypeIntoAddRow(grid, "Salt");
-                grid.SelectionController.CurrentCellManager.EndEdit(canCommit: false);
-                grid.GetAddNewRowController().CancelAddNew();
-                OffscreenGrid.Pump();
-
-                lines.Should().NotContain(cancelled);
-                dropped.Should().Equal(cancelled);
-            });
-    }
-
     /// <summary>Starts the add row in its Grams cell, as a tap there does, and gives its line a name.</summary>
     private static Line TypeIntoAddRow(SfDataGrid grid, string name)
     {

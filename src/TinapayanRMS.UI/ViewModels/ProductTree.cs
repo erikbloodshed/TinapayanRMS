@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reactive.Subjects;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
@@ -78,11 +79,11 @@ public sealed class ProductFolderNode : ProductTreeNode
     }
 
     /// <summary>A stage's folder. Open to start with, so the list first opens on the category folders.</summary>
-    public static ProductFolderNode ForStage(ProductStage stage) => new(stage, null, isStage: true, StageTitle(stage)) { IsExpanded = true };
+    public static ProductFolderNode ForStage(ProductStage stage) => new(stage, null, isStage: true, ProductRules.StageTitle(stage)) { IsExpanded = true };
 
     public static ProductFolderNode ForCategory(ProductStage stage, ProductCategory category) => new(stage, category.Id, isStage: false, category.Name);
 
-    public static ProductFolderNode Uncategorized(ProductStage stage) => new(stage, null, isStage: false, UncategorizedTitle);
+    public static ProductFolderNode Uncategorized(ProductStage stage) => new(stage, null, isStage: false, ProductRules.UncategorizedTitle);
 
     /// <summary>
     /// The Deleted folder, holding the deleted products by name, whatever their stage and category, until each is restored
@@ -90,12 +91,7 @@ public sealed class ProductFolderNode : ProductTreeNode
     /// </summary>
     public static ProductFolderNode Deleted() => new(default, null, isStage: false, DeletedTitle, isDeletedFolder: true);
 
-    public const string UncategorizedTitle = "Uncategorized";
-
     public const string DeletedTitle = "Deleted";
-
-    /// <summary>What a stage's folder reads: "Production" or "Research and Development".</summary>
-    public static string StageTitle(ProductStage stage) => stage == ProductStage.Production ? "Production" : "Research and Development";
 
     public ProductStage Stage { get; }
 
@@ -120,7 +116,7 @@ public sealed class ProductFolderNode : ProductTreeNode
     public string Key =>
         IsDeletedFolder ? DeletedTitle
         : IsStage ? Stage.ToString()
-        : $"{Stage}/{CategoryId?.ToString(CultureInfo.InvariantCulture) ?? UncategorizedTitle}";
+        : $"{Stage}/{CategoryId?.ToString(CultureInfo.InvariantCulture) ?? ProductRules.UncategorizedTitle}";
 
     /// <summary>The products the folder shows: none for a stage's folder, whose rows are folders.</summary>
     public IEnumerable<ProductLeafNode> Products => Children.OfType<ProductLeafNode>();

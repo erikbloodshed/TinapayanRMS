@@ -1,6 +1,7 @@
 using System.Collections.Specialized;
 using AwesomeAssertions;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.UI.ViewModels;
@@ -58,7 +59,7 @@ public class ProductTreeTests
         // A refresh with the product recategorized keeps its row, which takes its new category's picture.
         var tree = new ProductTree();
         tree.Refresh([Cakes], [ProductOf(2, "Pandesal", ProductStage.Production, null)], isFiltered: false);
-        var leaf = Folder(tree, ProductStage.Production, ProductFolderNode.UncategorizedTitle).Children.OfType<ProductLeafNode>().Single();
+        var leaf = Folder(tree, ProductStage.Production, ProductRules.UncategorizedTitle).Children.OfType<ProductLeafNode>().Single();
 
         tree.Refresh([Cakes], [ProductOf(2, "Pandesal", ProductStage.Production, Cakes)], isFiltered: false);
 

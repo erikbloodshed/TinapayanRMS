@@ -1,8 +1,7 @@
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing;
 
 /// <summary>
 /// A row of the Price Simulator screen's Price Changes: a purchased material and the price it's tried at, typed as a change in
@@ -10,7 +9,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// (ToScenarioLine), which changes no real price.
 /// </summary>
 /// <param name="find">The material with an id, and what it's bought in; null for one that isn't there.</param>
-public sealed class SimulatedPriceChange(Func<int, (RawMaterial Material, PurchaseUnit Unit)?> find) : ReactiveObject
+public sealed class SimulatedPriceChange(Func<int, (RawMaterial Material, PurchaseUnit Unit)?> find) : ObservableRow
 {
     // Which of the two was typed last, the other following it; and set while the other is being worked out.
     private bool _percentTyped;

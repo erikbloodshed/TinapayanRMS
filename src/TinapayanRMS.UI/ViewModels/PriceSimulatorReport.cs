@@ -1,3 +1,5 @@
+using TinapayanRMS.Pricing;
+
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>

@@ -1,3 +1,4 @@
+using TinapayanRMS.Pricing;
 ﻿using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.UI.ViewModels;

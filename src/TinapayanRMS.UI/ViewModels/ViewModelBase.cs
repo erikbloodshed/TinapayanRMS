@@ -1,6 +1,7 @@
 using System.IO;
 using System.Reactive.Linq;
 using ReactiveUI;
+using TinapayanRMS.Infrastructure.Services;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI.ViewModels;
@@ -100,7 +101,10 @@ public abstract class ViewModelBase : ReactiveObject
     /// <summary>
     /// <see cref="IUnsavedChangesScreen.ResolveUnsavedChangesAsync"/> for a screen: when <paramref name="isDirty"/>, asks
     /// about the changes to <paramref name="name"/> and runs <paramref name="save"/> (true when it went through) or
-    /// <paramref name="discard"/> (null when nothing needs putting back). True when the form may be left.
+    /// <paramref name="discard"/> (null when nothing needs putting back). True when the form may be left. Whatever fails on
+    /// the way, such as reading the record back to put the form as it was saved, is shown here and the form isn't left:
+    /// whoever's asking is on the way to another screen, or out of the app, and has no notice of its own to say so in
+    /// (2026-11-04: a move to another tab awaited by nothing lost it, so the click just did nothing).
     /// </summary>
     protected async Task<bool> AskAboutUnsavedChangesAsync(bool isDirty, string name, Func<Task<bool>> save, Func<Task>? discard)
     {
@@ -114,31 +118,39 @@ public abstract class ViewModelBase : ReactiveObject
             return false;
         }
 
-        UnsavedChangesAnswer answer;
-        _isAskingAboutUnsavedChanges = true;
         try
         {
-            answer = await ConfirmUnsavedChanges.Handle(
-                $"Save the changes to {name}?\n\nYes saves them. No throws them away. Cancel keeps them, and you stay on {name}.");
-        }
-        finally
-        {
-            _isAskingAboutUnsavedChanges = false;
-        }
+            UnsavedChangesAnswer answer;
+            _isAskingAboutUnsavedChanges = true;
+            try
+            {
+                answer = await ConfirmUnsavedChanges.Handle(
+                    $"Save the changes to {name}?\n\nYes saves them. No throws them away. Cancel keeps them, and you stay on {name}.");
+            }
+            finally
+            {
+                _isAskingAboutUnsavedChanges = false;
+            }
 
-        switch (answer)
-        {
-            case UnsavedChangesAnswer.Save:
-                return await save();
-            case UnsavedChangesAnswer.DontSave:
-                if (discard is not null)
-                {
-                    await discard();
-                }
+            switch (answer)
+            {
+                case UnsavedChangesAnswer.Save:
+                    return await save();
+                case UnsavedChangesAnswer.DontSave:
+                    if (discard is not null)
+                    {
+                        await discard();
+                    }
 
-                return true;
-            default:
-                return false;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowFailure(ex);
+            return false;
         }
     }
 

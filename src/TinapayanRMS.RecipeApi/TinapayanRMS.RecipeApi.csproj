@@ -1,13 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- A read-only HTTP API over the LAN for the shop's other apps (TinapayanBMS first): the mixes, ingredients,
-       products and saved plans, and a production plan worked out with the app's own code (Program). It references the UI
-       project because the plan's naming and the saved products' reading live there (ProductionPlanBuilder,
-       SavedProductReader), so its figures are the Production Plan screen's. -->
+  <!-- A read-only HTTP API over the LAN for the shop's other apps (TinapayanBMS first): the mixes, ingredients, products and
+       their recipes (Program). It prices with TinapayanRMS.Pricing, so its figures are the screens', and has nothing of the
+       UI: it's on plain net11.0, which can't reference the UI project, so that can't come back by accident. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
-    <UseWPF>true</UseWPF>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,10 +12,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TinapayanRMS.UI\TinapayanRMS.UI.csproj" />
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.Pricing\TinapayanRMS.Pricing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The app's own, so it reads the database the app saves to. -->
+    <Content Include="..\TinapayanRMS.UI\appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="recipeapi.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

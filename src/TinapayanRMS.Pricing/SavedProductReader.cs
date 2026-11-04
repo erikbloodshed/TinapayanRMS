@@ -4,7 +4,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing;
 
 /// <summary>Everything a product's detail shows, as it's saved: what <see cref="SavedProductReader.ReadDetailAsync"/> reads.</summary>
 public sealed record ProductDetail(
@@ -54,7 +54,7 @@ public sealed record SavedComponent(ProductComponent Component, ComponentCosts C
         CompositeProductRules.CalculateComponentPackagingCost(Costs.PackagingAt(basis), Component.Quantity);
 
     /// <summary>"Ensaymada × 6", what the Costing tab calls the line.</summary>
-    public string LineName => ProductComponentRow.LineNameFor(Component.ComponentProduct!.Name, Component.Quantity);
+    public string LineName => CompositeProductRules.LineName(Component.ComponentProduct!.Name, Component.Quantity);
 }
 
 /// <summary>
@@ -74,32 +74,6 @@ public sealed record SavedProduct(
 {
     /// <summary>A composite's products, each with its recipe cost; none for a product made of sub-assemblies.</summary>
     public IReadOnlyList<SavedComponent> Components { get; init; } = [];
-
-    /// <summary>What Print puts on paper for it: as saved, so with no save note.</summary>
-    public ProductPrintout ToPrintout(DateTime printedAt) => new(
-        Product.Name,
-        Product.Category?.Name ?? ProductFolderNode.UncategorizedTitle,
-        ProductFolderNode.StageTitle(Product.Stage),
-        ProductPrintout.CostUnitCaptionFor(Product.QuantityRequired, Product.IsComposite),
-        ProductPrintout.LastUpdatedTextFor(Product.UpdatedAt),
-        null,
-        printedAt,
-        [.. Sections.Select(s => PrintedSection.From(s, CostBasis))],
-        HasPackaging ? PrintedPackaging.From(PackagingLines, PackagingLinkedTo) : null,
-        Costs,
-        Product.IsComposite
-            ? [.. Components.Select(c => Product.IncludesComponentPackaging
-                ? new PrintedComponent(
-                    c.Component.ComponentProduct!.Name,
-                    c.Component.Quantity,
-                    c.RecipeCostAt(CostBasis),
-                    c.CostAt(CostBasis) + c.PackagingCostAt(CostBasis),
-                    c.Costs.PackagingAt(CostBasis))
-                : new PrintedComponent(c.Component.ComponentProduct!.Name, c.Component.Quantity, c.RecipeCostAt(CostBasis), c.CostAt(CostBasis)))]
-            : null)
-    {
-        CostBasis = CostBasis,
-    };
 }
 
 /// <summary>
