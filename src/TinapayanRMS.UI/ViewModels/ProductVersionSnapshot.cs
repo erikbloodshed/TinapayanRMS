@@ -67,9 +67,9 @@ public static class ProductVersionSnapshot
             IncludesComponentPackaging = product.IncludesComponentPackaging,
             Costing = costing is null
                 ? null
-                : new VersionCosting(
-                    costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent, costing.VatPercent),
+                : new VersionCosting(costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent),
             WastagePercent = detail.WastagePercent,
+            VatPercent = detail.VatPercent,
             Sections = sections,
             PackagingLink = detail.PackagingLink is { } link
                 ? new VersionPackagingLink(
@@ -97,13 +97,14 @@ public static class ProductVersionSnapshot
     /// <paramref name="content"/> as a product and its detail, for SavedProductReader.Build: <paramref name="productId"/>'s,
     /// with its materials at their costs then, its products at what they brought then and the wastage it had then. Pass
     /// <paramref name="componentCostsNow"/> for each product's cost as it is now instead, where it's known, and
-    /// <paramref name="wastagePercentNow"/> for the wastage as it is now.
+    /// <paramref name="wastagePercentNow"/> and <paramref name="vatPercentNow"/> for the wastage and VAT as they are now.
     /// </summary>
     public static (Product Product, ProductDetail Detail) ToDetail(
         int productId,
         ProductVersionContent content,
         IReadOnlyDictionary<int, ComponentCosts>? componentCostsNow = null,
-        decimal? wastagePercentNow = null)
+        decimal? wastagePercentNow = null,
+        decimal? vatPercentNow = null)
     {
         var materials = content.Materials.ToDictionary(m => m.Id, ToRawMaterial);
         RawMaterial MaterialOf(int id) => materials.GetValueOrDefault(id) ?? new RawMaterial { Id = id, Name = $"Material {id}" };
@@ -194,7 +195,6 @@ public static class ProductVersionSnapshot
                 OverheadPercent = c.OverheadPercent,
                 AdministrativePercent = c.AdministrativePercent,
                 MarginPercent = c.MarginPercent,
-                VatPercent = c.VatPercent,
             }
             : null;
 
@@ -212,6 +212,7 @@ public static class ProductVersionSnapshot
         var detail = new ProductDetail(link, usages, packaging, costing, lines, addIns)
         {
             WastagePercent = wastagePercentNow ?? content.WastagePercent ?? 0m,
+            VatPercent = vatPercentNow ?? content.VatThen,
             Components =
             [
                 .. content.Components.Select((component, sortOrder) => new SavedComponent(

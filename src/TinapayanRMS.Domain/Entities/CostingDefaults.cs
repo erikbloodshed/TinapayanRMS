@@ -3,13 +3,13 @@ using TinapayanRMS.Domain.Enums;
 namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>
-/// The stage a new product is filed in, the labor, overhead, administrative, markup and VAT percentages its costing
-/// starts with, the cost buffer a new raw material starts with, and the shop-wide wastage every product's costing adds,
-/// set in Settings. One row at most (Id 1); none until they're first saved, which reads as new products in
-/// <see cref="DefaultNewProductStage"/>, the costing at zero, the buffer at <see cref="DefaultCostBufferPercent"/> and the
-/// wastage at <see cref="DefaultWastagePercent"/>. A product keeps its own stage and CostingParameters and a material its
-/// own buffer: changing those defaults never touches a saved one. The wastage is different: it isn't a starting value
-/// but the one figure every product is priced with, so changing it reprices them all.
+/// The stage a new product is filed in, the labor, overhead, administrative and markup percentages its costing starts
+/// with, the cost buffer a new raw material starts with, and the shop's VAT and wastage, which every product is priced
+/// with, set in Settings. One row at most (Id 1); none until they're first saved, which reads as new products in
+/// <see cref="DefaultNewProductStage"/>, the costing and VAT at zero, the buffer at <see cref="DefaultCostBufferPercent"/>
+/// and the wastage at <see cref="DefaultWastagePercent"/>. A product keeps its own stage and CostingParameters and a
+/// material its own buffer: changing those defaults never touches a saved one. The VAT and the wastage are different:
+/// they aren't starting values but the figures every product is priced with, so changing either reprices them all.
 /// </summary>
 public sealed class CostingDefaults
 {
@@ -36,6 +36,7 @@ public sealed class CostingDefaults
     /// <summary>Markup on cost, as CostingParameters.MarginPercent.</summary>
     public decimal MarginPercent { get; set; }
 
+    /// <summary>The shop's VAT, added on top of every product's marked-up price, as a percentage (since 2026-11-05).</summary>
     public decimal VatPercent { get; set; }
 
     /// <summary>

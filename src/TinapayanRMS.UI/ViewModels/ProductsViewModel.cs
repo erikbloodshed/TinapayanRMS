@@ -687,6 +687,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     // its category sets its own (EditingCategory.WastagePercent, 2026-10-29).
     private decimal _wastagePercent = CostingDefaults.DefaultWastagePercent;
 
+    // The shop's VAT (Settings → Costing Defaults), as of the last LoadCommand: what every product is priced with.
+    private decimal _vatPercent;
+
     /// <summary>What the Costing tab's rounded selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep).</summary>
     private decimal _priceRoundingStep;
 
@@ -1251,8 +1254,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 c => c.EditingLaborPercent,
                 c => c.EditingOverheadPercent,
                 c => c.EditingAdministrativePercent,
-                c => c.EditingMarginPercent,
-                c => c.EditingVatPercent)
+                c => c.EditingMarginPercent)
             .Where(_ => !IsRestoring)
             .Subscribe(_ => RecomputeCosts());
 
@@ -2899,10 +2901,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var untouchedNewProduct = _editingId == 0 && Costing.ShowsDefaults;
         Costing.SetDefaults(defaults);
         _defaultNewProductStage = defaults.NewProductStage;
-        if (_wastagePercent != defaults.WastagePercent || _priceRoundingStep != defaults.PriceRoundingStep)
+        if (_wastagePercent != defaults.WastagePercent || _vatPercent != defaults.VatPercent || _priceRoundingStep != defaults.PriceRoundingStep)
         {
             // Every product is priced with it, the one open included: its Costing tab follows at once.
             _wastagePercent = defaults.WastagePercent;
+            _vatPercent = defaults.VatPercent;
             _priceRoundingStep = defaults.PriceRoundingStep;
             RecomputeCosts();
         }
@@ -3270,7 +3273,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }
 
         sections.Sort(ProductUsageEdit.RecipeOrder);
-        var costing = content.Costing ?? new VersionCosting(0m, 0m, 0m, 0m, 0m);
+        var costing = content.Costing ?? new VersionCosting(0m, 0m, 0m, 0m);
         AsUndoStep(() =>
         {
             // The form goes, as any restore closes it: what it held comes back with Undo.
@@ -3281,7 +3284,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     CurrentPrice = content.CurrentPrice,
                     QuantityRequired = content.QuantityRequired,
                     IncludesComponentPackaging = content.IncludesComponentPackaging,
-                    Costing = (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent, costing.VatPercent),
+                    Costing = (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent),
                     Usages = sections,
                     SelectedTab = sections.Count > 0 ? new RecipeTabChoice.Usage(0)
                         : product.IsComposite ? new RecipeTabChoice.Components()
@@ -4576,6 +4579,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             PackagingCosts = [.. Packaging.LineEdits.Select(l => l.CostPerUnit)],
             ComponentPackaging = componentPackaging,
             WastagePercent = EditingCategory?.WastagePercent ?? _wastagePercent,
+            VatPercent = _vatPercent,
             PriceRoundingStep = _priceRoundingStep,
             CurrentPrice = EditingCurrentPrice,
             IsComposite = IsEditingComposite,

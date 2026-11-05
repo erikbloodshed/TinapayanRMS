@@ -190,8 +190,8 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Text="VAT %" Style="{StaticResource FormLabelStyle}" ToolTip="On top of the marked-up price" />
-                        <syncfusion:PercentTextBox Grid.Column="1" PercentDecimalDigits="1" PercentPositivePattern="1" MinValue="0" PercentValue="{Binding Costing.EditingVatPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" controls:FieldUndoStep.Recorder="{Binding}" />
+                        <TextBlock Text="VAT %" Style="{StaticResource FormLabelStyle}" ToolTip="The shop's VAT, on top of the marked-up price. It's the same for every product: set it in Settings → Costing Defaults." />
+                        <TextBlock Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,8,0" Foreground="{StaticResource ReadOnlyForegroundBrush}" Text="{Binding Costing.Costs.VatPercent, StringFormat='{}{0:0.#}%', Mode=OneWay}" ToolTip="The shop's VAT, the same for every product. Set it in Settings → Costing Defaults." />
                         <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Style="{StaticResource TileCaptionStyle}">
                             <Run Text="{Binding Costing.Costs.Vat, StringFormat='{}{0:N2}', Mode=OneWay}" /><Run Text="{Binding Costing.Costs.VatShare, StringFormat=' · {0:N1}% of the price', Mode=OneWay}" />
                         </TextBlock>

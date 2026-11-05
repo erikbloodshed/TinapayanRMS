@@ -271,7 +271,7 @@ On a new database, set things up in this order. Each step uses what the one befo
 2. **Material categories** (Settings → Material Categories): how raw materials are grouped, such as Flour, Dairy, In-House, Boxes and Ribbons. Each category is for ingredients, made ingredients or packaging.
 3. **Product categories** (Settings → Product Categories): how products are grouped, such as Breads, Cakes and Pastries.
 4. **Roles** (Settings → Roles): the parts of a recipe. Dough, Filling, Topping, Inclusion, Finishing and Packaging are there from the start.
-5. **Costing defaults** (Settings → Costing Defaults): the stage a new product goes in, the labour, overhead, administrative, markup and VAT percentages that it starts with, the cost buffer a new raw material starts with, and the shop's wastage.
+5. **Costing defaults** (Settings → Costing Defaults): the stage a new product goes in, the labour, overhead, administrative and markup percentages that it starts with, the cost buffer a new raw material starts with, and the shop's VAT and wastage.
 6. **Raw materials**: every purchased ingredient and packaging material with its prices, then the linked ingredients.
 7. **Sub-assemblies**: the doughs, fillings and packaging sets shared by more than one product, and the recipes of the shop's made ingredients, such as a syrup or an icing.
 8. **Made ingredients**, on the Raw Materials screen, each made from one of those sub-assemblies.
@@ -327,13 +327,14 @@ A role can't be deleted while any sub-assembly uses it.
 
 **New Products In** is where **New** on the Products screen files a product when you save it: **Production** (the default) or **Research and Development**. **New Product Here** still files it in the folder you picked it on, and a clone or variant still goes in Research and Development.
 
-Under it are the five percentages a **new** product's costing starts with:
+Under it are the four percentages a **new** product's costing starts with:
 
 - **Labor %**, **Overhead %** and **Administrative %** (office, permits, bookkeeping): each is a percentage of the product's sub-assemblies (ingredients) cost.
 - **Markup %**: added on the base cost (materials, wastage, labour, overhead and administrative).
-- **VAT %**: added on top of the marked-up price.
 
-Under them, **Wastage %** is the shop's [wastage](#wastage): a percentage of every product's sub-assemblies (ingredients) cost, added to its costing. It starts at 3%, and can be anything from 0 to 100. Unlike the other figures here, it isn't where a new product starts: **every** product is priced with it, saved ones included, unless its category sets its own (Settings → Product Categories), so changing it changes those products' costs and suggested prices.
+**VAT %** is the shop's VAT, added on top of every product's marked-up price. It isn't where a new product starts: **every** product is priced with it, saved ones included, so changing it changes every product's suggested price. A product's Costing tab shows it, but you change it only here.
+
+Under them, **Wastage %** is the shop's [wastage](#wastage): a percentage of every product's sub-assemblies (ingredients) cost, added to its costing. It starts at 3%, and can be anything from 0 to 100. Like the VAT, it isn't where a new product starts: **every** product is priced with it, saved ones included, unless its category sets its own (Settings → Product Categories), so changing it changes those products' costs and suggested prices.
 
 **Price Rounding** rounds a suggested price up to a price you'd charge: up to the next 0.25, 0.50, 1, 5 or 10, or **None** (the default). It's always rounded up, so the rounded price still earns at least the markup. The exact figures don't change: the rounded price is shown beside them, under the **Total Selling Price** on a product's Costing tab (*Rounded up to the next 0.25: 43.25*), in the **Rounded Price** column of Reports' Product Cost Summary, and in the Price Simulator.
 
@@ -727,7 +728,7 @@ Save needs at least **two different products** in a composite.
 
 ### Costing tab
 
-On the left are the product's four metrics, **Labor Metric**, **Overhead Metric**, **Admin Metric** and **Markup Metric**, then **VAT %**. A new product starts with the Costing Defaults.
+On the left are the product's four metrics, **Labor Metric**, **Overhead Metric**, **Admin Metric** and **Markup Metric**, then the shop's **VAT %**. A new product's metrics start with the Costing Defaults. The VAT is the same for every product: it's shown greyed here, and changed only in Settings → Costing Defaults.
 
 Each metric has two boxes. The first is its percentage, shown to one decimal with its % sign. The second is what that percentage comes to in pesos for one sellable unit, shown to two decimals. Type in either box and the other one follows. For example, with ₱20.00 of sub-assemblies, typing **5.00** in Labor Metric's peso box sets its percentage to **25.0%**.
 
@@ -736,7 +737,7 @@ Each metric has two boxes. The first is its percentage, shown to one decimal wit
 - Only the percentage is saved. If the recipe's cost changes later, the percentage stays and the peso amount changes with it.
 - A product with nothing in its recipe yet has no cost to take a percentage of, so its peso boxes stay at 0.00. Type the percentage instead.
 
-Under each metric is its share of the price. VAT has a percentage box only, with its amount in pesos and its share of the price under it.
+Under each metric is its share of the price. Under the VAT are its amount in pesos and its share of the price.
 
 On the right, the **Costing Summary** lists each component with its amount and its **% of Price**:
 
@@ -787,7 +788,7 @@ A composite product's clone or variant is a composite too, holding the same prod
 
 The History tab keeps a product's earlier versions, so you can see how its recipe and price changed and go back to an old one. It's shown for saved products only.
 
-**When a version is recorded.** Each **Save** that changes the product's recipe, packaging, costing percentages, Quantity Required or Current Price records a version. A Save that only renames the product, or changes its description or category, doesn't. Nor does a change in what its materials cost: that's what the **Today** columns show. The first time you save a product that has no versions yet, two are recorded: how it was before ("Before version history began") and how it is now.
+**When a version is recorded.** Each **Save** that changes the product's recipe, packaging, costing percentages, Quantity Required or Current Price records a version. A Save that only renames the product, or changes its description or category, doesn't. Nor does a change in what its materials cost: that's what the **Today** columns show. Nor does a change in the shop's VAT or wastage (Settings, or the product's category), but when one has changed between two versions, their list of changes ends with it, such as *VAT % (Settings): 12 → 10*, since it moves the price too. The first time you save a product that has no versions yet, two are recorded: how it was before ("Before version history began") and how it is now.
 
 **Changes made from somewhere else are recorded too**, with a note that says where they came from:
 
@@ -1089,7 +1090,7 @@ All figures below are per sellable unit.
 
 ### A worked example
 
-Say a product's sections cost **20.00** a piece, its packaging costs **2.00**, and it's sold by the piece. The shop's wastage is 3%, and the product's costing is Labor 25%, Overhead 10%, Administrative 5%, Markup 30% and VAT 12%.
+Say a product's sections cost **20.00** a piece, its packaging costs **2.00**, and it's sold by the piece. The shop's wastage is 3% and its VAT 12%, and the product's costing is Labor 25%, Overhead 10%, Administrative 5% and Markup 30%.
 
 | Step | Working | Amount |
 |---|---|---|

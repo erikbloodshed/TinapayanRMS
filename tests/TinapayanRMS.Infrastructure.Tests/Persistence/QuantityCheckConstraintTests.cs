@@ -103,7 +103,6 @@ public class QuantityCheckConstraintTests(DatabaseFixture fixture) : Persistence
     [InlineData(nameof(CostingParameters.OverheadPercent))]
     [InlineData(nameof(CostingParameters.AdministrativePercent))]
     [InlineData(nameof(CostingParameters.MarginPercent))]
-    [InlineData(nameof(CostingParameters.VatPercent))]
     public async Task A_costing_percent_cant_be_negative(string percent)
     {
         var productId = await AddProductAsync("Pandesal");
@@ -131,6 +130,10 @@ public class QuantityCheckConstraintTests(DatabaseFixture fixture) : Persistence
             UnitsPerPackagingUnit = unitsPerPackagingUnit,
         };
     }
+
+    [Fact]
+    public async Task The_shops_vat_cant_be_negative() =>
+        await SavingShouldBeRefusedByAsync("CK_CostingDefaults_VatPercent", new CostingDefaults { VatPercent = -100m });
 
     private async Task SavingShouldBeRefusedByAsync(string constraint, object row)
     {

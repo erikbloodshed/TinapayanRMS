@@ -280,20 +280,33 @@ public static class ProductVersionRules
 
     private static void AddCostingChanges(List<string> changes, VersionCosting? older, VersionCosting? newer)
     {
-        var was = older ?? new VersionCosting(0m, 0m, 0m, 0m, 0m);
-        var now = newer ?? new VersionCosting(0m, 0m, 0m, 0m, 0m);
+        var was = older ?? new VersionCosting(0m, 0m, 0m, 0m);
+        var now = newer ?? new VersionCosting(0m, 0m, 0m, 0m);
         AddPercent(changes, "Labor %", was.LaborPercent, now.LaborPercent);
         AddPercent(changes, "Overhead %", was.OverheadPercent, now.OverheadPercent);
         AddPercent(changes, "Admin %", was.AdministrativePercent, now.AdministrativePercent);
         AddPercent(changes, "Markup %", was.MarginPercent, now.MarginPercent);
-        AddPercent(changes, "VAT %", was.VatPercent, now.VatPercent);
+    }
 
-        static void AddPercent(List<string> changes, string label, decimal was, decimal now)
+    /// <summary>
+    /// What changed from <paramref name="older"/> to <paramref name="newer"/> in what the shop prices every product with
+    /// rather than in the product, so the price a version shows moves with nothing in <see cref="Changes"/> to say why: the
+    /// VAT, and the wastage (Settings', or its category's). Shown with its changes, never counted as one: a Save records no
+    /// version for these alone.
+    /// </summary>
+    public static IReadOnlyList<string> ShopChanges(ProductVersionContent older, ProductVersionContent newer)
+    {
+        List<string> changes = [];
+        AddPercent(changes, "VAT % (Settings)", older.VatThen, newer.VatThen);
+        AddPercent(changes, "Wastage % (Settings or its category)", older.WastagePercent ?? 0m, newer.WastagePercent ?? 0m);
+        return changes;
+    }
+
+    private static void AddPercent(List<string> changes, string label, decimal was, decimal now)
+    {
+        if (was != now)
         {
-            if (was != now)
-            {
-                changes.Add($"{label}: {Amount(was)} → {Amount(now)}");
-            }
+            changes.Add($"{label}: {Amount(was)} → {Amount(now)}");
         }
     }
 

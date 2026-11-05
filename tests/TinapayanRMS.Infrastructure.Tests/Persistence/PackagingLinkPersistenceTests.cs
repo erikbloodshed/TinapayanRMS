@@ -207,7 +207,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
             [new LinkedUsageDraft(linkedDoughId, UsageAuthoredField.WeightPerPiece, 40m)]));
         await CreatePackagingLineRepository().SetLinesAsync(otherId, [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)], Cancellation);
         await CreatePackagingLinkRepository().SetLinkAsync(sourceId, otherId, Cancellation);
-        await CreateCostingParametersRepository().SetAsync(sourceId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1.25m, marginPercent: 40m, vatPercent: 12m, Cancellation);
+        await CreateCostingParametersRepository().SetAsync(sourceId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1.25m, marginPercent: 40m, Cancellation);
 
         var cloneId = await CreateProductCloner().CloneAsync(sourceId, "Clone Of Source", Cancellation);
 

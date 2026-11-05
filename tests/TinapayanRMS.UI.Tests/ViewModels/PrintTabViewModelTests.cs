@@ -234,10 +234,11 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
 
     private async Task SetCostingAsync(int productId)
     {
+        await SetVatAsync(12m);
         await using var dbContext = CreateDbContext();
         dbContext.CostingParameters.Add(new CostingParameters
         {
-            ProductId = productId, LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 30m, VatPercent = 12m,
+            ProductId = productId, LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 30m,
         });
         await dbContext.SaveChangesAsync(Cancellation);
     }

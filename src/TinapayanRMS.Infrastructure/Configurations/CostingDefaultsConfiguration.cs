@@ -38,6 +38,10 @@ public sealed class CostingDefaultsConfiguration : IEntityTypeConfiguration<Cost
             // A share of the ingredient cost added on top of it (CostingRules.EnsureValidWastage).
             t.HasCheckConstraint("CK_CostingDefaults_WastagePercent", "wastage_percent >= 0 AND wastage_percent <= 100");
 
+            // Backstop for CostingRules.EnsureValidVat: every product's current price has the VAT taken out by dividing by
+            // 1 + VAT%, on every read.
+            t.HasCheckConstraint("CK_CostingDefaults_VatPercent", "vat_percent >= 0");
+
             // A material's own range (CK_RawMaterials_CostBufferPercent): a new one starts at it.
             t.HasCheckConstraint("CK_CostingDefaults_CostBufferPercent", "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");
 

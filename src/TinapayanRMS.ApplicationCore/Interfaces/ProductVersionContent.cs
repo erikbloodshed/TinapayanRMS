@@ -16,9 +16,10 @@ public sealed record ProductVersionContent
 {
     /// <summary>
     /// The shape written today. A later change of shape bumps it, so an old snapshot can still be read. 2 (2026-11-05):
-    /// each section keeps its label (VersionSection.Label), which 1 read from the sub-assembly's name.
+    /// each section keeps its label (VersionSection.Label), which 1 read from the sub-assembly's name. 3 (2026-11-05): the
+    /// VAT is the shop's (<see cref="VatPercent"/>), where 2 and before kept the product's own in its costing.
     /// </summary>
-    public const int CurrentSchema = 2;
+    public const int CurrentSchema = 3;
 
     public int Schema { get; init; } = CurrentSchema;
 
@@ -44,6 +45,15 @@ public sealed record ProductVersionContent
     /// like a material's price. A version saved before then has a ShrinkagePercent on each section, which is ignored.
     /// </summary>
     public decimal? WastagePercent { get; init; }
+
+    /// <summary>
+    /// The shop's VAT it was priced with then (CostingDefaults.VatPercent); null for a version saved while each product had
+    /// its own, which its costing kept (VersionCosting.VatPercent). Not part of its recipe, as the wastage isn't.
+    /// </summary>
+    public decimal? VatPercent { get; init; }
+
+    /// <summary>The VAT it was priced with then: the shop's, or before that its costing's own; 0 when it had none.</summary>
+    public decimal VatThen => VatPercent ?? Costing?.VatPercent ?? 0m;
 
     /// <summary>Its sub-assemblies, in the order they were read.</summary>
     public IReadOnlyList<VersionSection> Sections { get; init; } = [];
@@ -86,9 +96,10 @@ public sealed record ProductVersionContent
 [JsonSerializable(typeof(ProductVersionContent))]
 internal sealed partial class ProductVersionJsonContext : JsonSerializerContext;
 
-/// <summary>The five costing percentages (CostingParameters).</summary>
+/// <summary>The costing percentages (CostingParameters).</summary>
+/// <param name="VatPercent">The product's own VAT, in a snapshot from before VAT was the shop's (ProductVersionContent.VatPercent); null since.</param>
 public sealed record VersionCosting(
-    decimal LaborPercent, decimal OverheadPercent, decimal AdministrativePercent, decimal MarginPercent, decimal VatPercent);
+    decimal LaborPercent, decimal OverheadPercent, decimal AdministrativePercent, decimal MarginPercent, decimal? VatPercent = null);
 
 /// <summary>
 /// One sub-assembly in the recipe, as the product used it: its own (<see cref="IsOwn"/>) or linked, at the product's piece

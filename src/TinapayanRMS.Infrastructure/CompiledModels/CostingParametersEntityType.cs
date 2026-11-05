@@ -21,7 +21,7 @@ public partial class CostingParametersEntityType
             "TinapayanRMS.Domain.Entities.CostingParameters",
             typeof(CostingParameters),
             baseEntityType,
-            propertyCount: 7,
+            propertyCount: 6,
             navigationCount: 1,
             foreignKeyCount: 1,
             unnamedIndexCount: 1,
@@ -90,17 +90,6 @@ public partial class CostingParametersEntityType
             sentinel: 0);
         productId.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         productId.AddAnnotation("Relational:ColumnName", "product_id");
-
-        var vatPercent = runtimeEntityType.AddProperty(
-            "VatPercent",
-            typeof(decimal),
-            propertyInfo: typeof(CostingParameters).GetProperty("VatPercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            fieldInfo: typeof(CostingParameters).GetField("<VatPercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            precision: 18,
-            scale: 4,
-            sentinel: 0m);
-        vatPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
-        vatPercent.AddAnnotation("Relational:ColumnName", "vat_percent");
 
         var key = runtimeEntityType.AddKey(
             new[] { id });

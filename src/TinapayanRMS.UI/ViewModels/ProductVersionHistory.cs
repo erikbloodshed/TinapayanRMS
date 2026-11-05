@@ -105,11 +105,12 @@ public sealed class ProductVersionRow : ReactiveObject
         CostBasis basis,
         IReadOnlyDictionary<int, RawMaterial> materialsNow,
         IReadOnlyDictionary<int, ComponentCosts> componentCostsNow,
-        decimal wastagePercentNow)
+        decimal wastagePercentNow,
+        decimal vatPercentNow)
     {
         var (product, detail) = ProductVersionSnapshot.ToDetail(productId, Content);
         Then = SavedProductReader.Build(product, detail, basis).Costs;
-        var (_, detailNow) = ProductVersionSnapshot.ToDetail(productId, Content, componentCostsNow, wastagePercentNow);
+        var (_, detailNow) = ProductVersionSnapshot.ToDetail(productId, Content, componentCostsNow, wastagePercentNow, vatPercentNow);
         Today = SavedProductReader.Build(product, detailNow, basis, materialsNow).Costs;
     }
 }
@@ -155,6 +156,9 @@ public sealed class ProductVersionHistory : ReactiveObject
 
     /// <summary>The shop-wide wastage as it is now, which the product as it's saved now was read with: what today's figures add.</summary>
     private decimal WastageNow => _current?.WastagePercent ?? 0m;
+
+    /// <summary>The shop's VAT as it is now, which the product as it's saved now was read with: what today's figures add.</summary>
+    private decimal VatNow => _current?.VatThen ?? 0m;
     private IReadOnlyDictionary<int, RawMaterial> _materialsNow = new Dictionary<int, RawMaterial>();
     private IReadOnlyDictionary<int, ComponentCosts> _componentCostsNow = new Dictionary<int, ComponentCosts>();
 
@@ -203,12 +207,18 @@ public sealed class ProductVersionHistory : ReactiveObject
     }
 
     private IReadOnlyList<string> _changes = [];
-    /// <summary>What changed, one line each (ProductVersionRules.Changes).</summary>
+    /// <summary>
+    /// What changed, one line each: the product's changes (ProductVersionRules.Changes), then the shop's figures it was priced
+    /// with that changed between them (ProductVersionRules.ShopChanges), which move its price too.
+    /// </summary>
     public IReadOnlyList<string> Changes
     {
         get => _changes;
         private set => this.RaiseAndSetIfChanged(ref _changes, value);
     }
+
+    private static IReadOnlyList<string> ChangesBetween(ProductVersionContent older, ProductVersionContent newer) =>
+        [.. ProductVersionRules.Changes(older, newer), .. ProductVersionRules.ShopChanges(older, newer)];
 
     private string _changesCaption = string.Empty;
     /// <summary>What <see cref="Changes"/> compares, or why there's nothing to list.</summary>
@@ -266,7 +276,7 @@ public sealed class ProductVersionHistory : ReactiveObject
         _basis = basis;
         foreach (var row in rows)
         {
-            row.Price(productId, basis, materialsNow, componentCostsNow, WastageNow);
+            row.Price(productId, basis, materialsNow, componentCostsNow, WastageNow, VatNow);
         }
 
         Rows.Clear();
@@ -288,7 +298,7 @@ public sealed class ProductVersionHistory : ReactiveObject
         _basis = basis;
         foreach (var row in Rows)
         {
-            row.Price(_productId, basis, _materialsNow, _componentCostsNow, WastageNow);
+            row.Price(_productId, basis, _materialsNow, _componentCostsNow, WastageNow, VatNow);
         }
 
         RefreshTrend();
@@ -346,7 +356,7 @@ public sealed class ProductVersionHistory : ReactiveObject
             }
 
             var (older, newer) = other.Number < row.Number ? (other, row) : (row, other);
-            Changes = ProductVersionRules.Changes(older.Content, newer.Content);
+            Changes = ChangesBetween(older.Content, newer.Content);
             ChangesCaption = Changes.Count == 0
                 ? $"{older.Title} and {newer.Title.ToLowerInvariant()} have the same recipe and price."
                 : $"From {older.Title.ToLowerInvariant()} to {newer.Title.ToLowerInvariant()}:";
@@ -355,7 +365,7 @@ public sealed class ProductVersionHistory : ReactiveObject
 
         if (_compareWith == VersionComparison.Current)
         {
-            Changes = _current is null ? [] : ProductVersionRules.Changes(row.Content, _current);
+            Changes = _current is null ? [] : ChangesBetween(row.Content, _current);
             ChangesCaption = Changes.Count == 0
                 ? $"The product as saved now has the same recipe and price as {row.Title.ToLowerInvariant()}."
                 : $"From {row.Title.ToLowerInvariant()} to the product as saved now:";
@@ -371,7 +381,7 @@ public sealed class ProductVersionHistory : ReactiveObject
         }
 
         var previous = Rows[index + 1];
-        Changes = ProductVersionRules.Changes(previous.Content, row.Content);
+        Changes = ChangesBetween(previous.Content, row.Content);
         ChangesCaption = $"From {previous.Title.ToLowerInvariant()} to {row.Title.ToLowerInvariant()}:";
     }
 }

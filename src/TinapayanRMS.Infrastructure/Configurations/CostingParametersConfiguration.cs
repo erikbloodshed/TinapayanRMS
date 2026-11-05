@@ -8,11 +8,10 @@ public sealed class CostingParametersConfiguration : IEntityTypeConfiguration<Co
 {
     public void Configure(EntityTypeBuilder<CostingParameters> builder)
     {
-        // Backstop for CostingRules.EnsureValidParameters: a current price has its VAT taken out by dividing by 1 + VAT%, on
-        // every read of the product.
+        // Backstop for CostingRules.EnsureValidParameters.
         builder.ToTable(t => t.HasCheckConstraint(
             "CK_CostingParameters_Percents",
-            "labor_percent >= 0 AND overhead_percent >= 0 AND administrative_percent >= 0 AND margin_percent >= 0 AND vat_percent >= 0"));
+            "labor_percent >= 0 AND overhead_percent >= 0 AND administrative_percent >= 0 AND margin_percent >= 0"));
 
         // One-to-one with Product: deleting the product takes its costing parameters with it.
         builder.HasOne(c => c.Product)

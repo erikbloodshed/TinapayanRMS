@@ -12,6 +12,5 @@ public sealed class CostingParametersValidator : AbstractValidator<CostingParame
         RuleFor(c => c.OverheadPercent).GreaterThanOrEqualTo(0m).WithMessage("Overhead percent can't be negative.");
         RuleFor(c => c.AdministrativePercent).GreaterThanOrEqualTo(0m).WithMessage("Administrative percent can't be negative.");
         RuleFor(c => c.MarginPercent).GreaterThanOrEqualTo(0m).WithMessage("Margin percent can't be negative.");
-        RuleFor(c => c.VatPercent).GreaterThanOrEqualTo(0m).WithMessage("VAT percent can't be negative.");
     }
 }

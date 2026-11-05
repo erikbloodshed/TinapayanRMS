@@ -120,7 +120,6 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
                     OverheadPercent = costing.OverheadPercent,
                     AdministrativePercent = costing.AdministrativePercent,
                     MarginPercent = costing.MarginPercent,
-                    VatPercent = costing.VatPercent,
                 },
                 cancellationToken);
         }

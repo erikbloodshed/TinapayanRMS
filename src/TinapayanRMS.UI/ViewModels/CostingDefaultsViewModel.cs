@@ -134,14 +134,13 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
-            // The same checks, and messages, as a product's own costing.
+            // The same checks, and messages, as a product's own costing; the VAT and the rest are the repository's to check.
             var validation = _validator.Validate(new CostingParameters
             {
                 LaborPercent = EditingLaborPercent,
                 OverheadPercent = EditingOverheadPercent,
                 AdministrativePercent = EditingAdministrativePercent,
                 MarginPercent = EditingMarginPercent,
-                VatPercent = EditingVatPercent,
             });
             if (!validation.IsValid)
             {
@@ -163,7 +162,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
                     PriceRoundingStep = EditingPriceRounding.Step,
                 },
                 CancellationToken.None);
-            SuccessMessage = "Costing defaults saved. New products and raw materials start with them, and every product is priced with the wastage.";
+            SuccessMessage = "Costing defaults saved. New products and raw materials start with them, and every product is priced with the VAT and the wastage.";
         }));
 
         RecalculateCostsCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>

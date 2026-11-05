@@ -34,7 +34,7 @@ public class CostingRulesTests
     [Fact]
     public void EnsureValidParameters_rejects_negative_labor_cost()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborPercent: -1m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: 0m, vatPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborPercent: -1m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: 0m);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -42,7 +42,7 @@ public class CostingRulesTests
     [Fact]
     public void EnsureValidParameters_rejects_negative_overhead_cost()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: -1m, administrativePercent: 0m, marginPercent: 0m, vatPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: -1m, administrativePercent: 0m, marginPercent: 0m);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -50,7 +50,7 @@ public class CostingRulesTests
     [Fact]
     public void EnsureValidParameters_rejects_negative_administrative_cost()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: -1m, marginPercent: 0m, vatPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: -1m, marginPercent: 0m);
 
         act.Should().Throw<InvalidOperationException>();
     }
@@ -58,23 +58,25 @@ public class CostingRulesTests
     [Fact]
     public void EnsureValidParameters_rejects_negative_margin_percent()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: -5m, vatPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: -5m);
 
         act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void EnsureValidParameters_rejects_negative_vat_percent()
+    public void EnsureValidVat_rejects_a_negative_vat_and_accepts_none()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: 0m, vatPercent: -1m);
+        var negative = () => CostingRules.EnsureValidVat(-1m);
+        var none = () => CostingRules.EnsureValidVat(0m);
 
-        act.Should().Throw<InvalidOperationException>();
+        negative.Should().Throw<InvalidOperationException>();
+        none.Should().NotThrow();
     }
 
     [Fact]
     public void EnsureValidParameters_accepts_zeroes()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: 0m, vatPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: 0m);
 
         act.Should().NotThrow();
     }

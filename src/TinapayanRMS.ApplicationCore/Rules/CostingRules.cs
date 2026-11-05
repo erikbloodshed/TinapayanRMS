@@ -2,16 +2,25 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 
 public static class CostingRules
 {
-    public static void EnsureValidParameters(decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent, decimal vatPercent)
+    public static void EnsureValidParameters(decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent)
     {
         if (laborPercent < 0 || overheadPercent < 0 || administrativePercent < 0)
         {
             throw new BusinessRuleException("Labor, overhead and administrative percentages can't be negative.");
         }
 
-        if (marginPercent < 0 || vatPercent < 0)
+        if (marginPercent < 0)
         {
-            throw new BusinessRuleException("Margin and VAT percentages can't be negative.");
+            throw new BusinessRuleException("The markup percentage can't be negative.");
+        }
+    }
+
+    /// <summary>The shop's VAT (CostingDefaults.VatPercent), which every product is priced with: 0 or more.</summary>
+    public static void EnsureValidVat(decimal vatPercent)
+    {
+        if (vatPercent < 0)
+        {
+            throw new BusinessRuleException("The VAT percentage can't be negative.");
         }
     }
 

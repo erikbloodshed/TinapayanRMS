@@ -24,6 +24,9 @@ public sealed record ProductDetail(
     /// </summary>
     public decimal WastagePercent { get; init; }
 
+    /// <summary>The VAT it's priced with: the shop's (CostingDefaults.VatPercent); today's, or a version's then.</summary>
+    public decimal VatPercent { get; init; }
+
     /// <summary>What its rounded selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep): today's; 0 for a version's.</summary>
     public decimal PriceRoundingStep { get; init; }
 }
@@ -168,6 +171,7 @@ public sealed class SavedProductReader(
             {
                 // Its category's, when that sets one (2026-10-29); a composite's own, never its products'.
                 WastagePercent = categoryWastage.TryGetValue(productId, out var wastage) ? wastage : costingDefaults.WastagePercent,
+                VatPercent = costingDefaults.VatPercent,
                 PriceRoundingStep = costingDefaults.PriceRoundingStep,
                 Components =
                 [
@@ -351,7 +355,7 @@ public sealed class SavedProductReader(
             OverheadPercent = costing?.OverheadPercent ?? 0m,
             AdministrativePercent = costing?.AdministrativePercent ?? 0m,
             MarginPercent = costing?.MarginPercent ?? 0m,
-            VatPercent = costing?.VatPercent ?? 0m,
+            VatPercent = detail.VatPercent,
             WastagePercent = detail.WastagePercent,
             PriceRoundingStep = detail.PriceRoundingStep,
             CurrentPrice = product.CurrentPrice,

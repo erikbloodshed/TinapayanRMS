@@ -12,5 +12,5 @@ public interface ICostingParametersRepository
 
     /// <summary>Adds or updates the product's one CostingParameters row (a 1-to-1 settings record, not a list).</summary>
     Task SetAsync(
-        int productId, decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent, decimal vatPercent, CancellationToken cancellationToken);
+        int productId, decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent, CancellationToken cancellationToken);
 }

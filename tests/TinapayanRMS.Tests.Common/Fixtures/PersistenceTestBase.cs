@@ -150,11 +150,24 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
 
     /// <summary>
     /// Settings' shop-wide Wastage % set to <paramref name="wastagePercent"/>, which every product is priced with: 3% until
-    /// something is saved. The other defaults are left as a database with nothing saved has them. Set it before the screen
-    /// or reader that prices a product reads it.
+    /// something is saved. The other defaults stay as they are. Set it before the screen or reader that prices a product
+    /// reads it.
     /// </summary>
-    protected Task SetWastageAsync(decimal wastagePercent) =>
-        new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(new CostingDefaults { WastagePercent = wastagePercent }, Cancellation);
+    protected Task SetWastageAsync(decimal wastagePercent) => ChangeDefaultsAsync(defaults => defaults.WastagePercent = wastagePercent);
+
+    /// <summary>
+    /// Settings' shop VAT set to <paramref name="vatPercent"/>, which every product is priced with: none until something is
+    /// saved. The other defaults stay as they are. Set it before the screen or reader that prices a product reads it.
+    /// </summary>
+    protected Task SetVatAsync(decimal vatPercent) => ChangeDefaultsAsync(defaults => defaults.VatPercent = vatPercent);
+
+    private async Task ChangeDefaultsAsync(Action<CostingDefaults> change)
+    {
+        var repository = new CostingDefaultsRepository(CreateDbContextFactory());
+        var defaults = await repository.GetAsync(Cancellation);
+        change(defaults);
+        await repository.SetAsync(defaults, Cancellation);
+    }
 
     /// <summary>No wastage on any product, as a test's figures assume when they're about something else.</summary>
     protected Task WithoutWastageAsync() => SetWastageAsync(0m);

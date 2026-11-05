@@ -226,7 +226,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         [
             (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m),
         ], Cancellation);
-        await CreateCostingParametersRepository().SetAsync(productId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, marginPercent: 40m, vatPercent: 12m, Cancellation);
+        await CreateCostingParametersRepository().SetAsync(productId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, marginPercent: 40m, Cancellation);
 
         await CreateProductRepository().DeletePermanentlyAsync(productId, Cancellation);
 
@@ -249,8 +249,8 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         var productId = await SeedProductAsync("Ensaymada");
         var repository = CreateCostingParametersRepository();
 
-        await repository.SetAsync(productId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, marginPercent: 40m, vatPercent: 12m, Cancellation);
-        await repository.SetAsync(productId, laborPercent: 6m, overheadPercent: 3m, administrativePercent: 1.5m, marginPercent: 35m, vatPercent: 12m, Cancellation);
+        await repository.SetAsync(productId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, marginPercent: 40m, Cancellation);
+        await repository.SetAsync(productId, laborPercent: 6m, overheadPercent: 3m, administrativePercent: 1.5m, marginPercent: 35m, Cancellation);
 
         var parameters = await repository.GetForProductAsync(productId, Cancellation);
         parameters.Should().NotBeNull();
@@ -267,7 +267,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     {
         var productId = await SeedProductAsync("Ensaymada");
 
-        var act = () => CreateCostingParametersRepository().SetAsync(productId, laborPercent: -1m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: 0m, vatPercent: 0m, Cancellation);
+        var act = () => CreateCostingParametersRepository().SetAsync(productId, laborPercent: -1m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: 0m, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -277,7 +277,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     {
         var productId = await SeedProductAsync("Ensaymada");
 
-        var act = () => CreateCostingParametersRepository().SetAsync(productId, laborPercent: 0m, overheadPercent: 0m, administrativePercent: -1m, marginPercent: 0m, vatPercent: 0m, Cancellation);
+        var act = () => CreateCostingParametersRepository().SetAsync(productId, laborPercent: 0m, overheadPercent: 0m, administrativePercent: -1m, marginPercent: 0m, Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }

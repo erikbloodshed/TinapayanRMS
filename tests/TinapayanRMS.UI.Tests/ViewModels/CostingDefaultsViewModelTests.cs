@@ -118,7 +118,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
 
         await viewModel.SaveCommand.Execute();
 
-        viewModel.ErrorMessage.Should().Be("VAT percent can't be negative.");
+        viewModel.ErrorMessage.Should().Be("The VAT percentage can't be negative.");
         (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).VatPercent.Should().Be(0m);
     }
 

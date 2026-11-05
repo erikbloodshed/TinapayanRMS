@@ -85,7 +85,7 @@
                                                       MinValue="0"
                                                       Value="{Binding EditingMarginPercent, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                            <TextBlock Grid.Row="10" Text="VAT %" Style="{StaticResource FormLabelStyle}" ToolTip="On top of the marked-up price" />
+                            <TextBlock Grid.Row="10" Text="VAT %" Style="{StaticResource FormLabelStyle}" ToolTip="Every product's, not just new ones: the shop's VAT, on top of the marked-up price. Changing it reprices every product." />
                             <syncfusion:DoubleTextBox Grid.Row="10"
                                                       Grid.Column="1"
                                                       MinValue="0"

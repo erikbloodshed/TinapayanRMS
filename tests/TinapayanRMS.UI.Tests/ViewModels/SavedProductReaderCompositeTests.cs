@@ -20,7 +20,7 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
 {
     private static CostingParameters Costing() => new()
     {
-        LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 30m, VatPercent = 12m,
+        LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 30m,
     };
 
     /// <summary>
@@ -29,6 +29,8 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
     /// </summary>
     private async Task<(Product Ensaymada, Product CheeseRoll)> AddTwoProductsAsync()
     {
+        // The shop's VAT, which every product is priced with.
+        await SetVatAsync(12m);
         var doughRoleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.04m, bufferedCostPerGram: 0.05m);
         var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m);

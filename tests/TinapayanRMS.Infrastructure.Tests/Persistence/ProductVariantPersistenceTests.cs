@@ -230,7 +230,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         }
 
         var costingRepository = new CostingParametersRepository(CreateDbContextFactory());
-        await costingRepository.SetAsync(sourceId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, marginPercent: 40m, vatPercent: 12m, Cancellation);
+        await costingRepository.SetAsync(sourceId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, marginPercent: 40m, Cancellation);
 
         var variantId = await CreateVariantAsync(sourceId, "Ensaymada Small");
 

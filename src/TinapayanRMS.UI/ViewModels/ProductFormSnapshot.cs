@@ -60,7 +60,7 @@ public sealed record ProductFormSnapshot
     public required int? CategoryId { get; init; }
     public required string CloneName { get; init; }
 
-    public required (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) Costing { get; init; }
+    public required (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Costing { get; init; }
 
     /// <summary>Held by reference: a ProductUsageEdit is never changed in place, only replaced.</summary>
     public required IReadOnlyList<ProductUsageEdit> Usages { get; init; }

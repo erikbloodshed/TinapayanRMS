@@ -1,8 +1,9 @@
 namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>
-/// Labor, overhead, administrative, margin and VAT for one product's selling price. Always independent
-/// per product, even for a derived/linked product (Phase 10) — never live-templated.
+/// Labor, overhead, administrative and markup for one product's selling price. Always independent per product, even for
+/// a derived/linked product (Phase 10) — never live-templated. VAT isn't one of them: it's the shop's
+/// (CostingDefaults.VatPercent), as the wastage is.
 /// </summary>
 public sealed class CostingParameters
 {
@@ -23,7 +24,4 @@ public sealed class CostingParameters
 
     /// <summary>Markup on cost (materials + labor + overhead + administrative), as a percentage.</summary>
     public decimal MarginPercent { get; set; }
-
-    /// <summary>Added on top of the marked-up price, as a percentage.</summary>
-    public decimal VatPercent { get; set; }
 }

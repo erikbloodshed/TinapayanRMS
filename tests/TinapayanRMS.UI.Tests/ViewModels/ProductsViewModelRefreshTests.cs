@@ -1857,6 +1857,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     public async Task The_current_price_shows_the_markup_it_earns_as_it_is_typed_and_Save_keeps_it()
     {
         await WithoutWastageAsync();
+        await SetVatAsync(12m);
         var roleId = await AddRoleAsync("Filling");
         var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.25m);
         await AddProductWithSubAssemblyAsync("Ube pandesal", roleId, [(ubeId, 100m)], weightPerPiece: 10m);
@@ -1866,7 +1867,6 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedProduct = viewModel.Products.Single();
         await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
         viewModel.Costing.EditingLaborPercent = 100m;
-        viewModel.Costing.EditingVatPercent = 12m;
         viewModel.Costing.Costs.BaseCost.Should().Be(5m, "₱2.50 of filling and as much again in labor");
         viewModel.Costing.Costs.CurrentMarkupPercent.Should().BeNull("no current price is entered");
 
@@ -2203,8 +2203,9 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await viewModel.LoadCommand.Execute();
 
-        (viewModel.Costing.EditingLaborPercent, viewModel.Costing.EditingOverheadPercent, viewModel.Costing.EditingAdministrativePercent, viewModel.Costing.EditingMarginPercent, viewModel.Costing.EditingVatPercent)
-            .Should().Be((25m, 10m, 5m, 40m, 12m), "the screen opens on a new product");
+        (viewModel.Costing.EditingLaborPercent, viewModel.Costing.EditingOverheadPercent, viewModel.Costing.EditingAdministrativePercent, viewModel.Costing.EditingMarginPercent)
+            .Should().Be((25m, 10m, 5m, 40m), "the screen opens on a new product");
+        viewModel.Costing.Costs.VatPercent.Should().Be(12m, "every product is priced with the shop's VAT");
 
         viewModel.EditingName = "Pandesal";
         await viewModel.SaveCommand.Execute();
@@ -2212,7 +2213,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
         var costing = await dbContext.CostingParameters.SingleAsync(c => c.Product!.Name == "Pandesal", Cancellation);
-        (costing.LaborPercent, costing.MarginPercent, costing.VatPercent).Should().Be((25m, 40m, 12m));
+        (costing.LaborPercent, costing.MarginPercent).Should().Be((25m, 40m));
     }
 
     [Fact]
@@ -2241,7 +2242,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         // New starts from the latest defaults.
         await viewModel.NewCommand.Execute();
-        (viewModel.Costing.EditingLaborPercent, viewModel.Costing.EditingVatPercent).Should().Be((30m, 12m));
+        (viewModel.Costing.EditingLaborPercent, viewModel.Costing.Costs.VatPercent).Should().Be((30m, 12m));
     }
 
     private async Task<int> AddProductCategoryAsync(string name)

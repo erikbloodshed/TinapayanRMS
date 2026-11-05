@@ -91,7 +91,8 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
 
         // A 1,000 g / ₱50 dough at 50 g a piece, a ₱30 gift box a piece, and 25% labor, 10% overhead and 5% admin, at the
-        // 3% wastage nothing saved in Settings gives.
+        // 3% wastage nothing saved in Settings gives, and the shop's 12% VAT.
+        await SetVatAsync(12m);
         var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", roleId, [(flourId, 1000m)], weightPerPiece: 50m);
         await using (var dbContext = CreateDbContext())
         {
@@ -109,7 +110,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
             });
             dbContext.CostingParameters.Add(new CostingParameters
             {
-                ProductId = ensaymadaId, LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 30m, VatPercent = 12m,
+                ProductId = ensaymadaId, LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 30m,
             });
             await dbContext.SaveChangesAsync(Cancellation);
         }

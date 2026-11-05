@@ -17,8 +17,8 @@ public sealed class CostingDefaultsRepository(IDbContextFactory<TinapayanRMSDbCo
 
     public async Task SetAsync(CostingDefaults defaults, CancellationToken cancellationToken)
     {
-        CostingRules.EnsureValidParameters(
-            defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent);
+        CostingRules.EnsureValidParameters(defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent);
+        CostingRules.EnsureValidVat(defaults.VatPercent);
         CostingRules.EnsureValidWastage(defaults.WastagePercent);
         CostingRules.EnsureValidPriceRoundingStep(defaults.PriceRoundingStep);
         RawMaterialRules.EnsureValidCostBuffer(defaults.CostBufferPercent);

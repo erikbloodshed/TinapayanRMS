@@ -13,10 +13,10 @@ namespace TinapayanRMS.UI.ViewModels;
 public sealed class ProductCosting : ReactiveObject
 {
     /// <summary>What a new product's costing starts with (Settings → Costing Defaults), as of the screen's last load.</summary>
-    private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) _defaults;
+    private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) _defaults;
 
     /// <summary>The costing as loaded, so Save only sends it when it changed.</summary>
-    private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) _saved;
+    private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) _saved;
 
     private decimal _editingLaborPercent;
     public decimal EditingLaborPercent
@@ -44,13 +44,6 @@ public sealed class ProductCosting : ReactiveObject
     {
         get => _editingMarginPercent;
         set => this.RaiseAndSetIfChanged(ref _editingMarginPercent, value);
-    }
-
-    private decimal _editingVatPercent;
-    public decimal EditingVatPercent
-    {
-        get => _editingVatPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingVatPercent, value);
     }
 
     // Each metric's value box: its percentage as pesos for one sellable unit. Typing an amount sets the percentage that
@@ -106,11 +99,11 @@ public sealed class ProductCosting : ReactiveObject
         }
     }
 
-    /// <summary>The five percentages as typed, for an undo step to keep and put back (ProductFormSnapshot.Costing).</summary>
-    public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin, decimal Vat) Percentages
+    /// <summary>The four percentages as typed, for an undo step to keep and put back (ProductFormSnapshot.Costing).</summary>
+    public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Percentages
     {
-        get => (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent);
-        set => (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent, EditingVatPercent) = value;
+        get => (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent);
+        set => (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent) = value;
     }
 
     /// <summary>Whether the percentages differ from the costing as loaded: what Save sends only then.</summary>
@@ -126,7 +119,6 @@ public sealed class ProductCosting : ReactiveObject
         OverheadPercent = EditingOverheadPercent,
         AdministrativePercent = EditingAdministrativePercent,
         MarginPercent = EditingMarginPercent,
-        VatPercent = EditingVatPercent,
     };
 
     /// <summary>Shows a product's costing as saved, none for all zero, and makes it what Save compares against.</summary>
@@ -136,8 +128,7 @@ public sealed class ProductCosting : ReactiveObject
             costing?.LaborPercent ?? 0m,
             costing?.OverheadPercent ?? 0m,
             costing?.AdministrativePercent ?? 0m,
-            costing?.MarginPercent ?? 0m,
-            costing?.VatPercent ?? 0m);
+            costing?.MarginPercent ?? 0m);
         _saved = Percentages;
     }
 
@@ -149,11 +140,11 @@ public sealed class ProductCosting : ReactiveObject
 
     /// <summary>Takes up the defaults as the screen's load read them, for the next new product.</summary>
     public void SetDefaults(CostingDefaults defaults) =>
-        _defaults = (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent);
+        _defaults = (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent);
 
     /// <summary>
-    /// The cost summary from <paramref name="recipe"/>, the recipe and product figures as the screen has them now, at the
-    /// percentages as typed here.
+    /// The cost summary from <paramref name="recipe"/>, the recipe and product figures as the screen has them now with the
+    /// shop's VAT and wastage, at the percentages as typed here.
     /// </summary>
     public void Recompute(ProductCostInputs recipe) =>
         Costs = new ProductCostSummary(recipe with
@@ -162,6 +153,5 @@ public sealed class ProductCosting : ReactiveObject
             OverheadPercent = EditingOverheadPercent,
             AdministrativePercent = EditingAdministrativePercent,
             MarginPercent = EditingMarginPercent,
-            VatPercent = EditingVatPercent,
         });
 }

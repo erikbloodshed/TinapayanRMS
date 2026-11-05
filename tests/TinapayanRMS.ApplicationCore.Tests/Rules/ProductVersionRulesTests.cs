@@ -164,6 +164,24 @@ public class ProductVersionRulesTests
     }
 
     [Fact]
+    public void The_shops_vat_and_wastage_are_shop_changes_not_the_products()
+    {
+        // Base is a snapshot from before VAT was the shop's: its costing kept the product's own 12%.
+        var later = Base with
+        {
+            Schema = ProductVersionContent.CurrentSchema,
+            Costing = new VersionCosting(25m, 10m, 5m, 30m),
+            VatPercent = 10m,
+            WastagePercent = 5m,
+        };
+
+        ProductVersionRules.Changes(Base, later).Should().BeEmpty("neither is the product's");
+        ProductVersionRules.IsSameRecipe(Base, later).Should().BeTrue("a Save records no version for the shop's figures alone");
+        ProductVersionRules.ShopChanges(Base, later).Should().Equal("VAT % (Settings): 12 → 10", "Wastage % (Settings or its category): 0 → 5");
+        ProductVersionRules.ShopChanges(later, later).Should().BeEmpty();
+    }
+
+    [Fact]
     public void No_costing_saved_is_the_same_as_all_zero()
     {
         var none = Base with { Costing = null };

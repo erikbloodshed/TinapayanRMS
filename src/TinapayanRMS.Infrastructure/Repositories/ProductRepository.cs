@@ -267,7 +267,6 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
                     OverheadPercent = costing.OverheadPercent,
                     AdministrativePercent = costing.AdministrativePercent,
                     MarginPercent = costing.MarginPercent,
-                    VatPercent = costing.VatPercent,
                 },
                 cancellationToken);
         }

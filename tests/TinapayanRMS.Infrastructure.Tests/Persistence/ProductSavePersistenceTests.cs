@@ -63,7 +63,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
                 [new LinkedUsageDraft(linkedFillingId, UsageAuthoredField.WeightPerPiece, 10m)]),
             null,
             [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)],
-            new CostingParameters { LaborPercent = 6m, OverheadPercent = 5.5m, AdministrativePercent = 3.5m, MarginPercent = 30m, VatPercent = 12m },
+            new CostingParameters { LaborPercent = 6m, OverheadPercent = 5.5m, AdministrativePercent = 3.5m, MarginPercent = 30m },
             Cancellation);
 
         product.Id.Should().Be(0, "the caller's entity is only read");
@@ -84,7 +84,6 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var costing = (await CreateCostingParametersRepository().GetForProductAsync(id, Cancellation))!;
         costing.LaborPercent.Should().Be(6m);
         costing.AdministrativePercent.Should().Be(3.5m);
-        costing.VatPercent.Should().Be(12m);
     }
 
     [Fact]
@@ -95,7 +94,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         var boxId = await SeedBoxAsync();
         var (productId, custardId) = await AddProductWithSubAssemblyAsync("Ensaymada", fillingRoleId, [(sugarId, 100m)]);
         await CreatePackagingLineRepository().SetLinesAsync(productId, [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)], Cancellation);
-        await CreateCostingParametersRepository().SetAsync(productId, 5m, 3m, 1m, 40m, 12m, Cancellation);
+        await CreateCostingParametersRepository().SetAsync(productId, 5m, 3m, 1m, 40m, Cancellation);
 
         await CreateProductRepository().SaveAsync(
             new Product { Id = productId, Name = "Custard Ensaymada" },

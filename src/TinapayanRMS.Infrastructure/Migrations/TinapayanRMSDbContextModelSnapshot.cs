@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261105040552_StoreSectionNames";
+    public override string LastMigrationId => "20261105043804_ShopVat";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -97,6 +97,8 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
                         t.HasCheckConstraint("CK_CostingDefaults_SingleRow", "id = 1");
 
+                        t.HasCheckConstraint("CK_CostingDefaults_VatPercent", "vat_percent >= 0");
+
                         t.HasCheckConstraint("CK_CostingDefaults_WastagePercent", "wastage_percent >= 0 AND wastage_percent <= 100");
                     });
             });
@@ -134,11 +136,6 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("integer")
                     .HasColumnName("product_id");
 
-                b.Property<decimal>("VatPercent")
-                    .HasPrecision(18, 4)
-                    .HasColumnType("numeric(18,4)")
-                    .HasColumnName("vat_percent");
-
                 b.HasKey("Id")
                     .HasName("pk_costing_parameters");
 
@@ -148,7 +145,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
                 b.ToTable("costing_parameters", t =>
                     {
-                        t.HasCheckConstraint("CK_CostingParameters_Percents", "labor_percent >= 0 AND overhead_percent >= 0 AND administrative_percent >= 0 AND margin_percent >= 0 AND vat_percent >= 0");
+                        t.HasCheckConstraint("CK_CostingParameters_Percents", "labor_percent >= 0 AND overhead_percent >= 0 AND administrative_percent >= 0 AND margin_percent >= 0");
                     });
             });
 
