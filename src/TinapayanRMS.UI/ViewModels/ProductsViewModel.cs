@@ -1077,59 +1077,23 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .AutoRefresh(l => l.IngredientId)
             .AutoRefresh(l => l.Grams)
             .AutoRefresh(l => l.IsFormulaBase)
-            .Subscribe(_ =>
-            {
-                if (IsRestoring)
-                {
-                    return;
-                }
-
-                IngredientLineRow.Resolve(UsageForm.FormLines, Ingredients.ToDictionary(m => m.Id));
-                FormLinesChanged();
-            });
+            .Subscribe(_ => _updates.Run(FormLinesEdited));
 
         // An add-in picked, typed or deleted: it's priced, and the batch it joins follows.
         UsageForm.FormAddIns.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
             .AutoRefresh(l => l.Grams)
-            .Subscribe(_ =>
-            {
-                if (IsRestoring)
-                {
-                    return;
-                }
-
-                IngredientLineRow.Resolve(UsageForm.FormAddIns, Ingredients.ToDictionary(m => m.Id));
-                FormLinesChanged();
-            });
+            .Subscribe(_ => _updates.Run(FormAddInsEdited));
 
         // A packaging line picked, typed or deleted in the add form: it's priced, and the preview follows.
         UsageForm.FormPackagingLines.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
             .AutoRefresh(l => l.CostPerUnit)
-            .Subscribe(_ =>
-            {
-                if (IsRestoring)
-                {
-                    return;
-                }
-
-                PackagingLineRow.Resolve(UsageForm.FormPackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
-                UsageForm.Recompute();
-            });
+            .Subscribe(_ => _updates.Run(FormPackagingEdited));
 
         // Whether the form adds packaging follows its mode, role and source.
         this.WhenAnyValue(x => x.UsageForm.IsAddingUsage, x => x.UsageForm.EditingUsageMode, x => x.UsageForm.EditingUsageRole, x => x.UsageForm.EditingUsageSource)
-            .Subscribe(_ =>
-            {
-                if (IsRestoring)
-                {
-                    return;
-                }
-
-                UsageForm.RaisePackagingChanged();
-                UsageForm.Recompute();
-            });
+            .Subscribe(_ => _updates.Run(FormAddsChanged));
 
         LoadLatest(
             UsageForm.SourcePicks.Where(_ => UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage),
@@ -1152,16 +1116,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         Packaging.LineEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
             .AutoRefresh(l => l.CostPerUnit)
-            .Subscribe(_ =>
-            {
-                if (IsRestoring)
-                {
-                    return;
-                }
-
-                PackagingLineRow.Resolve(Packaging.LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
-                RecomputeCosts();
-            });
+            .Subscribe(_ => _updates.Run(PackagingLinesEdited));
 
         // A composite's line picked, typed or deleted in its Products table: it's priced once its product's recipe cost
         // has been read (a new pick's is read then), and the composite's costs follow.
@@ -1176,35 +1131,22 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 nameof(ProductComponentRow.Quantity),
                 nameof(ProductComponentRow.RecipeCost),
                 nameof(ProductComponentRow.PackagingCost)))
-            .Subscribe(_ =>
-            {
-                if (IsRestoring)
-                {
-                    return;
-                }
-
-                ComponentsTable.ResolveRows();
-                ComponentsTable.ReadMissingCosts();
-                RecomputeCosts();
-            });
+            .Subscribe(_ => _updates.Run(ComponentsEdited));
 
         Costing.WhenAnyValue(
                 c => c.EditingLaborPercent,
                 c => c.EditingOverheadPercent,
                 c => c.EditingAdministrativePercent,
                 c => c.EditingMarginPercent)
-            .Where(_ => !IsRestoring)
-            .Subscribe(_ => RecomputeCosts());
+            .Subscribe(_ => _updates.Run(RecomputeCosts));
 
         // The category too: it can set the Wastage % the product is priced with.
         this.WhenAnyValue(x => x.EditingCurrentPrice, x => x.EditingQuantityRequired, x => x.EditingCategory)
-            .Where(_ => !IsRestoring)
-            .Subscribe(_ => RecomputeCosts());
+            .Subscribe(_ => _updates.Run(RecomputeCosts));
 
         // A composite's products' packaging joining its own, or leaving it.
         this.WhenAnyValue(x => x.EditingIncludesComponentPackaging)
-            .Where(_ => !IsRestoring)
-            .Subscribe(_ => RecomputeCosts());
+            .Subscribe(_ => _updates.Run(RecomputeCosts));
 
         // The caption on every figure names what it's for, so it follows the quantity, and a composite's is always one unit.
         this.WhenAnyValue(x => x.EditingQuantityRequired, x => x.IsEditingComposite)
@@ -2693,8 +2635,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>
     /// Puts the whole form back as <paramref name="snapshot"/> had it. Order matters throughout, and is explained
-    /// step by step below; the one recompute runs at the end, outside IsRestoring, so the figures are worked out
-    /// once from the restored form rather than over and over from a half-restored one.
+    /// step by step below. Every figure the writes would work out again waits for the end (_updates' batch), so the
+    /// figures are worked out once from the restored form rather than over and over from a half-restored one.
     /// </summary>
     /// <param name="settledThen">What Save measured against when <paramref name="snapshot"/> was taken, or null.</param>
     private void RestoreSnapshot(ProductFormSnapshot snapshot, ProductFormSnapshot? settledThen)
@@ -2702,7 +2644,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // A message about a form that no longer exists would outlive what it was about.
         ErrorMessage = null;
 
-        ApplyRestore(() =>
+        ApplyRestore(() => _updates.Batch(() =>
         {
             // 1. The form goes first. EditingUsage has to be null before the sections are replaced: the tab mirror
             //    refills FormLines from a section that replaces the one being edited, which would undo this restore.
@@ -2814,9 +2756,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 ? UsageEdits[usageIndex]
                 : null;
             UsageForm.IsUsageFormOpen = snapshot.IsUsageFormOpen;
-        });
+        }));
 
-        // 8. One pass over the restored form, outside the guard. FormLinesChanged is the screen's own "the lines
+        // 8. One pass over the restored form, after the batch. FormLinesChanged is the screen's own "the lines
         //    changed, bring everything into line" entry point: it raises what the form's tables show, works the
         //    derived piece-size figure out again, and runs the single ApplyFormulaBase pass that gives every row
         //    back its BaseWeight and BatchWeight.
@@ -3884,6 +3826,55 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         && UsageForm.FormAddIns.All(l => l.IngredientId is null && l.Grams == 0)
         && UsageForm.FormPackagingLines.All(l => l.PackagingMaterialId is null && l.QtyPerUnit == 0)
         && IsPieceSizeAsStarted(UsageForm.EditingUsageRole);
+
+    /// <summary>The screen's derived updates, run as their inputs change, or once at the end of a restore.</summary>
+    private readonly DerivedUpdates _updates = new();
+
+    /// <summary>A line picked, typed or deleted in the form's table: it's priced, and the batch and preview follow.</summary>
+    private void FormLinesEdited()
+    {
+        IngredientLineRow.Resolve(UsageForm.FormLines, Ingredients.ToDictionary(m => m.Id));
+        FormLinesChanged();
+    }
+
+    /// <summary>An add-in picked, typed or deleted: it's priced, and the batch it joins follows.</summary>
+    private void FormAddInsEdited()
+    {
+        IngredientLineRow.Resolve(UsageForm.FormAddIns, Ingredients.ToDictionary(m => m.Id));
+        FormLinesChanged();
+    }
+
+    /// <summary>A packaging line picked, typed or deleted in the add form: it's priced, and the preview follows.</summary>
+    private void FormPackagingEdited()
+    {
+        PackagingLineRow.Resolve(UsageForm.FormPackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
+        UsageForm.Recompute();
+    }
+
+    /// <summary>Whether the form adds packaging follows its mode, role and source.</summary>
+    private void FormAddsChanged()
+    {
+        UsageForm.RaisePackagingChanged();
+        UsageForm.Recompute();
+    }
+
+    /// <summary>A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.</summary>
+    private void PackagingLinesEdited()
+    {
+        PackagingLineRow.Resolve(Packaging.LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
+        RecomputeCosts();
+    }
+
+    /// <summary>
+    /// A composite's line picked, typed or deleted in its Products table: it's priced once its product's recipe cost has
+    /// been read (a new pick's is read then), and the composite's costs follow.
+    /// </summary>
+    private void ComponentsEdited()
+    {
+        ComponentsTable.ResolveRows();
+        ComponentsTable.ReadMissingCosts();
+        RecomputeCosts();
+    }
 
     /// <summary>The form's lines changed, or its source's were loaded: the batch weight, the other piece-size figure and the preview follow.</summary>
     private void FormLinesChanged()
