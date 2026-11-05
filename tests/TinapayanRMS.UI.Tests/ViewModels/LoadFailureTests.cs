@@ -53,6 +53,39 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         viewModel.ErrorMessage.Should().BeNull("a load that works takes away the error a failed one left");
     }
 
+    // While a picked product's details are on their way the form still holds the product before's, which a Save would
+    // write under the new one's name. Typing then isn't an unsaved change (the history records nothing until they come),
+    // so Save stays off, rather than on and doing nothing as a review of the code had read it (2026-11-05).
+    [Fact]
+    public async Task Products_Save_stays_off_while_the_picked_products_details_are_on_their_way()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        foreach (var name in new[] { "Almond Bread", "Banana Bread" })
+        {
+            await AddProductWithSubAssemblyAsync(name, roleId, [new RecipeLine(flourId, 1000m)]);
+        }
+
+        var factory = new FailingDbContextFactory(CreateDbContextFactory());
+        var viewModel = CreateProductsViewModel(factory);
+        await viewModel.LoadCommand.Execute();
+        Product Named(string name) => viewModel.Products.Single(p => p.Name == name);
+        await PickAsync(() => viewModel.SelectedProduct = Named("Almond Bread"), () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
+
+        var hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        factory.Hold = hold;
+        viewModel.SelectedProduct = Named("Banana Bread");
+        viewModel.AreDetailsReady.Should().BeFalse("Banana Bread's details are still on their way");
+        viewModel.EditingName = "Banana Loaf";
+
+        viewModel.History.IsDirty.Should().BeFalse("the history records nothing until the details come");
+        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeFalse("what the form holds isn't Banana Bread's to save");
+
+        factory.Hold = null;
+        hold.SetResult();
+        await PickAsync(() => { }, () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
+    }
+
     [Fact]
     public async Task Raw_materials_a_pick_that_fails_to_load_says_so_and_the_next_pick_loads()
     {

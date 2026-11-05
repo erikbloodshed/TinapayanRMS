@@ -1417,8 +1417,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
         {
-            // The picked product's details haven't replaced the previous one's yet: saving now would write that
-            // recipe under this product's name. The moment passes in a fraction of a second.
+            // The picked product's details haven't replaced the previous one's yet: saving now would write that recipe
+            // under this product's name. Save is off then, since the history records nothing until they come, so nothing
+            // is unsaved (UndoHistory's canRecord); this is the backstop for an Execute that doesn't ask.
             if (!AreDetailsReady)
             {
                 return;
@@ -1531,7 +1532,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // Print shows the product as the screen does, unsaved edits and all (the user's choice, 2026-09-27). A form left
         // open is part of that, as it's part of what Save writes, so it's applied first; a rule refusing it shows its
         // message, and the Print tab doesn't open. It stays enabled while a picked product's details are on their way,
-        // as Save does, and does nothing if clicked then: disabled for that moment, it flickered on every pick.
+        // and does nothing if clicked then: disabled for that moment, it flickered on every pick. (Save is off then
+        // anyway, with nothing unsaved, so it doesn't flicker.)
         PrintCommand = ReactiveCommand.CreateFromTask(
             () => RunSafelyAsync(() =>
             {
