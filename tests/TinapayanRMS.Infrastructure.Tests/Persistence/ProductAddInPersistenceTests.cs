@@ -14,7 +14,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// not the sub-assembly, so two products linking the same dough each keep their own and neither moves the
 /// dough's stored batch. Written with the rest of the recipe (ProductRepository.SaveAsync).
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class ProductAddInPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductSubAssemblyUsageRepository CreateUsageRepository() => new(CreateDbContextFactory());

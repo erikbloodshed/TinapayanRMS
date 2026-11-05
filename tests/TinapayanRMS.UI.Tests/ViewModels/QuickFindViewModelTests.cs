@@ -9,7 +9,7 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>Find (Ctrl+K): every raw material, standalone sub-assembly and product by name, best first.</summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

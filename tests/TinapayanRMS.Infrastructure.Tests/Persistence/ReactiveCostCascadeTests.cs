@@ -19,7 +19,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// -> a product's live-read packaging cost) needs no propagation code of its own, since
 /// nothing in it is stored redundantly.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateIngredientRepository() => new(CreateDbContextFactory());

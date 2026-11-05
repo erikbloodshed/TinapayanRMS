@@ -23,7 +23,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// itself, and what each item does, run as the menu runs it. A recipe only moves between recipe roles, and a packaging set
 /// stays in the Packaging role.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

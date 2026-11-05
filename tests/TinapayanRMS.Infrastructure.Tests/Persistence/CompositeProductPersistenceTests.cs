@@ -15,7 +15,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// sellable units (ProductComponent), and its own packaging, saved with the rest of the product
 /// (IProductRepository.SaveAsync, the recipe's Components), cloned with it, and guarding the products it holds.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class CompositeProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateRepository() => new(CreateDbContextFactory());

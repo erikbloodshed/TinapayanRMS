@@ -15,7 +15,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// (SubAssemblyRepository), linked or copied by products, kept linked by a clone, and repriced by the ingredient
 /// cost cascade.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRepository CreateRepository() => new(CreateDbContextFactory());

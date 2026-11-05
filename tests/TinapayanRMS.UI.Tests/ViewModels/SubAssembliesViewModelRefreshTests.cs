@@ -20,7 +20,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// and lines; coming back to the tab (LoadCommand) keeps unsaved lines and reprices them; Delete is refused
 /// while a product links it.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

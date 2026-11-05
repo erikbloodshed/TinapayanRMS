@@ -22,7 +22,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// folder and the list itself, and what each item does, run as the menu runs it. Moves and renames save at once; the
 /// notice of a move can take it back; the folders left open open again next time.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

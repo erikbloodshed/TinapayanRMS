@@ -1,0 +1,80 @@
+<#
+.SYNOPSIS
+    Runs one test project's tests again each time you change its code, within seconds and without a rebuild where it can:
+    Microsoft.Testing.Platform's hot reload, under dotnet watch.
+
+.DESCRIPTION
+    Starts the test project under dotnet watch with hot reload on (TESTINGPLATFORM_HOTRELOAD_ENABLED). A change to a
+    method's body, in the tests or the code they test, is applied to the tests running, and they run again. A change
+    hot reload can't apply (a new method, type or parameter, a XAML file) makes dotnet watch rebuild and start them again
+    (DOTNET_WATCH_RESTART_ON_RUDE_EDIT), which takes longer. Stop it with Ctrl+C.
+
+    Give it a class or a test to keep each run short: with neither, every test in the project runs after each change,
+    about 3 minutes for UI.Tests.
+
+    While it runs it holds the project's build and uses its test databases, so stop it before building or testing that
+    project another way: a second run would reset the databases under this one's tests. Test-Changed.ps1 refuses to run
+    it meanwhile.
+
+.PARAMETER Project
+    The test project: UI, Infrastructure, Pricing, Mcp, RecipeApi or ApplicationCore (with or without .Tests).
+
+.PARAMETER Class
+    Only classes whose name matches, as dotnet test's --filter-class: "*ProductsViewModelRefreshTests".
+
+.PARAMETER Method
+    Only tests whose name matches, as dotnet test's --filter-method: "*keeps_the_selection*". Give a class or a method,
+    not both: together they ran nothing.
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 UI -Class "*ProductsViewModelRefreshTests"
+#>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory, Position = 0)]
+    [string]$Project,
+    [string[]]$Class,
+    [string[]]$Method
+)
+
+$ErrorActionPreference = 'Stop'
+$repo = Split-Path -Parent $PSScriptRoot
+
+# Spelled as the caller's terminal spells the repo's folder, drive letter's case and all, or the watcher's build would
+# recompile every project, and the next build from the terminal would again (see Test-Changed.ps1).
+$here = [Environment]::CurrentDirectory
+$repoAsCalled = if ($here.StartsWith($repo, [StringComparison]::OrdinalIgnoreCase)) { $here.Substring(0, $repo.Length) } else { $repo }
+
+$name = 'TinapayanRMS.' + ($Project -replace '^TinapayanRMS\.', '' -replace '\.Tests$', '') + '.Tests'
+$path = Join-Path $repoAsCalled "tests\$name\$name.csproj"
+if (-not (Test-Path -LiteralPath $path)) {
+    $known = (Get-ChildItem (Join-Path $repo 'tests') -Directory -Filter '*.Tests' | ForEach-Object { $_.Name -replace '^TinapayanRMS\.', '' -replace '\.Tests$', '' }) -join ', '
+    Write-Output "There's no test project $name. The test projects: $known."
+    exit 1
+}
+if ($Class -and $Method) {
+    Write-Output 'Give -Class or -Method, not both: together they ran no tests.'
+    exit 1
+}
+
+$running = Get-Process -Name $name -ErrorAction SilentlyContinue
+if ($running) {
+    Write-Output "$name is running already (process $($running[0].Id)). Stop it first: both would reset the same test databases."
+    exit 1
+}
+
+$arguments = @()
+foreach ($pattern in $Class) {
+    $arguments += '--filter-class', $pattern
+}
+foreach ($pattern in $Method) {
+    $arguments += '--filter-method', $pattern
+}
+if ($arguments.Count -eq 0) {
+    Write-Output "No -Class or -Method, so every test in $name runs after each change."
+}
+
+$env:TESTINGPLATFORM_HOTRELOAD_ENABLED = '1'
+$env:DOTNET_WATCH_RESTART_ON_RUDE_EDIT = '1'
+& dotnet watch --project $path run -- @arguments
+exit $LASTEXITCODE

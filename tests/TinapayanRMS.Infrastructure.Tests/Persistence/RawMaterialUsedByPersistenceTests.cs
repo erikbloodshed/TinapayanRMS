@@ -13,7 +13,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Raw Materials' Used By (IRawMaterialRepository.GetUsedByAsync): every product a material's cost goes into, through a
 /// recipe or packaging, directly or through the made and linked ingredients, packaging sets and packaging links between.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());

@@ -27,7 +27,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 ///
 /// The last few cover whether Save has anything to write, which is measured against the same snapshots.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

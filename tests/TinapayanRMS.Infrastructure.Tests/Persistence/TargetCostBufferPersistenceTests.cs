@@ -10,7 +10,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// A purchased material's target buffer, the one last typed for it, which IRawMaterialRepository.ReapplyTargetBuffersAsync puts
 /// back on top of its dearest brand once rising prices have worn its fixed buffered cost down.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class TargetCostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());

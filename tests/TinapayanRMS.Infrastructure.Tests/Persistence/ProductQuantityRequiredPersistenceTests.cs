@@ -16,7 +16,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// for one whole unit. A "Box of 8" is a variant of the single with a quantity of 8 and a packaging set of
 /// its own, not a pack row hanging off it.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class ProductQuantityRequiredPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());

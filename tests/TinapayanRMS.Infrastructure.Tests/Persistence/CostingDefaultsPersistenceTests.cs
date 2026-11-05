@@ -13,7 +13,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// in Settings: one row, reading as new products in Production, the costing at zero, the wastage at 3% and the buffer at
 /// 10% until first saved.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private CostingDefaultsRepository CreateRepository() => new(CreateDbContextFactory());

@@ -15,7 +15,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// be the base of one formula and an extra in another. It rides along with the lines wherever they go —
 /// saved with the recipe, read back, and carried into a copy — and never touches cost.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private async Task<IReadOnlyList<SubAssemblyLine>> LinesAsync(int subAssemblyId)

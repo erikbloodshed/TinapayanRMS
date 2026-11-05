@@ -16,7 +16,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// sub-assembly, which stays as it is, in a Made category with no weight loss, so nothing's cost moves. Refused, either
 /// writes nothing.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static NewSubAssemblyDraft Section(

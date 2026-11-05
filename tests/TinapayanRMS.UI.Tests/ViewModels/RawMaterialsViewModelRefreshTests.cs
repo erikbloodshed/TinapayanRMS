@@ -21,7 +21,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// BOM, the usage example, the empty form a new material starts with, and how its type decides which of
 /// its fields apply.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

@@ -19,7 +19,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// deliberately outside it: its Delete writes to the database on the spot, so there is nothing unsaved for an
 /// undo to put back.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.A)]
 public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

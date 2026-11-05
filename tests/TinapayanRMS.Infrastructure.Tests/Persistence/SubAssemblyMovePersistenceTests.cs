@@ -13,7 +13,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// What the Sub-Assemblies list saves at once, without the form's Save: sub-assemblies dragged or moved into another role
 /// (MoveAsync), and one renamed from its menu (RenameAsync). Each changes that one thing, through the checks Save makes.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class SubAssemblyMovePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRepository CreateRepository() => new(CreateDbContextFactory());

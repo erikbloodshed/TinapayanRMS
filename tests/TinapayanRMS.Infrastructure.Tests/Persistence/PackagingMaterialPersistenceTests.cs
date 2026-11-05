@@ -8,7 +8,7 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());

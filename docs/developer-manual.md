@@ -184,6 +184,8 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 | One test project | `dotnet test --project tests/TinapayanRMS.ApplicationCore.Tests` |
 | One test class | `dotnet test --project tests/TinapayanRMS.ApplicationCore.Tests --filter-class "*UnitConversionRulesTests"` |
 | One test | `dotnet test --project tests/TinapayanRMS.UI.Tests --filter-method "*Declining_the_question_saves_nothing"` |
+| Only the test projects your changes reach (see [Running fewer tests while developing](#running-fewer-tests-while-developing)) | `powershell -ExecutionPolicy Bypass -File scripts/Test-Changed.ps1` |
+| One class again each time you save, by hot reload | `powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 UI -Class "*ProductsViewModelRefreshTests"` |
 | Coverage (a Cobertura report in `TestResults/`) | `dotnet test --solution TinapayanRMS.slnx --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml` |
 | Add a migration | `dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure` |
 | Check the model matches the migrations | `dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infrastructure` |
@@ -195,7 +197,7 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 | Run the Recipe API (see [The Recipe API](#the-recipe-api)), then try it | `dotnet run --project src/TinapayanRMS.RecipeApi`, then `curl http://localhost:5290/api/v1/mixes` |
 | Install the Recipe API for this Windows user, starting at sign-in (in an administrator PowerShell to let the LAN in) | `powershell -ExecutionPolicy Bypass -File scripts/Install-RecipeApi.ps1` |
 
-The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test.runner`). VSTest-style flags such as `--filter` and `--collect` don't work: use the `--filter-*` options and `--coverage` instead.
+The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test.runner`). VSTest-style flags such as `--filter` and `--collect` don't work: use the `--filter-*` options and `--coverage` instead. A test project run directly (`dotnet run`, or its `.exe`) runs on it too, with the same options (`UseMicrosoftTestingPlatformRunner` in `tests/Directory.Build.props`, 2026-11-05); before, that ran xUnit's own console runner, whose options are `-class` and `-xml`.
 
 Close any copy of the app you have running before you build. A running app locks its own output files.
 
@@ -1082,7 +1084,7 @@ Retired on 2026-10-31: production planning moved to TinapayanBMS (`../TinapayanB
 ### How the tests work
 
 - **Nothing is mocked.** Rules are tested as pure functions. Repositories, services and ViewModels are tested on a real PostgreSQL database that Respawn resets before every test. Grid behaviours are tested in real `SfDataGrid`s in windows placed off-screen.
-- **Each database-backed project has its own database**: `tinapayanrms_test_infrastructure`, `tinapayanrms_test_ui`, `tinapayanrms_test_pricing`, `tinapayanrms_test_mcp` and `tinapayanrms_test_recipeapi`. `dotnet test --solution` runs the projects side by side, and a shared database would be reset under the other project's running test.
+- **Each database-backed project has its own database**: `tinapayanrms_test_infrastructure`, `tinapayanrms_test_ui`, `tinapayanrms_test_pricing`, `tinapayanrms_test_mcp` and `tinapayanrms_test_recipeapi`. `dotnet test --solution` runs the projects side by side, and a shared database would be reset under the other project's running test. `UI.Tests` and `Infrastructure.Tests` have four database collections each, `DatabaseCollection.A` to `D`, and each collection has a database of its own (the project's, then `_2` to `_4`), so their database tests run four at a time (2026-11-05). With one collection, those tests ran one after another and took about 7 of the suite's 7½ minutes. It now takes 4 to 6 on this PC, depending on what else is running: with everything at once its processor is the limit (85% on average, paging hard with 8 GB).
 - **Each database is migrated once per test run**, by the fixture's `MigrateAsync`.
 - **Respawn clears every table** except `__EFMigrationsHistory` before each test (it truncates them, and tries again if PostgreSQL ends the truncate as a deadlock with a read the last test left running). That includes rows the migrations seeded, so a test creates every row it needs.
 
@@ -1096,13 +1098,21 @@ Retired on 2026-10-31: production planning moved to TinapayanBMS (`../TinapayanB
 | `RecipeApi.Tests` | `Endpoints/` (`RecipeApiTests`): each endpoint served in memory on the API's read-only connection, the key when one is set, and the connection refusing a write | PostgreSQL |
 | `Tests.Common` | Nothing: it's the shared fixture library | — |
 
+### Running fewer tests while developing
+
+The whole suite takes 4 to 6 minutes on this PC. While you work, two scripts run less of it (2026-11-05). Before a commit or a merge, run it all: both pick by project or by name, so they can miss a test of something a change reaches some other way.
+
+- **[scripts/Test-Changed.ps1](../scripts/Test-Changed.ps1) runs the test projects your changes can reach.** It takes the files changed since `-Since` (`HEAD` by default, so what isn't committed yet, new files included; `-Since main` for the whole branch) and runs every test project that references, directly or through others, a project one of them is in. It reads the references from the `.csproj` files, so it needs no list of its own. A change to the UI runs `UI.Tests` alone (about 3 minutes, where all of them take 4 to 6); one to `Pricing` runs Pricing, UI, Mcp and RecipeApi's tests; one to `Domain`, `ApplicationCore`, a build setting (`Directory.Build.props`, `Directory.Packages.props`, `global.json`, `.editorconfig`, the solution) or a file outside the projects runs them all. A file another project links in counts for it too: the UI's `appsettings.json` reaches every database test project, through `Tests.Common`. Docs, `scripts/` and `.claude/` run nothing. Several projects run side by side from one `dotnet test`, through a solution filter it writes to `%TEMP%`. `-List` says what it would run and why, and runs nothing; `-Class "*ProductsViewModel*"` runs only matching classes, a project with none passing with "Zero tests ran".
+- **[scripts/Watch-Tests.ps1](../scripts/Watch-Tests.ps1) runs one class again each time you save**, by Microsoft.Testing.Platform's hot reload (`Microsoft.Testing.Extensions.HotReload`, in every test project; it does nothing unless `TESTINGPLATFORM_HOTRELOAD_ENABLED` is `1`, which only this script sets). It starts the project under `dotnet watch`: a change to a method's body, in a test or the code it tests, is applied to the running tests, which run again; anything hot reload can't apply (a new method, type or parameter, a XAML file) makes `dotnet watch` rebuild and start them again (`DOTNET_WATCH_RESTART_ON_RUDE_EDIT`). Measured on `SubAssemblyRolesViewModelTests` (8 tests): 94 seconds to start, most of it the build, then a broken assertion failed 17 seconds after the save and passed 7 seconds after it was put back. Give it `-Class` or `-Method`, not both; with neither, the whole project runs after each save. Stop it with Ctrl+C.
+- **Don't run a project two ways at once.** A watcher holds its project's build, so a `dotnet build` of it fails on locked files, and it uses the project's test databases, so a second run would reset them under its tests. `Test-Changed.ps1` and `Watch-Tests.ps1` refuse to start while that project's tests are running already.
+- **Both hand `dotnet` the repo's path as your terminal spells it.** The build records each project's folder with its drive letter's case, so `C:\…` after `c:\…` would recompile every project (see "Build configuration").
 ### The database fixtures
 
 - **[DatabaseFixtureBase](../tests/TinapayanRMS.Tests.Common/Fixtures/DatabaseFixtureBase.cs)** (in Tests.Common) reads the app's connection string, swaps in the project's database name, migrates the database, and resets it with Respawn.
-- **`DatabaseFixture`** and **`DatabaseCollection`** are defined in each project's own `Fixtures/` folder, because xUnit only finds a collection definition in the tests' own assembly. Each `DatabaseFixture` is one line that names its database.
+- **`DatabaseFixture`** and **`DatabaseCollection`** are defined in each project's own `Fixtures/` folder, because xUnit only finds a collection definition in the tests' own assembly. Each `DatabaseFixture` is one line that names its database. xUnit makes a collection fixture once for each collection, and `DatabaseFixtureBase` gives the first one of a run the name as it is and the next ones the name with `_2`, `_3` and so on, so each collection has a database of its own.
 - **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()` (the app's own `SharedTransactionDbContextFactory`, optionally on a `TestClock`), `CreateUnitOfWork()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`. With nothing saved in Settings, every product is priced with the 3% default wastage; a test whose figures are about something else calls `WithoutWastageAsync()` (or `SetWastageAsync`) before the screen or reader reads it.
 - **[ThrowawayDatabase](../tests/TinapayanRMS.Tests.Common/Fixtures/ThrowawayDatabase.cs)** is a migrated database of one test's own on the same server (`tinapayanrms_test_backup_` and eight characters of a GUID), dropped when the test is done. The backup tests restore over it, which would put every other test out of the shared database.
-- **Every concrete test class must carry `[Collection(DatabaseCollection.Name)]`.** It's deliberately left off the base class: xUnit isn't guaranteed to honour it there, and without it tests could run in parallel against the one database.
+- **Every concrete test class must carry `[Collection(DatabaseCollection.Name)]`**, or in `UI.Tests` and `Infrastructure.Tests` one of `DatabaseCollection.A` to `D`. It's deliberately left off the base class: xUnit isn't guaranteed to honour it there, and without it tests could run in parallel against one database. The four are balanced by how long their classes take, so put a new class in the one with least in it (`Infrastructure.Tests`' A is `DatabaseBackupsTests`' alone). A class's own tests always run one at a time.
 
 ### Writing tests
 
@@ -1141,7 +1151,7 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class ProductCategoryRenamePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
@@ -1162,7 +1172,7 @@ public class ProductCategoryRenamePersistenceTests(DatabaseFixture fixture) : Pe
 A ViewModel test builds the ViewModel on real repositories, stands in for the dialogs, and drives its commands. Abridged from [SubAssemblyRolesViewModelTests](../tests/TinapayanRMS.UI.Tests/ViewModels/SubAssemblyRolesViewModelTests.cs):
 
 ```csharp
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRolesViewModel CreateViewModel(bool confirm)

@@ -13,7 +13,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// RawMaterialRepository.SaveAsync, the Raw Materials screen's one Save: a material with its alternative
 /// units, a new price and its BOM, written in one transaction.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);

@@ -13,7 +13,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// is ₱0.09 a gram, and egg white (70% of its weight, 30% of its cost) and egg yolk (30%, 70%) are costed from
 /// it, follow it through the cascade, and together can't take more than all of it.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     /// <summary>Stored costs keep 4 decimal places, so a share that doesn't divide evenly is compared to within one of them.</summary>

@@ -15,7 +15,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// Settings' Roles tab and its Product-owned option: shown for the role picked, saved with it, asked about first when
 /// it moves sub-assemblies (saying how many), and never offered for the Packaging role.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRolesViewModel CreateViewModel(bool confirm, List<string>? asked = null)

@@ -15,7 +15,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// product it holds brings its recipe cost, as its own Costing tab's Sub-assemblies figure, times its quantity; its
 /// packaging stays out; a composite inside another brings its products'.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.A)]
 public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static CostingParameters Costing() => new()

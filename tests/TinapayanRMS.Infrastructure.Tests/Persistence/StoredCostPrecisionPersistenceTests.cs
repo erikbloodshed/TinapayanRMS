@@ -13,7 +13,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// stored to 20. Until 2026-10-03 the two were compared as they were, so a Save that changed nothing read the cost as
 /// changed: it logged the same price in price history again, and moved the cost's date.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class StoredCostPrecisionPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());

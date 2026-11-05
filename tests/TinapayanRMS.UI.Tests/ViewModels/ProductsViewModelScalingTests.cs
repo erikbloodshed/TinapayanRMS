@@ -19,7 +19,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// worked out while the tab shows and again as the form changes, made ingredients opening into their saved BOMs and a
 /// composite's products into their saved recipes. The number isn't part of the product.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class ProductsViewModelScalingTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

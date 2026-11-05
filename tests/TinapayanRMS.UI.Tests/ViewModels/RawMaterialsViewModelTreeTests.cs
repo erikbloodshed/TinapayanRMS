@@ -21,7 +21,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// Products list: what each menu offers a material, several materials, a folder and the list itself, and what each item
 /// does, run as the menu runs it. A material only moves between categories of its own type.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

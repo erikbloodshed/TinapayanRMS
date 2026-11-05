@@ -14,7 +14,7 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>Settings' Costing Defaults tab: loads what's saved, saves what's typed and picked, and refuses a negative percentage.</summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.A)]
 public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private CostingDefaultsViewModel CreateViewModel()

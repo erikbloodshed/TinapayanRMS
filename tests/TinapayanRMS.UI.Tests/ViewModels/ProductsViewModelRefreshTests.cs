@@ -24,7 +24,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// the product's own sub-assemblies (made in the form), the ones it links, and the rest. The Recipe
 /// Structure shows them in tabs, which keep their place through edits and refreshes.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.A)]
 public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

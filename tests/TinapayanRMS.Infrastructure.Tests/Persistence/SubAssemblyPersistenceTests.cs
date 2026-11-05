@@ -14,7 +14,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Sub-Assemblies screen, named after the product and their role, and linked: their lines in grams and totals, their
 /// names, links from other products, and what's kept when a section or a product goes.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRoleRepository CreateRoleRepository() => new(CreateDbContextFactory());

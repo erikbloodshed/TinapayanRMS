@@ -13,7 +13,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// What the Raw Materials list saves at once, without the form's Save: a material dragged or moved into another category
 /// (MoveAsync), and a material renamed from its menu (RenameAsync). Each changes that one thing and stamps UpdatedAt.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     /// <summary>The clock a move or rename stamps from, so the date it stamps is one the test can name.</summary>

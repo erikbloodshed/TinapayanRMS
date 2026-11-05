@@ -15,7 +15,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// A product's version history (ProductVersion): numbered per product, recorded only when the recipe or price differs
 /// from the latest, with a note that can be changed, and gone with the product when it's deleted for good.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class ProductVersionPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductVersionRepository CreateRepository() => new(CreateDbContextFactory());

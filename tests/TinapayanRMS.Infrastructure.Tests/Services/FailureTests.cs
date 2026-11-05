@@ -17,7 +17,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Services;
 /// DbUpdateException read "That name is already in use." and every driver exception "This item is currently in use elsewhere
 /// and can't be deleted.", whatever had happened, and a database that couldn't be reached among them.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

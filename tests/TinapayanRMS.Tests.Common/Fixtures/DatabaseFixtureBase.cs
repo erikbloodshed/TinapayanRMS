@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
@@ -14,10 +15,19 @@ namespace TinapayanRMS.Tests.Common.Fixtures;
 /// would be reset under another project's running test. No table carries migration-seeded
 /// baseline rows the tests rely on (UnitOfMeasure is fully user-managed, with no protected/well-known
 /// ids), so every table -- units_of_measure included -- gets the same full Respawn reset.
+/// <para>
+/// xUnit makes a collection fixture once for each collection, so a project with several database collections has one of
+/// these for each, and each takes a database of its own: the first the project's name, the next ones that name with _2,
+/// _3 and so on (2026-11-05). The collections then run side by side, where one database made every database test of a
+/// project run after the other.
+/// </para>
 /// </summary>
 public abstract class DatabaseFixtureBase : IAsyncLifetime
 {
     private static readonly string[] TablesExcludedFromReset = ["__EFMigrationsHistory"];
+
+    /// <summary>How many fixtures of this run have taken each project's database name.</summary>
+    private static readonly ConcurrentDictionary<string, int> FixturesByName = new();
 
     private Respawner _respawner = null!;
 
@@ -25,6 +35,12 @@ public abstract class DatabaseFixtureBase : IAsyncLifetime
 
     protected DatabaseFixtureBase(string databaseName)
     {
+        var number = FixturesByName.AddOrUpdate(databaseName, 1, (_, taken) => taken + 1);
+        if (number > 1)
+        {
+            databaseName = $"{databaseName}_{number}";
+        }
+
         var configuration = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: false)

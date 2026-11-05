@@ -14,7 +14,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// sub-assemblies and the ones it links), its packaging lines and its costing in one transaction, so a
 /// part that's rejected saves none of it.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());

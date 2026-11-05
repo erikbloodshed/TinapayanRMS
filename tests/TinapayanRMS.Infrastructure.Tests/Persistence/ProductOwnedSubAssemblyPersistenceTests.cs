@@ -16,7 +16,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// hands each of its sub-assemblies one product uses to that product, and one made not product-owned hands them back
 /// to the Sub-Assemblies screen; clones and variants get copies of their own.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRepository CreateSubAssemblyRepository() => new(CreateDbContextFactory());

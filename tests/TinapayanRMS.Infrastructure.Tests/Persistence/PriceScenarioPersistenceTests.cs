@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// The Price Simulator's saved scenarios: a name and its price changes, each kept as typed. Saving under a name already
 /// there replaces its changes, and deleting a material takes its changes out of every scenario.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class PriceScenarioPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static readonly DateTime SavedAt = new(2026, 10, 22, 9, 14, 0);

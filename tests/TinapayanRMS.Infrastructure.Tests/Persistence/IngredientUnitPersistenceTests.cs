@@ -9,7 +9,7 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialUnitRepository CreateRepository() => new(CreateDbContextFactory());

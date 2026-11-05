@@ -18,7 +18,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// The Price Simulator screen against a real database: a price change reaches made and linked ingredients and composites as
 /// a real one would, an untouched product prices exactly as Reports does, and nothing is saved.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     /// <summary>

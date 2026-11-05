@@ -22,7 +22,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Services;
 /// folder of its own under ProgramData, set up as the app's is. In the database collection, so they run one at a time with the other database tests: a restore
 /// clears every pooled connection.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.A)]
 public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;

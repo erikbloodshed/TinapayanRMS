@@ -8,7 +8,7 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private UnitOfMeasureRepository CreateRepository() => new(CreateDbContextFactory());

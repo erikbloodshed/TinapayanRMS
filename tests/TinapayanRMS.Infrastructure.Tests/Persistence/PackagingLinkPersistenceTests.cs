@@ -14,7 +14,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Derived products: a packaging link reads through to another product's packaging, and a clone is an
 /// independent copy — its own copy of every sub-assembly, with no links.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());
