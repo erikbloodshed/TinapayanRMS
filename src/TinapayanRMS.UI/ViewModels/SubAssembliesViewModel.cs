@@ -149,10 +149,31 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     public bool IsPackaging => EditingRole?.IsPackaging == true;
 
     private StandaloneSubAssemblyRow? _selectedRow;
+
+    /// <summary>
+    /// Each sub-assembly picked, by the user or for them (Open, a list pick), nothing picked included: what loads one into
+    /// the form. Fed by <see cref="SelectedRow"/>'s setter alone, starting with nothing picked.
+    /// </summary>
+    private readonly BehaviorSubject<StandaloneSubAssemblyRow?> _picks = new(null);
+
+    /// <summary>
+    /// The selection pointed at <paramref name="row"/> without it being a pick: a load's fresh copy of the one picked, Save's
+    /// reload (which loads the form itself), New's empty selection. The list follows; the form isn't loaded.
+    /// </summary>
+    private void RepointSelection(StandaloneSubAssemblyRow? row) => this.RaiseAndSetIfChanged(ref _selectedRow, row, nameof(SelectedRow));
     public StandaloneSubAssemblyRow? SelectedRow
     {
         get => _selectedRow;
-        set => this.RaiseAndSetIfChanged(ref _selectedRow, value);
+        set
+        {
+            if (EqualityComparer<StandaloneSubAssemblyRow?>.Default.Equals(_selectedRow, value))
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _selectedRow, value);
+            _picks.OnNext(value);
+        }
     }
 
     private IngredientLineRow? _selectedLine;
@@ -472,73 +493,33 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         this.WhenAnyValue(x => x.SelectedRow)
             .Subscribe(_ => SyncTreeSelection());
 
-        // Picking a sub-assembly loads it into the form; a refresh only re-points the selection at its
-        // refreshed copy, so it leaves the form and its unsaved edits alone.
-        LoadLatest(this.WhenAnyValue(x => x.SelectedRow).Where(_ => !IsBusyApplying), (row, _) => LoadIntoFormAsync(row));
+        // Picking a sub-assembly loads it into the form. Only a pick does (_picks): a refresh re-points the selection at its
+        // refreshed copy quietly (RepointSelection), so it leaves the form and its unsaved edits alone.
+        LoadLatest(_picks, (row, _) => LoadIntoFormAsync(row));
 
         // An ingredient picked in the table is pointed at the screen's copy of it, which prices the line.
         Lines.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
-            .Subscribe(_ =>
-            {
-                if (IsRestoring)
-                {
-                    return;
-                }
-
-                IngredientLineRow.Resolve(Lines, Ingredients.ToDictionary(m => m.Id));
-            });
+            .Subscribe(_ => _updates.Run(ResolveLines));
 
         // Cost follows both an ingredient picked and grams typed.
         Lines.ToObservableChangeSet()
             .AutoRefresh(l => l.Cost)
-            .Subscribe(_ =>
-            {
-                if (IsRestoring)
-                {
-                    return;
-                }
-
-                RecomputeTotals();
-            });
+            .Subscribe(_ => _updates.Run(RecomputeTotals));
 
         // A packaging set's lines price themselves as their material is picked, and the set's cost follows.
         PackagingLines.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
-            .Subscribe(_ =>
-            {
-                if (IsRestoring)
-                {
-                    return;
-                }
-
-                PackagingLineRow.Resolve(PackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
-            });
+            .Subscribe(_ => _updates.Run(ResolvePackagingLines));
         PackagingLines.ToObservableChangeSet()
             .AutoRefresh(l => l.CostPerUnit)
-            .Subscribe(_ =>
-            {
-                if (IsRestoring)
-                {
-                    return;
-                }
-
-                SetCost = PackagingLines.Sum(l => l.CostPerUnit);
-            });
+            .Subscribe(_ => _updates.Run(RecomputeSetCost));
 
         // The formula's base: what's ticked, and how much of it there is.
         Lines.ToObservableChangeSet()
             .AutoRefresh(l => l.IsFormulaBase)
             .AutoRefresh(l => l.Grams)
-            .Subscribe(_ =>
-            {
-                if (IsRestoring)
-                {
-                    return;
-                }
-
-                RecomputeFormulaBase();
-            });
+            .Subscribe(_ => _updates.Run(RecomputeFormulaBase));
 
         // Runs whenever the tab is shown (MainWindow) and after this screen's own saves. It merges
         // rather than replaces, so the screen keeps its selection and unsaved lines while picking up
@@ -574,7 +555,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 RecomputeTotals();
                 SetCost = PackagingLines.Sum(l => l.CostPerUnit);
 
-                SelectedRow = Rows.FirstOrDefault(r => r.Id == selectedId);
+                RepointSelection(Rows.FirstOrDefault(r => r.Id == selectedId));
                 if (_editingId > 0)
                 {
                     ShowUsedBy(linkedBy.GetValueOrDefault(_editingId) ?? [], madeFrom.GetValueOrDefault(_editingId) ?? []);
@@ -683,7 +664,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             // The list picks up the new totals; then the form reloads what was saved.
             await LoadCommand.Execute();
             var row = Rows.FirstOrDefault(r => r.Id == saved.Id);
-            ApplyRefresh(() => SelectedRow = row);
+            RepointSelection(row);
             await LoadIntoFormAsync(row);
             SuccessMessage = ProductVersionRecorder.RecordedMessage(saved.ProductsVersioned) is { } recorded
                 ? $"{name} was saved. {recorded}"
@@ -844,7 +825,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         // A load still on its way would otherwise land on top of what's being put back.
         _formLoadVersion++;
 
-        ApplyRestore(() =>
+        ApplyRestore(() => _updates.Batch(() =>
         {
             SelectedLine = null;
             SelectedPackagingLine = null;
@@ -877,21 +858,34 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                     QtyPerUnit = line.QtyPerUnit,
                 });
             }
-        });
+        }));
 
-        IngredientLineRow.Resolve(Lines, Ingredients.ToDictionary(m => m.Id));
-        PackagingLineRow.Resolve(PackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
+        // Once more, in this order, from the form put back: an undo that leaves a table as it was asks for none of these.
+        ResolveLines();
+        ResolvePackagingLines();
         RecomputeFormulaBase();
         RecomputeTotals();
-        SetCost = PackagingLines.Sum(l => l.CostPerUnit);
+        RecomputeSetCost();
     }
+
+    /// <summary>The screen's derived updates, run as their inputs change, or once at the end of an undo's restore.</summary>
+    private readonly DerivedUpdates _updates = new();
+
+    /// <summary>An ingredient picked in the table is pointed at the screen's copy of it, which prices the line.</summary>
+    private void ResolveLines() => IngredientLineRow.Resolve(Lines, Ingredients.ToDictionary(m => m.Id));
+
+    /// <summary>A packaging set's lines price themselves as their material is picked.</summary>
+    private void ResolvePackagingLines() => PackagingLineRow.Resolve(PackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
+
+    /// <summary>A packaging set's cost follows its lines.</summary>
+    private void RecomputeSetCost() => SetCost = PackagingLines.Sum(l => l.CostPerUnit);
 
     /// <summary>A fresh form for a new sub-assembly: nothing selected, no name or lines, in <paramref name="role"/> or the first role.</summary>
     private void ClearForm(SubAssemblyRole? role = null)
     {
         History.Clear();
         _formLoadVersion++;
-        ApplyRefresh(() => SelectedRow = null);
+        RepointSelection(null);
         _editingId = 0;
         HeaderTitle = "New sub-assembly";
         EditingName = string.Empty;
@@ -1522,6 +1516,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         _rowCache.Dispose();
         _productOpenRequests.Dispose();
         _rawMaterialOpenRequests.Dispose();
+        _picks.Dispose();
         _newProductRequests.Dispose();
     }
 }
