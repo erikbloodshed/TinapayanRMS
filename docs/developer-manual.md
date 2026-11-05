@@ -381,7 +381,7 @@ Never inject `TinapayanRMSDbContext` into a repository or a ViewModel.
 - **Reads inside a unit of work run one at a time.** They share one connection, and Npgsql refuses a second command while one is running. So `SavedProductReader` and `ProductVersionRecorder` read in sequence, never with `Task.WhenAll`.
 - **Only [VersionedSaves](../src/TinapayanRMS.Pricing/Versions/VersionedSaves.cs) uses it today**, for the saves that record product versions (see "Product versions"). Outside a unit of work, each context has a connection of its own, as before.
 
-Views aren't in the container. `MainWindow` and `SettingsWindow` create them with `new SomeView(viewModel)`. [CompositionRootTests](../tests/TinapayanRMS.UI.Tests/CompositionRootTests.cs) resolves every screen's ViewModel, so a missing registration fails a test rather than the app.
+Views aren't in the container. `MainWindow` and `SettingsWindow` create them with `new SomeView(viewModel)`. [CompositionRootTests](../tests/TinapayanRMS.UI.Tests/CompositionRootTests.cs) resolves every screen's ViewModel, so a missing registration fails a test rather than the app. It builds the host with the view state in memory (`InMemoryViewStateStore`) in place of the developer's own `view-state.json`, and checks that screens made and disposed without being shown write none of it.
 
 A ViewModel that owns a DynamicData `SourceCache` is `sealed` and `IDisposable`, so that the host disposes the cache at exit.
 
