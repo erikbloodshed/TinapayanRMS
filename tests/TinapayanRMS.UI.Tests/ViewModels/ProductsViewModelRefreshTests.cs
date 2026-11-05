@@ -1416,7 +1416,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     });
 
     /// <summary>
-    /// The piece size isn't a requirement (2026-09-20, at the user's request): a section goes into the recipe, and
+    /// The piece size isn't a requirement: a section goes into the recipe, and
     /// saves, before how much of it a piece takes is known. It just costs nothing per piece until one is typed.
     /// </summary>
     [Fact]

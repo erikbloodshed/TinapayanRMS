@@ -104,7 +104,7 @@ public abstract class ViewModelBase : ReactiveObject
     /// <paramref name="discard"/> (null when nothing needs putting back). True when the form may be left. Whatever fails on
     /// the way, such as reading the record back to put the form as it was saved, is shown here and the form isn't left:
     /// whoever's asking is on the way to another screen, or out of the app, and has no notice of its own to say so in
-    /// (2026-11-04: a move to another tab awaited by nothing lost it, so the click just did nothing).
+    /// (a move to another tab is awaited by nothing, so the click would just do nothing).
     /// </summary>
     protected async Task<bool> AskAboutUnsavedChangesAsync(bool isDirty, string name, Func<Task<bool>> save, Func<Task>? discard)
     {
@@ -224,8 +224,8 @@ public abstract class ViewModelBase : ReactiveObject
     /// <summary>
     /// Loads what each of <paramref name="values"/> needs as it comes (a record picked in a list), a newer value cancelling a
     /// load still running (Switch). A load that fails shows why and is logged, and the next value loads as usual: a failure
-    /// reaching Switch would end the subscription, and from then on no pick would load anything until the app restarted
-    /// (found 2026-10-03: one failed read left Products and Raw Materials ignoring every later pick, Save included). A load
+    /// reaching Switch would end the subscription, and from then on no pick would load anything until the app restarted.
+    /// A load
     /// cancelled by a newer value isn't a failure, whatever it threw on its way out (a driver can report a command cancelled
     /// mid-read as its own exception). Nothing picked loads nothing, so it leaves a failed load's error showing: the
     /// failure itself can clear the pick, as Sub-Assemblies does.

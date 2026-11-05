@@ -4,7 +4,7 @@ using Syncfusion.UI.Xaml.Grid;
 namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
-/// A grid's headings sit at the bottom of its header row instead of the middle (2026-10-21, at the user's request), so a
+/// A grid's headings sit at the bottom of its header row instead of the middle, so a
 /// one-line heading lines up with the last line of a two-line one beside it. Set
 /// <c>controls:GridHeaderAlignment.IsBottom="True"</c> on a grid whose headings wrap (<see cref="GridHeaderHeight.LinesProperty"/>).
 /// The theme centres a header cell's content, and its sort arrow and filter funnel. A HeaderStyle would replace the

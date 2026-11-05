@@ -10,8 +10,8 @@ namespace TinapayanRMS.UI.Tests.Controls;
 
 /// <summary>
 /// GridEditCommit's commit of a half-typed add row when the cursor leaves a lines table set up as the app's are
-/// (UsageFormPanel.xaml). The grid left its current cell on the add row, a fresh one once the line was added, so the
-/// outline jumped to the row under the line being typed (Products' sub-assembly lines, 2026-09-27).
+/// (UsageFormPanel.xaml). Left to the grid, its current cell stays on the add row, a fresh one once the line is added,
+/// so the outline jumps to the row under the line being typed (Products' sub-assembly lines).
 /// </summary>
 [Collection(OffscreenGridCollection.Name)]
 public class GridEditCommitTests

@@ -12,12 +12,12 @@ using TinapayanRMS.UI.Tests.Fixtures;
 namespace TinapayanRMS.UI.Tests.Controls;
 
 /// <summary>
-/// A lines table as the app sets them up (the Production Plan's, retired on 2026-10-31 when planning moved to TinapayanBMS,
+/// A lines table as the app sets them up (the Production Plan's, before planning moved to TinapayanBMS,
 /// and the screens that take lines the same way): a product picked from a drop-down that's typed into, units,
 /// and a pieces column Tab skips. Tab from the add row's last cell adds the line and opens the next add row
 /// (UntouchedAddRowSelectionController.ProcessKeyDown). A pick reaches the line only when its edit is committed, since
 /// AutoCompleteDropDownRenderer makes the column's UpdateTrigger Explicit, so retyping it and pressing Esc leaves the line
-/// as it was (2026-10-24, both reported by the user).
+/// as it was.
 /// </summary>
 [Collection(OffscreenGridCollection.Name)]
 public class GridAddNewRowTabTests

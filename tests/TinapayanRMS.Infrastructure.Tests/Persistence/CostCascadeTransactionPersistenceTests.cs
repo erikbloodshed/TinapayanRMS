@@ -13,10 +13,9 @@ using TinapayanRMS.Tests.Common.Fixtures;
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
 /// <summary>
-/// Writes that are all or nothing (2026-10-03). The cost cascade runs inside the transaction of the save that causes it:
-/// these make it fail part-way, as a dropped connection would, and check the save went with it. Until then the save was
-/// committed first and the cascade ran after, on contexts of its own, so a failure left the stored costs above it stale for
-/// good. Unlinking a product's packaging is one transaction too. And Settings' Recalculate Costs puts right a stored cost
+/// Writes that are all or nothing. The cost cascade runs inside the transaction of the save that causes it:
+/// these make it fail part-way, as a dropped connection would, and check the save went with it. A failure
+/// can't leave the stored costs above it stale. Unlinking a product's packaging is one transaction too. And Settings' Recalculate Costs puts right a stored cost
 /// changed outside the app.
 /// </summary>
 [Collection(DatabaseCollection.B)]

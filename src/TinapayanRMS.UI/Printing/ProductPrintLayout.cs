@@ -51,7 +51,7 @@ public sealed class ProductPrintLayout
     private static readonly GridLength[] ScalingColumns = [new(1, GridUnitType.Star), new(130), new(90)];
     private static readonly GridLength[] ScalingColumnsWithoutCosts = [new(1, GridUnitType.Star), new(130)];
 
-    // The Price Simulator report's (2026-10-06): its tables have a Cost Now column after their cost, and its costing sets today's
+    // The Price Simulator report's: its tables have a Cost Now column after their cost, and its costing sets today's
     // figures beside the simulated ones.
     private static readonly GridLength[] RecipeColumnsWithNow = [new(1, GridUnitType.Star), new(70), new(64), new(84), new(72), new(72), new(40)];
     private static readonly GridLength[] PackagingColumnsWithNow = [new(1, GridUnitType.Star), new(60), new(56), new(84), new(80), new(80)];

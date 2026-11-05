@@ -3,7 +3,7 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.ApplicationCore.Rules;
 
 /// <summary>
-/// A price change tried on the Price Simulator screen (2026-10-03): a purchased material's price per its purchase unit, typed as a
+/// A price change tried on the Price Simulator screen: a purchased material's price per its purchase unit, typed as a
 /// change in percent or as the new price, and the costs per base unit it would give the material. Nothing here is saved.
 /// </summary>
 public static class PriceChangeRules
@@ -49,7 +49,7 @@ public static class PriceChangeRules
     /// <paramref name="material"/>'s true and buffered costs per base unit at <paramref name="newPrice"/>, at the stored scale.
     /// <list type="bullet">
     /// <item>A material with a price (<paramref name="currentPrice"/>, the dearest brand's, which its cost comes from): both
-    /// costs move by the same factor, as typing the Cost Buffer % again after a real price change would (the user's choice).
+    /// costs move by the same factor, as typing the Cost Buffer % again after a real price change would.
     /// A real price change alone leaves the fixed buffered cost where it was.</item>
     /// <item>One with no price yet: priced as its first price would be, the buffer percent on top of the cost
     /// (RawMaterialRules.ApplyBrandPrices).</item>

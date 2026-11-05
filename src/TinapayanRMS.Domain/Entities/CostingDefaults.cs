@@ -36,7 +36,7 @@ public sealed class CostingDefaults
     /// <summary>Markup on cost, as CostingParameters.MarginPercent.</summary>
     public decimal MarginPercent { get; set; }
 
-    /// <summary>The shop's VAT, added on top of every product's marked-up price, as a percentage (since 2026-11-05).</summary>
+    /// <summary>The shop's VAT, added on top of every product's marked-up price, as a percentage.</summary>
     public decimal VatPercent { get; set; }
 
     /// <summary>
@@ -59,7 +59,7 @@ public sealed class CostingDefaults
     public ProductStage NewProductStage { get; set; } = DefaultNewProductStage;
 
     /// <summary>
-    /// What a suggested price is rounded up to a multiple of, such as 0.25 or 1 (2026-10-29): a price the shop would charge.
+    /// What a suggested price is rounded up to a multiple of, such as 0.25 or 1: a price the shop would charge.
     /// 0 for none. Only the rounded figures shown beside the costing's exact ones follow it (CostingRules.RoundPriceUp).
     /// </summary>
     public decimal PriceRoundingStep { get; set; }

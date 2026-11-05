@@ -18,7 +18,7 @@
     <UserControl.Resources>
         <!--
             The piece-size column's pieces: a figure's tile, a group's small heading, and a label-and-value row ruled off
-            from the next. A tile's caption and value are centred in it (2026-09-25, at the user's request), as the
+            from the next. A tile's caption and value are centred in it, as the
             headers' tiles are.
         -->
         <Style x:Key="StatTileStyle" TargetType="Border">
@@ -98,8 +98,8 @@
             <TextBlock Text="Existing Sub-Assembly or Packaging" Style="{StaticResource FormLabelStyle}" />
             <!--
                 IsEditable and AutoCompleteMode are spelled out here, unlike every other picker, which takes them from
-                App's ApplyPickerDefaults as it loads (2026-09-22, at the user's request: "the combobox for selecting
-                Existing Sub-Assembly or Packaging is not searchable"). This form is a UserControl inside a collapsed
+                App's ApplyPickerDefaults as it loads, so the Existing Sub-Assembly and Packaging pickers are searchable.
+                This form is a UserControl inside a collapsed
                 Border (RecipeStructureCard), so it isn't measured with the screen, its template never applies, and its
                 pickers never raise Loaded — the class handler that sets those two properties never sees them. Set in
                 XAML they hold from the first template application. Same for Role below.
@@ -119,7 +119,7 @@
             kept, or "Moves to Sub-Assemblies on Save". Beside it, an own or new section's role, which is what it's
             called, and its optional name, which tells it apart from others in that role ("Filling: Ube" beside
             "Filling: Cheese"), each label on the left of its field (FormLabelStyle); a linked one's are the Sub-Assemblies
-            screen's, so they don't show. An own one has no badge (the user's call, 2026-09-24): its Role and Name take
+            screen's, so they don't show. An own one has no badge: its Role and Name take
             the badge's place, level with its Move to Sub-Assemblies, as a linked one's badge is level with its Unlink
             and Copy. At the far right, those actions, never both sets. Packaging has no name: there's only ever one.
             Each piece carries the row's bottom margin itself, so a row with nothing showing takes no room. The two badges
@@ -286,7 +286,7 @@
 
             <!--
                 A linked one's add-ins badge, level with its linked badge and aligned on the top right corner of its lines
-                table (2026-09-28, at the user's request): whether the product adds anything to the recipe, so it reads
+                table: whether the product adds anything to the recipe, so it reads
                 without scrolling down to the add-ins table. A layer over the row above, in the tables' columns (the
                 piece-size column's width shared through PieceSizeColumn, the gap the same 16), so the badge's right
                 edge is the table's while Unlink and Copy keep the far right. Without a background the layer lets clicks
@@ -553,13 +553,13 @@
                     into the batch, so the Total Weight below is the recipe's lines plus these, and a piece takes its
                     share of the whole thing. Only a linked sub-assembly has them, and it's always this product's to
                     type into, so the grid is plainly editable rather than bound like the one above. Always shown,
-                    empty or not: a Show/Hide Add-Ins toggle shut it before (until 2026-09-28), which hid that the batch
-                    had extras in it. The badge above the lines says whether it has any, and scrolls here.
+                    empty or not, since a shut table would hide that the batch
+                    has extras in it. The badge above the lines says whether it has any, and scrolls here.
                 -->
                 <StackPanel x:Name="AddInsSection" Margin="0,6,0,0" Visibility="{Binding UsageForm.IsFormShowingAddIns, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <!--
                         The table's heading, and on the right, over the table's top right corner as the add-ins badge is over
-                        the lines', a Go to top badge (2026-09-28, at the user's request), the add-ins badge's way back: a
+                        the lines', a Go to top badge, the add-ins badge's way back: a
                         click (or Enter or Space) scrolls to the top of the form and puts focus in the lines table.
                     -->
                     <Grid Margin="0,0,0,4">
@@ -622,7 +622,7 @@
                                     </syncfusion:Columns>
                                 </syncfusion:GridMultiColumnDropDownList.Columns>
                             </syncfusion:GridMultiColumnDropDownList>
-                            <!-- The figure columns one width, as above (2026-09-28, with Cost/g added at the user's request), so they line up under the recipe's. -->
+                            <!-- The figure columns one width, as above, so they line up under the recipe's. -->
                             <controls:NumericColumn MappingName="Grams" HeaderText="Grams" Width="96" NumberDecimalDigits="1" TypedDecimalDigits="4" AllowNullValue="True" />
                             <controls:NumericColumn MappingName="Percent"
                                                     HeaderTemplate="{StaticResource PercentHeaderTemplate}"

@@ -37,7 +37,7 @@
         </Grid>
 
         <!--
-            The other way round (2026-10-29): how many sellable units an amount of one ingredient makes, the most whose
+            The other way round: how many sellable units an amount of one ingredient makes, the most whose
             whole batches it's enough for. Scale to puts that in Sellable Units. Nothing here is saved.
         -->
         <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
@@ -101,7 +101,7 @@
             It's themed on its own (SfSkinManager.Theme set here, not inherited from the window). The theme's SfTreeGrid
             dictionary merges in SfGrid's unthemed Control/Themes/Generic.xaml, whose implicit GridCell, header cell and
             row styles are the ones the SfDataGrid dictionary themes. Inherited, it joined the window's theme dictionaries
-            after SfDataGrid's, so its unthemed styles won and every data grid in the app lost the theme (2026-09-30).
+            after SfDataGrid's, so its unthemed styles won and every data grid in the app lost the theme.
             Set here, its dictionaries go into this grid's own resources instead.
 
             FontSize is the app's 14px body text: the theme's cell style is one the generic ones outrank, so the cells

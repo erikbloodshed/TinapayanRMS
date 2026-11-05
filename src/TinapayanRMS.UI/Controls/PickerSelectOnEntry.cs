@@ -8,8 +8,7 @@ namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
 /// A picker that's typed into (ComboBoxAdv, editable, as App makes every one) selects its whole text as the keyboard
-/// enters it, by a click or by Tab, so what's typed next replaces it (2026-10-16, at the user's request: "whenever i
-/// select or click inside a searchable combobox the text inside is highlighted").
+/// enters it, by a click or by Tab, so what's typed next replaces it.
 /// <list type="bullet">
 /// <item>A click selected the text only for a moment: the picker selects it as its box takes the keyboard
 /// (Part_IsEdit_GotFocus, and only with a name picked), then the box's own mouse handling put the caret where the click

@@ -718,8 +718,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         (await NameOfAsync(mamonId)).Should().Be("Mamon");
     });
 
-    // No puts a new product back blank. What's typed into it next has to count, or it's lost with no question asked (found
-    // 2026-11-04: what a blank form is measured against was cleared again straight after it was set).
+    // No puts a new product back blank. What's typed into it next has to count, or it's lost with no question asked.
     [Fact]
     public Task What_is_typed_after_no_on_a_new_product_counts_as_unsaved() => StaThread.RunAsync(async () =>
     {

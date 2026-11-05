@@ -28,7 +28,7 @@ public sealed class RawMaterial
     public decimal? WeightLossPercent { get; set; }
 
     /// <summary>
-    /// Made only, and required for one: the sub-assembly whose recipe it's made from (2026-10-27). The Sub-Assemblies screen
+    /// Made only, and required for one: the sub-assembly whose recipe it's made from. The Sub-Assemblies screen
     /// is the one place the recipe is written; the made ingredient adds its own add-ins (IngredientAddInLine) and its
     /// weight loss on top. Only one kept on the Sub-Assemblies screen, and not a packaging set (SubAssemblyRules.EnsureLinkableByMadeIngredient).
     /// </summary>
@@ -78,24 +78,24 @@ public sealed class RawMaterial
     public decimal CostBufferPercent { get; set; }
 
     /// <summary>
-    /// Purchased only, and set for every one: the buffer percent last typed for it, 0 to 100 (2026-10-29), which
+    /// Purchased only, and set for every one: the buffer percent last typed for it, 0 to 100, which
     /// <see cref="CostBufferPercent"/> drifts from as prices change, since the buffered cost stays fixed. What Re-apply
-    /// Target puts back on top of the dearest brand. A save without one stores the buffer, and the ones saved before
-    /// targets were kept were given theirs once (TargetBuffersUpgrade, 2026-11-05). Null for a made or linked ingredient.
+    /// Target puts back on top of the dearest brand. A save without one stores the buffer (TargetBuffersUpgrade gave the
+    /// older ones theirs). Null for a made or linked ingredient.
     /// </summary>
     public decimal? TargetCostBufferPercent { get; set; }
 
     /// <summary>
-    /// Purchased only: the brand its cost comes from (2026-10-29, at the user's request: cost by preferred brand), the
-    /// dearest of that brand's prices when it's priced in more than one unit. Null for the dearest brand, as before, which
+    /// Purchased only: the brand its cost comes from, the dearest of that brand's prices when it's priced in more than one
+    /// unit. Null for the dearest brand, which
     /// is also what a brand that no longer has a price falls back to (RawMaterialRules.FindCostBrandPrice).
     /// </summary>
     public string? PreferredBrand { get; set; }
 
     /// <summary>
     /// The cost of one base unit with the buffer on top: what recipes, sub-assemblies, packaging lines and products are
-    /// costed with, while <see cref="CostPerBaseUnit"/> stays the true cost. For Purchased a fixed amount (since
-    /// 2026-09-19): the costed brand's price plus the buffer, set on the first price and whenever the buffer % is typed or
+    /// costed with, while <see cref="CostPerBaseUnit"/> stays the true cost. For Purchased a fixed amount: the
+    /// costed brand's price plus the buffer, set on the first price and whenever the buffer % is typed or
     /// re-applied, and left where it is as prices move, so its buffer drifts and it can fall below the true cost
     /// (RawMaterialRules.BufferedCost). For Made the BOM rollup of the components' buffered costs and nothing more, so a
     /// buffer is counted once however deep the tree; for Linked its cost with the linked-to ingredient's buffer on top.
@@ -121,7 +121,7 @@ public sealed class RawMaterial
     public List<RawMaterialUnit> Units { get; set; } = [];
 
     /// <summary>
-    /// A copy to give other costs to without touching this one, as the Price Simulator screen prices with (2026-10-03). It shares
+    /// A copy to give other costs to without touching this one, as the Price Simulator screen prices with. It shares
     /// this material's category, base unit and units, which no cost lives in. Every property comes with it, so one added
     /// later is never left behind.
     /// </summary>

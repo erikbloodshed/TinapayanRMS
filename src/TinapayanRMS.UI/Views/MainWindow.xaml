@@ -1,5 +1,5 @@
 ﻿<!--
-    Chromeless (2026-09-25, at the user's request): Syncfusion's ChromelessWindow draws the title bar itself, in the
+    Chromeless: Syncfusion's ChromelessWindow draws the title bar itself, in the
     theme, with its own Minimize, Maximize/Restore and Close buttons on the right, so Windows' caption bar is gone.
     The app's header strip (the menu toggle and the heading) is the title bar's left side,
     LeftHeaderItemsSource, the way Syncfusion's own Sample Browser window puts its logo and name there: ShowTitle and
@@ -45,7 +45,7 @@
             app's accent. Templating a *framework* control is fine; App.xaml's no-Style rule is
             about Syncfusion controls, whose templates must stay intact.
             **There is no selected state, and no focus outline**: marking the page showing here only
-            repeated the tab strip right below it (dropped 2026-09-22, at the user's request). So the
+            repeats the tab strip right below it. So the
             template answers hover and keyboard focus with the same wash and nothing else, and
             MainWindow.xaml.cs navigates from the click rather than from the ListBox's selection, which
             is now neither shown nor read.
@@ -73,8 +73,8 @@
                             </Trigger>
                             <!--
                                 Keyboard focus looks exactly like hover, deliberately: an outline of its
-                                own read as "this is the current page" all over again (2026-09-22, at the
-                                user's request). A row still has to show where the keyboard is, or the
+                                own read as "this is the current page" all over again. A row
+                                still has to show where the keyboard is, or the
                                 arrows move something invisible.
                             -->
                             <Trigger Property="IsKeyboardFocused" Value="True">
@@ -98,7 +98,7 @@
                 The drawer lives in the window's content, so its scrim covers the tabs but not the title bar: the toggle
                 stays visible and clickable while the menu is open, and clicking it again puts the
                 menu away. Icon only, so the name lives in ToolTip/AutomationProperties.
-                It hovers like the title bar's minimise and maximise buttons (2026-09-26, at the user's request),
+                It hovers like the title bar's minimise and maximise buttons,
                 because it's built the way they are: the theme's WPFGlyphButtonStyle, fetched by ThemeKey as a
                 DynamicResource (the Sample Browser's {sfskin:ThemeResource} form looks the style up once, before
                 OnStartup's SetTheme has merged the theme's dictionaries into this window, and never again), with the template
@@ -131,8 +131,8 @@
     <!--
         Back and Forward between screens, as a browser has them (NavigationHistory): a step is a change of screen, and
         going back reopens the record that screen had open. Alt+Left and Alt+Right do the same (MainWindow.xaml.cs).
-        On the title bar's right, just before Minimize (2026-10-01, at the user's request; they were at the tab strip's
-        right end before, and after the menu toggle before that). Built like the toggle and the bar's own caption buttons:
+        On the title bar's right, just before Minimize.
+        Built like the toggle and the bar's own caption buttons:
         40×32, WPFGlyphButtonStyle with WPFGlyphWindowButtonTemplate, and IsHitTestVisibleInChrome, so they hover, press
         and grey out the way Minimize does. Not focusable, like the caption buttons: a focused glyph button keeps its
         hover wash, so it would stay lit after a click. The title bar sits above the drawer's scrim, so they work while
@@ -142,7 +142,7 @@
     <controls:AppWindow.RightHeaderItemsSource>
         <collections:ArrayList>
             <vim:VimModeIndicator />
-            <!-- Find (2026-10-29): every raw material, sub-assembly and product by name, opened on its own screen. Built as Back is -->
+            <!-- Find: every raw material, sub-assembly and product by name, opened on its own screen. Built as Back is -->
             <Button x:Name="FindButton"
                     Width="40"
                     Height="32"
@@ -199,7 +199,7 @@
             Left/Right drawer, DrawerHeight a Top/Bottom one, and under Compact neither is read (the drawer
             expands to ExpandedModeWidth), which is why the DrawerWidth="220" this screen carried under
             Compact never did anything. Position is left unset, since Left is its default.
-            Position="Top" was tried and reverted (2026-09-22): a top drawer is always a full-width band,
+            Position="Top" was tried and reverted: a top drawer is always a full-width band,
             which forces the destinations into a row, and the user wants them stacked.
             DrawerHeight is left unset: RefreshSlider derives it from ActualHeight and re-runs on
             SizeChanged, so the panel fills the tab area.
@@ -336,7 +336,7 @@
                     <syncfusion:TabItemExt x:Name="SubAssembliesTab" Header="Sub-Assemblies" />
                     <syncfusion:TabItemExt x:Name="ProductsTab" Header="Products" />
                     <!--
-                        The app starts with only the first three open (2026-10-04, at the user's request); these open
+                        The app starts with only the first three open; these open
                         from the menu, as a closed tab does, and load when first shown.
                     -->
                     <syncfusion:TabItemExt x:Name="ReportsTab" Header="Reports" Visibility="Collapsed" />

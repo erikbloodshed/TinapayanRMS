@@ -7,9 +7,7 @@ using Syncfusion.Windows.Tools.Controls;
 namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
-/// A picker whose text was deleted shows its value again once the keyboard leaves it, when that value can't be empty
-/// (2026-10-16, at the user's request: "When i delete a value inside the Raw Material Type combobox and switch between
-/// raw materials or i close the raw material tab, the Type combobox stays empty").
+/// A picker whose text was deleted shows its value again once the keyboard leaves it, when that value can't be empty.
 /// <list type="bullet">
 /// <item>Deleting a picker's text clears its pick (ComboBoxAdv's Part_IsEdit_PreviewKeyDown, on Backspace or Delete).
 /// Bound to a value that can't be empty, such as Raw Materials' Type and Source (enums), the empty pick can't be written

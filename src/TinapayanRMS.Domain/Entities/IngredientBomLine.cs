@@ -2,8 +2,8 @@ namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>
 /// One component of a made ingredient's bill of materials, as the sub-assembly it's made from (RawMaterial.SubAssemblyId)
-/// and its own add-ins (IngredientAddInLine) give it: read, never stored (2026-10-27; until then a table of the made
-/// ingredient's own lines). Both ends are raw materials of the Ingredient type.
+/// and its own add-ins (IngredientAddInLine) give it: read, never stored. Both ends are raw materials of the Ingredient
+/// type.
 /// </summary>
 public sealed class IngredientBomLine
 {

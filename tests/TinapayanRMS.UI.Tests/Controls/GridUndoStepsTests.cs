@@ -15,7 +15,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// <summary>
 /// GridUndoSteps' pending edit in a real lines table set up as the app's are (UsageFormPanel.xaml), beside a Save button
 /// offered only while an edit is pending or the lines have changed, as the screens offer theirs. A line typed on the add
-/// row and saved with a click on Save, the add row still open, wasn't added (Products' add-ins, 2026-10-26).
+/// row and saved with a click on Save, the add row still open, is added (Products' add-ins).
 /// </summary>
 [Collection(OffscreenGridCollection.Name)]
 public class GridUndoStepsTests

@@ -9,8 +9,7 @@ using Syncfusion.UI.Xaml.TreeGrid;
 namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
-/// Keyboard focus in every SfDataGrid sits on a cell, never on the grid as a whole (2026-09-27, at the user's request:
-/// "Keyboard focus must be on the grid instead of the outline. It's absurd and nonstandard"):
+/// Keyboard focus in every SfDataGrid sits on a cell, never on the grid as a whole:
 /// <list type="bullet">
 /// <item>No dotted focus rectangle round the whole grid. WPF drew it whenever the grid itself took focus by keyboard:
 /// tabbed into, or handed focus back as a cell's edit ended. The current cell's outline already shows where the

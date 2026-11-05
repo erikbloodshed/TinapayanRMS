@@ -16,7 +16,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// apart from raw material categories (CategoriesViewModel).
 /// Picking a category loads it for renaming; New, or finishing a Save or Delete, clears the form, so
 /// the next Save always adds a category rather than renaming the last one touched.
-/// A category can set the Wastage % its products are priced with in place of the shop-wide one (2026-10-29).
+/// A category can set the Wastage % its products are priced with in place of the shop-wide one.
 /// </summary>
 public sealed class ProductCategoriesViewModel : ViewModelBase, IDisposable
 {

@@ -10,9 +10,9 @@ namespace TinapayanRMS.UI.Tests.Controls;
 
 /// <summary>
 /// GridFillerRows in a lines table set up as the app's are (UsageFormPanel.xaml): padding must never move the grid's
-/// current cell, or leave it somewhere it can't be. While the padding was rows of the grid (until 2026-10-15), adding them
-/// moved it, and moving it back to a cell that no longer existed threw "InValid RowColumnIndex" from a dispatcher
-/// callback, which closed the app (twice on the Products screen, 2026-09-16). Drawn, the padding can't touch the current
+/// current cell, or leave it somewhere it can't be. As rows of the grid, adding the padding would
+/// move it, and moving it back to a cell that no longer exists throws "InValid RowColumnIndex" from a dispatcher
+/// callback, which closes the app. Drawn, the padding can't touch the current
 /// cell, and these pin that it doesn't. (The add row's current cell when its lines go is GridAddNewRowCurrentCellTests'.)
 /// </summary>
 [Collection(OffscreenGridCollection.Name)]

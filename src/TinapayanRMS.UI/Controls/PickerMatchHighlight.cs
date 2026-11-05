@@ -9,9 +9,8 @@ namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
 /// Every picker that filters as you type (ComboBoxAdv, editable with Suggest, as App makes every one) highlights the name
-/// its text best matches, and Enter or Tab picks it (2026-09-30, at the user's request: "auto highlight match item in all
-/// the searchable combobox"). The picker only ever filtered its list: nothing in it was highlighted until an arrow key
-/// was pressed, and Enter or Tab kept only a name typed out in full, so "flo" and Enter left the picker empty.
+/// its text best matches, and Enter or Tab picks it. On its own the picker only filters its list: nothing in it is highlighted until an arrow
+/// key is pressed, and Enter or Tab keeps only a name typed out in full, so "flo" and Enter would leave it empty.
 /// <list type="bullet">
 /// <item>The match is the one the grids' drop-downs pick (ScreenAwareDropDownControl): the name typed in full, or else
 /// the first starting with the text, or else the first containing it. "fir" highlights First Class Flour; "flour",

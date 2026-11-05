@@ -10,8 +10,8 @@ using TinapayanRMS.Tests.Common.Fixtures;
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
 /// <summary>
-/// The database's backstops for the figures a read divides by or adds up (2026-11-03, found by a code review: one packaging
-/// line stored at 0 failed Reports, Print and the Recipe API for every product). The rules refuse these first, in better
+/// The database's backstops for the figures a read divides by or adds up, since one packaging
+/// line stored at 0 would fail Reports, Print and the Recipe API for every product. The rules refuse these first, in better
 /// words, so these tests write past the repositories, as an edit outside the app would.
 /// </summary>
 [Collection(DatabaseCollection.C)]

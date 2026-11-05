@@ -25,7 +25,7 @@ public sealed record GridLayout(IReadOnlyList<string>? HiddenColumns, IReadOnlyL
 
 /// <summary>
 /// A grid's layout kept between runs for the Windows user (IViewStateStore), under <paramref name="key"/>: Reports' tables
-/// keep their filters, sort and columns (2026-10-29, at the user's request; until then they lasted until the app closed).
+/// keep their filters, sort and columns.
 /// Controls/GridLayoutKeeping applies it to the grid and writes it back as it changes. A line it can't read back is left
 /// out, so a layout written by a later version never stops the grid from showing.
 /// </summary>

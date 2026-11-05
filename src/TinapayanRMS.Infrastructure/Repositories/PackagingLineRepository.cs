@@ -39,12 +39,11 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
     /// Each product's packaging as it shows, by product id: its link chain (if any) is followed to an unlinked product,
     /// whose own lines it shows, or to a packaging set, whose lines it shows as its own (<see cref="SetLinesAsPackagingLines"/>).
     /// Every link is read in one query and followed in memory, then the lines at the chains' ends in one query for
-    /// products and one for sets, however many products and however long their chains (2026-10-03: it was a query per
-    /// link followed, for each product, and Reports read every product that way). A chain that comes round again, which only
-    /// an edit outside the app can leave (SetLinkAsync refuses one), is refused, as a write that copies the lines should
-    /// be (ProductCloner, RemoveLinkAsync); given <paramref name="looping"/>, as a read of many products is, its product
-    /// shows no lines and goes in it instead (2026-11-05: a refusal failed every product's read, for Reports, Print, the
-    /// Products list and the servers). Reads through Dapper, in <paramref name="dbContext"/>'s transaction if it has one
+    /// products and one for sets, however many products and however long their chains. A chain that comes round again,
+    /// which only an edit outside the app can leave (SetLinkAsync refuses one), is refused, as a write that copies the
+    /// lines should be (ProductCloner, RemoveLinkAsync); given <paramref name="looping"/>, as a read of many products is,
+    /// its product shows no lines and goes in it instead, so one bad chain doesn't fail every product's read (Reports,
+    /// Print, the Products list, the servers). Reads through Dapper, in <paramref name="dbContext"/>'s transaction if it has one
     /// (ProductCloner's and RemoveLinkAsync's do).
     /// </summary>
     internal static async Task<IReadOnlyDictionary<int, IReadOnlyList<PackagingLine>>> ResolveEffectiveAsync(

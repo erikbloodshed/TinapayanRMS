@@ -15,9 +15,8 @@ namespace TinapayanRMS.UI.Tests.Controls;
 
 /// <summary>
 /// The Base tick in a lines table's add row (GridAddNewRow.HideCheckBoxes, AddRowHiddenCheckBoxRenderer): blank while the
-/// row holds no line, there to tick once one is being typed into it, and the tick goes in with the line. It used to stay
-/// hidden until the line was added, so the Base of a line just typed couldn't be ticked on a new sub-assembly or product
-/// section (2026-10-28, reported by the user).
+/// row holds no line, there to tick once one is being typed into it, and the tick goes in with the line. Hidden until the
+/// line is added, the Base of a line just typed couldn't be ticked on a new sub-assembly or product section.
 /// </summary>
 [Collection(OffscreenGridCollection.Name)]
 public class GridAddNewRowCheckBoxTests

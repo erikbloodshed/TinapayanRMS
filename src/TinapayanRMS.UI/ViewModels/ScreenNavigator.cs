@@ -6,7 +6,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// <param name="OpenRecord">Reopens a record, for Back and Forward; null for a screen with no record to reopen.</param>
 /// <param name="UnsavedChanges">
 /// Its form, when it has one that can hold unsaved changes. Print has Products': it prints the product as Products shows it,
-/// unsaved edits and all (the user's choice), so moving between the two asks nothing.
+/// unsaved edits and all, so moving between the two asks nothing.
 /// </param>
 public sealed record NavigationScreen(AppScreen Screen, Func<int?> CurrentRecord, Action<int>? OpenRecord = null, IUnsavedChangesScreen? UnsavedChanges = null)
 {
@@ -17,8 +17,7 @@ public sealed record NavigationScreen(AppScreen Screen, Func<int?> CurrentRecord
 /// <summary>
 /// Moving between the main window's screens, with no screen's unsaved changes left behind: a link from one screen to a record
 /// on another, Back and Forward, a tab picked, and closing the app. It knows nothing of tabs: MainWindow says which screen is
-/// showing and shows the one asked for, so all of this can be tested without a window, which it couldn't while it was
-/// MainWindow's own (moved out 2026-11-04, at the user's request, from a code review).
+/// showing and shows the one asked for, so all of this can be tested without a window.
 ///
 /// Nothing awaits a move, since it starts from a click, so what fails in one goes to <c>showFailure</c>: left to a task nobody
 /// awaits, it only ever reached a warning in the log, and the click just did nothing.
@@ -39,8 +38,8 @@ public sealed class ScreenNavigator(
     private bool _isStepping;
 
     // The forms already answered for while closing. No leaves a form as it is for the app to close over, still unsaved,
-    // and showing the next screen mustn't ask about it again as if it were being left (found 2026-11-04, in the real app:
-    // No to one of two forms asked about the second with the first showing, then about the first again).
+    // and showing the next screen mustn't ask about it again as if it were being left (No to one of two
+    // forms would ask about the second with the first showing, then about the first again).
     private readonly HashSet<IUnsavedChangesScreen> _answeredForClosing = [];
 
     /// <summary>Whether any screen's form holds unsaved changes, which closing the app asks about.</summary>

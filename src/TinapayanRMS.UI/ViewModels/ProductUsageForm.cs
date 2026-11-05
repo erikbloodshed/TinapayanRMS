@@ -9,8 +9,8 @@ using TinapayanRMS.Pricing;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// The Products screen's add/edit sub-assembly form (UsageFormPanel, through ProductsViewModel.UsageForm, since
-/// 2026-10-28): the section it edits or the one it adds, its fields and tables, and what it shows worked out from them.
+/// The Products screen's add/edit sub-assembly form (UsageFormPanel, through ProductsViewModel.UsageForm):
+/// the section it edits or the one it adds, its fields and tables, and what it shows worked out from them.
 /// The screen keeps what the form does to the recipe (opening it, Apply, a link changed, a move), since that changes the
 /// recipe's sections, its tabs and the undo history these fields are part of, and says when the lines or what the form
 /// adds have changed. The form works out its own piece size and figures from its tables (<see cref="Recompute"/>).
@@ -255,8 +255,8 @@ public sealed class ProductUsageForm(
     /// <summary>
     /// The form's add-ins table shows, always, empty or not: only for a sub-assembly the product links, and only
     /// once the recipe it sits on top of is there to sit on. A sub-assembly of the product's own has no add-ins —
-    /// its extras just go in its lines. There was a Show/Hide Add-Ins toggle before (until 2026-09-28): a shut
-    /// table hid that the batch had extras in it, so the table stays open and the badge above the lines says
+    /// its extras just go in its lines. A shut table would hide that the batch
+    /// has extras in it, so the table stays open and the badge above the lines says
     /// whether it has any (FormAddInsBadgeText).
     /// </summary>
     public bool IsFormShowingAddIns => !IsFormEditingLines && IsFormShowingLines;
@@ -519,7 +519,7 @@ public sealed class ProductUsageForm(
         var costPerPiece = totalWeight > 0 && weightPerPiece > 0
             ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight)
             : (decimal?)null;
-        // Two decimals, as Batch cost beside it (2026-09-25, at the user's request); packaging's, above, keeps four.
+        // Two decimals, as Batch cost beside it; packaging's, above, keeps four.
         UsageFormCostPerPieceText = costPerPiece is { } figure ? $"{figure:N2}" : "—";
 
         // The formula's base and the batch, given to both tables: an add-in is read against the recipe's base, never its own,

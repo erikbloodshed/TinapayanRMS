@@ -377,7 +377,7 @@
             </Style>
 
             <!--
-                A stacked form's field label, on the left of its input (2026-09-24, the user's practice for a desktop app:
+                A stacked form's field label, on the left of its input (a desktop app's practice:
                 labels beside inputs, not above them). Each field is a row Grid of its own, the label in an Auto column
                 that a SharedSizeGroup lines up down the form, and the gap to the next field on the row, so the label
                 centres on its box. FieldLabelStyle, above its input, stays for side-by-side strips of fields (the
@@ -407,9 +407,8 @@
                 A header figure's tile (the Raw Materials, Sub-Assemblies and Products headers): a rounded block in a
                 Latte Wash, one colour per figure, behind the figure's label and value, which sit in the grid cells the
                 tile spans. The same figure keeps its colour on every screen: Last Updated is Mauve, a total weight Teal,
-                a total cost Flamingo, a cost per gram Yellow (2026-09-25, at the user's request; they were plain columns
-                with a thin line between each before). The label is Text rather than muted, since Subtext on the Mauve
-                Wash is only 4.1:1, and the tiles stand 8 apart (FigureTileGapStyle) where the lines were.
+                a total cost Flamingo, a cost per gram Yellow. The label is Text rather than muted, since Subtext on the Mauve
+                Wash is only 4.1:1, and the tiles stand 8 apart (FigureTileGapStyle).
             -->
             <Style x:Key="FigureTileStyle" TargetType="Border">
                 <Setter Property="CornerRadius" Value="6" />

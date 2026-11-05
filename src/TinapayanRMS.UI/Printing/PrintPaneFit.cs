@@ -71,8 +71,8 @@ public static class PrintPaneFit
     /// printout, margins changed. Laying out, the pane takes its one page control out of its panel and puts it back
     /// (PrintPreviewPanel.InValidate), and out of the window's tree it loses the theme's style, so back in it gets its
     /// template again, with a new viewbox of no size: the page is drawn at 100% while the zoom still says otherwise. The
-    /// pane sizes that viewbox only when the zoom changes, so the zoom moves by one and back. Found in the app with the
-    /// Print tab (2026-09-27); a tick box does it too (PrintPaneFitTests).
+    /// pane sizes that viewbox only when the zoom changes, so the zoom moves by one and back. A tick box on the Print
+    /// tab is enough to see it (PrintPaneFitTests).
     /// </summary>
     private static void KeepZoom(PrintPreviewAreaControl area, PrintPageControl page)
     {

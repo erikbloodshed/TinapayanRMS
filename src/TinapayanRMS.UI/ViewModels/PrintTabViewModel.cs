@@ -64,7 +64,7 @@ public closed record PrintScope(string Label)
 /// prepared each time the tab is shown (<see cref="LoadCommand"/>, which the main window runs as it runs every tab's) and
 /// each time another choice is made. This product is the Products screen's product as it shows it, unsaved edits
 /// included; a folder or all products are read as they're saved (SavedProductReader), each starting a page of its own
-/// after a contents page (the user's choices, 2026-09-27).
+/// after a contents page.
 /// </summary>
 public sealed class PrintTabViewModel : ViewModelBase
 {
@@ -231,8 +231,7 @@ public sealed class PrintTabViewModel : ViewModelBase
         var printedAt = DateTime.Now;
 
         // At the costs the Products screen shows: buffered, unless it's been switched to unbuffered. Read together, in the
-        // same dozen or so queries however many products the set holds (2026-10-03; they were read one at a time, with
-        // "Preparing 12 of 30…" while they were).
+        // same dozen or so queries however many products the set holds.
         Progress = products.Count == 1 ? "Preparing 1 product…" : $"Preparing {products.Count} products…";
         var saved = await _savedProducts.ReadAllAsync(products, _products.CostBasis, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();

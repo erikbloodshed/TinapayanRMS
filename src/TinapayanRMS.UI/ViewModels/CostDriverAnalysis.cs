@@ -6,7 +6,7 @@ using TinapayanRMS.Pricing;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// A row of Reports' Cost Drivers (2026-10-29): a purchased material, and what it makes up of the products in Production,
+/// A row of Reports' Cost Drivers: a purchased material, and what it makes up of the products in Production,
 /// one sellable unit of each.
 /// </summary>
 /// <param name="CostInProducts">What one of each product using it spends on it, added up: its share of their material costs, in pesos.</param>

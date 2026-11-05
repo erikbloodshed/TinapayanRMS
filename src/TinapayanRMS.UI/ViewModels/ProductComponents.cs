@@ -10,7 +10,7 @@ namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// A composite's Products table, in the Products screen's Recipe Structure (ComponentsSectionView, through
-/// ProductsViewModel.ComponentsTable, since 2026-10-28): its lines, each a product and how many of it go in, the add row,
+/// ProductsViewModel.ComponentsTable): its lines, each a product and how many of it go in, the add row,
 /// what the product cell offers, and what each product brings, read off the UI thread once per product. The screen keeps
 /// whether the composite takes its products' packaging (a product field and an undo step), the undo history these lines
 /// are part of, and the costs they add up to.

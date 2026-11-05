@@ -15,10 +15,10 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// The Price Simulator screen (2026-10-03): try raw material price changes and see every product's cost, suggested price and
+/// The Price Simulator screen: try raw material price changes and see every product's cost, suggested price and
 /// markup with them, beside what they are now. A change reaches made and linked ingredients as a real one would
 /// (IngredientCostRules.Reprice) and products through the same pricing as Reports (SavedProductReader). No real price is
-/// changed. The changes last while the app is open, and can be saved under a name as a scenario (2026-10-22) to open again.
+/// changed. The changes last while the app is open, and can be saved under a name as a scenario to open again.
 /// </summary>
 public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
 {
@@ -57,7 +57,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
 
     private CostBasis _costBasis;
     /// <summary>
-    /// Which of the materials' costs every figure is at (2026-10-24, at the user's request): buffered, as always, until the
+    /// Which of the materials' costs every figure is at: buffered, as always, until the
     /// Products card's Unbuffered button (<see cref="ToggleCostBasisCommand"/>) switches to their true costs, as the Products
     /// screen's does. The table, Print Report and Export to Excel all follow it. For the session only: nothing is saved, and
     /// it isn't part of a scenario.

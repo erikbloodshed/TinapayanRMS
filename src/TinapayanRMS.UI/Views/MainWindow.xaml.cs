@@ -103,7 +103,7 @@ public sealed partial class MainWindow : AppWindow, IVimHost
         _loadCommands[PriceSimulatorTab] = priceSimulatorViewModel.LoadCommand;
 
         // Print's load prepares its pages again: This product as Products shows it now, so the tab follows the edits made
-        // there, and the product opened there, since it was last shown (the user's choice, 2026-09-27); a set as it's saved.
+        // there, and the product opened there, since it was last shown; a set as it's saved.
         _loadCommands[PrintTab] = printTabViewModel.LoadCommand;
 
         _tabs[AppScreen.RawMaterials] = RawMaterialsTab;
@@ -234,7 +234,7 @@ public sealed partial class MainWindow : AppWindow, IVimHost
     /// </summary>
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        // Ctrl+K: Find, from anywhere in the window, a grid or a box included (2026-10-29).
+        // Ctrl+K: Find, from anywhere in the window, a grid or a box included.
         if (e.Key == Key.K && e.KeyboardDevice.Modifiers == ModifierKeys.Control)
         {
             OpenFind();
@@ -486,7 +486,7 @@ public sealed partial class MainWindow : AppWindow, IVimHost
 
     /// <summary>
     /// Makes a tab's screen the first time the tab is shown, and keeps it from then on. Making all seven at startup took
-    /// most of the time between the window appearing and the app being ready (2026-10-22), and a session seldom opens
+    /// most of the time between the window appearing and the app being ready, and a session seldom opens
     /// them all. A screen's ViewModel exists from the start, so a link from another screen can open a record on one
     /// that isn't made yet: the screen shows it once it's made and loaded.
     /// </summary>

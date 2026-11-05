@@ -62,8 +62,8 @@ public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbCont
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        // The link goes and the lines it showed take its place in one transaction (2026-10-03): they were two saves on two
-        // contexts, so lines refused after the link had gone left the product with no packaging at all.
+        // The link goes and the lines it showed take its place in one transaction, so lines refused after the link had gone
+        // can't leave the product with no packaging at all.
         await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         var link = await dbContext.PackagingLinks.FirstOrDefaultAsync(l => l.ProductId == productId, cancellationToken);
         if (link is null)

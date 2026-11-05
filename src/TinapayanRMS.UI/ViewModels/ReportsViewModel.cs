@@ -58,7 +58,7 @@ public sealed class ProductCostRow(Product product, ProductCostSummary costs)
     public decimal SuggestedPrice => costs.SellingPrice;
 
     /// <summary>
-    /// <see cref="SuggestedPrice"/> rounded up to a price the shop would charge (Settings' price rounding, 2026-10-29); the
+    /// <see cref="SuggestedPrice"/> rounded up to a price the shop would charge (Settings' price rounding); the
     /// same figure without rounding.
     /// </summary>
     public decimal RoundedPrice => costs.RoundedSellingPrice;
@@ -73,7 +73,7 @@ public sealed class ProductCostRow(Product product, ProductCostSummary costs)
     public decimal TargetMarkupPercent => costs.MarginPercent;
 
     /// <summary>
-    /// How many percentage points the current price's markup is short of <see cref="TargetMarkupPercent"/> (2026-10-29); null
+    /// How many percentage points the current price's markup is short of <see cref="TargetMarkupPercent"/>; null
     /// when it isn't short, or there's no current price. Sorting by it puts the furthest short first.
     /// </summary>
     public decimal? ShortOfTargetMarkup => costs.IsBelowTargetMarkup ? costs.MarginPercent - costs.CurrentMarkupPercent : null;
@@ -138,7 +138,7 @@ public sealed class RawMaterialPriceSummaryRow
 }
 
 /// <summary>
-/// A row of Reports' Cost Buffers (2026-10-29): a purchased material with a price, its fixed buffered cost against its dearest
+/// A row of Reports' Cost Buffers: a purchased material with a price, its fixed buffered cost against its dearest
 /// brand now, and the buffer that leaves against the one last typed for it (RawMaterialRules.TargetBufferPercentOf). Rising
 /// prices wear a buffer down, since the buffered cost doesn't follow them.
 /// </summary>
@@ -191,12 +191,12 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
 
     public const string MarginErosionTitle = "Margin Erosion";
 
-    /// <summary>The purchased materials that make up most of what the products in Production cost, the most first (2026-10-29).</summary>
+    /// <summary>The purchased materials that make up most of what the products in Production cost, the most first.</summary>
     public ObservableCollection<CostDriverRow> CostDrivers { get; } = [];
 
     private IReadOnlyList<MarginErosionRow> _allMarginErosion = [];
 
-    /// <summary>Each product's markup as it stood on <see cref="MarginErosionSince"/> against now, the furthest dropped first (2026-10-29).</summary>
+    /// <summary>Each product's markup as it stood on <see cref="MarginErosionSince"/> against now, the furthest dropped first.</summary>
     public ObservableCollection<MarginErosionRow> MarginErosion { get; } = [];
 
     private DateTime _marginErosionSince = DateTime.Today.AddDays(-30);
@@ -375,8 +375,7 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Every product as it's saved, priced as the Products screen prices it once opened (SavedProductReader, which the
     /// screen and Print read through too). All of them are read together, in the same dozen or so queries however many
-    /// products there are (2026-10-03: they were read a product at a time, nine or so queries each, several products at
-    /// once). The rows stay in the list's order, by name.
+    /// products there are. The rows stay in the list's order, by name.
     /// </summary>
     private async Task<(List<ProductCostRow> Rows, IReadOnlyList<SavedProduct> Saved)> ReadProductCostsAsync()
     {

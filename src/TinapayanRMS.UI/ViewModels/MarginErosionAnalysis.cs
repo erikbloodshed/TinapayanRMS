@@ -8,7 +8,7 @@ using TinapayanRMS.Pricing;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// A row of Reports' Margin Erosion (2026-10-29): a product's markup at its current price as it stood on a date, its latest
+/// A row of Reports' Margin Erosion: a product's markup at its current price as it stood on a date, its latest
 /// version saved by then priced at its costs then, against now.
 /// </summary>
 /// <param name="VersionNumber">The version it's compared with, the latest saved on or before the date.</param>

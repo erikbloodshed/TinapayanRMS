@@ -140,7 +140,7 @@
 
                 <!--
                     The figures then, oldest version on the left, on one peso axis. The table above has the same figures, so
-                    the series' colours (checked for colour-blind readers, 2026-10-17) needn't carry them alone; a legend and
+                    the series' colours (checked for colour-blind readers) needn't carry them alone; a legend and
                     a tooltip on each point name them too. A version with no current price leaves a gap in that line.
                 -->
                 <Grid Grid.Column="2">

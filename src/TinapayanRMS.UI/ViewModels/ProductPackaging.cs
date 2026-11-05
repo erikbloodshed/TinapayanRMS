@@ -9,8 +9,8 @@ using TinapayanRMS.Pricing;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// The Products screen's Packaging tab, in its Recipe Structure (PackagingSectionView, through ProductsViewModel.Packaging,
-/// since 2026-10-28): the per-piece packaging lines, typed straight into its table, or what they link (another product's
+/// The Products screen's Packaging tab, in its Recipe Structure (PackagingSectionView, through ProductsViewModel.Packaging):
+/// the per-piece packaging lines, typed straight into its table, or what they link (another product's
 /// packaging, or a set on the Sub-Assemblies screen), a Move to Sub-Assemblies waiting for Save, and what was last loaded,
 /// which Save compares against. The screen keeps whether the product has packaging at all (HasPackaging, the tab), the
 /// undo history these are part of, and the commands that change them as undo steps.

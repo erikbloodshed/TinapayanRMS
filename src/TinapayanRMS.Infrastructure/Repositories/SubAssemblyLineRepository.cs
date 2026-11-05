@@ -87,7 +87,7 @@ public sealed class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbCo
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // A made ingredient made from it has these lines in its BOM (IngredientBoms), so each is checked for a loop through
-        // them, then repriced, which reaches every made ingredient and sub-assembly using it in turn (2026-10-27).
+        // them, then repriced, which reaches every made ingredient using it in turn.
         var madeFromIt = await dbContext.RawMaterials
             .Where(m => m.SubAssemblyId == subAssembly.Id)
             .Select(m => new { m.Id, m.Name })

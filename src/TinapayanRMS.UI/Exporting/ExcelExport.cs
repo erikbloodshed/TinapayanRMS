@@ -9,7 +9,7 @@ using Syncfusion.XlsIO;
 namespace TinapayanRMS.UI.Exporting;
 
 /// <summary>
-/// Writes grids to an Excel workbook as the screen shows them, through Syncfusion's grid converter (2026-10-03): the
+/// Writes grids to an Excel workbook as the screen shows them, through Syncfusion's grid converter: the
 /// rows in the grid's current sort and filter (its View), the columns the user hasn't hidden, one sheet per grid.
 /// What the converter leaves to its caller is done here:
 /// <list type="bullet">

@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.Infrastructure.Queries;
 
 /// <summary>
-/// Every made ingredient's bill of materials, read from what it's made of (2026-10-27): the lines of the sub-assembly it's
+/// Every made ingredient's bill of materials, read from what it's made of: the lines of the sub-assembly it's
 /// made from, then its own add-ins. The one definition of it, so the cascade (IngredientCostPropagator), the cycle check
 /// (IngredientDependencies) and every screen reading a BOM (IngredientBomLineRepository) can't disagree. A sub-assembly
 /// line edit changes the BOM of every made ingredient made from it, which is why SubAssemblyLineRepository.SetLinesAsync

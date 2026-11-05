@@ -17,7 +17,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// in their order, and which of them are product-owned (a section made in a product stays that product's own).
 /// Picking a role loads it for editing; New, or finishing a Save or Delete, clears the form, so the next Save
 /// always adds a role rather than renaming the last one touched. A new role goes last; Move Up and Move Down change
-/// the picked one's place (2026-09-29, at the user's request, in place of an Order box on the form).
+/// the picked one's place.
 /// </summary>
 public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
 {

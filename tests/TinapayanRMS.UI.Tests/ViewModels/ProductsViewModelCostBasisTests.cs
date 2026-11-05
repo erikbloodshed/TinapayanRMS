@@ -126,7 +126,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
     /// true), and a gift box a piece, 30 buffered and 25 true.
     /// </summary>
     // Every cost on the screen is at buffered costs, and a purchased material's is a fixed amount that rising prices can
-    // pass: the product was then priced under what it cost with nothing here to say so (2026-11-05).
+    // pass: the product is then priced under what it costs, which the screen has to say.
     [Fact]
     public Task The_header_says_when_prices_have_risen_past_a_materials_buffered_cost() => StaThread.RunAsync(async () =>
     {

@@ -7,7 +7,7 @@ using Syncfusion.UI.Xaml.TreeGrid;
 namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
-/// Every SfDataGrid's and SfTreeGrid's header row is as tall as its text needs (2026-09-27, at the user's request). The Windows11Light
+/// Every SfDataGrid's and SfTreeGrid's header row is as tall as its text needs. The Windows11Light
 /// theme's grid style fixes it at 24px, sized for its own 12px body text; since the fonts went up to 14px (App's theme
 /// settings), a header's text needs 19px plus the header cell's 3px padding above and below and its 1px bottom border,
 /// so descenders were cut off ("Ingredient" read "Inqredient").

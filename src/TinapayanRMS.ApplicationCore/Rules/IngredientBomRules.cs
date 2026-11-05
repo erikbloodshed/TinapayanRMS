@@ -1,8 +1,8 @@
 namespace TinapayanRMS.ApplicationCore.Rules;
 
 /// <summary>
-/// A made ingredient's bill of materials: the lines of the sub-assembly it's made from and its own add-ins (2026-10-27;
-/// until then a BOM of its own), less its weight loss.
+/// A made ingredient's bill of materials: the lines of the sub-assembly it's made from and its own add-ins, less its
+/// weight loss.
 /// </summary>
 public static class IngredientBomRules
 {

@@ -310,7 +310,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
 
         var act = () => CreateRepository().DeleteAsync(eggId, Cancellation);
 
-        // Refused before the foreign key would, naming the part (2026-11-05): the key's own refusal said only "in use elsewhere".
+        // Refused before the foreign key would, naming the part: the key's own refusal says only "in use elsewhere".
         (await act.Should().ThrowAsync<BusinessRuleException>()).Which.Message
             .Should().Be("Egg can't be deleted while it's used: Egg White (linked to it). Take it out of them first.");
     }

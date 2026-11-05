@@ -5,7 +5,7 @@ using TinapayanRMS.Pricing;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// The Products screen's Costing tab (CostingCard, through ProductsViewModel.Costing, since 2026-10-28): the costing
+/// The Products screen's Costing tab (CostingCard, through ProductsViewModel.Costing): the costing
 /// percentages as typed, each metric's amount, and the cost summary worked out from them and the recipe. The screen
 /// supplies the recipe's figures and says when (<see cref="Recompute"/>); it also keeps the undo history, which these
 /// percentages are part of. What Save compares against, the costing as loaded, and a new product's defaults are here.

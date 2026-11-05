@@ -6,7 +6,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 namespace TinapayanRMS.ApplicationCore.Rules;
 
 /// <summary>
-/// The database backups' rules (2026-10-03): how a backup file is named and read back, when the day's automatic backup is
+/// The database backups' rules: how a backup file is named and read back, when the day's automatic backup is
 /// due and which old ones go, what a backup file says of itself, and whether a restored database is one this version of the
 /// app can use.
 /// </summary>
@@ -64,8 +64,8 @@ public static class BackupRules
     /// <summary>
     /// <see cref="FileNameFor"/>'s name, a second later for each one <paramref name="isTaken"/> says is already in the folder.
     /// Names only go to the second, and two backups in the same second mustn't share a file: a restore's safety backup taken
-    /// within a second of the one before it overwrote it, and the restore then put back the data it was
-    /// replacing. Found by DatabaseBackupsTests (2026-10-07). Still a name <see cref="TryParse"/> reads, in order.
+    /// within a second of the one before it would overwrite it, and the restore would then put back the data it was
+    /// replacing. Still a name <see cref="TryParse"/> reads, in order.
     /// </summary>
     public static string FreeFileNameFor(string databaseName, BackupKind kind, DateTime takenAt, Func<string, bool> isTaken)
     {

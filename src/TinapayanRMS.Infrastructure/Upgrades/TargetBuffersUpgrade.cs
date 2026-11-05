@@ -4,9 +4,8 @@ using TinapayanRMS.Domain.Enums;
 namespace TinapayanRMS.Infrastructure.Upgrades;
 
 /// <summary>
-/// Gives every purchased material saved before targets were kept (RawMaterial.TargetCostBufferPercent, 2026-10-29) the
-/// target it has been read as since: its buffer percent as last saved. Every save stores one since 2026-11-05, so after
-/// this every purchased material has its own.
+/// Gives every purchased material saved before targets were kept (RawMaterial.TargetCostBufferPercent) the target it was
+/// read as: its buffer percent as last saved. Every save stores one, so after this every purchased material has its own.
 /// </summary>
 internal static class TargetBuffersUpgrade
 {

@@ -219,9 +219,9 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         (await dbContext.Products.AnyAsync(p => p.Name == "Pasalubong Box", Cancellation)).Should().BeFalse();
     });
 
-    // A composite holding itself, through the products in it, can only come of an edit outside the app. Its read was
-    // refused, and with it every product's (the list's, Reports', the servers'). It opens now and says so, and Save still
-    // refuses the loop (2026-11-05).
+    // A composite holding itself, through the products in it, can only come of an edit outside the app. Its read mustn't be
+    // refused, taking every product's with it (the list's, Reports', the servers'): it opens and says so, and Save still
+    // refuses the loop.
     [Fact]
     public Task A_composite_that_holds_itself_opens_with_a_notice_and_Save_still_refuses_the_loop() => StaThread.RunAsync(async () =>
     {

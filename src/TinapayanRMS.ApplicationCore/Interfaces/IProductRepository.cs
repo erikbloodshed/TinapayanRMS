@@ -59,7 +59,7 @@ public closed record SectionPlacement
     public sealed record MoveToSubAssemblies : SectionPlacement;
 
     /// <summary>
-    /// Move to In-House (2026-10-27; until then the lines became a bill of materials of the made ingredient's own): moved to
+    /// Move to In-House: moved to
     /// the Sub-Assemblies screen as <see cref="MoveToSubAssemblies"/> is, and a new made ingredient is made from it. The
     /// product links it at the same piece size, so it costs what it did.
     /// </summary>

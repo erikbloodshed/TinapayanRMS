@@ -161,7 +161,7 @@ public sealed class ProductCostSummary
     public bool HasPriceRounding => PriceRoundingStep > 0m;
 
     /// <summary>
-    /// The selling price rounded up to a price the shop would charge (CostingRules.RoundPriceUp, 2026-10-29): the exact one
+    /// The selling price rounded up to a price the shop would charge (CostingRules.RoundPriceUp): the exact one
     /// when there's no rounding. Only shown and offered; every figure above it stays exact.
     /// </summary>
     public decimal RoundedSellingPrice => CostingRules.RoundPriceUp(SellingPrice, PriceRoundingStep);
@@ -175,7 +175,7 @@ public sealed class ProductCostSummary
     public bool IsCurrentPriceBelowCost => CurrentMarkupPercent < 0;
 
     /// <summary>
-    /// The current price earns less than the costing's Markup % (2026-10-29, at the user's request), compared as they're shown,
+    /// The current price earns less than the costing's Markup %, compared as they're shown,
     /// to 2 decimals, so a price that rounds to the target isn't flagged: amber in the header, the Products list and Reports.
     /// </summary>
     public bool IsBelowTargetMarkup => CurrentMarkupPercent is { } earned && Math.Round(earned, 2) < Math.Round(MarginPercent, 2);

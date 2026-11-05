@@ -14,8 +14,8 @@ public enum UnsavedChangesAnswer
 }
 
 /// <summary>
-/// A screen whose form can hold unsaved changes: Products, Raw Materials and Sub-Assemblies. It's never left with them
-/// (2026-10-29, at the user's request: "don't leave that tab until it's been saved"): the main window asks it before
+/// A screen whose form can hold unsaved changes: Products, Raw Materials and Sub-Assemblies. It's never left with them:
+/// the main window asks it before
 /// another tab shows or the app closes, and the screen asks itself before its form shows another record.
 /// </summary>
 public interface IUnsavedChangesScreen

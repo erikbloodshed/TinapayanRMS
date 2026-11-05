@@ -11,7 +11,7 @@ namespace TinapayanRMS.Infrastructure;
 /// <summary>
 /// A host with the app's database and every repository registered, from the appsettings.json beside it: what the app
 /// (CompositionRoot) and its two servers, the Recipe API and the MCP server, all start from, so they reach the same database the
-/// same way. Moved out of CompositionRoot on 2026-11-04, when the servers stopped referencing the UI project.
+/// same way. It's here, not in the UI project, because the servers can't reference that.
 /// </summary>
 public static class DatabaseHost
 {

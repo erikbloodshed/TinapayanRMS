@@ -10,9 +10,8 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Views;
 
 /// <summary>
-/// A printout previewed and printed in a dialog (2026-10-03): the Price Simulator report (2026-10-06), which isn't the
-/// Products screen's, so it doesn't go to the main window's Print tab. (The Production Plan's printout was the first, until
-/// the plan moved to TinapayanBMS on 2026-10-31.) The window is themed before the pane goes into it: a PrintPreview
+/// A printout previewed and printed in a dialog: the Price Simulator report, which isn't the
+/// Products screen's, so it doesn't go to the main window's Print tab. The window is themed before the pane goes into it: a PrintPreview
 /// already in a window when SfSkinManager themes the window throws (PrintPreviewThemeOrderTests), so whoever opens this
 /// mustn't theme it again.
 /// </summary>

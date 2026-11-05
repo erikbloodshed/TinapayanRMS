@@ -15,9 +15,9 @@ namespace TinapayanRMS.ApplicationCore.Interfaces;
 public sealed record ProductVersionContent
 {
     /// <summary>
-    /// The shape written today. A later change of shape bumps it, so an old snapshot can still be read. 2 (2026-11-05):
-    /// each section keeps its label (VersionSection.Label), which 1 read from the sub-assembly's name. 3 (2026-11-05): the
-    /// VAT is the shop's (<see cref="VatPercent"/>), where 2 and before kept the product's own in its costing.
+    /// The shape written today. A later change of shape bumps it, so an old snapshot can still be read. 2: each section
+    /// keeps its label (VersionSection.Label), which 1 read from the sub-assembly's name. 3: the VAT is the shop's
+    /// (<see cref="VatPercent"/>), where 2 and before kept the product's own in its costing.
     /// </summary>
     public const int CurrentSchema = 3;
 
@@ -88,9 +88,8 @@ public sealed record ProductVersionContent
 }
 
 /// <summary>
-/// A version snapshot's JSON, written and read by code generated at compile time rather than by reflection (2026-10-29):
-/// enums by name and nulls left out, as the reflection-based options it replaced had them, so snapshots saved before read
-/// the same.
+/// A version snapshot's JSON, written and read by code generated at compile time rather than by reflection: enums by name
+/// and nulls left out, the format every snapshot in the database was written in.
 /// </summary>
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, UseStringEnumConverter = true)]
 [JsonSerializable(typeof(ProductVersionContent))]

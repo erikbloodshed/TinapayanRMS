@@ -18,8 +18,7 @@ public static class ProductRules
 
     /// <summary>
     /// A product's name as it's saved: without spaces at either end, and refused when there's nothing else. PostgreSQL's
-    /// collation counts a space at the end, so "Pandesal " would get past the unique index beside "Pandesal", where SQL
-    /// Server's ignored it (found 2026-11-03, by a code review).
+    /// collation counts a space at the end, so "Pandesal " would get past the unique index beside "Pandesal".
     /// </summary>
     public static string StoredName(string name)
     {
@@ -45,7 +44,7 @@ public static class ProductRules
     /// <summary>
     /// A product's whole set of usages: an empty set is valid (PLAN.md doesn't require a product to
     /// have a usage at all times), and so is a piece size of 0 — a section can go into the recipe before
-    /// anyone knows how much of it a piece takes (2026-09-20, at the user's request), and until it's
+    /// anyone knows how much of it a piece takes, and until it's
     /// known the section costs the product nothing per piece (ResolvePieceSize, CalculateUsageCostPerPiece).
     /// A negative piece size is still nonsense, and a product uses each sub-assembly once.
     /// </summary>

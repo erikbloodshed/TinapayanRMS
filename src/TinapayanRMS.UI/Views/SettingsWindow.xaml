@@ -1,5 +1,5 @@
 <!--
-    Chromeless, as MainWindow is (2026-09-29, at the user's request): an AppWindow, so the title bar is the theme's, in the
+    Chromeless, as MainWindow is: an AppWindow, so the title bar is the theme's, in the
     main window's card colour and height, with its own Maximize/Restore and Close. No Minimize: the dialog is modal and
     has no taskbar button, so minimized it would only leave the main window disabled behind a sliver of title bar. The
     heading is a left header item, as the main window's is, since the theme draws ShowTitle's text flush against the

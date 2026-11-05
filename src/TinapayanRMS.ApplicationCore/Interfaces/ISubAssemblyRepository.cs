@@ -66,9 +66,8 @@ public interface ISubAssemblyRepository
     Task<IReadOnlyDictionary<int, IReadOnlyList<MadeIngredientUse>>> GetMadeIngredientsBySubAssemblyAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Make In-House Ingredient on the Sub-Assemblies screen (2026-10-27; until then Move to In-House, which moved the
-    /// lines into a bill of materials of the made ingredient's own): a new made ingredient (<paramref name="made"/>) made
-    /// from this recipe, with no add-ins and no weight loss, in one transaction. The recipe stays here as it is, and the
+    /// Make In-House Ingredient on the Sub-Assemblies screen: a new made ingredient (<paramref name="made"/>) made from this
+    /// recipe, with no add-ins and no weight loss, in one transaction. The recipe stays here as it is, and the
     /// products linking it are left alone. Refused for a packaging set, a product's own, and a name another raw material
     /// has. Returns the made ingredient's id.
     /// </summary>

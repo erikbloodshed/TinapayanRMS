@@ -230,7 +230,7 @@ public class ProductVersionRulesTests
     [Fact]
     public void A_snapshot_saved_with_shrinkage_before_there_was_wastage_still_reads()
     {
-        // Until 2026-10-23 each section had a ShrinkagePercent, and there was no WastagePercent: the one is ignored, and
+        // An older snapshot has a ShrinkagePercent on each section and no WastagePercent: the one is ignored, and
         // the other reads as none, so the version prices with no wastage.
         var json = Base.ToJson().Replace("\"AuthoredValue\":60", "\"AuthoredValue\":60,\"ShrinkagePercent\":3", StringComparison.Ordinal);
         json.Should().Contain("ShrinkagePercent");

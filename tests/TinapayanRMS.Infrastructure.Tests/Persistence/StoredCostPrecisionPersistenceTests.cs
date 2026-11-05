@@ -10,8 +10,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
 /// <summary>
 /// A cost that doesn't come out even (₱170 a pack of 240 is ₱0.708333… a piece) is worked out to 28 places in memory and
-/// stored to 20. Until 2026-10-03 the two were compared as they were, so a Save that changed nothing read the cost as
-/// changed: it logged the same price in price history again, and moved the cost's date.
+/// stored to 20. Compared as they are, a Save that changed nothing would read the cost as
+/// changed: it would log the same price in price history again, and move the cost's date.
 /// </summary>
 [Collection(DatabaseCollection.D)]
 public class StoredCostPrecisionPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)

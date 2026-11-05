@@ -8,7 +8,7 @@ namespace TinapayanRMS.ApplicationCore.Interfaces;
 public sealed record LinkingProduct(int Id, string Name, string? CategoryName, bool IsComposite = false)
 {
     /// <summary>
-    /// What the material makes up of the product's material cost, "38% of materials" (2026-10-29, Raw Materials' Used By);
+    /// What the material makes up of the product's material cost, "38% of materials" (Raw Materials' Used By);
     /// null where it isn't worked out, as on Sub-Assemblies' tiles.
     /// </summary>
     public string? CostShareText { get; init; }

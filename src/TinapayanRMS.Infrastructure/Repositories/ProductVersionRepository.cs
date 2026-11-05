@@ -65,8 +65,8 @@ public sealed class ProductVersionRepository(IDbContextFactory<TinapayanRMSDbCon
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        // Serializable, as AddAsync's. Every product's latest comes in one read, however many products there are
-        // (2026-10-17: a call of AddAsync each was 209 commands for a sub-assembly 40 products link).
+        // Serializable, as AddAsync's. Every product's latest comes in one read, however many products there are (a call of
+        // AddAsync each would be over 200 commands for a sub-assembly 40 products link).
         await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
         List<int> productIds = [.. drafts.Select(d => d.ProductId).Distinct()];
         var latestByProduct = await dbContext.Products

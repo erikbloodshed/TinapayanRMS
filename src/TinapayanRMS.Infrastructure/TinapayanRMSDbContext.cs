@@ -22,8 +22,7 @@ public sealed class TinapayanRMSDbContext : DbContext
     public DateTime LocalNow() => Clock.GetLocalNow().DateTime;
 
     /// <summary>
-    /// Every string column's collation: case-insensitive but accent-sensitive, as SQL Server's default was until the move
-    /// to PostgreSQL (2026-10-21). The unique name indexes rely on it (a raw material "flour" is a duplicate of "Flour"),
+    /// Every string column's collation: case-insensitive but accent-sensitive. The unique name indexes rely on it (a raw material "flour" is a duplicate of "Flour"),
     /// and so does the order names sort in. PostgreSQL's own collations are case-sensitive, hence this ICU one.
     /// </summary>
     public const string CaseInsensitiveCollation = "case_insensitive";

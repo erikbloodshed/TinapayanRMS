@@ -7,8 +7,7 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 public readonly record struct IngredientCosts(decimal CostPerBaseUnit, decimal BufferedCostPerBaseUnit, decimal CostBufferPercent);
 
 /// <summary>
-/// How a made or linked ingredient's costs follow from what it's made of or cut from (2026-10-03, moved out of
-/// IngredientCostPropagator). The cascade stores what this works out; the Price Simulator screen works it out over prices that
+/// How a made or linked ingredient's costs follow from what it's made of or cut from. The cascade stores what this works out; the Price Simulator screen works it out over prices that
 /// aren't real (<see cref="Reprice"/>). One piece of code for both, so a simulation can never price an ingredient differently
 /// from how a real price change would.
 /// </summary>
@@ -22,8 +21,8 @@ public static class IngredientCostRules
     /// <item>Linked: the same share of the linked-to ingredient's true cost and of its buffered cost, so a part follows the
     /// linked-to one's fixed buffered cost, and its buffer percent copied for show, so a buffer change reaches the parts.</item>
     /// <item>Made (or a link missing a field): two rollups of its BOM lines, the true cost from the components' true costs
-    /// and the buffered cost from their buffered ones, with no buffer of its own on top (2026-09-21, at the user's
-    /// request), since every component's buffer is already in its figure. The weight loss divides both. Its buffer
+    /// and the buffered cost from their buffered ones, with no buffer of its own on top, since every component's buffer is
+    /// already in its figure. The weight loss divides both. Its buffer
     /// percent is 0, as a made ingredient has no buffer box on the screen.</item>
     /// </list>
     /// </summary>
@@ -65,7 +64,7 @@ public static class IngredientCostRules
     /// <summary>
     /// The materials a change to <paramref name="materialId"/>'s cost reaches: itself, and every made and linked
     /// ingredient depending on it, however deeply, the ones <see cref="Reprice"/> works out again (the Price Simulator report's
-    /// "price changes applied" to a product, 2026-10-06).
+    /// "price changes applied" to a product).
     /// </summary>
     public static IReadOnlySet<int> ReachedBy(IEnumerable<RawMaterial> materials, IEnumerable<IngredientBomLine> bomLines, int materialId) =>
         IngredientCostGraph.GetDependentsInOrder(materialId, Dependencies(materials, bomLines)).Prepend(materialId).ToHashSet();

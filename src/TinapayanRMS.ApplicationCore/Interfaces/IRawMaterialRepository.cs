@@ -40,7 +40,7 @@ public interface IRawMaterialRepository
     Task UpdateAsync(RawMaterial material, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Puts each purchased material's target buffer back on top of its dearest brand (2026-10-29, Reports' Cost Buffers): its
+    /// Puts each purchased material's target buffer back on top of its dearest brand (Reports' Cost Buffers): its
     /// buffered cost becomes that, and its buffer percent the target again, with the cascade a Save runs, all in one
     /// transaction. A material with no price, or not purchased, is passed over, and so is one already at its target.
     /// Returns how many were changed.

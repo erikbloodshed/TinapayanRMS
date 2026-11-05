@@ -10,7 +10,7 @@ namespace TinapayanRMS.UI.Controls;
 /// the window region (SetBorderMask, from its WM_SIZE hook and its StateChanged handler). The mask only rounds the
 /// content's bottom corners to the window's CornerRadius. After a restore from the taskbar WPF can draw a frame before
 /// the brush has anything to show, and an empty mask hides everything: the window went black for a frame, most
-/// restores (2026-09-29, found by the user). A bare ChromelessWindow did it too, and never with the mask off.
+/// restores. A bare ChromelessWindow did it too, and never with the mask off.
 /// </summary>
 public static class ChromelessWindowMask
 {

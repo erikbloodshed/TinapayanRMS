@@ -6,8 +6,8 @@ namespace TinapayanRMS.UI.ViewModels;
 /// <summary>
 /// Runs a screen's load each time its tab is shown (MainWindow.LoadSelectedTab), never two of one screen's side by side.
 /// One asked for while the screen's last is still running follows it once it's done, if the screen still shows: the
-/// running one may have read before another screen changed what it shows. Until 2026-11-05 such a showing was dropped,
-/// and the screen kept what the earlier load had read until it was shown again.
+/// running one may have read before another screen changed what it shows, and dropped, the screen would keep what that
+/// load read until it was shown again.
 /// </summary>
 /// <param name="isShowing">Whether a screen is the one showing now.</param>
 public sealed class ScreenLoads<TScreen>(Func<TScreen, bool> isShowing)

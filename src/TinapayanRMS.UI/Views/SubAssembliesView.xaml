@@ -20,7 +20,7 @@
         </DataTemplate>
         <!--
             A header figure's value, under its label (FigureTileLabelStyle), sized as the Products and Raw Materials
-            headers' figures are, and centred in the figure's tile as theirs are (2026-09-25, at the user's request)
+            headers' figures are, and centred in the figure's tile as theirs are
         -->
         <Style x:Key="TotalValueStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="16" />
@@ -53,9 +53,9 @@
         <sa:SubAssemblyListCard Grid.Column="0" />
 
         <!--
-            As on Products and Raw Materials (2026-10-06, at the user's request): the header card, with the title, the
+            As on Products and Raw Materials: the header card, with the title, the
             buttons, the figures and the fields typed in, then the details in a card of their own, 4px under it. The
-            header stays put while the details scroll. They shared one scrolling card until then.
+            header stays put while the details scroll.
         -->
         <Grid Grid.Column="2">
             <Grid.RowDefinitions>
@@ -115,11 +115,9 @@
 
                     <!--
                         The batch totals first, each label over its figure as the other headers' figures are; then the
-                        fields 16 under them, each label on the left of its field (FormLabelStyle; 2026-09-24, at the
-                        user's request, as the Products header has them). They shared one row, labels above, until then.
-                        The figures take equal shares of the width (2026-09-25, at the user's request, as the Raw
-                        Materials and Products headers lay theirs out), each on a tile of its own colour with a gap
-                        between each (a thin line until later that day); they sat packed at the left, 24 apart, before.
+                        fields 16 under them, each label on the left of its field (FormLabelStyle, as the
+                        Products header has them). The figures take equal shares of the width (as the Raw Materials
+                        and Products headers lay theirs out), each on a tile of its own colour with a gap between each.
                         A packaging set's Set Cost stands alone in the first share, with the gaps hidden.
                     -->
                     <Grid>
@@ -238,7 +236,7 @@
             </Border>
 
             <!--
-                The details in tabs along the bottom (2026-10-06, at the user's request), as Products and Raw Materials have
+                The details in tabs along the bottom, as Products and Raw Materials have
                 theirs: the recipe, and the products that link it. In a card of its own with 4px padding, so the tabs get the
                 rounded corners the theme's square frame doesn't have; the tab control draws no frame (BorderThickness 0).
                 Each tab scrolls on its own, so the strip stays put.
@@ -429,7 +427,7 @@
                                         </StackPanel>
                                     </Grid>
 
-                                    <!-- Scale (2026-10-29): every line by the factor that makes the batch, or its base, weigh what's typed. One undo step; not for a packaging set. -->
+                                    <!-- Scale: every line by the factor that makes the batch, or its base, weigh what's typed. One undo step; not for a packaging set. -->
                                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0"
                                                 Visibility="{Binding IsPackaging, Converter={StaticResource EmptyStateVisibilityConverter}}">
                                         <TextBlock Text="Scale" Style="{StaticResource FormLabelStyle}" />

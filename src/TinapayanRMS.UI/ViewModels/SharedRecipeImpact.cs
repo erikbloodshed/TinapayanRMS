@@ -12,8 +12,8 @@ public sealed record RecipeImpact(string ProductName, decimal BaseCostBefore, de
 }
 
 /// <summary>
-/// What saving new lines for a standalone sub-assembly does to the products linking it (2026-10-29, at the user's request:
-/// "show what it does to each product's cost, Cheese Roll +0.42"): each priced as saved, and again with the new lines in
+/// What saving new lines for a standalone sub-assembly does to the products linking it (Cheese Roll +0.42): each
+/// priced as saved, and again with the new lines in
 /// place of the sub-assembly's, at buffered costs. The products using a made ingredient made from it change too, which
 /// the question says without pricing them.
 /// </summary>

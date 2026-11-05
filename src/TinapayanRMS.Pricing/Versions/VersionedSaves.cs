@@ -15,10 +15,9 @@ public sealed record ProductSaved(int Id, Product Product, ProductDetail Detail,
 public sealed record SubAssemblySaved(int Id, IReadOnlyList<string> ProductsVersioned);
 
 /// <summary>
-/// The saves that record product versions, each in one unit of work with the versions it records (IUnitOfWork, since
-/// 2026-10-28), so a save and its versions are written together or not at all: a version that can't be recorded takes
-/// its save back, where until then the save stood and the next one recorded the version. Its reads run one at a time,
-/// as a unit of work's must.
+/// The saves that record product versions, each in one unit of work with the versions it records (IUnitOfWork), so a
+/// save and its versions are written together or not at all: a version that can't be recorded takes its save back. Its
+/// reads run one at a time, as a unit of work's must.
 /// </summary>
 public sealed class VersionedSaves(
     IUnitOfWork unitOfWork,

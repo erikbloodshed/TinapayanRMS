@@ -66,9 +66,9 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         subAssemblyIds.Count == 0 && productIds.Count == 0
             ? Task.FromResult<IReadOnlyList<int>>([])
             : dbContextFactory.QueryAsync<int>(
-                // The app refuses a loop of packaging links (PackagingLinkRules), but one left by an edit outside it ran until
-                // the command timed out, and a save waits on this, so chain stops where a product comes round again (CYCLE,
-                // 2026-11-04, as RawMaterialRepository.UsedBySql does).
+                // The app refuses a loop of packaging links (PackagingLinkRules), but one left by an edit outside it would run
+                // until the command timed out, and a save waits on this, so chain stops where a product comes round again
+                // (CYCLE, as RawMaterialRepository.UsedBySql does).
                 """
                 WITH RECURSIVE seeds AS (
                     SELECT unnest(@productIds) AS product_id

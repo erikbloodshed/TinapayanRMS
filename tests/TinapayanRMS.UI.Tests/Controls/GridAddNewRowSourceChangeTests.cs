@@ -10,9 +10,9 @@ namespace TinapayanRMS.UI.Tests.Controls;
 
 /// <summary>
 /// A lines table whose lines the screen replaces while its add row is open. The grid commits an open add row whenever
-/// its collection changes, which adds to the collection inside its own CollectionChanged, so Products' Save crashed
-/// with "Cannot change ObservableCollection during a CollectionChanged event" when its reload refilled the form's
-/// lines (2026-09-28). The screen listens to the collection too, as ProductsViewModel does: with the grid as the only
+/// its collection changes, which adds to the collection inside its own CollectionChanged, so Products' Save would crash
+/// with "Cannot change ObservableCollection during a CollectionChanged event" when its reload refills the form's
+/// lines. The screen listens to the collection too, as ProductsViewModel does: with the grid as the only
 /// listener, ObservableCollection lets the nested add through.
 /// </summary>
 [Collection(OffscreenGridCollection.Name)]

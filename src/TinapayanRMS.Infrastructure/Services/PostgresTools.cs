@@ -5,7 +5,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 namespace TinapayanRMS.Infrastructure.Services;
 
 /// <summary>
-/// PostgreSQL's own command-line tools (pg_dump and pg_restore), which the backups run (2026-10-21). They're found in
+/// PostgreSQL's own command-line tools (pg_dump and pg_restore), which the backups run. They're found in
 /// <paramref name="configuredFolder"/> when there is one, else in PostgreSQL's usual places on Windows and on a Mac, newest
 /// version first, else on the PATH. Each runs with the app's connection details in its environment, and reads its password
 /// from the same password file Npgsql does, so none is ever on a command line.
@@ -36,8 +36,8 @@ internal sealed class PostgresTools(string? configuredFolder, TimeSpan? timeout 
     /// so neither fills up and stalls it.
     /// <para>
     /// It's never let ask for a password (--no-password). With none available, in the password file or the connection
-    /// string, a tool otherwise waits at a prompt on a console nobody can see, for ever (found 2026-11-03, by a code
-    /// review), and every backup and restore after it waits its turn behind it.
+    /// string, a tool otherwise waits at a prompt on a console nobody can see, for ever, and every backup and restore
+    /// after it waits its turn behind it.
     /// </para>
     /// </summary>
     public async Task<string> RunAsync(

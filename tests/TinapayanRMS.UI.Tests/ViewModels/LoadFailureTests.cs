@@ -16,9 +16,9 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>
 /// A read or save that fails, as when the database stops answering, says why in the screen's error notice, and the screen
-/// carries on: the next pick, load or save works as usual once the database answers again (2026-10-03). Until then a failed
-/// pick ended the screen's selection subscription for good (no later pick loaded anything, and Save did nothing, with no
-/// word of why), and a failed load or an unexpected failure in a save closed the app.
+/// carries on: the next pick, load or save works as usual once the database answers again. A failed pick
+/// mustn't end the screen's selection subscription for good (no later pick would load anything, and Save would do
+/// nothing, with no word of why), and a failed load or an unexpected failure in a save mustn't close the app.
 /// </summary>
 [Collection(DatabaseCollection.B)]
 public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
@@ -54,7 +54,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
     // While a picked product's details are on their way the form still holds the product before's, which a Save would
     // write under the new one's name. Typing then isn't an unsaved change (the history records nothing until they come),
-    // so Save stays off, rather than on and doing nothing as a review of the code had read it (2026-11-05).
+    // so Save stays off, rather than on and doing nothing.
     [Fact]
     public Task Products_Save_stays_off_while_the_picked_products_details_are_on_their_way() => StaThread.RunAsync(async () =>
     {
@@ -184,8 +184,8 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         viewModel.Categories.Should().ContainSingle().Which.Name.Should().Be("Breads");
     });
 
-    // No to "Save the changes?" on leaving a screen reads the record again to put the form back. Nothing awaited the move
-    // to another tab, so a read that failed there was lost: the click did nothing, with no word of why (2026-11-04).
+    // No to "Save the changes?" on leaving a screen reads the record again to put the form back. Nothing awaits the move
+    // to another tab, so a read that failed there would be lost: the click would do nothing, with no word of why.
     [Fact]
     public Task Products_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays() => StaThread.RunAsync(async () =>
     {

@@ -5,11 +5,11 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.UI;
 
 /// <summary>
-/// What the app does when it can't start (2026-11-03, found by a code review): it logs why, says why, and closes. Until
-/// then a failure before the main window showed (appsettings.json missing, a screen that wouldn't build) reached App's
-/// handler for exceptions on the UI thread, which is for a running app: it said "The app is still running" and kept the
-/// process alive, with no window to close it from, until someone ended it in Task Manager. UnhandledErrorGuard decides
-/// what happens once the window is up, where there's unsaved work to carry on with.
+/// What the app does when it can't start: it logs why, says why, and closes. A failure before the main window shows
+/// (appsettings.json missing, a screen that won't build) mustn't reach App's handler for exceptions on the UI thread,
+/// which is for a running app: it would say "The app is still running" and keep the process alive, with no window to
+/// close it from. UnhandledErrorGuard decides what happens once the window is up, where there's unsaved work to carry on
+/// with.
 /// </summary>
 public static class AppStartup
 {

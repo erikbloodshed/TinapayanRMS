@@ -12,8 +12,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
 /// <summary>
 /// Deleting a raw material (IRawMaterialRepository.DeleteAsync): with its units and prices, and refused while anything
-/// uses it, naming each user, as deleting a product names what leans on it. Until 2026-11-05 the foreign keys refused it,
-/// and the screen said only "This item is currently in use elsewhere and can't be deleted."
+/// uses it, naming each user, as deleting a product names what leans on it. Left to the foreign keys, the screen
+/// would say only "This item is currently in use elsewhere and can't be deleted."
 /// </summary>
 [Collection(DatabaseCollection.A)]
 public class RawMaterialDeletePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)

@@ -11,8 +11,8 @@ using TinapayanRMS.Tests.Common.Fixtures;
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
 /// <summary>
-/// Product.QuantityRequired: how many finished pieces make one sellable unit, which replaced ProductPack on
-/// 2026-09-20. The recipe stays per piece; the costing multiplies by it, and the packaging lines are already
+/// Product.QuantityRequired: how many finished pieces make one sellable unit.
+/// The recipe stays per piece; the costing multiplies by it, and the packaging lines are already
 /// for one whole unit. A "Box of 8" is a variant of the single with a quantity of 8 and a packaging set of
 /// its own, not a pack row hanging off it.
 /// </summary>

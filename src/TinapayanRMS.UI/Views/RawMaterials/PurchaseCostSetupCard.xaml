@@ -75,7 +75,7 @@
             </syncfusion:SfDataGrid>
 
             <!--
-                Remove acts on the row picked in the grid. Cost From (2026-10-29): the brand the material's cost comes from,
+                Remove acts on the row picked in the grid. Cost From: the brand the material's cost comes from,
                 the dearest unless one is picked.
             -->
             <DockPanel Margin="0,8,0,0">
@@ -158,7 +158,7 @@
                            Text="{Binding BufferedCostWarningText}"
                            Foreground="{StaticResource WarningForegroundBrush}"
                            TextWrapping="Wrap" />
-                <!-- While prices have moved the buffer off the one last typed (2026-10-29): it, and a button that types it again -->
+                <!-- While prices have moved the buffer off the one last typed: it, and a button that types it again -->
                 <StackPanel Grid.Row="4"
                             Grid.ColumnSpan="5"
                             Orientation="Horizontal"

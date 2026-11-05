@@ -9,7 +9,7 @@ namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
 /// Lets a blank line be put in above the current one of an editable SfDataGrid, where the add row only ever adds at the
-/// bottom (2026-10-15, at the user's request, for the ingredient lines of Sub-Assemblies and of a product's sections).
+/// bottom (for the ingredient lines of Sub-Assemblies and of a product's sections).
 /// Set <c>controls:GridRowInserting.IsEnabled="True"</c> on a grid whose ItemsSource is an ObservableCollection of lines
 /// and whose <see cref="GridAddNewRow"/>.ItemFactory makes them; the new line is the factory's, as the add row's is.
 /// <para>
@@ -114,7 +114,7 @@ public static class GridRowInserting
 
         // The grid lays the change out now rather than when it gets round to it, so the new line has its row and its
         // place before the cursor goes there. Scrolled to before that, from a table scrolled down, the view jumped back to
-        // the top and left the new line half out of sight at the bottom (2026-10-15). And with its cell opened only later,
+        // the top and left the new line half out of sight at the bottom. And with its cell opened only later,
         // a key pressed in between (a fast typist, Insert held down) landed on the line it went in above. Open here, the
         // cell takes every key after the Insert, so holding Insert down puts in the one line.
         grid.UpdateLayout();

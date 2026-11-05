@@ -2,7 +2,7 @@ namespace TinapayanRMS.Domain.Entities;
 
 /// <summary>
 /// One of a made ingredient's own extra ingredients on top of the sub-assembly it's made from (RawMaterial.SubAssemblyId),
-/// in grams, as a product's linked usage has UsageAddInLine (2026-10-27). It belongs to the made ingredient, not to the
+/// in grams, as a product's linked usage has UsageAddInLine. It belongs to the made ingredient, not to the
 /// sub-assembly: two made ingredients made from the same base each keep their own, and neither changes the base itself.
 /// The made ingredient's bill of materials is the sub-assembly's lines and these (IngredientBomLine).
 /// </summary>

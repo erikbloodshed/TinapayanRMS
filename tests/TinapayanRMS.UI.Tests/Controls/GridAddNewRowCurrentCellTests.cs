@@ -16,8 +16,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// UntouchedAddRowSelectionController.PutCurrentCellBackOnAddRow). SfDataGrid moves the add row up but leaves its current
 /// cell index where the add row was: the add row keeps its outline, and the next key moves from the stale index, so Left,
 /// Right and Tab each left no cell current. Ctrl+Z back to no brands on Raw Materials' Purchase Cost Setup, or another
-/// material with none, with the add row's cell current. (Until 2026-10-16 these were in GridFillerRowsCurrentCellTests,
-/// from when a filler row sat at that index and GridFillerRows moved the current cell off it.)
+/// material with none, with the add row's cell current.
 /// </summary>
 [Collection(OffscreenGridCollection.Name)]
 public class GridAddNewRowCurrentCellTests

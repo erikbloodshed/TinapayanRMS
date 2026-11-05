@@ -102,9 +102,8 @@ public sealed partial class App : Application
         // them, so each took its content's: an SfTextBoxExt 18-20px, a DoubleTextBox 22px, a
         // ButtonAdv 24px, or whatever its layout row stretched it to. A type default is the lowest
         // precedence, so a Height set in XAML still wins. IntegerTextBox and CurrencyTextBox (Products'
-        // Quantity Required and Current Price) joined on 2026-09-24: with their labels moved beside them
-        // they stood shorter than the Product Name box next to them. PercentTextBox (the Costing tab's metrics) joined
-        // on 2026-09-28, beside the DoubleTextBox that holds each metric's value.
+        // Quantity Required and Current Price) are set too, so they stand as tall as the Product Name box beside them,
+        // and so is PercentTextBox (the Costing tab's metrics), beside the DoubleTextBox that holds each metric's value.
         foreach (var type in new[] { typeof(SfTextBoxExt), typeof(DoubleTextBox), typeof(IntegerTextBox), typeof(CurrencyTextBox), typeof(PercentTextBox), typeof(ButtonAdv) })
         {
             FrameworkElement.HeightProperty.OverrideMetadata(type, new FrameworkPropertyMetadata(ControlHeight));
@@ -167,8 +166,7 @@ public sealed partial class App : Application
     }
 
     /// <summary>
-    /// Right-aligns every number box's text (2026-09-28, at the user's request: "make textbox containing numeric values
-    /// like percentage and double be right aligned"), as figures line up in a column and as the grids show them.
+    /// Right-aligns every number box's text, as figures line up in a column and as the grids show them.
     /// EditorBase is what Syncfusion's DoubleTextBox, IntegerTextBox, CurrencyTextBox and PercentTextBox are built on,
     /// a plain TextBox underneath. A local value, as AlignTextBoxText's is, so the theme's style can't outrank it; a box
     /// whose XAML or grid already says where its text goes keeps that.
@@ -377,8 +375,7 @@ public sealed partial class App : Application
     {
         PrimaryBackground = primaryBackground,
         PrimaryForeground = primaryForeground,
-        // Each 2 above the theme's defaults (16/14/14/12/12/10), for readability (2026-09-27, at the
-        // user's request). The themed windows take BodyFontSize as their FontSize, so plain TextBlocks
+        // Each 2 above the theme's defaults (16/14/14/12/12/10), for readability. The themed windows take BodyFontSize as their FontSize, so plain TextBlocks
         // inherit it too.
         HeaderFontSize = 18,
         SubHeaderFontSize = 16,

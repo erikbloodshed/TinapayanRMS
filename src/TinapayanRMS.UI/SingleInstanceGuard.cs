@@ -22,7 +22,7 @@ public enum SingleInstanceOutcome
 }
 
 /// <summary>
-/// Keeps the app to one copy for each Windows sign-in (2026-11-04, at the user's request, from a code review). Nothing in
+/// Keeps the app to one copy for each Windows sign-in. Nothing in
 /// the database notices a row changing after a screen read it, so two copies side by side saved over each other with
 /// neither saying so. A copy that finds the app open asks that one to come to the front, and closes.
 ///

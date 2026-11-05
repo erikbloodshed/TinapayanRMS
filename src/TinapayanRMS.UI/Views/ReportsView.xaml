@@ -189,7 +189,7 @@
                     </Border>
                 </syncfusion:TabItemExt>
 
-                <!-- 2026-10-29: the purchased materials whose fixed buffered cost rising prices have worn below its target buffer -->
+                <!-- The purchased materials whose fixed buffered cost rising prices have worn below its target buffer -->
                 <syncfusion:TabItemExt Header="Cost Buffers" CanClose="False">
                     <Border Padding="12">
                         <DockPanel>
@@ -255,7 +255,7 @@
                     </Border>
                 </syncfusion:TabItemExt>
 
-                <!-- 2026-10-29: the purchased materials that make up most of what the products in Production cost -->
+                <!-- The purchased materials that make up most of what the products in Production cost -->
                 <syncfusion:TabItemExt Header="Cost Drivers" CanClose="False">
                     <Border Padding="12">
                         <DockPanel>
@@ -305,7 +305,7 @@
                     </Border>
                 </syncfusion:TabItemExt>
 
-                <!-- 2026-10-29: each product's markup at its current price as it stood on a day, against now -->
+                <!-- Each product's markup at its current price as it stood on a day, against now -->
                 <syncfusion:TabItemExt Header="Margin Erosion" CanClose="False">
                     <Border Padding="12">
                         <DockPanel>

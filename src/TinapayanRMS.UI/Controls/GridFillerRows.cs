@@ -8,10 +8,9 @@ namespace TinapayanRMS.UI.Controls;
 /// down to the grid's bottom edge. Set <c>controls:GridFillerRows.IsEnabled="True"</c> on a grid with a height to fill
 /// (one in a star-sized row or with a fixed Height, not one sized to its rows).
 ///
-/// The rows are only drawn (<see cref="GridFillerLayer"/>), not added to the grid (2026-10-15). Until then they were
-/// GridUnBoundRows, the technique from the SfDataGrid_Demo sample, and so live rows the grid selected, edited, moved its
-/// current cell onto and froze as footers: most of the code was guards against that, and they still crashed the app
-/// twice and drew a second current-cell outline. Drawn, the grid never knows they're there.
+/// The rows are only drawn (<see cref="GridFillerLayer"/>), not added to the grid. As
+/// GridUnBoundRows, the technique from the SfDataGrid_Demo sample, they'd be live rows the grid selects, edits, moves its
+/// current cell onto and freezes as footers, each needing a guard. Drawn, the grid never knows they're there.
 /// </summary>
 public static class GridFillerRows
 {
@@ -28,8 +27,7 @@ public static class GridFillerRows
     /// <summary>
     /// How many rows of <paramref name="rowHeight"/> it takes to fill the space <paramref name="contentHeight"/> leaves
     /// in <paramref name="viewportHeight"/>: the last is cut off by the grid's bottom edge when only part of it fits, as
-    /// the grid's own last row is. (Until 2026-10-16 it was whole rows only, from when the rows were the grid's own and a
-    /// part of one would have made it scroll; drawn, they can't.)
+    /// the grid's own last row is. Drawn rather than added, a part of one can't make the grid scroll.
     /// </summary>
     public static int FillerRowCount(double viewportHeight, double contentHeight, double rowHeight)
     {

@@ -16,9 +16,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>
 /// The Reports summaries, read from the database. The Product Cost Summary costs every product as it's saved, through
-/// SavedProductReader, as the Products screen prices the product it opens; before 2026-09-27 Reports had a copy of its
-/// own that read a sub-assembly's stored totals as the usage's batch. The add-in figures were worked out for that copy
-/// and are unchanged, so the two pricings agree.
+/// SavedProductReader, as the Products screen prices the product it opens, so the two pricings agree.
 /// </summary>
 [Collection(DatabaseCollection.D)]
 public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)

@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
 /// <summary>
 /// A made ingredient is made from a sub-assembly, the one place its recipe is written, with add-ins of its own and its
-/// weight loss on top (2026-10-27; until then a BOM of its own). Its bill of materials is read from the two.
+/// weight loss on top. Its bill of materials is read from the two.
 /// </summary>
 [Collection(DatabaseCollection.C)]
 public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)

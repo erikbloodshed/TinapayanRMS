@@ -10,7 +10,7 @@ namespace TinapayanRMS.UI.Controls;
 /// adds a window hook that marks every WM_DPICHANGED handled and does nothing else. WPF calls a window's hooks before
 /// its own handling, so the message never reaches it. When the window moved to a monitor with another scale, WPF kept
 /// drawing at the old monitor's DPI and Windows didn't resize the window. On this machine's 100% secondary monitor,
-/// a window opened on the 125% primary drew everything a quarter too large (2026-09-26, found by the user).
+/// a window opened on the 125% primary drew everything a quarter too large.
 /// </summary>
 public static class ChromelessWindowDpi
 {

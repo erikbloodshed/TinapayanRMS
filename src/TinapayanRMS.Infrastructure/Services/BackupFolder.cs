@@ -6,10 +6,10 @@ using TinapayanRMS.ApplicationCore.Rules;
 namespace TinapayanRMS.Infrastructure.Services;
 
 /// <summary>
-/// The backups folder, shared by every Windows user of the computer (2026-10-03). The app keeps its backups in a folder under
+/// The backups folder, shared by every Windows user of the computer. The app keeps its backups in a folder under
 /// ProgramData that it creates and gives an allow-Modify entry for Users, inherited by every file in it, so whoever uses the
-/// app can take, copy, restore and delete them, whoever took them. pg_dump writes a backup as the user running the app
-/// (2026-10-21; SQL Server wrote them as its own service account, which needed an entry of its own). Whoever creates the
+/// app can take, copy, restore and delete them, whoever took them. pg_dump writes a backup as the user running the app.
+/// Whoever creates the
 /// folder owns it, and an owner may always change its permissions, so this needs no administrator.
 /// </summary>
 [SupportedOSPlatform("windows")]

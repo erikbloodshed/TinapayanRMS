@@ -237,8 +237,8 @@ public static class RawMaterialRules
     /// <summary>
     /// <paramref name="cost"/> as the database stores it: to 20 places, rounded half away from zero as PostgreSQL rounds a numeric.
     /// A stored cost is always set through this. Worked out in memory, a cost that doesn't come out even carries up to 28
-    /// places (₱170 a pack of 240 is ₱0.708333… a piece), and compared with the stored one it read as changed when nothing
-    /// had: a Save logged the same price in price history again, and moved the cost's date (found 2026-10-03).
+    /// places (₱170 a pack of 240 is ₱0.708333… a piece), and compared with the stored one it would read as changed when
+    /// nothing had: a Save would log the same price in price history again, and move the cost's date.
     /// </summary>
     public static decimal StoredCost(decimal cost) => decimal.Round(cost, StoredCostScale, MidpointRounding.AwayFromZero);
 
@@ -247,7 +247,7 @@ public static class RawMaterialRules
         ApplyBrandPrices(material, [.. brandPrices.Select(p => ((string?)null, p.Price, p.BaseUnitsPerUnit))]);
 
     /// <summary>
-    /// The index of the brand price a material's cost comes from (2026-10-29): the dearest per base unit of
+    /// The index of the brand price a material's cost comes from: the dearest per base unit of
     /// <paramref name="preferredBrand"/>'s prices, matched as brands are (trimmed, whatever the case); the dearest of them
     /// all when no brand is preferred, or the one preferred has no price. Null for no prices.
     /// </summary>
@@ -297,8 +297,7 @@ public static class RawMaterialRules
 
     /// <summary>
     /// A material's name as it's saved: without spaces at either end, and refused when there's nothing else. PostgreSQL's
-    /// collation counts a space at the end, so "Flour " would get past the unique index beside "Flour", where SQL Server's
-    /// ignored it (found 2026-11-03, by a code review).
+    /// collation counts a space at the end, so "Flour " would get past the unique index beside "Flour".
     /// </summary>
     public static string StoredName(string name)
     {
@@ -349,8 +348,7 @@ public static class RawMaterialRules
         cost * (1 + bufferPercent / 100m);
 
     /// <summary>
-    /// The buffer percent a material is stored with. A made ingredient's is always 0 (2026-09-21, at the user's
-    /// request): its components' buffers are already inside its BOM rollup, so it adds none of its own, and since
+    /// The buffer percent a material is stored with. A made ingredient's is always 0: its components' buffers are already inside its BOM rollup, so it adds none of its own, and since
     /// it has no buffer box on the screen a stale stored percent is normalised away by any save rather than
     /// rejected — which would leave it unsaveable. A linked ingredient takes the one it's linked to
     /// (<paramref name="inheritedBuffer"/>); anything else keeps what the form sent.
@@ -366,9 +364,9 @@ public static class RawMaterialRules
         (bufferedCost / cost - 1) * 100m;
 
     /// <summary>
-    /// The buffer percent a purchased material is meant to have (2026-10-29): the one last typed for it, which every
-    /// purchased material has (stored with each save, and given once on 2026-11-05 to the ones saved before targets were
-    /// kept: TargetBuffersUpgrade). A made or linked ingredient has none, and reads as its buffer.
+    /// The buffer percent a purchased material is meant to have: the one last typed for it, which every purchased material
+    /// has (stored with each save; TargetBuffersUpgrade gave the older ones theirs). A made or linked ingredient has none,
+    /// and reads as its buffer.
     /// </summary>
     public static decimal TargetBufferPercentOf(RawMaterial material) => material.TargetCostBufferPercent ?? material.CostBufferPercent;
 
@@ -382,9 +380,9 @@ public static class RawMaterialRules
             : null;
 
     /// <summary>
-    /// A purchased material whose buffer has worn below its target as its prices rose (2026-10-29, Reports' Cost Buffers):
-    /// by a tenth of a point or more, so a buffered cost typed to the centavo in a sack or a bag, which comes a hair under
-    /// its percent, isn't counted (found on the dev data: 9.98% against 10%).
+    /// A purchased material whose buffer has worn below its target as its prices rose (Reports' Cost Buffers): by a tenth
+    /// of a point or more, so a buffered cost typed to the centavo in a sack or a bag, which comes a hair under its percent
+    /// (9.98% against 10%), isn't counted.
     /// </summary>
     public static bool IsBufferBelowTarget(RawMaterial material) =>
         CurrentBufferPercentOf(material) is { } now && Math.Round(now, 1) < Math.Round(TargetBufferPercentOf(material), 1);

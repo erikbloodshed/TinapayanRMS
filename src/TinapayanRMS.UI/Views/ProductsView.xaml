@@ -26,7 +26,7 @@
 
         <!--
             ErrorMessage and SuccessMessage as toasts, over everything: each spans the whole Grid and puts itself in its
-            bottom-right corner. The success toast came with the History tab (2026-10-17), whose Restore says what it put
+            bottom-right corner. The success toast came with the History tab, whose Restore says what it put
             back; Revert's and a relink's messages had been set here all along with nothing to show them.
         -->
         <controls:ErrorToast Grid.ColumnSpan="3" />
@@ -54,7 +54,7 @@
 
                     <!--
                         The header only shows figures; what's typed in about the product sits under it, 16 below the
-                        figures (4 until 2026-09-24, when its labels moved beside the boxes and the row needed setting apart)
+                        figures, setting apart the row of boxes with their labels beside them
                     -->
                     <p:ProductHeaderCard />
 

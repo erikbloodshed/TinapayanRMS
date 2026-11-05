@@ -7,7 +7,7 @@ namespace TinapayanRMS.UI.Controls;
 /// <summary>
 /// Draws a window in software from the moment it's minimized until shortly after it's back, and with the GPU the rest of
 /// the time. Restored from the taskbar while maximized, MainWindow showed its content, then went black for a frame or two
-/// about a tenth of a second later, then showed it again (2026-09-29, found by the user). The black was WPF's hardware
+/// about a tenth of a second later, then showed it again. The black was WPF's hardware
 /// surface: in software the same restores never went black, and neither did switching back to the GPU once the window
 /// had settled. A plain WPF window didn't do it; a ChromelessWindow with the app's content did, whatever of its own
 /// handling was taken off, so this works around it rather than fixing its cause.

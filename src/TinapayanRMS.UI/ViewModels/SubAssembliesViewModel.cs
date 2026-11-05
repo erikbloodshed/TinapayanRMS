@@ -248,7 +248,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     }
 
     private decimal? _scaleTo;
-    /// <summary>What Scale makes the batch, or its base, weigh, in grams (2026-10-29). Not part of the sub-assembly.</summary>
+    /// <summary>What Scale makes the batch, or its base, weigh, in grams. Not part of the sub-assembly.</summary>
     public decimal? ScaleTo
     {
         get => _scaleTo;
@@ -271,7 +271,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
     /// <summary>
     /// Every line's grams by the factor that makes the batch, or its base, weigh <see cref="ScaleTo"/>, as one undo step
-    /// (2026-10-29, at the user's request: "make it 5 kg"). A line typed as a baker's percentage keeps it and follows the base.
+    /// ("make it 5 kg"). A line typed as a baker's percentage keeps it and follows the base.
     /// </summary>
     public ReactiveCommand<RxVoid, RxVoid> ScaleCommand { get; }
 
@@ -639,7 +639,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 List<RecipeLine> recipeLines = [.. lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
                 save = cancellationToken => _subAssemblyRepository.SaveStandaloneAsync(subAssembly, recipeLines, cancellationToken);
 
-                // A saved one that products link: what it does to their costs is asked about first (2026-10-29).
+                // A saved one that products link: what it does to their costs is asked about first.
                 if (_recipeImpact is not null && subAssembly.Id != 0)
                 {
                     List<SubAssemblyLine> newLines =
@@ -1330,8 +1330,8 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
     /// <summary>
     /// The list's Make In-House Ingredient, saved at once once the prompt is answered: a new made ingredient made from the
-    /// recipe, in the Made category picked, with no add-ins and no weight loss (2026-10-27; until then Move to In-House,
-    /// which moved the lines into the made ingredient). The recipe stays here as it is, and the products linking it are
+    /// recipe, in the Made category picked, with no add-ins and no weight loss. The
+    /// recipe stays here as it is, and the products linking it are
     /// left alone; it shows under Used By. The form's unsaved changes to it have to be saved or undone first: the made
     /// ingredient is made from it as it's saved.
     /// </summary>

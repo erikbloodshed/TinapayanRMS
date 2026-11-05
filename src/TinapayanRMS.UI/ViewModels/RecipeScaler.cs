@@ -173,8 +173,8 @@ public sealed class RecipeScaler(
         Amounts(recipe, units, productId is { } id ? [id] : []).Where(a => a.Ingredient.Id == ingredientId).Sum(a => a.Grams);
 
     /// <summary>
-    /// The most whole sellable units that <paramref name="grams"/> of <paramref name="ingredientId"/> are enough for (2026-10-29,
-    /// the Scaling tab's "from what you have"): 0 when not even one is, or the recipe doesn't take it. More units never take
+    /// The most whole sellable units that <paramref name="grams"/> of <paramref name="ingredientId"/> are enough for (the
+    /// Scaling tab's "from what you have"): 0 when not even one is, or the recipe doesn't take it. More units never take
     /// less, since a section only ever needs more batches, so the most is found by doubling, then halving back.
     /// </summary>
     public int UnitsFrom(ScalingRecipe recipe, int? productId, int ingredientId, decimal grams)

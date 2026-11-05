@@ -13,10 +13,9 @@ namespace TinapayanRMS.Infrastructure.Services;
 /// collaborator, not exposed as an ApplicationCore interface — callers are other repositories and CostRecalculator, never
 /// the UI.
 ///
-/// It runs on the caller's context, inside the caller's transaction (2026-10-03), so a save that changes a cost and the
-/// cascade it causes commit together or not at all. Until then it ran after the caller's commit, on contexts of its own:
-/// a cascade that failed part-way (a dropped connection, the app closed) left the save in and the stored costs above it
-/// stale, and nothing ever put them right, since saving again unchanged doesn't cascade.
+/// It runs on the caller's context, inside the caller's transaction, so a save that changes a cost and the cascade it
+/// causes commit together or not at all: a cascade that failed part-way after its save had committed would leave the
+/// stored costs above it stale, and nothing would put them right, since saving again unchanged doesn't cascade.
 /// </summary>
 internal static class IngredientCostPropagator
 {

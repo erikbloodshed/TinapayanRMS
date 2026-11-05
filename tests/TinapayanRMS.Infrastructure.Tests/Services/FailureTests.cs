@@ -13,9 +13,9 @@ using TinapayanRMS.Infrastructure.Tests.Fixtures;
 namespace TinapayanRMS.Infrastructure.Tests.Services;
 
 /// <summary>
-/// What a screen's error notice says for each kind of failure, from real database errors (2026-10-03). Until then every
-/// DbUpdateException read "That name is already in use." and every driver exception "This item is currently in use elsewhere
-/// and can't be deleted.", whatever had happened, and a database that couldn't be reached among them.
+/// What a screen's error notice says for each kind of failure, from real database errors: each kind
+/// says what happened, rather than one message for every DbUpdateException and another for every driver exception, a
+/// database that can't be reached among them.
 /// </summary>
 [Collection(DatabaseCollection.C)]
 public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)

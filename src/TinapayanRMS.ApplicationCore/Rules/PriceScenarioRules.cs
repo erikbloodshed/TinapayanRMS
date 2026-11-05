@@ -3,7 +3,7 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.ApplicationCore.Rules;
 
 /// <summary>
-/// A Price Simulator scenario (2026-10-22): the price changes in its table, saved under a name to open again later.
+/// A Price Simulator scenario: the price changes in its table, saved under a name to open again later.
 /// Nothing in one changes a real price.
 /// </summary>
 public static class PriceScenarioRules

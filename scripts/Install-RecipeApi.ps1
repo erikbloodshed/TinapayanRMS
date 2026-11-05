@@ -99,7 +99,7 @@ if ($running) {
 }
 
 # The folder is made to hold what was published and no more: publishing straight into it never takes away what an earlier
-# version needed and this one doesn't (2026-11-04: 67 MB of WPF and Syncfusion, once the API stopped using them). What's
+# version needed and this one doesn't (such as the WPF and Syncfusion assemblies the API once carried). What's
 # installed of recipeapi.json is left as it is, with its key, and so is the logs folder.
 Write-Host "Copying to $InstallFolder ..."
 & robocopy $published $InstallFolder /MIR /XD logs /XF recipeapi.json /NFL /NDL /NJH /NJS /NP | Out-Null

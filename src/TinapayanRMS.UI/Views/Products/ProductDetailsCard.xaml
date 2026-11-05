@@ -6,9 +6,9 @@
     <!--
         What's typed in about the product itself, under the header's figures: its name, its category, how many pieces
         make one sellable unit, and the price the shop charges now. One row, each label on the left of its field
-        (FormLabelStyle; 2026-09-24, at the user's request, though Raw Materials' header keeps its labels above).
+        (FormLabelStyle).
         Save writes them with the rest of the form. Quantity Required's box takes half the share it had, a number of a
-        few digits, and the half went to Product Name's (2026-09-28, at the user's request), so the other two keep theirs.
+        few digits, and the half went to Product Name's, so the other two keep theirs.
         A composite has no Quantity Required: its column takes no width then (BooleanToStarWidthConverter), and the gap
         after it is its box's margin, so it goes too.
     -->

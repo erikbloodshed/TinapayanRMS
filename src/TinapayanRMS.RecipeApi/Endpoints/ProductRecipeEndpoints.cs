@@ -8,7 +8,7 @@ using TinapayanRMS.RecipeApi.Contracts;
 namespace TinapayanRMS.RecipeApi.Endpoints;
 
 /// <summary>
-/// Every product's recipe, which TinapayanBMS plans production from (2026-10-31, when planning moved there), and every
+/// Every product's recipe, which TinapayanBMS plans production from, and every
 /// raw material, which its purchase requisition prices. The products are read as saved (SavedProductReader.ReadAllAsync),
 /// at buffered costs, each with its packaging per unit, Wastage % and costing.
 /// </summary>

@@ -102,7 +102,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
 
     /// <summary>
-    /// Recalculate Costs (2026-10-03): every made and linked ingredient's costs worked out again from what they're made of
+    /// Recalculate Costs: every made and linked ingredient's costs worked out again from what they're made of
     /// (ICostRecalculator), for after the database was changed outside the app. Says how many were out of date.
     /// </summary>
     public ReactiveCommand<RxVoid, RxVoid> RecalculateCostsCommand { get; }

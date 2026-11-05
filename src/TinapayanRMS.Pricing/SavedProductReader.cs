@@ -117,9 +117,7 @@ public sealed class SavedProductReader(
 
     /// <summary>
     /// Several products' saved details at once, by id: <see cref="ReadDetailAsync"/>'s, in a dozen or so queries however
-    /// many products there are (2026-10-03). A product took nine or so queries of its own, and Reports and Print read every
-    /// product that way, so their round trips grew with the list, and a composite's products each started reads of their
-    /// own at once. The products a composite among them holds are read with it, however deep, and are in the result too.
+    /// many products there are, rather than nine or so a product, which for Reports and Print would grow with the list. The products a composite among them holds are read with it, however deep, and are in the result too.
     /// </summary>
     public async Task<IReadOnlyDictionary<int, ProductDetail>> ReadDetailsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
     {
@@ -138,9 +136,8 @@ public sealed class SavedProductReader(
             holders = [.. components.Select(c => c.ComponentProductId).Where(productIdsRead.Add)];
         }
 
-        // The rest one at a time, not side by side (2026-10-28): a Save reads through here inside its unit of work, whose
-        // reads share one connection (IUnitOfWork). Measured against the dev database (68 products), every product's
-        // detail took 31 ms this way against 22 ms side by side, and one product's 13 ms against 12.
+        // The rest one at a time, not side by side: a Save reads through here inside its unit of work, whose reads share one
+        // connection (IUnitOfWork). It costs little: every product's detail, 68 of them, in 31 ms against 22 side by side.
         List<int> ids = [.. productIdsRead];
         var linksByProduct = (await packagingLinkRepository.GetForProductsAsync(ids, cancellationToken)).ToDictionary(l => l.ProductId);
         var packaging = await packagingLineRepository.GetEffectiveForProductsAsync(ids, cancellationToken);
@@ -163,8 +160,8 @@ public sealed class SavedProductReader(
         Dictionary<int, ComponentCosts> costsByProduct = [];
 
         // A composite holding itself, through the products it holds, can only come of data changed outside the app, since
-        // Save refuses it. It's read all the same, its loop cut where it closes, rather than refused (2026-11-05): a refusal
-        // failed the whole read, every product's, for Reports, Print, the Products list and the servers.
+        // Save refuses it. It's read all the same, its loop cut where it closes, rather than refused: a refusal would fail the
+        // whole read, every product's, for Reports, Print, the Products list and the servers.
         Dictionary<int, IReadOnlyList<int>> heldIds = componentsByHolder.ToDictionary(e => e.Key, e => (IReadOnlyList<int>)[.. e.Value.Select(c => c.ComponentProductId)]);
         bool HoldsItself(int productId) =>
             heldIds.TryGetValue(productId, out var held) && held.Any(id => id == productId || CompositeProductRules.Contains(id, productId, heldIds));
@@ -185,7 +182,7 @@ public sealed class SavedProductReader(
                 [.. productUsages.Select(u => u.SubAssemblyId).Distinct().SelectMany(id => sectionLinesBySubAssembly[id])],
                 [.. addInsByProduct[productId]])
             {
-                // Its category's, when that sets one (2026-10-29); a composite's own, never its products'.
+                // Its category's, when that sets one; a composite's own, never its products'.
                 WastagePercent = categoryWastage.TryGetValue(productId, out var wastage) ? wastage : costingDefaults.WastagePercent,
                 VatPercent = costingDefaults.VatPercent,
                 PriceRoundingStep = costingDefaults.PriceRoundingStep,
@@ -253,7 +250,7 @@ public sealed class SavedProductReader(
 
     /// <summary>
     /// <paramref name="details"/> with every composite's products priced again with <paramref name="materialsById"/> in place
-    /// of the materials they were read with (the Price Simulator screen, 2026-10-03): what a composite's products bring is worked out
+    /// of the materials they were read with (the Price Simulator screen): what a composite's products bring is worked out
     /// when they're read, so a different cost for one of their materials has to reach them here, however deeply they're held.
     /// A product holding none comes back as it was, since <see cref="Build"/> takes the materials for its own sections.
     /// </summary>

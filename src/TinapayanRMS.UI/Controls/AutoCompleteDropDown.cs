@@ -57,7 +57,7 @@ public static class AutoCompleteDropDown
 /// <item>The pick reaches the row only when the edit is committed (Tab, Enter, a click away, Vim's Esc), never as it's
 /// typed: the column's UpdateTrigger is made Explicit (<see cref="OnInitializeEditElement"/>). Its default left the
 /// control to write each change, so typing over a name emptied the row as soon as the text matched nothing, and Esc
-/// had nothing to undo (2026-10-24).</item>
+/// had nothing to undo.</item>
 /// <item>Text that names nothing in the list isn't a pick: committing it leaves the row's value as it was, rather than
 /// clearing it (<see cref="UpdateSource"/>). Text cleared still clears it, with the column's AllowNullInput.</item>
 /// </list>
@@ -135,11 +135,10 @@ public sealed class AutoCompleteDropDownRenderer : GridCellMultiColumnDropDownRe
     }
 
     /// <summary>
-    /// Writes the pick to the row as the edit is committed, except when the box holds text naming nothing in the list
-    /// (2026-10-24, reported by the user on the Production Plan: retyping a line's product and leaving it emptied the
-    /// line's product). Typing clears the control's pick as soon as the text matches no name (AllowNullInput), and every
-    /// commit (Tab, Enter, a click away, Vim's Esc) then wrote that empty pick to the row. Now the row keeps its value,
-    /// and the cell shows it again as the edit ends. Only a column whose binding waits for the commit
+    /// Writes the pick to the row as the edit is committed, except when the box holds text naming nothing in the list,
+    /// so retyping a line's name and leaving it doesn't empty the line. Typing clears the control's pick as soon as the
+    /// text matches no name (AllowNullInput), and every commit (Tab, Enter, a click away, Vim's Esc) would then write that
+    /// empty pick to the row. The row keeps its value, and the cell shows it again as the edit ends. Only a column whose binding waits for the commit
     /// (UpdateTrigger="Explicit") is protected throughout; with the default trigger the control writes as it's typed.
     /// </summary>
     public override void UpdateSource(FrameworkElement cellElement)

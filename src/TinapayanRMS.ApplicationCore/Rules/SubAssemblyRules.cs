@@ -101,7 +101,7 @@ public static class SubAssemblyRules
     }
 
     /// <summary>
-    /// What a made ingredient can be made from (2026-10-27): a recipe kept on the Sub-Assemblies screen, the one place it's
+    /// What a made ingredient can be made from: a recipe kept on the Sub-Assemblies screen, the one place it's
     /// written. Not a packaging set, which has no ingredients, and not a product's own, which its product changes or removes
     /// at any time. <paramref name="ownerName"/> is its product's, or null for one on the Sub-Assemblies screen.
     /// </summary>
@@ -177,7 +177,7 @@ public static class SubAssemblyRules
             : SectionLabel(subAssembly.Name, productName, roleName);
 
     /// <summary>
-    /// The section name a product's own sub-assembly saved before section names were stored (2026-11-05) goes by: its
+    /// The section name a product's own sub-assembly saved before section names were stored goes by: its
     /// label as it was read from its name then (<see cref="SectionLabel"/>), with "Cheese Roll Filling 2", numbered when
     /// "Cheese Roll Filling" was taken, read as no name rather than as all of it. For that one-time upgrade only.
     /// </summary>
@@ -240,7 +240,7 @@ public static class SubAssemblyRules
         Math.Round(baseWeight * percent / 100m, 4);
 
     /// <summary>
-    /// A line's grams in a batch scaled from weighing <paramref name="from"/> to <paramref name="to"/> (2026-10-29, the
+    /// A line's grams in a batch scaled from weighing <paramref name="from"/> to <paramref name="to"/> (the
     /// Sub-Assemblies screen's Scale): the batch or its base, every line by the same factor, so each keeps its percentage.
     /// Rounded to the 4 decimals grams are stored in, as <see cref="GramsFromBakersPercent"/> is. Nothing to scale from
     /// leaves the grams as they are.

@@ -6,11 +6,10 @@ using TinapayanRMS.ApplicationCore.Rules;
 namespace TinapayanRMS.Infrastructure.Services;
 
 /// <summary>
-/// What a screen tells the user when something failed, and how it's logged (2026-10-03). A rule's refusal is shown in its
-/// own words. What the database said is put plainly, by its error code: its own text is technical, and the same
-/// exception type covers very different things (a duplicate name, a row still in use, a server that isn't running), which
-/// one fixed message each for DbUpdateException and the driver's exception used to read as "That name is already in use."
-/// and "This item is currently in use elsewhere and can't be deleted." whatever had happened. Anything else is a bug: it's
+/// What a screen tells the user when something failed, and how it's logged. A rule's refusal is shown in its own words.
+/// What the database said is put plainly, by its error code: its own text is technical, and the same exception type covers
+/// very different things (a duplicate name, a row still in use, a server that isn't running), so one fixed message per
+/// exception type would say the wrong thing. Anything else is a bug: it's
 /// still shown, so nothing fails silently, and it's logged as an error with its stack.
 /// </summary>
 /// <param name="Text">What the screen's error notice says.</param>

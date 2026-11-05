@@ -4,7 +4,7 @@ namespace TinapayanRMS.UI.Tests.Fixtures;
 
 /// <summary>
 /// The four collections a database test class goes in, each with a database of its own (DatabaseFixtureBase), so they
-/// run side by side while the tests in one run one at a time (2026-11-05). With one collection, this project's database
+/// run side by side while the tests in one run one at a time. With one collection, this project's database
 /// tests took 450 s one after another, which was the whole suite's time. They're balanced by the time their classes
 /// take: put a new class in whichever has least in it. A class's own tests always run together.
 /// </summary>

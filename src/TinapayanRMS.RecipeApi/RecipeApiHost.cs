@@ -21,9 +21,9 @@ namespace TinapayanRMS.RecipeApi;
 /// Puts the Recipe API's web server on a host with the app's database (DatabaseHost). Kestrel listens where recipeapi.json's Kestrel section says
 /// (every address, port 5290, so another PC on the LAN can reach it). With RecipeApi:Key set, as the installer sets it, every
 /// request must carry it in an X-Api-Key header. With none set, only this PC is answered, so a copy run without a key isn't
-/// open to the LAN (2026-11-03: it used to answer anyone who could reach the port, with every cost and price). What goes
-/// wrong comes back as { error }: a business rule's refusal as a 400 with its message, a database that can't be used as a 503
-/// saying so, and anything else as a 500 with its details left in the log (until then both of those were an empty 500).
+/// open to the LAN, where it would give every cost and price to anyone who could reach the port. What goes wrong comes back
+/// as { error }: a business rule's refusal as a 400 with its message, a database that can't be used as a 503 saying so, and
+/// anything else as a 500 with its details left in the log.
 /// </summary>
 public static class RecipeApiHost
 {

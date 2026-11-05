@@ -45,7 +45,7 @@ public static class CostingRules
     }
 
     /// <summary>
-    /// <paramref name="price"/> rounded up to the next multiple of <paramref name="step"/> (2026-10-29): 43.24 to 43.25 on
+    /// <paramref name="price"/> rounded up to the next multiple of <paramref name="step"/>: 43.24 to 43.25 on
     /// 0.25, to 44 on 1. Up, never down, so a rounded price still earns at least its markup. No step leaves it as it is.
     /// </summary>
     public static decimal RoundPriceUp(decimal price, decimal step) =>

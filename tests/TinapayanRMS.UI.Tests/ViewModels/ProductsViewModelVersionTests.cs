@@ -367,7 +367,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
         await OpenHistoryAsync(viewModel, rows: 2);
 
-        // The tab stays on History through both picks (found in the app 2026-10-17: coming back, it was empty).
+        // The tab stays on History through both picks, and isn't empty coming back.
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == otherId);
         await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.VersionHistory.ProductId == otherId,
@@ -461,8 +461,8 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
     /// <summary>
     /// The commands a Save of a new current price takes, with the product's History tab hidden: its own, and those of the
     /// reload's below-markup flags, which read every product in the background whatever the Save changed. Counted once
-    /// they're all done, since that read is still going when the Save returns, and how far it had got varied the count
-    /// (2026-10-30: 53 to 56, in a test run on its own).
+    /// they're all done, since that read is still going when the Save returns, and how far it had got would vary the
+    /// count.
     /// </summary>
     private async Task<int> CommandsSavingPriceAsync(int productId)
     {

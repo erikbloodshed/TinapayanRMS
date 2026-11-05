@@ -28,7 +28,7 @@ public sealed class DatabaseBackupRow(DatabaseBackup backup)
 }
 
 /// <summary>
-/// The Settings dialog's Database tab (2026-10-03): the backups in the backups folder, newest first, and what can be done
+/// The Settings dialog's Database tab: the backups in the backups folder, newest first, and what can be done
 /// with them. Back Up Now takes one; Copy to… puts one elsewhere, such as a USB stick; Restore and Restore from File…
 /// put one back over the database, after a confirmation, and restart the app, whose screens all hold what was there before.
 /// </summary>
@@ -76,7 +76,7 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
     /// <summary>What takes the day's backup and copies it to the second folder; null in a screen built without it.</summary>
     private readonly AutomaticBackups? _automatic;
 
-    /// <summary>Where each automatic backup is copied as well (2026-10-29); "None" when nowhere.</summary>
+    /// <summary>Where each automatic backup is copied as well; "None" when nowhere.</summary>
     public string CopyFolderText => _automatic?.CopyFolder ?? "None";
 
     /// <summary>Why the last automatic copy didn't go through, in amber under the folder; null when it did.</summary>

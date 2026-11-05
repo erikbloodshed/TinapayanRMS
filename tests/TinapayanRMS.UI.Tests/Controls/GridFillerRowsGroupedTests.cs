@@ -14,11 +14,10 @@ using TinapayanRMS.UI.Tests.Fixtures;
 namespace TinapayanRMS.UI.Tests.Controls;
 
 /// <summary>
-/// GridFillerRows in a grouped, name-sorted, live-data-shaped list — how the Raw Materials list (MaterialListCard.xaml)
-/// was set up before its grouping was removed (2026-09-17). Kept as a regression test for any grid set up this way,
-/// since GridFillerRows is still used elsewhere. While the padding was the grid's own frozen footer rows (until
-/// 2026-10-15), ones that no longer fit sat over the list's rows, and a grouped grid's row generation broke under them:
-/// an ArgumentOutOfRangeException from GroupDisplayElements.GetItemAt during layout closed the app (2026-09-16). Drawn,
+/// GridFillerRows in a grouped, name-sorted, live-data-shaped list, kept as a regression
+/// test for any grid set up this way. As the grid's own frozen footer rows, padding that no longer fits would sit over
+/// the list's rows, and a grouped grid's row generation breaks under them: an ArgumentOutOfRangeException from
+/// GroupDisplayElements.GetItemAt during layout closes the app. Drawn,
 /// the padding is never in the grid's rows, and it still has to keep to the space the rows leave.
 /// </summary>
 [Collection(OffscreenGridCollection.Name)]

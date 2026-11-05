@@ -15,8 +15,7 @@ public sealed class ProductComponentConfiguration : IEntityTypeConfiguration<Pro
             .OnDelete(DeleteBehavior.Cascade);
 
         // A product in a composite can't be deleted until it's taken out there (ProductRepository.DeleteAsync names the
-        // composites first). It doesn't cascade: that would be a second cascade path from Products to this table,
-        // which SQL Server (the database until 2026-10-21) refused.
+        // composites first). It doesn't cascade, so deleting a product never takes it out of a composite unnoticed.
         builder.HasOne(c => c.ComponentProduct)
             .WithMany()
             .HasForeignKey(c => c.ComponentProductId)

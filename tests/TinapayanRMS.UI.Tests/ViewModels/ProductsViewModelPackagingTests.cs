@@ -24,8 +24,8 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 [Collection(DatabaseCollection.B)]
 public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    // A product whose packaging links come round in a loop, as only an edit outside the app can leave them, failed every
-    // product's read with it. It opens now, showing no packaging, and says so (2026-11-05).
+    // A product whose packaging links come round in a loop, as only an edit outside the app can leave them, mustn't fail
+    // every product's read with it. It opens, showing no packaging, and says so.
     [Fact]
     public Task A_product_whose_packaging_links_come_round_in_a_loop_opens_with_a_notice() => StaThread.RunAsync(async () =>
     {

@@ -18,7 +18,7 @@ public interface IProductVersionRepository
     Task<bool> HasAnyAsync(int productId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Each product's latest version saved on or before <paramref name="asOf"/> (2026-10-29, Reports' Margin Erosion), in one
+    /// Each product's latest version saved on or before <paramref name="asOf"/> (Reports' Margin Erosion), in one
     /// read; a product with none by then isn't there.
     /// </summary>
     Task<IReadOnlyList<ProductVersion>> GetLatestAsOfAsync(DateTime asOf, CancellationToken cancellationToken);

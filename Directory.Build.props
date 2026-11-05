@@ -15,10 +15,10 @@
     <Features>$(Features);runtime-async=on</Features>
   </PropertyGroup>
 
-  <!-- Everyday builds leave the commit out (2026-11-04). The SDK otherwise puts the commit's hash into
-       each assembly's version and its Source Link file, so the first build after any commit recompiled
+  <!-- Everyday builds leave the commit out. The SDK otherwise puts the commit's hash into each
+       assembly's version and its Source Link file, so the first build after any commit would recompile
        every project, even after a commit that changed only docs, and the MCP server, which builds as it
-       starts, missed Claude Code's wait at every session start. A dotnet publish keeps both, so an
+       starts, would miss Claude Code's wait at every session start. A dotnet publish keeps both, so an
        installed copy still says which commit it was built from. -->
   <PropertyGroup Condition="'$(_IsPublishing)' != 'true'">
     <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>

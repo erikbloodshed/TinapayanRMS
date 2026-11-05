@@ -6,12 +6,12 @@
     <UserControl.Resources>
         <!--
             A value tile: its label (FigureTileLabelStyle) over its value, sized as the Products header's figures are,
-            on a tile of its own colour (FigureTileStyle). Both are centred in the tile (2026-09-25, at the user's
-            request), as the Products and Sub-Assemblies headers' figures are.
+            on a tile of its own colour (FigureTileStyle). Both are centred in the tile, as the Products
+            and Sub-Assemblies headers' figures are.
         -->
         <!--
-            24 is the height the Base Unit picker (ComboBoxAdv) was pinned to while it stood in the first tile for
-            a packaging material (until 2026-09-26). Every value keeps that height, so the header measures as it did.
+            24 is a picker's height (ComboBoxAdv), which the header was built around when its first tile held one.
+            Every value keeps that height, so the header measures the same.
             A TextBlock draws its text at the top of its box rather than centring it, so the padding puts the
             14pt line (18.62 high) in the middle of the 24: (24 - 18.62) / 2.
         -->
@@ -65,8 +65,8 @@
 
             <!--
                 The tiles: labels in the first row, values in the second, each figure's coloured tile and the gaps
-                between them spanning both (the gaps were thin lines until 2026-09-25). A plain row rather than a bordered box (2026-09-21, at the user's request that this header be as compact as the
-                Products one, whose figures row this now matches in every measurement).
+                between them spanning both. A plain row rather than a bordered box, to be as compact as the
+                Products header, whose figures row this matches in every measurement.
             -->
             <Grid>
                 <Grid.RowDefinitions>
@@ -112,8 +112,7 @@
 
                 <!--
                     An ingredient is always in grams. Packaging picks its base unit in the fields row, beside Category,
-                    and the tile shows it once saved, as the cost tiles show only what's saved (2026-09-26, at the
-                    user's request; the picker stood in this tile until then).
+                    and the tile shows it once saved, as the cost tiles show only what's saved.
                 -->
                 <TextBlock Grid.Column="0" Text="Base Unit" Style="{StaticResource FigureTileLabelStyle}" />
                 <TextBlock Grid.Row="1"
@@ -188,7 +187,7 @@
 
             <!--
                 The fields, Name first, on one row 16 under the tiles, each label on the left of its field
-                (FormLabelStyle; 2026-09-24, at the user's request, as the Products header has them). Packaging is
+                (FormLabelStyle, as the Products header has them). Packaging is
                 always purchased, so it has no Source and picks its Base Unit there instead; only an ingredient can be made.
             -->
             <Grid Margin="0,16,0,0">

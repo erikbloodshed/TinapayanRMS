@@ -109,7 +109,7 @@ public class BackupRulesTests
     [InlineData("\r\n")]
     public void A_backups_listing_says_which_database_it_is_of_and_when_it_was_taken(string newLine)
     {
-        // The start of what pg_restore --list printed for a backup of the dev database (2026-10-11), on Windows and on a Mac.
+        // The start of what pg_restore --list printed for a backup of the dev database, on Windows and on a Mac.
         var listing = string.Join(newLine,
             ";",
             "; Archive created at 2026-10-11 00:06:41",

@@ -152,7 +152,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private bool _isChangingSubAssembly;
     /// <summary>
     /// The Recipe card's Edit was pressed: the Made from picker shows again in place of the badge, until another sub-assembly
-    /// is picked or Cancel is pressed (2026-10-27, at the user's request: the picker was too easy to change by accident).
+    /// is picked or Cancel is pressed, so the recipe it's made from isn't changed by accident.
     /// </summary>
     public bool IsChangingSubAssembly
     {
@@ -357,8 +357,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
             this.RaiseAndSetIfChanged(ref _editingSource, value);
 
-            // A made ingredient starts at 3% weight loss (2026-09-21, at the user's request: a small shrink is the normal
-            // case in the shop), and the box stays freely editable — typing 0 is a legitimate custom value. Only when the
+            // A made ingredient starts at 3% weight loss, since a small shrink is the normal
+            // case in the shop, and the box stays freely editable — typing 0 is a legitimate custom value. Only when the
             // box is empty, so a saved material keeps what it was saved with.
             if (value == RawMaterialSource.Made)
             {
@@ -411,7 +411,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
     private decimal? _editingTargetCostBufferPercent = CostingDefaults.DefaultCostBufferPercent;
     /// <summary>
-    /// Purchased only: the buffer last typed (2026-10-29), which the Cost Buffer % box drifts from as prices move while the
+    /// Purchased only: the buffer last typed, which the Cost Buffer % box drifts from as prices move while the
     /// buffered cost stays fixed. Re-apply Target types it again.
     /// </summary>
     public decimal? EditingTargetCostBufferPercent
@@ -428,7 +428,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private string? _editingPreferredBrand;
 
     /// <summary>
-    /// The brand a purchased material's cost comes from (2026-10-29), as Save will keep it: null for the dearest brand. The
+    /// The brand a purchased material's cost comes from, as Save will keep it: null for the dearest brand. The
     /// costs and texts below follow it at once, as they follow the grid (UpdatePurchaseCostTexts).
     /// </summary>
     public string? EditingPreferredBrand
@@ -673,7 +673,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>
     /// The Base Unit tile: "gram (g)" for an ingredient, and a packaging material's base unit as last saved, e.g.
     /// "centimeter (cm)", or "—" until its first Save. The unit is picked in the fields row (EditingBaseUnit), so
-    /// the tile shows what's saved, as the cost tiles beside it do (2026-09-26, at the user's request).
+    /// the tile shows what's saved, as the cost tiles beside it do.
     /// </summary>
     public string SavedBaseUnitText => _savedBaseUnitText.Value;
 
@@ -1731,8 +1731,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         UpdatePurchaseCostTexts();
 
         // The Cost Buffer % box shows TypedCostBufferPercent, raised as the buffer changes: an undo that leaves the buffer
-        // as it was doesn't, and without this the box kept the percent from before the undo (found 2026-10-29, undoing a
-        // Cost From pick).
+        // as it was doesn't, and without this the box would keep the percent from before the undo (undoing a
+        // Cost From pick, say).
         this.RaisePropertyChanged(nameof(TypedCostBufferPercent));
         RecomputeBomTotals();
     }
@@ -1999,7 +1999,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private readonly Subject<RxVoid> _costSharesWanted = new();
 
     /// <summary>
-    /// The Used By tiles' "38% of materials" (2026-10-29), worked out only while the tab shows, since it reads every product
+    /// The Used By tiles' "38% of materials", worked out only while the tab shows, since it reads every product
     /// the material goes into: the material at no cost against as it is (MaterialCostShares). Kept on the tiles until they change.
     /// </summary>
     private async Task ShowCostSharesAsync(CancellationToken cancellationToken)
@@ -2030,10 +2030,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     /// <summary>
-    /// The Last Updated tile: the day the material's cost last changed, and nothing else (2026-09-21, at the
-    /// user's request, replacing a two-line tile that showed the save date over the cost date). Until CostUpdatedAt
-    /// was stored the tile read the newest price history entry's date, which a made or linked ingredient never
-    /// has, so it showed "—" for them however recently their cost had moved. The material also carries UpdatedAt,
+    /// The Last Updated tile: the day the material's cost last changed (CostUpdatedAt), and nothing else. Not the
+    /// newest price history entry's date, which a made or linked ingredient never has, so it would show "—" for them
+    /// however recently their cost had moved. The material also carries UpdatedAt,
     /// the day the form last saved it; nothing shows it.
     /// </summary>
     private void ShowUpdatedAt(RawMaterial? material) =>
@@ -2316,8 +2315,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         HeaderCostUnitText = BufferedCostUnit?.Abbreviation ?? BaseUnitAbbreviation;
         CurrentCostText = SelectedRawMaterial is { } material ? FormatInBufferedCostUnit(material.CostPerBaseUnit) : "—";
 
-        // A made ingredient's buffered cost follows the form's BOM instead of the saved row (2026-09-21, at the
-        // user's request), so the Total Cost and Total Weight tiles beside it always divide out to it as the grid
+        // A made ingredient's buffered cost follows the form's BOM instead of the saved row, so
+        // the Total Cost and Total Weight tiles beside it always divide out to it as the grid
         // is typed into; Save then stores the same figure. Every other material shows what was last saved.
         BufferedCostText = IsEditingMade
             ? FormatInBufferedCostUnit(BomTotalWeight > 0 ? BomTotalCost / BomTotalWeight : 0m)
@@ -2502,7 +2501,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         {
             var over = RawMaterialRules.CostBufferPercentOf(cost, buffered);
             // The % box is what the fixed amount now comes to over the dearest brand, so a price change moves the % while
-            // the amount stays put (2026-09-21, at the user's request). Held to the 0-100 the box, the validator and the
+            // the amount stays put. Held to the 0-100 the box, the validator and the
             // check constraint allow, so a buffer that's gone (or more than double) pins it; the line below and the
             // warning say where it really stands. Typing the % still works the other way, through TypedCostBufferPercent.
             EditingCostBufferPercent = Math.Clamp(Math.Round(over, 4), 0m, 100m);

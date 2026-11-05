@@ -16,7 +16,7 @@ public static class MixEndpoints
         api.MapGet("/mixes", async (ISubAssemblyRepository subAssemblies, ISubAssemblyLineRepository lines, CancellationToken cancellationToken) =>
             (await DetailsAsync(subAssemblies, lines, cancellationToken)).Select(d => d.Mix).ToList());
 
-        // Every mix with its lines at once (2026-10-31): what TinapayanBMS's sync copies, in a few queries rather than a
+        // Every mix with its lines at once: what TinapayanBMS's sync copies, in a few queries rather than a
         // call per mix.
         api.MapGet("/mixes/details", (ISubAssemblyRepository subAssemblies, ISubAssemblyLineRepository lines, CancellationToken cancellationToken) =>
             DetailsAsync(subAssemblies, lines, cancellationToken));

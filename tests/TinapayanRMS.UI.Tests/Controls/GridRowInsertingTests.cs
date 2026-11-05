@@ -174,8 +174,8 @@ public class GridRowInsertingTests
     [Fact]
     public void From_a_table_scrolled_down_the_new_line_is_in_view_whole()
     {
-        // From a table scrolled to its bottom, the view jumped back to the top and left the new line half out of sight
-        // (found in the app, 2026-10-15).
+        // From a table scrolled to its bottom, the view mustn't jump back to the top and leave the new line half out of
+        // sight.
         OffscreenGrid.Run(() => LinesGrid(lineCount: 30), grid =>
         {
             var lines = (ObservableCollection<Line>)grid.ItemsSource;

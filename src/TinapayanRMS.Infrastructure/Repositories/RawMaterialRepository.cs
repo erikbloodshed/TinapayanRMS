@@ -41,9 +41,8 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
     /// their packaging only when it includes theirs (products.includes_component_packaging), and then all of it, so
     /// packaging_costs climbs from every product whose packaging cost the material is in to each composite like that
     /// holding it, and on up. A packaging link takes only the lines, so packaging_users doesn't climb through composites.
-    /// feeds, recipe_users and packaging_costs each stop where a row comes round again (CYCLE, 2026-11-04, from a code
-    /// review): the app refuses a loop, but one left by an edit outside it ran until the command timed out after 30
-    /// seconds. A UNION would end it too, but PostgreSQL sizes a UNION's hash table from its row estimate, here thousands
+    /// feeds, recipe_users and packaging_costs each stop where a row comes round again (CYCLE): the app refuses a loop, but
+    /// one left by an edit outside it would run until the command timed out after 30 seconds. A UNION would end it too, but PostgreSQL sizes a UNION's hash table from its row estimate, here thousands
     /// of times too high, and that made this read about 20 ms slower. packaging_users can't meet a loop: it climbs from
     /// products that link no other product, and a product links one at most, so one in a loop links only inside it.
     /// </summary>
@@ -363,7 +362,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
         }
 
         // Checked rather than left to the foreign keys, whose refusal reads only "in use elsewhere", so the message can name
-        // what uses it (2026-11-05), as deleting a product names what leans on it. Its units, brand prices, price history,
+        // what uses it, as deleting a product names what leans on it. Its units, brand prices, price history,
         // Price Simulator lines and a made one's own add-ins go with it (Cascade).
         static string Listed(string name, DateTime? deletedAt) => ProductRules.ListedName(name, deletedAt is not null);
         List<(string User, string How)> uses =

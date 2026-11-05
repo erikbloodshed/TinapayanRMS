@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// <summary>
 /// Move to In-House: a product's Save moves a section of its own to the Sub-Assemblies screen and makes a made ingredient
 /// from it (NewSubAssemblyDraft.ToMadeIngredient), and the Sub-Assemblies screen's Make In-House Ingredient makes one from a
-/// recipe there (ISubAssemblyRepository.AddMadeIngredientAsync). Since 2026-10-27 the made ingredient is made from the
+/// recipe there (ISubAssemblyRepository.AddMadeIngredientAsync). The made ingredient is made from the
 /// sub-assembly, which stays as it is, in a Made category with no weight loss, so nothing's cost moves. Refused, either
 /// writes nothing.
 /// </summary>

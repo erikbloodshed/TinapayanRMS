@@ -135,8 +135,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private ProductStage _newProductStage = CostingDefaults.DefaultNewProductStage;
     /// <summary>
     /// The stage Save files a new product in: the one Settings → Costing Defaults gives a new product after New
-    /// (Production unless it says otherwise, 2026-10-07), or the stage of the folder New Product Here was picked on (the
-    /// user's choice, 2026-09-26). Revert keeps it. The header says so (NewProductTag).
+    /// (Production unless it says otherwise), or the stage of the folder New Product Here was picked on.
+    /// Revert keeps it. The header says so (NewProductTag).
     /// </summary>
     public ProductStage NewProductStage
     {
@@ -495,7 +495,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>
-    /// The header's switch, named for the costs a click switches to (the user's request, 2026-09-29): "Unbuffered" while
+    /// The header's switch, named for the costs a click switches to: "Unbuffered" while
     /// the screen is buffered, "Buffered" while it isn't.
     /// </summary>
     public string CostBasisButtonLabel => IsUnbuffered ? "Buffered" : "Unbuffered";
@@ -572,7 +572,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private readonly Subject<IReadOnlyList<Product>> _markupChecks = new();
 
     /// <summary>
-    /// Flags each product in the list whose current price earns less than its target markup (2026-10-29): every product
+    /// Flags each product in the list whose current price earns less than its target markup: every product
     /// priced as saved, as Reports prices them (SavedProductReader.ReadAllAsync, a dozen or so queries however many there are),
     /// off the UI thread. A product's flag follows its Save at the next load.
     /// </summary>
@@ -611,7 +611,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private RecipeDraft _savedRecipe = new([], []);
 
     // The shop-wide Wastage % (Settings → Costing Defaults), as of the last LoadCommand: what a product is priced with unless
-    // its category sets its own (EditingCategory.WastagePercent, 2026-10-29).
+    // its category sets its own (EditingCategory.WastagePercent).
     private decimal _wastagePercent = CostingDefaults.DefaultWastagePercent;
 
     // The shop's VAT (Settings → Costing Defaults), as of the last LoadCommand: what every product is priced with.
@@ -1125,9 +1125,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         //
         // One refresh operator for all four properties, not an AutoRefresh each: each operator takes its own lock, and the
         // subscriber sets the rows' costs (Resolve), so with a chain a cost set on one thread could hold one operator's lock
-        // while waiting for the next, and a cost set on another thread the other way round. That deadlocked when the
-        // ViewModel tests ran without a UI thread (until 2026-11-05); on the one UI thread it can't, but one operator is
-        // also the simpler way to say it.
+        // while waiting for the next, and a cost set on another thread the other way round. One operator
+        // can't deadlock, whatever thread a cost is set on, and is the simpler way to say it.
         ComponentsTable.ComponentEdits.ToObservableChangeSet()
             .AutoRefreshOnObservable(r => r.WhenAnyPropertyChanged(
                 nameof(ProductComponentRow.ComponentProductId),
@@ -1451,8 +1450,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // Written with its versions, all or nothing (VersionedSaves): a saved product with none yet first gets how it
             // stood until now, so there's one to go back to; then the product as saved; and the products sharing its
             // sections' lines or linking its packaging each get one if this Save changes them. Only linked lines edited
-            // here and the packaging reach those, so a Save of neither reads none (2026-10-17: a price-only Save spent half
-            // a second reading the 39 products sharing its dough, twice).
+            // here and the packaging reach those, so a Save of neither reads none: a price-only Save would
+            // otherwise spend half a second reading every product sharing its dough, twice.
             var packagingLink = Packaging.ChangedLink();
             var packagingLines = Packaging.ChangedLines();
             var changesSharing = UsageEdits.Any(u => u.AreLinkedLinesEdited) || packagingLines is not null || packagingLink is not null;
@@ -1471,7 +1470,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             ShowSavedProduct(saved.Product, saved.Detail);
 
             // Read again now if the History tab shows; otherwise the versions it holds are out of date, and go, so showing it
-            // reads them (a Save made from the Recipe tab left the tab without the new version, found in the app 2026-10-17).
+            // reads them, so a Save made from the Recipe tab doesn't leave the tab without the new version.
             if (SelectedDetailsTab == HistoryTab)
             {
                 RequestVersions(force: true);
@@ -1506,7 +1505,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             () => RunSafelyAsync(() => VersionHistory.SelectedRow is { } row ? RestoreVersionAsync(row) : Task.CompletedTask),
             VersionHistory.WhenAnyValue(h => h.SelectedRow).Select(row => row is not null));
 
-        // Print shows the product as the screen does, unsaved edits and all (the user's choice, 2026-09-27). A form left
+        // Print shows the product as the screen does, unsaved edits and all. A form left
         // open is part of that, as it's part of what Save writes, so it's applied first; a rule refusing it shows its
         // message, and the Print tab doesn't open. It stays enabled while a picked product's details are on their way,
         // and does nothing if clicked then: disabled for that moment, it flickered on every pick. (Save is off then
@@ -4424,7 +4423,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>
     /// The product the screen has open, as the Print tab shows it: asked for each time that tab is shown, so it follows
-    /// the edits made here since, and the product opened here since (the user's choice, 2026-09-27). A sub-assembly form
+    /// the edits made here since, and the product opened here since. A sub-assembly form
     /// left open is applied first, as Print applies it. Empty while the details are still arriving, and a
     /// <see cref="PrintProblem"/> when a rule refuses the form, with its message (shown on this screen too, for when it's
     /// next shown): the tab then keeps what it had.
@@ -4460,8 +4459,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>
     /// What Print puts on paper: the product as the screen shows it now, its details, every section in recipe order, its
     /// packaging and its costing, with a note when that isn't what's saved. With the Scaling tab showing, the pages are
-    /// that tab instead, the recipe scaled (the user's request, 2026-10-02: "If the view is scaling, clicking print will
-    /// print the scaling"). Its rows are already worked out: the tab is worked out again on every change while it shows.
+    /// that tab instead, the recipe scaled. Its rows are already worked out: the tab is worked out again on every change while it shows.
     /// </summary>
     private ProductPrintout CurrentPrintout() => new(
         string.IsNullOrWhiteSpace(EditingName) ? (IsEditingComposite ? "New composite product" : "New product") : EditingName.Trim(),
@@ -4491,8 +4489,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     };
 
     /// <summary>
-    /// A version from the History tab on paper (the user's request, 2026-10-17: "is there a way to preview or show the
-    /// recipe at the history i currently selected?"): its sections, packaging and costing as that Save left them, priced
+    /// A version from the History tab on paper: its sections, packaging and costing as that Save left them, priced
     /// at its costs then, as the table's Then columns are, at the screen's cost basis. Titled with the version, dated when
     /// it was saved, and marked in the footer as from the history; the category and stage are the product's now, which a
     /// version doesn't keep.

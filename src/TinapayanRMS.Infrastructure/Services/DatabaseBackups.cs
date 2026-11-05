@@ -6,7 +6,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 namespace TinapayanRMS.Infrastructure.Services;
 
 /// <summary>
-/// The database's backups, as PostgreSQL's own (2026-10-21, replacing SQL Server's BACKUP and RESTORE): pg_dump writes the
+/// The database's backups, as PostgreSQL's own: pg_dump writes the
 /// whole database to a file in <see cref="Folder"/> in its custom format, and pg_restore reads one back. A restore goes into
 /// a scratch database first, which is checked and brought up to date before it takes the database's place, so a backup
 /// that's refused or fails part-way never touches the data. Every statement runs on its own unpooled connection to the
@@ -30,8 +30,8 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
 
     /// <summary>
     /// Ten minutes for a statement on the maintenance database. On Windows, PostgreSQL checkpoints before it drops a
-    /// database, syncing every file it has written since the last one: after a busy spell that took 30 seconds on the
-    /// development PC (found by TinapayanRMS_Web, 2026-10-11), Npgsql's default timeout.
+    /// database, syncing every file it has written since the last one: after a busy spell that has taken 30 seconds on the
+    /// development PC, Npgsql's default timeout.
     /// </summary>
     private const int MaintenanceCommandTimeoutSeconds = 600;
 
@@ -170,8 +170,8 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
     /// <summary>
     /// pg_dump writes to a partial file, which only takes the backup's name once pg_dump has finished without an error.
     /// So whatever stops it part-way (a power cut, the process killed) leaves nothing that reads as a backup. pg_dump makes
-    /// its file before it even connects, and under the backup's own name a stray one counted as the day's backup, so
-    /// none was taken that day (found 2026-11-03, by a code review).
+    /// its file before it even connects, and under the backup's own name a stray one would count as the day's backup, so
+    /// none would be taken that day.
     /// </summary>
     private async Task<DatabaseBackup> BackUpInTurnAsync(Target target, BackupKind kind, DateTime takenAt, CancellationToken cancellationToken)
     {
@@ -272,7 +272,7 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
             cancellationToken);
 
     /// <summary>
-    /// Brings the restored backup up to this version of the app, as the user chose (2026-10-03): the updates it lacks are
+    /// Brings the restored backup up to this version of the app: the updates it lacks are
     /// applied, so the app works with it straight away. One from a later version, or of another app's database, is refused
     /// (BackupRules.UpdatesNeeded) before it takes the database's place.
     /// </summary>
@@ -376,7 +376,7 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
     /// <summary>
     /// Drops <paramref name="database"/> once everyone is out of it. Not WITH (FORCE): that ends the server's own workers
     /// in it too, and an account that isn't a superuser may not end an autovacuum worker, which a database just filled by a
-    /// restore often has (found by TinapayanRMS_Web, 2026-10-11). A plain DROP DATABASE stops those itself.
+    /// restore often has. A plain DROP DATABASE stops those itself.
     /// </summary>
     private static async Task DropDatabaseAsync(Target target, string database, CancellationToken cancellationToken)
     {

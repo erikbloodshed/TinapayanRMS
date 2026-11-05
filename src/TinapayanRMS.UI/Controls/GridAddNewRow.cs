@@ -137,7 +137,7 @@ internal sealed class UntouchedAddRowSelectionController(SfDataGrid grid) : Grid
     /// The grid's answer to its lines changing under an open add row is to commit the add row, which adds to the lines
     /// while they're still raising CollectionChanged, and that throws "Cannot change ObservableCollection during a
     /// CollectionChanged event" as soon as the screen listens to them too. Products' Save crashed that way when its
-    /// reload refilled the form's lines (2026-09-28). There's no committing the row from inside that event, so it's
+    /// reload refilled the form's lines. There's no committing the row from inside that event, so it's
     /// cancelled the way Esc cancels it. The grid's own commit doesn't pass through here with the row open.
     /// </summary>
     protected override void ProcessSourceCollectionChanged(NotifyCollectionChangedEventArgs e, CollectionChangedReason reason)
@@ -162,7 +162,6 @@ internal sealed class UntouchedAddRowSelectionController(SfDataGrid grid) : Grid
     /// be on. The add row keeps its outline, but the next key moves from the index, off the rows: Left, Right and Tab
     /// all left no cell current. So the index goes back on the add row's cell. One dispatcher pass after the change: until
     /// the add row is laid out the grid can't find its cell, notes only the index, and the next move leaves it outlined.
-    /// (Until 2026-10-15 GridFillerRows did this, since one of its rows was at that index and drew a second outline.)
     /// </summary>
     private void PutCurrentCellBackOnAddRow()
     {
@@ -176,9 +175,9 @@ internal sealed class UntouchedAddRowSelectionController(SfDataGrid grid) : Grid
 
     /// <summary>
     /// Tab from the add row's last cell that takes the keyboard adds the line, as Enter does, and opens the new add row's
-    /// first cell for the next line (2026-10-24, reported by the user on the Production Plan: "I couldn't add a third
-    /// product immediately"). The grid only ended the cell's edit there: the row stayed an add row with its values in,
-    /// not yet a line, so there was no empty row to start the next one in until Enter or a click elsewhere added it. An
+    /// first cell for the next line. Left to the grid, Tab only ends the cell's edit there: the row stays an add row with
+    /// its values in, not yet a line, so there's no empty row to start the next one in until Enter or a click elsewhere
+    /// adds it. An
     /// add row nothing was typed into is left to the grid, so Tab still leaves the table from it.
     /// </summary>
     protected override void ProcessKeyDown(KeyEventArgs args)
@@ -244,9 +243,8 @@ internal sealed class UntouchedAddRowSelectionController(SfDataGrid grid) : Grid
 /// <para>
 /// In the add row it follows its DataContext, which is the add row's item from the moment the row is opened until it's
 /// committed or dropped, and null otherwise; the grid doesn't initialize the cell again in between. Hidden for the whole
-/// add row, the Base box couldn't be ticked while its line was being typed: the user typed the ingredient and grams,
-/// reached for Base on the same row and found nothing there until the line was added (2026-10-28, reported on a new
-/// sub-assembly and a new product's section). Ticked there, the tick goes into the item and is added with it.
+/// add row, the Base box couldn't be ticked while its line is being typed, with the ingredient and grams in and nothing
+/// to tick until the line is added. Ticked there, the tick goes into the item and is added with it.
 /// </para>
 /// </summary>
 public sealed class AddRowHiddenCheckBoxRenderer : GridCellCheckBoxRenderer

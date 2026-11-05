@@ -4,8 +4,8 @@ using TinapayanRMS.ApplicationCore.Rules;
 namespace TinapayanRMS.Infrastructure.Upgrades;
 
 /// <summary>
-/// Gives every product's own sub-assembly the section name it went by until section names were stored
-/// (SubAssembly.SectionName, 2026-11-05), read from its name this once (SubAssemblyRules.SectionNameFromSavedName).
+/// Gives every product's own sub-assembly the section name it went by before section names were stored
+/// (SubAssembly.SectionName), read from its name this once (SubAssemblyRules.SectionNameFromSavedName).
 /// </summary>
 internal static class SectionNamesUpgrade
 {

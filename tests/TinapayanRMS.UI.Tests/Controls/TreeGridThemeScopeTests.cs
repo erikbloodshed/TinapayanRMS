@@ -13,8 +13,8 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// Syncfusion's Windows11Light dictionary for SfTreeGrid (34.2.9) merges in SfGrid's unthemed Control/Themes/Generic.xaml,
 /// whose implicit GridCell, header cell and row styles are the very ones its SfDataGrid dictionary themes. SfSkinManager
 /// adds each control's dictionary to the window's in the order it meets them, so a tree grid inheriting the window's theme
-/// after the data grids left every data grid in the app unthemed: black grid lines, a bold add-row +, until a cell was
-/// edited (found 2026-09-30, the day the Products screen's Scaling tab brought the first tree grid in). ScalingCard's tree
+/// after the data grids leaves every data grid in the app unthemed: black grid lines, a bold add-row +, until a cell is
+/// edited. ScalingCard's tree
 /// grid is themed on its own (SfSkinManager.Theme set on it), which keeps its dictionaries in its own resources. The
 /// second half fails once Syncfusion's dictionary stops carrying the generic styles, when the local theme stops mattering.
 /// </summary>

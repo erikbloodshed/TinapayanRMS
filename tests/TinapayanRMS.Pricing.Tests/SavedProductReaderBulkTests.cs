@@ -11,9 +11,8 @@ using TinapayanRMS.Pricing.Tests.Fixtures;
 namespace TinapayanRMS.Pricing.Tests;
 
 /// <summary>
-/// Many products read at once (SavedProductReader.ReadDetailsAsync and ReadAllAsync, 2026-10-03), as Reports and Print
+/// Many products read at once (SavedProductReader.ReadDetailsAsync and ReadAllAsync), as Reports and Print
 /// read them: the round trips don't grow with the number of products, and each product comes out as it would read alone.
-/// They were nine or so queries a product.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)

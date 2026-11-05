@@ -8,11 +8,10 @@ namespace TinapayanRMS.UI.Controls;
 
 /// <summary>
 /// The app's windows: a Syncfusion ChromelessWindow, which draws the title bar itself, in the theme, with its own Minimize,
-/// Maximize/Restore and Close buttons, so Windows' caption bar is gone (MainWindow since 2026-09-25, the Settings dialog
-/// since 2026-09-29, at the user's request). This holds everything a window needs to behave like one on top of that.
+/// Maximize/Restore and Close buttons, so Windows' caption bar is gone (MainWindow and the Settings dialog). This holds everything a window needs to behave like one on top of that.
 /// <para>
 /// UseNativeChrome, CornerRadius 0 and ResizeBorderThickness 0 (set here, so a window's XAML doesn't repeat them) fix two
-/// bugs in the plain chromeless mode (2026-09-25, found by the user). There, every point of the window hit-tested as
+/// bugs in the plain chromeless mode. There, every point of the window hit-tested as
 /// client area, and ChromelessWindow resized the window from its own mouse handling, which only caught the outermost pixel
 /// of the left and right edges. The bottom edge and all four corners couldn't be dragged at all. It also cut its 8px
 /// rounded corners out of an opaque window, so the corners and a 1px ring around it drew black. With UseNativeChrome, a
@@ -99,10 +98,10 @@ public class AppWindow : ChromelessWindow
     /// a restore. ChromelessWindow sets it from two places: its own hook (WM_SIZE, WM_SIZING, WM_EXITSIZEMOVE), which has
     /// just run when this one does, and its StateChanged handler, which WPF raises from WM_SIZE after every hook. So the
     /// region comes off now and again once this message has been dealt with.
-    /// Without a redraw (2026-09-29): taking the region off only reshapes the window, which WPF has drawn already. The
-    /// second clear, asking for one, landed just after a restore's first frame, and the window went black until the next
-    /// (found by the user; at normal size, black on most restores with the redraw and on none without it; maximized,
-    /// RestoreRendering takes care of the rest).
+    /// Without a redraw: taking the region off only reshapes the window, which WPF has drawn already. The
+    /// second clear, asking for one, would land just after a restore's first frame, and the window would go black until the
+    /// next (at normal size, black on most restores with the redraw and on none without it; maximized, RestoreRendering
+    /// takes care of the rest).
     /// </summary>
     private IntPtr DropWindowRegion(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {

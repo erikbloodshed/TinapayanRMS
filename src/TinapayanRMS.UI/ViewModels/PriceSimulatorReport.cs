@@ -3,7 +3,7 @@ using TinapayanRMS.Pricing;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// The Price Simulator screen's report on paper (2026-10-06): each product's recipe and costing at the simulated prices, the lines a
+/// The Price Simulator screen's report on paper: each product's recipe and costing at the simulated prices, the lines a
 /// price change moves carrying their cost now beside it, and the changes that reach it; the set's first page lists every
 /// change tried. Nothing in it is WPF: it pairs a product priced now with the same product priced at simulated prices.
 /// </summary>

@@ -10,7 +10,7 @@
 
             <!--
                 Typed straight into, like the Bill of Materials: the add row at the bottom starts a unit, and a material
-                can have any number of them (the limit of two went 2026-10-01, at the user's request). The add row's item
+                can have any number of them. The add row's item
                 comes from the screen (NewUnitRow), so it names its unit as soon as one is picked.
             -->
             <syncfusion:SfDataGrid ItemsSource="{Binding UnitRows}"

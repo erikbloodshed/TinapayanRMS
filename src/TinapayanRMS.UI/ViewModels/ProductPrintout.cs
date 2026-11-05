@@ -56,7 +56,7 @@ public sealed record ProductPrintout(
 
     /// <summary>
     /// The Price Simulator report's own: what the product costs at today's prices, and the price changes that reach it, its other
-    /// figures being at the simulated prices (PriceSimulatorReport, 2026-10-06). Null for every other printout.
+    /// figures being at the simulated prices (PriceSimulatorReport). Null for every other printout.
     /// </summary>
     public PrintedSimulation? Simulation { get; init; }
 

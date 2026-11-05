@@ -18,7 +18,7 @@ namespace TinapayanRMS.Tests.Common.Fixtures;
 /// <para>
 /// xUnit makes a collection fixture once for each collection, so a project with several database collections has one of
 /// these for each, and each takes a database of its own: the first the project's name, the next ones that name with _2,
-/// _3 and so on (2026-11-05). The collections then run side by side, where one database made every database test of a
+/// _3 and so on. The collections then run side by side, where one database would make every database test of a
 /// project run after the other.
 /// </para>
 /// </summary>

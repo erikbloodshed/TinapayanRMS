@@ -2,7 +2,7 @@
 
   <!-- What a saved product costs, read and worked out the one way the screens, the Recipe API and the MCP server all read it:
        SavedProductReader and what it builds. It knows repository interfaces and rules, and nothing of WPF, Syncfusion or
-       ReactiveUI, so the two servers can price without a UI (2026-11-04: they referenced the UI project for this). -->
+       ReactiveUI, so the two servers can price without a UI. -->
 
   <ItemGroup>
     <ProjectReference Include="..\TinapayanRMS.ApplicationCore\TinapayanRMS.ApplicationCore.csproj" />

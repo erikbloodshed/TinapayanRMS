@@ -7,12 +7,12 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// The day's automatic backup (2026-10-29, at the user's request, made safer): taken when the app starts and checked again
+/// The day's automatic backup: taken when the app starts and checked again
 /// every hour while it stays open, so a copy left open over midnight still takes the next day's; and copied to a second
 /// folder when one is set (a USB stick, a synced cloud folder), which keeps the newest automatic ones as the backups folder
-/// does. The second folder is kept for the Windows user on this computer (IViewStateStore), and so is what last went wrong
-/// (2026-11-03, found by a code review: a backup that failed only went to the log, and a copy's problem was forgotten at the
-/// next start, so backups could stop for weeks with nothing to show for it). The Database tab shows both problems, and an
+/// does. The second folder is kept for the Windows user on this computer (IViewStateStore), and so is what last went wrong,
+/// so backups can't stop for weeks with a failure only in the log, or a copy's problem forgotten at the next start. The
+/// Database tab shows both problems, and an
 /// automatic backup failing with the newest one getting old also says so once a run (<see cref="OverdueWarningAsync"/>).
 /// </summary>
 public sealed class AutomaticBackups(IDatabaseBackups backups, IViewStateStore viewState, ILogger logger)
