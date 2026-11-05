@@ -1124,9 +1124,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // has been read (a new pick's is read then), and the composite's costs follow.
         //
         // One refresh operator for all four properties, not an AutoRefresh each: each operator takes its own lock, and the
-        // subscriber sets the rows' costs (Resolve), so with a chain a cost set on one thread held one operator's lock
-        // while waiting for the next, and a cost set on another thread the other way round. A cost read arriving off the
-        // UI thread while a LoadCommand's applied (as in the tests, which have no UI thread) deadlocked there.
+        // subscriber sets the rows' costs (Resolve), so with a chain a cost set on one thread could hold one operator's lock
+        // while waiting for the next, and a cost set on another thread the other way round. That deadlocked when the
+        // ViewModel tests ran without a UI thread (until 2026-11-05); on the one UI thread it can't, but one operator is
+        // also the simpler way to say it.
         ComponentsTable.ComponentEdits.ToObservableChangeSet()
             .AutoRefreshOnObservable(r => r.WhenAnyPropertyChanged(
                 nameof(ProductComponentRow.ComponentProductId),
