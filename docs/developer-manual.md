@@ -13,7 +13,7 @@ This manual is for developers who build, maintain or extend the app. It explains
 | [PLAN.md](../PLAN.md) and [docs/plan/](plan/) | Developers and AI agents | Every design decision with its reason and date: tech stack, domain model, architecture, costing cascade and conventions in PLAN.md; each main screen's design notes, the Syncfusion notes and the build plan in `docs/plan/` |
 | [CLAUDE.md](../CLAUDE.md) | AI coding agents | The commands and rules an agent needs before it changes the code |
 
-PLAN.md is long: an overview ("At a glance"), then about 800 lines of very long bullets. List its sections with `grep -n "^#" PLAN.md` and read the ones your change touches. Its largest parts moved to `docs/plan/` on 2026-10-28 and are still part of it.
+PLAN.md is long: an overview ("At a glance"), then about 650 lines of long bullets, describing the app as it is now. List its sections with `grep -n "^#" PLAN.md` and read the ones your change touches. Its largest parts are in `docs/plan/` and are still part of it; the build plan's dated log there holds the history.
 
 ## Contents
 
@@ -1413,7 +1413,7 @@ Each tool takes a product or material by its name, or by a part of it that names
 | [Tech Stack](../PLAN.md#tech-stack) | You touch a package, the ReactiveUI bootstrap, or the test runner |
 | [Solution Structure](../PLAN.md#solution-structure) | You add a project or a folder |
 | [Domain Model](../PLAN.md#domain-model) | You change an entity or a rule. Each entity's bullets give its rules and the reasons for them. |
-| [Syncfusion notes](plan/syncfusion.md) | You use a Syncfusion control, or change the theme, the DPI handling or printing |
+| [Syncfusion notes](plan/syncfusion.md) | You use a Syncfusion control, or change the theme, the windows, the DPI handling, printing, the toasts or the Reports screen |
 | [Application Architecture](../PLAN.md#application-architecture) | You change a screen, a repository pattern or a migration |
 | [Products](plan/products-screen.md), [Raw Materials](plan/raw-materials-screen.md), [Sub-Assemblies](plan/sub-assemblies-screen.md) | You change one of the three main screens: each one's design notes |
 | [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade) | You change any cost |
