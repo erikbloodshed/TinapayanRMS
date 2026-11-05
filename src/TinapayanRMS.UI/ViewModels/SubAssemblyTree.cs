@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Reactive.Subjects;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
@@ -27,7 +26,7 @@ public closed class SubAssemblyTreeNode : ReactiveObject
 /// <see cref="Children"/> through a HierarchyPropertyDescriptor for this type alone (SubAssemblyListCard), as the Raw
 /// Materials list does (RawMaterialFolderNode).
 /// </summary>
-public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode
+public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, IListFolder
 {
     internal SubAssemblyFolderNode(SubAssemblyRole role)
     {
@@ -144,26 +143,23 @@ public sealed class SubAssemblyTree : IDisposable
     /// <summary>Every role's folder, shown or not, by role id.</summary>
     private readonly Dictionary<int, SubAssemblyFolderNode> _folders = [];
 
-    /// <summary>The folders left closed last time, by SubAssemblyFolderNode.Key. Every other folder opens, a role new since included.</summary>
-    private readonly HashSet<string> _closedKeys;
+    /// <summary>Which folders start open, and every one opened or closed since.</summary>
+    private readonly FolderMemory _memory;
 
-    private readonly Subject<RxVoid> _expansionChanged = new();
-
-    /// <param name="closedFolders">
-    /// The folders to start closed, by <see cref="SubAssemblyFolderNode.Key"/>, as <see cref="ClosedFolderKeys"/> gave them
-    /// last time; null for none, so the list first shows every sub-assembly. The closed ones are kept, not the open ones as
-    /// on Raw Materials, whose category folders start closed: here a role added since opens, as every folder first did.
+    /// <param name="memory">
+    /// The folders left closed last time (<see cref="ClosedFolderKeys"/>, by <see cref="SubAssemblyFolderNode.Key"/>); null
+    /// for none kept, so the list first shows every sub-assembly.
     /// </param>
-    public SubAssemblyTree(IEnumerable<string>? closedFolders = null)
+    public SubAssemblyTree(FolderMemory? memory = null)
     {
-        _closedKeys = closedFolders?.ToHashSet(StringComparer.Ordinal) ?? [];
+        _memory = memory ?? new FolderMemory();
     }
 
     /// <summary>The role folders the list shows, in the roles' order: all of them, or while a search filters it, those holding a match.</summary>
     public ObservableCollection<SubAssemblyFolderNode> Roots { get; } = [];
 
     /// <summary>A folder opened or closed, by a click, a search or Expand All: for remembering them (ClosedFolderKeys).</summary>
-    public IObservable<RxVoid> ExpansionChanged => _expansionChanged;
+    public IObservable<RxVoid> ExpansionChanged => _memory.ExpansionChanged;
 
     /// <summary>The sub-assembly's row, or null while it isn't listed (a search hides it, or it isn't loaded).</summary>
     public SubAssemblyLeafNode? Find(int subAssemblyId) => _leaves.GetValueOrDefault(subAssemblyId);
@@ -175,10 +171,7 @@ public sealed class SubAssemblyTree : IDisposable
     /// Every folder closed now, by <see cref="SubAssemblyFolderNode.Key"/>: what to start with next time. Before the first
     /// Refresh, which makes the folders, the ones it was given, so a screen never shown keeps them as they were.
     /// </summary>
-    public IReadOnlyList<string> ClosedFolderKeys() =>
-        _folders.Count == 0
-            ? [.. _closedKeys.Order(StringComparer.Ordinal)]
-            : [.. _folders.Values.Where(f => !f.IsExpanded).Select(f => f.Key).Order(StringComparer.Ordinal)];
+    public IReadOnlyList<string> ClosedFolderKeys() => _memory.ClosedKeys(_folders.Values, _folders.Count > 0);
 
     public void ExpandAll()
     {
@@ -196,24 +189,7 @@ public sealed class SubAssemblyTree : IDisposable
         }
     }
 
-    public void Dispose() => _expansionChanged.Dispose();
-
-    /// <summary>A role's folder, open unless it was left closed last time, whose opening and closing is reported (ExpansionChanged).</summary>
-    private SubAssemblyFolderNode NewFolder(SubAssemblyRole role)
-    {
-        var folder = new SubAssemblyFolderNode(role);
-        folder.IsExpanded = !_closedKeys.Contains(folder.Key);
-
-        // The event itself rather than WhenAnyValue, which needs ReactiveUI set up first: the tree is used without it too.
-        folder.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(SubAssemblyFolderNode.IsExpanded))
-            {
-                _expansionChanged.OnNext(RxVoid.Default);
-            }
-        };
-        return folder;
-    }
+    public void Dispose() => _memory.Dispose();
 
     /// <summary>
     /// Where dropping <paramref name="subAssembly"/> on <paramref name="target"/> files it: a role's folder puts it in that
@@ -294,7 +270,7 @@ public sealed class SubAssemblyTree : IDisposable
             }
             else
             {
-                _folders[role.Id] = NewFolder(role);
+                _folders[role.Id] = _memory.Track(new SubAssemblyFolderNode(role));
             }
         }
 

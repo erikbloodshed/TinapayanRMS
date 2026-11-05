@@ -227,17 +227,17 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         Headers(listMenu).Should().Equal(
             "New Raw Material", "New Ingredient Category…", "New Made Category…", "New Packaging Category…", "Expand All", "Collapse All");
 
+        await RunAsync(listMenu.Single(i => i.Header == "Collapse All"));
+        TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeFalse();
+        TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeFalse();
+        viewModel.RawMaterialTree.Roots.Should().OnlyContain(r => r.IsExpanded);
+
         await RunAsync(viewModel.TreeMenuFor(ingredients).Single(i => i.Header == "Expand All"));
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeTrue();
         TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeFalse("only that type's folders");
 
         await RunAsync(listMenu.Single(i => i.Header == "Expand All"));
         TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeTrue();
-
-        await RunAsync(listMenu.Single(i => i.Header == "Collapse All"));
-        TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeFalse();
-        TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeFalse();
-        viewModel.RawMaterialTree.Roots.Should().OnlyContain(r => r.IsExpanded);
     });
 
     [Fact]
@@ -465,7 +465,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
     });
 
     [Fact]
-    public Task The_folders_left_open_open_again_next_time() => StaThread.RunAsync(async () =>
+    public Task The_folders_left_closed_stay_closed_next_time_and_a_new_category_opens() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var boxesId = await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
@@ -474,20 +474,41 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         store.WriteCount.Should().Be(0, "nothing opened or closed is nothing to remember");
         var first = await LoadedViewModelAsync(store);
 
-        TreeFolder(first, RawMaterialType.Ingredient, "Flour").IsExpanded = true;
+        TreeFolder(first, RawMaterialType.Ingredient, "Flour").IsExpanded = false;
 
         await Settle.EventuallyAsync(
-            () => store.ReadList(RawMaterialsViewModel.OpenFoldersKey)?.Contains($"Ingredient/{flourId}") == true,
-            () => string.Join(", ", store.ReadList(RawMaterialsViewModel.OpenFoldersKey) ?? []));
+            () => store.ReadList(RawMaterialsViewModel.ClosedFoldersKey)?.Contains($"Ingredient/{flourId}") == true,
+            () => string.Join(", ", store.ReadList(RawMaterialsViewModel.ClosedFoldersKey) ?? []));
+        first.Dispose();
 
+        await AddCategoryAsync("Dairy", RawMaterialCategoryType.Ingredient);
         var next = await LoadedViewModelAsync(store);
-        TreeFolder(next, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeTrue();
-        TreeFolder(next, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeFalse();
+        TreeFolder(next, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeFalse();
+        TreeFolder(next, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeTrue();
+        TreeFolder(next, RawMaterialType.Ingredient, "Dairy").IsExpanded.Should().BeTrue("a category new since opens, as every folder first did");
 
-        // One opened just before the app closes is written as it closes.
-        TreeFolder(next, RawMaterialType.Packaging, "Boxes").IsExpanded = true;
+        // One closed just before the app closes is written as it closes.
+        TreeFolder(next, RawMaterialType.Packaging, "Boxes").IsExpanded = false;
         next.Dispose();
-        store.ReadList(RawMaterialsViewModel.OpenFoldersKey).Should().Contain($"Packaging/{boxesId}");
+        store.ReadList(RawMaterialsViewModel.ClosedFoldersKey).Should().Contain($"Packaging/{boxesId}");
+    });
+
+    [Fact]
+    public Task The_folders_the_list_kept_open_before_open_again_and_the_rest_start_closed() => StaThread.RunAsync(async () =>
+    {
+        var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
+        var boxesId = await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
+        var store = new InMemoryViewStateStore();
+        store.WriteList(RawMaterialsViewModel.OpenFoldersKey, ["Ingredient", $"Ingredient/{flourId}", "Packaging"]);
+
+        var viewModel = await LoadedViewModelAsync(store);
+
+        TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeTrue();
+        TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeFalse();
+
+        // Kept as closed folders from then on.
+        viewModel.Dispose();
+        store.ReadList(RawMaterialsViewModel.ClosedFoldersKey).Should().Contain($"Packaging/{boxesId}").And.NotContain($"Ingredient/{flourId}");
     });
 
     private static IEnumerable<string> Headers(IEnumerable<TreeMenuItem> menu) => menu.Where(i => !i.IsSeparator).Select(i => i.Header);

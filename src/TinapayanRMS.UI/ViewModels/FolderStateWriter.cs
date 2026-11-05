@@ -5,8 +5,8 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// Keeps the folders of a screen's list as they were left, for next time: the open ones (Products, Raw Materials) or the
-/// closed ones (Sub-Assemblies), under one view state key (IViewStateStore). Once they've settled after a change (a search
+/// Keeps the folders of a screen's list as they were left, for next time: the closed ones (FolderMemory.ClosedKeys),
+/// under one view state key (IViewStateStore). Once they've settled after a change (a search
 /// or Expand All opens several in a row) they're written off the UI thread, and only when they differ from what was written
 /// last. Disposing it writes a change still settling, rather than losing it as the app closes.
 /// </summary>
@@ -24,7 +24,7 @@ public sealed class FolderStateWriter : IDisposable
     private IReadOnlyList<string> _written;
 
     /// <param name="expansionChanged">The list's folders opening and closing (the tree's ExpansionChanged).</param>
-    /// <param name="readFolders">The folders to keep as the list has them now, such as ProductTree.OpenFolderKeys.</param>
+    /// <param name="readFolders">The folders to keep as the list has them now, such as ProductTree.ClosedFolderKeys.</param>
     public FolderStateWriter(IViewStateStore viewStateStore, string key, IObservable<RxVoid> expansionChanged, Func<IReadOnlyList<string>> readFolders)
     {
         _viewStateStore = viewStateStore;

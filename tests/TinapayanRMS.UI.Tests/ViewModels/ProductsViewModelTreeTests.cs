@@ -172,15 +172,17 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         Headers(viewModel.TreeMenuFor(production)).Should().Equal("New Product Here", "New Composite Product Here", "New Category…", "Print Stage", "Expand All", "Collapse All");
         Headers(viewModel.TreeMenuFor(null)).Should().Equal("New Product", "New Composite Product", "New Category…", "Print All Products", "Expand All", "Collapse All");
 
+        await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "Collapse All"));
+        viewModel.ProductTree.Stages.SelectMany(r => r.Children).Cast<ProductFolderNode>().Should().OnlyContain(f => !f.IsExpanded);
+        viewModel.ProductTree.Stages.Should().OnlyContain(r => r.IsExpanded);
+
         await RunAsync(viewModel.TreeMenuFor(production).Single(i => i.Header == "Expand All"));
         production.Children.Cast<ProductFolderNode>().Should().OnlyContain(f => f.IsExpanded);
         viewModel.ProductTree.StageFolder(ProductStage.ResearchAndDevelopment).Children.Cast<ProductFolderNode>()
             .Should().OnlyContain(f => !f.IsExpanded, "the other stage's folders are left as they were");
 
         await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "Expand All"));
-        await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "Collapse All"));
-        viewModel.ProductTree.Stages.SelectMany(r => r.Children).Cast<ProductFolderNode>().Should().OnlyContain(f => !f.IsExpanded);
-        viewModel.ProductTree.Stages.Should().OnlyContain(r => r.IsExpanded);
+        viewModel.ProductTree.Stages.SelectMany(r => r.Children).Cast<ProductFolderNode>().Should().OnlyContain(f => f.IsExpanded);
     });
 
     [Fact]
@@ -556,7 +558,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
     });
 
     [Fact]
-    public Task The_folders_left_open_open_again_next_time() => StaThread.RunAsync(async () =>
+    public Task The_folders_left_closed_stay_closed_next_time_and_a_new_category_opens() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
         var cakesId = await AddProductCategoryAsync("Cakes");
@@ -565,20 +567,42 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         store.WriteCount.Should().Be(0, "nothing opened or closed is nothing to remember");
         var first = await LoadedViewModelAsync(store);
 
-        TreeFolder(first, ProductStage.Production, "Breads").IsExpanded = true;
+        TreeFolder(first, ProductStage.Production, "Breads").IsExpanded = false;
 
         await Settle.EventuallyAsync(
-            () => store.ReadList(ProductsViewModel.OpenFoldersKey)?.Contains($"Production/{breadsId}") == true,
-            () => string.Join(", ", store.ReadList(ProductsViewModel.OpenFoldersKey) ?? []));
+            () => store.ReadList(ProductsViewModel.ClosedFoldersKey)?.Contains($"Production/{breadsId}") == true,
+            () => string.Join(", ", store.ReadList(ProductsViewModel.ClosedFoldersKey) ?? []));
+        first.Dispose();
 
+        await AddProductCategoryAsync("Pastries");
         var next = await LoadedViewModelAsync(store);
-        TreeFolder(next, ProductStage.Production, "Breads").IsExpanded.Should().BeTrue();
-        TreeFolder(next, ProductStage.ResearchAndDevelopment, "Breads").IsExpanded.Should().BeFalse();
+        TreeFolder(next, ProductStage.Production, "Breads").IsExpanded.Should().BeFalse();
+        TreeFolder(next, ProductStage.ResearchAndDevelopment, "Breads").IsExpanded.Should().BeTrue();
+        TreeFolder(next, ProductStage.Production, "Pastries").IsExpanded.Should().BeTrue("a category new since opens, as every folder first did");
 
-        // One opened just before the app closes is written as it closes.
-        TreeFolder(next, ProductStage.Production, "Cakes").IsExpanded = true;
+        // One closed just before the app closes is written as it closes.
+        TreeFolder(next, ProductStage.Production, "Cakes").IsExpanded = false;
         next.Dispose();
-        store.ReadList(ProductsViewModel.OpenFoldersKey).Should().Contain($"Production/{cakesId}");
+        store.ReadList(ProductsViewModel.ClosedFoldersKey).Should().Contain($"Production/{cakesId}");
+    });
+
+    [Fact]
+    public Task The_folders_the_list_kept_open_before_open_again_and_the_rest_start_closed() => StaThread.RunAsync(async () =>
+    {
+        var breadsId = await AddProductCategoryAsync("Breads");
+        var cakesId = await AddProductCategoryAsync("Cakes");
+        var store = new InMemoryViewStateStore();
+        store.WriteList(ProductsViewModel.OpenFoldersKey, ["Production", $"Production/{breadsId}"]);
+
+        var viewModel = await LoadedViewModelAsync(store);
+
+        TreeFolder(viewModel, ProductStage.Production, "Breads").IsExpanded.Should().BeTrue();
+        TreeFolder(viewModel, ProductStage.Production, "Cakes").IsExpanded.Should().BeFalse();
+        viewModel.ProductTree.StageFolder(ProductStage.ResearchAndDevelopment).IsExpanded.Should().BeFalse();
+
+        // Kept as closed folders from then on.
+        viewModel.Dispose();
+        store.ReadList(ProductsViewModel.ClosedFoldersKey).Should().Contain($"Production/{cakesId}").And.NotContain($"Production/{breadsId}");
     });
 
     private static IEnumerable<string> Headers(IEnumerable<TreeMenuItem> menu) => menu.Where(i => !i.IsSeparator).Select(i => i.Header);

@@ -162,7 +162,7 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 - **Search** at the top of the list narrows it to matching names and opens the folders that hold them.
 - **Drag** one or more items onto a folder to move them there. A notice under the list says what moved, with an **Undo** button.
 - **Right-click** an item, a folder or the empty space for a menu of what you can do there. Some menu items have keyboard shortcuts: **F2** renames and **Del** deletes.
-- Folders you leave open or closed are the same the next time you use the app.
+- Folders you leave open or closed are the same the next time you use the app. A folder that's new since, such as a category or role you've just added, starts open, so whatever you save into it shows. The first time, every folder starts open, apart from the **Deleted** folder on Products.
 
 ### Editing and saving
 
@@ -524,7 +524,7 @@ Sections that belong to a single product, in a product-owned role, aren't listed
 
 ### The list
 
-The list has a folder for each role, in the order set in Settings → Roles, with the sub-assemblies in that role inside it, by name. Each folder shows how many it holds. All the folders start open. When a product saves a new section, it's saved here under a name made from the product and the role, such as *Cheese Roll Dough*. If the section has its own name, that's added after them, as in *Cheese Roll Filling: Ube*.
+The list has a folder for each role, in the order set in Settings → Roles, with the sub-assemblies in that role inside it, by name. Each folder shows how many it holds. When a product saves a new section, it's saved here under a name made from the product and the role, such as *Cheese Roll Dough*. If the section has its own name, that's added after them, as in *Cheese Roll Filling: Ube*.
 
 Right-click menus:
 

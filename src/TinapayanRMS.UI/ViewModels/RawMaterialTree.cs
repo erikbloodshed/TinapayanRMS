@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Reactive.Subjects;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
@@ -34,7 +33,7 @@ public closed class RawMaterialTreeNode : ReactiveObject
 /// Products list does (ProductFolderNode).
 
 /// </summary>
-public sealed class RawMaterialFolderNode : RawMaterialTreeNode
+public sealed class RawMaterialFolderNode : RawMaterialTreeNode, IListFolder
 {
     private RawMaterialFolderNode(RawMaterialType type, int? categoryId, RawMaterialCategoryType? categoryType, string title)
     {
@@ -45,8 +44,8 @@ public sealed class RawMaterialFolderNode : RawMaterialTreeNode
         Children.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(Glyph));
     }
 
-    /// <summary>A type's folder. Open to start with, so the list first opens on the category folders.</summary>
-    public static RawMaterialFolderNode ForType(RawMaterialType type) => new(type, null, null, TypeTitle(type)) { IsExpanded = true };
+    /// <summary>A type's folder.</summary>
+    public static RawMaterialFolderNode ForType(RawMaterialType type) => new(type, null, null, TypeTitle(type));
 
     public static RawMaterialFolderNode ForCategory(RawMaterialCategory category) =>
         new(RawMaterialRules.MaterialTypeOf(category.Type), category.Id, category.Type, category.Name);
@@ -69,7 +68,7 @@ public sealed class RawMaterialFolderNode : RawMaterialTreeNode
     public bool IsCategory => CategoryId is not null;
 
     /// <summary>
-    /// What names the folder from one run to the next, for remembering whether it was left open: "Ingredient",
+    /// What names the folder from one run to the next, for remembering whether it was left closed: "Ingredient",
     /// "Packaging", and "Ingredient/12" for category 12.
     /// </summary>
     public string Key => CategoryId is { } id ? $"{Type}/{id.ToString(CultureInfo.InvariantCulture)}" : Type.ToString();
@@ -174,26 +173,27 @@ public sealed class RawMaterialTree : IDisposable
     /// <summary>Every category's folder, shown or not, by category id: each is in its own type's folder.</summary>
     private readonly Dictionary<int, RawMaterialFolderNode> _categoryFolders = [];
 
-    /// <summary>The folders left open last time, by RawMaterialFolderNode.Key; null the first time, when only the types open.</summary>
-    private readonly HashSet<string>? _openKeys;
+    /// <summary>Which folders start open, and every one opened or closed since.</summary>
+    private readonly FolderMemory _memory;
 
-    private readonly Subject<RxVoid> _expansionChanged = new();
+    /// <summary>The first Refresh has made the category folders, so <see cref="ClosedFolderKeys"/> reads the folders.</summary>
+    private bool _isFilled;
 
-    /// <param name="openFolders">
-    /// The folders to start open, by <see cref="RawMaterialFolderNode.Key"/>, as <see cref="OpenFolderKeys"/> gave them
-    /// last time; null to start with the types open and every folder in them closed.
+    /// <param name="memory">
+    /// The folders left closed last time (<see cref="ClosedFolderKeys"/>, by <see cref="RawMaterialFolderNode.Key"/>); null
+    /// for none kept, when every folder starts open.
     /// </param>
-    public RawMaterialTree(IEnumerable<string>? openFolders = null)
+    public RawMaterialTree(FolderMemory? memory = null)
     {
-        _openKeys = openFolders?.ToHashSet(StringComparer.Ordinal);
-        Roots = [NewFolder(RawMaterialFolderNode.ForType(RawMaterialType.Ingredient)), NewFolder(RawMaterialFolderNode.ForType(RawMaterialType.Packaging))];
+        _memory = memory ?? new FolderMemory();
+        Roots = [_memory.Track(RawMaterialFolderNode.ForType(RawMaterialType.Ingredient)), _memory.Track(RawMaterialFolderNode.ForType(RawMaterialType.Packaging))];
     }
 
     /// <summary>The two type folders, Ingredients first. They're always there.</summary>
     public IReadOnlyList<RawMaterialFolderNode> Roots { get; }
 
-    /// <summary>A folder opened or closed, by a click, a search or Expand All: for remembering them (OpenFolderKeys).</summary>
-    public IObservable<RxVoid> ExpansionChanged => _expansionChanged;
+    /// <summary>A folder opened or closed, by a click, a search or Expand All: for remembering them (ClosedFolderKeys).</summary>
+    public IObservable<RxVoid> ExpansionChanged => _memory.ExpansionChanged;
 
     /// <summary>The material's row, or null while it isn't listed (a search hides it, or it isn't loaded).</summary>
     public RawMaterialLeafNode? Find(int rawMaterialId) => _leaves.GetValueOrDefault(rawMaterialId);
@@ -204,9 +204,11 @@ public sealed class RawMaterialTree : IDisposable
     /// <summary>The category's folder, shown or not; null for one it has no folder for yet.</summary>
     public RawMaterialFolderNode? CategoryFolder(int categoryId) => _categoryFolders.GetValueOrDefault(categoryId);
 
-    /// <summary>Every folder open now, types included, by <see cref="RawMaterialFolderNode.Key"/>: what to start with next time.</summary>
-    public IReadOnlyList<string> OpenFolderKeys() =>
-        [.. Roots.Concat(_categoryFolders.Values).Where(f => f.IsExpanded).Select(f => f.Key).Order(StringComparer.Ordinal)];
+    /// <summary>
+    /// Every folder closed now, types included, by <see cref="RawMaterialFolderNode.Key"/>: what to start with next time.
+    /// Before the first Refresh, which makes the category folders, the ones it was given.
+    /// </summary>
+    public IReadOnlyList<string> ClosedFolderKeys() => _memory.ClosedKeys(Roots.Concat(_categoryFolders.Values), _isFilled);
 
     /// <summary>Opens every folder in <paramref name="typeFolder"/>'s type, and the type's folder itself; in both types when it's null.</summary>
     public void ExpandAll(RawMaterialFolderNode? typeFolder)
@@ -223,7 +225,7 @@ public sealed class RawMaterialTree : IDisposable
 
     /// <summary>
     /// Closes every folder in <paramref name="typeFolder"/>'s type, or in both types when it's null. The types stay open,
-    /// as the list first opens: on the category folders, closed.
+    /// so their category folders show, closed.
     /// </summary>
     public void CollapseAll(RawMaterialFolderNode? typeFolder)
     {
@@ -241,26 +243,7 @@ public sealed class RawMaterialTree : IDisposable
 
     private IEnumerable<RawMaterialFolderNode> FoldersIn(RawMaterialType type) => _categoryFolders.Values.Where(f => f.Type == type);
 
-    public void Dispose() => _expansionChanged.Dispose();
-
-    /// <summary>A folder, open if it was left open last time, whose opening and closing is reported (ExpansionChanged).</summary>
-    private RawMaterialFolderNode NewFolder(RawMaterialFolderNode folder)
-    {
-        if (_openKeys is not null)
-        {
-            folder.IsExpanded = _openKeys.Contains(folder.Key);
-        }
-
-        // The event itself rather than WhenAnyValue, which needs ReactiveUI set up first: the tree is used without it too.
-        folder.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(RawMaterialFolderNode.IsExpanded))
-            {
-                _expansionChanged.OnNext(RxVoid.Default);
-            }
-        };
-        return folder;
-    }
+    public void Dispose() => _memory.Dispose();
 
     /// <summary>
     /// Where dropping <paramref name="material"/> on <paramref name="target"/> files it: a category folder of its own type
@@ -346,7 +329,7 @@ public sealed class RawMaterialTree : IDisposable
             {
                 // New, or a category whose type was changed in Settings (only while everything in it fits the new one): its
                 // folder is made again, in the other type's folder when it's packaging now or no longer is.
-                _categoryFolders[category.Id] = NewFolder(RawMaterialFolderNode.ForCategory(category));
+                _categoryFolders[category.Id] = _memory.Track(RawMaterialFolderNode.ForCategory(category));
             }
         }
 
@@ -421,6 +404,8 @@ public sealed class RawMaterialTree : IDisposable
                 folder.AnnounceExpanded();
             }
         }
+
+        _isFilled = true;
 
         List<RawMaterialTreeNode> RowsOf(IEnumerable<RawMaterial> inFolder) => [.. inFolder.Select(m => _leaves[m.Id])];
 

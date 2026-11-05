@@ -56,7 +56,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>The Raw Materials list (MaterialListCard): VisibleRawMaterials filed in a folder for their type, then their category.</summary>
     public RawMaterialTree RawMaterialTree { get; }
 
-    /// <summary>The view state key the open folders of the Raw Materials list are kept under (IViewStateStore).</summary>
+    /// <summary>The view state key the closed folders of the Raw Materials list are kept under (IViewStateStore).</summary>
+    public const string ClosedFoldersKey = "RawMaterials.ClosedFolders";
+
+    /// <summary>
+    /// The view state key the list kept its open folders under, before it kept the closed ones: read while there are no
+    /// closed ones kept, so the list opens as it was left (FolderMemory.Read).
+    /// </summary>
     public const string OpenFoldersKey = "RawMaterials.OpenFolders";
 
     private readonly ICostingDefaultsRepository _costingDefaultsRepository;
@@ -64,7 +70,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     // What a new material's Cost Buffer % starts at (Settings → Costing Defaults), as of the last LoadCommand.
     private decimal _defaultCostBufferPercent = CostingDefaults.DefaultCostBufferPercent;
 
-    private readonly FolderStateWriter _openFoldersWriter;
+    private readonly FolderStateWriter _closedFoldersWriter;
 
     private readonly TreeSelection _treeSelection = new();
 
@@ -1010,10 +1016,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         _brandPriceValidator = brandPriceValidator;
         _costingDefaultsRepository = costingDefaultsRepository;
 
-        // The list's folders open as they were left last time, and the ones open are written for next time
-        // (FolderStateWriter), as on the Products screen; Dispose writes any change still waiting.
-        RawMaterialTree = new RawMaterialTree(viewStateStore.ReadList(OpenFoldersKey));
-        _openFoldersWriter = new FolderStateWriter(viewStateStore, OpenFoldersKey, RawMaterialTree.ExpansionChanged, RawMaterialTree.OpenFolderKeys);
+        // The list's folders open as they were left last time, a folder new since included, and the ones closed are written
+        // for next time (FolderStateWriter), as on the Products screen; Dispose writes any change still waiting.
+        RawMaterialTree = new RawMaterialTree(FolderMemory.Read(viewStateStore, ClosedFoldersKey, OpenFoldersKey));
+        _closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, RawMaterialTree.ExpansionChanged, RawMaterialTree.ClosedFolderKeys);
 
         SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();
 
@@ -3178,7 +3184,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public void Dispose()
     {
         // A change still settling when the app closes is written now, rather than lost.
-        _openFoldersWriter.Dispose();
+        _closedFoldersWriter.Dispose();
         RawMaterialTree.Dispose();
 
         _rawMaterialCache.Dispose();

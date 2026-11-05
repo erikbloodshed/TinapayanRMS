@@ -88,10 +88,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The Products list (ProductListCard): VisibleProducts filed in a folder for their stage, then their category.</summary>
     public ProductTree ProductTree { get; }
 
-    /// <summary>The view state key the open folders of the Products list are kept under (IViewStateStore).</summary>
+    /// <summary>The view state key the closed folders of the Products list are kept under (IViewStateStore).</summary>
+    public const string ClosedFoldersKey = "Products.ClosedFolders";
+
+    /// <summary>
+    /// The view state key the list kept its open folders under, before it kept the closed ones: read while there are no
+    /// closed ones kept, so the list opens as it was left (FolderMemory.Read).
+    /// </summary>
     public const string OpenFoldersKey = "Products.OpenFolders";
 
-    private readonly FolderStateWriter _openFoldersWriter;
+    private readonly FolderStateWriter _closedFoldersWriter;
 
     private readonly TreeSelection _treeSelection = new();
 
@@ -928,10 +934,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _categoryRepository = categoryRepository;
         _categoryValidator = categoryValidator;
 
-        // The list's folders open as they were left last time, and the ones open are written for next time
-        // (FolderStateWriter); Dispose writes any change still waiting.
-        ProductTree = new ProductTree(viewStateStore.ReadList(OpenFoldersKey));
-        _openFoldersWriter = new FolderStateWriter(viewStateStore, OpenFoldersKey, ProductTree.ExpansionChanged, ProductTree.OpenFolderKeys);
+        // The list's folders open as they were left last time, a folder new since included, and the ones closed are written
+        // for next time (FolderStateWriter); Dispose writes any change still waiting.
+        ProductTree = new ProductTree(FolderMemory.Read(viewStateStore, ClosedFoldersKey, OpenFoldersKey));
+        _closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, ProductTree.ExpansionChanged, ProductTree.ClosedFolderKeys);
 
         SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();
 
@@ -4927,7 +4933,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public void Dispose()
     {
         // A change still settling when the app closes is written now, rather than lost.
-        _openFoldersWriter.Dispose();
+        _closedFoldersWriter.Dispose();
         ProductTree.Dispose();
 
         _productCache.Dispose();

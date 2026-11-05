@@ -441,10 +441,10 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         _subAssemblyValidator = subAssemblyValidator;
         _roleValidator = roleValidator;
 
-        // The list's folders open as they were left last time, and the ones closed are written for next time
-        // (FolderStateWriter), as on Raw Materials; Dispose writes any change still waiting. As read, so nothing is
-        // written until a folder is opened or closed: the folders aren't made until the roles are loaded.
-        SubAssemblyTree = new SubAssemblyTree(viewStateStore.ReadList(ClosedFoldersKey));
+        // The list's folders open as they were left last time, a folder new since included, and the ones closed are written
+        // for next time (FolderStateWriter), as on Raw Materials; Dispose writes any change still waiting. As read, so
+        // nothing is written until a folder is opened or closed: the folders aren't made until the roles are loaded.
+        SubAssemblyTree = new SubAssemblyTree(FolderMemory.Read(viewStateStore, ClosedFoldersKey));
         _closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, SubAssemblyTree.ExpansionChanged, SubAssemblyTree.ClosedFolderKeys);
 
         SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();

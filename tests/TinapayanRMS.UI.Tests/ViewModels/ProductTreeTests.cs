@@ -184,15 +184,17 @@ public class ProductTreeTests
     }
 
     [Fact]
-    public void The_stages_start_open_and_their_folders_closed_and_a_search_opens_the_folders_it_shows()
+    public void Every_folder_starts_open_but_Deleted_and_a_search_opens_the_folders_it_shows()
     {
         var tree = new ProductTree();
         Product[] products = [ProductOf(1, "Pandesal", ProductStage.Production, Breads)];
         tree.Refresh([Breads, Cakes], products, isFiltered: false);
 
         tree.Stages.Should().OnlyContain(r => r.IsExpanded);
-        Folder(tree, ProductStage.Production, "Breads").IsExpanded.Should().BeFalse();
+        tree.Stages.SelectMany(r => r.Children).Cast<ProductFolderNode>().Should().OnlyContain(f => f.IsExpanded);
+        tree.DeletedFolder.IsExpanded.Should().BeFalse();
 
+        tree.CollapseAll(null);
         tree.Refresh([Breads, Cakes], products, isFiltered: true);
         Folder(tree, ProductStage.Production, "Breads").IsExpanded.Should().BeTrue("every match shows");
 
@@ -208,6 +210,7 @@ public class ProductTreeTests
         const string openFolderGlyph = "";
         var tree = new ProductTree();
         tree.Refresh([Breads, Cakes], [ProductOf(1, "Pandesal", ProductStage.Production, Breads)], isFiltered: false);
+        tree.CollapseAll(null);
         var breads = Folder(tree, ProductStage.Production, "Breads");
         var glyphChanges = 0;
         breads.PropertyChanged += (_, e) => glyphChanges += e.PropertyName == nameof(ProductFolderNode.Glyph) ? 1 : 0;
@@ -252,7 +255,7 @@ public class ProductTreeTests
     public void An_open_folder_that_gets_its_first_product_tells_the_tree_it_is_open()
     {
         // As the screen loads: the categories arrive first, so each folder is made empty, and its products after.
-        var tree = new ProductTree(["Production", "Production/2"]);
+        var tree = new ProductTree(new FolderMemory([$"Production/{Breads.Id}"]));
         tree.Refresh([Breads, Cakes], [], isFiltered: false);
         var cakes = Folder(tree, ProductStage.Production, "Cakes");
         var breads = Folder(tree, ProductStage.Production, "Breads");
@@ -418,6 +421,7 @@ public class ProductTreeTests
     {
         var tree = new ProductTree();
         tree.Refresh([Breads, Cakes], [], isFiltered: false);
+        tree.CollapseAll(null);
         var production = Root(tree, ProductStage.Production);
         production.IsExpanded = false;
 
@@ -438,26 +442,30 @@ public class ProductTreeTests
     }
 
     [Fact]
-    public void The_folders_left_open_open_again_and_the_rest_start_closed()
+    public void The_folders_left_closed_start_closed_and_the_rest_open_a_category_new_since_included()
     {
         var first = new ProductTree();
         first.Refresh([Breads, Cakes], [], isFiltered: false);
-        Folder(first, ProductStage.Production, "Cakes").IsExpanded = true;
-        Folder(first, ProductStage.ResearchAndDevelopment, "Uncategorized").IsExpanded = true;
+        Folder(first, ProductStage.Production, "Cakes").IsExpanded = false;
+        Folder(first, ProductStage.ResearchAndDevelopment, "Uncategorized").IsExpanded = false;
         Root(first, ProductStage.ResearchAndDevelopment).IsExpanded = false;
 
-        var openFolders = first.OpenFolderKeys();
+        var closedFolders = first.ClosedFolderKeys();
 
-        openFolders.Should().BeEquivalentTo("Production", "Production/2", "ResearchAndDevelopment/Uncategorized");
+        closedFolders.Should().Equal("Deleted", "Production/2", "ResearchAndDevelopment", "ResearchAndDevelopment/Uncategorized");
 
-        var next = new ProductTree(openFolders);
-        next.Refresh([Breads, Cakes], [], isFiltered: false);
+        var next = new ProductTree(new FolderMemory(closedFolders));
+        next.ClosedFolderKeys().Should().Equal(closedFolders, "before the first Refresh it keeps what it was given");
+        ProductCategory pastries = new() { Id = 3, Name = "Pastries" };
+        next.Refresh([Breads, Cakes, pastries], [], isFiltered: false);
         Root(next, ProductStage.Production).IsExpanded.Should().BeTrue();
         Root(next, ProductStage.ResearchAndDevelopment).IsExpanded.Should().BeFalse("a stage left closed starts closed");
-        Folder(next, ProductStage.Production, "Cakes").IsExpanded.Should().BeTrue("a category's folder made on the first Refresh opens as it was left");
-        Folder(next, ProductStage.Production, "Breads").IsExpanded.Should().BeFalse();
-        Folder(next, ProductStage.ResearchAndDevelopment, "Uncategorized").IsExpanded.Should().BeTrue();
-        next.OpenFolderKeys().Should().Equal(openFolders);
+        Folder(next, ProductStage.Production, "Cakes").IsExpanded.Should().BeFalse("a category's folder made on the first Refresh starts as it was left");
+        Folder(next, ProductStage.Production, "Breads").IsExpanded.Should().BeTrue();
+        Folder(next, ProductStage.Production, "Pastries").IsExpanded.Should().BeTrue("a category new since opens");
+        Folder(next, ProductStage.ResearchAndDevelopment, "Uncategorized").IsExpanded.Should().BeFalse();
+        next.DeletedFolder.IsExpanded.Should().BeFalse();
+        next.ClosedFolderKeys().Should().Equal(closedFolders);
     }
 
     [Fact]
@@ -468,10 +476,10 @@ public class ProductTreeTests
         var reports = 0;
         using var subscription = tree.ExpansionChanged.Subscribe(_ => reports++);
 
-        Folder(tree, ProductStage.Production, "Breads").IsExpanded = true;
+        Folder(tree, ProductStage.Production, "Breads").IsExpanded = false;
         Root(tree, ProductStage.ResearchAndDevelopment).IsExpanded = false;
         tree.Refresh([Breads, Cakes], [], isFiltered: false);
-        Folder(tree, ProductStage.Production, "Cakes").IsExpanded = true;
+        Folder(tree, ProductStage.Production, "Cakes").IsExpanded = false;
 
         reports.Should().Be(3, "a folder made since reports too");
     }

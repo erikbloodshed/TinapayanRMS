@@ -46,7 +46,7 @@ public class SubAssemblyTreeTests
     [Fact]
     public void A_search_shows_only_the_folders_holding_a_match_and_opens_them()
     {
-        var tree = new SubAssemblyTree([Key(Dough), Key(Filling)]);
+        var tree = new SubAssemblyTree(new FolderMemory([Key(Dough), Key(Filling)]));
         StandaloneSubAssemblyRow[] rows = [RowOf(1, "Pandesal Dough", Dough)];
         tree.Refresh(Roles, rows, isFiltered: false);
         tree.Folder(Dough.Id)!.IsExpanded.Should().BeFalse("it was left closed");
@@ -149,7 +149,7 @@ public class SubAssemblyTreeTests
     [Fact]
     public void The_folders_closed_are_what_is_remembered_and_a_tree_never_refreshed_keeps_what_it_was_given()
     {
-        var tree = new SubAssemblyTree([Key(Filling), "99"]);
+        var tree = new SubAssemblyTree(new FolderMemory([Key(Filling), "99"]));
         tree.ClosedFolderKeys().Should().Equal(Key(Filling), "99");
 
         tree.Refresh(Roles, [], isFiltered: false);

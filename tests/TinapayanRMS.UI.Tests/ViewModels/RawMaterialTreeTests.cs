@@ -63,7 +63,8 @@ public class RawMaterialTreeTests
         var tree = new RawMaterialTree();
         RawMaterial[] materials = [MaterialOf(1, "Bread Flour", Flour)];
         tree.Refresh(Categories, materials, isFiltered: false);
-        Folder(tree, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeFalse("a category folder starts closed");
+        Folder(tree, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeTrue("a category folder starts open");
+        tree.CollapseAll(null);
 
         tree.Refresh(Categories, materials, isFiltered: true);
 
@@ -146,9 +147,9 @@ public class RawMaterialTreeTests
     }
 
     [Fact]
-    public void The_folders_left_open_start_open_and_a_folder_with_its_first_rows_is_announced_open_again()
+    public void The_folders_left_closed_start_closed_and_a_folder_with_its_first_rows_is_announced_open_again()
     {
-        var tree = new RawMaterialTree(["Ingredient", $"Ingredient/{Flour.Id}"]);
+        var tree = new RawMaterialTree(new FolderMemory(["Packaging", $"Ingredient/{Dairy.Id}"]));
         var flourFolderAnnounced = 0;
 
         // The categories come in first, as a load merges them, so the folder is made open but empty.
@@ -160,8 +161,10 @@ public class RawMaterialTreeTests
 
         flour.IsExpanded.Should().BeTrue();
         flourFolderAnnounced.Should().Be(1, "the tree can't open a folder with nothing in it, and has to be told again once it has rows");
-        tree.TypeFolder(RawMaterialType.Packaging).IsExpanded.Should().BeFalse("it wasn't left open");
-        tree.OpenFolderKeys().Should().Equal("Ingredient", $"Ingredient/{Flour.Id}");
+        Folder(tree, RawMaterialType.Ingredient, "Dairy").IsExpanded.Should().BeFalse("it was left closed");
+        tree.TypeFolder(RawMaterialType.Packaging).IsExpanded.Should().BeFalse("it was left closed");
+        Folder(tree, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeTrue("it wasn't left closed");
+        tree.ClosedFolderKeys().Should().Equal($"Ingredient/{Dairy.Id}", "Packaging");
     }
 
     [Fact]
@@ -188,6 +191,7 @@ public class RawMaterialTreeTests
     {
         var tree = new RawMaterialTree();
         tree.Refresh(Categories, [], isFiltered: false);
+        tree.CollapseAll(null);
 
         tree.ExpandAll(tree.TypeFolder(RawMaterialType.Packaging));
         Folder(tree, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeTrue();
@@ -198,6 +202,6 @@ public class RawMaterialTreeTests
 
         tree.CollapseAll(null);
         Categories.Select(c => tree.CategoryFolder(c.Id)!).Should().OnlyContain(f => !f.IsExpanded);
-        tree.Roots.Should().OnlyContain(r => r.IsExpanded, "the types stay open, as the list first opens");
+        tree.Roots.Should().OnlyContain(r => r.IsExpanded, "the types stay open on their folders");
     }
 }

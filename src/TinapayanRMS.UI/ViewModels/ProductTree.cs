@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Reactive.Subjects;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
@@ -65,7 +64,7 @@ public enum ProductIcon
 /// for this type alone (ProductListCard). A product has no children at all: the tree gives an expander to every row whose
 /// children are an observable collection, even an empty one.
 /// </summary>
-public sealed class ProductFolderNode : ProductTreeNode
+public sealed class ProductFolderNode : ProductTreeNode, IListFolder
 {
     private ProductFolderNode(ProductStage stage, int? categoryId, bool isStage, string title, bool isDeletedFolder = false)
     {
@@ -77,8 +76,8 @@ public sealed class ProductFolderNode : ProductTreeNode
         Children.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(Glyph));
     }
 
-    /// <summary>A stage's folder. Open to start with, so the list first opens on the category folders.</summary>
-    public static ProductFolderNode ForStage(ProductStage stage) => new(stage, null, isStage: true, ProductRules.StageTitle(stage)) { IsExpanded = true };
+    /// <summary>A stage's folder.</summary>
+    public static ProductFolderNode ForStage(ProductStage stage) => new(stage, null, isStage: true, ProductRules.StageTitle(stage));
 
     public static ProductFolderNode ForCategory(ProductStage stage, ProductCategory category) => new(stage, category.Id, isStage: false, category.Name);
 
@@ -86,7 +85,7 @@ public sealed class ProductFolderNode : ProductTreeNode
 
     /// <summary>
     /// The Deleted folder, holding the deleted products by name, whatever their stage and category, until each is restored
-    /// or deleted permanently. Closed to start with. Its Stage means nothing.
+    /// or deleted permanently. Closed the first time the list shows, as every other folder is open. Its Stage means nothing.
     /// </summary>
     public static ProductFolderNode Deleted() => new(default, null, isStage: false, DeletedTitle, isDeletedFolder: true);
 
@@ -108,7 +107,7 @@ public sealed class ProductFolderNode : ProductTreeNode
     public bool IsCategory => CategoryId is not null;
 
     /// <summary>
-    /// What names the folder from one run to the next, for remembering whether it was left open: "Production",
+    /// What names the folder from one run to the next, for remembering whether it was left closed: "Production",
     /// "Production/Uncategorized", "Production/12" for category 12, and the same under "ResearchAndDevelopment"; "Deleted"
     /// for the Deleted folder.
     /// </summary>
@@ -244,25 +243,26 @@ public sealed class ProductTree : IDisposable
     /// <summary>Every folder each stage has, shown or not: one per category, and its Uncategorized.</summary>
     private readonly Dictionary<ProductFolderNode, StageFolders> _foldersByRoot = [];
 
-    /// <summary>The folders left open last time, by ProductFolderNode.Key; null the first time, when only the stages open.</summary>
-    private readonly HashSet<string>? _openKeys;
+    /// <summary>Which folders start open, and every one opened or closed since.</summary>
+    private readonly FolderMemory _memory;
 
-    private readonly Subject<RxVoid> _expansionChanged = new();
+    /// <summary>The first Refresh has made the category folders, so <see cref="ClosedFolderKeys"/> reads the folders.</summary>
+    private bool _isFilled;
 
-    /// <param name="openFolders">
-    /// The folders to start open, by <see cref="ProductFolderNode.Key"/>, as <see cref="OpenFolderKeys"/> gave them last
-    /// time; null to start with the stages open and every folder in them closed.
+    /// <param name="memory">
+    /// The folders left closed last time (<see cref="ClosedFolderKeys"/>, by <see cref="ProductFolderNode.Key"/>); null for
+    /// none kept, when every folder starts open but Deleted.
     /// </param>
-    public ProductTree(IEnumerable<string>? openFolders = null)
+    public ProductTree(FolderMemory? memory = null)
     {
-        _openKeys = openFolders?.ToHashSet(StringComparer.Ordinal);
-        Stages = [NewFolder(ProductFolderNode.ForStage(ProductStage.Production)), NewFolder(ProductFolderNode.ForStage(ProductStage.ResearchAndDevelopment))];
+        _memory = memory ?? new FolderMemory();
+        Stages = [_memory.Track(ProductFolderNode.ForStage(ProductStage.Production)), _memory.Track(ProductFolderNode.ForStage(ProductStage.ResearchAndDevelopment))];
         foreach (var root in Stages)
         {
-            _foldersByRoot[root] = new StageFolders(NewFolder(ProductFolderNode.Uncategorized(root.Stage)));
+            _foldersByRoot[root] = new StageFolders(_memory.Track(ProductFolderNode.Uncategorized(root.Stage)));
         }
 
-        DeletedFolder = NewFolder(ProductFolderNode.Deleted());
+        DeletedFolder = _memory.Track(ProductFolderNode.Deleted(), startsOpen: false);
         Roots = [.. Stages, DeletedFolder];
     }
 
@@ -275,8 +275,8 @@ public sealed class ProductTree : IDisposable
     /// <summary>The Deleted folder, after the stages, holding the deleted products.</summary>
     public ProductFolderNode DeletedFolder { get; }
 
-    /// <summary>A folder opened or closed, by a click, a search or Expand All: for remembering them (OpenFolderKeys).</summary>
-    public IObservable<RxVoid> ExpansionChanged => _expansionChanged;
+    /// <summary>A folder opened or closed, by a click, a search or Expand All: for remembering them (ClosedFolderKeys).</summary>
+    public IObservable<RxVoid> ExpansionChanged => _memory.ExpansionChanged;
 
     /// <summary>The product's row, or null while it isn't listed (a search hides it, or it isn't loaded).</summary>
     public ProductLeafNode? Find(int productId) => _leaves.GetValueOrDefault(productId);
@@ -288,9 +288,12 @@ public sealed class ProductTree : IDisposable
     public ProductFolderNode? CategoryFolder(ProductStage stage, int categoryId) =>
         _foldersByRoot[StageFolder(stage)].ByCategory.GetValueOrDefault(categoryId);
 
-    /// <summary>Every folder open now, stages included, by <see cref="ProductFolderNode.Key"/>: what to start with next time.</summary>
-    public IReadOnlyList<string> OpenFolderKeys() =>
-        [.. Roots.Concat(_foldersByRoot.Values.SelectMany(f => f.All)).Where(f => f.IsExpanded).Select(f => f.Key).Order(StringComparer.Ordinal)];
+    /// <summary>
+    /// Every folder closed now, stages and Deleted included, by <see cref="ProductFolderNode.Key"/>: what to start with
+    /// next time. Before the first Refresh, which makes the category folders, the ones it was given.
+    /// </summary>
+    public IReadOnlyList<string> ClosedFolderKeys() =>
+        _memory.ClosedKeys(Roots.Concat(_foldersByRoot.Values.SelectMany(f => f.All)), _isFilled);
 
     /// <summary>
     /// Opens every folder in <paramref name="stage"/>, and the stage itself; in both stages, and the Deleted folder, when
@@ -315,7 +318,7 @@ public sealed class ProductTree : IDisposable
 
     /// <summary>
     /// Closes every folder in <paramref name="stage"/>, or in both stages, and the Deleted folder, when it's null. The
-    /// stages stay open, as the list first opens: on the category folders, closed.
+    /// stages stay open, so their category folders show, closed.
     /// </summary>
     public void CollapseAll(ProductFolderNode? stage)
     {
@@ -335,26 +338,7 @@ public sealed class ProductTree : IDisposable
 
     private IEnumerable<ProductFolderNode> StagesOf(ProductFolderNode? stage) => stage is null ? Stages : [StageFolder(stage.Stage)];
 
-    public void Dispose() => _expansionChanged.Dispose();
-
-    /// <summary>A folder, open if it was left open last time, whose opening and closing is reported (ExpansionChanged).</summary>
-    private ProductFolderNode NewFolder(ProductFolderNode folder)
-    {
-        if (_openKeys is not null)
-        {
-            folder.IsExpanded = _openKeys.Contains(folder.Key);
-        }
-
-        // The event itself rather than WhenAnyValue, which needs ReactiveUI set up first: the tree is used without it too.
-        folder.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(ProductFolderNode.IsExpanded))
-            {
-                _expansionChanged.OnNext(RxVoid.Default);
-            }
-        };
-        return folder;
-    }
+    public void Dispose() => _memory.Dispose();
 
     /// <summary>
     /// Where dropping <paramref name="product"/> on <paramref name="target"/> files it: a category folder or Uncategorized
@@ -458,7 +442,7 @@ public sealed class ProductTree : IDisposable
                 }
                 else
                 {
-                    folder = folders.ByCategory[category.Id] = NewFolder(ProductFolderNode.ForCategory(root.Stage, category));
+                    folder = folders.ByCategory[category.Id] = _memory.Track(ProductFolderNode.ForCategory(root.Stage, category));
                 }
 
                 wanted.Add((folder, RowsOf(inStage.Where(p => p.CategoryId == category.Id))));
@@ -548,6 +532,8 @@ public sealed class ProductTree : IDisposable
                 folder.AnnounceExpanded();
             }
         }
+
+        _isFilled = true;
 
         List<ProductTreeNode> RowsOf(IEnumerable<Product> inFolder) => [.. inFolder.Select(p => _leaves[p.Id])];
 
