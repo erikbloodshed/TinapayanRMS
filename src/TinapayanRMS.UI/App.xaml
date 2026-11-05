@@ -384,7 +384,7 @@
                 headers), where a label beside every box wouldn't fit on one row.
             -->
             <Style x:Key="FormLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource FieldLabelStyle}">
-                <!-- 6 to its box, not 12: at 12 the label read as apart from its field (the user's call, the same day) -->
+                <!-- 6 to its box, not 12: at 12 the label reads as apart from its field -->
                 <Setter Property="Margin" Value="0,0,6,0" />
                 <Setter Property="VerticalAlignment" Value="Center" />
             </Style>
