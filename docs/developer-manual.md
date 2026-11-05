@@ -1413,7 +1413,7 @@ Each tool takes a product or material by its name, or by a part of it that names
 | [Tech Stack](../PLAN.md#tech-stack) | You touch a package, the ReactiveUI bootstrap, or the test runner |
 | [Solution Structure](../PLAN.md#solution-structure) | You add a project or a folder |
 | [Domain Model](../PLAN.md#domain-model) | You change an entity or a rule. Each entity's bullets give its rules and the reasons for them. |
-| [Syncfusion notes](plan/syncfusion.md) | You use a Syncfusion control, or change the theme, the DPI handling or printing |
+| [Syncfusion notes](plan/syncfusion.md) | You use a Syncfusion control, or change the theme, the windows, the DPI handling, printing, the toasts or the Reports screen |
 | [Application Architecture](../PLAN.md#application-architecture) | You change a screen, a repository pattern or a migration |
 | [Products](plan/products-screen.md), [Raw Materials](plan/raw-materials-screen.md), [Sub-Assemblies](plan/sub-assemblies-screen.md) | You change one of the three main screens: each one's design notes |
 | [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade) | You change any cost |
