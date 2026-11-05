@@ -93,10 +93,12 @@ public sealed class RawMaterial
     public string? PreferredBrand { get; set; }
 
     /// <summary>
-    /// The cost of one base unit with the buffer on top: what recipes, sub-assemblies, packaging lines
-    /// and products are costed with, while <see cref="CostPerBaseUnit"/> stays the true cost. Stored
-    /// alongside it: for Purchased it's CostPerBaseUnit plus the buffer, for Made the BOM rollup of the
-    /// components' buffered costs and nothing more, so a buffer is counted once however deep the tree.
+    /// The cost of one base unit with the buffer on top: what recipes, sub-assemblies, packaging lines and products are
+    /// costed with, while <see cref="CostPerBaseUnit"/> stays the true cost. For Purchased a fixed amount (since
+    /// 2026-09-19): the costed brand's price plus the buffer, set on the first price and whenever the buffer % is typed or
+    /// re-applied, and left where it is as prices move, so its buffer drifts and it can fall below the true cost
+    /// (RawMaterialRules.BufferedCost). For Made the BOM rollup of the components' buffered costs and nothing more, so a
+    /// buffer is counted once however deep the tree; for Linked its cost with the linked-to ingredient's buffer on top.
     /// </summary>
     public decimal BufferedCostPerBaseUnit { get; set; }
 
