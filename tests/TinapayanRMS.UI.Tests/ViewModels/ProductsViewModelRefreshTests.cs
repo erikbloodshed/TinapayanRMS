@@ -158,7 +158,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             var subAssembly = await dbContext.SubAssemblies.SingleAsync(Cancellation);
             subAssembly.Name.Should().Be("Ube pandesal Filling");
             subAssembly.RoleId.Should().Be(roleId);
-            subAssembly.TotalWeight.Should().Be(100m);
+            (await SubAssemblyTotalsAsync(subAssembly.Id)).TotalWeight.Should().Be(100m);
             var saved = await dbContext.ProductSubAssemblyUsages.SingleAsync(Cancellation);
             saved.AuthoredField.Should().Be(UsageAuthoredField.WeightPerPiece);
             saved.AuthoredValue.Should().Be(10m);
@@ -348,8 +348,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.TotalWeight.Should().Be(1100m);
         usage.WeightPerPiece.Should().Be(50m);
         viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single().Header.Should().Be("Dough");
-        (await new SubAssemblyRepository(CreateDbContextFactory()).GetByIdsAsync([doughId], Cancellation))
-            .Should().ContainSingle().Which.TotalWeight.Should().Be(1000m, "the sub-assembly it was a copy of is left as it was");
+        (await SubAssemblyTotalsAsync(doughId)).TotalWeight.Should().Be(1000m, "the sub-assembly it was a copy of is left as it was");
     }
 
     [Fact]
@@ -433,8 +432,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         saved.SubAssemblyId.Should().Be(fillingId, "Save rewrites the product's own in place");
         saved.IsOwned.Should().BeTrue();
         viewModel.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>().Which.Usage.Should().BeSameAs(saved);
-        await using var dbContext = CreateDbContext();
-        (await dbContext.SubAssemblies.SingleAsync(Cancellation)).TotalWeight.Should().Be(150m);
+        (await SubAssemblyTotalsAsync(fillingId)).TotalWeight.Should().Be(150m);
     }
 
     [Fact]
@@ -574,7 +572,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var usage = await dbContext.ProductSubAssemblyUsages.Include(u => u.SubAssembly).SingleAsync(u => u.ProductId == productId, Cancellation);
         usage.AuthoredField.Should().Be(UsageAuthoredField.Yield);
         usage.AuthoredValue.Should().Be(30m);
-        usage.SubAssembly!.TotalWeight.Should().Be(1500m);
+        (await SubAssemblyTotalsAsync(usage.SubAssemblyId)).TotalWeight.Should().Be(1500m);
     }
 
     [Fact]
@@ -858,7 +856,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var miniUsage = await dbContext.ProductSubAssemblyUsages.Include(u => u.SubAssembly).SingleAsync(u => u.ProductId == miniId, Cancellation);
         miniUsage.SubAssemblyId.Should().NotBe(doughId);
         miniUsage.SubAssembly!.Name.Should().Be("Cream Loaf Mini Dough");
-        miniUsage.SubAssembly.TotalWeight.Should().Be(1250m);
+        (await SubAssemblyTotalsAsync(miniUsage.SubAssemblyId)).TotalWeight.Should().Be(1250m);
         miniUsage.AuthoredValue.Should().Be(30m);
     }
 
@@ -919,8 +917,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.History.IsDirty.Should().BeFalse("what was saved is the new starting point");
         await using (var dbContext = CreateDbContext())
         {
-            var dough = await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == doughId, Cancellation);
-            (dough.TotalWeight, dough.TotalCost).Should().Be((1250m, 150m));
+            (await SubAssemblyTotalsAsync(doughId)).Should().Be((1250m, 150m));
             (await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == doughId).OrderBy(l => l.SortOrder).Select(l => l.IngredientId).ToListAsync(Cancellation))
                 .Should().Equal(flourId, butterId);
         }
@@ -1021,11 +1018,12 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.SubAssemblyId.Should().NotBe(doughId);
         usage.SubAssembly!.Name.Should().Be("Cream Loaf Mini Dough");
         usage.SubAssembly.OwnerProductId.Should().Be(productId);
-        usage.SubAssembly.TotalWeight.Should().Be(1250m);
+        (await SubAssemblyTotalsAsync(usage.SubAssemblyId)).TotalWeight.Should().Be(1250m);
         usage.AuthoredValue.Should().Be(30m);
         (await dbContext.UsageAddInLines.AnyAsync(Cancellation)).Should().BeFalse("the add-in went into the copy's lines");
-        (await subAssemblies.GetStandaloneAsync(Cancellation)).Select(s => (s.Name, s.TotalWeight)).Should()
-            .Equal([("House Dough", 1000m)], "the one it was linked to stays on the Sub-Assemblies screen as it was, and the copy isn't there");
+        (await subAssemblies.GetStandaloneAsync(Cancellation)).Select(s => s.Name).Should()
+            .Equal(["House Dough"], "the one it was linked to stays on the Sub-Assemblies screen, and the copy isn't there");
+        (await SubAssemblyTotalsAsync(doughId)).TotalWeight.Should().Be(1000m, "as it was");
     }
 
     [Fact]
@@ -1067,7 +1065,8 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         linked.SubAssemblyId.Should().Be(fillingId, "the same sub-assembly, not a copy");
         linked.LinkedName.Should().Be("Cheese Roll Filling");
         var moved = await new SubAssemblyRepository(CreateDbContextFactory()).GetStandaloneAsync(Cancellation);
-        moved.Should().ContainSingle().Which.TotalWeight.Should().Be(120m);
+        moved.Should().ContainSingle().Which.Id.Should().Be(fillingId);
+        (await SubAssemblyTotalsAsync(fillingId)).TotalWeight.Should().Be(120m);
     }
 
     [Fact]
@@ -1612,7 +1611,11 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single();
-        await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+
+        // The load fills the sections, then shows the first one's tab: Delete Sub-Assembly follows the tab.
+        await WaitUntilSettledAsync(
+            () => viewModel.UsageEdits.Count == 1 && viewModel.SelectedRecipeTab is SubAssemblyRecipeTab,
+            () => $"usage rows={viewModel.UsageEdits.Count}, tab={viewModel.SelectedRecipeTab?.Header}");
         (await viewModel.RemoveUsageCommand.CanExecute.FirstAsync()).Should().BeTrue("a sub-assembly's tab is showing");
 
         // Add Sub-Assembly: its tab goes before Packaging and shows the add form, on the first role the recipe doesn't
