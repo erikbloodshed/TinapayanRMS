@@ -407,6 +407,8 @@ At the top are the material's name and **New**, **Save**, **Undo**, **Redo** and
 - **Total Weight** and **Total Cost**, for a made ingredient only: what its batch yields after weight loss, and what that batch costs.
 - **Last Updated**: when the material was last saved, and when its cost last changed.
 
+**Delete** removes the material with its prices and alternative units. While anything uses it, it stays, and the message names each one and how it uses it: a recipe or packaging set with it in its lines, a product with it in its packaging or as an add-in, a made ingredient with it as an add-in, or an ingredient linked to it. Take it out of those first.
+
 Below the figures are the fields you fill in:
 
 - **Name**: must be unique. The app tells you straight away if another material already has it.

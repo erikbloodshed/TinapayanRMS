@@ -356,7 +356,35 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
+        if (await dbContext.RawMaterials.Where(m => m.Id == id).Select(m => m.Name).FirstOrDefaultAsync(cancellationToken) is not { } name)
+        {
+            return;
+        }
+
+        // Checked rather than left to the foreign keys, whose refusal reads only "in use elsewhere", so the message can name
+        // what uses it (2026-11-05), as deleting a product names what leans on it. Its units, brand prices, price history,
+        // Price Simulator lines and a made one's own add-ins go with it (Cascade).
+        static string Listed(string name, DateTime? deletedAt) => ProductRules.ListedName(name, deletedAt is not null);
+        List<(string User, string How)> uses =
+        [
+            .. (await dbContext.SubAssemblyLines.Where(l => l.IngredientId == id).Select(l => l.SubAssembly!.Name).Distinct().ToListAsync(cancellationToken))
+                .Select(n => (n, "recipe")),
+            .. (await dbContext.SubAssemblyPackagingLines.Where(l => l.PackagingMaterialId == id).Select(l => l.SubAssembly!.Name).Distinct().ToListAsync(cancellationToken))
+                .Select(n => (n, "packaging set")),
+            .. (await dbContext.PackagingLines.Where(l => l.PackagingMaterialId == id).Select(l => new { l.Product!.Name, l.Product.DeletedAt }).Distinct().ToListAsync(cancellationToken))
+                .Select(p => (Listed(p.Name, p.DeletedAt), "packaging")),
+            .. (await dbContext.UsageAddInLines.Where(l => l.IngredientId == id).Select(l => new { l.Usage!.Product!.Name, l.Usage.Product.DeletedAt }).Distinct().ToListAsync(cancellationToken))
+                .Select(p => (Listed(p.Name, p.DeletedAt), "add-in")),
+            .. (await dbContext.IngredientAddInLines.Where(l => l.AddInIngredientId == id).Select(l => l.Ingredient!.Name).Distinct().ToListAsync(cancellationToken))
+                .Select(n => (n, "add-in")),
+            .. (await dbContext.RawMaterials.Where(m => m.LinkedToId == id).Select(m => m.Name).ToListAsync(cancellationToken))
+                .Select(n => (n, "linked to it")),
+        ];
+        RawMaterialRules.EnsureNotInUse(name, uses);
+
         await dbContext.RawMaterials.Where(m => m.Id == id).ExecuteDeleteAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     /// <summary>

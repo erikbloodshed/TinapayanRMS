@@ -87,5 +87,9 @@ public interface IRawMaterialRepository
         IReadOnlyList<(int IngredientId, decimal Grams)>? addIns,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Deletes the material with its units, prices and price history, refused while anything uses it, naming each user
+    /// (RawMaterialRules.EnsureNotInUse).
+    /// </summary>
     Task DeleteAsync(int id, CancellationToken cancellationToken);
 }

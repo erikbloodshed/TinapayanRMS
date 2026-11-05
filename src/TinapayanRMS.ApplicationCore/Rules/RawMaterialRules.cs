@@ -426,6 +426,25 @@ public static class RawMaterialRules
         }
     }
 
+    /// <summary>
+    /// A material can't be deleted while anything uses it: a recipe's line, a packaging set's, a product's packaging line
+    /// or add-in, a made ingredient's add-in, or an ingredient linked to it. Names each, with how it uses the material, so
+    /// the user knows where to take it out; the foreign keys' own refusal says only that it's in use elsewhere.
+    /// </summary>
+    public static void EnsureNotInUse(string name, IReadOnlyCollection<(string User, string How)> uses)
+    {
+        if (uses.Count == 0)
+        {
+            return;
+        }
+
+        var listed = string.Join(", ", uses
+            .Distinct()
+            .OrderBy(u => u.User, StringComparer.CurrentCultureIgnoreCase)
+            .Select(u => $"{u.User} ({u.How})"));
+        throw new BusinessRuleException($"{name} can't be deleted while it's used: {listed}. Take it out of them first.");
+    }
+
     /// <summary>A material has each unit of measure at most once: two of its alternative units can't share one.</summary>
     public static void EnsureUnitNotAlreadyAdded(bool alreadyAdded)
     {

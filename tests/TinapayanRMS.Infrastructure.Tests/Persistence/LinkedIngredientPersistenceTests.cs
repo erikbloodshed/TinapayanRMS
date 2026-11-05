@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -309,8 +310,9 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
 
         var act = () => CreateRepository().DeleteAsync(eggId, Cancellation);
 
-        // FK violation surfaces as the driver's own PostgresException, not a DbUpdateException.
-        await act.Should().ThrowAsync<Npgsql.PostgresException>();
+        // Refused before the foreign key would, naming the part (2026-11-05): the key's own refusal said only "in use elsewhere".
+        (await act.Should().ThrowAsync<BusinessRuleException>()).Which.Message
+            .Should().Be("Egg can't be deleted while it's used: Egg White (linked to it). Take it out of them first.");
     }
 
     private async Task<int> TrayUnitOfMeasureIdAsync()

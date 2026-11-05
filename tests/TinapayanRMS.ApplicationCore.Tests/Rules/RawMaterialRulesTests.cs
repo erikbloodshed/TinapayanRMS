@@ -813,4 +813,22 @@ public class RawMaterialRulesTests
 
         act.Should().Throw<BusinessRuleException>().Which.Should().BeAssignableTo<InvalidOperationException>();
     }
+
+    [Fact]
+    public void A_material_nothing_uses_can_be_deleted()
+    {
+        var act = () => RawMaterialRules.EnsureNotInUse("Salt", []);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void A_material_in_use_names_each_user_once_in_order_with_how_it_uses_it()
+    {
+        var act = () => RawMaterialRules.EnsureNotInUse(
+            "Butter", [("Ube Bun", "add-in"), ("Butter Icing Base", "recipe"), ("Ube Bun", "add-in"), ("ensaymada", "packaging")]);
+
+        act.Should().Throw<BusinessRuleException>().Which.Message.Should().Be(
+            "Butter can't be deleted while it's used: Butter Icing Base (recipe), ensaymada (packaging), Ube Bun (add-in). Take it out of them first.");
+    }
 }
