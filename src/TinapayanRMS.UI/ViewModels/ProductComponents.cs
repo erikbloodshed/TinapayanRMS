@@ -19,13 +19,15 @@ namespace TinapayanRMS.UI.ViewModels;
 /// <param name="productsById">The screen's products by id, as it holds them now.</param>
 /// <param name="includesPackaging">Whether the composite takes its products' packaging, which a new row's Cost follows.</param>
 /// <param name="showFailure">Shows a failure on the screen, for a cost read nothing awaits.</param>
+/// <param name="work">The screen's work nothing awaits, which counts the cost reads (ViewModelBase.WhenIdleAsync).</param>
 public sealed class ProductComponents(
     SavedProductReader savedProducts,
     Func<int, Product?> findProduct,
     Func<IReadOnlyDictionary<int, Product>> productsById,
     Func<CostBasis> costBasis,
     Func<bool> includesPackaging,
-    Action<Exception, string> showFailure) : ReactiveObject
+    Action<Exception, string> showFailure,
+    BackgroundWork work) : ReactiveObject
 {
     /// <summary>
     /// What one of each product in the table brings, by product id: its recipe and packaging costs as saved, read with the
@@ -190,7 +192,7 @@ public sealed class ProductComponents(
         List<int> missing = [.. ProductIds.Where(id => !_costs.ContainsKey(id) && _fetching.Add(id))];
         if (missing.Count > 0)
         {
-            _ = FetchCostsAsync(missing);
+            _ = work.RunAsync(() => FetchCostsAsync(missing));
         }
     }
 
@@ -207,7 +209,7 @@ public sealed class ProductComponents(
 
         if (_fetching.Add(id))
         {
-            _ = FetchCostsAsync([id]);
+            _ = work.RunAsync(() => FetchCostsAsync([id]));
         }
 
         return null;

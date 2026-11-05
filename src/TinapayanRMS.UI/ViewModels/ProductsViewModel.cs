@@ -890,7 +890,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             () => Products.ToDictionary(p => p.Id),
             () => CostBasis,
             () => EditingIncludesComponentPackaging,
-            (ex, text) => ShowFailure(ex, text));
+            (ex, text) => ShowFailure(ex, text),
+            Work);
         VersionHistory = new ProductVersionHistory(
             versionRepository,
             productRepository,
@@ -913,7 +914,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             () => Ingredients.ToDictionary(i => i.Id),
             () => CostBasis,
             _savedProducts,
-            (ex, text) => ShowFailure(ex, text));
+            (ex, text) => ShowFailure(ex, text),
+            Work);
         _versionedSaves = new VersionedSaves(
             unitOfWork,
             productRepository,

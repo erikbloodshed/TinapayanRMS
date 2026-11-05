@@ -165,13 +165,25 @@ public abstract class ViewModelBase : ReactiveObject
     private string? _loadFailure;
 
     /// <summary>
+    /// The work the screen starts that nothing awaits, counted while it runs: every load, action and selection-driven load
+    /// below goes through it, and so does what the screen's parts read on their own (their constructors take it).
+    /// </summary>
+    protected BackgroundWork Work { get; } = new();
+
+    /// <summary>
+    /// Completes once the screen has settled: nothing it started is still running, a pick's load and a table's reads
+    /// included, and their results are on the screen. For whoever drives the screen without watching it, as the tests do.
+    /// </summary>
+    public Task WhenIdleAsync() => Work.WhenIdleAsync();
+
+    /// <summary>
     /// Runs action, clearing any previous ErrorMessage and SuccessMessage first (which also closes their toasts). Whatever
     /// it throws is shown as ErrorMessage, in the words <see cref="Failure"/> gives it, and logged: a rule's refusal
     /// (BusinessRuleException) as written, what the database refused or couldn't do put plainly, and anything else, a bug,
     /// as "Something went wrong", logged as an error with its stack. Nothing reaches ReactiveUI, which would take the app
     /// down with it, and nothing fails silently.
     /// </summary>
-    protected async Task RunSafelyAsync(Func<Task> action)
+    protected Task RunSafelyAsync(Func<Task> action) => Work.RunAsync(async () =>
     {
         ErrorMessage = null;
         SuccessMessage = null;
@@ -184,7 +196,7 @@ public abstract class ViewModelBase : ReactiveObject
         {
             ShowFailure(ex);
         }
-    }
+    });
 
     /// <summary>
     /// Runs a load, a LoadCommand's body: a load that fails shows why and is logged as <see cref="RunSafelyAsync"/>'s
@@ -192,7 +204,7 @@ public abstract class ViewModelBase : ReactiveObject
     /// action it leaves the notices alone, since a screen loads after its own Save too and mustn't take that Save's message
     /// away; but a load that succeeds takes away the error a failed one left.
     /// </summary>
-    protected async Task LoadSafelyAsync(Func<Task> load)
+    protected Task LoadSafelyAsync(Func<Task> load) => Work.RunAsync(async () =>
     {
         try
         {
@@ -207,7 +219,7 @@ public abstract class ViewModelBase : ReactiveObject
         {
             ShowLoadFailure(ex);
         }
-    }
+    });
 
     /// <summary>
     /// Loads what each of <paramref name="values"/> needs as it comes (a record picked in a list), a newer value cancelling a
@@ -219,7 +231,7 @@ public abstract class ViewModelBase : ReactiveObject
     /// failure itself can clear the pick, as Sub-Assemblies does.
     /// </summary>
     protected void LoadLatest<T>(IObservable<T> values, Func<T, CancellationToken, Task> load) =>
-        Observable.Switch(values.Select(value => Observable.FromAsync(async cancellationToken =>
+        Observable.Switch(values.Select(value => Observable.FromAsync(cancellationToken => Work.RunAsync(async () =>
             {
                 try
                 {
@@ -237,7 +249,7 @@ public abstract class ViewModelBase : ReactiveObject
                 {
                     ShowLoadFailure(ex);
                 }
-            })))
+            }))))
             .Subscribe();
 
     /// <summary>

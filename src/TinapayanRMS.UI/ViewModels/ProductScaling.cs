@@ -25,6 +25,7 @@ public sealed record ScalingInput(ScalingRecipe Recipe, int? ProductId, IReadOnl
 /// <param name="costBasis">The screen's cost basis, buffered or not.</param>
 /// <param name="savedProducts">Reads the saved recipes of a composite's products.</param>
 /// <param name="showFailure">Shows a read nothing awaits that failed, on the screen.</param>
+/// <param name="work">The screen's work nothing awaits, which counts the recipe reads (ViewModelBase.WhenIdleAsync).</param>
 public sealed class ProductScaling : ReactiveObject
 {
     private readonly Func<ScalingInput> _input;
@@ -32,6 +33,7 @@ public sealed class ProductScaling : ReactiveObject
     private readonly Func<CostBasis> _costBasis;
     private readonly SavedProductReader _savedProducts;
     private readonly Action<Exception, string> _showFailure;
+    private readonly BackgroundWork _work;
 
     /// <summary>Every made ingredient's BOM lines, by made ingredient, as the screen last loaded them: what a made ingredient opens into.</summary>
     private ILookup<int, IngredientBomLine> _bomLines = Array.Empty<IngredientBomLine>().ToLookup(l => l.IngredientId);
@@ -50,8 +52,10 @@ public sealed class ProductScaling : ReactiveObject
         Func<IReadOnlyDictionary<int, RawMaterial>> ingredientsById,
         Func<CostBasis> costBasis,
         SavedProductReader savedProducts,
-        Action<Exception, string> showFailure)
+        Action<Exception, string> showFailure,
+        BackgroundWork work)
     {
+        _work = work;
         _input = input;
         _ingredientsById = ingredientsById;
         _costBasis = costBasis;
@@ -263,7 +267,7 @@ public sealed class ProductScaling : ReactiveObject
         List<Product> missing = [.. products.DistinctBy(p => p.Id).Where(p => !_products.ContainsKey(p.Id) && _reading.Add(p.Id))];
         if (missing.Count > 0)
         {
-            _ = ReadAsync(missing);
+            _ = _work.RunAsync(() => ReadAsync(missing));
         }
     }
 
