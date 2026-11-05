@@ -3,9 +3,9 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Pricing;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Pricing.Versions;
 
-namespace TinapayanRMS.UI.Tests.Fixtures;
+namespace TinapayanRMS.Tests.Common.Fixtures;
 
 /// <summary>
 /// A ProductVersionRecorder over real repositories, and the VersionedSaves over one, for a ViewModel under test, as

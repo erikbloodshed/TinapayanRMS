@@ -45,7 +45,7 @@ dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-
   - `Domain` holds the entities and has no dependencies.
   - `ApplicationCore` holds the business and costing rules (static `*Rules` classes), the repository interfaces and the FluentValidation validators.
   - `Infrastructure` holds EF Core (PostgreSQL through Npgsql, snake_case names), the repositories, and the cross-entity services (the cost propagators and `ProductCloner`).
-  - `Pricing` holds `SavedProductReader` and what it builds: the one way a saved product is read and priced, shared by the screens, the Recipe API and the MCP server. It has no WPF, Syncfusion or ReactiveUI, so keep them out: the two servers are on plain `net11.0`, which can't reference the UI project.
+  - `Pricing` holds `SavedProductReader` and what it builds: the one way a saved product is read and priced, shared by the screens, the Recipe API and the MCP server. Its `Versions/` holds the product versions' snapshot and the saves that record them (`VersionedSaves`). It has no WPF, Syncfusion or ReactiveUI, so keep them out: the two servers are on plain `net11.0`, which can't reference the UI project.
   - `UI` is WPF with Syncfusion and ReactiveUI. The DI host is set up in `CompositionRoot.cs`, on Infrastructure's `DatabaseHost`.
   - **Each folder is its own namespace, and files are grouped by kind.** Only app-startup plumbing, the DbContext pair and `Pricing`, one kind of thing throughout, sit at a project root.
 - **Some costs are stored, others are computed on read.**

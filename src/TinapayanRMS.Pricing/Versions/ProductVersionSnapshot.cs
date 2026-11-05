@@ -2,9 +2,8 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.Pricing;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing.Versions;
 
 /// <summary>
 /// Turns a saved product into a version's snapshot (ProductVersionContent) and back. The way back gives the
@@ -48,13 +47,18 @@ public static class ProductVersionSnapshot
                 SubAssemblyRules.NormalizeName(SubAssemblyRules.LabelIn(subAssembly, product.Id, product.Name, role.Name))));
         }
 
-        // As the Packaging tab shows them: a line saved as pieces per unit is its quantity per unit.
+        // As the Packaging tab shows them (PackagingLineRow.FromSaved): a line saved as pieces per unit is its quantity per
+        // unit, in its unit while the material still has that unit, else in the base unit.
         List<VersionPackagingLine> packaging = [];
         foreach (var line in detail.Lines)
         {
             Use(line.PackagingMaterial);
-            var row = PackagingLineRow.FromSaved(line);
-            packaging.Add(new VersionPackagingLine(line.PackagingMaterialId, row.UnitId, row.QtyPerUnit ?? 0m));
+            var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? line.QtyPerUnit : line.UnitsPerPackagingUnit;
+            var qtyPerUnit = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerUnit;
+            int? unitId = line.UnitId is { } id && PricedPackagingLine.UnitChoices(line.PackagingMaterial, CostBasis.Buffered).Any(c => c.Key == id)
+                ? id
+                : null;
+            packaging.Add(new VersionPackagingLine(line.PackagingMaterialId, unitId, qtyPerUnit));
         }
 
         var costing = detail.Costing;

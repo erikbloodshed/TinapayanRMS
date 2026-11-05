@@ -11,6 +11,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.Pricing.Versions;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.UI.ViewModels;
 using TinapayanRMS.UI.Vim;

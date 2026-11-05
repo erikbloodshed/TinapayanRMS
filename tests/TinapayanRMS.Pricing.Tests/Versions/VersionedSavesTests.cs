@@ -6,16 +6,16 @@ using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Tests.Common.Fixtures;
-using TinapayanRMS.UI.Tests.Fixtures;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Pricing.Tests.Fixtures;
+using TinapayanRMS.Pricing.Versions;
 
-namespace TinapayanRMS.UI.Tests.ViewModels;
+namespace TinapayanRMS.Pricing.Tests.Versions;
 
 /// <summary>
 /// The saves that record versions (VersionedSaves), each written with its versions or not at all: a version that can't be
 /// recorded takes its save back. The versions a save records, and their notes, are in the screens' *VersionTests.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[Collection(DatabaseCollection.Name)]
 public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private const string Refused = "Simulated: the version couldn't be written.";
@@ -114,7 +114,7 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         var cloner = new ProductCloner(CreateDbContextFactory());
 
         var make = () => CreateSaves(refuseVersions: true).MakeProductFromAsync(
-            pandesalId, "Pandesal Copy", cloner.CloneAsync, ProductsViewModel.ClonedFrom, DateTime.Now, Cancellation);
+            pandesalId, "Pandesal Copy", cloner.CloneAsync, "Cloned from", DateTime.Now, Cancellation);
 
         await make.Should().ThrowAsync<TimeoutException>().WithMessage(Refused);
         (await new ProductRepository(CreateDbContextFactory()).GetAllAsync(Cancellation)).Select(p => p.Name).Should().Equal("Pandesal");

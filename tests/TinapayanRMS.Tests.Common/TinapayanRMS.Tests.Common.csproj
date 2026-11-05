@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\TinapayanRMS.Pricing\TinapayanRMS.Pricing.csproj" />
   </ItemGroup>
 
   <ItemGroup>

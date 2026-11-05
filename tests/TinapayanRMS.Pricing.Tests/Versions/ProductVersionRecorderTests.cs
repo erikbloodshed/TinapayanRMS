@@ -1,7 +1,7 @@
 using AwesomeAssertions;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Pricing.Versions;
 
-namespace TinapayanRMS.UI.Tests.ViewModels;
+namespace TinapayanRMS.Pricing.Tests.Versions;
 
 /// <summary>What a save adds to its message for the versions it recorded of other products.</summary>
 public class ProductVersionRecorderTests

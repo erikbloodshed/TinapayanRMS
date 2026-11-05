@@ -2,9 +2,8 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.Pricing;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing.Versions;
 
 /// <summary>
 /// What a product's Save wrote: its id, the product and its detail as saved, which the form shows next, and the names of

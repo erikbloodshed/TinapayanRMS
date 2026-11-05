@@ -1,9 +1,8 @@
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
-using TinapayanRMS.Pricing;
 
-namespace TinapayanRMS.UI.ViewModels;
+namespace TinapayanRMS.Pricing.Versions;
 
 /// <summary>A product as it was saved before a save that may change it: its snapshot, and when it was last saved.</summary>
 public sealed record CapturedProduct(ProductVersionContent Content, DateTime? UpdatedAt);
