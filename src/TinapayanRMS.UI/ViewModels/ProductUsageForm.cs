@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using ReactiveUI;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
@@ -10,8 +11,8 @@ namespace TinapayanRMS.UI.ViewModels;
 /// The Products screen's add/edit sub-assembly form (UsageFormPanel, through ProductsViewModel.UsageForm, since
 /// 2026-10-28): the section it edits or the one it adds, its fields and tables, and what it shows worked out from them.
 /// The screen keeps what the form does to the recipe (opening it, Apply, a link changed, a move), since that changes the
-/// recipe's sections, its tabs and the undo history these fields are part of; it sets the figures this shows
-/// (RecomputeUsageForm) and says when the lines or what the form adds have changed.
+/// recipe's sections, its tabs and the undo history these fields are part of, and says when the lines or what the form
+/// adds have changed. The form works out its own piece size and figures from its tables (<see cref="Recompute"/>).
 /// </summary>
 /// <param name="findIngredient">An ingredient as the screen last loaded it, for a row that prices itself.</param>
 /// <param name="findPackagingMaterial">A packaging material as the screen last loaded it.</param>
@@ -291,28 +292,88 @@ public sealed class ProductUsageForm(
         set => this.RaiseAndSetIfChanged(ref _selectedFormAddIn, value);
     }
 
-    // The piece size: the user types either figure, and the other follows from the batch weight. Only the one typed is
-    // kept (AuthoredField); IsSyncingPieceSize stops each box setting the other back. The screen does the arithmetic.
+    // The piece size: the user types either figure into its box, and the other follows from the batch weight. Only the one
+    // typed is kept (AuthoredField). A box's setter is the typing; the screen shows a size (ShowPieceSize) or puts one back
+    // (RestorePieceSize) through methods of their own, so nothing has to tell the two apart.
 
     /// <summary>Which piece-size figure was typed, and so stays put when the batch changes.</summary>
-    internal UsageAuthoredField AuthoredField { get; set; } = UsageAuthoredField.WeightPerPiece;
+    internal UsageAuthoredField AuthoredField { get; private set; } = UsageAuthoredField.WeightPerPiece;
 
-    /// <summary>Set while the screen sets one piece-size figure from the other, so neither box's change sets the other back.</summary>
-    internal bool IsSyncingPieceSize { get; set; }
+    /// <summary>The figure typed: <see cref="AuthoredField"/>'s.</summary>
+    internal decimal AuthoredValue => AuthoredField == UsageAuthoredField.WeightPerPiece ? _editingUsageWeightPerPiece : _editingUsageYield;
 
     private decimal _editingUsageWeightPerPiece;
+    /// <summary>Grams of the batch in a piece. Typed, it's the figure kept, and the yield follows.</summary>
     public decimal EditingUsageWeightPerPiece
     {
         get => _editingUsageWeightPerPiece;
-        set => this.RaiseAndSetIfChanged(ref _editingUsageWeightPerPiece, value);
+        set => PieceSizeTyped(UsageAuthoredField.WeightPerPiece, value);
     }
 
     private decimal _editingUsageYield;
+    /// <summary>Pieces a batch makes. Typed, it's the figure kept, and the weight per piece follows.</summary>
     public decimal EditingUsageYield
     {
         get => _editingUsageYield;
-        set => this.RaiseAndSetIfChanged(ref _editingUsageYield, value);
+        set => PieceSizeTyped(UsageAuthoredField.Yield, value);
     }
+
+    /// <summary>
+    /// Shows a piece size, the other figure worked out from the batch, and the form's figures with it: a section opened, or
+    /// the size a role starts at.
+    /// </summary>
+    internal void ShowPieceSize(UsageAuthoredField authoredField, decimal authoredValue)
+    {
+        AuthoredField = authoredField;
+        SetPieceSizeFigure(authoredField, authoredValue);
+        FollowPieceSize();
+    }
+
+    /// <summary>What the piece size is worked out from changed (a line, an add-in): the figure not typed follows, and the form's figures with it.</summary>
+    internal void FollowPieceSize()
+    {
+        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(AuthoredField, AuthoredValue, Batch().Sum(l => l.Grams));
+
+        // Rounded to the 2 decimals the box shows.
+        if (AuthoredField == UsageAuthoredField.WeightPerPiece)
+        {
+            SetPieceSizeFigure(UsageAuthoredField.Yield, Math.Round(yield, 2));
+        }
+        else
+        {
+            SetPieceSizeFigure(UsageAuthoredField.WeightPerPiece, Math.Round(weightPerPiece, 2));
+        }
+
+        Recompute();
+    }
+
+    private void PieceSizeTyped(UsageAuthoredField authoredField, decimal value)
+    {
+        if (value != (authoredField == UsageAuthoredField.WeightPerPiece ? _editingUsageWeightPerPiece : _editingUsageYield))
+        {
+            ShowPieceSize(authoredField, value);
+        }
+    }
+
+    private void SetPieceSizeFigure(UsageAuthoredField field, decimal value)
+    {
+        if (field == UsageAuthoredField.WeightPerPiece)
+        {
+            this.RaiseAndSetIfChanged(ref _editingUsageWeightPerPiece, value, nameof(EditingUsageWeightPerPiece));
+        }
+        else
+        {
+            this.RaiseAndSetIfChanged(ref _editingUsageYield, value, nameof(EditingUsageYield));
+        }
+    }
+
+    /// <summary>
+    /// The form's batch, as each line's grams and cost per gram (buffered, unless the screen isn't): both its tables, the
+    /// recipe and this product's add-ins on top of it, leaving out any row with no ingredient picked yet. Everything the form
+    /// works out from the batch reads it here, so add-ins reach all of it at once.
+    /// </summary>
+    internal IReadOnlyList<(decimal Grams, decimal CostPerGram)> Batch() =>
+        [.. FormLines.Concat(FormAddIns).Where(l => l.Ingredient is not null).Select(l => (l.Grams ?? 0m, l.CostPerGram))];
 
     private string _usageFormTotalWeightText = "0 g";
     /// <summary>The batch that goes in, e.g. "1,700 g".</summary>
@@ -376,6 +437,61 @@ public sealed class ProductUsageForm(
         internal set => this.RaiseAndSetIfChanged(ref _usageFormBatchCostText, value);
     }
 
+    /// <summary>The form's batch weight, which figure stays put, and what a piece costs.</summary>
+    internal void Recompute()
+    {
+        // Packaging is one set of lines per piece, with no batch to share out.
+        if (IsFormPackaging)
+        {
+            var packagingCost = FormPackagingLines.Sum(l => l.CostPerUnit);
+            UsageFormCostPerPieceText = FormPackagingLines.Any(l => l.PackagingMaterial is not null) ? $"{packagingCost:N4}" : "—";
+            return;
+        }
+
+        var batch = Batch();
+        var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(batch);
+        UsageFormBatchCostText = batch.Count > 0 ? $"{totalCost:N2}" : "—";
+        var authoredValue = AuthoredValue;
+        var (weightPerPiece, _) = ProductRules.ResolvePieceSize(AuthoredField, authoredValue, totalWeight);
+
+        UsageFormTotalWeightText = $"{totalWeight:#,0.##} g";
+        // Neither figure is needed to put the section in (ProductRules.EnsureValidUsages), so with none typed the
+        // caption says what that costs: nothing per piece, until one is. A yield of 1 is what a section in a
+        // product-owned role starts at (StartingPieceSize), so it says how to size a bigger batch.
+        UsageFormPieceSizeCaption = authoredValue <= 0
+            ? "Type the weight per piece or the yield; the other is worked out. Until then this section costs nothing per piece."
+            : AuthoredField == UsageAuthoredField.Yield && authoredValue == 1
+                ? "One piece takes the whole batch, and still does if the batch changes. For a batch that makes more, type the weight per piece or the yield."
+            : AuthoredField == UsageAuthoredField.WeightPerPiece
+                ? $"Weight per piece stays at {authoredValue:#,0.##} g if the batch changes."
+                : $"The yield stays at {authoredValue:#,0.##} pieces if the batch changes.";
+
+        var costPerPiece = totalWeight > 0 && weightPerPiece > 0
+            ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight)
+            : (decimal?)null;
+        // Two decimals, as Batch cost beside it (2026-09-25, at the user's request); packaging's, above, keeps four.
+        UsageFormCostPerPieceText = costPerPiece is { } figure ? $"{figure:N2}" : "—";
+
+        // The formula's base and the batch, given to both tables: an add-in is read against the recipe's base, never its own,
+        // and with no base every line of both is read against the whole batch, add-ins included, so they come to 100%.
+        var formulaBase = IngredientLineRow.ApplyFormulaBase([.. FormLines], totalWeight);
+        FormFormulaBase = formulaBase;
+        IngredientLineRow.ApplyFormulaBase(FormAddIns, formulaBase, totalWeight);
+        UsageFormPercentHeader = IngredientLineRow.PercentHeader(formulaBase);
+        UsageFormBaseCaption = formulaBase > 0
+            ? $"Base {formulaBase:#,0.##} g · whole formula {totalWeight / formulaBase * 100m:#,0.#}%"
+            : SubAssembliesViewModel.NoBaseCaption;
+
+        // The arithmetic of the two tables, in words: the recipe's grams, this product's on top, the batch.
+        var recipeName = EditingUsage?.DisplayName
+            ?? EditingUsageSource?.SubAssembly?.Name ?? "the recipe";
+        var addInWeight = FormAddIns.Where(l => l.Ingredient is not null).Sum(l => l.Grams);
+        var baseWeight = totalWeight - addInWeight;
+        UsageFormAddInsCaption = addInWeight > 0
+            ? $"{baseWeight:#,0.##} g from {recipeName} + {addInWeight:#,0.##} g of add-ins = a {totalWeight:#,0.##} g batch."
+            : $"Nothing extra yet — the batch is {recipeName}'s {baseWeight:#,0.##} g.";
+    }
+
     // An undo step putting the form back (the screen's RestoreSnapshot): each field is set and said to have changed even
     // when it's the same, so a picker bound to it shows it again, and without the setters' own follow-ups.
 
@@ -397,9 +513,10 @@ public sealed class ProductUsageForm(
         this.RaisePropertyChanged(nameof(EditingUsageName));
     }
 
-    /// <summary>Puts both piece-size figures back as they stood.</summary>
-    internal void RestorePieceSize(decimal weightPerPiece, decimal yield)
+    /// <summary>Puts the piece size back as it stood: which figure was typed, and both figures.</summary>
+    internal void RestorePieceSize(UsageAuthoredField authoredField, decimal weightPerPiece, decimal yield)
     {
+        AuthoredField = authoredField;
         _editingUsageWeightPerPiece = weightPerPiece;
         this.RaisePropertyChanged(nameof(EditingUsageWeightPerPiece));
         _editingUsageYield = yield;

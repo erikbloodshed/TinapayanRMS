@@ -1173,7 +1173,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 }
 
                 PackagingLineRow.Resolve(UsageForm.FormPackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
-                RecomputeUsageForm();
+                UsageForm.Recompute();
             });
 
         // Whether the form adds packaging follows its mode, role and source.
@@ -1186,7 +1186,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 }
 
                 UsageForm.RaisePackagingChanged();
-                RecomputeUsageForm();
+                UsageForm.Recompute();
             });
 
         LoadLatest(
@@ -1209,17 +1209,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .Buffer(2, 1)
             .Where(roles => !IsBusyApplying && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage && IsPieceSizeAsStarted(roles[0]))
             .Subscribe(_ => StartPieceSize());
-
-        // Typing one figure of the piece size works out the other, and makes it the one that's kept.
-        this.WhenAnyValue(x => x.UsageForm.EditingUsageWeightPerPiece)
-            .Skip(1)
-            .Where(_ => !UsageForm.IsSyncingPieceSize && !IsBusyApplying)
-            .Subscribe(_ => PieceSizeTyped(UsageAuthoredField.WeightPerPiece));
-
-        this.WhenAnyValue(x => x.UsageForm.EditingUsageYield)
-            .Skip(1)
-            .Where(_ => !UsageForm.IsSyncingPieceSize && !IsBusyApplying)
-            .Subscribe(_ => PieceSizeTyped(UsageAuthoredField.Yield));
 
         // A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.
         Packaging.LineEdits.ToObservableChangeSet()
@@ -1434,7 +1423,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 UsageForm.EditingUsageSource = UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == usageSourceKey);
                 PackagingLineRow.Resolve(UsageForm.FormPackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
 
-                RecomputeUsageForm();
+                UsageForm.Recompute();
                 RecomputeCosts();
             });
 
@@ -2870,8 +2859,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 UsageForm.FormPackagingLines.Add(RestoreLine(line));
             }
 
-            UsageForm.AuthoredField = snapshot.UsageAuthoredField;
-            UsageForm.RestorePieceSize(snapshot.UsageWeightPerPiece, snapshot.UsageYield);
+            UsageForm.RestorePieceSize(snapshot.UsageAuthoredField, snapshot.UsageWeightPerPiece, snapshot.UsageYield);
 
             UsageForm.EditingUsage = snapshot.EditingUsageIndex is { } usageIndex && usageIndex < UsageEdits.Count
                 ? UsageEdits[usageIndex]
@@ -3483,7 +3471,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private void StartPieceSize()
     {
         var (field, value) = StartingPieceSize(UsageForm.EditingUsageRole);
-        SetPieceSize(field, value);
+        UsageForm.ShowPieceSize(field, value);
     }
 
     /// <summary>
@@ -3494,7 +3482,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private bool IsPieceSizeAsStarted(SubAssemblyRole? role)
     {
         var (field, value) = StartingPieceSize(role);
-        return CurrentAuthoredValue() == value && (value == 0 || UsageForm.AuthoredField == field);
+        return UsageForm.AuthoredValue == value && (value == 0 || UsageForm.AuthoredField == field);
     }
 
     /// <summary>The badge's Edit: the picker, holding what the section could link instead, in the badge's place.</summary>
@@ -3560,7 +3548,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 role,
                 lines,
                 UsageForm.AuthoredField,
-                CurrentAuthoredValue(),
+                UsageForm.AuthoredValue,
                 subAssembly.Name,
                 [.. addIns.Where(a => !lineIngredientIds.Contains(a.Ingredient.Id)).Select(a => new SectionLine(a.Ingredient, a.Grams))],
                 SectionLabelOf(subAssembly.Name, role));
@@ -3738,7 +3726,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private ProductUsageEdit ApplyUsageForm()
     {
-        var authoredValue = CurrentAuthoredValue();
+        var authoredValue = UsageForm.AuthoredValue;
         ProductUsageEdit usage;
 
         if (UsageForm.EditingUsage is { IsLinked: true } linked)
@@ -3980,7 +3968,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ShowFormAddIns(usage.AddIns);
         UsageForm.SelectedFormLine = null;
         UsageForm.SelectedFormAddIn = null;
-        SetPieceSize(usage.AuthoredField, usage.AuthoredValue);
+        UsageForm.ShowPieceSize(usage.AuthoredField, usage.AuthoredValue);
         UsageForm.IsUsageFormOpen = true;
         RebaseSettledForm();
     }
@@ -4016,137 +4004,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private void FormLinesChanged()
     {
         UsageForm.RaiseLinesChanged();
-        ResyncPieceSize();
-    }
-
-    /// <summary>Shows a piece size in the form, with the other figure worked out, without any of it counting as typed.</summary>
-    private void SetPieceSize(UsageAuthoredField authoredField, decimal authoredValue)
-    {
-        UsageForm.AuthoredField = authoredField;
-        UsageForm.IsSyncingPieceSize = true;
-        try
-        {
-            if (authoredField == UsageAuthoredField.WeightPerPiece)
-            {
-                UsageForm.EditingUsageWeightPerPiece = authoredValue;
-            }
-            else
-            {
-                UsageForm.EditingUsageYield = authoredValue;
-            }
-        }
-        finally
-        {
-            UsageForm.IsSyncingPieceSize = false;
-        }
-
-        ResyncPieceSize();
-    }
-
-    private void PieceSizeTyped(UsageAuthoredField authoredField)
-    {
-        UsageForm.AuthoredField = authoredField;
-        ResyncPieceSize();
-    }
-
-    /// <summary>
-    /// Whatever the piece size is worked out from has changed — a line, an add-in, or the box
-    /// the user just typed in: the other figure follows, and the form's figures with it.
-    /// </summary>
-    private void ResyncPieceSize()
-    {
-        UsageForm.IsSyncingPieceSize = true;
-        try
-        {
-            UpdateOtherPieceSizeFigure();
-        }
-        finally
-        {
-            UsageForm.IsSyncingPieceSize = false;
-        }
-
-        RecomputeUsageForm();
-    }
-
-    /// <summary>Works out the figure the user didn't type from the one they did, rounded to the 2 decimals the box shows. Call with UsageForm.IsSyncingPieceSize set.</summary>
-    private void UpdateOtherPieceSizeFigure()
-    {
-        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(UsageForm.AuthoredField, CurrentAuthoredValue(), UsageFormBatch().Sum(l => l.Grams));
-        if (UsageForm.AuthoredField == UsageAuthoredField.WeightPerPiece)
-        {
-            UsageForm.EditingUsageYield = Math.Round(yield, 2);
-        }
-        else
-        {
-            UsageForm.EditingUsageWeightPerPiece = Math.Round(weightPerPiece, 2);
-        }
-    }
-
-    private decimal CurrentAuthoredValue() =>
-        UsageForm.AuthoredField == UsageAuthoredField.WeightPerPiece ? UsageForm.EditingUsageWeightPerPiece : UsageForm.EditingUsageYield;
-
-    /// <summary>
-    /// The form's batch, as each line's grams and cost per gram (buffered, unless the screen isn't): both its tables, the recipe and
-    /// this product's add-ins on top of it, leaving out any row with no ingredient picked yet. Everything
-    /// the form works out from the batch — the total weight, the other piece-size figure, the caption and
-    /// the cost preview — reads it here, so add-ins reach all of them at once.
-    /// </summary>
-    private IReadOnlyList<(decimal Grams, decimal CostPerGram)> UsageFormBatch() =>
-        [.. UsageForm.FormLines.Concat(UsageForm.FormAddIns).Where(l => l.Ingredient is not null).Select(l => (l.Grams ?? 0m, l.CostPerGram))];
-
-    /// <summary>The form's batch weight, which figure stays put, and what a piece costs.</summary>
-    private void RecomputeUsageForm()
-    {
-        // Packaging is one set of lines per piece, with no batch to share out.
-        if (UsageForm.IsFormPackaging)
-        {
-            var packagingCost = UsageForm.FormPackagingLines.Sum(l => l.CostPerUnit);
-            UsageForm.UsageFormCostPerPieceText = UsageForm.FormPackagingLines.Any(l => l.PackagingMaterial is not null) ? $"{packagingCost:N4}" : "—";
-            return;
-        }
-
-        var batch = UsageFormBatch();
-        var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(batch);
-        UsageForm.UsageFormBatchCostText = batch.Count > 0 ? $"{totalCost:N2}" : "—";
-        var authoredValue = CurrentAuthoredValue();
-        var (weightPerPiece, _) = ProductRules.ResolvePieceSize(UsageForm.AuthoredField, authoredValue, totalWeight);
-
-        UsageForm.UsageFormTotalWeightText = $"{totalWeight:#,0.##} g";
-        // Neither figure is needed to put the section in (ProductRules.EnsureValidUsages), so with none typed the
-        // caption says what that costs: nothing per piece, until one is. A yield of 1 is what a section in a
-        // product-owned role starts at (StartingPieceSize), so it says how to size a bigger batch.
-        UsageForm.UsageFormPieceSizeCaption = authoredValue <= 0
-            ? "Type the weight per piece or the yield; the other is worked out. Until then this section costs nothing per piece."
-            : UsageForm.AuthoredField == UsageAuthoredField.Yield && authoredValue == 1
-                ? "One piece takes the whole batch, and still does if the batch changes. For a batch that makes more, type the weight per piece or the yield."
-            : UsageForm.AuthoredField == UsageAuthoredField.WeightPerPiece
-                ? $"Weight per piece stays at {authoredValue:#,0.##} g if the batch changes."
-                : $"The yield stays at {authoredValue:#,0.##} pieces if the batch changes.";
-
-        var costPerPiece = totalWeight > 0 && weightPerPiece > 0
-            ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight)
-            : (decimal?)null;
-        // Two decimals, as Batch cost beside it (2026-09-25, at the user's request); packaging's, above, keeps four.
-        UsageForm.UsageFormCostPerPieceText = costPerPiece is { } figure ? $"{figure:N2}" : "—";
-
-        // The formula's base and the batch, given to both tables: an add-in is read against the recipe's base, never its own,
-        // and with no base every line of both is read against the whole batch, add-ins included, so they come to 100%.
-        var formulaBase = IngredientLineRow.ApplyFormulaBase([.. UsageForm.FormLines], totalWeight);
-        UsageForm.FormFormulaBase = formulaBase;
-        IngredientLineRow.ApplyFormulaBase(UsageForm.FormAddIns, formulaBase, totalWeight);
-        UsageForm.UsageFormPercentHeader = IngredientLineRow.PercentHeader(formulaBase);
-        UsageForm.UsageFormBaseCaption = formulaBase > 0
-            ? $"Base {formulaBase:#,0.##} g · whole formula {totalWeight / formulaBase * 100m:#,0.#}%"
-            : SubAssembliesViewModel.NoBaseCaption;
-
-        // The arithmetic of the two tables, in words: the recipe's grams, this product's on top, the batch.
-        var recipeName = UsageForm.EditingUsage?.DisplayName
-            ?? UsageForm.EditingUsageSource?.SubAssembly?.Name ?? "the recipe";
-        var addInWeight = UsageForm.FormAddIns.Where(l => l.Ingredient is not null).Sum(l => l.Grams);
-        var baseWeight = totalWeight - addInWeight;
-        UsageForm.UsageFormAddInsCaption = addInWeight > 0
-            ? $"{baseWeight:#,0.##} g from {recipeName} + {addInWeight:#,0.##} g of add-ins = a {totalWeight:#,0.##} g batch."
-            : $"Nothing extra yet — the batch is {recipeName}'s {baseWeight:#,0.##} g.";
+        UsageForm.FollowPieceSize();
     }
 
     private void InsertInRecipeOrder(ProductUsageEdit usage)
@@ -4630,7 +4488,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ComponentsTable.Reprice();
 
         RecomputeCosts();
-        RecomputeUsageForm();
+        UsageForm.Recompute();
         VersionHistory.Reprice(CostBasis);
     }
 
