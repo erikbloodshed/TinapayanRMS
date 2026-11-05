@@ -194,7 +194,11 @@ public static class SubAssemblyRules
         }
     }
 
-    /// <summary>TotalWeight = Σ grams; TotalCost = Σ (grams × that line's ingredient cost per gram, its CostPerBaseUnit).</summary>
+    /// <summary>
+    /// A batch from its lines: TotalWeight = Σ grams; TotalCost = Σ (grams × the line's ingredient cost per gram as given,
+    /// its buffered cost or, for the unbuffered view, its true cost). Nothing stores it: a sub-assembly is costed from its
+    /// lines whenever it's read.
+    /// </summary>
     public static (decimal TotalWeight, decimal TotalCost) CalculateTotals(IReadOnlyList<(decimal Grams, decimal IngredientCostPerGram)> lines)
     {
         var totalWeight = lines.Sum(l => l.Grams);

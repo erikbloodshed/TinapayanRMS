@@ -69,11 +69,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         return await dbContext.RawMaterials.AsNoTracking().SingleAsync(m => m.Id == id, Cancellation);
     }
 
-    private async Task<decimal> GetSubAssemblyTotalCostAsync(int id)
-    {
-        await using var dbContext = CreateDbContext();
-        return (await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == id, Cancellation)).TotalCost;
-    }
+    private async Task<decimal> GetSubAssemblyTotalCostAsync(int id) => (await SubAssemblyTotalsAsync(id)).TotalCost;
 
     [Fact]
     public async Task Egg_white_and_yolk_are_costed_from_the_egg_by_their_shares()

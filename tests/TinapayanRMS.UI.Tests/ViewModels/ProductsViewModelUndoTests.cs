@@ -140,7 +140,6 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         await using var dbContext = CreateDbContext();
         var lines = await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == subAssemblyId).ToListAsync(Cancellation);
         lines.Should().ContainSingle().Which.Grams.Should().Be(1000m);
-        (await dbContext.SubAssemblies.SingleAsync(s => s.Id == subAssemblyId, Cancellation)).TotalWeight.Should().Be(1000m);
     }
 
     [Fact]

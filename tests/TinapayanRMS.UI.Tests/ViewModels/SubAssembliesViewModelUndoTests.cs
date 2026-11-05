@@ -94,7 +94,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
             .OrderBy(l => l.Id)
             .ToListAsync(Cancellation);
         lines[0].Grams.Should().Be(1000m, "a change undone and a change never made come to the same thing");
-        (await dbContext.SubAssemblies.SingleAsync(s => s.Id == subAssemblyId, Cancellation)).TotalWeight.Should().Be(1200m);
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalWeight.Should().Be(1200m);
     }
 
     [Fact]

@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261105043804_ShopVat";
+    public override string LastMigrationId => "20261105060247_DropStoredSubAssemblyTotals";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -938,16 +938,6 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("character varying(100)")
                     .HasColumnName("section_name")
                     .UseCollation("case_insensitive");
-
-                b.Property<decimal>("TotalCost")
-                    .HasPrecision(18, 4)
-                    .HasColumnType("numeric(18,4)")
-                    .HasColumnName("total_cost");
-
-                b.Property<decimal>("TotalWeight")
-                    .HasPrecision(18, 4)
-                    .HasColumnType("numeric(18,4)")
-                    .HasColumnName("total_weight");
 
                 b.HasKey("Id")
                     .HasName("pk_sub_assemblies");

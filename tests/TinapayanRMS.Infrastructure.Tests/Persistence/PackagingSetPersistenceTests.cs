@@ -201,8 +201,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         await using var dbContext = CreateDbContext();
         var set = await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == id, Cancellation);
         set.Name.Should().Be("Gift Box Set");
-        set.TotalWeight.Should().Be(0m);
-        set.TotalCost.Should().Be(0m);
+        (await SubAssemblyTotalsAsync(id)).Should().Be((0m, 0m), "a set has no ingredient lines");
         var lines = await CreateRepository().GetPackagingLinesAsync(id, Cancellation);
         lines.Select(l => (l.PackagingMaterialId, l.QtyPerSet)).Should().Equal((boxId, 1m), (ribbonId, 30m));
         lines.Select(l => (l.PackagingMaterial!.Name, l.PackagingMaterial.Category!.Name, l.PackagingMaterial.BaseUnit!.Abbreviation))

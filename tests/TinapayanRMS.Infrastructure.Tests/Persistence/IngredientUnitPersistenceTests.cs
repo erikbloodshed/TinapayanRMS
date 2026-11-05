@@ -156,11 +156,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
 
         (await GetCostPerGramAsync(sugarId)).Should().Be(0.1m); // 90 / 900 g
         (await GetCostPerGramAsync(syrupId)).Should().Be(0.1m, "the made ingredient using sugar is recomputed");
-        await using (var dbContext = CreateDbContext())
-        {
-            (await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == subAssemblyId, Cancellation)).TotalCost
-                .Should().Be(50m, "the sub-assembly using sugar is recomputed: 500 g at 0.10/g");
-        }
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(50m, "the sub-assembly using sugar is costed at its new cost: 500 g at 0.10/g");
     }
 
     [Fact]
@@ -184,9 +180,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         await using var check = CreateDbContext();
         (await check.SubAssemblyLines.AsNoTracking().SingleAsync(l => l.SubAssemblyId == subAssemblyId, Cancellation)).Grams.Should().Be(150m);
         (await check.SubAssemblyLines.AsNoTracking().SingleAsync(l => l.SubAssemblyId == custardRecipeId, Cancellation)).Grams.Should().Be(100m);
-        var subAssemblyAfter = await check.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == subAssemblyId, Cancellation);
-        subAssemblyAfter.TotalWeight.Should().Be(150m);
-        subAssemblyAfter.TotalCost.Should().Be(30m); // 150 g at 0.20/g
+        (await SubAssemblyTotalsAsync(subAssemblyId)).Should().Be((150m, 30m)); // 150 g at 0.20/g
         (await GetCostPerGramAsync(eggId)).Should().Be(0.2m, "a price per gram doesn't depend on the piece's weight");
         (await GetCostPerGramAsync(custardId)).Should().Be(0.2m);
     }

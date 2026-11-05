@@ -158,13 +158,6 @@ public sealed class TinapayanRMSDbContext : DbContext
     /// <summary>The decimal places every decimal column has, unless its configuration says otherwise (ConfigureConventions).</summary>
     public const int DecimalScale = 4;
 
-    /// <summary>
-    /// <paramref name="value"/> as a <see cref="DecimalScale"/>-place column stores it, rounded half away from zero as
-    /// PostgreSQL rounds a numeric. For a figure worked out in memory and compared with the stored one, such as a sub-assembly's totals:
-    /// at full precision they never compare equal, and every save would write them again.
-    /// </summary>
-    public static decimal Stored(decimal value) => decimal.Round(value, DecimalScale, MidpointRounding.AwayFromZero);
-
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         // Every decimal column is numeric(18,4) unless a configuration overrides it. Npgsql's default is an

@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels;
 public partial class TinapayanRMSDbContextModel
 {
     private TinapayanRMSDbContextModel()
-        : base(skipDetectChanges: false, modelId: new Guid("2f2c9d36-2b23-45cf-852a-deb88bf80416"), entityTypeCount: 24)
+        : base(skipDetectChanges: false, modelId: new Guid("eace24d2-5266-4a0d-8dd9-65f2add313e5"), entityTypeCount: 24)
     {
     }
 

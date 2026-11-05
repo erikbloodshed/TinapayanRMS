@@ -74,7 +74,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         await using var dbContext = CreateDbContext();
         (await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == recipeId).Select(l => l.IngredientId).ToListAsync(Cancellation))
             .Should().Equal([sugarId], "an add-in is the made ingredient's, not the recipe's");
-        (await dbContext.SubAssemblies.SingleAsync(s => s.Id == recipeId, Cancellation)).TotalWeight.Should().Be(1000m);
+        (await SubAssemblyTotalsAsync(recipeId)).TotalWeight.Should().Be(1000m);
     }
 
     [Fact]
@@ -139,8 +139,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         await SetRecipeLinesAsync(syrupId, [(sugarId, 1000m), (waterId, 1000m)]);
 
         (await GetIngredientAsync(syrupId)).CostPerBaseUnit.Should().Be(0.045m);
-        await using var dbContext = CreateDbContext();
-        (await dbContext.SubAssemblies.SingleAsync(s => s.Id == toppingId, Cancellation)).TotalCost.Should().Be(4.5m);
+        (await SubAssemblyTotalsAsync(toppingId)).TotalCost.Should().Be(4.5m);
     }
 
     [Fact]

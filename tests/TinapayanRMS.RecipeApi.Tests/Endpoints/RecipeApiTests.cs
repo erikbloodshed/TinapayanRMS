@@ -66,8 +66,11 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         int setId;
         await using (var dbContext = CreateDbContext())
         {
-            var set = new SubAssembly { Name = "Gift Set", RoleId = packagingRoleId, TotalWeight = 5m };
+            // With an ingredient line, as the app never gives a set: the role alone keeps it out.
+            var set = new SubAssembly { Name = "Gift Set", RoleId = packagingRoleId };
             dbContext.SubAssemblies.Add(set);
+            await dbContext.SaveChangesAsync(Cancellation);
+            dbContext.SubAssemblyLines.Add(new SubAssemblyLine { SubAssemblyId = set.Id, IngredientId = bakery.FlourId, Grams = 5m });
             await dbContext.SaveChangesAsync(Cancellation);
             setId = set.Id;
         }

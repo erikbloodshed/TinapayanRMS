@@ -13,8 +13,9 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
 /// <summary>
 /// End-to-end tests for the reactive costing cascade (PLAN.md), proving the full chain
-/// a price change ripples through: an ingredient's price history -> its CostPerBaseUnit ->
-/// (through the BOM tree) -> SubAssembly.TotalCost -> a product's live-read cost per piece.
+/// a price change ripples through: an ingredient's price history -> its stored costs ->
+/// (through the BOM tree) the made ingredients' stored costs -> a sub-assembly's cost and a
+/// product's cost per piece, both worked out from their lines on read (SubAssemblyTotalsAsync).
 /// Also proves the packaging branch (a packaging material's price history -> its CostPerBaseUnit
 /// -> a product's live-read packaging cost) needs no propagation code of its own, since
 /// nothing in it is stored redundantly.
@@ -58,14 +59,8 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         return subAssemblyId;
     }
 
-    private async Task<SubAssembly> GetSubAssemblyAsync(int id)
-    {
-        await using var dbContext = CreateDbContext();
-        return await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == id, Cancellation);
-    }
-
     [Fact]
-    public async Task A_price_change_on_an_ingredient_used_directly_in_a_sub_assembly_recomputes_its_TotalCost()
+    public async Task A_price_change_on_an_ingredient_used_directly_in_a_sub_assembly_reaches_its_cost()
     {
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
@@ -74,12 +69,12 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 90m); // 0.09/g
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, sugarId, 1000m);
 
-        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(90m);
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(90m);
 
         // Sugar's price doubles — no direct edit to the sub-assembly.
         await SetPriceAndRecalculateBufferAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m);
 
-        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(180m);
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(180m);
     }
 
     [Fact]
@@ -94,12 +89,12 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var syrupId = await AddMadeIngredientAsync("Simple Syrup", [(sugarId, 1000m)]); // syrup: 0.09/g
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, syrupId, 500m); // 500g syrup @ 0.09/g -> 45
 
-        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(45m);
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(45m);
 
         // Sugar's price doubles: syrup becomes 0.18/g, which should ripple into Custard too.
         await SetPriceAndRecalculateBufferAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m);
 
-        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(90m); // 500g @ 0.18/g
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(90m); // 500g @ 0.18/g
     }
 
     [Fact]
@@ -114,7 +109,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         var syrupId = await AddMadeIngredientAsync("Simple Syrup", [(sugarId, 1000m)]); // syrup: 1000g -> 0.09/g
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, syrupId, 1000m); // 1000g syrup @ 0.09/g -> 90
 
-        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(90m);
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(90m);
 
         // 10% weight loss: syrup output drops to 900g for the same 90 total cost -> 0.10/g.
         await using (var dbContext = CreateDbContext())
@@ -127,7 +122,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
             new RawMaterial { Id = syrupId, Name = "Simple Syrup", CategoryId = madeCategoryId, Source = RawMaterialSource.Made, WeightLossPercent = 10m, SubAssemblyId = await RecipeIdOfAsync(syrupId) },
             Cancellation);
 
-        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(100m); // 1000g @ 0.10/g
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(100m); // 1000g @ 0.10/g
     }
 
     [Fact]
@@ -144,7 +139,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
 
         await SetRecipeLinesAsync(syrupId, [(sugarId, 1000m), (waterId, 1000m)]); // syrup: ₱90 over 2,000 g -> 0.045/g
 
-        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(22.5m);
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(22.5m);
     }
 
     [Fact]
@@ -161,18 +156,18 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         await rawMaterials.SaveAsync((await rawMaterials.GetByIdAsync(syrupId, Cancellation))!, [], brandPrices: null, [(vanillaId, 100m)], Cancellation);
         var subAssemblyId = await SeedSubAssemblyAsync("Custard", roleId, syrupId, 1000m); // ₱81 + ₱100 over 1,000 g -> 181
         var baseId = await RecipeIdOfAsync(syrupId);
-        var baseCost = (await GetSubAssemblyAsync(baseId)).TotalCost;
+        var baseCost = (await SubAssemblyTotalsAsync(baseId)).TotalCost;
 
-        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(181m);
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(181m);
 
         await SetPriceAndRecalculateBufferAsync(vanillaId, await KilogramUnitIdAsync(vanillaId), 2000m);
 
-        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(281m);
-        (await GetSubAssemblyAsync(baseId)).TotalCost.Should().Be(baseCost, "an add-in is the made ingredient's, never its sub-assembly's");
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(281m);
+        (await SubAssemblyTotalsAsync(baseId)).TotalCost.Should().Be(baseCost, "an add-in is the made ingredient's, never its sub-assembly's");
     }
 
     [Fact]
-    public async Task A_price_change_recomputes_every_sub_assembly_that_uses_the_ingredient()
+    public async Task A_price_change_reaches_every_sub_assembly_that_uses_the_ingredient()
     {
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
@@ -184,12 +179,12 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
 
         await SetPriceAndRecalculateBufferAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m); // 0.18/g
 
-        (await GetSubAssemblyAsync(custardId)).TotalCost.Should().Be(90m); // 500 * 0.18
-        (await GetSubAssemblyAsync(caramelId)).TotalCost.Should().Be(36m); // 200 * 0.18
+        (await SubAssemblyTotalsAsync(custardId)).TotalCost.Should().Be(90m); // 500 * 0.18
+        (await SubAssemblyTotalsAsync(caramelId)).TotalCost.Should().Be(36m); // 200 * 0.18
     }
 
     [Fact]
-    public async Task A_sub_assembly_with_multiple_ingredients_recomputes_using_every_lines_current_cost_not_just_the_changed_one()
+    public async Task A_sub_assembly_with_multiple_ingredients_is_costed_at_every_lines_current_cost_not_just_the_changed_one()
     {
         var categoryId = await SeedCategoryAsync("Dough");
         var flourId = await SeedPurchasedIngredientAsync("Flour", categoryId);
@@ -200,20 +195,20 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         await SetPriceAsync(sugarId, await KilogramUnitIdAsync(sugarId), 90m); // 0.09/g
         var (_, subAssemblyId) = await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 800m), (sugarId, 200m)]);
 
-        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(58m); // 800*0.05 + 200*0.09
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(58m); // 800*0.05 + 200*0.09
 
         // Only flour's price changes; sugar's line cost must still use its own current cost.
         await SetPriceAndRecalculateBufferAsync(flourId, await KilogramUnitIdAsync(flourId), 100m); // 0.10/g
 
-        (await GetSubAssemblyAsync(subAssemblyId)).TotalCost.Should().Be(98m); // 800*0.10 + 200*0.09
+        (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(98m); // 800*0.10 + 200*0.09
     }
 
     [Fact]
     public async Task A_products_live_read_cost_reflects_an_ingredient_price_change_with_no_product_level_propagation()
     {
-        // Proves Product needs no propagation code of its own: as long as SubAssembly.
-        // TotalCost is kept fresh, a product's cost — always computed on read, never
-        // stored (Phase 8) — is automatically correct.
+        // Proves a product needs no propagation code of its own: its sections are costed from
+        // their lines as they're read, and its cost with them, never stored (Phase 8), so it
+        // follows a new price as soon as the ingredient's buffered cost does.
         var categoryId = await SeedCategoryAsync("Fillings");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar", categoryId);
         var roleId = await AddRoleAsync("Filling");
@@ -224,18 +219,19 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
 
         await using var dbContext = CreateDbContext();
 
-        decimal ReadUsageCostPerPiece()
+        async Task<decimal> ReadUsageCostPerPieceAsync()
         {
-            var usage = dbContext.ProductSubAssemblyUsages.AsNoTracking().Include(u => u.SubAssembly).Single(u => u.ProductId == productId);
-            var (weightPerPiece, _) = ProductRules.ResolvePieceSize(usage.AuthoredField, usage.AuthoredValue, usage.SubAssembly!.TotalWeight);
-            return ProductRules.CalculateUsageCostPerPiece(usage.SubAssembly.TotalCost, weightPerPiece, usage.SubAssembly.TotalWeight);
+            var usage = await dbContext.ProductSubAssemblyUsages.AsNoTracking().SingleAsync(u => u.ProductId == productId, Cancellation);
+            var (totalWeight, totalCost) = await SubAssemblyTotalsAsync(usage.SubAssemblyId);
+            var (weightPerPiece, _) = ProductRules.ResolvePieceSize(usage.AuthoredField, usage.AuthoredValue, totalWeight);
+            return ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight);
         }
 
-        ReadUsageCostPerPiece().Should().Be(0.9m); // 9 * 10 / 100
+        (await ReadUsageCostPerPieceAsync()).Should().Be(0.9m); // 9 * 10 / 100
 
         await SetPriceAndRecalculateBufferAsync(sugarId, await KilogramUnitIdAsync(sugarId), 180m);
 
-        ReadUsageCostPerPiece().Should().Be(1.8m); // sugar doubled -> usage cost doubled, with zero product-level code involved
+        (await ReadUsageCostPerPieceAsync()).Should().Be(1.8m); // sugar doubled -> usage cost doubled, with zero product-level code involved
     }
 
     [Fact]
@@ -243,7 +239,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
     {
         // Add-ins are the third branch that needs no propagation code. They hang off the usage, and their
         // cost is read off the ingredient, so nothing derived about them is stored — and the sub-assembly
-        // they sit on top of must not move, since it belongs to another product.
+        // they sit on top of keeps its own lines, since it belongs to another product.
         var categoryId = await SeedCategoryAsync("Fillings");
         var flourId = await SeedPurchasedIngredientAsync("Flour", categoryId);
         var ubeId = await SeedPurchasedIngredientAsync("Ube Flavour", categoryId);
@@ -261,29 +257,26 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
 
         await using var dbContext = CreateDbContext();
 
-        decimal ReadUsageCostPerPiece()
+        async Task<decimal> ReadUsageCostPerPieceAsync()
         {
-            var usage = dbContext.ProductSubAssemblyUsages.AsNoTracking().Include(u => u.SubAssembly).Single(u => u.ProductId == linkerId);
-            var addIns = dbContext.UsageAddInLines.AsNoTracking().Include(l => l.Ingredient).Where(l => l.UsageId == usage.Id).ToList();
+            var usage = await dbContext.ProductSubAssemblyUsages.AsNoTracking().SingleAsync(u => u.ProductId == linkerId, Cancellation);
+            var addIns = await dbContext.UsageAddInLines.AsNoTracking().Include(l => l.Ingredient).Where(l => l.UsageId == usage.Id).ToListAsync(Cancellation);
+            var (ownWeight, ownCost) = await SubAssemblyTotalsAsync(usage.SubAssemblyId);
             var (totalWeight, totalCost) = ProductRules.CalculateEffectiveBatch(
-                usage.SubAssembly!.TotalWeight,
-                usage.SubAssembly.TotalCost,
-                [.. addIns.Select(l => (l.Grams, l.Ingredient!.BufferedCostPerBaseUnit))]);
+                ownWeight, ownCost, [.. addIns.Select(l => (l.Grams, l.Ingredient!.BufferedCostPerBaseUnit))]);
             var (weightPerPiece, _) = ProductRules.ResolvePieceSize(usage.AuthoredField, usage.AuthoredValue, totalWeight);
             return ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight);
         }
 
         // A 1,020 g / ₱66 effective batch at 30 g a piece.
-        ReadUsageCostPerPiece().Should().Be(66m * 30m / 1020m);
+        (await ReadUsageCostPerPieceAsync()).Should().Be(66m * 30m / 1020m);
 
         await SetPriceAndRecalculateBufferAsync(ubeId, await KilogramUnitIdAsync(ubeId), 1600m);
 
         // ₱82 now: the ube doubled to ₱32, with no add-in-level propagation code anywhere.
-        ReadUsageCostPerPiece().Should().Be(82m * 30m / 1020m);
+        (await ReadUsageCostPerPieceAsync()).Should().Be(82m * 30m / 1020m);
 
-        var dough = await GetSubAssemblyAsync(doughId);
-        dough.TotalWeight.Should().Be(1000m, "the ube is the linking product's own; the dough is Cream Loaf's");
-        dough.TotalCost.Should().Be(50m);
+        (await SubAssemblyTotalsAsync(doughId)).Should().Be((1000m, 50m), "the ube is the linking product's own; the dough is Cream Loaf's");
     }
 
     [Fact]

@@ -58,7 +58,7 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
     {
         var (productId, toppingRoleId, toppingId, lines) = await SeedToppingAsync();
         var inHouseId = await MadeCategoryIdAsync();
-        var before = await SubAssemblyAsync(toppingId);
+        var before = await SubAssemblyTotalsAsync(toppingId);
 
         await SaveRecipeAsync(productId, new RecipeDraft(
             [Section(toppingRoleId, lines, id: toppingId, made: new MadeIngredientDraft(" Butter Icing ", inHouseId))], []));
@@ -73,7 +73,7 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
         var topping = await SubAssemblyAsync(toppingId);
         (await LinesAsync(toppingId)).Select(l => (l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))
             .Should().Equal((lines[0].IngredientId, 300m, true, (decimal?)null), (lines[1].IngredientId, 200m, false, 66.6667m));
-        (topping.TotalWeight, topping.TotalCost).Should().Be((before.TotalWeight, before.TotalCost), "its lines stay as they were");
+        (await SubAssemblyTotalsAsync(toppingId)).Should().Be(before, "its lines stay as they were");
         topping.OwnerProductId.Should().BeNull("it's on the Sub-Assemblies screen now, where a made ingredient can be made from it");
         topping.Name.Should().Be("Cheese Roll Topping");
         var usage = await dbContext.ProductSubAssemblyUsages.SingleAsync(Cancellation);
@@ -193,12 +193,13 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
         var productId = await AddProductAsync("Ube Cheese Bun");
         await SaveRecipeAsync(productId, new RecipeDraft(
             [], [new LinkedUsageDraft(baseId, UsageAuthoredField.WeightPerPiece, 20m) { AddIns = [(cheeseId, 50m)] }]));
-        var before = await SubAssemblyAsync(baseId);
+        var before = await SubAssemblyTotalsAsync(baseId);
 
         await SubAssemblies().AddMadeIngredientAsync(baseId, new MadeIngredientDraft("Ube Filling", await MadeCategoryIdAsync()), Cancellation);
 
         var kept = await SubAssemblyAsync(baseId);
-        (kept.Name, kept.OwnerProductId, kept.TotalWeight, kept.TotalCost).Should().Be(("Ube Base", (int?)null, before.TotalWeight, before.TotalCost));
+        (kept.Name, kept.OwnerProductId).Should().Be(("Ube Base", (int?)null));
+        (await SubAssemblyTotalsAsync(baseId)).Should().Be(before);
         (await LinesAsync(baseId)).Select(l => (l.IngredientId, l.Grams)).Should().Equal((ubeId, 300m), (milkId, 100m));
         await using var dbContext = CreateDbContext();
         var usage = await dbContext.ProductSubAssemblyUsages.SingleAsync(Cancellation);

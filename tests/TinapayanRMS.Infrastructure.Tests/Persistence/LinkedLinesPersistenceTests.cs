@@ -40,7 +40,7 @@ public class LinkedLinesPersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         await using var dbContext = CreateDbContext();
         var dough = await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == doughId, Cancellation);
-        (dough.TotalWeight, dough.TotalCost).Should().Be((1250m, 150m), "the stored totals follow the new lines");
+        (await SubAssemblyTotalsAsync(doughId)).Should().Be((1250m, 150m), "the dough is costed from its new lines");
         dough.OwnerProductId.Should().BeNull("it stays on the Sub-Assemblies screen");
         (await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == doughId).OrderBy(l => l.SortOrder)
                 .Select(l => new { l.IngredientId, l.Grams, l.IsFormulaBase }).ToListAsync(Cancellation))

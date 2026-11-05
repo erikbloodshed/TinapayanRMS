@@ -367,6 +367,16 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncL
         return (productId, await SubAssemblyIdAsync(productId, roleId));
     }
 
+    /// <summary>
+    /// A sub-assembly's batch, read through its saved lines and their ingredients' buffered costs as saved now: what every
+    /// recipe using it is costed from (SubAssemblyRules.CalculateTotals). Nothing stores it.
+    /// </summary>
+    protected async Task<(decimal TotalWeight, decimal TotalCost)> SubAssemblyTotalsAsync(int subAssemblyId)
+    {
+        var lines = await new SubAssemblyLineRepository(CreateDbContextFactory()).GetForSubAssembliesAsync([subAssemblyId], Cancellation);
+        return SubAssemblyRules.CalculateTotals([.. lines.Select(l => (l.Grams, l.Ingredient!.BufferedCostPerBaseUnit))]);
+    }
+
     private DbContextOptions<TinapayanRMSDbContext> CreateDbContextOptions() =>
         TinapayanRMSDbContext.CreateOptions(fixture.ConnectionString);
 }

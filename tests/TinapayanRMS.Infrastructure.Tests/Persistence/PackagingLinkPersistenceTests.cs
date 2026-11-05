@@ -220,10 +220,10 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         var sourceIds = (await CreateUsageRepository().GetForProductAsync(sourceId, Cancellation)).Select(u => u.SubAssemblyId);
         var usages = await CreateUsageRepository().GetForProductAsync(cloneId, Cancellation);
         usages.Select(u => u.SubAssemblyId).Should().BeEquivalentTo(sourceIds);
-        usages.Select(u => (u.SubAssembly!.Name, u.AuthoredField, u.AuthoredValue, u.SubAssembly.TotalWeight)).Should().BeEquivalentTo(new[]
+        usages.Select(u => (u.SubAssembly!.Name, u.AuthoredField, u.AuthoredValue)).Should().BeEquivalentTo(new[]
         {
-            ("Source Filling", UsageAuthoredField.Yield, 10m, 100m),
-            ("Pandesal Dough", UsageAuthoredField.WeightPerPiece, 40m, 1000m),
+            ("Source Filling", UsageAuthoredField.Yield, 10m),
+            ("Pandesal Dough", UsageAuthoredField.WeightPerPiece, 40m),
         });
         await using (var dbContext = CreateDbContext())
         {

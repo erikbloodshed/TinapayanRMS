@@ -54,8 +54,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         var subAssembly = await GetSubAssemblyAsync(await SubAssemblyIdAsync(productId, roleId));
         subAssembly.Name.Should().Be("Pandesal Dough");
-        subAssembly.TotalWeight.Should().Be(1000m);
-        subAssembly.TotalCost.Should().Be(58m); // 800*0.05 + 200*0.09
+        (await SubAssemblyTotalsAsync(subAssembly.Id)).Should().Be((1000m, 58m)); // 800*0.05 + 200*0.09
         var usage = (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Should().ContainSingle().Subject;
         usage.SubAssemblyId.Should().Be(subAssembly.Id);
         usage.AuthoredField.Should().Be(UsageAuthoredField.WeightPerPiece);

@@ -132,14 +132,14 @@ public class ProductQuantityRequiredPersistenceTests(DatabaseFixture fixture) : 
         }
 
         var usages = await new ProductSubAssemblyUsageRepository(CreateDbContextFactory()).GetForProductAsync(variantId, Cancellation);
-        var usageCosts = usages
-            .Select(u =>
-            {
-                var subAssembly = u.SubAssembly!;
-                var (weightPerPiece, _) = ProductRules.ResolvePieceSize(u.AuthoredField, u.AuthoredValue, subAssembly.TotalWeight);
-                return ProductRules.CalculateUsageCostPerPiece(subAssembly.TotalCost, weightPerPiece, subAssembly.TotalWeight);
-            })
-            .ToList();
+        List<decimal> usageCosts = [];
+        foreach (var u in usages)
+        {
+            var (totalWeight, totalCost) = await SubAssemblyTotalsAsync(u.SubAssemblyId);
+            var (weightPerPiece, _) = ProductRules.ResolvePieceSize(u.AuthoredField, u.AuthoredValue, totalWeight);
+            usageCosts.Add(ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight));
+        }
+
         usageCosts.Should().ContainSingle().Which.Should().Be(0.50m, "the recipe is linked, so a piece is still 10 g of the dough");
 
         var lines = await CreatePackagingLineRepository().GetEffectiveForProductAsync(variantId, Cancellation);

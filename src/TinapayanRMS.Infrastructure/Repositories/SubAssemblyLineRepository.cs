@@ -39,8 +39,8 @@ public sealed class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbCo
     }
 
     /// <summary>
-    /// Replaces the sub-assembly's whole line set on the caller's context (edited together), recomputes its
-    /// TotalWeight/TotalCost, and saves. Lines are in grams, and every one must be an ingredient
+    /// Replaces the sub-assembly's whole line set on the caller's context (edited together) and saves. Lines are in grams,
+    /// and every one must be an ingredient
     /// (RawMaterialRules.EnsureUsableInRecipes). Nothing is deleted until every line passes. Every line write goes
     /// through here, so here is where the made ingredients made from it are cascaded, in the caller's transaction,
     /// after a check that no line closes a loop through one of them.
@@ -57,7 +57,7 @@ public sealed class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbCo
         var ingredientIds = lines.Select(l => l.IngredientId).ToList();
         var ingredients = await dbContext.RawMaterials
             .Where(m => ingredientIds.Contains(m.Id))
-            .Select(m => new { m.Id, m.Name, m.Type, m.BufferedCostPerBaseUnit })
+            .Select(m => new { m.Id, m.Name, m.Type })
             .ToDictionaryAsync(m => m.Id, cancellationToken);
 
         foreach (var line in lines)
@@ -83,9 +83,6 @@ public sealed class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbCo
             AuthoredBakersPercent = l.AuthoredBakersPercent,
             SortOrder = index,
         }));
-
-        var costInputs = lines.Select(l => (l.Grams, IngredientCostPerGram: ingredients[l.IngredientId].BufferedCostPerBaseUnit)).ToList();
-        (subAssembly.TotalWeight, subAssembly.TotalCost) = SubAssemblyRules.CalculateTotals(costInputs);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

@@ -137,7 +137,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         usage.AuthoredValue.Should().Be(10m);
         await using var dbContext = CreateDbContext();
         (await dbContext.SubAssemblyLines.SingleAsync(Cancellation)).IngredientId.Should().Be(sugarId);
-        (await dbContext.SubAssemblies.SingleAsync(Cancellation)).TotalCost.Should().Be(9m, "the sub-assembly the new section made is rolled back");
+        (await dbContext.SubAssemblies.SingleAsync(Cancellation)).Id.Should().Be(custardId, "the sub-assembly the new section made is rolled back");
         (await CreatePackagingLineRepository().GetForProductAsync(productId, Cancellation)).Should().BeEmpty();
         (await CreateCostingParametersRepository().GetForProductAsync(productId, Cancellation)).Should().BeNull();
     }
@@ -181,8 +181,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         {
             var linked = (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Should().ContainSingle().Subject;
             linked.SubAssemblyId.Should().Be(doughId);
-            linked.SubAssembly!.TotalWeight.Should().Be(1100m);
-            linked.SubAssembly.TotalCost.Should().Be(90m); // 1000*0.05 + 100*0.4
+            (await SubAssemblyTotalsAsync(linked.SubAssemblyId)).Should().Be((1100m, 90m)); // 1000*0.05 + 100*0.4
         }
     }
 }

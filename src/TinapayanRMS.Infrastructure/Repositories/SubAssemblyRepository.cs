@@ -38,7 +38,10 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
     public Task<IReadOnlyList<SubAssembly>> GetLinkableAsync(CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync<IReadOnlyList<SubAssembly>>(
             dbContext => SubAssemblyReads.GetWithRoleAsync(
-                dbContext, "WHERE s.total_weight > 0 AND NOT r.is_packaging\nORDER BY s.name", null, cancellationToken),
+                dbContext,
+                "WHERE EXISTS (SELECT 1 FROM sub_assembly_lines l WHERE l.sub_assembly_id = s.id) AND NOT r.is_packaging\nORDER BY s.name",
+                null,
+                cancellationToken),
             cancellationToken);
 
     public Task<IReadOnlyList<SubAssembly>> GetStandaloneAsync(CancellationToken cancellationToken) =>

@@ -90,9 +90,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         await SaveRecipeAsync(linkerId, new RecipeDraft([], [Linked(doughId, 30m, (ubeId, 20m))]));
 
         await using var dbContext = CreateDbContext();
-        var dough = await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == doughId, Cancellation);
-        dough.TotalWeight.Should().Be(1000m, "an add-in is the linking product's own, not the dough's");
-        dough.TotalCost.Should().Be(50m);
+        (await SubAssemblyTotalsAsync(doughId)).Should().Be((1000m, 50m), "an add-in is the linking product's own, not the dough's");
         (await dbContext.SubAssemblyLines.CountAsync(l => l.SubAssemblyId == doughId, Cancellation)).Should().Be(1);
     }
 

@@ -43,10 +43,4 @@ public sealed class SubAssembly
     /// the Sub-Assemblies screen, whose label in a recipe comes from its name (SubAssemblyRules.SectionLabel).
     /// </summary>
     public string? SectionName { get; set; }
-
-    /// <summary>Stored, not computed: the sum of its lines' Grams. Refreshed whenever its lines are saved.</summary>
-    public decimal TotalWeight { get; set; }
-
-    /// <summary>Stored, not computed: the sum of (line Grams × that line's Ingredient.BufferedCostPerBaseUnit, its buffered cost per gram). Refreshed whenever its lines are saved.</summary>
-    public decimal TotalCost { get; set; }
 }

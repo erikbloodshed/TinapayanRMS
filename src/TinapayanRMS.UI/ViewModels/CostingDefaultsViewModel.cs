@@ -102,9 +102,8 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
 
     /// <summary>
-    /// Recalculate Costs (2026-10-03): every made and linked ingredient's costs and every sub-assembly's totals worked out
-    /// again from what they're made of (ICostRecalculator), for after the database was changed outside the app. Says how
-    /// many were out of date.
+    /// Recalculate Costs (2026-10-03): every made and linked ingredient's costs worked out again from what they're made of
+    /// (ICostRecalculator), for after the database was changed outside the app. Says how many were out of date.
     /// </summary>
     public ReactiveCommand<RxVoid, RxVoid> RecalculateCostsCommand { get; }
 
@@ -172,28 +171,13 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
         }));
     }
 
-    /// <summary>"Costs recalculated: 1 made or linked ingredient and 2 sub-assemblies were out of date, and are right now."</summary>
-    public static string RecalculatedText(CostRecalculation result)
+    /// <summary>"Costs recalculated: 2 made or linked ingredients were out of date, and are right now."</summary>
+    public static string RecalculatedText(CostRecalculation result) => result.IngredientsCorrected switch
     {
-        if (!result.CorrectedAny)
-        {
-            return "Costs recalculated: every one was already up to date.";
-        }
-
-        List<string> parts = [];
-        if (result.IngredientsCorrected > 0)
-        {
-            parts.Add(result.IngredientsCorrected == 1 ? "1 made or linked ingredient" : $"{result.IngredientsCorrected} made or linked ingredients");
-        }
-
-        if (result.SubAssembliesCorrected > 0)
-        {
-            parts.Add(result.SubAssembliesCorrected == 1 ? "1 sub-assembly" : $"{result.SubAssembliesCorrected} sub-assemblies");
-        }
-
-        var verb = result.IngredientsCorrected + result.SubAssembliesCorrected == 1 ? "was" : "were";
-        return $"Costs recalculated: {string.Join(" and ", parts)} {verb} out of date, and {(verb == "was" ? "is" : "are")} right now.";
-    }
+        0 => "Costs recalculated: every one was already up to date.",
+        1 => "Costs recalculated: 1 made or linked ingredient was out of date, and is right now.",
+        var count => $"Costs recalculated: {count} made or linked ingredients were out of date, and are right now.",
+    };
 }
 
 /// <summary>A choice of Settings' Price Rounding: the step, and how it reads, "Up to the next 0.25".</summary>

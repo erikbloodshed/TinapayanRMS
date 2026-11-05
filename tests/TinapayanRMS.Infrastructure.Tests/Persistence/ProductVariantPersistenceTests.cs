@@ -123,7 +123,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
 
         var usage = (await CreateUsageRepository().GetForProductAsync(variantId, Cancellation)).Should().ContainSingle().Subject;
         usage.SubAssemblyId.Should().Be(fillingId);
-        usage.SubAssembly!.TotalWeight.Should().Be(1500m, "the variant reads the source's filling as it is now");
+        (await SubAssemblyTotalsAsync(usage.SubAssemblyId)).TotalWeight.Should().Be(1500m, "the variant reads the source's filling as it is now");
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         var usage = (await CreateUsageRepository().GetForProductAsync(variantId, Cancellation)).Should().ContainSingle().Subject;
         usage.SubAssemblyId.Should().Be(fillingId);
         usage.AuthoredValue.Should().Be(30m);
-        usage.SubAssembly!.TotalWeight.Should().Be(1200m);
+        (await SubAssemblyTotalsAsync(usage.SubAssemblyId)).TotalWeight.Should().Be(1200m);
     }
 
     [Fact]

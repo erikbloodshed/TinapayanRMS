@@ -46,12 +46,12 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         {
             var saved = await dbContext.SubAssemblies.SingleAsync(Cancellation);
             saved.Name.Should().Be("Chocolate Glaze");
-            saved.TotalCost.Should().Be(18m);
+            (await SubAssemblyTotalsAsync(saved.Id)).TotalCost.Should().Be(18m);
         }
 
         var row = viewModel.Rows.Should().ContainSingle().Subject;
         viewModel.SelectedRow.Should().BeSameAs(row);
-        row.TotalWeight.Should().Be(200m);
+        viewModel.BatchWeight.Should().Be(200m);
         viewModel.HeaderTitle.Should().Be("Chocolate Glaze");
         viewModel.Lines.Should().ContainSingle().Which.Grams.Should().Be(200m);
     }

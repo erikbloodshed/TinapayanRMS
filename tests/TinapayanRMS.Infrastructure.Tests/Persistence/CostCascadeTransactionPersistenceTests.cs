@@ -118,22 +118,20 @@ public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : P
         {
             await dbContext.RawMaterials.Where(m => m.Id == syrupId)
                 .ExecuteUpdateAsync(set => set.SetProperty(m => m.CostPerBaseUnit, 9m).SetProperty(m => m.BufferedCostPerBaseUnit, 9m), Cancellation);
-            await dbContext.SubAssemblies.Where(s => s.Id == doughId)
-                .ExecuteUpdateAsync(set => set.SetProperty(s => s.TotalCost, 1m), Cancellation);
         }
 
         var result = await new CostRecalculator(CreateDbContextFactory()).RecalculateAllAsync(Cancellation);
 
-        result.Should().Be(new CostRecalculation(IngredientsCorrected: 1, SubAssembliesCorrected: 1));
+        result.Should().Be(new CostRecalculation(IngredientsCorrected: 1));
         await using var check = CreateDbContext();
         var syrup = await check.RawMaterials.AsNoTracking().SingleAsync(m => m.Id == syrupId, Cancellation);
         syrup.CostPerBaseUnit.Should().Be(0.05m, "₱50 of flour over the 1,000 g it makes");
         syrup.BufferedCostPerBaseUnit.Should().Be(0.05m);
-        (await check.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == doughId, Cancellation)).TotalCost.Should().Be(50m);
+        (await SubAssemblyTotalsAsync(doughId)).TotalCost.Should().Be(50m, "the dough is costed from its lines, at the syrup's cost put right");
 
         var again = await new CostRecalculator(CreateDbContextFactory()).RecalculateAllAsync(Cancellation);
 
-        again.Should().Be(new CostRecalculation(0, 0), "nothing's out of date any more");
+        again.Should().Be(new CostRecalculation(0), "nothing's out of date any more");
         (await check.RawMaterials.AsNoTracking().SingleAsync(m => m.Id == syrupId, Cancellation)).CostUpdatedAt
             .Should().Be(syrup.CostUpdatedAt, "a cost recalculated to what it already was hasn't changed");
     }

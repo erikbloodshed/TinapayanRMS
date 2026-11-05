@@ -21,10 +21,6 @@ public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyL
 
     public string RoleName => SubAssembly.Role?.Name ?? string.Empty;
 
-    public decimal TotalWeight => SubAssembly.TotalWeight;
-
-    public decimal TotalCost => SubAssembly.TotalCost;
-
     /// <summary>The products linking it, e.g. "Cream Loaf, Cream Loaf Mini", or empty when none do.</summary>
     public string UsedByText { get; } = string.Join(", ", usedBy.Select(p => p.Name));
 

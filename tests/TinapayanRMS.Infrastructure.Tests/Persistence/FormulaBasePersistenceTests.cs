@@ -89,10 +89,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
             []));
 
         var doughId = await SubAssemblyIdAsync(productId, roleId);
-        await using var dbContext = CreateDbContext();
-        var dough = await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == doughId, Cancellation);
-        dough.TotalWeight.Should().Be(1000m, "a tick is a reading of the batch, not a change to it");
-        dough.TotalCost.Should().Be(50m);
+        (await SubAssemblyTotalsAsync(doughId)).Should().Be((1000m, 50m), "a tick is a reading of the batch, not a change to it");
     }
 
     [Fact]

@@ -72,7 +72,7 @@ The [user manual](user-manual.md) describes every screen. Read its [Key ideas](u
 | Price history | `RawMaterialPriceHistory` | A log of the prices a material was costed at. Deleting an entry reprices nothing. |
 | Bill of materials (BOM) | `IngredientBomLine` | A made ingredient's components, in grams: the lines of the sub-assembly it's made from (`RawMaterial.SubAssemblyId`), then its own add-ins (`IngredientAddInLine`). A read model, never stored (`Infrastructure/Queries/IngredientBoms`). BOMs nest to any depth. `WeightLossPercent` shrinks the output. |
 | Cost buffer, buffered cost | `CostBufferPercent`, `BufferedCostPerBaseUnit` | A cushion on top of the true cost (`CostPerBaseUnit`). Everything downstream is costed at the buffered cost. |
-| Sub-assembly | `SubAssembly` | A recipe of ingredient lines (`SubAssemblyLine`), or a packaging set of packaging lines (`SubAssemblyPackagingLine`). It stores its `TotalWeight` and `TotalCost`. |
+| Sub-assembly | `SubAssembly` | A recipe of ingredient lines (`SubAssemblyLine`), or a packaging set of packaging lines (`SubAssemblyPackagingLine`). Its batch weight and cost are worked out from its lines whenever it's read. |
 | Role | `SubAssemblyRole` | What a sub-assembly is in a recipe (Dough, Filling, …). Roles set the order of a product's recipe tabs. `IsPackaging` marks the role packaging sets go in. `IsProductOwned` makes a section made in a product that product's own. |
 | Standalone or own | `SubAssembly.OwnerProductId` | A standalone sub-assembly (null owner) lives on the Sub-Assemblies screen, and products link it. An own sub-assembly belongs to one product and is edited in that product's recipe. |
 | Usage | `ProductSubAssemblyUsage` | One sub-assembly in a product's recipe, with the product's own piece size. The piece size is either a weight per piece or a yield: one is typed and the other is worked out from the batch's total weight. |
@@ -277,7 +277,7 @@ A file can hold a few small, closely related types, such as a tree's rows in `Pr
 
 1. The entities [RawMaterial](../src/TinapayanRMS.Domain/Entities/RawMaterial.cs), [SubAssembly](../src/TinapayanRMS.Domain/Entities/SubAssembly.cs) and [Product](../src/TinapayanRMS.Domain/Entities/Product.cs). Their XML comments explain the domain.
 2. [CostingRules](../src/TinapayanRMS.ApplicationCore/Rules/CostingRules.cs), [ProductRules](../src/TinapayanRMS.ApplicationCore/Rules/ProductRules.cs) and [IngredientCostGraph](../src/TinapayanRMS.ApplicationCore/Rules/IngredientCostGraph.cs).
-3. [IngredientCostPropagator](../src/TinapayanRMS.Infrastructure/Services/IngredientCostPropagator.cs) and [SubAssemblyCostPropagator](../src/TinapayanRMS.Infrastructure/Services/SubAssemblyCostPropagator.cs).
+3. [IngredientCostPropagator](../src/TinapayanRMS.Infrastructure/Services/IngredientCostPropagator.cs).
 4. [ProductCategoryRepository](../src/TinapayanRMS.Infrastructure/Repositories/ProductCategoryRepository.cs), the simplest repository; then `SaveAsync` in [RawMaterialRepository](../src/TinapayanRMS.Infrastructure/Repositories/RawMaterialRepository.cs).
 5. [App.xaml.cs](../src/TinapayanRMS.UI/App.xaml.cs), [CompositionRoot.cs](../src/TinapayanRMS.UI/CompositionRoot.cs) and [MainWindow.xaml.cs](../src/TinapayanRMS.UI/Views/MainWindow.xaml.cs).
 6. [ViewModelBase](../src/TinapayanRMS.UI/ViewModels/ViewModelBase.cs), then the smallest complete screen: [CategoriesViewModel](../src/TinapayanRMS.UI/ViewModels/CategoriesViewModel.cs) with [CategoriesView.xaml](../src/TinapayanRMS.UI/Views/CategoriesView.xaml).
@@ -312,7 +312,7 @@ Then move on to the large screens. `ProductsViewModel.cs` is about 4,890 lines a
 ┌───────────────┴──────────── TinapayanRMS.Infrastructure ──────────────────┐
 │  TinapayanRMSDbContext, Configurations, Migrations     EF Core: writes    │
 │  Queries                                               Dapper: reads      │
-│  Repositories; Services (cost propagators, ProductCloner, view state)     │
+│  Repositories; Services (cost propagator, ProductCloner, view state)      │
 └───────────────────────────────────────────────────────────────────────────┘
                 every layer uses
 ┌──────────────────────────── TinapayanRMS.Domain ──────────────────────────┐
@@ -390,7 +390,7 @@ Take a user who types a new price for cake flour on Raw Materials and presses **
 
 1. **The ViewModel.** `RawMaterialsViewModel.SaveCommand` runs inside `RunSafelyAsync`. It runs the FluentValidation validators for what it's about to save, and stops with an `ErrorMessage` if one fails.
 2. **The repository, in one transaction.** `IRawMaterialRepository.SaveAsync(material, units, brandPrices, addIns)` opens one context and one transaction. It saves the material through `RawMaterialRules`' checks, replaces the units and brand prices, and reprices the material at its dearest brand, logging one price history entry if the cost moved. It replaces a made ingredient's add-ins if they were sent, then checks the made ingredient as a whole (`EnsureMadeIngredientFitsAsync`: a sub-assembly it can be made from, add-ins its recipe lacks, no loop).
-3. **The cascade, in the same transaction.** `IngredientCostPropagator` recomputes every made or linked ingredient that depends on the flour, in dependency order. It then hands the changed ids to `SubAssemblyCostPropagator`, which recomputes the `TotalWeight` and `TotalCost` of every sub-assembly that uses any of them. Then the transaction commits. A rule that throws anywhere, or a cascade that fails part-way, rolls all of it back.
+3. **The cascade, in the same transaction.** `IngredientCostPropagator` recomputes every made or linked ingredient that depends on the flour, in dependency order. Nothing above the ingredients stores a cost: every sub-assembly and product using them is costed from its lines when it's next read. Then the transaction commits. A rule that throws anywhere, or a cascade that fails part-way, rolls all of it back.
 4. **The DbContext** stamps `CostUpdatedAt` on every material whose stored cost changed.
 5. **Back in the ViewModel**, `LoadCommand` merges the fresh data into the screen, and a success toast says "Cake Flour was saved."
 6. **The Products screen** stores no costs. The next time its tab shows, its `LoadCommand` reads the new sub-assembly costs, and `ProductRules` and `CostingRules` work out the new selling price on read.
@@ -400,7 +400,7 @@ Take a user who types a new price for cake flour on Raw Materials and presses **
 | Decision | Why | Read more in PLAN.md |
 |---|---|---|
 | A DbContext factory, and one short-lived context per operation | ViewModels are singletons, and screens load at the same time | [Application Architecture](../PLAN.md#application-architecture) |
-| Reads through Dapper, writes through EF Core | Plain SQL reads are fast and explicit. Every write still goes through EF Core, so the cost propagators run and a duplicate name surfaces as `DbUpdateException`. | [Conventions](../PLAN.md#conventions) |
+| Reads through Dapper, writes through EF Core | Plain SQL reads are fast and explicit. Every write still goes through EF Core, so the cost propagator runs and a duplicate name surfaces as `DbUpdateException`. | [Conventions](../PLAN.md#conventions) |
 | Material and sub-assembly costs stored and propagated; product costs computed on read | BOMs nest to any depth, so their costs are worth keeping current. A product's figures are quick to work out from those stored costs, and working them out on every read is simpler than keeping them in step. | [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade) |
 | A pure ordering function plus a database orchestrator, instead of DynamicData joins | Simpler, testable without a database, and the database stays the single source of truth | [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade) |
 | Cost-plus pricing, in three separate steps | The shop owner can check each step by hand | Application Architecture, "Cost-plus pricing" |
@@ -479,7 +479,7 @@ PER PRODUCT
 | `IngredientAddInLine` | One of a made ingredient's own add-ins, in grams | Ingredients only, each once, none its sub-assembly already has (`IngredientBomRules.EnsureValidAddIns`). Cascades with the made ingredient. |
 | `IngredientBomLine` (read model) | One component of a made ingredient, in grams: its sub-assembly's lines, then its add-ins | A made ingredient can't be made from a packaging set or a product's own (`SubAssemblyRules.EnsureLinkableByMadeIngredient`), and its BOM can't contain it, directly or through others (`IngredientBomRules.EnsureNotInOwnRecipe`, `EnsureNoCycle`). |
 | `SubAssemblyRole` | Dough, Filling, Topping, Packaging, … | The starting roles are seeded by migrations, and are edited in Settings. The Packaging role (`IsPackaging`) can't be deleted, and nothing clears its flag. |
-| `SubAssembly` | A recipe, or a packaging set | Names are unique. A null `OwnerProductId` means standalone. A product's own keeps its label in that product's recipe in `SectionName`, and its name is made from that, the product's name and the role's. It stores `TotalWeight` and `TotalCost`, and can't be deleted while a product links it. |
+| `SubAssembly` | A recipe, or a packaging set | Names are unique. A null `OwnerProductId` means standalone. A product's own keeps its label in that product's recipe in `SectionName`, and its name is made from that, the product's name and the role's. Its batch weight and cost are worked out from its lines on read. It can't be deleted while a product links it. |
 | `SubAssemblyLine` | An ingredient in a recipe, in grams | Grams are always stored. `AuthoredBakersPercent` records a percentage the user typed instead. |
 | `SubAssemblyPackagingLine` | A packaging material in a packaging set | Costed on read. |
 | `Product` | A sellable product | Names are unique, deleted products' included. `IsComposite` is fixed once saved. `QuantityRequired` is at least 1, and exactly 1 for a composite. Deleting one only stamps `DeletedAt` (a soft delete): see [Deleted products](#deleted-products). |
@@ -553,7 +553,7 @@ Before you change any cost path, read the user manual's [How costs are worked ou
 |---|---|---|
 | A material's `CostPerBaseUnit` and `BufferedCostPerBaseUnit` | Stored | The Raw Materials Save and the brand-price repository (purchased); `IngredientCostPropagator` (made and linked) |
 | A material's `CostUpdatedAt` | Stored | `TinapayanRMSDbContext.SaveChangesAsync`, from what actually changed |
-| A sub-assembly's `TotalWeight` and `TotalCost` | Stored | `SubAssemblyLineRepository.SetLinesAsync` when its lines are saved; `SubAssemblyCostPropagator` when an ingredient's cost changes |
+| A sub-assembly's batch weight and cost | Computed on read | `SubAssemblyRules.CalculateTotals`, from its lines |
 | A usage's worked-out piece size and cost per piece | Computed on read | `ProductRules` |
 | Packaging line and packaging set costs | Computed on read | `ProductRules` |
 | A product's material cost, wastage, base cost, selling price and markup | Computed on read | `ProductRules`, `CostingRules` |
@@ -574,24 +574,20 @@ IngredientCostPropagator
   recomputes every made or linked ingredient that depends on it,
   components first (IngredientCostGraph.GetDependentsInOrder)
   │
-  ▼
-SubAssemblyCostPropagator
-  recomputes TotalWeight and TotalCost of every sub-assembly that uses a changed ingredient
-  │
   ▼  nothing more is stored
-products, packaging, composites, Reports and Print
-  work their figures out on read (ProductRules, CostingRules, SavedProductReader)
+sub-assemblies, products, packaging, composites, Reports and Print
+  work their figures out on read (SubAssemblyRules, ProductRules, CostingRules, SavedProductReader)
 
 A packaging material's saved price ──► its stored cost, which every packaging line and set reads (no propagation needed)
 ```
 
-The repositories call the propagators; the UI never does. The callers are `RawMaterialRepository` (add, update and Save), `RawMaterialBrandPriceRepository`, `RawMaterialUnitRepository` (a corrected multiplier) and `SubAssemblyLineRepository.SetLinesAsync` (for each made ingredient made from the sub-assembly, after a loop check). Each call comes after the write has been saved and before its transaction commits. The propagators are static classes that run on the caller's context, so a save and the cascade it causes commit together or not at all. Each loads what it needs once, recomputes in memory, and saves once. A recomputed cost is stored at its column's scale (see [Precision and rounding](#precision-and-rounding)), so one worked out again from unchanged inputs equals what's stored, and isn't written or dated again.
+The repositories call the propagator; the UI never does. The callers are `RawMaterialRepository` (add, update and Save), `RawMaterialBrandPriceRepository`, `RawMaterialUnitRepository` (a corrected multiplier) and `SubAssemblyLineRepository.SetLinesAsync` (for each made ingredient made from the sub-assembly, after a loop check). Each call comes after the write has been saved and before its transaction commits, with every ingredient the save changed at once. The propagator is a static class that runs on the caller's context, so a save and the cascade it causes commit together or not at all. It loads the ingredient graph once, recomputes in memory, and saves once. A recomputed cost is stored at its column's scale (see [Precision and rounding](#precision-and-rounding)), so one worked out again from unchanged inputs equals what's stored, and isn't written or dated again.
 
-`IngredientCostGraph` is pure and lives in ApplicationCore. It finds the dependents with a reverse breadth-first search, then orders them with a depth-first topological sort. A linked ingredient's link is just one more edge in the same graph. `IngredientCostPropagator`, in Infrastructure, loads every ingredient and BOM line, asks the graph for the order, and recomputes each ingredient from its components' costs, which are already fresh by then. Sub-assemblies don't nest, so they need no ordering.
+`IngredientCostGraph` is pure and lives in ApplicationCore. It finds the dependents with a reverse breadth-first search, then orders them with a depth-first topological sort. A linked ingredient's link is just one more edge in the same graph. `IngredientCostPropagator`, in Infrastructure, loads every ingredient and BOM line, asks the graph for the order, and recomputes each ingredient from its components' costs, which are already fresh by then. Sub-assemblies store no cost, so the cascade stops at the ingredients.
 
 The cascade doesn't push changes live to other screens. A screen picks up new costs the next time it's shown, through its `LoadCommand`.
 
-**Recalculate Costs**, on Settings' Costing Defaults tab, is the safety net for a change made outside the app, such as by a script. [CostRecalculator](../src/TinapayanRMS.Infrastructure/Services/CostRecalculator.cs) runs the propagators' own code over every made and linked ingredient, in dependency order (`IngredientCostGraph.InDependencyOrder`), and then every sub-assembly, in one transaction, and returns how many were wrong. Purchased materials aren't touched: their cost comes straight from their saved prices.
+**Recalculate Costs**, on Settings' Costing Defaults tab, is the safety net for a change made outside the app, such as by a script. [CostRecalculator](../src/TinapayanRMS.Infrastructure/Services/CostRecalculator.cs) runs the propagator's own code over every made and linked ingredient, in dependency order (`IngredientCostGraph.InDependencyOrder`), in one transaction, and returns how many were wrong. Purchased materials aren't touched: their cost comes straight from their saved prices.
 
 ### Formulas and where they live
 
@@ -602,8 +598,8 @@ The cascade doesn't push changes live to other screens. A screen picks up new co
 | Made: output grams | Σ line grams × (1 − weight loss %) | `IngredientBomRules.CalculateOutputGrams` |
 | Made: cost per gram | Σ (line grams × component cost per gram) ÷ output grams. The buffered cost rolls up the components' buffered costs, and adds no buffer of its own. | `IngredientBomRules.CalculateCost` |
 | Linked: cost per gram | The linked-to ingredient's cost × cost share % ÷ weight share %, for both costs | `RawMaterialRules.LinkedCost` |
-| Sub-assembly totals | Σ grams; Σ (grams × the ingredient's buffered cost per gram) | `SubAssemblyRules.CalculateTotals` |
-| A usage's batch | The sub-assembly's totals plus its add-ins | `ProductRules.CalculateEffectiveBatch` |
+| Sub-assembly batch | Σ grams; Σ (grams × the ingredient's buffered cost per gram, or its true cost for the Unbuffered view) | `SubAssemblyRules.CalculateTotals` |
+| A usage's batch | The sub-assembly's batch plus its add-ins | `ProductRules.CalculateEffectiveBatch` |
 | Piece size | Yield = batch weight ÷ weight per piece, or weight per piece = batch weight ÷ yield, depending on which was typed | `ProductRules.ResolvePieceSize` |
 | Usage cost per piece | Batch cost × weight per piece ÷ batch weight | `ProductRules.CalculateUsageCostPerPiece` |
 | Packaging line cost | Cost per base unit × the quantity in base units | `ProductRules.CalculatePackagingLineCost` |
@@ -623,7 +619,7 @@ A made or linked ingredient's costs are worked out by **`IngredientCostRules.Rec
 - Every cost is a `decimal` at full precision through the whole cascade. Round only for display, and for the final selling price.
 - `TinapayanRMSDbContext.ConfigureConventions` makes every `decimal` column `numeric(18,4)`, so a new column can't fall back to Npgsql's unconstrained `numeric`, which would keep whatever scale a division left. The two costs per base unit are `numeric(28,20)`, so a buffered cost typed per bag comes back exactly as typed after it's divided down to the gram.
 - A value that goes through a `numeric(18,4)` column comes back rounded to 4 places: 1/6 becomes 0.1667. A test that reads a value back from the database asserts the rounded value.
-- A stored figure worked out in memory is set at its column's scale, after it's worked out at full precision: a cost per base unit through `RawMaterialRules.StoredCost` (20 places), a sub-assembly's totals through `TinapayanRMSDbContext.Stored` (4), each rounded half away from zero as PostgreSQL rounds a `numeric`. At full precision, a cost that doesn't come out even (170 ÷ 240) never equals the stored one, so a Save that changed nothing would read it as changed, log a price again and move the cost's date.
+- A stored figure worked out in memory is set at its column's scale, after it's worked out at full precision: a cost per base unit through `RawMaterialRules.StoredCost` (20 places), rounded half away from zero as PostgreSQL rounds a `numeric`. At full precision, a cost that doesn't come out even (170 ÷ 240) never equals the stored one, so a Save that changed nothing would read it as changed, log a price again and move the cost's date.
 - On screen: 2 decimals for the Products screen's per-piece costing figures and for prices, and 4 for a cost per base unit and for a recipe tab's cost per piece. Grid quantities show 1 decimal and accept up to 4. No amount shows a currency symbol.
 - **A `double` never becomes a `decimal` by a plain conversion.** Since .NET 11 a cast, `Convert.ToDecimal` or `new decimal(double)` keeps the double's exact binary value, so 28.35 becomes 28.349999999999997868371792719, where .NET 10 rounded it to 15 digits. The number boxes and grid editors hold a `double`, so every typed figure crosses over: a two-way box binding takes `DecimalValueConverter`, and a grid's `NumericColumn` parses its edit as a decimal (`ParsingMode` `Decimal`). Both go through the number's text, so 28.35 typed is 28.35. Anywhere else, write the value as a `decimal` from the start, or go through its text the same way (`DecimalValueConverter.ToDecimal`).
 
@@ -669,7 +665,7 @@ The rules for reads:
 - **A recursive query over links people make stops at a loop.** The app refuses a loop of made and linked ingredients, composites or packaging links, but one made outside it (a hand edit, say) would run until the command timed out. Put `CYCLE <column> SET is_cycle USING path` after the recursive CTE, as [RawMaterialRepository](../src/TinapayanRMS.Infrastructure/Repositories/RawMaterialRepository.cs)'s `UsedBySql` does, and test it with a loop put in past the repository, as `RawMaterialUsedByPersistenceTests` does. `UNION` in place of `UNION ALL` ends a loop too, but PostgreSQL sizes its hash table from the planner's row estimate, which made Used By about 20 ms slower.
 - Dapper maps a `date` column to `DateOnly`, and an enum stored as a string back to the enum, on its own.
 
-Never write through Dapper. A Dapper write would skip the cost propagators and the `CostUpdatedAt` stamp, leaving stored costs stale.
+Never write through Dapper. A Dapper write would skip the cost propagator and the `CostUpdatedAt` stamp, leaving stored costs stale.
 
 ### Writing safely
 
@@ -710,8 +706,8 @@ await using (var transaction = await dbContext.Database.BeginOrJoinTransactionAs
 
 `Infrastructure/Services` holds the work that spans entities:
 
-- **`IngredientCostPropagator` and `SubAssemblyCostPropagator`**: the cascade. They're internal static classes that run on a repository's context, inside its transaction, and aren't exposed through ApplicationCore interfaces.
-- **`CostRecalculator`** (`ICostRecalculator`): Settings' Recalculate Costs, the propagators' code run over every made and linked ingredient and every sub-assembly, in one transaction.
+- **`IngredientCostPropagator`**: the cascade. It's an internal static class that runs on a repository's context, inside its transaction, and isn't exposed through ApplicationCore interfaces.
+- **`CostRecalculator`** (`ICostRecalculator`): Settings' Recalculate Costs, the propagator's code run over every made and linked ingredient, in one transaction.
 - **`IngredientDependencies`**: loads the ingredient dependency graph, made of BOM edges (`IngredientBoms`: sub-assembly lines and add-ins) and link edges, for the cycle checks, and `EnsureNoCycleAsync` checks one made ingredient against it.
 - **`ProductCloner`** (`IProductCloner`): Clone and Create Variant. A clone links the sub-assemblies the source links, copies the source's own ones and copies the packaging. A variant links every sub-assembly the source uses, the ones it links and its own alike, and has no packaging. It's the only way a product links another product's own sub-assembly. `SetRecipeAsync` takes `linksOthersOwn` for it, and otherwise refuses such a link (`SubAssemblyRules.EnsureLinkable`) unless the product already has it. While a variant links one, the source can't drop it from its recipe or be deleted. On the Products screen, `ProductUsageEdit.LinkedOwner` names the source, and the linked badge (`OpenLinkedSourceCommand`) opens it.
 - **`JsonViewStateStore`** (`IViewStateStore`): the view-state file. A missing or broken file reads as empty, and a failed write is dropped.
@@ -1306,7 +1302,7 @@ Respawn picks up the new table by itself.
 
 1. Read PLAN.md's [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade), and the Domain Model bullets for the entities involved.
 2. Change or add the formula in its Rules class, with unit tests.
-3. If the figure is stored, make sure every write path that can change one of its inputs recomputes it, and that the propagators do too. If it's computed on read, the Rules change is enough: `SavedProductReader` and the screens share it.
+3. If the figure is stored, make sure every write path that can change one of its inputs recomputes it, and that the propagator does too. If it's computed on read, the Rules change is enough: `SavedProductReader` and the screens share it.
 4. Extend `ReactiveCostCascadeTests` with the end-to-end case.
 5. Update the user manual's [How costs are worked out](user-manual.md#12-how-costs-are-worked-out), including its worked example, in the same change.
 6. Record the decision in PLAN.md.

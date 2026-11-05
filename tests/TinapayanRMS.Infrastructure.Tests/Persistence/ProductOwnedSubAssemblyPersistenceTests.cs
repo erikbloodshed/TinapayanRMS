@@ -89,8 +89,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         await SaveRecipeAsync(productId, new RecipeDraft([Own(fillingRoleId, [(cheeseId, 100m), (milkId, 50m)], id: fillingId, weightPerPiece: 15m)], []));
 
         var filling = (await FindAsync(fillingId))!;
-        filling.TotalWeight.Should().Be(150m);
-        filling.TotalCost.Should().Be(45m);
+        (await SubAssemblyTotalsAsync(fillingId)).Should().Be((150m, 45m));
         filling.OwnerProductId.Should().Be(productId);
         (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Single().AuthoredValue.Should().Be(15m);
 
@@ -196,7 +195,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         var moved = (await FindAsync(fillingId))!;
         moved.OwnerProductId.Should().BeNull("it's on the Sub-Assemblies screen now, even in a product-owned role");
         moved.Name.Should().Be("Cheese Roll Filling: Cheese");
-        moved.TotalWeight.Should().Be(150m);
+        (await SubAssemblyTotalsAsync(fillingId)).TotalWeight.Should().Be(150m);
         (await CreateSubAssemblyRepository().GetStandaloneAsync(Cancellation)).Select(s => s.Id).Should().Equal(fillingId);
         var usage = (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Single();
         usage.SubAssemblyId.Should().Be(fillingId);
@@ -430,8 +429,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         var adopted = (await FindAsync(rollFillingId))!;
         adopted.OwnerProductId.Should().Be(rollId);
         adopted.Name.Should().Be("Cheese Roll Filling", "its name is kept");
-        adopted.TotalWeight.Should().Be(120m, "the corn added on top of it is in its lines now");
-        adopted.TotalCost.Should().Be(42m);
+        (await SubAssemblyTotalsAsync(rollFillingId)).Should().Be((120m, 42m), "the corn added on top of it is in its lines now");
         await using (var dbContext = CreateDbContext())
         {
             (await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == rollFillingId).OrderBy(l => l.SortOrder).Select(l => l.IngredientId).ToListAsync(Cancellation))
@@ -516,7 +514,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         filling.SubAssemblyId.Should().NotBe(sourceFillingId);
         filling.SubAssembly!.Name.Should().Be("Cheese Roll Mini Filling: Cheese");
         filling.SubAssembly.OwnerProductId.Should().Be(newId);
-        filling.SubAssembly.TotalWeight.Should().Be(100m);
+        (await SubAssemblyTotalsAsync(filling.SubAssemblyId)).TotalWeight.Should().Be(100m);
         filling.AuthoredValue.Should().Be(12m);
         (await FindAsync(sourceFillingId))!.OwnerProductId.Should().Be(sourceId, "the source's own is untouched");
     }

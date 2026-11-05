@@ -45,8 +45,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
 
         var subAssembly = await GetSubAssemblyAsync(id);
         subAssembly.Name.Should().Be("Chocolate Glaze");
-        subAssembly.TotalWeight.Should().Be(1000m);
-        subAssembly.TotalCost.Should().Be(152m); // 800*0.09 + 200*0.40
+        (await SubAssemblyTotalsAsync(id)).Should().Be((1000m, 152m)); // 800*0.09 + 200*0.40
         (await CreateRepository().GetStandaloneAsync(Cancellation)).Should().ContainSingle().Which.Role!.Name.Should().Be("Glaze");
     }
 
@@ -63,8 +62,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         var subAssembly = await GetSubAssemblyAsync(id);
         subAssembly.Name.Should().Be("Sugar Topping");
         subAssembly.RoleId.Should().Be(toppingRoleId);
-        subAssembly.TotalWeight.Should().Be(500m);
-        subAssembly.TotalCost.Should().Be(45m);
+        (await SubAssemblyTotalsAsync(id)).Should().Be((500m, 45m));
         (await new SubAssemblyLineRepository(CreateDbContextFactory()).GetForSubAssembliesAsync([id], Cancellation))
             .Should().ContainSingle().Which.Grams.Should().Be(500m);
     }
@@ -136,7 +134,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         var usage = (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Should().ContainSingle().Subject;
         usage.SubAssemblyId.Should().Be(glazeId);
         usage.AuthoredValue.Should().Be(5m);
-        usage.SubAssembly!.TotalWeight.Should().Be(200m, "a link reads the sub-assembly as it's saved now");
+        (await SubAssemblyTotalsAsync(usage.SubAssemblyId)).TotalWeight.Should().Be(200m, "a link reads the sub-assembly as it's saved now");
         (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation))[glazeId].Select(p => p.Name).Should().Equal("Cream Loaf");
     }
 
@@ -291,8 +289,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         await using var dbContext = CreateDbContext();
         (await dbContext.UsageAddInLines.AsNoTracking().Where(l => l.Usage!.ProductId == cloneId).Select(l => new { l.IngredientId, l.Grams }).ToListAsync(Cancellation))
             .Should().ContainSingle().Which.Should().Be(new { IngredientId = ubeId, Grams = 20m });
-        (await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == doughId, Cancellation))
-            .TotalWeight.Should().Be(1000m, "the dough itself is untouched");
+        (await SubAssemblyTotalsAsync(doughId)).TotalWeight.Should().Be(1000m, "the dough itself is untouched");
     }
 
     [Fact]
@@ -304,6 +301,6 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
 
         await SetPriceAndRecalculateBufferAsync(sugarId, null, 0.18m);
 
-        (await GetSubAssemblyAsync(glazeId)).TotalCost.Should().Be(180m);
+        (await SubAssemblyTotalsAsync(glazeId)).TotalCost.Should().Be(180m);
     }
 }

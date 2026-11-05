@@ -342,7 +342,7 @@ Under them, **Wastage %** is the shop's [wastage](#wastage): a percentage of eve
 
 Each product keeps its own stage and percentages, and each raw material its own cost buffer, from its first Save. Changing those defaults doesn't change anything saved. Changing the Wastage % does: it reprices every product. A new product you haven't saved yet moves to the new stage, since you didn't pick one for it. A new raw material you haven't saved moves to the new cost buffer, unless you've typed one.
 
-**Stored Costs**, to the right of the defaults, has a **Recalculate Costs** button. The app keeps every made and linked ingredient's cost, and every sub-assembly's total weight and cost, up to date as you save. You only need this button if the database was changed outside the app, for example by a script. It works all of those costs out again from what they're made of, and a green notice says how many were out of date. Purchased materials keep their prices.
+**Stored Costs**, to the right of the defaults, has a **Recalculate Costs** button. The app keeps every made and linked ingredient's cost up to date as you save. You only need this button if the database was changed outside the app, for example by a script. It works those costs out again from what they're made of, and a green notice says how many were out of date. Sub-assemblies and products need nothing: their costs are always worked out fresh from their lines. Purchased materials keep their prices.
 
 ### Keyboard
 

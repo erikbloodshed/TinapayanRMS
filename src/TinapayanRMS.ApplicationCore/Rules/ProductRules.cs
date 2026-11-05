@@ -82,9 +82,9 @@ public static class ProductRules
     /// <summary>
     /// A usage's effective batch: the sub-assembly's own, plus this product's add-ins. Add-ins go into the
     /// batch, so 1,700 g of dough with 20 g of flavouring is a 1,720 g batch and a piece takes its
-    /// weight-per-piece share of the whole thing. Pass the sub-assembly's stored TotalWeight and TotalCost,
-    /// or the same figures worked out from its lines — they're the same figures. A sub-assembly of the
-    /// product's own never has add-ins, so its effective batch is its own.
+    /// weight-per-piece share of the whole thing. Pass the sub-assembly's own batch, worked out from its lines
+    /// (SubAssemblyRules.CalculateTotals). A sub-assembly of the product's own never has add-ins, so its
+    /// effective batch is its own.
     /// </summary>
     public static (decimal TotalWeight, decimal TotalCost) CalculateEffectiveBatch(
         decimal subAssemblyTotalWeight,

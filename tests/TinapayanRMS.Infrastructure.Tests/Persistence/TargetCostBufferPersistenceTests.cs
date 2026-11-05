@@ -33,7 +33,7 @@ public class TargetCostBufferPersistenceTests(DatabaseFixture fixture) : Persist
         flour.BufferedCostPerBaseUnit.Should().Be(0.066m);
         flour.CostBufferPercent.Should().Be(10m);
         flour.CostPerBaseUnit.Should().Be(0.06m, "the true cost doesn't move");
-        (await SubAssemblyCostAsync(subAssemblyId)).Should().Be(66m, "the cascade carries the new buffered cost up");
+        (await SubAssemblyCostAsync(subAssemblyId)).Should().Be(66m, "the recipes using it are costed at the new buffered cost");
     }
 
     [Fact]
@@ -92,9 +92,5 @@ public class TargetCostBufferPersistenceTests(DatabaseFixture fixture) : Persist
         await dbContext.SaveChangesAsync(Cancellation);
     }
 
-    private async Task<decimal> SubAssemblyCostAsync(int subAssemblyId)
-    {
-        await using var dbContext = CreateDbContext();
-        return (await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == subAssemblyId, Cancellation)).TotalCost;
-    }
+    private async Task<decimal> SubAssemblyCostAsync(int subAssemblyId) => (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost;
 }

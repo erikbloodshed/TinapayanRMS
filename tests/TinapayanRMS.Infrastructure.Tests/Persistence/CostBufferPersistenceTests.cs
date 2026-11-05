@@ -52,11 +52,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         return await dbContext.RawMaterials.AsNoTracking().SingleAsync(m => m.Id == id, Cancellation);
     }
 
-    private async Task<decimal> GetSubAssemblyTotalCostAsync(int id)
-    {
-        await using var dbContext = CreateDbContext();
-        return (await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == id, Cancellation)).TotalCost;
-    }
+    private async Task<decimal> GetSubAssemblyTotalCostAsync(int id) => (await SubAssemblyTotalsAsync(id)).TotalCost;
 
     [Fact]
     public async Task A_new_price_gets_the_materials_buffer_on_top_and_keeps_the_true_cost()

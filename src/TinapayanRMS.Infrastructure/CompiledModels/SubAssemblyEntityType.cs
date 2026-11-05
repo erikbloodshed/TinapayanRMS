@@ -21,7 +21,7 @@ public partial class SubAssemblyEntityType
             "TinapayanRMS.Domain.Entities.SubAssembly",
             typeof(SubAssembly),
             baseEntityType,
-            propertyCount: 7,
+            propertyCount: 5,
             navigationCount: 2,
             foreignKeyCount: 2,
             unnamedIndexCount: 3,
@@ -74,28 +74,6 @@ public partial class SubAssemblyEntityType
             maxLength: 100);
         sectionName.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         sectionName.AddAnnotation("Relational:ColumnName", "section_name");
-
-        var totalCost = runtimeEntityType.AddProperty(
-            "TotalCost",
-            typeof(decimal),
-            propertyInfo: typeof(SubAssembly).GetProperty("TotalCost", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            fieldInfo: typeof(SubAssembly).GetField("<TotalCost>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            precision: 18,
-            scale: 4,
-            sentinel: 0m);
-        totalCost.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
-        totalCost.AddAnnotation("Relational:ColumnName", "total_cost");
-
-        var totalWeight = runtimeEntityType.AddProperty(
-            "TotalWeight",
-            typeof(decimal),
-            propertyInfo: typeof(SubAssembly).GetProperty("TotalWeight", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            fieldInfo: typeof(SubAssembly).GetField("<TotalWeight>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            precision: 18,
-            scale: 4,
-            sentinel: 0m);
-        totalWeight.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
-        totalWeight.AddAnnotation("Relational:ColumnName", "total_weight");
 
         var key = runtimeEntityType.AddKey(
             new[] { id });

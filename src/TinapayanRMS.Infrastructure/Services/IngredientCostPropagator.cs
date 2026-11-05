@@ -8,10 +8,10 @@ namespace TinapayanRMS.Infrastructure.Services;
 
 /// <summary>
 /// Keeps every made and linked ingredient's costs (CostPerBaseUnit, BufferedCostPerBaseUnit) correct after something it
-/// (directly or transitively) depends on changes cost, then hands off to SubAssemblyCostPropagator so every sub-assembly
-/// using any of the changed ingredients stays correct too (Phase 11 — the sub-assembly branch of the reactive costing
-/// cascade). An Infrastructure-internal collaborator, not exposed as an ApplicationCore interface — callers are other
-/// repositories and CostRecalculator, never the UI.
+/// (directly or transitively) depends on changes cost: the stored part of the reactive costing cascade, and all of it, since
+/// sub-assemblies and products store no cost and are costed from their lines as they're read. An Infrastructure-internal
+/// collaborator, not exposed as an ApplicationCore interface — callers are other repositories and CostRecalculator, never
+/// the UI.
 ///
 /// It runs on the caller's context, inside the caller's transaction (2026-10-03), so a save that changes a cost and the
 /// cascade it causes commit together or not at all. Until then it ran after the caller's commit, on contexts of its own:
@@ -25,9 +25,8 @@ internal static class IngredientCostPropagator
     /// before its transaction commits: a brand price, a made ingredient's sub-assembly, add-in or weight loss percent edit,
     /// its sub-assembly's lines changing (SubAssemblyLineRepository.SetLinesAsync), a link or share edit, a buffer edit, or
     /// a corrected unit multiplier. If changedIngredientId is itself Made or Linked, its own cost is recomputed first from
-    /// its current BOM (IngredientBoms: its sub-assembly's lines and its add-ins) or link; then every made or linked ingredient that transitively depends
-    /// on it is recomputed too, in dependency order; then every sub-assembly that uses any of those ingredients — or
-    /// changedIngredientId itself, whose own cost the caller already updated — is recomputed. Only ingredients take part:
+    /// its current BOM (IngredientBoms: its sub-assembly's lines and its add-ins) or link; then every made or linked
+    /// ingredient that transitively depends on it is recomputed too, in dependency order. Only ingredients take part:
     /// packaging is never in a BOM, a link or a sub-assembly.
     /// </summary>
     public static Task RecomputeAndPropagateAsync(TinapayanRMSDbContext dbContext, int changedIngredientId, CancellationToken cancellationToken) =>
@@ -58,27 +57,22 @@ internal static class IngredientCostPropagator
             affected.UnionWith(IngredientCostGraph.GetDependentsInOrder(id, graph.DependencyIdsByIngredientId));
         }
 
-        var order = affected.Count == 0 ? [] : IngredientCostGraph.InDependencyOrder(affected, graph.DependencyIdsByIngredientId);
-        if (order.Count > 0)
+        if (affected.Count == 0)
         {
-            foreach (var id in order)
-            {
-                graph.Recompute(id);
-            }
-
-            await dbContext.SaveChangesAsync(cancellationToken);
+            return;
         }
 
-        // Every ingredient whose cost just changed: the changed ones themselves (a purchased one's own cost was updated by the
-        // caller before this ran, from a new brand price) and every one recomputed above.
-        HashSet<int> allChangedIngredientIds = [.. order, .. changedIngredientIds];
-        await SubAssemblyCostPropagator.RecomputeAsync(dbContext, allChangedIngredientIds, cancellationToken);
+        foreach (var id in IngredientCostGraph.InDependencyOrder(affected, graph.DependencyIdsByIngredientId))
+        {
+            graph.Recompute(id);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>
     /// Recomputes every made and linked ingredient, in dependency order, from what it's made of or linked to as stored, and
-    /// saves on <paramref name="dbContext"/>. Returns how many had a stored cost that was wrong. The sub-assemblies are the
-    /// caller's to recompute after (CostRecalculator).
+    /// saves on <paramref name="dbContext"/>. Returns how many had a stored cost that was wrong.
     /// </summary>
     public static async Task<int> RecomputeAllAsync(TinapayanRMSDbContext dbContext, CancellationToken cancellationToken)
     {

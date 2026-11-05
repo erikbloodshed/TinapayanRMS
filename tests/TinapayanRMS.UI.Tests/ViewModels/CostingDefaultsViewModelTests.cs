@@ -123,32 +123,32 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task Recalculate_costs_puts_right_a_total_changed_outside_the_app_and_says_how_many()
+    public async Task Recalculate_costs_puts_right_a_cost_changed_outside_the_app_and_says_how_many()
     {
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
-        var roleId = await AddRoleAsync("Dough");
-        var (_, doughId) = await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 1000m)]);
+        var syrupId = await AddMadeIngredientAsync("Syrup", [(flourId, 1000m)]);
         await using (var dbContext = CreateDbContext())
         {
-            await dbContext.SubAssemblies.Where(s => s.Id == doughId).ExecuteUpdateAsync(set => set.SetProperty(s => s.TotalCost, 1m), Cancellation);
+            await dbContext.RawMaterials.Where(m => m.Id == syrupId)
+                .ExecuteUpdateAsync(set => set.SetProperty(m => m.CostPerBaseUnit, 9m).SetProperty(m => m.BufferedCostPerBaseUnit, 9m), Cancellation);
         }
 
         var viewModel = CreateViewModel();
         await viewModel.RecalculateCostsCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.SuccessMessage.Should().Be("Costs recalculated: 1 sub-assembly was out of date, and is right now.");
+        viewModel.SuccessMessage.Should().Be("Costs recalculated: 1 made or linked ingredient was out of date, and is right now.");
         await using var check = CreateDbContext();
-        (await check.SubAssemblies.SingleAsync(s => s.Id == doughId, Cancellation)).TotalCost.Should().Be(50m, "1,000 g of flour at 0.05 a gram");
+        (await check.RawMaterials.SingleAsync(m => m.Id == syrupId, Cancellation)).BufferedCostPerBaseUnit
+            .Should().Be(0.05m, "₱50 of flour over the 1,000 g it makes");
     }
 
     [Theory]
-    [InlineData(0, 0, "Costs recalculated: every one was already up to date.")]
-    [InlineData(1, 0, "Costs recalculated: 1 made or linked ingredient was out of date, and is right now.")]
-    [InlineData(0, 2, "Costs recalculated: 2 sub-assemblies were out of date, and are right now.")]
-    [InlineData(2, 3, "Costs recalculated: 2 made or linked ingredients and 3 sub-assemblies were out of date, and are right now.")]
-    public void RecalculatedText_says_how_many_were_out_of_date(int ingredients, int subAssemblies, string expected)
+    [InlineData(0, "Costs recalculated: every one was already up to date.")]
+    [InlineData(1, "Costs recalculated: 1 made or linked ingredient was out of date, and is right now.")]
+    [InlineData(2, "Costs recalculated: 2 made or linked ingredients were out of date, and are right now.")]
+    public void RecalculatedText_says_how_many_were_out_of_date(int ingredients, string expected)
     {
-        CostingDefaultsViewModel.RecalculatedText(new CostRecalculation(ingredients, subAssemblies)).Should().Be(expected);
+        CostingDefaultsViewModel.RecalculatedText(new CostRecalculation(ingredients)).Should().Be(expected);
     }
 }

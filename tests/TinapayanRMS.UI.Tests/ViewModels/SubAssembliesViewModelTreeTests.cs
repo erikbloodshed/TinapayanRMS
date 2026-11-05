@@ -189,7 +189,8 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         await using (var dbContext = CreateDbContext())
         {
             var saved = await dbContext.SubAssemblies.SingleAsync(s => s.Id == halayaId, Cancellation);
-            (saved.Name, saved.TotalWeight).Should().Be(("Ube Spread", 100m), "the rename saves the name alone");
+            saved.Name.Should().Be("Ube Spread");
+            (await SubAssemblyTotalsAsync(halayaId)).TotalWeight.Should().Be(100m, "the rename saves the name alone");
         }
 
         viewModel.EditingName.Should().Be("Ube Spread");
@@ -428,7 +429,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.SuccessMessage.Should().Be("Ube Filling was added to In-House, made from Ube Base.");
         viewModel.SelectedRow!.Id.Should().Be(baseId, "it stays on the list, and on the form");
         viewModel.Lines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal(("Ube", 300m), ("Milk", 100m));
-        viewModel.SelectedRow.TotalCost.Should().Be(70m, "₱60 of ube and ₱10 of milk, as before");
+        viewModel.BatchCost.Should().Be(70m, "₱60 of ube and ₱10 of milk, as before");
         viewModel.UsedBy.Select(p => p.Name).Should().Equal("Ube Bun");
         viewModel.MadeIngredients.Select(m => m.Name).Should().Equal("Ube Filling");
         viewModel.History.IsDirty.Should().BeFalse("the form shows it as it's saved");

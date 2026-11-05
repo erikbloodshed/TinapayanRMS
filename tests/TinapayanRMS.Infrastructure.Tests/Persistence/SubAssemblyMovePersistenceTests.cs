@@ -35,7 +35,8 @@ public class SubAssemblyMovePersistenceTests(DatabaseFixture fixture) : Persiste
         await using var dbContext = CreateDbContext();
         var moved = await dbContext.SubAssemblies.AsNoTracking().OrderBy(s => s.Name).ToListAsync(Cancellation);
         moved.Should().OnlyContain(s => s.RoleId == fillingRoleId);
-        (moved[0].Name, moved[0].TotalWeight, moved[0].TotalCost).Should().Be(("Ube Halaya", 100m, 20m), "a role costs nothing");
+        moved[0].Name.Should().Be("Ube Halaya");
+        (await SubAssemblyTotalsAsync(moved[0].Id)).Should().Be((100m, 20m), "a role costs nothing");
     }
 
     [Fact]
@@ -105,7 +106,8 @@ public class SubAssemblyMovePersistenceTests(DatabaseFixture fixture) : Persiste
         await using (var dbContext = CreateDbContext())
         {
             var renamed = await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == halayaId, Cancellation);
-            (renamed.Name, renamed.RoleId, renamed.TotalCost).Should().Be(("Ube Spread", doughRoleId, 20m));
+            (renamed.Name, renamed.RoleId).Should().Be(("Ube Spread", doughRoleId));
+            (await SubAssemblyTotalsAsync(halayaId)).TotalCost.Should().Be(20m);
         }
 
         var rename = () => CreateRepository().RenameAsync(halayaId, "ube jam", Cancellation);

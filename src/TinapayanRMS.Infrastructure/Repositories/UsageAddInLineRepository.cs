@@ -15,9 +15,9 @@ public static class UsageAddInLineRepository
     /// Lines are in grams, every one must be an ingredient, and none may be one the linked recipe already
     /// has (<see cref="ProductRules.EnsureValidAddIns"/>). Nothing is deleted until every line passes.
     /// <para>
-    /// Unlike <see cref="SubAssemblyLineRepository.SetLinesAsync"/> it computes no totals: an add-in is
-    /// this product's own, so the sub-assembly's stored TotalWeight and TotalCost must not move. A usage's
-    /// effective batch is worked out on read instead (ProductRules.CalculateEffectiveBatch).
+    /// An add-in is this product's own, never the sub-assembly's: the sub-assembly's lines stay as they are,
+    /// and a usage's effective batch, its lines and its add-ins, is worked out on read
+    /// (ProductRules.CalculateEffectiveBatch).
     /// </para>
     /// </summary>
     /// <param name="usage">The usage, tracked by <paramref name="dbContext"/> and saved already (it has its id).</param>
