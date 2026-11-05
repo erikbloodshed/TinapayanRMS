@@ -72,6 +72,14 @@ public static class CompositeProductRules
         }
     }
 
+    /// <summary>
+    /// What the Products screen says of a composite that holds itself, through the products it holds: only data changed
+    /// outside the app can make one, since Save refuses it (<see cref="EnsureNoCycle"/>), and it's read and priced all the
+    /// same, the product that closes the loop bringing nothing there (SavedProductReader).
+    /// </summary>
+    public static string HoldsItselfText(string name) =>
+        $"{name} holds itself, through the products in it, so its cost leaves out the one that comes round again. Take one of them out of another.";
+
     /// <summary>Whether <paramref name="containerId"/> holds <paramref name="targetId"/>, directly or through the composites in it.</summary>
     public static bool Contains(int containerId, int targetId, IReadOnlyDictionary<int, IReadOnlyList<int>> componentIdsByProductId)
     {

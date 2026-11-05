@@ -29,6 +29,12 @@ public sealed record ProductDetail(
 
     /// <summary>What its rounded selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep): today's; 0 for a version's.</summary>
     public decimal PriceRoundingStep { get; init; }
+
+    /// <summary>
+    /// A composite that holds itself, through the products it holds, as only data changed outside the app can leave one
+    /// (CompositeProductRules.HoldsItselfText): the product that closes the loop brings nothing at that point.
+    /// </summary>
+    public bool HoldsItself { get; init; }
 }
 
 /// <summary>
@@ -38,6 +44,9 @@ public sealed record ProductDetail(
 /// </summary>
 public sealed record ComponentCosts(decimal RecipeBuffered, decimal RecipeUnbuffered, decimal PackagingBuffered, decimal PackagingUnbuffered)
 {
+    /// <summary>What a product brings where it would close a loop of composites holding each other: nothing.</summary>
+    public static ComponentCosts None { get; } = new(0m, 0m, 0m, 0m);
+
     public decimal RecipeAt(CostBasis basis) => basis == CostBasis.Unbuffered ? RecipeUnbuffered : RecipeBuffered;
 
     public decimal PackagingAt(CostBasis basis) => basis == CostBasis.Unbuffered ? PackagingUnbuffered : PackagingBuffered;
@@ -146,15 +155,15 @@ public sealed class SavedProductReader(
         Dictionary<int, ProductDetail> details = [];
         Dictionary<int, ComponentCosts> costsByProduct = [];
 
+        // A composite holding itself, through the products it holds, can only come of data changed outside the app, since
+        // Save refuses it. It's read all the same, its loop cut where it closes, rather than refused (2026-11-05): a refusal
+        // failed the whole read, every product's, for Reports, Print, the Products list and the servers.
+        Dictionary<int, IReadOnlyList<int>> heldIds = componentsByHolder.ToDictionary(e => e.Key, e => (IReadOnlyList<int>)[.. e.Value.Select(c => c.ComponentProductId)]);
+        bool HoldsItself(int productId) =>
+            heldIds.TryGetValue(productId, out var held) && held.Any(id => id == productId || CompositeProductRules.Contains(id, productId, heldIds));
+
         ProductDetail DetailOf(int productId, ImmutableHashSet<int> holding)
         {
-            // Save refuses a composite that would hold itself, so this only guards against data changed outside the app,
-            // which would otherwise read round the loop for ever.
-            if (holding.Contains(productId))
-            {
-                throw new BusinessRuleException("A composite product holds itself, through the products in it. Take it out of one of them.");
-            }
-
             if (details.TryGetValue(productId, out var built))
             {
                 return built;
@@ -176,8 +185,11 @@ public sealed class SavedProductReader(
                 Components =
                 [
                     .. componentsByHolder.GetValueOrDefault(productId, [])
-                        .Select(c => new SavedComponent(c, CostsOf(c.ComponentProduct!, holding.Add(productId)))),
+                        .Select(c => new SavedComponent(
+                            c,
+                            ClosesLoop(c.ComponentProductId, productId, holding) ? ComponentCosts.None : CostsOf(c.ComponentProduct!, holding.Add(productId)))),
                 ],
+                HoldsItself = HoldsItself(productId),
             };
             details[productId] = detail;
             return detail;
@@ -244,11 +256,6 @@ public sealed class SavedProductReader(
 
         ProductDetail Priced(int productId, ImmutableHashSet<int> holding)
         {
-            if (holding.Contains(productId))
-            {
-                throw new BusinessRuleException("A composite product holds itself, through the products in it. Take it out of one of them.");
-            }
-
             if (priced.TryGetValue(productId, out var done))
             {
                 return done;
@@ -263,7 +270,9 @@ public sealed class SavedProductReader(
                     [
                         .. detail.Components.Select(c => c with
                         {
-                            Costs = ComponentCostsOf(c.Component.ComponentProduct!, Priced(c.Component.ComponentProductId, holding.Add(productId)), materialsById),
+                            Costs = ClosesLoop(c.Component.ComponentProductId, productId, holding)
+                                ? ComponentCosts.None
+                                : ComponentCostsOf(c.Component.ComponentProduct!, Priced(c.Component.ComponentProductId, holding.Add(productId)), materialsById),
                         }),
                     ],
                 };
@@ -280,6 +289,13 @@ public sealed class SavedProductReader(
 
         return priced;
     }
+
+    /// <summary>
+    /// Whether <paramref name="componentId"/>, held by <paramref name="productId"/>, closes a loop of composites holding each
+    /// other: it's that product itself, or one of those being put together above it (<paramref name="holding"/>).
+    /// </summary>
+    private static bool ClosesLoop(int componentId, int productId, ImmutableHashSet<int> holding) =>
+        componentId == productId || holding.Contains(componentId);
 
     /// <summary><paramref name="product"/> as it's saved, read and priced at its buffered costs.</summary>
     public Task<SavedProduct> ReadAsync(Product product, CancellationToken cancellationToken) =>

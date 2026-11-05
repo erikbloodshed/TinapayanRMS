@@ -109,6 +109,40 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
     }
 
     [Fact]
+    public async Task Composites_holding_each_other_are_read_with_the_loop_cut_and_said_of_and_the_rest_as_usual()
+    {
+        var setup = await SetUpAsync();
+        var (breadIds, _) = await AddProductsAsync(setup, "Bread", count: 2);
+        var products = new ProductRepository(CreateDbContextFactory());
+        async Task<int> AddCompositeAsync(string name) => await products.SaveAsync(
+            new Product { Name = name, IsComposite = true },
+            new RecipeDraft([], []) { Components = [(breadIds[0], 1), (breadIds[1], 1)] },
+            null,
+            null,
+            null,
+            Cancellation);
+        var (aId, bId) = (await AddCompositeAsync("Box A"), await AddCompositeAsync("Box B"));
+        await using (var dbContext = CreateDbContext())
+        {
+            // As only an edit outside the app could leave them: Save refuses a composite that would hold itself.
+            dbContext.ProductComponents.Add(new ProductComponent { ProductId = aId, ComponentProductId = bId, Quantity = 1, SortOrder = 2 });
+            dbContext.ProductComponents.Add(new ProductComponent { ProductId = bId, ComponentProductId = aId, Quantity = 1, SortOrder = 2 });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var details = await CreateReader().ReadDetailsAsync([aId, bId, breadIds[0]], Cancellation);
+
+        details[aId].Components.Select(c => (c.Component.ComponentProductId, c.RecipeCostAt(CostBasis.Buffered)))
+            .Should().Equal((breadIds[0], 2.5m), (breadIds[1], 2.5m), (bId, 5m));
+        details[bId].Components.Select(c => (c.Component.ComponentProductId, c.RecipeCostAt(CostBasis.Buffered)))
+            .Should().Equal([(breadIds[0], 2.5m), (breadIds[1], 2.5m), (aId, 0m)], "Box A, read first, is the one that comes round again");
+        (details[aId].HoldsItself, details[bId].HoldsItself, details[breadIds[0]].HoldsItself).Should().Be((true, true, false));
+
+        var all = await CreateReader().ReadAllAsync(await products.GetAllAsync(Cancellation), CostBasis.Buffered, Cancellation);
+        all.Select(p => p.Product.Name).Should().Contain(["Bread 1", "Bread 2", "Box A", "Box B"], "one loop no longer fails every product's read");
+    }
+
+    [Fact]
     public async Task A_packaging_chain_that_comes_round_again_is_refused()
     {
         var (aId, bId) = (await AddProductAsync("A"), await AddProductAsync("B"));

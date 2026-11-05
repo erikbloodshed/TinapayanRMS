@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using ReactiveUI;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
@@ -217,6 +218,34 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.ErrorMessage.Should().Be("Enter how many Cheese Roll go in, or delete its line.");
         await using var dbContext = CreateDbContext();
         (await dbContext.Products.AnyAsync(p => p.Name == "Pasalubong Box", Cancellation)).Should().BeFalse();
+    });
+
+    // A composite holding itself, through the products in it, can only come of an edit outside the app. Its read was
+    // refused, and with it every product's (the list's, Reports', the servers'). It opens now and says so, and Save still
+    // refuses the loop (2026-11-05).
+    [Fact]
+    public Task A_composite_that_holds_itself_opens_with_a_notice_and_Save_still_refuses_the_loop() => StaThread.RunAsync(async () =>
+    {
+        var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
+        var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
+        var trayId = await AddCompositeAsync("Party Tray", (boxId, 1), (ensaymadaId, 12));
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.ProductComponents.Add(new ProductComponent { ProductId = boxId, ComponentProductId = trayId, Quantity = 1, SortOrder = 2 });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var viewModel = await CreateLoadedViewModelAsync();
+        viewModel.Products.Select(p => p.Name).Should().Contain(["Pasalubong Box", "Party Tray"]);
+
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
+        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 3, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
+
+        viewModel.ErrorMessage.Should().Be(CompositeProductRules.HoldsItselfText("Pasalubong Box"));
+        viewModel.ComponentsTable.ComponentEdits[0].Quantity = 7;
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().Be(
+            "Party Tray can't go into Pasalubong Box: it already contains Pasalubong Box, so Pasalubong Box would end up containing itself.");
     });
 
     [Fact]

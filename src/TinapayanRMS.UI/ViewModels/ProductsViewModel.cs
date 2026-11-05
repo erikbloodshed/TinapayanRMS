@@ -2403,6 +2403,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         RefreshComponentOptions();
         RecomputeCosts();
         History.MarkClean();
+
+        // Read and priced all the same, so it can be put right here; Save refuses it until one product is taken out of another.
+        if (detail.HoldsItself)
+        {
+            ErrorMessage = CompositeProductRules.HoldsItselfText(product.Name);
+        }
     }
 
     /// <summary>
