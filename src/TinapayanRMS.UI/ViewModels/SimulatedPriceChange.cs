@@ -1,7 +1,8 @@
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Pricing;
 
-namespace TinapayanRMS.Pricing;
+namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// A row of the Price Simulator screen's Price Changes: a purchased material and the price it's tried at, typed as a change in
@@ -83,32 +84,11 @@ public sealed class SimulatedPriceChange(Func<int, (RawMaterial Material, Purcha
     /// The material's costs per base unit at the new price, or null for a row not filled in yet. A price that can't be is
     /// refused (a BusinessRuleException): a fall of 100% or more, a price of 0, or a percentage on a material with no price.
     /// </summary>
-    public (int MaterialId, decimal Cost, decimal BufferedCost)? NewCosts()
-    {
-        if (Material is not { } material || Unit is not { } unit)
-        {
-            return null;
-        }
-
-        if (_percentTyped && ChangePercent is { } percent)
-        {
-            if (unit.Price is null)
-            {
-                throw new BusinessRuleException($"{material.Name}: {PriceChangeRules.NoPriceToChangeText}");
-            }
-
-            PriceChangeRules.EnsureValidChange(percent);
-        }
-
-        if (NewPrice is not { } newPrice)
-        {
-            return null;
-        }
-
-        PriceChangeRules.EnsureValidNewPrice(newPrice);
-        var (cost, bufferedCost) = PriceChangeRules.CostsAfter(material, unit.Price, newPrice, unit.BaseUnitsPerUnit);
-        return (material.Id, cost, bufferedCost);
-    }
+    public (int MaterialId, decimal Cost, decimal BufferedCost)? NewCosts() =>
+        Material is { } material && Unit is { } unit
+            && TriedPriceChange.Of(material, unit, ChangePercent, NewPrice, _percentTyped) is { } tried
+            ? (material.Id, tried.Cost, tried.BufferedCost)
+            : null;
 
     /// <summary>
     /// What was typed for the row, as a saved scenario keeps it: the material and the one of Change % and New Price that

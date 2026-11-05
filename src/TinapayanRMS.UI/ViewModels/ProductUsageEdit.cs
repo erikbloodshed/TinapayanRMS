@@ -2,8 +2,9 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 
-namespace TinapayanRMS.Pricing;
+namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// One sub-assembly in the product's recipe, saved or not: a section of the Recipe Structure, called by its
@@ -70,15 +71,15 @@ public sealed class ProductUsageEdit : ObservableRow
     public ProductUsageEdit(
         int subAssemblyId,
         SubAssemblyRole? role,
-        IReadOnlyList<SubAssemblyLineEdit> lines,
+        IReadOnlyList<SectionLine> lines,
         UsageAuthoredField authoredField,
         decimal authoredValue,
         string? linkedName,
-        IReadOnlyList<SubAssemblyLineEdit>? addIns = null,
+        IReadOnlyList<SectionLine>? addIns = null,
         string? name = null,
         bool isOwn = false,
         bool isReleasing = false,
-        IReadOnlyList<SubAssemblyLineEdit>? savedLines = null,
+        IReadOnlyList<SectionLine>? savedLines = null,
         (int Id, string Name)? linkedOwner = null,
         MadeIngredientDraft? toMadeIngredient = null)
     {
@@ -150,13 +151,13 @@ public sealed class ProductUsageEdit : ObservableRow
     /// </summary>
     public string SectionName => PricedSection.NameOf(RoleName, Label, IsRoleRepeated);
 
-    public IReadOnlyList<SubAssemblyLineEdit> Lines { get; }
+    public IReadOnlyList<SectionLine> Lines { get; }
 
     /// <summary>
     /// This product's own extra ingredients on top of a recipe it links — a colouring, a flavouring, an
     /// inclusion. Empty for a new section, whose lines the form edits directly.
     /// </summary>
-    public IReadOnlyList<SubAssemblyLineEdit> AddIns { get; }
+    public IReadOnlyList<SectionLine> AddIns { get; }
 
     /// <summary>Which figure the user typed; it stays put when the batch changes, and the other follows.</summary>
     public UsageAuthoredField AuthoredField { get; }
@@ -221,13 +222,13 @@ public sealed class ProductUsageEdit : ObservableRow
 
     public bool IsLinked => LinkedName is not null;
 
-    private readonly IReadOnlyList<SubAssemblyLineEdit> _savedLines;
+    private readonly IReadOnlyList<SectionLine> _savedLines;
 
     /// <summary>
     /// A linked one's lines as the Sub-Assemblies screen has them, which Save compares against: the same as
     /// <see cref="Lines"/> until they're changed here.
     /// </summary>
-    public IReadOnlyList<SubAssemblyLineEdit> SavedLines => _savedLines;
+    public IReadOnlyList<SectionLine> SavedLines => _savedLines;
 
     /// <summary>
     /// A linked one's lines were changed in this product: Save writes them to the sub-assembly where it's kept, and every
@@ -281,7 +282,7 @@ public sealed class ProductUsageEdit : ObservableRow
     public string WeightText => $"{WeightPerPiece:#,0.##} g per piece";
 
     /// <summary>A new section with its role refreshed (renamed in Settings) and its lines repriced with their ingredients.</summary>
-    public ProductUsageEdit With(SubAssemblyRole? role, IReadOnlyList<SubAssemblyLineEdit> lines) =>
+    public ProductUsageEdit With(SubAssemblyRole? role, IReadOnlyList<SectionLine> lines) =>
         new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, _isReleasing, linkedOwner: LinkedOwner, toMadeIngredient: _toMadeIngredient);
 
     /// <summary>The same section of the product's own, for Save to move to the Sub-Assemblies screen and link.</summary>
@@ -302,22 +303,22 @@ public sealed class ProductUsageEdit : ObservableRow
         string linkedName,
         string? name,
         SubAssemblyRole? role,
-        IReadOnlyList<SubAssemblyLineEdit> savedLines,
-        IReadOnlyList<SubAssemblyLineEdit>? editedLines,
-        IReadOnlyList<SubAssemblyLineEdit> addIns,
+        IReadOnlyList<SectionLine> savedLines,
+        IReadOnlyList<SectionLine>? editedLines,
+        IReadOnlyList<SectionLine> addIns,
         (int Id, string Name)? linkedOwner) =>
         new(SubAssemblyId, role, editedLines ?? savedLines, AuthoredField, AuthoredValue, linkedName, addIns, name, savedLines: savedLines, linkedOwner: linkedOwner);
 
     /// <summary>The same linked section with the lines, piece size and add-ins the form now holds.</summary>
     public ProductUsageEdit WithLinkedForm(
-        IReadOnlyList<SubAssemblyLineEdit> lines,
+        IReadOnlyList<SectionLine> lines,
         UsageAuthoredField authoredField,
         decimal authoredValue,
-        IReadOnlyList<SubAssemblyLineEdit> addIns) =>
+        IReadOnlyList<SectionLine> addIns) =>
         new(SubAssemblyId, Role, lines, authoredField, authoredValue, LinkedName, addIns, Name, savedLines: _savedLines, linkedOwner: LinkedOwner);
 
     /// <summary>Whether two sets of lines would save the same: the same ingredients, grams and base ticks, in the same order, whatever they cost.</summary>
-    private static bool HaveSameRecipe(IReadOnlyList<SubAssemblyLineEdit> a, IReadOnlyList<SubAssemblyLineEdit> b) =>
+    private static bool HaveSameRecipe(IReadOnlyList<SectionLine> a, IReadOnlyList<SectionLine> b) =>
         ReferenceEquals(a, b)
         || (a.Count == b.Count
             && a.Zip(b).All(pair =>

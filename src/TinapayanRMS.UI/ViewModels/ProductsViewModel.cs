@@ -3241,12 +3241,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 sections.Add(new ProductUsageEdit(
                     linked.Id,
                     linkedRole,
-                    [.. current.Select(l => new SubAssemblyLineEdit(
+                    [.. current.Select(l => new SectionLine(
                         ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
                     section.AuthoredField,
                     section.AuthoredValue,
                     linked.Name,
-                    [.. section.AddIns.Select(a => new SubAssemblyLineEdit(ingredientsById[a.IngredientId], a.Grams))],
+                    [.. section.AddIns.Select(a => new SectionLine(ingredientsById[a.IngredientId], a.Grams))],
                     SectionLabelOf(linked.Name, linkedRole),
                     linkedOwner: PricedSection.LinkedOwnerOf(linked)));
                 continue;
@@ -3259,8 +3259,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 keepsId ? section.SubAssemblyId : 0,
                 Roles.First(r => r.Id == section.Role.Id),
                 [
-                    .. section.Lines.Select(l => new SubAssemblyLineEdit(ingredientsById[l.IngredientId], l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)),
-                    .. section.AddIns.Select(a => new SubAssemblyLineEdit(ingredientsById[a.IngredientId], a.Grams)),
+                    .. section.Lines.Select(l => new SectionLine(ingredientsById[l.IngredientId], l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)),
+                    .. section.AddIns.Select(a => new SectionLine(ingredientsById[a.IngredientId], a.Grams)),
                 ],
                 section.AuthoredField,
                 section.AuthoredValue,
@@ -3458,8 +3458,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }
 
         var ingredientsById = Ingredients.ToDictionary(m => m.Id);
-        IReadOnlyList<SubAssemblyLineEdit> lines =
-            [.. saved.Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
+        IReadOnlyList<SectionLine> lines =
+            [.. saved.Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
         var role = Roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role;
         try
         {
@@ -3479,7 +3479,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 UsageForm.AuthoredField,
                 CurrentAuthoredValue(),
                 subAssembly.Name,
-                [.. addIns.Where(a => !lineIngredientIds.Contains(a.Ingredient.Id)).Select(a => new SubAssemblyLineEdit(a.Ingredient, a.Grams))],
+                [.. addIns.Where(a => !lineIngredientIds.Contains(a.Ingredient.Id)).Select(a => new SectionLine(a.Ingredient, a.Grams))],
                 SectionLabelOf(subAssembly.Name, role));
             EnsureSectionsDistinct(replacement, linked);
 
@@ -3502,7 +3502,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     private async Task LoadUsageSourceAsync(LinkableSubAssemblyOption? source, CancellationToken cancellationToken)
     {
-        IReadOnlyList<SubAssemblyLineEdit> lines = [];
+        IReadOnlyList<SectionLine> lines = [];
         IReadOnlyList<PackagingLineRow> packagingRows = [];
         if (source?.PackagingTarget is { } packaging)
         {
@@ -3518,7 +3518,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             var saved = await _subAssemblyLineRepository.GetForSubAssembliesAsync([subAssembly.Id], cancellationToken);
             var ingredientsById = Ingredients.ToDictionary(m => m.Id);
-            lines = [.. saved.Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams))];
+            lines = [.. saved.Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams))];
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -3667,7 +3667,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 throw new BusinessRuleException($"Add the ingredients that go into {linked.DisplayName}, in grams.");
             }
 
-            IReadOnlyList<SubAssemblyLineEdit> lineEdits = [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
+            IReadOnlyList<SectionLine> lineEdits = [.. lines.Select(l => new SectionLine(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
             usage = linked.WithLinkedForm(
                 lineEdits, UsageForm.AuthoredField, authoredValue, CompleteAddIns(linked.DisplayName, lineEdits));
         }
@@ -3685,7 +3685,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // One of the product's own keeps its id, so Save rewrites it in place; a new one has none yet. One unlinked
             // and not saved yet stays the product's own, and one on its way to the Sub-Assemblies screen stays so.
             usage = new ProductUsageEdit(
-                UsageForm.EditingUsage is { IsOwned: true } own ? own.SubAssemblyId : 0, role, [.. lines.Select(l => new SubAssemblyLineEdit(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], UsageForm.AuthoredField, authoredValue, linkedName: null, name: UsageForm.EditingUsageName, isOwn: UsageForm.EditingUsage?.IsOwned == true, isReleasing: UsageForm.EditingUsage?.IsReleasing == true, toMadeIngredient: UsageForm.EditingUsage?.ToMadeIngredient);
+                UsageForm.EditingUsage is { IsOwned: true } own ? own.SubAssemblyId : 0, role, [.. lines.Select(l => new SectionLine(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], UsageForm.AuthoredField, authoredValue, linkedName: null, name: UsageForm.EditingUsageName, isOwn: UsageForm.EditingUsage?.IsOwned == true, isReleasing: UsageForm.EditingUsage?.IsReleasing == true, toMadeIngredient: UsageForm.EditingUsage?.ToMadeIngredient);
         }
         else
         {
@@ -3700,8 +3700,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 throw new BusinessRuleException($"{sourceName} is still loading its ingredients. Try again in a moment.");
             }
 
-            IReadOnlyList<SubAssemblyLineEdit> sourceLines =
-                [.. UsageForm.FormLines.Where(l => l.Ingredient is not null).Select(l => new SubAssemblyLineEdit(l.Ingredient!, l.Grams ?? 0m, l.IsFormulaBase, l.AuthoredBakersPercent))];
+            IReadOnlyList<SectionLine> sourceLines =
+                [.. UsageForm.FormLines.Where(l => l.Ingredient is not null).Select(l => new SectionLine(l.Ingredient!, l.Grams ?? 0m, l.IsFormulaBase, l.AuthoredBakersPercent))];
 
             var role = Roles.FirstOrDefault(r => r.Id == source.RoleId) ?? source.Role;
             usage = new ProductUsageEdit(
@@ -3813,7 +3813,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// The repository checks the same rule as it writes them; this is what puts the message on the screen
     /// the moment Apply is pressed, or the tab is left.
     /// </summary>
-    private IReadOnlyList<SubAssemblyLineEdit> CompleteAddIns(string subAssemblyName, IReadOnlyList<SubAssemblyLineEdit> baseLines)
+    private IReadOnlyList<SectionLine> CompleteAddIns(string subAssemblyName, IReadOnlyList<SectionLine> baseLines)
     {
         var addIns = IngredientLineRow.CompleteLines(UsageForm.FormAddIns, subAssemblyName);
         ProductRules.EnsureValidAddIns(
@@ -3821,7 +3821,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             subAssemblyName,
             [.. baseLines.Select(l => l.Ingredient.Id)]);
 
-        return [.. addIns.Select(a => new SubAssemblyLineEdit(a.Ingredient, a.Grams))];
+        return [.. addIns.Select(a => new SectionLine(a.Ingredient, a.Grams))];
     }
 
     /// <summary>
@@ -4429,7 +4429,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 fresh = new ProductUsageEdit(
                     saved.Id,
                     role,
-                    [.. linkedLinesById[saved.Id].Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
+                    [.. linkedLinesById[saved.Id].Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
                     edit.AuthoredField,
                     edit.AuthoredValue,
                     linkedName: null,
@@ -4450,7 +4450,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     subAssembly.Name,
                     SectionLabelOf(subAssembly.Name, role),
                     role,
-                    [.. linkedLinesById[subAssembly.Id].Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
+                    [.. linkedLinesById[subAssembly.Id].Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
                     edit.AreLinkedLinesEdited ? Repriced(edit.Lines, ingredientsById) : null,
                     Repriced(edit.AddIns, ingredientsById),
                     PricedSection.LinkedOwnerOf(subAssembly));
@@ -4497,14 +4497,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>Puts <paramref name="lines"/> in the form's table, in place of whatever it held.</summary>
-    private void ShowFormLines(IEnumerable<SubAssemblyLineEdit> lines)
+    private void ShowFormLines(IEnumerable<SectionLine> lines)
     {
         UsageForm.FormLines.Clear();
         UsageForm.FormLines.AddRange(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)));
     }
 
     /// <summary>Whether the form's lines table still shows <paramref name="lines"/>, with nothing typed into it since.</summary>
-    private bool IsFormShowing(IReadOnlyList<SubAssemblyLineEdit> lines) =>
+    private bool IsFormShowing(IReadOnlyList<SectionLine> lines) =>
         UsageForm.FormLines.Count == lines.Count
         && UsageForm.FormLines.Zip(lines).All(pair =>
             pair.First.IngredientId == pair.Second.Ingredient.Id
@@ -4513,16 +4513,16 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent);
 
     /// <summary>The same for the add-ins table under it.</summary>
-    private void ShowFormAddIns(IEnumerable<SubAssemblyLineEdit> addIns)
+    private void ShowFormAddIns(IEnumerable<SectionLine> addIns)
     {
         UsageForm.FormAddIns.Clear();
         UsageForm.FormAddIns.AddRange(addIns.Select(a => new IngredientLineRow(a.Ingredient, a.Grams)));
     }
 
     /// <summary><paramref name="lines"/> with each ingredient swapped for its refreshed copy when that differs; unchanged lines are kept as they are.</summary>
-    private static IReadOnlyList<SubAssemblyLineEdit> Repriced(IReadOnlyList<SubAssemblyLineEdit> lines, Dictionary<int, RawMaterial> ingredientsById) =>
+    private static IReadOnlyList<SectionLine> Repriced(IReadOnlyList<SectionLine> lines, Dictionary<int, RawMaterial> ingredientsById) =>
         [.. lines.Select(l => ingredientsById.TryGetValue(l.Ingredient.Id, out var fresh) && !CollectionMerge.HasSameValues(fresh, l.Ingredient)
-            ? new SubAssemblyLineEdit(fresh, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)
+            ? new SectionLine(fresh, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)
             : l)];
 
     /// <summary>

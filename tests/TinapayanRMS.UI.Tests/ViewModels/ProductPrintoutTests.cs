@@ -26,10 +26,10 @@ public class ProductPrintoutTests
             1,
             Dough,
             [
-                new SubAssemblyLineEdit(Ingredient("Bread Flour", 0.05m), 700m, isFormulaBase: true),
-                new SubAssemblyLineEdit(Ingredient("Cake Flour", 0.06m), 300m, isFormulaBase: true),
-                new SubAssemblyLineEdit(Ingredient("Water", 0m), 650m),
-                new SubAssemblyLineEdit(Ingredient("Salt", 0.02m), 20m),
+                new SectionLine(Ingredient("Bread Flour", 0.05m), 700m, isFormulaBase: true),
+                new SectionLine(Ingredient("Cake Flour", 0.06m), 300m, isFormulaBase: true),
+                new SectionLine(Ingredient("Water", 0m), 650m),
+                new SectionLine(Ingredient("Salt", 0.02m), 20m),
             ],
             UsageAuthoredField.WeightPerPiece,
             60m,
@@ -56,13 +56,13 @@ public class ProductPrintoutTests
             5,
             Dough,
             [
-                new SubAssemblyLineEdit(Ingredient("Flour", 0.05m), 1000m, isFormulaBase: true),
-                new SubAssemblyLineEdit(Ingredient("Water", 0m), 600m),
+                new SectionLine(Ingredient("Flour", 0.05m), 1000m, isFormulaBase: true),
+                new SectionLine(Ingredient("Water", 0m), 600m),
             ],
             UsageAuthoredField.WeightPerPiece,
             50m,
             linkedName: "Variety Bread Dough",
-            addIns: [new SubAssemblyLineEdit(Ingredient("Ube Flavouring", 0.5m), 20m)]);
+            addIns: [new SectionLine(Ingredient("Ube Flavouring", 0.5m), 20m)]);
 
         var section = PrintedSection.From(usage.ToPriced(), CostBasis.Buffered);
 
@@ -78,13 +78,13 @@ public class ProductPrintoutTests
             7,
             Glaze,
             [
-                new SubAssemblyLineEdit(Ingredient("Butter", 0.4m), 300m),
-                new SubAssemblyLineEdit(Ingredient("Sugar", 0.09m), 200m),
+                new SectionLine(Ingredient("Butter", 0.4m), 300m),
+                new SectionLine(Ingredient("Sugar", 0.09m), 200m),
             ],
             UsageAuthoredField.Yield,
             40m,
             linkedName: "Butter Glaze",
-            addIns: [new SubAssemblyLineEdit(Ingredient("Cream", 0.3m), 500m)]);
+            addIns: [new SectionLine(Ingredient("Cream", 0.3m), 500m)]);
 
         var section = PrintedSection.From(usage.ToPriced(), CostBasis.Buffered);
 
@@ -101,8 +101,8 @@ public class ProductPrintoutTests
             1,
             Dough,
             [
-                new SubAssemblyLineEdit(Ingredient("Flour", 0.05m), 1000m, isFormulaBase: true),
-                new SubAssemblyLineEdit(Ingredient("Water", 0m), 700m),
+                new SectionLine(Ingredient("Flour", 0.05m), 1000m, isFormulaBase: true),
+                new SectionLine(Ingredient("Water", 0m), 700m),
             ],
             UsageAuthoredField.WeightPerPiece,
             60m,
@@ -123,7 +123,7 @@ public class ProductPrintoutTests
         var usage = new ProductUsageEdit(
             1,
             Dough,
-            [new SubAssemblyLineEdit(Ingredient("Flour", 0.05m), 1000m, isFormulaBase: true)],
+            [new SectionLine(Ingredient("Flour", 0.05m), 1000m, isFormulaBase: true)],
             UsageAuthoredField.WeightPerPiece,
             0m,
             linkedName: null);

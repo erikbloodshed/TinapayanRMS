@@ -23,8 +23,8 @@ public sealed record PricedSection(
     (int Id, string Name)? LinkedOwner,
     UsageAuthoredField AuthoredField,
     decimal AuthoredValue,
-    IReadOnlyList<SubAssemblyLineEdit> Lines,
-    IReadOnlyList<SubAssemblyLineEdit> AddIns,
+    IReadOnlyList<SectionLine> Lines,
+    IReadOnlyList<SectionLine> AddIns,
     SectionFigures Figures)
 {
     /// <summary>Where every sub-assembly not kept in a product is kept, and edited: the Sub-Assemblies screen.</summary>
@@ -93,10 +93,10 @@ public sealed record PricedSection(
         var subAssembly = usage.SubAssembly!;
         var isOwn = subAssembly.OwnerProductId == usage.ProductId;
         RawMaterial IngredientOf(int id, RawMaterial? read) => ingredientsById?.GetValueOrDefault(id) ?? read!;
-        IReadOnlyList<SubAssemblyLineEdit> sectionLines =
-            [.. lines.Select(l => new SubAssemblyLineEdit(IngredientOf(l.IngredientId, l.Ingredient), l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
-        IReadOnlyList<SubAssemblyLineEdit> sectionAddIns =
-            [.. addIns.Select(a => new SubAssemblyLineEdit(IngredientOf(a.IngredientId, a.Ingredient), a.Grams))];
+        IReadOnlyList<SectionLine> sectionLines =
+            [.. lines.Select(l => new SectionLine(IngredientOf(l.IngredientId, l.Ingredient), l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
+        IReadOnlyList<SectionLine> sectionAddIns =
+            [.. addIns.Select(a => new SectionLine(IngredientOf(a.IngredientId, a.Ingredient), a.Grams))];
         var roleName = role?.Name ?? string.Empty;
         var label = SubAssemblyRules.NormalizeName(SubAssemblyRules.SectionLabel(subAssembly.Name, productName, roleName));
         return new PricedSection(

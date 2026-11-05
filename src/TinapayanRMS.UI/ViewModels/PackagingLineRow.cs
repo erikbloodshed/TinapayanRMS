@@ -1,8 +1,9 @@
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
 
-namespace TinapayanRMS.Pricing;
+namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
 /// One row of the Recipe Structure's Packaging table and of a packaging set's Lines table, both typed into directly.

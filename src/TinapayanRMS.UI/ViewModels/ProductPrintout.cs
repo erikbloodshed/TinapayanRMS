@@ -166,7 +166,7 @@ public sealed record PrintedSection(
         decimal? PercentOf(decimal grams) => formulaBase > 0
             ? SubAssemblyRules.CalculateBakersPercent(grams, formulaBase)
             : SubAssemblyRules.CalculateAbsolutePercent(grams, section.TotalWeight);
-        PrintedLine Line(SubAssemblyLineEdit line) =>
+        PrintedLine Line(SectionLine line) =>
             new(line.Ingredient.Name, line.Grams, PercentOf(line.Grams), line.CostPerGramAt(basis), line.CostAt(basis), line.IsFormulaBase);
 
         return new(

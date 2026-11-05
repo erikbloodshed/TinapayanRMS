@@ -1,8 +1,10 @@
 using AwesomeAssertions;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Pricing;
+using TinapayanRMS.UI.ViewModels;
 
-namespace TinapayanRMS.Pricing.Tests;
+namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>
 /// The row behind every packaging table: a quantity typed in the material's base unit or in one of its alternative

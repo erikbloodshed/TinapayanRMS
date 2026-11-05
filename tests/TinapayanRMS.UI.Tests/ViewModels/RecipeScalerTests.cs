@@ -54,7 +54,7 @@ public class RecipeScalerTests
     private static ProductUsageEdit EnsaymadaDough(RawMaterial flour, RawMaterial water) => new(
         1,
         Dough,
-        [new SubAssemblyLineEdit(flour, 600m), new SubAssemblyLineEdit(water, 400m)],
+        [new SectionLine(flour, 600m), new SectionLine(water, 400m)],
         UsageAuthoredField.WeightPerPiece,
         10m,
         linkedName: null);
@@ -121,11 +121,11 @@ public class RecipeScalerTests
         var section = new ProductUsageEdit(
             5,
             Dough,
-            [new SubAssemblyLineEdit(Ingredient("Flour", 0.05m), 980m)],
+            [new SectionLine(Ingredient("Flour", 0.05m), 980m)],
             UsageAuthoredField.Yield,
             100m,
             linkedName: "Variety Bread Dough",
-            addIns: [new SubAssemblyLineEdit(Ingredient("Ube Flavouring", 0.5m), 20m)]);
+            addIns: [new SectionLine(Ingredient("Ube Flavouring", 0.5m), 20m)]);
 
         var rows = Scaler().Scale(Recipe([section]), 150m, productId: null);
 
@@ -153,7 +153,7 @@ public class RecipeScalerTests
             new() { IngredientId = syrup.Id, ComponentIngredientId = water.Id, Grams = 500m },
         ];
         var section = new ProductUsageEdit(
-            2, Filling, [new SubAssemblyLineEdit(caramel, 100m)], UsageAuthoredField.Yield, 10m, linkedName: null);
+            2, Filling, [new SectionLine(caramel, 100m)], UsageAuthoredField.Yield, 10m, linkedName: null);
 
         var rows = Scaler(boms, [sugar, water, cream, syrup, caramel]).Scale(Recipe([section]), 10m, productId: null);
 
@@ -170,7 +170,7 @@ public class RecipeScalerTests
         var loop = Made("Starter", 0.01m);
         IngredientBomLine[] boms = [new() { IngredientId = loop.Id, ComponentIngredientId = loop.Id, Grams = 100m }];
         var section = new ProductUsageEdit(
-            3, Dough, [new SubAssemblyLineEdit(loop, 100m)], UsageAuthoredField.Yield, 10m, linkedName: null);
+            3, Dough, [new SectionLine(loop, 100m)], UsageAuthoredField.Yield, 10m, linkedName: null);
 
         var rows = Scaler(boms, [loop]).Scale(Recipe([section]), 10m, productId: null);
 
@@ -192,7 +192,7 @@ public class RecipeScalerTests
     public void A_section_without_a_piece_size_has_nothing_to_scale()
     {
         var section = new ProductUsageEdit(
-            4, Dough, [new SubAssemblyLineEdit(Ingredient("Flour", 0.05m), 1000m)], UsageAuthoredField.WeightPerPiece, 0m, linkedName: null);
+            4, Dough, [new SectionLine(Ingredient("Flour", 0.05m), 1000m)], UsageAuthoredField.WeightPerPiece, 0m, linkedName: null);
 
         var row = Scaler().Scale(Recipe([section]), 10m, productId: null).Should().ContainSingle().Subject;
 
@@ -215,7 +215,7 @@ public class RecipeScalerTests
         var cheeseRoll = new Product { Id = 2, Name = "Cheese Roll" };
         var partyBox = new Product { Id = 3, Name = "Party Box", IsComposite = true };
         var cheeseDough = new ProductUsageEdit(
-            9, Dough, [new SubAssemblyLineEdit(flour, 500m)], UsageAuthoredField.Yield, 4m, linkedName: null);
+            9, Dough, [new SectionLine(flour, 500m)], UsageAuthoredField.Yield, 4m, linkedName: null);
         Dictionary<int, SavedProduct> products = new()
         {
             [1] = new SavedProduct(ensaymada, [EnsaymadaDough(flour, water).ToPriced()], [new PackagingLineRow(wrapper, 1m).ToPriced()], true, null, ProductCostSummary.Empty),

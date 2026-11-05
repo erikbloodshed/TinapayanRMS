@@ -221,7 +221,7 @@ public sealed record ProductFormSnapshot
         return true;
     }
 
-    private static bool LinesShowSame(IReadOnlyList<SubAssemblyLineEdit> left, IReadOnlyList<SubAssemblyLineEdit> right) =>
+    private static bool LinesShowSame(IReadOnlyList<SectionLine> left, IReadOnlyList<SectionLine> right) =>
         left.Count == right.Count
         && left.Zip(right).All(pair =>
             pair.First.Ingredient?.Id == pair.Second.Ingredient?.Id

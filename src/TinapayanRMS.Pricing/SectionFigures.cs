@@ -33,8 +33,8 @@ public sealed record SectionFigures(
     /// figure typed (<paramref name="authoredField"/>). Add-ins go into the batch, so a piece takes its share of both.
     /// </summary>
     public static SectionFigures Of(
-        IReadOnlyList<SubAssemblyLineEdit> lines,
-        IReadOnlyList<SubAssemblyLineEdit> addIns,
+        IReadOnlyList<SectionLine> lines,
+        IReadOnlyList<SectionLine> addIns,
         UsageAuthoredField authoredField,
         decimal authoredValue)
     {
@@ -57,6 +57,6 @@ public sealed record SectionFigures(
             hasPieces ? ProductRules.CalculateUsageCostPerPiece(unbufferedTotalCost, weightPerPiece, totalWeight) : 0m);
     }
 
-    private static List<(decimal Grams, decimal IngredientCostPerGram)> CostInputs(IReadOnlyList<SubAssemblyLineEdit> lines, CostBasis basis) =>
+    private static List<(decimal Grams, decimal IngredientCostPerGram)> CostInputs(IReadOnlyList<SectionLine> lines, CostBasis basis) =>
         [.. lines.Select(l => (l.Grams, l.CostPerGramAt(basis)))];
 }

@@ -95,7 +95,7 @@ public sealed record SectionCosting(
 
 public sealed record LineCosting(string Ingredient, decimal Grams, decimal CostPerGram, decimal Cost)
 {
-    public static LineCosting From(SubAssemblyLineEdit line, CostBasis basis) =>
+    public static LineCosting From(SectionLine line, CostBasis basis) =>
         new(line.Ingredient.Name, line.Grams, line.CostPerGramAt(basis), line.CostAt(basis));
 }
 

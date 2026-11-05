@@ -1,6 +1,8 @@
 using AwesomeAssertions;
+using TinapayanRMS.Pricing;
+using TinapayanRMS.UI.ViewModels;
 
-namespace TinapayanRMS.Pricing.Tests;
+namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>What a row's grid and the screen's WhenAnyValue and AutoRefresh depend on, as ReactiveObject gave them.</summary>
 public class ObservableRowTests

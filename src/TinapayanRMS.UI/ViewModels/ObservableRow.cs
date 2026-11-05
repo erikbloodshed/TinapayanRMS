@@ -1,12 +1,11 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace TinapayanRMS.Pricing;
+namespace TinapayanRMS.UI.ViewModels;
 
 /// <summary>
-/// A row that says when it changes, for the screens' grids and bindings to follow. It's all these rows ever took from
-/// ReactiveObject (2026-11-04), whose ReactiveUI a server that only reads prices has no use for, and the screens' WhenAnyValue
-/// and AutoRefresh follow plain property changes just the same.
+/// A row that says when it changes, for the screens' grids and bindings to follow: a lighter base than ReactiveObject for
+/// the editable rows, which need nothing else from it. WhenAnyValue and AutoRefresh follow plain property changes.
 /// </summary>
 public abstract class ObservableRow : INotifyPropertyChanged
 {

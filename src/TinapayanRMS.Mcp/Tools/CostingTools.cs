@@ -81,14 +81,14 @@ public sealed class CostingTools(
             var prices = (await brandPriceRepository.GetAllAsync(cancellationToken)).ToLookup(p => p.RawMaterialId);
             var details = await savedProducts.ReadDetailsAsync([.. products.Select(p => p.Id)], cancellationToken);
 
-            // Each change as a Price Changes row, so it's worked out and checked as one typed there is.
-            List<SimulatedPriceChange> rows = [.. changes.Select(change => RowFor(change, materials, prices))];
-            if (rows.GroupBy(r => r.MaterialId).FirstOrDefault(g => g.Count() > 1) is { } repeated)
+            // Each change worked out and checked as the Price Simulator works out one typed into its Price Changes table.
+            List<TriedPriceChange> rows = [.. changes.Select(change => TriedFor(change, materials, prices))];
+            if (rows.GroupBy(r => r.Material.Id).FirstOrDefault(g => g.Count() > 1) is { } repeated)
             {
-                throw new McpException($"{repeated.First().Material!.Name} is changed more than once. Give it one change.");
+                throw new McpException($"{repeated.First().Material.Name} is changed more than once. Give it one change.");
             }
 
-            List<(int MaterialId, decimal Cost, decimal BufferedCost)> newCosts = [.. rows.Select(r => r.NewCosts()!.Value)];
+            List<(int MaterialId, decimal Cost, decimal BufferedCost)> newCosts = [.. rows.Select(r => (r.Material.Id, r.Cost, r.BufferedCost))];
 
             // As PriceSimulatorViewModel.RecalculateAsync works them out.
             var basis = BasisOf(unbuffered);
@@ -105,10 +105,10 @@ public sealed class CostingTools(
             List<PriceChangeTried> tried =
             [
                 .. rows.Select(r => new PriceChangeTried(
-                    r.Material!.Name,
-                    r.UnitName!,
-                    r.CurrentPrice,
-                    r.NewPrice!.Value,
+                    r.Material.Name,
+                    r.Unit.Name,
+                    r.Unit.Price,
+                    r.NewPrice,
                     r.ChangePercent,
                     [
                         .. IngredientCostRules.ReachedBy(materials.Values, bomLines, r.Material.Id)
@@ -131,8 +131,11 @@ public sealed class CostingTools(
                 ]);
         });
 
-    /// <summary>A Price Changes row for <paramref name="change"/>, filled in as typing it would; refused when it can't be one.</summary>
-    private static SimulatedPriceChange RowFor(
+    /// <summary>
+    /// <paramref name="change"/> worked out as the Price Simulator works out one typed into its Price Changes table, and
+    /// refused for what that refuses: a fall of 100% or more, a price of 0, a percentage on a material with no price.
+    /// </summary>
+    private static TriedPriceChange TriedFor(
         PriceChangeInput change, IReadOnlyDictionary<int, RawMaterial> materials, ILookup<int, RawMaterialBrandPrice> prices)
     {
         var material = Named(materials.Values, m => m.Name, change.Material, "raw material");
@@ -148,21 +151,9 @@ public sealed class CostingTools(
             throw new McpException($"{material.Name}: give either its new price or its change in percent, not both or neither.");
         }
 
-        var row = new SimulatedPriceChange(id => materials.GetValueOrDefault(id) is { Source: RawMaterialSource.Purchased } m
-            ? (m, PurchaseUnit.Of(m, [.. prices[id]]))
-            : null) { MaterialId = material.Id };
-        if (change.ChangePercent is { } percent)
-        {
-            row.ChangePercent = percent;
-        }
-        else
-        {
-            row.NewPrice = change.NewPrice;
-        }
-
-        // Refuses what the screen refuses: a fall of 100% or more, a price of 0, a percentage on a material with no price.
-        _ = row.NewCosts();
-        return row;
+        // Either the percentage or the price was given, so there's a price to try (or a refusal) either way.
+        return TriedPriceChange.Of(
+            material, PurchaseUnit.Of(material, [.. prices[material.Id]]), change.ChangePercent, change.NewPrice, percentTyped: change.ChangePercent is not null)!;
     }
 
     /// <summary>The one item named <paramref name="name"/>, ignoring case, or else the one whose name contains it.</summary>
