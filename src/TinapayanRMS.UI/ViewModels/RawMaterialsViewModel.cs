@@ -443,12 +443,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
             this.RaiseAndSetIfChanged(ref _editingPreferredBrand, value);
             this.RaisePropertyChanged(nameof(CostFrom));
-
-            // An undo puts the grid back after this, and works the texts out once at its end (RestoreSnapshot).
-            if (!IsRestoring)
-            {
-                UpdatePurchaseCostTexts();
-            }
+            _updates.Run(UpdatePurchaseCostTexts);
         }
     }
 
@@ -1169,23 +1164,15 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             .AutoRefresh(r => r.Price)
             .AutoRefresh(r => r.Quantity)
             .AutoRefresh(r => r.Brand)
-            .Where(_ => !IsRestoring)
-            .Subscribe(_ => UpdatePurchaseCostTexts());
+            .Subscribe(_ => _updates.Run(UpdatePurchaseCostTexts));
 
         // Each brand's buffered price follows the fixed buffered cost. Only typing the percent moves the amount (TypedCostBufferPercent).
         this.WhenAnyValue(x => x.EditingBufferedCost, x => x.EditingCostBufferPercent)
-            .Where(_ => !IsRestoring)
-            .Subscribe(_ =>
-            {
-                this.RaisePropertyChanged(nameof(TypedCostBufferPercent));
-                RefreshBrandPriceRows();
-                UpdatePurchaseCostTexts();
-            });
+            .Subscribe(_ => _updates.Run(BufferedCostChanged));
 
         // The made-ingredient tiles follow the Weight Loss % box, which moves the yield the cost is spread over.
         this.WhenAnyValue(x => x.EditingWeightLossPercent)
-            .Where(_ => !IsBusyApplying)
-            .Subscribe(_ => RecomputeBomTotals());
+            .Subscribe(_ => _updates.Run(RecomputeBomTotals));
 
         // The Recipe card shows the picked sub-assembly's lines as it's saved: read again on every pick, an undo's
         // included, and on every load, which re-points the pick at the refreshed copy, so a change made on the
@@ -1241,15 +1228,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // An ingredient picked in the Add-Ins table is pointed at the screen's copy of it, for its name.
         AddInEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
-            .Where(_ => !IsRestoring)
-            .Subscribe(_ => IngredientLineRow.Resolve(AddInEdits, Ingredients.ToDictionary(m => m.Id)));
+            .Subscribe(_ => _updates.Run(ResolveAddIns));
 
         // The header's Total Weight and Total Cost follow the add-ins as they're typed into: Cost covers both an
         // ingredient picked and grams typed, as the sub-assembly form's batch totals do.
         AddInEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.Cost)
-            .Where(_ => !IsRestoring)
-            .Subscribe(_ => RecomputeBomTotals());
+            .Subscribe(_ => _updates.Run(RecomputeBomTotals));
 
         this.WhenAnyValue(x => x.ExampleRawMaterial)
             .Where(_ => !IsRefreshing)
@@ -1670,7 +1655,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     {
         ErrorMessage = null;
 
-        ApplyRestore(() =>
+        ApplyRestore(() => _updates.Batch(() =>
         {
             SelectedUnitRow = null;
             SelectedBrandPriceRow = null;
@@ -1732,7 +1717,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                     line.IsFormulaBase,
                     line.AuthoredBakersPercent));
             }
-        });
+        }));
 
         // The Per picker's choices are rebuilt from the units above, so the one that was picked is found again here
         // rather than in the guard: RebuildUnitViews replaces the list BufferedCostUnit is chosen from.
@@ -1745,13 +1730,26 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         RefreshBrandPriceRows();
         UpdatePurchaseCostTexts();
 
-        // The Cost Buffer % box shows TypedCostBufferPercent, which is only raised outside a restore: without this it kept
-        // the percent from before the undo (found 2026-10-29, undoing a Cost From pick).
+        // The Cost Buffer % box shows TypedCostBufferPercent, raised as the buffer changes: an undo that leaves the buffer
+        // as it was doesn't, and without this the box kept the percent from before the undo (found 2026-10-29, undoing a
+        // Cost From pick).
         this.RaisePropertyChanged(nameof(TypedCostBufferPercent));
-        // Once, from the restored form: the change set and the Weight Loss % subscription are both suppressed while
-        // a restore applies, so without this the tiles would keep the figures from before the undo.
         RecomputeBomTotals();
     }
+
+    /// <summary>The screen's derived updates, run as their inputs change, or once at the end of an undo's restore.</summary>
+    private readonly DerivedUpdates _updates = new();
+
+    /// <summary>Each brand's buffered price follows the fixed buffered cost. Only typing the percent moves the amount (TypedCostBufferPercent).</summary>
+    private void BufferedCostChanged()
+    {
+        this.RaisePropertyChanged(nameof(TypedCostBufferPercent));
+        RefreshBrandPriceRows();
+        UpdatePurchaseCostTexts();
+    }
+
+    /// <summary>An ingredient picked in the Add-Ins table is pointed at the screen's copy of it, for its name.</summary>
+    private void ResolveAddIns() => IngredientLineRow.Resolve(AddInEdits, Ingredients.ToDictionary(m => m.Id));
 
     /// <summary>
     /// An empty form, for New and after Delete. It starts as a purchased ingredient, the usual kind, but
