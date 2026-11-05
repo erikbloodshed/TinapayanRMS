@@ -143,8 +143,10 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
     }
 
     [Fact]
-    public async Task A_packaging_chain_that_comes_round_again_is_refused()
+    public async Task A_packaging_chain_that_comes_round_again_shows_no_packaging_and_is_said_of_rather_than_failing_the_read()
     {
+        var setup = await SetUpAsync();
+        var (breadIds, _) = await AddProductsAsync(setup, "Bread", count: 1);
         var (aId, bId) = (await AddProductAsync("A"), await AddProductAsync("B"));
         await using (var dbContext = CreateDbContext())
         {
@@ -154,9 +156,15 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
-        var act = () => CreateReader().ReadDetailsAsync([aId], Cancellation);
+        var details = await CreateReader().ReadDetailsAsync([aId, bId, breadIds[0]], Cancellation);
 
-        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("Circular packaging link detected.");
+        (details[aId].Lines.Count, details[bId].Lines.Count, details[breadIds[0]].Lines.Count).Should().Be((0, 0, 1));
+        (details[aId].PackagingLinkedRoundInALoop, details[bId].PackagingLinkedRoundInALoop, details[breadIds[0]].PackagingLinkedRoundInALoop)
+            .Should().Be((true, true, false));
+
+        // A write that copies a product's packaging still refuses it (ProductCloner and unlinking read one product's).
+        var copying = () => new PackagingLineRepository(CreateDbContextFactory()).GetEffectiveForProductAsync(aId, Cancellation);
+        await copying.Should().ThrowAsync<BusinessRuleException>().WithMessage(PackagingLinkRules.LoopText);
     }
 
     [Fact]

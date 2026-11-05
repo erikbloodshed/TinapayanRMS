@@ -35,6 +35,12 @@ public sealed record ProductDetail(
     /// (CompositeProductRules.HoldsItselfText): the product that closes the loop brings nothing at that point.
     /// </summary>
     public bool HoldsItself { get; init; }
+
+    /// <summary>
+    /// Its packaging links come round in a loop, as only data changed outside the app can leave them
+    /// (PackagingLinkRules.LinkedRoundInALoopText): it shows no packaging, and none is costed.
+    /// </summary>
+    public bool PackagingLinkedRoundInALoop { get; init; }
 }
 
 /// <summary>
@@ -137,7 +143,8 @@ public sealed class SavedProductReader(
         // detail took 31 ms this way against 22 ms side by side, and one product's 13 ms against 12.
         List<int> ids = [.. productIdsRead];
         var linksByProduct = (await packagingLinkRepository.GetForProductsAsync(ids, cancellationToken)).ToDictionary(l => l.ProductId);
-        var packagingByProduct = await packagingLineRepository.GetEffectiveForProductsAsync(ids, cancellationToken);
+        var packaging = await packagingLineRepository.GetEffectiveForProductsAsync(ids, cancellationToken);
+        var packagingByProduct = packaging.Lines;
         var costingsByProduct = (await costingParametersRepository.GetForProductsAsync(ids, cancellationToken)).ToDictionary(c => c.ProductId);
         var addIns = await usageRepository.GetAddInsForProductsAsync(ids, cancellationToken);
         var usages = await usageRepository.GetForProductsAsync(ids, cancellationToken);
@@ -190,6 +197,7 @@ public sealed class SavedProductReader(
                             ClosesLoop(c.ComponentProductId, productId, holding) ? ComponentCosts.None : CostsOf(c.ComponentProduct!, holding.Add(productId)))),
                 ],
                 HoldsItself = HoldsItself(productId),
+                PackagingLinkedRoundInALoop = packaging.LinkedRoundInALoop.Contains(productId),
             };
             details[productId] = detail;
             return detail;

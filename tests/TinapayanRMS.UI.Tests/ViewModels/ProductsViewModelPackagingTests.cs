@@ -3,6 +3,7 @@ using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
@@ -24,6 +25,32 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 [Collection(DatabaseCollection.B)]
 public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
+    // A product whose packaging links come round in a loop, as only an edit outside the app can leave them, failed every
+    // product's read with it. It opens now, showing no packaging, and says so (2026-11-05).
+    [Fact]
+    public async Task A_product_whose_packaging_links_come_round_in_a_loop_opens_with_a_notice()
+    {
+        await AddRoleAsync("Packaging", sortOrder: 6, isPackaging: true);
+        var bigId = await AddProductAsync("Ensaymada");
+        var miniId = await AddProductAsync("Ensaymada Mini");
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.PackagingLinks.Add(new PackagingLink { ProductId = bigId, LinkedProductId = miniId });
+            dbContext.PackagingLinks.Add(new PackagingLink { ProductId = miniId, LinkedProductId = bigId });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        var viewModel = await CreateLoadedViewModelAsync();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == bigId);
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.ErrorMessage is not null,
+            () => $"ready={viewModel.AreDetailsReady}, error={viewModel.ErrorMessage}");
+
+        viewModel.ErrorMessage.Should().Be(PackagingLinkRules.LinkedRoundInALoopText("Ensaymada"));
+        viewModel.Packaging.LineEdits.Should().BeEmpty();
+        viewModel.Costing.Costs.Packaging.Should().Be(0m);
+    }
+
     [Fact]
     public async Task A_new_packaging_is_added_in_the_Packaging_role_and_saved_as_the_products_own_lines()
     {

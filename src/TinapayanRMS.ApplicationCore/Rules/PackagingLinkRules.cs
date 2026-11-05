@@ -2,6 +2,17 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 
 public static class PackagingLinkRules
 {
+    /// <summary>What a write that follows a product's packaging links says of a chain that comes round again.</summary>
+    public const string LoopText = "Circular packaging link detected.";
+
+    /// <summary>
+    /// What the Products screen says of a product whose packaging links come round again: only an edit outside the app
+    /// can leave one, since a link that would close one is refused (<see cref="EnsureNoCycle"/>), and it's read all the
+    /// same, showing no packaging, rather than fail every product's read (PackagingLineRepository).
+    /// </summary>
+    public static string LinkedRoundInALoopText(string name) =>
+        $"{name}'s packaging links come round in a loop, so it shows no packaging and none is costed. Link it to a product or set outside the loop.";
+
     public static void EnsureNotSelfLink(int productId, int linkedProductId)
     {
         if (productId == linkedProductId)

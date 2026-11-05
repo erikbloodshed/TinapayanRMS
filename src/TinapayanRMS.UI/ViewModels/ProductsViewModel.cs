@@ -2409,6 +2409,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             ErrorMessage = CompositeProductRules.HoldsItselfText(product.Name);
         }
+        else if (detail.PackagingLinkedRoundInALoop)
+        {
+            ErrorMessage = PackagingLinkRules.LinkedRoundInALoopText(product.Name);
+        }
     }
 
     /// <summary>

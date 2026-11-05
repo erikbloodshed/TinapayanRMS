@@ -21,14 +21,16 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
         return await ResolveEffectiveAsync(dbContext, productId, cancellationToken);
     }
 
-    public async Task<IReadOnlyDictionary<int, IReadOnlyList<PackagingLine>>> GetEffectiveForProductsAsync(
+    public async Task<EffectivePackaging> GetEffectiveForProductsAsync(
         IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await ResolveEffectiveAsync(dbContext, productIds, cancellationToken);
+        HashSet<int> looping = [];
+        var lines = await ResolveEffectiveAsync(dbContext, productIds, cancellationToken, looping);
+        return new EffectivePackaging(lines, looping);
     }
 
-    /// <summary><see cref="ResolveEffectiveAsync(TinapayanRMSDbContext, IReadOnlyCollection{int}, CancellationToken)"/> for one product.</summary>
+    /// <summary><see cref="ResolveEffectiveAsync(TinapayanRMSDbContext, IReadOnlyCollection{int}, CancellationToken, ISet{int})"/> for one product.</summary>
     internal static async Task<IReadOnlyList<PackagingLine>> ResolveEffectiveAsync(
         TinapayanRMSDbContext dbContext, int productId, CancellationToken cancellationToken) =>
         (await ResolveEffectiveAsync(dbContext, [productId], cancellationToken))[productId];
@@ -38,19 +40,33 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
     /// whose own lines it shows, or to a packaging set, whose lines it shows as its own (<see cref="SetLinesAsPackagingLines"/>).
     /// Every link is read in one query and followed in memory, then the lines at the chains' ends in one query for
     /// products and one for sets, however many products and however long their chains (2026-10-03: it was a query per
-    /// link followed, for each product, and Reports read every product that way). A chain that comes round again is
-    /// refused, should one slip past SetLinkAsync's own check (e.g. a manual data edit). Reads through Dapper, in
-    /// <paramref name="dbContext"/>'s transaction if it has one (ProductCloner's and RemoveLinkAsync's do).
+    /// link followed, for each product, and Reports read every product that way). A chain that comes round again, which only
+    /// an edit outside the app can leave (SetLinkAsync refuses one), is refused, as a write that copies the lines should
+    /// be (ProductCloner, RemoveLinkAsync); given <paramref name="looping"/>, as a read of many products is, its product
+    /// shows no lines and goes in it instead (2026-11-05: a refusal failed every product's read, for Reports, Print, the
+    /// Products list and the servers). Reads through Dapper, in <paramref name="dbContext"/>'s transaction if it has one
+    /// (ProductCloner's and RemoveLinkAsync's do).
     /// </summary>
     internal static async Task<IReadOnlyDictionary<int, IReadOnlyList<PackagingLine>>> ResolveEffectiveAsync(
-        TinapayanRMSDbContext dbContext, IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
+        TinapayanRMSDbContext dbContext, IReadOnlyCollection<int> productIds, CancellationToken cancellationToken, ISet<int>? looping = null)
     {
         // One row a product at most, so every link is a small read, and a chain costs nothing more to follow.
         var links = (await dbContext.QueryAsync<PackagingLink>(
                 $"SELECT {Columns.Of<PackagingLink>("l")} FROM packaging_links l", null, cancellationToken))
             .ToDictionary(l => l.ProductId);
 
-        var ends = productIds.Distinct().ToDictionary(id => id, id => ChainEnd(id, links));
+        var chainEnds = productIds.Distinct().ToDictionary(id => id, id => ChainEnd(id, links));
+        foreach (var id in chainEnds.Where(e => e.Value is null).Select(e => e.Key))
+        {
+            if (looping is null)
+            {
+                throw new BusinessRuleException(PackagingLinkRules.LoopText);
+            }
+
+            looping.Add(id);
+        }
+
+        var ends = chainEnds.Where(e => e.Value is not null).ToDictionary(e => e.Key, e => e.Value!.Value);
         var ownerIds = ends.Values.Where(end => end.SetId is null).Select(end => end.ProductId).Distinct().ToList();
         var setIds = ends.Values.Select(end => end.SetId).OfType<int>().Distinct().ToList();
 
@@ -62,25 +78,28 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
 
         var ownLinesByProduct = ownLines.ToLookup(l => l.ProductId);
         var setLinesBySet = setLines.ToLookup(l => l.SubAssemblyId);
-        return ends.ToDictionary(
+        return chainEnds.ToDictionary(
             pair => pair.Key,
-            pair => pair.Value.SetId is { } setId
-                ? SetLinesAsPackagingLines(pair.Value.ProductId, setLinesBySet[setId])
-                : (IReadOnlyList<PackagingLine>)[.. ownLinesByProduct[pair.Value.ProductId]]);
+            pair => pair.Value switch
+            {
+                null => [],
+                { SetId: { } setId } end => SetLinesAsPackagingLines(end.ProductId, setLinesBySet[setId]),
+                var end => (IReadOnlyList<PackagingLine>)[.. ownLinesByProduct[end.Value.ProductId]],
+            });
     }
 
     /// <summary>
     /// Where <paramref name="productId"/>'s link chain ends: at the product whose own lines it shows, or at the set the
-    /// last product in it links (SetId), with that product.
+    /// last product in it links (SetId), with that product; null for a chain that comes round again.
     /// </summary>
-    private static (int ProductId, int? SetId) ChainEnd(int productId, Dictionary<int, PackagingLink> links)
+    private static (int ProductId, int? SetId)? ChainEnd(int productId, Dictionary<int, PackagingLink> links)
     {
         HashSet<int> visited = [];
         while (true)
         {
             if (!visited.Add(productId))
             {
-                throw new BusinessRuleException("Circular packaging link detected.");
+                return null;
             }
 
             if (!links.TryGetValue(productId, out var link) || link is { LinkedSubAssemblyId: null, LinkedProductId: null })
