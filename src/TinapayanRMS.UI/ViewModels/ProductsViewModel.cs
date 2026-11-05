@@ -3248,7 +3248,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     linked.Name,
                     [.. section.AddIns.Select(a => new SubAssemblyLineEdit(ingredientsById[a.IngredientId], a.Grams))],
                     SectionLabelOf(linked.Name, linkedRole),
-                    linkedOwner: ProductUsageEdit.LinkedOwnerOf(linked)));
+                    linkedOwner: PricedSection.LinkedOwnerOf(linked)));
                 continue;
             }
 
@@ -4453,7 +4453,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     [.. linkedLinesById[subAssembly.Id].Select(l => new SubAssemblyLineEdit(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
                     edit.AreLinkedLinesEdited ? Repriced(edit.Lines, ingredientsById) : null,
                     Repriced(edit.AddIns, ingredientsById),
-                    ProductUsageEdit.LinkedOwnerOf(subAssembly));
+                    PricedSection.LinkedOwnerOf(subAssembly));
             }
             else
             {
@@ -4596,8 +4596,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ReadMissingScalingProducts(components.Select(r => r.Product!));
 
         var recipe = new ScalingRecipe(
-            [.. UsageEdits],
-            [.. Packaging.LineEdits],
+            [.. UsageEdits.Select(u => u.ToPriced())],
+            [.. Packaging.LineEdits.Select(l => l.ToPriced())],
             [.. components.Select(r => (r.Product!, r.Quantity!.Value))],
             EditingQuantityRequired,
             IsEditingComposite && EditingIncludesComponentPackaging);
@@ -4762,8 +4762,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             ? ProductPrintout.NotSavedNote
             : History.IsDirty ? ProductPrintout.UnsavedChangesNote : null,
         DateTime.Now,
-        [.. UsageEdits.Select(u => PrintedSection.From(u, CostBasis))],
-        HasPackaging ? PrintedPackaging.From(Packaging.LineEdits, Packaging.IsPackagingLinked ? Packaging.PackagingLinkedToText : null) : null,
+        [.. UsageEdits.Select(u => PrintedSection.From(u.ToPriced(), CostBasis))],
+        HasPackaging
+            ? PrintedPackaging.From(Packaging.LineEdits.Select(l => l.ToPriced()), Packaging.IsPackagingLinked ? Packaging.PackagingLinkedToText : null)
+            : null,
         Costing.Costs,
         IsEditingComposite ? PrintedComponent.From(ComponentsTable.ComponentEdits) : null)
     {

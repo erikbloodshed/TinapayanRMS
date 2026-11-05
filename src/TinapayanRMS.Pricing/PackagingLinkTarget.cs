@@ -20,7 +20,7 @@ public closed record PackagingLinkTarget(string Name)
     /// <summary>The Packaging tab's banner, e.g. "Linked to Gift Box Set (Sub-Assemblies)" or "Linked to Cream Loaf".</summary>
     public string LinkedToText => this switch
     {
-        Set => $"Linked to {Name} ({ProductUsageEdit.StandaloneSourceName})",
+        Set => $"Linked to {Name} ({PricedSection.StandaloneSourceName})",
         OtherProduct => $"Linked to {Name}",
     };
 

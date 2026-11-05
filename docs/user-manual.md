@@ -656,7 +656,7 @@ The recipe has a tab for every section: each sub-assembly, named by its role, th
 
 Each section's tab shows its form:
 
-- **Role**, and an optional **Name**. The name tells apart two sections in the same role, such as *Filling: Ube* and *Filling: Cheese*.
+- **Role**, and an optional **Name**. The name tells apart two sections in the same role, such as *Filling: Ube* and *Filling: Cheese*, here and wherever the saved product shows: Reports, printouts and the Price Simulator.
 - **Existing Sub-Assembly or Packaging** picker, when you're linking or copying.
 - **The lines table**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base**. Under it are **Insert Line**, **Remove Line** and the section's cost per piece.
 - **Batch parameters**:

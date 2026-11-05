@@ -76,7 +76,7 @@ public class RecipeScalerTests
         int quantityRequired = 1,
         IReadOnlyList<(Product, int)>? components = null,
         bool includesComponentPackaging = false) =>
-        new(sections, packaging ?? [], components ?? [], quantityRequired, includesComponentPackaging);
+        new([.. sections.Select(s => s.ToPriced())], [.. (packaging ?? []).Select(l => l.ToPriced())], components ?? [], quantityRequired, includesComponentPackaging);
 
     [Fact]
     public void A_box_of_8_scales_its_sections_in_whole_batches_and_its_packaging_by_the_box()
@@ -218,9 +218,9 @@ public class RecipeScalerTests
             9, Dough, [new SubAssemblyLineEdit(flour, 500m)], UsageAuthoredField.Yield, 4m, linkedName: null);
         Dictionary<int, SavedProduct> products = new()
         {
-            [1] = new SavedProduct(ensaymada, [EnsaymadaDough(flour, water)], [new PackagingLineRow(wrapper, 1m)], true, null, ProductCostSummary.Empty),
-            [2] = new SavedProduct(cheeseRoll, [cheeseDough], [new PackagingLineRow(wrapper, 1m)], true, null, ProductCostSummary.Empty),
-            [3] = new SavedProduct(partyBox, [], [new PackagingLineRow(partyBoxCarton, 1m)], true, null, ProductCostSummary.Empty)
+            [1] = new SavedProduct(ensaymada, [EnsaymadaDough(flour, water).ToPriced()], [new PackagingLineRow(wrapper, 1m).ToPriced()], true, null, ProductCostSummary.Empty),
+            [2] = new SavedProduct(cheeseRoll, [cheeseDough.ToPriced()], [new PackagingLineRow(wrapper, 1m).ToPriced()], true, null, ProductCostSummary.Empty),
+            [3] = new SavedProduct(partyBox, [], [new PackagingLineRow(partyBoxCarton, 1m).ToPriced()], true, null, ProductCostSummary.Empty)
             {
                 Components = [new SavedComponent(new ProductComponent { ComponentProductId = 2, ComponentProduct = cheeseRoll, Quantity = 2 }, new ComponentCosts(0m, 0m, 0m, 0m))],
             },

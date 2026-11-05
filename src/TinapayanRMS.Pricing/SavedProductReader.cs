@@ -58,15 +58,15 @@ public sealed record SavedComponent(ProductComponent Component, ComponentCosts C
 }
 
 /// <summary>
-/// A saved product as the Products screen shows it once opened: its sections in recipe order, its packaging, and its
-/// costing worked out to the selling price. What a set of products prints, and what Reports prices.
+/// A saved product, read and priced: its sections in recipe order, its packaging, and its costing worked out to the
+/// selling price, all immutable. What Reports prices, what a set of products prints, and what the servers return.
 /// </summary>
 /// <param name="PackagingLinkedTo">The Packaging tab's "Linked to …" banner, or null for the product's own lines.</param>
 /// <param name="CostBasis">Which of its materials' costs it's priced at: buffered, unless the Products screen is switched to unbuffered.</param>
 public sealed record SavedProduct(
     Product Product,
-    IReadOnlyList<ProductUsageEdit> Sections,
-    IReadOnlyList<PackagingLineRow> PackagingLines,
+    IReadOnlyList<PricedSection> Sections,
+    IReadOnlyList<PricedPackagingLine> PackagingLines,
     bool HasPackaging,
     string? PackagingLinkedTo,
     ProductCostSummary Costs,
@@ -320,17 +320,21 @@ public sealed class SavedProductReader(
     {
         var linesBySubAssembly = detail.SubAssemblyLines.ToLookup(l => l.SubAssemblyId);
         var addInsByUsage = detail.AddIns.ToLookup(a => a.UsageId);
-        List<ProductUsageEdit> sections =
+
+        // Two sections in one role are told apart by their labels, "Dough" beside "Dough: Paste", as the screen tells them.
+        var repeatedRoles = PricedSection.RepeatedRoles(detail.Usages.Select(u => u.SubAssembly!.Role?.Id ?? 0));
+        List<PricedSection> sections =
         [
             .. detail.Usages
-                .Select(u => ProductUsageEdit.FromSaved(u, linesBySubAssembly[u.SubAssemblyId], addInsByUsage[u.Id], u.SubAssembly!.Role, product.Name, materialsById))
-                .Order(ProductUsageEdit.RecipeOrder),
+                .Select(u =>
+                {
+                    var role = u.SubAssembly!.Role;
+                    return PricedSection.FromSaved(
+                        u, linesBySubAssembly[u.SubAssemblyId], addInsByUsage[u.Id], role, product.Name, repeatedRoles.Contains(role?.Id ?? 0), materialsById);
+                })
+                .Order(PricedSection.RecipeOrder),
         ];
-        List<PackagingLineRow> packagingLines = [.. detail.Lines.Select(l => PackagingLineRow.FromSaved(l, basis))];
-        if (materialsById is not null)
-        {
-            PackagingLineRow.Resolve(packagingLines, materialsById);
-        }
+        List<PricedPackagingLine> packagingLines = [.. detail.Lines.Select(l => PricedPackagingLine.FromSaved(l, basis, materialsById))];
 
         var costing = detail.Costing;
         var costs = new ProductCostSummary(new ProductCostInputs

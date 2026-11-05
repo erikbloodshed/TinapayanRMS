@@ -16,8 +16,8 @@ namespace TinapayanRMS.UI.ViewModels;
 /// <param name="QuantityRequired">The pieces in one sellable unit.</param>
 /// <param name="IncludesComponentPackaging">A composite's products bring their packaging too.</param>
 public sealed record ScalingRecipe(
-    IReadOnlyList<ProductUsageEdit> Sections,
-    IReadOnlyList<PackagingLineRow> Packaging,
+    IReadOnlyList<PricedSection> Sections,
+    IReadOnlyList<PricedPackagingLine> Packaging,
     IReadOnlyList<(Product Product, int Quantity)> Components,
     int QuantityRequired,
     bool IncludesComponentPackaging)
@@ -103,7 +103,7 @@ public sealed class RecipeScaler(
     }
 
     /// <summary>A section in the whole batches that make <paramref name="pieces"/>, its lines and add-ins that many times over.</summary>
-    private ScalingRow ScaleSection(ProductUsageEdit section, decimal pieces)
+    private ScalingRow ScaleSection(PricedSection section, decimal pieces)
     {
         var batches = RecipeScalingRules.BatchesFor(pieces, section.AuthoredField, section.AuthoredValue, section.TotalWeight);
         if (batches == 0)
@@ -150,10 +150,10 @@ public sealed class RecipeScaler(
     }
 
     /// <summary>A packaging line for <paramref name="units"/> sellable units, in the unit it's typed in.</summary>
-    private static ScalingRow ScalePackagingLine(PackagingLineRow line, decimal units)
+    private static ScalingRow ScalePackagingLine(PricedPackagingLine line, decimal units)
     {
         var quantity = (line.QtyPerUnit ?? 0m) * units;
-        var unit = line.UnitOptions.FirstOrDefault(o => o.Key == line.UnitKey)?.Abbreviation ?? line.BaseUnitAbbreviation;
+        var unit = line.UnitAbbreviation ?? string.Empty;
         return ScalingRow.Line(line.PackagingMaterial!.Name, string.Empty, $"{quantity:#,0.##} {unit}".TrimEnd(), line.CostPerUnit * units);
     }
 

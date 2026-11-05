@@ -35,7 +35,7 @@ public class ProductPrintoutTests
             60m,
             linkedName: null);
 
-        var section = PrintedSection.From(usage, CostBasis.Buffered);
+        var section = PrintedSection.From(usage.ToPriced(), CostBasis.Buffered);
 
         section.Name.Should().Be("Dough");
         section.Source.Should().BeNull("the section is the product's own");
@@ -64,7 +64,7 @@ public class ProductPrintoutTests
             linkedName: "Variety Bread Dough",
             addIns: [new SubAssemblyLineEdit(Ingredient("Ube Flavouring", 0.5m), 20m)]);
 
-        var section = PrintedSection.From(usage, CostBasis.Buffered);
+        var section = PrintedSection.From(usage.ToPriced(), CostBasis.Buffered);
 
         section.Source.Should().Be("Variety Bread Dough, from Sub-Assemblies");
         section.AddIns.Should().Equal(new PrintedLine("Ube Flavouring", 20m, 2m, CostPerGram: 0.5m, 10m, IsFormulaBase: false));
@@ -86,7 +86,7 @@ public class ProductPrintoutTests
             linkedName: "Butter Glaze",
             addIns: [new SubAssemblyLineEdit(Ingredient("Cream", 0.3m), 500m)]);
 
-        var section = PrintedSection.From(usage, CostBasis.Buffered);
+        var section = PrintedSection.From(usage.ToPriced(), CostBasis.Buffered);
 
         section.PercentHeader.Should().Be("Absolute %");
         section.Lines.Select(l => l.Percent).Should().Equal(30m, 20m);
@@ -108,7 +108,7 @@ public class ProductPrintoutTests
             60m,
             linkedName: null);
 
-        var section = PrintedSection.From(usage, CostBasis.Buffered);
+        var section = PrintedSection.From(usage.ToPriced(), CostBasis.Buffered);
 
         section.HasPieceSize.Should().BeTrue();
         (section.TotalWeight, section.BatchCost).Should().Be((1700m, 50m));
@@ -128,7 +128,7 @@ public class ProductPrintoutTests
             0m,
             linkedName: null);
 
-        var section = PrintedSection.From(usage, CostBasis.Buffered);
+        var section = PrintedSection.From(usage.ToPriced(), CostBasis.Buffered);
 
         section.HasPieceSize.Should().BeFalse();
         section.CostPerPiece.Should().Be(0m);
@@ -154,7 +154,7 @@ public class ProductPrintoutTests
         };
 
         var packaging = PrintedPackaging.From(
-            [new PackagingLineRow(box, 1m), new PackagingLineRow(ribbon, 0.5m, unitId: 7), new PackagingLineRow()],
+            [new PackagingLineRow(box, 1m).ToPriced(), new PackagingLineRow(ribbon, 0.5m, unitId: 7).ToPriced(), new PackagingLineRow().ToPriced()],
             linkedTo: "Linked to Gift Box Set (Sub-Assemblies)");
 
         packaging.LinkedTo.Should().Be("Linked to Gift Box Set (Sub-Assemblies)");

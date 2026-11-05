@@ -19,18 +19,8 @@ public sealed class ProductUsageEdit : ObservableRow
     /// Sections show in role order (SubAssemblyRole.SortOrder); several in one role, in the order they were saved,
     /// then any not saved yet.
     /// </summary>
-    public static IComparer<ProductUsageEdit> RecipeOrder { get; } = Comparer<ProductUsageEdit>.Create((a, b) =>
-    {
-        var byRole = (a.Role?.SortOrder ?? int.MaxValue).CompareTo(b.Role?.SortOrder ?? int.MaxValue);
-        if (byRole == 0)
-        {
-            byRole = StringComparer.CurrentCultureIgnoreCase.Compare(a.RoleName, b.RoleName);
-        }
-
-        return byRole != 0 ? byRole : SavedOrder(a).CompareTo(SavedOrder(b));
-    });
-
-    private static int SavedOrder(ProductUsageEdit usage) => usage.SubAssemblyId > 0 ? usage.SubAssemblyId : int.MaxValue;
+    public static IComparer<ProductUsageEdit> RecipeOrder { get; } =
+        Comparer<ProductUsageEdit>.Create((a, b) => PricedSection.CompareInRecipe(a.Role, a.SubAssemblyId, b.Role, b.SubAssemblyId));
 
     /// <summary>
     /// A saved usage of <paramref name="productName"/>'s as its section: the sub-assembly's lines, this product's add-ins,
@@ -46,24 +36,18 @@ public sealed class ProductUsageEdit : ObservableRow
         string productName,
         IReadOnlyDictionary<int, RawMaterial>? ingredientsById = null)
     {
-        var subAssembly = usage.SubAssembly!;
-        var isOwn = subAssembly.OwnerProductId == usage.ProductId;
-        RawMaterial IngredientOf(int id, RawMaterial? read) => ingredientsById?.GetValueOrDefault(id) ?? read!;
+        var saved = PricedSection.FromSaved(usage, lines, addIns, role, productName, isRoleRepeated: false, ingredientsById);
         return new ProductUsageEdit(
-            subAssembly.Id,
+            saved.SubAssemblyId,
             role,
-            [.. lines.Select(l => new SubAssemblyLineEdit(IngredientOf(l.IngredientId, l.Ingredient), l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
-            usage.AuthoredField,
-            usage.AuthoredValue,
-            isOwn ? null : subAssembly.Name,
-            [.. addIns.Select(a => new SubAssemblyLineEdit(IngredientOf(a.IngredientId, a.Ingredient), a.Grams))],
-            SubAssemblyRules.SectionLabel(subAssembly.Name, productName, role?.Name ?? string.Empty),
-            linkedOwner: isOwn ? null : LinkedOwnerOf(subAssembly));
+            saved.Lines,
+            saved.AuthoredField,
+            saved.AuthoredValue,
+            saved.LinkedName,
+            saved.AddIns,
+            saved.Label,
+            linkedOwner: saved.LinkedOwner);
     }
-
-    /// <summary>The product a linked sub-assembly is kept in, when it's that product's own (a variant's link); null for one on the Sub-Assemblies screen.</summary>
-    public static (int Id, string Name)? LinkedOwnerOf(SubAssembly subAssembly) =>
-        subAssembly.OwnerProductId is { } ownerId ? (ownerId, subAssembly.OwnerProduct?.Name ?? $"Product {ownerId}") : null;
 
     /// <param name="subAssemblyId">The sub-assembly's id, or 0 for a new section, not saved yet.</param>
     /// <param name="linkedName">The linked sub-assembly's name, e.g. "Cheese Roll Filling: Ube"; null for the product's own or a new section.</param>
@@ -112,27 +96,17 @@ public sealed class ProductUsageEdit : ObservableRow
         LinkedOwner = linkedName is null ? null : linkedOwner;
         AddIns = addIns ?? [];
 
-        // The sub-assembly's own batch, then this product's on top of it: add-ins go into the batch, so a
-        // piece takes its weight-per-piece share of the two together. Worked out at both costs, buffered and
-        // true, so the screen can switch between them without building its sections again.
-        (BaseTotalWeight, var baseCost) = SubAssemblyRules.CalculateTotals([.. lines.Select(l => (l.Grams, l.CostPerGramAt(CostBasis.Buffered)))]);
-        var baseUnbufferedCost = SubAssemblyRules.CalculateTotals([.. lines.Select(l => (l.Grams, l.CostPerGramAt(CostBasis.Unbuffered)))]).TotalCost;
-        (TotalWeight, _totalCost) = ProductRules.CalculateEffectiveBatch(
-            BaseTotalWeight, baseCost, [.. AddIns.Select(a => (a.Grams, a.CostPerGramAt(CostBasis.Buffered)))]);
-        _unbufferedTotalCost = ProductRules.CalculateEffectiveBatch(
-            BaseTotalWeight, baseUnbufferedCost, [.. AddIns.Select(a => (a.Grams, a.CostPerGramAt(CostBasis.Unbuffered)))]).TotalCost;
-
-        // The pieces share out the whole batch. What's lost making it is a cost on the product (its Wastage), not a
-        // smaller batch.
-        (WeightPerPiece, Yield) = ProductRules.ResolvePieceSize(authoredField, authoredValue, TotalWeight);
-
-        // A batch that weighs nothing has nothing to share out per piece.
-        if (TotalWeight > 0 && WeightPerPiece > 0)
-        {
-            _costPerPiece = ProductRules.CalculateUsageCostPerPiece(_totalCost, WeightPerPiece, TotalWeight);
-            _unbufferedCostPerPiece = ProductRules.CalculateUsageCostPerPiece(_unbufferedTotalCost, WeightPerPiece, TotalWeight);
-        }
+        // Worked out at both costs, buffered and true, so the screen can switch between them without building its
+        // sections again.
+        Figures = SectionFigures.Of(lines, AddIns, authoredField, authoredValue);
     }
+
+    /// <summary>The section's batch and piece figures, at both costs.</summary>
+    public SectionFigures Figures { get; }
+
+    /// <summary>The section as it stands now, called what it's called now: what printouts and scaling read.</summary>
+    public PricedSection ToPriced() =>
+        new(SubAssemblyId, Role, Label, SectionName, LinkedName, LinkedOwner, AuthoredField, AuthoredValue, Lines, AddIns, Figures);
 
     public int SubAssemblyId { get; }
 
@@ -174,7 +148,7 @@ public sealed class ProductUsageEdit : ObservableRow
     /// What the section is called: its tab and its heading. Its role, e.g. "Filling",
     /// and with its name when the recipe has more than one in the role: "Filling: Ube" beside "Filling: Cheese".
     /// </summary>
-    public string SectionName => IsRoleRepeated && Label is { } label ? $"{RoleName}: {label}" : RoleName;
+    public string SectionName => PricedSection.NameOf(RoleName, Label, IsRoleRepeated);
 
     public IReadOnlyList<SubAssemblyLineEdit> Lines { get; }
 
@@ -188,9 +162,6 @@ public sealed class ProductUsageEdit : ObservableRow
     public UsageAuthoredField AuthoredField { get; }
 
     public decimal AuthoredValue { get; }
-
-    /// <summary>Where every sub-assembly is kept, and edited: the Sub-Assemblies screen.</summary>
-    public const string StandaloneSourceName = "Sub-Assemblies";
 
     /// <summary>The linked sub-assembly's name, e.g. "Cheese Roll Filling: Ube"; null for the product's own or a new section.</summary>
     public string? LinkedName { get; }
@@ -268,7 +239,7 @@ public sealed class ProductUsageEdit : ObservableRow
     /// The badge beside a linked section's heading, which opens where it's kept: "Cheese Roll Dough, from Sub-Assemblies",
     /// or a variant's "Ensaymada Filling, from Ensaymada", the product whose own it is.
     /// </summary>
-    public string LinkedFromText => $"{LinkedName}, from {LinkedOwner?.Name ?? StandaloneSourceName}";
+    public string LinkedFromText => PricedSection.LinkedFromText(LinkedName ?? string.Empty, LinkedOwner);
 
     /// <summary>The badge's tooltip: where it's kept, and that Save here writes changed lines there.</summary>
     public string LinkedFromToolTip => LinkedOwner is { } owner
@@ -279,32 +250,26 @@ public sealed class ProductUsageEdit : ObservableRow
     public string DisplayName => LinkedName ?? SectionName;
 
     /// <summary>The sub-assembly's own batch, before this product's add-ins: what the form's caption compares against.</summary>
-    public decimal BaseTotalWeight { get; }
+    public decimal BaseTotalWeight => Figures.BaseTotalWeight;
 
     /// <summary>The batch a piece is cut from: the sub-assembly's own plus this product's add-ins.</summary>
-    public decimal TotalWeight { get; }
-
-    private readonly decimal _totalCost;
-    private readonly decimal _unbufferedTotalCost;
+    public decimal TotalWeight => Figures.TotalWeight;
 
     /// <summary>What the whole batch costs, add-ins included, at <paramref name="basis"/>.</summary>
-    public decimal TotalCostAt(CostBasis basis) => basis == CostBasis.Unbuffered ? _unbufferedTotalCost : _totalCost;
+    public decimal TotalCostAt(CostBasis basis) => Figures.TotalCostAt(basis);
 
     /// <summary>Grams of the batch in one piece.</summary>
-    public decimal WeightPerPiece { get; }
+    public decimal WeightPerPiece => Figures.WeightPerPiece;
 
     /// <summary>Pieces one batch makes. Expected to differ across a product's sub-assemblies.</summary>
-    public decimal Yield { get; }
+    public decimal Yield => Figures.Yield;
 
     public bool IsYieldAuthored => AuthoredField == UsageAuthoredField.Yield;
 
     public bool IsWeightAuthored => AuthoredField == UsageAuthoredField.WeightPerPiece;
 
-    private readonly decimal _costPerPiece;
-    private readonly decimal _unbufferedCostPerPiece;
-
     /// <summary>What one piece costs at <paramref name="basis"/>; 0 while the batch weighs nothing or has no piece size.</summary>
-    public decimal CostPerPieceAt(CostBasis basis) => basis == CostBasis.Unbuffered ? _unbufferedCostPerPiece : _costPerPiece;
+    public decimal CostPerPieceAt(CostBasis basis) => Figures.CostPerPieceAt(basis);
 
     /// <summary>E.g. "1,700 g batch".</summary>
     public string BatchText => $"{TotalWeight:#,0.##} g batch";

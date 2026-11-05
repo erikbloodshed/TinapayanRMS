@@ -38,5 +38,5 @@ public sealed class LinkableSubAssemblyOption
 
     public string DisplayName => SubAssembly is null
         ? $"Packaging — {PackagingTarget!.Name}"
-        : $"{SubAssembly.Name} — {SubAssembly.OwnerProduct?.Name ?? ProductUsageEdit.StandaloneSourceName} ({SubAssembly.Role?.Name})";
+        : $"{SubAssembly.Name} — {SubAssembly.OwnerProduct?.Name ?? PricedSection.StandaloneSourceName} ({SubAssembly.Role?.Name})";
 }

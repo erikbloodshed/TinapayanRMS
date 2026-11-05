@@ -81,9 +81,9 @@ public sealed record SectionCosting(
     IReadOnlyList<LineCosting> Lines,
     IReadOnlyList<LineCosting> AddIns)
 {
-    public static SectionCosting From(ProductUsageEdit section, CostBasis basis) => new(
+    public static SectionCosting From(PricedSection section, CostBasis basis) => new(
         section.SectionName,
-        section.IsLinked ? section.LinkedFromText : null,
+        section.LinkedFrom,
         section.TotalWeight,
         section.TotalCostAt(basis),
         section.WeightPerPiece,
@@ -112,10 +112,10 @@ public sealed record ComponentCosting(string Product, int Quantity, decimal Reci
 
 public sealed record PackagingCosting(string? Material, decimal? Quantity, string? Unit, decimal Cost)
 {
-    public static PackagingCosting From(PackagingLineRow line) => new(
+    public static PackagingCosting From(PricedPackagingLine line) => new(
         line.PackagingMaterial?.Name,
         line.QtyPerUnit,
-        line.UnitOptions.FirstOrDefault(o => o.Key == line.UnitKey)?.Abbreviation,
+        line.UnitAbbreviation,
         line.CostPerUnit);
 }
 

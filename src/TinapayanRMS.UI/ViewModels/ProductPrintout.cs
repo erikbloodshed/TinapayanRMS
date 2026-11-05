@@ -157,31 +157,31 @@ public sealed record PrintedSection(
     public decimal? NowBatchCost { get; init; }
 
     /// <summary>The section as its recipe tab shows it, at <paramref name="basis"/>.</summary>
-    public static PrintedSection From(ProductUsageEdit usage, CostBasis basis)
+    public static PrintedSection From(PricedSection section, CostBasis basis)
     {
         // Read as the recipe form reads them (ProductsViewModel.RecomputeUsageForm): against the formula's base while a
         // line is ticked, add-ins included, since an add-in is read against the recipe's base; with nothing ticked, every
         // line of both tables against the whole batch, add-ins included, so they come to 100 between them.
-        var formulaBase = SubAssemblyRules.FormulaBaseWeight([.. usage.Lines.Select(l => (l.Grams, l.IsFormulaBase))]);
+        var formulaBase = SubAssemblyRules.FormulaBaseWeight([.. section.Lines.Select(l => (l.Grams, l.IsFormulaBase))]);
         decimal? PercentOf(decimal grams) => formulaBase > 0
             ? SubAssemblyRules.CalculateBakersPercent(grams, formulaBase)
-            : SubAssemblyRules.CalculateAbsolutePercent(grams, usage.TotalWeight);
+            : SubAssemblyRules.CalculateAbsolutePercent(grams, section.TotalWeight);
         PrintedLine Line(SubAssemblyLineEdit line) =>
             new(line.Ingredient.Name, line.Grams, PercentOf(line.Grams), line.CostPerGramAt(basis), line.CostAt(basis), line.IsFormulaBase);
 
         return new(
-            usage.SectionName,
-            usage.IsLinked ? usage.LinkedFromText : null,
+            section.SectionName,
+            section.LinkedFrom,
             IngredientLineRow.PercentHeader(formulaBase),
-            [.. usage.Lines.Select(Line)],
-            [.. usage.AddIns.Select(Line)],
-            usage.TotalWeight,
-            PercentOf(usage.TotalWeight),
-            usage.TotalCostAt(basis),
-            usage.WeightPerPiece,
-            usage.Yield,
-            usage.CostPerPieceAt(basis),
-            usage.AuthoredValue > 0);
+            [.. section.Lines.Select(Line)],
+            [.. section.AddIns.Select(Line)],
+            section.TotalWeight,
+            PercentOf(section.TotalWeight),
+            section.TotalCostAt(basis),
+            section.WeightPerPiece,
+            section.Yield,
+            section.CostPerPieceAt(basis),
+            section.AuthoredValue > 0);
     }
 }
 
@@ -201,19 +201,14 @@ public sealed record PrintedLine(string Ingredient, decimal Grams, decimal? Perc
 /// <param name="Total">What the lines cost together, for one sellable unit.</param>
 public sealed record PrintedPackaging(string? LinkedTo, IReadOnlyList<PrintedPackagingLine> Lines, decimal Total)
 {
-    /// <summary>The Packaging tab's rows, leaving out any without a material, which isn't a line yet.</summary>
-    public static PrintedPackaging From(IEnumerable<PackagingLineRow> rows, string? linkedTo)
+    /// <summary>The Packaging tab's lines, leaving out any without a material, which isn't a line yet.</summary>
+    public static PrintedPackaging From(IEnumerable<PricedPackagingLine> packagingLines, string? linkedTo)
     {
         IReadOnlyList<PrintedPackagingLine> lines =
         [
-            .. rows
-                .Where(r => r.PackagingMaterial is not null)
-                .Select(r => new PrintedPackagingLine(
-                    r.PackagingMaterial!.Name,
-                    r.QtyPerUnit,
-                    r.UnitOptions.FirstOrDefault(o => o.Key == r.UnitKey)?.Abbreviation ?? r.BaseUnitAbbreviation,
-                    r.UnitCost,
-                    r.CostPerUnit)),
+            .. packagingLines
+                .Where(l => l.PackagingMaterial is not null)
+                .Select(l => new PrintedPackagingLine(l.PackagingMaterial!.Name, l.QtyPerUnit, l.UnitAbbreviation ?? string.Empty, l.UnitCost, l.CostPerUnit)),
         ];
 
         return new(linkedTo, lines, lines.Sum(l => l.Cost));
