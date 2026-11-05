@@ -22,7 +22,7 @@ public sealed partial class MainWindow : AppWindow, IVimHost
 
     // Each tab's screen LoadCommand, run whenever that tab is shown (see LoadSelectedTab).
     private readonly Dictionary<TabItemExt, ReactiveCommand<RxVoid, RxVoid>> _loadCommands = [];
-    private readonly HashSet<TabItemExt> _loadingTabs = [];
+    private readonly ScreenLoads<TabItemExt> _loads;
 
     // The tab that shows each screen, and each tab's screen.
     private readonly Dictionary<AppScreen, TabItemExt> _tabs = [];
@@ -68,6 +68,7 @@ public sealed partial class MainWindow : AppWindow, IVimHost
     {
         InitializeComponent();
         DataContext = viewModel;
+        _loads = new ScreenLoads<TabItemExt>(tab => ReferenceEquals(MainTabControl.SelectedItem, tab));
         _quickFindViewModel = quickFindViewModel;
         _unitsOfMeasureViewModel = unitsOfMeasureViewModel;
         _categoriesViewModel = categoriesViewModel;
@@ -513,20 +514,13 @@ public sealed partial class MainWindow : AppWindow, IVimHost
     /// <summary>
     /// Refreshes the shown tab's data, picking up whatever other tabs changed. The screen keeps its
     /// state because every LoadCommand merges rather than reloads (PLAN.md). A refresh still running
-    /// from a quick earlier visit is left to finish rather than started twice.
+    /// from a quick earlier visit isn't started twice: another follows it (ScreenLoads).
     /// </summary>
     private void LoadSelectedTab()
     {
-        if (MainTabControl.SelectedItem is not TabItemExt tab
-            || !_loadCommands.TryGetValue(tab, out var load)
-            || !_loadingTabs.Add(tab))
+        if (MainTabControl.SelectedItem is TabItemExt tab && _loadCommands.TryGetValue(tab, out var load))
         {
-            return;
+            _loads.Load(tab, () => load.Execute());
         }
-
-        // A load shows its own failure in its screen's error notice (ViewModelBase.LoadSafelyAsync). Should one escape it
-        // all the same, ReactiveUI hands it to App's handler, which says what went wrong; the error on Execute's own
-        // observable is the same failure again, and without a handler here it would be thrown a second time.
-        load.Execute().Finally(() => _loadingTabs.Remove(tab)).Subscribe(_ => { }, _ => { });
     }
 }
