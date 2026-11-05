@@ -143,10 +143,20 @@ public sealed record VersionComparison(string Label, int? VersionId = null)
 
 /// <summary>
 /// The Products screen's History tab: the product's versions, newest first, the one picked, and what changed in it,
-/// against the version before it, the product as it's saved now, or any other version. ProductsViewModel reads the
-/// versions and hands them over (<see cref="Show"/>); Restore is the screen's own, since it puts the version into the form.
+/// against the version before it, the product as it's saved now, or any other version. It reads them itself
+/// (<see cref="ReadAsync"/>, which the screen asks for while the tab shows) and saves the notes typed into them; Restore is
+/// the screen's own, since it puts the version into the form.
 /// </summary>
-public sealed class ProductVersionHistory : ReactiveObject
+/// <param name="materialsNow">The materials as the screen last loaded them, by id: what today's figures price a version at.</param>
+/// <param name="costBasis">The screen's cost basis, buffered or not.</param>
+/// <param name="runSafely">Runs an action nothing awaits on the screen, which shows what goes wrong (ViewModelBase.RunSafelyAsync).</param>
+public sealed class ProductVersionHistory(
+    IProductVersionRepository versionRepository,
+    IProductRepository productRepository,
+    SavedProductReader savedProducts,
+    Func<IReadOnlyDictionary<int, RawMaterial>> materialsNow,
+    Func<CostBasis> costBasis,
+    Func<Func<Task>, Task> runSafely) : ReactiveObject
 {
     private static readonly IReadOnlyList<VersionComparison> FixedChoices = [VersionComparison.Previous, VersionComparison.Current];
 
@@ -303,6 +313,64 @@ public sealed class ProductVersionHistory : ReactiveObject
 
         RefreshTrend();
     }
+
+    /// <summary>
+    /// Reads <paramref name="productId"/>'s versions and shows them (<see cref="Show"/>), each priced then and today: the
+    /// versions, the product as it's saved now (what a version is compared with), and its products' costs now, read off the
+    /// UI thread. Shows nothing when <paramref name="stillWanted"/> says the screen has moved on meanwhile.
+    /// </summary>
+    public async Task ReadAsync(int productId, Func<bool> stillWanted, CancellationToken cancellationToken)
+    {
+        var versionsRead = Task.Run(() => versionRepository.GetForProductAsync(productId, cancellationToken), cancellationToken);
+        var productRead = Task.Run(() => productRepository.GetByIdAsync(productId, cancellationToken), cancellationToken);
+        var detailRead = Task.Run(() => savedProducts.ReadDetailAsync(productId, cancellationToken), cancellationToken);
+        await Task.WhenAll(versionsRead, productRead, detailRead);
+        if (await productRead is not { } product)
+        {
+            return;
+        }
+
+        var versions = await versionsRead;
+        List<(ProductVersion Version, ProductVersionContent Content)> contents =
+            [.. versions.Select(v => (v, ProductVersionContent.FromJson(v.Content)))];
+        IReadOnlyCollection<int> componentIds = [.. contents.SelectMany(c => c.Content.Components.Select(p => p.ProductId)).Distinct()];
+        var componentCostsNow = await Task.Run(() => savedProducts.ReadComponentCostsAsync(componentIds, cancellationToken), cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // The product picked since, or the tab left: what was read is someone else's, or not wanted.
+        if (!stillWanted())
+        {
+            return;
+        }
+
+        Show(
+            productId,
+            [.. contents.Select(c => new ProductVersionRow(c.Version, c.Content, NoteTyped))],
+            ProductVersionSnapshot.From(product, await detailRead),
+            materialsNow(),
+            componentCostsNow,
+            costBasis());
+    }
+
+    /// <summary>A note typed into the table, saved as the cell is left; one refused goes back as it was.</summary>
+    private void NoteTyped(ProductVersionRow row, string? previous) =>
+        _ = runSafely(async () =>
+        {
+            try
+            {
+                await versionRepository.SetNoteAsync(row.Id, row.Note, CancellationToken.None);
+                var stored = ProductVersionRules.NormalizeNote(row.Note);
+                if (!string.Equals(stored, row.Note, StringComparison.Ordinal))
+                {
+                    row.RevertNote(stored);
+                }
+            }
+            catch (Exception)
+            {
+                row.RevertNote(previous);
+                throw;
+            }
+        });
 
     /// <summary>Nothing showing, until the next product's versions are read.</summary>
     public void Clear()

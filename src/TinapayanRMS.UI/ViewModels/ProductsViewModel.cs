@@ -794,7 +794,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ReactiveCommand<RxVoid, RxVoid> CreateVariantCommand { get; }
 
     /// <summary>The History tab: the product's versions, read while the tab shows (<see cref="RequestVersions"/>).</summary>
-    public ProductVersionHistory VersionHistory { get; } = new();
+    public ProductVersionHistory VersionHistory { get; }
 
     /// <summary>
     /// Restore on the History tab: the picked version's recipe, packaging, costing and price into the form, as unsaved
@@ -853,6 +853,23 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             () => CostBasis,
             () => EditingIncludesComponentPackaging,
             (ex, text) => ShowFailure(ex, text));
+        VersionHistory = new ProductVersionHistory(
+            versionRepository,
+            productRepository,
+            _savedProducts,
+            () =>
+            {
+                // Today's materials are the screen's own.
+                Dictionary<int, RawMaterial> materialsNow = [];
+                foreach (var material in Ingredients.Concat(PackagingMaterials))
+                {
+                    materialsNow.TryAdd(material.Id, material);
+                }
+
+                return materialsNow;
+            },
+            () => CostBasis,
+            RunSafelyAsync);
         Scaling = new ProductScaling(
             ScalingInputNow,
             () => Ingredients.ToDictionary(i => i.Id),
@@ -934,7 +951,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // product's details arrive under it. A Save reads them again (RequestVersions(force: true)).
         this.WhenAnyValue(x => x.SelectedDetailsTab, x => x.AreDetailsReady, x => x.SelectedProduct)
             .Subscribe(_ => RequestVersions());
-        LoadLatest(_versionReads, LoadVersionsAsync);
+        LoadLatest(_versionReads, (productId, cancellationToken) => VersionHistory.ReadAsync(
+            productId, () => SelectedProduct?.Id == productId, cancellationToken));
 
         // The Scaling tab is worked out while it shows, and again as anything it scales changes: every change to the
         // recipe, the packaging, a composite's products, the quantity required or the cost basis gives new Costs.
@@ -3007,70 +3025,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             _versionReads.OnNext(product.Id);
         }
     }
-
-    /// <summary>
-    /// The product's versions, each priced then and today (ProductVersionHistory.Show): the versions, the product as it's
-    /// saved now (what a version is compared with), and its products' costs now, read off the UI thread; today's materials
-    /// are the screen's own.
-    /// </summary>
-    private async Task LoadVersionsAsync(int productId, CancellationToken cancellationToken)
-    {
-        var versionsRead = Task.Run(() => _versionRepository.GetForProductAsync(productId, cancellationToken), cancellationToken);
-        var productRead = Task.Run(() => _productRepository.GetByIdAsync(productId, cancellationToken), cancellationToken);
-        var detailRead = Task.Run(() => _savedProducts.ReadDetailAsync(productId, cancellationToken), cancellationToken);
-        await Task.WhenAll(versionsRead, productRead, detailRead);
-        if (await productRead is not { } product)
-        {
-            return;
-        }
-
-        var versions = await versionsRead;
-        List<(ProductVersion Version, ProductVersionContent Content)> contents =
-            [.. versions.Select(v => (v, ProductVersionContent.FromJson(v.Content)))];
-        IReadOnlyCollection<int> componentIds = [.. contents.SelectMany(c => c.Content.Components.Select(p => p.ProductId)).Distinct()];
-        var componentCostsNow = await Task.Run(() => _savedProducts.ReadComponentCostsAsync(componentIds, cancellationToken), cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // The product picked since, or the tab left: what was read is someone else's, or not wanted.
-        if (SelectedProduct?.Id != productId)
-        {
-            return;
-        }
-
-        Dictionary<int, RawMaterial> materialsNow = [];
-        foreach (var material in Ingredients.Concat(PackagingMaterials))
-        {
-            materialsNow.TryAdd(material.Id, material);
-        }
-
-        VersionHistory.Show(
-            productId,
-            [.. contents.Select(c => new ProductVersionRow(c.Version, c.Content, VersionNoteTyped))],
-            ProductVersionSnapshot.From(product, await detailRead),
-            materialsNow,
-            componentCostsNow,
-            CostBasis);
-    }
-
-    /// <summary>A note typed into the History tab's table, saved as the cell is left; one refused goes back as it was.</summary>
-    private void VersionNoteTyped(ProductVersionRow row, string? previous) =>
-        _ = RunSafelyAsync(async () =>
-        {
-            try
-            {
-                await _versionRepository.SetNoteAsync(row.Id, row.Note, CancellationToken.None);
-                var stored = ProductVersionRules.NormalizeNote(row.Note);
-                if (!string.Equals(stored, row.Note, StringComparison.Ordinal))
-                {
-                    row.RevertNote(stored);
-                }
-            }
-            catch (Exception)
-            {
-                row.RevertNote(previous);
-                throw;
-            }
-        });
 
     /// <summary>
     /// Puts <paramref name="row"/>'s version into the form as unsaved edits, in one undo step: its sections, packaging,
