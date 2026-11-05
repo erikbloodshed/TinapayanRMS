@@ -1255,7 +1255,7 @@ Or type the packaging straight into the pack product's Packaging tab, then press
 
 TinapayanBMS, the app for weighing ingredients out ahead of mixing, keeps a copy of TinapayanRMS's recipes, ingredients, prices and costs, and plans production from it. It copies them through the **Recipe API**, a small program that runs in the background on the PC that holds the TinapayanRMS database. The Recipe API only reads. It never changes a recipe, a price or anything else.
 
-1. On the PC that holds the TinapayanRMS database, open PowerShell **as an administrator**, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Install-RecipeApi.ps1`. It installs the Recipe API, starts it, and starts it again each time you sign in to Windows. Running it as an administrator also lets the other PCs on the shop's network reach it. The first time, it also makes the Recipe API's **key**, a long password for apps, and shows it at the end. Copy it for the next step.
+1. On the PC that holds the TinapayanRMS database, open PowerShell **as an administrator**, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\New-DatabaseReader.ps1`, then `powershell -ExecutionPolicy Bypass -File scripts\Install-RecipeApi.ps1 -ReadOnlyUser tinapayanrms_reader`. The first makes a database sign-in that can read and never change anything, which the Recipe API then uses. You only need it once on that PC. The second installs the Recipe API, starts it, and starts it again each time you sign in to Windows. Running it as an administrator also lets the other PCs on the shop's network reach it. The first time, it also makes the Recipe API's **key**, a long password for apps, and shows it at the end. Copy it for the next step.
 2. In TinapayanBMS's **Settings**, type the Recipe API's address. Use `http://localhost:5290` when TinapayanBMS runs on the same PC, or `http://` and that PC's name or network address followed by `:5290` when it runs on another PC. Paste the key into **Key**. Then press **Save and Test**.
 
 The Recipe API answers only an app that gives it the key, so other programs on the shop's network can't read your recipes, costs and prices. Every copy of TinapayanBMS uses the same key. To copy it again, run this in PowerShell on the PC with the Recipe API, then paste it where it's needed:
@@ -1264,7 +1264,7 @@ The Recipe API answers only an app that gives it the key, so other programs on t
 (Get-Content "$env:LOCALAPPDATA\Programs\TinapayanRMS.RecipeApi\recipeapi.json" -Raw | ConvertFrom-Json).RecipeApi.Key | Set-Clipboard
 ```
 
-Running the script again, to update the Recipe API, keeps the same key. Removing the Recipe API removes its key too, so after installing it again TinapayanBMS needs the new key in its Settings.
+Running the install script again, to update the Recipe API, keeps the same key, and the read-only sign-in, so `-ReadOnlyUser` is only needed the first time. Removing the Recipe API removes its key too, so after installing it again TinapayanBMS needs the new key in its Settings.
 
 When TinapayanBMS can't get through, what it says points to the reason:
 
