@@ -390,6 +390,14 @@ public static class RawMaterialRules
         CurrentBufferPercentOf(material) is { } now && Math.Round(now, 1) < Math.Round(TargetBufferPercentOf(material), 1);
 
     /// <summary>
+    /// A purchased material that prices have risen past its fixed buffered cost (RawMaterial.BufferedCostPerBaseUnit): its
+    /// buffer is below 0 by a tenth of a point or more, so a recipe costed at the buffered cost is costed under what it
+    /// costs. A tenth of a point, as <see cref="IsBufferBelowTarget"/> counts, so a 0% buffer typed to the centavo isn't one.
+    /// </summary>
+    public static bool IsBufferedBelowCost(RawMaterial material) =>
+        CurrentBufferPercentOf(material) is { } now && Math.Round(now, 1) < 0m;
+
+    /// <summary>
     /// A buffer that has drifted from its target, either way, by a tenth of a point or more, as <see cref="IsBufferBelowTarget"/>
     /// counts it: the Raw Materials form's Re-apply Target shows.
     /// </summary>

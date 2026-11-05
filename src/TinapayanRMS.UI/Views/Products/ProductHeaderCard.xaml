@@ -55,6 +55,13 @@
                 the name and a long name trims while the tag stays in sight.
             -->
             <DockPanel HorizontalAlignment="Left" Margin="0,0,12,0">
+                <!-- A material in the recipe or packaging priced past its fixed buffered cost, so the product is costed under it -->
+                <Border DockPanel.Dock="Right"
+                        Style="{StaticResource LinkedBadgeStyle}"
+                        ToolTip="{Binding BelowCostText}"
+                        Visibility="{Binding BelowCostText, Converter={StaticResource NotNullToVisibilityConverter}}">
+                    <TextBlock Text="Priced below cost" FontSize="13" Foreground="{StaticResource WarningForegroundBrush}" />
+                </Border>
                 <!-- While the costs are unbuffered, so no figure on the screen is taken for the usual, buffered one -->
                 <Border DockPanel.Dock="Right"
                         Style="{StaticResource LinkedBadgeStyle}"

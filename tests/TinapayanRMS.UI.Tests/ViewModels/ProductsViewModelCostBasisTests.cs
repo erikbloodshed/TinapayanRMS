@@ -126,6 +126,35 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
     /// Ensaymada: a Dough of 1,000 g of flour, 0.05 a gram buffered and 0.04 true, 50 g a piece (2.50 buffered, 2.00
     /// true), and a gift box a piece, 30 buffered and 25 true.
     /// </summary>
+    // Every cost on the screen is at buffered costs, and a purchased material's is a fixed amount that rising prices can
+    // pass: the product was then priced under what it cost with nothing here to say so (2026-11-05).
+    [Fact]
+    public async Task The_header_says_when_prices_have_risen_past_a_materials_buffered_cost()
+    {
+        var productId = await AddEnsaymadaAsync();
+        var viewModel = await OpenAsync(productId);
+        viewModel.BelowCostText.Should().BeNull("the flour and the box are costed above what they cost");
+
+        // The flour's price goes past its buffered cost, as a new brand price leaves it; then the box's too.
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.RawMaterials.Where(m => m.Name == "Flour").ExecuteUpdateAsync(set => set.SetProperty(m => m.CostPerBaseUnit, 0.06m), Cancellation);
+        }
+
+        (await OpenAsync(productId)).BelowCostText.Should().Be(
+            "Prices have risen past the buffered cost of Flour, so this product is priced under what it costs. "
+            + "Re-apply its target buffer on Raw Materials, or in Reports' Cost Buffers.");
+
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.RawMaterials.Where(m => m.Name == "Gift Box").ExecuteUpdateAsync(set => set.SetProperty(m => m.CostPerBaseUnit, 36m), Cancellation);
+        }
+
+        (await OpenAsync(productId)).BelowCostText.Should().Be(
+            "Prices have risen past the buffered costs of Flour and Gift Box, so this product is priced under what they cost. "
+            + "Re-apply their target buffers on Raw Materials, or in Reports' Cost Buffers.");
+    }
+
     private async Task<int> AddEnsaymadaAsync()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);

@@ -16,6 +16,32 @@ public class RawMaterialRulesTests
         TargetCostBufferPercent = target,
     };
 
+    public static TheoryData<decimal, decimal, bool> BelowCostCases => new()
+    {
+        { 0.06m, 0.05m, true }, // -16.7%: prices have risen past it
+        { 0.05m, 0.05m, false }, // 0%: no buffer, but not below
+        { 0.0518888m, 0.05188m, false }, // -0.02%: a 0% buffer typed to the centavo in a 25 kg sack
+        { 0.05m, 0.055m, false },
+    };
+
+    [Theory]
+    [MemberData(nameof(BelowCostCases))]
+    public void A_purchased_material_priced_past_its_buffered_cost_by_a_tenth_of_a_point_or_more_is_below_cost(
+        decimal cost, decimal buffered, bool expected)
+    {
+        RawMaterialRules.IsBufferedBelowCost(Purchased(cost, buffered, 0m, null)).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Only_a_priced_purchased_material_can_be_below_cost()
+    {
+        var made = new RawMaterial { Source = RawMaterialSource.Made, CostPerBaseUnit = 0.06m, BufferedCostPerBaseUnit = 0.05m };
+        var unpriced = Purchased(0m, 0m, 10m, 10m);
+
+        RawMaterialRules.IsBufferedBelowCost(made).Should().BeFalse("a made one's buffered cost is its components'");
+        RawMaterialRules.IsBufferedBelowCost(unpriced).Should().BeFalse();
+    }
+
     [Fact]
     public void A_buffer_worn_below_its_target_by_a_tenth_of_a_point_or_more_is_counted()
     {

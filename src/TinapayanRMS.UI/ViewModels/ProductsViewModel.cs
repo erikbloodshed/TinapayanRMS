@@ -456,6 +456,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The screen shows its unbuffered costs: the header's badge says so.</summary>
     public bool IsUnbuffered => CostBasis == CostBasis.Unbuffered;
 
+    private string? _belowCostText;
+    /// <summary>
+    /// The header's "Priced below cost" badge's tooltip, naming the purchased materials in the recipe and packaging that
+    /// prices have risen past their fixed buffered cost (RawMaterialRules.IsBufferedBelowCost): the product is priced at the
+    /// buffered costs, so under what those cost. Null, and no badge, while none is. A composite's products' materials aren't
+    /// in the form, so they aren't counted; each says so when it's opened.
+    /// </summary>
+    public string? BelowCostText
+    {
+        get => _belowCostText;
+        private set => this.RaiseAndSetIfChanged(ref _belowCostText, value);
+    }
+
     /// <summary>
     /// The header's switch, named for the costs a click switches to (the user's request, 2026-09-29): "Unbuffered" while
     /// the screen is buffered, "Buffered" while it isn't.
@@ -4376,6 +4389,24 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             IsComposite = IsEditingComposite,
             HasOwnSections = IsEditingComposite && UsageEdits.Count > 0,
         });
+
+        List<string> belowCost =
+        [
+            .. UsageEdits.SelectMany(u => u.Lines.Concat(u.AddIns)).Select(l => l.Ingredient)
+                .Concat(Packaging.LineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())
+                .Where(RawMaterialRules.IsBufferedBelowCost)
+                .Select(m => m.Name)
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .Order(StringComparer.CurrentCultureIgnoreCase),
+        ];
+        BelowCostText = belowCost.Count switch
+        {
+            0 => null,
+            1 => $"Prices have risen past the buffered cost of {belowCost[0]}, so this product is priced under what it costs. "
+                + "Re-apply its target buffer on Raw Materials, or in Reports' Cost Buffers.",
+            _ => $"Prices have risen past the buffered costs of {string.Join(", ", belowCost[..^1])} and {belowCost[^1]}, so this "
+                + "product is priced under what they cost. Re-apply their target buffers on Raw Materials, or in Reports' Cost Buffers.",
+        };
     }
 
     /// <summary>
