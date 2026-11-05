@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
@@ -208,7 +207,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && ready(viewModel),
             () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
         return viewModel;
@@ -242,27 +241,5 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
-    }
-
-    /// <summary>Selecting a product loads its detail in the background: waits until <paramref name="condition"/> has held for a moment.</summary>
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(500))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"The product's detail never finished loading: {describe()}.");
     }
 }

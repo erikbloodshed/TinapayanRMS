@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -477,7 +476,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
         TreeFolder(first, RawMaterialType.Ingredient, "Flour").IsExpanded = true;
 
-        await WaitUntilSettledAsync(
+        await Settle.EventuallyAsync(
             () => store.ReadList(RawMaterialsViewModel.OpenFoldersKey)?.Contains($"Ingredient/{flourId}") == true,
             () => string.Join(", ", store.ReadList(RawMaterialsViewModel.OpenFoldersKey) ?? []));
 
@@ -514,7 +513,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.EditingName = "Strong Bread Flour";
 
         Click(viewModel, viewModel.RawMaterialTree.Find(cakeFlourId)!);
-        await WaitUntilSettledAsync(() => asked.Count == 1, () => $"asked={asked.Count}");
+        await Settle.UntilAsync(viewModel, () => asked.Count == 1, () => $"asked={asked.Count}");
 
         asked.Single().Should().StartWith("Save the changes to Strong Bread Flour?");
         viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
@@ -536,7 +535,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.EditingName = "Strong Bread Flour";
 
         Click(viewModel, viewModel.RawMaterialTree.Find(cakeFlourId)!);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.SelectedRawMaterial?.Id == cakeFlourId && viewModel.AreDetailsReady && !viewModel.History.IsDirty,
             () => $"selected={viewModel.SelectedRawMaterial?.Id} ready={viewModel.AreDetailsReady}");
 
@@ -572,7 +571,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
         (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue();
 
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.EditingName == "Bread Flour" && viewModel.AreDetailsReady && !viewModel.History.IsDirty,
             () => $"name={viewModel.EditingName}");
         viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
@@ -741,7 +740,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
     {
         var viewModel = await LoadedViewModelAsync();
         viewModel.OpenRawMaterial(rawMaterialId);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.SelectedRawMaterial?.Id == rawMaterialId,
             () => $"ready={viewModel.AreDetailsReady}");
         return viewModel;
@@ -768,30 +767,5 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
             viewStateStore ?? new InMemoryViewStateStore(),
             new CostingDefaultsRepository(factory),
             new LoggerConfiguration().CreateLogger());
-    }
-
-    /// <summary>
-    /// Waits until <paramref name="condition"/> has held for a moment: a material's details load in the background, and
-    /// the open folders are written once they settle, with nothing to await.
-    /// </summary>
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(500))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"It never settled: {describe()}.");
     }
 }

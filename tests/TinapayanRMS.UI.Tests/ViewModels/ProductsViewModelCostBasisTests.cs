@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -88,7 +87,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         await viewModel.ToggleCostBasisCommand.Execute();
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == cheeseRollId);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == cheeseRollId && viewModel.UsageForm.FormLines.Count == 1,
             () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.UsageForm.FormLines.Count}");
 
@@ -204,7 +203,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && (ready?.Invoke(viewModel) ?? (viewModel.UsageForm.FormLines.Count == 1 && viewModel.HasPackaging)),
             () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
         return viewModel;
@@ -238,27 +237,5 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
-    }
-
-    /// <summary>Selecting a product loads its detail in the background: waits until <paramref name="condition"/> has held for a moment.</summary>
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(500))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"The product's detail never finished loading: {describe()}.");
     }
 }

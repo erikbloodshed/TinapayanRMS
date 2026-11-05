@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
@@ -75,7 +74,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.Scaling.Units = 5;
         viewModel.SelectedDetailsTab = ProductsViewModel.ScalingTab;
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.Scaling.Rows.Count == 2 && viewModel.Scaling.Rows.All(r => r.Detail != RecipeScaler.ReadingText),
             () => string.Join(", ", viewModel.Scaling.Rows.Select(r => $"{r.Name}: {r.Detail}")));
 
@@ -95,7 +94,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         viewModel.Scaling.Units = 25;
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == cheeseRollId);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == cheeseRollId && viewModel.UsageForm.FormLines.Count == 1,
             () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.UsageForm.FormLines.Count}");
 
@@ -185,7 +184,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && (ready?.Invoke(viewModel) ?? viewModel.UsageForm.FormLines.Count == 2),
             () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
         return viewModel;
@@ -219,27 +218,5 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
-    }
-
-    /// <summary>Selecting a product loads its detail in the background: waits until <paramref name="condition"/> has held for a moment.</summary>
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(500))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"The screen never settled: {describe()}.");
     }
 }

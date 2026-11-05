@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
@@ -70,7 +69,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
 
         await viewModel.LoadCommand.Execute();
         await reports.LoadCommand.Execute();
-        await WaitUntilSettledAsync(() => viewModel.Products.Count == 3, () => $"{viewModel.Products.Count} rows");
+        await Settle.UntilAsync(viewModel, () => viewModel.Products.Count == 3, () => $"{viewModel.Products.Count} rows");
 
         foreach (var row in viewModel.Products)
         {
@@ -97,7 +96,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         viewModel.Changes.Add(change);
         change.MaterialId = bakery.EggId;
         change.ChangePercent = 10m;
-        await WaitUntilSettledAsync(() => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+        await Settle.UntilAsync(viewModel, () => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
 
         change.UnitName.Should().Be("gram");
         change.CurrentPrice.Should().Be(0.014m);
@@ -133,7 +132,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         viewModel.Changes.Add(change);
         change.MaterialId = bakery.EggId;
         change.ChangePercent = 10m;
-        await WaitUntilSettledAsync(() => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+        await Settle.UntilAsync(viewModel, () => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
 
         var choices = viewModel.PrintChoices(new DateTime(2026, 10, 6, 9, 0, 0));
 
@@ -177,7 +176,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
             interaction.SetOutput(ReactiveUI.Primitives.RxVoid.Default);
         });
         await viewModel.LoadCommand.Execute();
-        await WaitUntilSettledAsync(() => viewModel.Products.Count == 3, () => $"{viewModel.Products.Count} rows");
+        await Settle.UntilAsync(viewModel, () => viewModel.Products.Count == 3, () => $"{viewModel.Products.Count} rows");
 
         viewModel.SelectedProducts.Add(Row(viewModel, bakery.PandesalId)!);
         viewModel.SelectedProducts.Add(Row(viewModel, bakery.MeringueId)!);
@@ -195,7 +194,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         viewModel.Changes.Add(change);
         change.MaterialId = bakery.EggId;
         change.ChangePercent = 10m;
-        await WaitUntilSettledAsync(() => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+        await Settle.UntilAsync(viewModel, () => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
         viewModel.SelectedProducts.Should().BeEquivalentTo([Row(viewModel, bakery.PandesalId), Row(viewModel, bakery.MeringueId)]);
 
         viewModel.OnlyAffected = true;
@@ -232,11 +231,11 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         flour.MaterialId = bakery.FlourId;
         flour.ChangePercent = 10m;
 
-        await WaitUntilSettledAsync(() => viewModel.ErrorMessage is not null, () => "no message");
+        await Settle.UntilAsync(viewModel, () => viewModel.ErrorMessage is not null, () => "no message");
         viewModel.ErrorMessage.Should().Be($"Flour: {PriceChangeRules.NoPriceToChangeText}");
 
         flour.NewPrice = 0.06m;
-        await WaitUntilSettledAsync(() => viewModel.ErrorMessage is null && Row(viewModel, bakery.PandesalId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+        await Settle.UntilAsync(viewModel, () => viewModel.ErrorMessage is null && Row(viewModel, bakery.PandesalId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
     });
 
     [Fact]
@@ -252,7 +251,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
 
         var viewModel = await CreateLoadedViewModelAsync();
         AddChange(viewModel, bakery.EggId, percent: 10m);
-        await WaitUntilSettledAsync(() => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+        await Settle.UntilAsync(viewModel, () => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
 
         var meringue = Row(viewModel, bakery.MeringueId)!;
         meringue.CurrentPrice.Should().Be(5m);
@@ -292,7 +291,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
             (bakery.EggId, 0.02m, 10m, 0.022m),
             (bakery.FlourId, (decimal?)null, (decimal?)null, 0.06m));
         later.HasUnsavedChanges.Should().BeFalse();
-        await WaitUntilSettledAsync(() => Row(later, bakery.PandesalId)?.IsAffected == true, () => later.ErrorMessage ?? "not yet");
+        await Settle.UntilAsync(later, () => Row(later, bakery.PandesalId)?.IsAffected == true, () => later.ErrorMessage ?? "not yet");
     });
 
     [Fact]
@@ -389,7 +388,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
 
         var viewModel = await CreateLoadedViewModelAsync();
         AddChange(viewModel, bakery.FlourId, percent: 10m);
-        await WaitUntilSettledAsync(() => Row(viewModel, bakery.PandesalId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+        await Settle.UntilAsync(viewModel, () => Row(viewModel, bakery.PandesalId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
         var buffered = Row(viewModel, bakery.PandesalId)!;
         viewModel.CostBasisButtonLabel.Should().Be("Unbuffered");
         viewModel.IsUnbuffered.Should().BeFalse();
@@ -398,7 +397,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
 
         viewModel.IsUnbuffered.Should().BeTrue();
         viewModel.CostBasisButtonLabel.Should().Be("Buffered");
-        await WaitUntilSettledAsync(() => !ReferenceEquals(Row(viewModel, bakery.PandesalId), buffered), () => "still buffered");
+        await Settle.UntilAsync(viewModel, () => !ReferenceEquals(Row(viewModel, bakery.PandesalId), buffered), () => "still buffered");
         var unbuffered = Row(viewModel, bakery.PandesalId)!;
         unbuffered.RawMaterialCost.Should().BeApproximately(buffered.RawMaterialCost * 0.05m / 0.06m, 0.0000001m, "flour at 0.05 a gram, not its buffered 0.06");
         unbuffered.BaseCost.Should().BeApproximately(buffered.BaseCost * 0.05m / 0.06m, 0.0000001m);
@@ -412,7 +411,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
 
         await viewModel.ToggleCostBasisCommand.Execute();
 
-        await WaitUntilSettledAsync(() => Row(viewModel, bakery.PandesalId)?.BaseCost == buffered.BaseCost, () => "still unbuffered");
+        await Settle.UntilAsync(viewModel, () => Row(viewModel, bakery.PandesalId)?.BaseCost == buffered.BaseCost, () => "still unbuffered");
         Row(viewModel, bakery.PandesalId)!.SimulatedBaseCost.Should().Be(buffered.SimulatedBaseCost);
         viewModel.HasUnsavedChanges.Should().BeTrue("the switch is no change to the scenario");
     });
@@ -528,26 +527,4 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         new SubAssemblyLineRepository(factory),
         new ProductRepository(factory),
         new CostingDefaultsRepository(factory));
-
-    /// <summary>The figures are worked out in the background: waits until <paramref name="condition"/> has held for a moment.</summary>
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(300))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"The figures never settled: {describe()}.");
-    }
 }

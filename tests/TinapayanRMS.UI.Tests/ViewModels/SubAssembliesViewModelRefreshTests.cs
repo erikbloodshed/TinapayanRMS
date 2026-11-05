@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -80,7 +79,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRow = viewModel.Rows.Single();
-        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}");
 
         viewModel.Lines.Single().Grams = 300m;
         await using (var dbContext = CreateDbContext())
@@ -112,7 +111,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
 
         viewModel.Rows.Single().UsedByText.Should().Be("Cream Loaf");
         viewModel.SelectedRow = viewModel.Rows.Single();
-        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}");
         var creamLoaf = viewModel.UsedBy.Should().ContainSingle().Subject;
         creamLoaf.Name.Should().Be("Cream Loaf");
         int? opened = null;
@@ -147,7 +146,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         await viewModel.LoadCommand.Execute();
 
         viewModel.SelectedRow!.Id.Should().Be(ubeId);
-        await WaitUntilSettledAsync(() => viewModel.EditingName == "Ube Glaze", () => $"name={viewModel.EditingName}");
+        await Settle.UntilAsync(viewModel, () => viewModel.EditingName == "Ube Glaze", () => $"name={viewModel.EditingName}");
 
         viewModel.SearchText = "Chocolate";
         viewModel.OpenSubAssembly(chocolateId);
@@ -175,7 +174,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
 
         viewModel.SelectedRow!.Id.Should().Be(ubeId);
         viewModel.OpenByName("fondant").Should().BeFalse();
-        await WaitUntilSettledAsync(() => viewModel.EditingName == "Ube Glaze", () => $"name={viewModel.EditingName}");
+        await Settle.UntilAsync(viewModel, () => viewModel.EditingName == "Ube Glaze", () => $"name={viewModel.EditingName}");
     });
 
     [Fact]
@@ -215,7 +214,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("Gift Box Set was saved.");
-        await WaitUntilSettledAsync(() => viewModel.PackagingLines.Count == 1, () => $"packaging lines={viewModel.PackagingLines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.PackagingLines.Count == 1, () => $"packaging lines={viewModel.PackagingLines.Count}");
         viewModel.IsPackaging.Should().BeTrue();
         viewModel.Lines.Should().BeEmpty();
         viewModel.PackagingLines.Single().BaseUnitAbbreviation.Should().Be("pc");
@@ -238,7 +237,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRow = viewModel.Rows.Single();
-        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
 
         await viewModel.CopyCommand.Execute();
 
@@ -276,7 +275,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRow = viewModel.Rows.Single(r => r.Name == "Glaze");
-        await WaitUntilSettledAsync(() => viewModel.EditingName == "Glaze" && viewModel.Lines.Count == 1, () => $"name={viewModel.EditingName}");
+        await Settle.UntilAsync(viewModel, () => viewModel.EditingName == "Glaze" && viewModel.Lines.Count == 1, () => $"name={viewModel.EditingName}");
 
         await viewModel.CopyCommand.Execute();
         await viewModel.SaveCommand.Execute();
@@ -313,7 +312,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRow = viewModel.Rows.Single();
-        await WaitUntilSettledAsync(() => viewModel.PackagingLines.Count == 1, () => $"packaging lines={viewModel.PackagingLines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.PackagingLines.Count == 1, () => $"packaging lines={viewModel.PackagingLines.Count}");
 
         await viewModel.CopyCommand.Execute();
 
@@ -344,7 +343,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         (await viewModel.NewProductCommand.CanExecute.FirstAsync()).Should().BeFalse("nothing is picked");
 
         viewModel.SelectedRow = viewModel.Rows.Single();
-        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}");
         (await viewModel.NewProductCommand.CanExecute.FirstAsync()).Should().BeTrue();
         viewModel.EditingName = "Sugar Glaze";
         await viewModel.NewProductCommand.Execute();
@@ -409,28 +408,6 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
             new LoggerConfiguration().CreateLogger());
     }
 
-    /// <summary>Selecting a row loads its lines in the background, with nothing to await: waits until <paramref name="condition"/> has held for a moment.</summary>
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(500))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"The sub-assembly never finished loading: {describe()}.");
-    }
-
     [Fact]
     public Task A_typed_percentage_is_saved_and_reopens_as_typed() => StaThread.RunAsync(async () =>
     {
@@ -444,7 +421,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRow = viewModel.Rows.Single();
-        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
 
         viewModel.PercentHeader.Should().Be("Baker's %");
         viewModel.Lines.Single(l => l.Ingredient!.Id == waterId).Percent = 62.5m;
@@ -452,7 +429,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
 
-        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
         var water = viewModel.Lines.Single(l => l.Ingredient!.Id == waterId);
         water.Grams.Should().Be(625m);
         water.IsPercentTyped.Should().BeTrue("the form reopens with the percentage as the figure that was typed");
@@ -471,7 +448,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRow = viewModel.Rows.Single();
-        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
         viewModel.Lines.Single(l => l.Ingredient!.Id == waterId).Percent.Should().Be(500m / 1500m * 100m);
 
         viewModel.Lines.Single(l => l.Ingredient!.Id == flourId).IsFormulaBase = false;

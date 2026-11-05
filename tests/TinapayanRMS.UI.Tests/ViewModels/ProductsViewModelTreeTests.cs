@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -128,7 +127,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.ErrorMessage.Should().BeNull();
         asked.Should().StartWith("Set the costing of Mamon and Pandesal to the costing defaults: labor 35%, overhead 25%, administrative 15% and markup 60%?");
         viewModel.SuccessMessage.Should().Be("The costing defaults were applied to Mamon and Pandesal, with a version of each.");
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.Costing.EditingMarginPercent == 60m,
             () => $"ready={viewModel.AreDetailsReady}, markup={viewModel.Costing.EditingMarginPercent}");
         viewModel.Costing.EditingLaborPercent.Should().Be(35m, "the product showing reads its new costing");
@@ -568,7 +567,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         TreeFolder(first, ProductStage.Production, "Breads").IsExpanded = true;
 
-        await WaitUntilSettledAsync(
+        await Settle.EventuallyAsync(
             () => store.ReadList(ProductsViewModel.OpenFoldersKey)?.Contains($"Production/{breadsId}") == true,
             () => string.Join(", ", store.ReadList(ProductsViewModel.OpenFoldersKey) ?? []));
 
@@ -603,7 +602,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         await PriceAsync(enoughId, currentPrice: 10m, targetMarkupPercent: 30m);
 
         var viewModel = await LoadedViewModelAsync();
-        await WaitUntilSettledAsync(() => viewModel.ProductTree.Find(shortId)!.IsBelowTargetMarkup, () => "not flagged yet");
+        await Settle.UntilAsync(viewModel, () => viewModel.ProductTree.Find(shortId)!.IsBelowTargetMarkup, () => "not flagged yet");
 
         viewModel.ProductTree.Find(enoughId)!.IsBelowTargetMarkup.Should().BeFalse();
     });
@@ -636,7 +635,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.EditingName = "Mamon Tostado";
 
         Click(viewModel, viewModel.ProductTree.Find(pandesalId)!);
-        await WaitUntilSettledAsync(() => asked.Count == 1, () => $"asked={asked.Count}");
+        await Settle.UntilAsync(viewModel, () => asked.Count == 1, () => $"asked={asked.Count}");
 
         asked.Single().Should().StartWith("Save the changes to Mamon Tostado?");
         viewModel.SelectedProduct!.Id.Should().Be(mamonId);
@@ -658,7 +657,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.EditingName = "Mamon Tostado";
 
         Click(viewModel, viewModel.ProductTree.Find(pandesalId)!);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.SelectedProduct?.Id == pandesalId && viewModel.AreDetailsReady && !viewModel.History.IsDirty,
             () => $"selected={viewModel.SelectedProduct?.Id} ready={viewModel.AreDetailsReady}");
 
@@ -712,7 +711,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue();
 
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.EditingName == "Mamon" && viewModel.AreDetailsReady && !viewModel.History.IsDirty,
             () => $"name={viewModel.EditingName}");
         viewModel.SelectedProduct!.Id.Should().Be(mamonId);
@@ -841,7 +840,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
     {
         var viewModel = await LoadedViewModelAsync();
         viewModel.OpenProduct(productId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == productId, () => $"ready={viewModel.AreDetailsReady}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == productId, () => $"ready={viewModel.AreDetailsReady}");
         return viewModel;
     }
 
@@ -873,30 +872,5 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
             new ProductCategoryValidator(),
             viewStateStore ?? new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
-    }
-
-    /// <summary>
-    /// Waits until <paramref name="condition"/> has held for a moment: a product's detail loads in the background, and
-    /// the open folders are written once they settle, with nothing to await.
-    /// </summary>
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(500))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"It never settled: {describe()}.");
     }
 }

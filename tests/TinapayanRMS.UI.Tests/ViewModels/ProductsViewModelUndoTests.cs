@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -365,7 +364,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.History.CanUndo.Should().BeFalse("what's saved is the new starting point");
 
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
         Edit(viewModel, () => viewModel.EditingName = "Renamed again");
         viewModel.History.CanUndo.Should().BeTrue();
 
@@ -390,7 +389,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         await viewModel.RevertCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1,
             () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}");
         viewModel.EditingName.Should().Be("Ube Roll");
@@ -528,7 +527,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
 
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.UsageForm.FormLines.Count == 1,
             () => $"details={viewModel.AreDetailsReady} lines={viewModel.UsageForm.FormLines.Count}");
 
@@ -795,7 +794,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && ready(viewModel),
             () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
 
@@ -831,26 +830,5 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
-    }
-
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(500))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"The product's detail never finished loading: {describe()}.");
     }
 }

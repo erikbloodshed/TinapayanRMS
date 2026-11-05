@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -288,7 +287,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRow = viewModel.Rows.Single(r => r.Id == subAssemblyId);
-        await WaitUntilSettledAsync(() => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
 
         viewModel.History.CanUndo.Should().BeFalse("the load itself isn't a change");
         return (viewModel, subAssemblyId);
@@ -310,26 +309,5 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
             new InMemoryViewStateStore(),
             VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
             new LoggerConfiguration().CreateLogger());
-    }
-
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(500))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"The sub-assembly never finished loading: {describe()}.");
     }
 }

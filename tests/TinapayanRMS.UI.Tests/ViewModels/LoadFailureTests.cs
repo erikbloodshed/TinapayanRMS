@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
@@ -39,15 +38,15 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await viewModel.LoadCommand.Execute();
         Product Named(string name) => viewModel.Products.Single(p => p.Name == name);
 
-        await PickAsync(() => viewModel.SelectedProduct = Named("Almond Bread"), () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = Named("Almond Bread"), () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
 
         factory.Fail = true;
-        await PickAsync(() => viewModel.SelectedProduct = Named("Banana Bread"), () => viewModel.ErrorMessage is not null);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = Named("Banana Bread"), () => viewModel.ErrorMessage is not null);
         viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
         viewModel.UsageEdits.Should().BeEmpty("nothing of Banana Bread's came, and Almond Bread's mustn't show under its name");
 
         factory.Fail = false;
-        await PickAsync(
+        await Settle.PickAsync(viewModel,
             () => viewModel.SelectedProduct = Named("Cheese Bread"),
             () => viewModel.AreDetailsReady && viewModel.EditingName == "Cheese Bread" && viewModel.UsageEdits.Count == 1);
         viewModel.ErrorMessage.Should().BeNull("a load that works takes away the error a failed one left");
@@ -70,7 +69,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var viewModel = CreateProductsViewModel(factory);
         await viewModel.LoadCommand.Execute();
         Product Named(string name) => viewModel.Products.Single(p => p.Name == name);
-        await PickAsync(() => viewModel.SelectedProduct = Named("Almond Bread"), () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = Named("Almond Bread"), () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
 
         var hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         factory.Hold = hold;
@@ -83,7 +82,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         factory.Hold = null;
         hold.SetResult();
-        await PickAsync(() => { }, () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
+        await Settle.PickAsync(viewModel, () => { }, () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
     });
 
     [Fact]
@@ -102,14 +101,14 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await viewModel.LoadCommand.Execute();
         RawMaterial WithId(int id) => viewModel.RawMaterials.Single(m => m.Id == id);
 
-        await PickAsync(() => viewModel.SelectedRawMaterial = WithId(ids[0]), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = WithId(ids[0]), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
 
         factory.Fail = true;
-        await PickAsync(() => viewModel.SelectedRawMaterial = WithId(ids[1]), () => viewModel.ErrorMessage is not null);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = WithId(ids[1]), () => viewModel.ErrorMessage is not null);
         viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
 
         factory.Fail = false;
-        await PickAsync(() => viewModel.SelectedRawMaterial = WithId(ids[2]), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = WithId(ids[2]), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
         viewModel.ErrorMessage.Should().BeNull();
     });
 
@@ -128,19 +127,19 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await viewModel.LoadCommand.Execute();
         StandaloneSubAssemblyRow Named(string name) => viewModel.Rows.Single(r => r.Name == name);
 
-        await PickAsync(() => viewModel.SelectedRow = Named("Almond Dough"), () => viewModel.EditingName == "Almond Dough" && viewModel.Lines.Count == 1,
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = Named("Almond Dough"), () => viewModel.EditingName == "Almond Dough" && viewModel.Lines.Count == 1,
             () => $"name={viewModel.EditingName} lines={viewModel.Lines.Count} error={viewModel.ErrorMessage}");
 
         // The failure clears the pick, and the pick of nothing that follows mustn't take the error away.
         factory.Fail = true;
-        await PickAsync(() => viewModel.SelectedRow = Named("Banana Dough"), () => viewModel.ErrorMessage is not null,
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = Named("Banana Dough"), () => viewModel.ErrorMessage is not null,
             () => $"name={viewModel.EditingName} lines={viewModel.Lines.Count} row={viewModel.SelectedRow?.Name}");
         viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
         viewModel.SelectedRow.Should().BeNull("the form went blank rather than show Almond Dough under Banana Dough's row");
         viewModel.Lines.Should().BeEmpty();
 
         factory.Fail = false;
-        await PickAsync(() => viewModel.SelectedRow = Named("Cheese Dough"), () => viewModel.EditingName == "Cheese Dough" && viewModel.Lines.Count == 1,
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = Named("Cheese Dough"), () => viewModel.EditingName == "Cheese Dough" && viewModel.Lines.Count == 1,
             () => $"name={viewModel.EditingName} lines={viewModel.Lines.Count} row={viewModel.SelectedRow?.Name} error={viewModel.ErrorMessage}");
         viewModel.ErrorMessage.Should().BeNull();
     });
@@ -196,7 +195,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateProductsViewModel(factory);
         await viewModel.LoadCommand.Execute();
-        await PickAsync(() => viewModel.SelectedProduct = viewModel.Products.Single(), () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = viewModel.Products.Single(), () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         viewModel.EditingName = "Almond Loaf";
 
@@ -208,7 +207,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         factory.Fail = false;
         await viewModel.LoadCommand.Execute();
-        await PickAsync(() => { }, () => viewModel.AreDetailsReady);
+        await Settle.PickAsync(viewModel, () => { }, () => viewModel.AreDetailsReady);
         (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
     });
 
@@ -220,7 +219,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateRawMaterialsViewModel(factory);
         await viewModel.LoadCommand.Execute();
-        await PickAsync(() => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         viewModel.EditingName = "Strong Flour";
 
@@ -245,7 +244,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateSubAssembliesViewModel(factory);
         await viewModel.LoadCommand.Execute();
-        await PickAsync(() => viewModel.SelectedRow = viewModel.Rows.Single(), () => viewModel.EditingName == "Almond Dough" && viewModel.Lines.Count == 1);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = viewModel.Rows.Single(), () => viewModel.EditingName == "Almond Dough" && viewModel.Lines.Count == 1);
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         viewModel.EditingName = "Almond Loaf Dough";
 
@@ -273,39 +272,17 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         var viewModel = CreateRawMaterialsViewModel(new FailingDbContextFactory(CreateDbContextFactory()));
         await viewModel.LoadCommand.Execute();
-        await PickAsync(() => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == ids[0]), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == ids[0]), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
         viewModel.ConfirmUnsavedChanges.RegisterHandler(_ => throw new InvalidOperationException("The question couldn't be asked."));
         viewModel.EditingName = "Salted Butter";
 
         viewModel.OpenByName("Flour").Should().BeTrue();
 
-        await PickAsync(() => { }, () => viewModel.ErrorMessage is not null);
+        await Settle.PickAsync(viewModel, () => { }, () => viewModel.ErrorMessage is not null);
         viewModel.ErrorMessage.Should().Contain("The question couldn't be asked.");
         viewModel.SelectedRawMaterial!.Id.Should().Be(ids[0], "it stays on the form it was asked to leave");
         viewModel.EditingName.Should().Be("Salted Butter");
     });
-
-    private static async Task PickAsync(Action pick, Func<bool> settled, Func<string>? describe = null)
-    {
-        pick();
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!settled())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(300))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"The pick never settled: {describe?.Invoke()}");
-    }
 
     private ProductsViewModel CreateProductsViewModel(FailingDbContextFactory factory)
     {

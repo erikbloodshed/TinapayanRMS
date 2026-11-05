@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
@@ -271,7 +270,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         if (productName is not null)
         {
             viewModel.SelectedProduct = viewModel.Products.Single(p => p.Name == productName);
-            await WaitUntilSettledAsync(
+            await Settle.UntilAsync(viewModel,
                 () => viewModel.AreDetailsReady && (ready?.Invoke(viewModel) ?? true),
                 () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}");
         }
@@ -307,27 +306,5 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
-    }
-
-    /// <summary>Selecting a product loads its detail in the background: waits until <paramref name="condition"/> has held for a moment.</summary>
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(500))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"The product's detail never finished loading: {describe()}.");
     }
 }

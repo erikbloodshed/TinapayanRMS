@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Reactive.Linq;
+﻿using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -140,7 +139,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         // A Save reloads what was saved, which re-points the selection and so reloads the form.
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
         viewModel.History.CanUndo.Should().BeFalse("what's saved is the new starting point");
 
         Edit(viewModel, () => viewModel.EditingName = "Renamed again");
@@ -167,7 +166,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.AreDetailsReady.Should().BeFalse("the details are still on their way");
         Edit(viewModel, () => viewModel.EditingName = "Renamed");
 
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1,
             () => $"ready={viewModel.AreDetailsReady}, brands={viewModel.BrandPriceRows.Count}");
 
@@ -202,11 +201,11 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         var (viewModel, _) = await OpenMadeIngredientAsync();
 
         Edit(viewModel, () => viewModel.EditingSubAssembly = viewModel.SubAssemblyOptions.Single(s => s.Name == "Thin Syrup Base"));
-        await WaitUntilSettledAsync(() => viewModel.RecipeLines.Count == 2, () => $"recipe lines={viewModel.RecipeLines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.RecipeLines.Count == 2, () => $"recipe lines={viewModel.RecipeLines.Count}");
         viewModel.BomTotalWeight.Should().Be(1455m, "1,000 g of the thinner recipe and the 500 g add-in, less 3%");
 
         viewModel.TryUndo().Should().BeTrue();
-        await WaitUntilSettledAsync(() => viewModel.RecipeLines.Count == 1, () => $"recipe lines={viewModel.RecipeLines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.RecipeLines.Count == 1, () => $"recipe lines={viewModel.RecipeLines.Count}");
         viewModel.EditingSubAssembly!.Name.Should().Be("Syrup Base");
         viewModel.BomTotalWeight.Should().Be(970m);
         viewModel.History.IsDirty.Should().BeFalse("it's back as it was saved");
@@ -259,7 +258,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
 
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.SelectedRawMaterial?.Id == materialId,
             () => $"ready={viewModel.AreDetailsReady}, selected={viewModel.SelectedRawMaterial?.Id}");
 
@@ -418,7 +417,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == materialId);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.UnitRows.Count == 1,
             () => $"ready={viewModel.AreDetailsReady}, units={viewModel.UnitRows.Count}");
 
@@ -471,7 +470,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == materialId);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.AddInEdits.Count == 1 && viewModel.RecipeLines.Count == 1,
             () => $"ready={viewModel.AreDetailsReady}, add-ins={viewModel.AddInEdits.Count}, recipe lines={viewModel.RecipeLines.Count}");
 
@@ -511,26 +510,5 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
             new InMemoryViewStateStore(),
             new CostingDefaultsRepository(factory),
             new LoggerConfiguration().CreateLogger());
-    }
-
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(300))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"The material never finished loading: {describe()}.");
     }
 }

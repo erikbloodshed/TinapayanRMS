@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -169,7 +168,7 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
         var viewModel = CreateViewModel(asksAboutCosts);
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRow = viewModel.Rows.Single(r => r.Id == subAssemblyId);
-        await WaitUntilAsync(() => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}, error={viewModel.ErrorMessage}");
+        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}, error={viewModel.ErrorMessage}");
         return viewModel;
     }
 
@@ -203,19 +202,5 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
                         productRepository,
                         new CostingDefaultsRepository(factory)))
                 : null);
-    }
-
-    private static async Task WaitUntilAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        while (!condition())
-        {
-            if (deadline.Elapsed > TimeSpan.FromSeconds(15))
-            {
-                throw new TimeoutException($"Never settled: {describe()}.");
-            }
-
-            await Task.Delay(25);
-        }
     }
 }

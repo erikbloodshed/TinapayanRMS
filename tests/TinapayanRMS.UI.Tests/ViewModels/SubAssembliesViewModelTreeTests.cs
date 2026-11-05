@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Reactive.Linq;
 using AwesomeAssertions;
@@ -523,7 +522,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         first.SubAssemblyTree.Folder(doughRoleId)!.IsExpanded = false;
 
         var doughKey = doughRoleId.ToString(CultureInfo.InvariantCulture);
-        await WaitUntilSettledAsync(
+        await Settle.EventuallyAsync(
             () => store.ReadList(SubAssembliesViewModel.ClosedFoldersKey)?.Contains(doughKey) == true,
             () => string.Join(", ", store.ReadList(SubAssembliesViewModel.ClosedFoldersKey) ?? []));
         first.Dispose();
@@ -558,7 +557,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.EditingName = "Sweeter Dough";
 
         Click(viewModel, viewModel.SubAssemblyTree.Find(plainId)!);
-        await WaitUntilSettledAsync(() => asked.Count == 1, () => $"asked={asked.Count}");
+        await Settle.UntilAsync(viewModel, () => asked.Count == 1, () => $"asked={asked.Count}");
 
         asked.Single().Should().StartWith("Save the changes to Sweeter Dough?");
         viewModel.SelectedRow!.Id.Should().Be(sweetId);
@@ -580,7 +579,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.EditingName = "Sweeter Dough";
 
         Click(viewModel, viewModel.SubAssemblyTree.Find(plainId)!);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.SelectedRow?.Id == plainId && viewModel.EditingName == "Plain Dough" && !viewModel.History.IsDirty,
             () => $"selected={viewModel.SelectedRow?.Id} name={viewModel.EditingName}");
 
@@ -615,7 +614,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
 
         (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue();
 
-        await WaitUntilSettledAsync(() => viewModel.EditingName == "Sweet Dough" && !viewModel.History.IsDirty, () => $"name={viewModel.EditingName}");
+        await Settle.UntilAsync(viewModel, () => viewModel.EditingName == "Sweet Dough" && !viewModel.History.IsDirty, () => $"name={viewModel.EditingName}");
         viewModel.SelectedRow!.Id.Should().Be(sweetId);
         (await NameOfAsync(sweetId)).Should().Be("Sweet Dough");
     });
@@ -743,7 +742,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
     {
         var viewModel = await LoadedViewModelAsync();
         viewModel.OpenSubAssembly(subAssemblyId);
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.SelectedRow?.Id == subAssemblyId && viewModel.Lines.Count > 0 && !viewModel.History.IsDirty,
             () => $"lines={viewModel.Lines.Count}");
         return viewModel;
@@ -765,30 +764,5 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
             viewStateStore ?? new InMemoryViewStateStore(),
             VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
             new LoggerConfiguration().CreateLogger());
-    }
-
-    /// <summary>
-    /// Waits until <paramref name="condition"/> has held for a moment: a sub-assembly's lines load in the background, and
-    /// the closed folders are written once they settle, with nothing to await.
-    /// </summary>
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(500))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"It never settled: {describe()}.");
     }
 }

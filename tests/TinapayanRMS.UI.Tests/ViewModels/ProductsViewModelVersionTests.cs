@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -79,7 +78,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await SetCostAsync(seeded.SugarId, 0.2m);
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedDetailsTab = ProductsViewModel.HistoryTab;
-        await WaitUntilAsync(() => viewModel.VersionHistory.Rows.Count == 2, () => $"rows={viewModel.VersionHistory.Rows.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.VersionHistory.Rows.Count == 2, () => $"rows={viewModel.VersionHistory.Rows.Count}");
 
         var (latest, first) = (viewModel.VersionHistory.Rows[0], viewModel.VersionHistory.Rows[1]);
         first.BaseCostThen.Should().Be(10m, "100 g of sugar at 0.10, the whole batch one piece");
@@ -111,7 +110,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await SetWastageAsync(10m);
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedDetailsTab = ProductsViewModel.HistoryTab;
-        await WaitUntilAsync(() => viewModel.VersionHistory.Rows.Count == 2, () => $"rows={viewModel.VersionHistory.Rows.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.VersionHistory.Rows.Count == 2, () => $"rows={viewModel.VersionHistory.Rows.Count}");
 
         var (latest, first) = (viewModel.VersionHistory.Rows[0], viewModel.VersionHistory.Rows[1]);
         first.BaseCostThen.Should().Be(10.3m, "100 g of sugar at 0.10, and the 3% wastage then");
@@ -152,7 +151,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
 
         // A read again (a Save) keeps the choice; another product's versions go back to the version before it.
         await viewModel.LoadCommand.Execute();
-        await WaitUntilAsync(() => history.Rows.Count == 3 && history.SelectedRow is not null, () => $"rows={history.Rows.Count}");
+        await Settle.UntilAsync(viewModel, () => history.Rows.Count == 3 && history.SelectedRow is not null, () => $"rows={history.Rows.Count}");
         history.CompareWith.Should().Be(VersionComparison.With(third));
         history.Clear();
         history.CompareWith.Should().Be(VersionComparison.Previous);
@@ -318,7 +317,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
             Cancellation);
         await viewModel.LoadCommand.Execute();
 
-        await WaitUntilAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.VersionHistory.Rows.Count == 3,
             () => $"rows={viewModel.VersionHistory.Rows.Count}, error={viewModel.ErrorMessage}");
         viewModel.VersionHistory.Rows[0].Note.Should().Be("From elsewhere");
@@ -344,7 +343,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         var plainId = await AddProductAsync("Pan de Coco");
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == plainId);
-        await WaitUntilAsync(() => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == plainId, () => $"ready={viewModel.AreDetailsReady}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == plainId, () => $"ready={viewModel.AreDetailsReady}");
         viewModel.EditingCloneName = "Pan de Coco Variant";
         await viewModel.CreateVariantCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
@@ -352,7 +351,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
 
         // The clone's first Save adds only what it changed: its history began when it was made.
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == cloneId);
-        await WaitUntilAsync(() => viewModel.AreDetailsReady && viewModel.UsageForm.FormLines.Count == 1, () => $"lines={viewModel.UsageForm.FormLines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.UsageForm.FormLines.Count == 1, () => $"lines={viewModel.UsageForm.FormLines.Count}");
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 28m);
         await viewModel.SaveCommand.Execute();
         (await VersionsAsync(cloneId)).Select(v => v.Number).Should().Equal(2, 1);
@@ -370,13 +369,13 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
 
         // The tab stays on History through both picks (found in the app 2026-10-17: coming back, it was empty).
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == otherId);
-        await WaitUntilAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.VersionHistory.ProductId == otherId,
             () => $"ready={viewModel.AreDetailsReady}, showing={viewModel.VersionHistory.ProductId}, error={viewModel.ErrorMessage}");
         viewModel.VersionHistory.IsEmpty.Should().BeTrue("Pan de Sal hasn't been saved since versions began to be kept");
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == seeded.ProductId);
-        await WaitUntilAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.VersionHistory.ProductId == seeded.ProductId && viewModel.VersionHistory.Rows.Count == 2,
             () => $"showing={viewModel.VersionHistory.ProductId}, rows={viewModel.VersionHistory.Rows.Count}, error={viewModel.ErrorMessage}");
         viewModel.SelectedDetailsTab.Should().Be(ProductsViewModel.HistoryTab);
@@ -433,7 +432,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await OpenHistoryAsync(viewModel, rows: 2);
 
         viewModel.VersionHistory.Rows[0].Note = "  New price for October ";
-        await WaitUntilAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.VersionHistory.Rows[0].Note == "New price for October",
             () => $"note={viewModel.VersionHistory.Rows[0].Note}, error={viewModel.ErrorMessage}");
 
@@ -524,7 +523,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
     private static async Task OpenHistoryAsync(ProductsViewModel viewModel, int rows)
     {
         viewModel.SelectedDetailsTab = ProductsViewModel.HistoryTab;
-        await WaitUntilAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.VersionHistory.Rows.Count == rows,
             () => $"rows={viewModel.VersionHistory.Rows.Count}, error={viewModel.ErrorMessage}");
     }
@@ -534,7 +533,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
-        await WaitUntilAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && ready(viewModel),
             () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
         return viewModel;
@@ -567,26 +566,5 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
-    }
-
-    private static async Task WaitUntilAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(300))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"Never settled: {describe()}.");
     }
 }

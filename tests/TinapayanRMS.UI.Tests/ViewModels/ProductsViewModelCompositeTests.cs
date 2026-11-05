@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -109,7 +108,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
 
         viewModel.ComponentsTable.ComponentEdits.Add(Line(viewModel, ensaymadaId, 6));
         viewModel.ComponentsTable.ComponentEdits.Add(Line(viewModel, cheeseRollId, 4));
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.ComponentsTable.ComponentEdits.All(r => r.RecipeCost is not null),
             () => $"costs={string.Join(", ", viewModel.ComponentsTable.ComponentEdits.Select(r => r.RecipeCost))}");
 
@@ -155,7 +154,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.EditingName = "Party Box";
         viewModel.ComponentsTable.ComponentEdits.Add(Line(viewModel, ensaymadaId, 6));
         viewModel.ComponentsTable.ComponentEdits.Add(Line(viewModel, cheeseRollId, 4));
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.ComponentsTable.ComponentEdits.All(r => r.RecipeCost is not null),
             () => $"costs={string.Join(", ", viewModel.ComponentsTable.ComponentEdits.Select(r => r.RecipeCost))}");
 
@@ -166,7 +165,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.UsageForm.EditingUsageWeightPerPiece = 100m;
 
         await viewModel.SaveCommand.Execute();
-        await WaitUntilSettledAsync(
+        await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1 && viewModel.ComponentsTable.ComponentEdits.Count == 2,
             () => $"sections={viewModel.UsageEdits.Count} lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
@@ -239,7 +238,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.Products.Select(p => p.Name).Should().Contain(["Pasalubong Box", "Party Tray"]);
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 3, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 3, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
         viewModel.ErrorMessage.Should().Be(CompositeProductRules.HoldsItselfText("Pasalubong Box"));
         viewModel.ComponentsTable.ComponentEdits[0].Quantity = 7;
@@ -259,14 +258,14 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var viewModel = await CreateLoadedViewModelAsync();
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
         viewModel.ComponentsTable.ComponentProductOptions.Select(p => p.Name).Should().Equal(
             ["Cheese Roll", "Chocolate Cake", "Ensaymada", "Office Tray"],
             "the Party Package holds the box, and the box can't hold itself; the Office Tray doesn't hold it");
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Name == "Party Package");
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2 && viewModel.ComponentsTable.ComponentEdits[0].ComponentProductId == boxId, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2 && viewModel.ComponentsTable.ComponentEdits[0].ComponentProductId == boxId, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
         viewModel.ComponentsTable.ComponentProductOptions.Select(p => p.Name).Should().Equal("Cheese Roll", "Chocolate Cake", "Ensaymada", "Office Tray", "Pasalubong Box");
 
         // A composite's own figures follow what's in it, the box inside it included.
@@ -274,7 +273,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
 
         // A product of sub-assemblies has no Products tab.
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == ensaymadaId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"sections={viewModel.UsageEdits.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"sections={viewModel.UsageEdits.Count}");
         viewModel.IsEditingComposite.Should().BeFalse();
         viewModel.RecipeTabs.Should().NotContain(viewModel.ComponentsTab);
         viewModel.ComponentsTable.ComponentEdits.Should().BeEmpty();
@@ -288,7 +287,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
         (await CanSave(viewModel)).Should().BeFalse();
 
         // What the grid's undo behaviour does around a cell edit.
@@ -327,7 +326,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
         viewModel.EditingIncludesComponentPackaging.Should().BeFalse();
         viewModel.Costing.Costs.Packaging.Should().Be(0m, "a product's own packaging stays out until the box is ticked");
@@ -417,7 +416,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
         // Ensaymada's pieces are made twice the size elsewhere: each now takes 5.00 of recipe.
         var doughId = await SubAssemblyIdAsync(ensaymadaId, doughRoleId);
@@ -438,7 +437,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == ensaymadaId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"sections={viewModel.UsageEdits.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"sections={viewModel.UsageEdits.Count}");
 
         await viewModel.DeleteCommand.Execute();
 
@@ -453,7 +452,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
         var printout = viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Subject;
 
@@ -517,27 +516,5 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
             new LoggerConfiguration().CreateLogger());
         await viewModel.LoadCommand.Execute();
         return viewModel;
-    }
-
-    /// <summary>Selecting a product, or picking one on a line, reads in the background: waits until <paramref name="condition"/> has held for a moment.</summary>
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(500))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"The screen never settled: {describe()}.");
     }
 }

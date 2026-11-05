@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Reactive.Linq;
+﻿using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -64,7 +63,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         viewModel.SelectedRawMaterial!.Id.Should().Be(sugarId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.EditingName == "Sugar", () => $"name={viewModel.EditingName}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.EditingName == "Sugar", () => $"name={viewModel.EditingName}");
 
         viewModel.SearchText = "Flour";
         viewModel.OpenRawMaterial(flourId);
@@ -75,7 +74,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SelectedRawMaterial!.Id.Should().Be(sugarId);
         viewModel.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
         viewModel.VisibleRawMaterials.Should().Contain(viewModel.SelectedRawMaterial);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "Sugar's details never arrived");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => "Sugar's details never arrived");
     });
 
     [Fact]
@@ -90,7 +89,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.SelectedRawMaterial!.Id.Should().Be(sugarId, "the name typed in full beats one that only holds it");
         viewModel.OpenByName("salt").Should().BeFalse();
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "Sugar's details never arrived");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => "Sugar's details never arrived");
     });
 
     [Fact]
@@ -134,7 +133,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == flourId);
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == sugarId);
 
-        await WaitUntilSettledAsync(() => viewModel.BrandPriceRows.Count > 0 && viewModel.PriceHistory.Count > 0,
+        await Settle.UntilAsync(viewModel, () => viewModel.BrandPriceRows.Count > 0 && viewModel.PriceHistory.Count > 0,
             () => $"brands={viewModel.BrandPriceRows.Count}, prices={viewModel.PriceHistory.Count}");
         viewModel.BrandPriceRows.Select(r => (r.Brand, r.Price)).Should().Equal([(null, 0.09m)], "Flour's brands never join Sugar's");
         viewModel.PriceHistory.Should().ContainSingle().Which.Entry.RawMaterialId.Should().Be(sugarId);
@@ -143,7 +142,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Name == "Butter Icing");
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Name == "Syrup");
 
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
         viewModel.RecipeLines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal([("Sugar", 100m)], "Butter Icing's lines never join Syrup's");
     });
 
@@ -170,7 +169,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.BrandPriceRows.Select(r => r.Brand).Should().Equal("Gold Medal", "Wellington");
         await viewModel.SaveCommand.Execute();
 
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1,
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1,
             () => $"ready={viewModel.AreDetailsReady}, brands={viewModel.BrandPriceRows.Count}");
         viewModel.BrandPriceRows.Single().Price.Should().Be(0.09m);
         viewModel.SuccessMessage.Should().BeNull("nothing was saved");
@@ -223,7 +222,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await AddUnitAsync(viewModel, trayId, 500m);
         await viewModel.SaveCommand.Execute();
 
-        await WaitUntilSettledAsync(() => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 1,
+        await Settle.UntilAsync(viewModel, () => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 1,
             () => $"price rows={viewModel.PriceHistory.Count}, brands={viewModel.BrandPriceRows.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("Flour was saved.", "a toast says so");
@@ -300,7 +299,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.SaveCommand.Execute();
 
-        await WaitUntilSettledAsync(() => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 1,
+        await Settle.UntilAsync(viewModel, () => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 1,
             () => $"price rows={viewModel.PriceHistory.Count}, brands={viewModel.BrandPriceRows.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
         var saved = viewModel.UnitRows.Should().ContainSingle().Subject;
@@ -556,7 +555,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.PurchaseCostText.Should().Be("0.0600", "the cost per gram is worked out as the price is typed");
         await viewModel.SaveCommand.Execute();
 
-        await WaitUntilSettledAsync(() => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 1,
+        await Settle.UntilAsync(viewModel, () => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 1,
             () => $"price rows={viewModel.PriceHistory.Count}, brands={viewModel.BrandPriceRows.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.PriceHistory.Single().UnitName.Should().Be("pack");
@@ -582,7 +581,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.SaveCommand.Execute();
 
-        await WaitUntilSettledAsync(() => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 2,
+        await Settle.UntilAsync(viewModel, () => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 2,
             () => $"price rows={viewModel.PriceHistory.Count}, brands={viewModel.BrandPriceRows.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SelectedRawMaterial!.CostPerBaseUnit.Should().Be(0.04m);
@@ -647,7 +646,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.AddInEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single(m => m.Name == "Vanilla").Id, Grams = 10m });
         await viewModel.SaveCommand.Execute();
 
-        await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial is not null && viewModel.AddInEdits.Count == 1,
+        await Settle.UntilAsync(viewModel, () => viewModel.SelectedRawMaterial is not null && viewModel.AddInEdits.Count == 1,
             () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.AddInEdits.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SelectedRawMaterial!.SubAssemblyId.Should().Be(recipeId);
@@ -736,7 +735,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         // A saved one opens with its badge, even after Edit was left open on the form before.
         await viewModel.StartChangingSubAssemblyCommand.Execute();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == syrupId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
         (viewModel.IsChangingSubAssembly, viewModel.IsShowingSubAssemblyBadge).Should().Be((false, true));
         viewModel.SubAssemblyBadgeText.Should().Be("Simple Syrup Base, from Sub-Assemblies");
     });
@@ -758,7 +757,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await PickRecipeAsync(viewModel, "Syrup Base");
         await viewModel.SaveCommand.Execute();
 
-        await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial?.Name == "Simple Syrup",
+        await Settle.UntilAsync(viewModel, () => viewModel.SelectedRawMaterial?.Name == "Simple Syrup",
             () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
 
         viewModel.AddInOptions.Should().NotContain(m => m.Name == "Simple Syrup", "a made ingredient can't be an add-in of itself");
@@ -783,7 +782,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await PickRecipeAsync(viewModel, "Syrup Base");
         viewModel.AddInEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single(m => m.Name == "Vanilla").Id, Grams = 10m });
         await viewModel.SaveCommand.Execute();
-        await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial?.Name == "Simple Syrup",
+        await Settle.UntilAsync(viewModel, () => viewModel.SelectedRawMaterial?.Name == "Simple Syrup",
             () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
 
         // Only reachable by editing the database directly — the picker already leaves the material itself out of
@@ -861,7 +860,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.SaveCommand.Execute();
 
-        await WaitUntilSettledAsync(() => viewModel.SelectedRawMaterial is not null && viewModel.AddInEdits.Count == 1 && viewModel.RecipeLines.Count == 1,
+        await Settle.UntilAsync(viewModel, () => viewModel.SelectedRawMaterial is not null && viewModel.AddInEdits.Count == 1 && viewModel.RecipeLines.Count == 1,
             () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.AddInEdits.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.BomTotalWeight.Should().Be(880m);
@@ -881,7 +880,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == flourId);
 
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "details never arrived");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => "details never arrived");
         viewModel.CurrentCostText.Should().Be("0.0500");
         viewModel.BufferedCostText.Should().Be("0.0525", "only a made ingredient's follows the form");
         viewModel.BomTotalWeight.Should().Be(0m, "it has no BOM");
@@ -897,7 +896,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == syrupId);
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
         viewModel.BomTotalCost.Should().Be(110m);
 
         // Sugar goes up behind the screen's back, as another screen or the cascade would leave it.
@@ -933,7 +932,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == syrupId);
 
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "details never arrived");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => "details never arrived");
         viewModel.LastUpdatedText.Should().Be("Sep 21, 2026", "the tile is one date, the day its cost changed, with no time");
     });
 
@@ -945,7 +944,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == flourId);
 
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "details never arrived");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => "details never arrived");
         viewModel.LastUpdatedText.Should().Be("—", "it was seeded straight into the database and has never been priced");
     });
 
@@ -1048,7 +1047,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.SaveCommand.Execute();
 
-        await WaitUntilSettledAsync(() => viewModel.PriceHistory.Count == 1,
+        await Settle.UntilAsync(viewModel, () => viewModel.PriceHistory.Count == 1,
             () => $"price rows={viewModel.PriceHistory.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SelectedRawMaterial!.CostBufferPercent.Should().Be(5m);
@@ -1099,7 +1098,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingBufferedCostInUnit.Should().Be(1920m, "₱1,600 with 20% on top");
 
         await viewModel.SaveCommand.Execute();
-        await WaitUntilSettledAsync(() => viewModel.BufferedCostText == "1,920.00",
+        await Settle.UntilAsync(viewModel, () => viewModel.BufferedCostText == "1,920.00",
             () => $"buffered={viewModel.BufferedCostText}, error={viewModel.ErrorMessage ?? "none"}");
 
         await viewModel.NewCommand.Execute();
@@ -1227,7 +1226,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.SaveCommand.Execute();
 
-        await WaitUntilSettledAsync(() => viewModel.PriceHistory.Count == 1,
+        await Settle.UntilAsync(viewModel, () => viewModel.PriceHistory.Count == 1,
             () => $"price rows={viewModel.PriceHistory.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
 
@@ -1336,7 +1335,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
 
-        await WaitUntilSettledAsync(() => viewModel.BrandPriceRows.Count == 1,
+        await Settle.UntilAsync(viewModel, () => viewModel.BrandPriceRows.Count == 1,
             () => $"brands={viewModel.BrandPriceRows.Count}");
         viewModel.EditingCostBufferPercent.Should().Be(5m);
         var brand = viewModel.BrandPriceRows.Single();
@@ -1974,7 +1973,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     private static async Task PickRecipeAsync(RawMaterialsViewModel viewModel, string name)
     {
         viewModel.EditingSubAssembly = viewModel.SubAssemblyOptions.Single(s => s.Name == name);
-        await WaitUntilSettledAsync(() => viewModel.RecipeLines.Count > 0, () => $"recipe lines={viewModel.RecipeLines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.RecipeLines.Count > 0, () => $"recipe lines={viewModel.RecipeLines.Count}");
     }
 
     /// <summary>Renames a unit of measure's abbreviation the way the Settings dialog would, behind the screen's back.</summary>
@@ -1999,32 +1998,6 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     private static async Task SelectAsync(RawMaterialsViewModel viewModel, RawMaterial material)
     {
         viewModel.SelectedRawMaterial = material;
-        await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => $"{material.Name}'s details never arrived");
-    }
-
-    /// <summary>
-    /// Selecting a material loads its price history in the background (the ViewModel's selection
-    /// subscriptions), with nothing to await. Waits until <paramref name="condition"/> has held for a
-    /// moment, so a load still finishing can't change things after the test moves on.
-    /// </summary>
-    private static async Task WaitUntilSettledAsync(Func<bool> condition, Func<string> describe)
-    {
-        var deadline = Stopwatch.StartNew();
-        var heldFor = Stopwatch.StartNew();
-        while (deadline.Elapsed < TimeSpan.FromSeconds(15))
-        {
-            if (!condition())
-            {
-                heldFor.Restart();
-            }
-            else if (heldFor.Elapsed > TimeSpan.FromMilliseconds(300))
-            {
-                return;
-            }
-
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"The material's details never finished loading: {describe()}.");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => $"{material.Name}'s details never arrived");
     }
 }

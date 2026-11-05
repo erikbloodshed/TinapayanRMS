@@ -1199,7 +1199,7 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
 }
 ```
 
-Some loads start from a selection, with nothing to await. Tests of those wait until a condition has held for a moment: see the helpers in `ProductsViewModelRefreshTests`.
+Some loads start from a selection, with nothing to await. A test waits for the screen to settle with [Settle](../tests/TinapayanRMS.UI.Tests/Fixtures/Settle.cs): `await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady)` awaits the screen's `WhenIdleAsync` (everything it started has finished, and its results are on the screen), then requires the condition, failing at once if it doesn't hold. `Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = …, condition)` picks first. Don't poll for a condition: a test then waits as long as the polling does, and can pass on a moment that doesn't last. Only something on a timer, which isn't the screen's work, polls, with `Settle.EventuallyAsync` (the folders written to the view state half a second after a change).
 
 A theory's `decimal` values with decimals go in `TheoryData`, written as `decimal` literals (`0.0525m`), with `[MemberData]`, never in `[InlineData]`. An attribute can't hold a `decimal`, so `[InlineData(0.0525)]` passes a `double`, which since .NET 11 arrives as 0.0524999999999999980571097069. Whole numbers are safe in `[InlineData]`. See `StandardUnitRulesTests`:
 
