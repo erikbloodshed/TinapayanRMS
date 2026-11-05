@@ -469,6 +469,22 @@ public class ProductTreeTests
     }
 
     [Fact]
+    public void An_empty_Refresh_as_the_screen_makes_its_tree_keeps_what_was_kept()
+    {
+        // The screen refreshes its tree, empty, as it's made, and a screen made but never loaded is disposed with the app.
+        var closedKept = new ProductTree(new FolderMemory(["Deleted", $"Production/{Breads.Id}"]));
+        closedKept.Refresh([], [], isFiltered: false);
+        closedKept.ClosedFolderKeys().Should().Equal("Deleted", $"Production/{Breads.Id}");
+
+        var openKept = new ProductTree(new FolderMemory(openKeys: ["Production", $"Production/{Breads.Id}"]));
+        openKept.Refresh([], [], isFiltered: false);
+        openKept.ClosedFolderKeys().Should().BeEmpty("which folders are closed isn't known until the categories come");
+
+        openKept.Refresh([Breads, Cakes], [], isFiltered: false);
+        openKept.ClosedFolderKeys().Should().Contain($"Production/{Cakes.Id}").And.NotContain($"Production/{Breads.Id}");
+    }
+
+    [Fact]
     public void A_folder_opened_or_closed_is_reported()
     {
         var tree = new ProductTree();

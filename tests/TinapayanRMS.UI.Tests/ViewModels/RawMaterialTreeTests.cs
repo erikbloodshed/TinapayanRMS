@@ -168,6 +168,17 @@ public class RawMaterialTreeTests
     }
 
     [Fact]
+    public void An_empty_Refresh_as_the_screen_makes_its_tree_keeps_what_was_kept()
+    {
+        var openKept = new RawMaterialTree(new FolderMemory(openKeys: ["Ingredient", $"Ingredient/{Flour.Id}"]));
+        openKept.Refresh([], [], isFiltered: false);
+        openKept.ClosedFolderKeys().Should().BeEmpty("which folders are closed isn't known until the categories come");
+
+        openKept.Refresh(Categories, [], isFiltered: false);
+        openKept.ClosedFolderKeys().Should().Equal($"Ingredient/{Dairy.Id}", "Packaging", $"Packaging/{Boxes.Id}");
+    }
+
+    [Fact]
     public void An_open_type_folder_is_announced_open_again_once_it_has_rows()
     {
         // The tree on the screen showing at startup binds to the type folders before the first load fills them, and can't

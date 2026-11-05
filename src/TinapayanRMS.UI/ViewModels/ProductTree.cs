@@ -246,7 +246,10 @@ public sealed class ProductTree : IDisposable
     /// <summary>Which folders start open, and every one opened or closed since.</summary>
     private readonly FolderMemory _memory;
 
-    /// <summary>The first Refresh has made the category folders, so <see cref="ClosedFolderKeys"/> reads the folders.</summary>
+    /// <summary>
+    /// A Refresh with something in it has made the category folders, so <see cref="ClosedFolderKeys"/> reads the folders. The
+    /// screen refreshes its tree, empty, as it's made, which doesn't count: disposed before a load, it would keep the stages alone.
+    /// </summary>
     private bool _isFilled;
 
     /// <param name="memory">
@@ -474,7 +477,7 @@ public sealed class ProductTree : IDisposable
             TreeRows.LayTopFolder(root, wanted, isFiltered);
         }
 
-        _isFilled = true;
+        _isFilled |= allCategories.Count > 0 || products.Count > 0 || deleted.Count > 0;
 
         List<ProductTreeNode> RowsOf(IEnumerable<Product> inFolder) => [.. _leaves.RowsOf(inFolder)];
     }
