@@ -30,18 +30,35 @@ internal static class IngredientCostPropagator
     /// changedIngredientId itself, whose own cost the caller already updated — is recomputed. Only ingredients take part:
     /// packaging is never in a BOM, a link or a sub-assembly.
     /// </summary>
-    public static async Task RecomputeAndPropagateAsync(TinapayanRMSDbContext dbContext, int changedIngredientId, CancellationToken cancellationToken)
-    {
-        var graph = await IngredientGraph.LoadAsync(dbContext, cancellationToken);
+    public static Task RecomputeAndPropagateAsync(TinapayanRMSDbContext dbContext, int changedIngredientId, CancellationToken cancellationToken) =>
+        RecomputeAndPropagateAsync(dbContext, [changedIngredientId], cancellationToken);
 
-        var order = new List<int>();
-        if (graph.Ingredients.TryGetValue(changedIngredientId, out var changed) && changed.Source != RawMaterialSource.Purchased)
+    /// <summary>
+    /// The same for several ingredients one save changed (Re-apply Target Buffers, a sub-assembly several made ingredients
+    /// are made from): the graph is loaded once, and every ingredient they reach is recomputed once, in dependency order,
+    /// however many of them changed.
+    /// </summary>
+    public static async Task RecomputeAndPropagateAsync(
+        TinapayanRMSDbContext dbContext, IReadOnlyCollection<int> changedIngredientIds, CancellationToken cancellationToken)
+    {
+        if (changedIngredientIds.Count == 0)
         {
-            order.Add(changedIngredientId);
+            return;
         }
 
-        order.AddRange(IngredientCostGraph.GetDependentsInOrder(changedIngredientId, graph.DependencyIdsByIngredientId));
+        var graph = await IngredientGraph.LoadAsync(dbContext, cancellationToken);
 
+        // The changed ones that are made or linked, whose own cost is worked out here, and every one depending on any of them.
+        HashSet<int> affected =
+        [
+            .. changedIngredientIds.Where(id => graph.Ingredients.TryGetValue(id, out var changed) && changed.Source != RawMaterialSource.Purchased),
+        ];
+        foreach (var id in changedIngredientIds)
+        {
+            affected.UnionWith(IngredientCostGraph.GetDependentsInOrder(id, graph.DependencyIdsByIngredientId));
+        }
+
+        var order = affected.Count == 0 ? [] : IngredientCostGraph.InDependencyOrder(affected, graph.DependencyIdsByIngredientId);
         if (order.Count > 0)
         {
             foreach (var id in order)
@@ -52,9 +69,9 @@ internal static class IngredientCostPropagator
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        // Every ingredient whose cost just changed: changedIngredientId itself (its own cost may already have been updated
-        // by the caller before this method ran — e.g. a new brand price) plus every made ingredient just recomputed above.
-        var allChangedIngredientIds = new HashSet<int>(order) { changedIngredientId };
+        // Every ingredient whose cost just changed: the changed ones themselves (a purchased one's own cost was updated by the
+        // caller before this ran, from a new brand price) and every one recomputed above.
+        HashSet<int> allChangedIngredientIds = [.. order, .. changedIngredientIds];
         await SubAssemblyCostPropagator.RecomputeAsync(dbContext, allChangedIngredientIds, cancellationToken);
     }
 

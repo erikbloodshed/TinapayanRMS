@@ -169,10 +169,8 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
 
         // A new buffer on an ingredient reaches the made and linked ingredients and sub-assemblies using it, as a Save's does;
         // a packaging material's needs nothing, since products cost their packaging lines on read.
-        foreach (var material in materials.Where(m => reapplied.Contains(m.Id) && m.Type == RawMaterialType.Ingredient))
-        {
-            await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, material.Id, cancellationToken);
-        }
+        await IngredientCostPropagator.RecomputeAndPropagateAsync(
+            dbContext, [.. materials.Where(m => reapplied.Contains(m.Id) && m.Type == RawMaterialType.Ingredient).Select(m => m.Id)], cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
         return reapplied.Count;

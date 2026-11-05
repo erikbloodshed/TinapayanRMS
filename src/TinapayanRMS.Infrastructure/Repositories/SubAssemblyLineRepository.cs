@@ -101,9 +101,6 @@ public sealed class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbCo
             await IngredientDependencies.EnsureNoCycleAsync(dbContext, made.Id, cancellationToken);
         }
 
-        foreach (var made in madeFromIt)
-        {
-            await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, made.Id, cancellationToken);
-        }
+        await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, [.. madeFromIt.Select(m => m.Id)], cancellationToken);
     }
 }

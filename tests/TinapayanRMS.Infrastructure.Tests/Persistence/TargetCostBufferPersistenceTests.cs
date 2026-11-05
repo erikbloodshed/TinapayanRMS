@@ -37,6 +37,43 @@ public class TargetCostBufferPersistenceTests(DatabaseFixture fixture) : Persist
     }
 
     [Fact]
+    public async Task Re_applying_the_target_to_several_ingredients_works_the_cascade_out_once_however_many_there_are()
+    {
+        async Task<List<int>> AddWornAsync(string name, int count)
+        {
+            List<int> ids = [];
+            for (var i = 1; i <= count; i++)
+            {
+                var id = await AddIngredientAsync($"{name} {i}", costPerGram: 0.06m, bufferedCostPerGram: 0.055m);
+                await SetTargetAsync(id, 10m);
+                ids.Add(id);
+            }
+
+            return ids;
+        }
+
+        var two = await AddWornAsync("Flour", 2);
+        var six = await AddWornAsync("Sugar", 6);
+        var repository = CreateRepository();
+
+        int forTwo;
+        using (var counter = SqlCommandCounter.Start())
+        {
+            (await repository.ReapplyTargetBuffersAsync(two, Cancellation)).Should().Be(2);
+            forTwo = counter.Commands;
+        }
+
+        int forSix;
+        using (var counter = SqlCommandCounter.Start())
+        {
+            (await repository.ReapplyTargetBuffersAsync(six, Cancellation)).Should().Be(6);
+            forSix = counter.Commands;
+        }
+
+        forSix.Should().Be(forTwo, "the ingredients' graph is loaded and each one reached recomputed once, not once for each re-applied");
+    }
+
+    [Fact]
     public async Task A_material_already_at_its_target_or_with_no_price_is_passed_over()
     {
         var atTargetId = await AddIngredientAsync("Sugar", costPerGram: 0.05m, bufferedCostPerGram: 0.055m);
